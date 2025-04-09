@@ -1,0 +1,9 @@
+
+
+# Load bootloader symbols
+set confirm off
+    # Bootloader elf was not found
+set confirm on
+
+# Load application symbols
+file C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/bootloader.elf
