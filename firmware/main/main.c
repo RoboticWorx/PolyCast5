@@ -9,6 +9,7 @@
 
 #include "esp_log.h"
 
+#include "hal/gpio_types.h"
 #include "lora_task.h"
 #include "sx126x.h"
 #include "sx126x_hal.h"
@@ -18,6 +19,7 @@
 #include "lvgl.h"
 
 #include "infrared_task.h"
+#include "infrared_funcs.h"
 
 // Logging tag
 static const char *TAG = "MAIN";
@@ -84,22 +86,32 @@ static void spi_shared_init(void) {
 
 // Initialize GPIOs
 static void gpio_init(void) {
-	gpio_config_t io_conf = {
+	gpio_config_t io_conf_out = {
 		.pin_bit_mask =
 			(1ULL << ST7789_LEDK_PIN), // | (1ULL << ST7789_RST_PIN),
 		.mode = GPIO_MODE_OUTPUT,
-		.pull_up_en = 0,
-		.pull_down_en = 0,
+		.pull_up_en = GPIO_PULLUP_DISABLE,
+		.pull_down_en = GPIO_PULLDOWN_DISABLE,
 		.intr_type = GPIO_INTR_DISABLE};
 
-	gpio_config(&io_conf);
+	gpio_config(&io_conf_out);
+	
+		/*gpio_config_t io_conf_in = {
+		.pin_bit_mask =
+			(1ULL << BUTTON_GPIO), // | (1ULL << ST7789_RST_PIN),
+		.mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+		.intr_type = GPIO_INTR_DISABLE};
+
+	gpio_config(&io_conf_in);*/
 }
 
 void app_main(void) {
 	
 	// Initialize SPI
 	//spi_shared_init();
-	gpio_init();
+	//gpio_init();
 
 	// Initialize the SX126x HAL with the SPI handle
 	//sx126x_hal_init(spi_sx126x);
@@ -116,6 +128,6 @@ void app_main(void) {
 	//lcd_task_create();
 	infrared_task_create();
 
-	ESP_LOGI(TAG, "SX126x initialized and LoRa task created");
+	ESP_LOGI(TAG, "Main initialized and tasks created");
 	
 }

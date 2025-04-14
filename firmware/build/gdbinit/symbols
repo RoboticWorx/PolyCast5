@@ -1,19 +1,3 @@
-# Load esp32c3 ROM ELF symbols
-define target hookpost-remote
-set confirm off
-  # if $_streq((char *) 0x3ff1b878, "Sep 18 2020")
-  if (*(int*) 0x3ff1b878) == 0x20706553 && (*(int*) 0x3ff1b87c) == 0x32203831 && (*(int*) 0x3ff1b880) == 0x303230
-    add-symbol-file C:/Espressif/tools/esp-rom-elfs/20241011/esp32c3_rev0_rom.elf
-  else
-    # if $_streq((char *) 0x3ff1a374, "Feb  7 2021")
-    if (*(int*) 0x3ff1a374) == 0x20626546 && (*(int*) 0x3ff1a378) == 0x32203720 && (*(int*) 0x3ff1a37c) == 0x313230
-      add-symbol-file C:/Espressif/tools/esp-rom-elfs/20241011/esp32c3_rev3_rom.elf
-    else
-      echo Warning: Unknown esp32c3 ROM revision.\n
-    end
-  end
-set confirm on
-end
 
 
 # Load bootloader symbols
