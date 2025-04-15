@@ -1,7 +1,7 @@
-ESP-IDF PolyCast5 Firmware
+PolyCast5 Firmware
 ====================
 
-This is a application used with [Espressif IoT Development Framework](https://github.com/espressif/esp-idf).
+This application uses [Espressif IoT Development Framework](https://github.com/espressif/esp-idf).
 
 Please check [ESP-IDF docs](https://docs.espressif.com/projects/esp-idf/en/latest/get-started/index.html) for getting started instructions if you have any difficulties.
 
