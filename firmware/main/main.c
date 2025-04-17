@@ -21,6 +21,8 @@
 #include "infrared_task.h"
 #include "infrared_funcs.h"
 
+#include "bluetooth_task.h"
+
 // Logging tag
 static const char *TAG = "MAIN";
 
@@ -126,7 +128,8 @@ void app_main(void) {
 	// Create tasks
 	//lora_task_create();
 	//lcd_task_create();
-	infrared_task_create();
+	//infrared_task_create();
+	bluetooth_task_create();
 
 	ESP_LOGI(TAG, "Main initialized and tasks created");
 	

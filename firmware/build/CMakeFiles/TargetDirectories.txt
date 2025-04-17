@@ -454,6 +454,7 @@ C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_gdbstub/CMakeF
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_gdbstub/CMakeFiles/install.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_gdbstub/CMakeFiles/install/local.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_gdbstub/CMakeFiles/install/strip.dir
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/bt/CMakeFiles/__idf_bt.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/bt/CMakeFiles/edit_cache.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/bt/CMakeFiles/rebuild_cache.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/bt/CMakeFiles/list_install_components.dir

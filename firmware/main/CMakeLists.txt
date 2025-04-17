@@ -18,13 +18,18 @@ idf_component_register(
         
         "${CMAKE_SOURCE_DIR}/components/infrared/src/infrared_funcs.c"
         "${CMAKE_SOURCE_DIR}/components/infrared/src/infrared_task.c"
+        
+        "${CMAKE_SOURCE_DIR}/components/bluetooth/src/bluetooth_funcs.c"
+        "${CMAKE_SOURCE_DIR}/components/bluetooth/src/bluetooth_task.c"
+        "${CMAKE_SOURCE_DIR}/components/bluetooth/src/esp_hid_gap.c"
     INCLUDE_DIRS "."    # optional, add here public include directories
     	"${CMAKE_SOURCE_DIR}/drivers/sx126x"
     	"${CMAKE_SOURCE_DIR}/components/lora/include"
     	"${CMAKE_SOURCE_DIR}/components/lcd/include"
     	"${CMAKE_SOURCE_DIR}/components/infrared/include"
+    	"${CMAKE_SOURCE_DIR}/components/bluetooth/include"
     PRIV_INCLUDE_DIRS   # optional, add here private include directories
     REQUIRES            # optional, list the public requirements (component names)
-    	driver freertos
+    	driver freertos nvs_flash bt esp_hid esp_driver_gpio
     PRIV_REQUIRES       # optional, list the private requirements
 )
