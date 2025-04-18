@@ -30,6 +30,6 @@ idf_component_register(
     	"${CMAKE_SOURCE_DIR}/components/bluetooth/include"
     PRIV_INCLUDE_DIRS   # optional, add here private include directories
     REQUIRES            # optional, list the public requirements (component names)
-    	driver freertos nvs_flash bt esp_hid esp_driver_gpio
+    	driver freertos nvs_flash bt esp_hid esp_driver_gpio console esp_driver_uart
     PRIV_REQUIRES       # optional, list the private requirements
 )

@@ -1,16 +1,0 @@
-Command: ninja flash
-[1/7] Performing build step for 'bootloader'
-[1/1] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\build\bootloader\esp-idf\esptool_py && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-master/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x0 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/bootloader.bin"
-Bootloader binary size 0x5220 bytes. 0x2de0 bytes (36%) free.
-[2/7] No install step for 'bootloader'
-[3/7] Completed 'bootloader'
-[4/7] Linking CXX executable app-template.elf
-FAILED: app-template.elf 
-C:\WINDOWS\system32\cmd.exe /C "cd . && C:\Espressif\tools\riscv32-esp-elf\esp-14.2.0_20241119\riscv32-esp-elf\bin\riscv32-esp-elf-g++.exe -march=rv32imc_zicsr_zifencei -nostartfiles -march=rv32imc_zicsr_zifencei    -Wl,--cref -Wl,--defsym=IDF_TARGET_ESP32C3=0 -Wl,--Map=C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/app-template.map -Wl,--no-warn-rwx-segments -Wl,--orphan-handling=warn -fno-rtti -fno-lto -Wl,--gc-sections -Wl,--warn-common -T rom.api.ld -T esp32c3.peripherals.ld -T esp32c3.rom.ld -T esp32c3.rom.api.ld -T esp32c3.rom.bt_funcs.ld -T esp32c3.rom.libgcc.ld -T esp32c3.rom.version.ld -T esp32c3.rom.eco3.ld -T esp32c3.rom.eco3_bt_funcs.ld -T esp32c3.rom.libc.ld -T esp32c3.rom.newlib.ld -T memory.ld -T sections.ld @CMakeFiles\app-template.elf.rsp -o app-template.elf && cd ."
-C:/Espressif/tools/riscv32-esp-elf/esp-14.2.0_20241119/riscv32-esp-elf/bin/../lib/gcc/riscv32-esp-elf/14.2.0/../../../../riscv32-esp-elf/bin/ld.exe: esp-idf/main/libmain.a(bluetooth_funcs.c.obj): in function `esp_hidd_send_consumer_value':
-C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/bluetooth/src/bluetooth_funcs.c:133: multiple definition of `esp_hidd_send_consumer_value'; esp-idf/main/libmain.a(main.c.obj):C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/main/main.c:264: first defined here
-C:/Espressif/tools/riscv32-esp-elf/esp-14.2.0_20241119/riscv32-esp-elf/bin/../lib/gcc/riscv32-esp-elf/14.2.0/../../../../riscv32-esp-elf/bin/ld.exe: esp-idf/main/libmain.a(bluetooth_funcs.c.obj): in function `ble_hid_device_host_task':
-C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/bluetooth/src/bluetooth_funcs.c:240: multiple definition of `ble_hid_device_host_task'; esp-idf/main/libmain.a(main.c.obj):C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/main/main.c:423: first defined here
-C:/Espressif/tools/riscv32-esp-elf/esp-14.2.0_20241119/riscv32-esp-elf/bin/../lib/gcc/riscv32-esp-elf/14.2.0/../../../../riscv32-esp-elf/bin/ld.exe: esp-idf/main/libmain.a(bluetooth_funcs.c.obj):C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/bluetooth/src/bluetooth_funcs.c:26: multiple definition of `mediaReportMap'; esp-idf/main/libmain.a(main.c.obj):C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/main/main.c:40: first defined here
-collect2.exe: error: ld returned 1 exit status
-ninja: build stopped: subcommand failed.
