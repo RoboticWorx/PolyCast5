@@ -12,10 +12,10 @@
     "app_bin":            "bootloader.bin",
     "build_type":         "flash_app",
     "git_revision":       "GIT-NOTFOUND",
-    "target":             "esp32c3",
+    "target":             "esp32c5",
     "rev":                "",
-    "min_rev":            "3",
-    "max_rev":            "199",
+    "min_rev":            "0",
+    "max_rev":            "99",
     "phy_data_partition": "",
     "monitor_baud" :      "115200",
     "monitor_toolprefix": "riscv32-esp-elf-",
@@ -55,7 +55,7 @@
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/esp-idf/bootloader_support/libbootloader_support.a",
-            "sources": [ "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_common.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_common_loader.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_clock_init.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_mem.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_random.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_efuse.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/flash_encrypt.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/secure_boot.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_random_esp32c3.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/bootloader_flash/src/bootloader_flash.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/bootloader_flash/src/flash_qio_mode.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/bootloader_flash/src/bootloader_flash_config_esp32c3.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_utility.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/flash_partitions.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/esp_image_format.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_sha.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_init.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_clock_loader.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_console.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_console_loader.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/esp32c3/bootloader_soc.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/esp32c3/bootloader_esp32c3.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_panic.c" ],
+            "sources": [ "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_common.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_common_loader.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_clock_init.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_mem.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_random.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_efuse.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/flash_encrypt.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/secure_boot.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_random_esp32c5.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/bootloader_flash/src/bootloader_flash.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/bootloader_flash/src/flash_qio_mode.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/bootloader_flash/src/bootloader_flash_config_esp32c5.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_utility.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/flash_partitions.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/esp_image_format.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_sha.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_init.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_clock_loader.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_console.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_console_loader.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/esp32c5/bootloader_soc.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/esp32c5/bootloader_esp32c5.c", "C:/Espressif/frameworks/esp-idf-master/components/bootloader_support/src/bootloader_panic.c" ],
             "include_dirs": [ "include", "bootloader_flash/include", "private_include" ]
         },
         "efuse": {
@@ -70,8 +70,8 @@
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/esp-idf/efuse/libefuse.a",
-            "sources": [ "C:/Espressif/frameworks/esp-idf-master/components/efuse/esp32c3/esp_efuse_table.c", "C:/Espressif/frameworks/esp-idf-master/components/efuse/esp32c3/esp_efuse_fields.c", "C:/Espressif/frameworks/esp-idf-master/components/efuse/esp32c3/esp_efuse_rtc_calib.c", "C:/Espressif/frameworks/esp-idf-master/components/efuse/esp32c3/esp_efuse_utility.c", "C:/Espressif/frameworks/esp-idf-master/components/efuse/src/esp_efuse_api.c", "C:/Espressif/frameworks/esp-idf-master/components/efuse/src/esp_efuse_fields.c", "C:/Espressif/frameworks/esp-idf-master/components/efuse/src/esp_efuse_utility.c", "C:/Espressif/frameworks/esp-idf-master/components/efuse/src/efuse_controller/keys/with_key_purposes/esp_efuse_api_key.c" ],
-            "include_dirs": [ "include", "esp32c3/include" ]
+            "sources": [ "C:/Espressif/frameworks/esp-idf-master/components/efuse/esp32c5/esp_efuse_table.c", "C:/Espressif/frameworks/esp-idf-master/components/efuse/esp32c5/esp_efuse_fields.c", "C:/Espressif/frameworks/esp-idf-master/components/efuse/esp32c5/esp_efuse_rtc_calib.c", "C:/Espressif/frameworks/esp-idf-master/components/efuse/esp32c5/esp_efuse_utility.c", "C:/Espressif/frameworks/esp-idf-master/components/efuse/src/esp_efuse_api.c", "C:/Espressif/frameworks/esp-idf-master/components/efuse/src/esp_efuse_fields.c", "C:/Espressif/frameworks/esp-idf-master/components/efuse/src/esp_efuse_utility.c", "C:/Espressif/frameworks/esp-idf-master/components/efuse/src/efuse_controller/keys/with_key_purposes/esp_efuse_api_key.c" ],
+            "include_dirs": [ "include", "esp32c5/include" ]
         },
         "esp_app_format": {
             "alias": "idf::esp_app_format",
@@ -130,8 +130,8 @@
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/esp-idf/esp_hw_support/libesp_hw_support.a",
-            "sources": [ "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/cpu.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c3/esp_cpu_intr.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/esp_memory_utils.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c3/cpu_region_protect.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c3/rtc_clk_init.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c3/rtc_clk.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c3/rtc_init.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c3/rtc_sleep.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c3/rtc_time.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c3/chip_info.c" ],
-            "include_dirs": [ "include", "include/soc", "include/soc/esp32c3", "dma/include", "ldo/include", "debug_probe/include", "mspi_timing_tuning/include", "power_supply/include" ]
+            "sources": [ "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/cpu.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/esp_cpu_intr.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/esp_memory_utils.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/cpu_region_protect.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/rtc_clk_init.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/rtc_time.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/rtc_clk.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/pmu_param.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/pmu_init.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/pmu_sleep.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/chip_info.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/ocode_init.c" ],
+            "include_dirs": [ "include", "include/soc", "include/soc/esp32c5", "dma/include", "ldo/include", "debug_probe/include", "mspi_timing_tuning/include", "power_supply/include" ]
         },
         "esp_rom": {
             "alias": "idf::esp_rom",
@@ -145,8 +145,8 @@
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/esp-idf/esp_rom/libesp_rom.a",
-            "sources": [ "C:/Espressif/frameworks/esp-idf-master/components/esp_rom/patches/esp_rom_sys.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_rom/patches/esp_rom_print.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_rom/patches/esp_rom_crc.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_rom/patches/esp_rom_uart.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_rom/patches/esp_rom_spiflash.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_rom/patches/esp_rom_efuse.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_rom/patches/esp_rom_gpio.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_rom/patches/esp_rom_systimer.c" ],
-            "include_dirs": [ "include", "esp32c3/include", "esp32c3/include/esp32c3", "esp32c3" ]
+            "sources": [ "C:/Espressif/frameworks/esp-idf-master/components/esp_rom/patches/esp_rom_sys.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_rom/patches/esp_rom_print.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_rom/patches/esp_rom_crc.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_rom/patches/esp_rom_uart.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_rom/patches/esp_rom_spiflash.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_rom/patches/esp_rom_efuse.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_rom/patches/esp_rom_gpio.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_rom/patches/esp_rom_hp_regi2c_esp32c5.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_rom/patches/esp_rom_systimer.c", "C:/Espressif/frameworks/esp-idf-master/components/esp_rom/patches/esp_rom_wdt.c" ],
+            "include_dirs": [ "include", "esp32c5/include", "esp32c5/include/esp32c5", "esp32c5" ]
         },
         "esp_security": {
             "alias": "idf::esp_security",
@@ -220,8 +220,8 @@
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/esp-idf/hal/libhal.a",
-            "sources": [ "C:/Espressif/frameworks/esp-idf-master/components/hal/hal_utils.c", "C:/Espressif/frameworks/esp-idf-master/components/hal/efuse_hal.c", "C:/Espressif/frameworks/esp-idf-master/components/hal/esp32c3/efuse_hal.c", "C:/Espressif/frameworks/esp-idf-master/components/hal/wdt_hal_iram.c", "C:/Espressif/frameworks/esp-idf-master/components/hal/mmu_hal.c", "C:/Espressif/frameworks/esp-idf-master/components/hal/cache_hal.c" ],
-            "include_dirs": [ "platform_port/include", "esp32c3/include", "include" ]
+            "sources": [ "C:/Espressif/frameworks/esp-idf-master/components/hal/hal_utils.c", "C:/Espressif/frameworks/esp-idf-master/components/hal/efuse_hal.c", "C:/Espressif/frameworks/esp-idf-master/components/hal/esp32c5/efuse_hal.c", "C:/Espressif/frameworks/esp-idf-master/components/hal/lp_timer_hal.c", "C:/Espressif/frameworks/esp-idf-master/components/hal/mmu_hal.c", "C:/Espressif/frameworks/esp-idf-master/components/hal/cache_hal.c" ],
+            "include_dirs": [ "platform_port/include", "esp32c5/include", "include" ]
         },
         "log": {
             "alias": "idf::log",
@@ -325,8 +325,8 @@
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/esp-idf/soc/libsoc.a",
-            "sources": [ "C:/Espressif/frameworks/esp-idf-master/components/soc/lldesc.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/dport_access_common.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c3/interrupts.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c3/gpio_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c3/uart_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c3/adc_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c3/dedic_gpio_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c3/gdma_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c3/spi_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c3/ledc_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c3/rmt_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c3/sdm_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c3/i2s_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c3/i2c_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c3/temperature_sensor_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c3/timer_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c3/mpi_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c3/twai_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c3/wdt_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c3/power_supply_periph.c" ],
-            "include_dirs": [ "include", "esp32c3", "esp32c3/include", "esp32c3/register" ]
+            "sources": [ "C:/Espressif/frameworks/esp-idf-master/components/soc/lldesc.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/dport_access_common.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/interrupts.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/gpio_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/uart_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/adc_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/ana_cmpr_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/dedic_gpio_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/etm_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/gdma_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/spi_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/ledc_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/pcnt_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/rmt_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/sdm_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/i2s_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/i2c_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/temperature_sensor_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/timer_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/parlio_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/mcpwm_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/mpi_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/wdt_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/ieee802154_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/rtc_io_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/system_retention_periph.c", "C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/power_supply_periph.c" ],
+            "include_dirs": [ "include", "esp32c5", "esp32c5/include", "esp32c5/register" ]
         },
         "spi_flash": {
             "alias": "idf::spi_flash",
@@ -463,7 +463,7 @@
             "priv_reqs": [ "bootloader_support", "soc", "spi_flash" ],
             "managed_reqs": [],
             "managed_priv_reqs": [],
-            "include_dirs": [ "include", "esp32c3/include" ]
+            "include_dirs": [ "include", "esp32c5/include" ]
         },
         "esp-tls": {
             "alias": "idf::esp-tls",
@@ -487,7 +487,7 @@
             "priv_reqs": [ "esp_driver_gpio", "efuse", "esp_pm", "esp_ringbuf", "esp_mm", "driver" ],
             "managed_reqs": [],
             "managed_priv_reqs": [],
-            "include_dirs": [ "include", "interface", "esp32c3/include", "deprecated/include" ]
+            "include_dirs": [ "include", "interface", "esp32c5/include", "deprecated/include" ]
         },
         "esp_app_format": {
             "alias": "idf::esp_app_format",
@@ -943,7 +943,7 @@
             "priv_reqs": [ "efuse", "spi_flash", "bootloader_support", "esp_security", "esp_system" ],
             "managed_reqs": [],
             "managed_priv_reqs": [],
-            "include_dirs": [ "include", "include/soc", "include/soc/esp32c3", "dma/include", "ldo/include", "debug_probe/include", "mspi_timing_tuning/include", "power_supply/include" ]
+            "include_dirs": [ "include", "include/soc", "include/soc/esp32c5", "dma/include", "ldo/include", "debug_probe/include", "mspi_timing_tuning/include", "power_supply/include" ]
         },
         "esp_lcd": {
             "alias": "idf::esp_lcd",
@@ -1027,7 +1027,7 @@
             "priv_reqs": [ "nvs_flash", "esp_driver_gpio", "efuse", "esp_timer", "esp_wifi" ],
             "managed_reqs": [],
             "managed_priv_reqs": [],
-            "include_dirs": [ "include", "esp32c3/include" ]
+            "include_dirs": [ "include", "esp32c5/include" ]
         },
         "esp_pm": {
             "alias": "idf::esp_pm",
@@ -1075,7 +1075,7 @@
             "priv_reqs": [ "soc", "hal" ],
             "managed_reqs": [],
             "managed_priv_reqs": [],
-            "include_dirs": [ "include", "esp32c3/include", "esp32c3/include/esp32c3", "esp32c3" ]
+            "include_dirs": [ "include", "esp32c5/include", "esp32c5/include/esp32c5", "esp32c5" ]
         },
         "esp_security": {
             "alias": "idf::esp_security",
@@ -1207,7 +1207,7 @@
             "priv_reqs": [],
             "managed_reqs": [],
             "managed_priv_reqs": [],
-            "include_dirs": [ "platform_port/include", "esp32c3/include", "include" ]
+            "include_dirs": [ "platform_port/include", "esp32c5/include", "include" ]
         },
         "heap": {
             "alias": "idf::heap",
@@ -1243,7 +1243,7 @@
             "priv_reqs": [],
             "managed_reqs": [],
             "managed_priv_reqs": [],
-            "include_dirs": [ "include", "include/esp32c3" ]
+            "include_dirs": [ "include", "include/esp32c5" ]
         },
         "ieee802154": {
             "alias": "idf::ieee802154",
@@ -1483,7 +1483,7 @@
             "priv_reqs": [],
             "managed_reqs": [],
             "managed_priv_reqs": [],
-            "include_dirs": [ "include", "esp32c3", "esp32c3/include", "esp32c3/register" ]
+            "include_dirs": [ "include", "esp32c5", "esp32c5/include", "esp32c5/register" ]
         },
         "spi_flash": {
             "alias": "idf::spi_flash",
@@ -1661,5 +1661,5 @@
         "03_py_extensions": "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/gdbinit/py_extensions",
         "04_connect": "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/gdbinit/connect"
     },
-    "debug_arguments_openocd": "-f board/esp32c3-builtin.cfg"
+    "debug_arguments_openocd": "-f board/esp32c5-builtin.cfg"
 }

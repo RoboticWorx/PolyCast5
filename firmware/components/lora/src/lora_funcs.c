@@ -1,8 +1,12 @@
 #include "lora_funcs.h"
 #include "lora_task.h"
+
+#include "esp_log.h"
 #include "sx126x_hal.h"
 
 #include <string.h>
+
+static const char *TAG = "LORA_FUNCS";
 
 static uint8_t encryption_key[16] = {0};
 
@@ -73,11 +77,11 @@ void process_received_message(uint8_t *message, size_t message_len) {
 		   CYPHERTEXT_LENGTH); // Extract the ciphertext (remaining 64 bytes)
 
 	// Print the received IV
-	/*printf("Received IV: ");
+	ESP_LOGI(TAG, "Received IV: ");
 	for (int i = 0; i < 16; i++) {
-		printf("%02X ", iv[i]);
+		ESP_LOGI(TAG, "%s", iv[i]);
 	}
-	printf("\n");*/
+	ESP_LOGI(TAG, "\n");
 
 	// osStatus_t status = osMessageQueuePut(lora_hex_queue_rx, message, 0, 0);
 	// if (status != osOK)
@@ -101,7 +105,7 @@ void process_received_message(uint8_t *message, size_t message_len) {
 	// }
 
 	// "cyphertext" is now decrypted - print
-	// printf("Decrypted text: %s\n", ciphertext);
+	ESP_LOGI(TAG, "Decrypted text: %s\n", ciphertext);
 }
 
 void encrypt_and_transmit(uint8_t plaintext[]) {

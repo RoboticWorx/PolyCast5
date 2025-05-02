@@ -41,10 +41,12 @@ C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_coex/libesp_co
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_wifi/libesp_wifi.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_driver_spi/libesp_driver_spi.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_gdbstub/libesp_gdbstub.a
-C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/bt/libbt.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/unity/libunity.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/cmock/libcmock.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/console/libconsole.a
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_driver_pcnt/libesp_driver_pcnt.a
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_driver_mcpwm/libesp_driver_mcpwm.a
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_driver_ana_cmpr/libesp_driver_ana_cmpr.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_driver_i2s/libesp_driver_i2s.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/sdmmc/libsdmmc.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_driver_sdspi/libesp_driver_sdspi.a
@@ -53,10 +55,12 @@ C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_driver_tsens/l
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_driver_sdm/libesp_driver_sdm.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_driver_i2c/libesp_driver_i2c.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_driver_ledc/libesp_driver_ledc.a
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_driver_parlio/libesp_driver_parlio.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/driver/libdriver.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/http_parser/libhttp_parser.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp-tls/libesp-tls.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_adc/libesp_adc.a
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_driver_bitscrambler/libesp_driver_bitscrambler.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_driver_cam/libesp_driver_cam.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_eth/libesp_eth.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_hid/libesp_hid.a
@@ -72,6 +76,7 @@ C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_local_ctrl/lib
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/espcoredump/libespcoredump.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/wear_levelling/libwear_levelling.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/fatfs/libfatfs.a
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/ieee802154/libieee802154.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/json/libjson.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/mqtt/libmqtt.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/nvs_sec_provider/libnvs_sec_provider.a

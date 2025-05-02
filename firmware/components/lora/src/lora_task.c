@@ -29,11 +29,7 @@ static void IRAM_ATTR dio1_isr_handler(void *arg) {
 
 // LoRa Task
 static void lora_task(void *pvParameters) {
-
-	// Create the LoRa event handler task
-	xTaskCreate(lora_event_handler_task, "lora_event_handler", 4096, NULL, 6,
-				NULL);
-
+	
 	// Create the semaphore for LoRa events
 	lora_event_semaphore = xSemaphoreCreateBinary();
 	if (lora_event_semaphore == NULL) {
@@ -46,6 +42,10 @@ static void lora_task(void *pvParameters) {
 		ESP_LOGE(TAG, "Failed to create TX_DONE semaphore");
 		vTaskDelete(NULL);
 	}
+
+	// Create the LoRa event handler task
+	xTaskCreate(lora_event_handler_task, "lora_event_handler", 4096, NULL, 6,
+				NULL);
 
 	sx126x_mod_params_lora_t lora_mod_params = {
 		.sf = SX126X_LORA_SF9, // Spreading factor (higher value sends further
@@ -123,11 +123,11 @@ static void lora_task(void *pvParameters) {
 
 	// sx126x_set_rx_tx_fallback_mode // Default is RC standby
 
-	status = sx126x_cfg_rx_boosted(
+	/*status = sx126x_cfg_rx_boosted(
 		NULL, true); // More sensitive RX at cost of more power
 	if (status != SX126X_STATUS_OK) {
 		ESP_LOGE(TAG, "Failed to configure RX boost mode");
-	}
+	}*/
 
 	status = sx126x_set_lora_mod_params(NULL, &lora_mod_params);
 	if (status != SX126X_STATUS_OK) {
@@ -185,7 +185,7 @@ static void lora_task(void *pvParameters) {
 			ESP_LOGW(TAG, "TX_DONE timeout after 1000 ms, skipping RX mode");
 		}
 
-		value_to_transmit = 0;
+		value_to_transmit++;
 
 		vTaskDelay(pdMS_TO_TICKS(500));
 	}
@@ -219,7 +219,7 @@ static void lora_event_handler_task(void *pvParameters) {
 				ESP_LOGI(TAG, "Received packet of size %d: %.*s", rx_size,
 						 rx_size, rx_buffer);
 
-				// process_received_message(rx_buffer, rx_size);
+				process_received_message(rx_buffer, rx_size);
 
 				// Clear IRQ
 				sx126x_clear_irq_status(NULL, SX126X_IRQ_RX_DONE);

@@ -9,8 +9,8 @@
 #include <stddef.h>
 
 // Configuration macros
-#define RMT_RX_GPIO       4
-#define RMT_TX_GPIO       5
+#define RMT_RX_GPIO       24
+#define RMT_TX_GPIO       12
 #define RMT_RESOLUTION_HZ 1000000  // 1 µs resolution
 #define MAX_PULSES        128
 #define PULSE_BLOCK       96

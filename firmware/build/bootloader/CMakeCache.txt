@@ -56,7 +56,7 @@ CMAKE_CXX_COMPILER_AR:FILEPATH=C:/Espressif/tools/riscv32-esp-elf/esp-14.2.0_202
 CMAKE_CXX_COMPILER_RANLIB:FILEPATH=C:/Espressif/tools/riscv32-esp-elf/esp-14.2.0_20241119/riscv32-esp-elf/bin/riscv32-esp-elf-gcc-ranlib.exe
 
 //C++ Compiler Base Flags
-CMAKE_CXX_FLAGS:STRING='-march=rv32imc_zicsr_zifencei '
+CMAKE_CXX_FLAGS:STRING='-march=rv32imac_zicsr_zifencei '
 
 //Flags used by the CXX compiler during DEBUG builds.
 CMAKE_CXX_FLAGS_DEBUG:STRING=-g
@@ -79,7 +79,7 @@ CMAKE_C_COMPILER_AR:FILEPATH=C:/Espressif/tools/riscv32-esp-elf/esp-14.2.0_20241
 CMAKE_C_COMPILER_RANLIB:FILEPATH=C:/Espressif/tools/riscv32-esp-elf/esp-14.2.0_20241119/riscv32-esp-elf/bin/riscv32-esp-elf-gcc-ranlib.exe
 
 //C Compiler Base Flags
-CMAKE_C_FLAGS:STRING='-march=rv32imc_zicsr_zifencei '
+CMAKE_C_FLAGS:STRING='-march=rv32imac_zicsr_zifencei '
 
 //Flags used by the C compiler during DEBUG builds.
 CMAKE_C_FLAGS_DEBUG:STRING=-g
@@ -97,7 +97,7 @@ CMAKE_C_FLAGS_RELWITHDEBINFO:STRING=-O2 -g -DNDEBUG
 CMAKE_DLLTOOL:FILEPATH=CMAKE_DLLTOOL-NOTFOUND
 
 //Linker Base Flags
-CMAKE_EXE_LINKER_FLAGS:STRING='-nostartfiles -march=rv32imc_zicsr_zifencei '
+CMAKE_EXE_LINKER_FLAGS:STRING='-nostartfiles -march=rv32imac_zicsr_zifencei '
 
 //Flags used by the linker during DEBUG builds.
 CMAKE_EXE_LINKER_FLAGS_DEBUG:STRING=
@@ -224,7 +224,7 @@ CMAKE_STRIP:FILEPATH=C:/Espressif/tools/riscv32-esp-elf/esp-14.2.0_20241119/risc
 CMAKE_TAPI:FILEPATH=CMAKE_TAPI-NOTFOUND
 
 //The CMake toolchain file
-CMAKE_TOOLCHAIN_FILE:FILEPATH=C:/Espressif/frameworks/esp-idf-master/tools/cmake/toolchain-esp32c3.cmake
+CMAKE_TOOLCHAIN_FILE:FILEPATH=C:/Espressif/frameworks/esp-idf-master/tools/cmake/toolchain-esp32c5.cmake
 
 //If this value is on, makefiles will be generated without the
 // .SILENT directive, and all commands will be echoed to the console
@@ -242,7 +242,7 @@ GIT_EXECUTABLE:FILEPATH=GIT_EXECUTABLE-NOTFOUND
 IDF_PATH:UNINITIALIZED=C:/Espressif/frameworks/esp-idf-master
 
 //IDF Build Target
-IDF_TARGET:STRING=esp32c3
+IDF_TARGET:STRING=esp32c5
 
 //IDF Build Toolchain Type
 IDF_TOOLCHAIN:STRING=gcc

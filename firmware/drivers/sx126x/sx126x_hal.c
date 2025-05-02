@@ -3,6 +3,9 @@
 #include "driver/gpio.h"	   // For GPIO control
 #include "driver/spi_master.h" // For SPI communication
 
+#include <string.h>
+#include <stdlib.h>
+
 #include "esp_log.h"		   // For logging
 #include "freertos/FreeRTOS.h" // For vTaskDelay
 #include "freertos/task.h"	   // For task delays
@@ -96,108 +99,62 @@ sx126x_hal_status_t sx126x_hal_wakeup(const void *context) {
 }
 
 // Write data to the SX126x chip
-sx126x_hal_status_t sx126x_hal_write(const void *context,
-									 const uint8_t *command,
-									 const uint16_t command_length,
-									 const uint8_t *data,
-									 const uint16_t data_length) {
-	// Ignore the context parameter
-	(void)context;
+sx126x_hal_status_t sx126x_hal_write( const void      *ctx,
+                                      const uint8_t   *cmd,
+                                      uint16_t         cmd_len,
+                                      const uint8_t   *data,
+                                      uint16_t         data_len )
+{
+    (void)ctx;
+    while (gpio_get_level(SX126X_BUSY_PIN)) vTaskDelay(1);
 
-	if (sx126x_spi == NULL) {
-		ESP_LOGE(TAG, "SPI not initialized");
-		return SX126X_HAL_STATUS_ERROR;
-	}
+    gpio_set_level(SX126X_CS_PIN, 0);           /* ↓CS */
 
-	// Wait for SX126x to be ready (BUSY pin goes low)
-	while (gpio_get_level(SX126X_BUSY_PIN) == 1) {
-		vTaskDelay(pdMS_TO_TICKS(1));
-	}
+    /* --- transmit command bytes --- */
+    spi_transaction_t t = { 0 };
+    t.tx_buffer = cmd;
+    t.length    = cmd_len * 8;
+    ESP_ERROR_CHECK_WITHOUT_ABORT(spi_device_polling_transmit(sx126x_spi, &t));
 
-	// CS low to begin communication
-	gpio_set_level(SX126X_CS_PIN, 0);
+    /* --- transmit payload (if any) --- */
+    if (data && data_len) {
+        spi_transaction_t t2 = { 0 };           /* fresh struct -> rxlength = 0 */
+        t2.tx_buffer = data;
+        t2.length    = data_len * 8;
+        ESP_ERROR_CHECK_WITHOUT_ABORT(spi_device_polling_transmit(sx126x_spi, &t2));
+    }
 
-	// Transmit command
-	spi_transaction_t trans = {
-		.tx_buffer = command,
-		.length = command_length * 8, // Length in bits
-	};
-
-	esp_err_t ret = spi_device_transmit(sx126x_spi, &trans);
-	if (ret != ESP_OK) {
-		ESP_LOGE(TAG, "SPI command transmit failed: %s", esp_err_to_name(ret));
-		gpio_set_level(SX126X_CS_PIN, 1); // CS high on failure
-		return SX126X_HAL_STATUS_ERROR;
-	}
-
-	// Transmit data (if any)
-	if (data != NULL && data_length > 0) {
-		trans.tx_buffer = data;
-		trans.length = data_length * 8; // Length in bits
-		ret = spi_device_transmit(sx126x_spi, &trans);
-		if (ret != ESP_OK) {
-			ESP_LOGE(TAG, "SPI data transmit failed: %s", esp_err_to_name(ret));
-			gpio_set_level(SX126X_CS_PIN, 1); // CS high on failure
-			return SX126X_HAL_STATUS_ERROR;
-		}
-	}
-
-	// CS high when done
-	gpio_set_level(SX126X_CS_PIN, 1);
-
-	return SX126X_HAL_STATUS_OK;
+    gpio_set_level(SX126X_CS_PIN, 1);           /* ↑CS */
+    return SX126X_HAL_STATUS_OK;
 }
 
-// Read data from the SX126x chip
-sx126x_hal_status_t sx126x_hal_read(const void *context, const uint8_t *command,
-									const uint16_t command_length,
-									uint8_t *data, const uint16_t data_length) {
-	// Ignore the context parameter
-	(void)context;
+/* ---------- READ :  CS low – cmd – dummy/MOSI – read/MISO – CS high ----- */
+sx126x_hal_status_t sx126x_hal_read( const void    *ctx,
+                                     const uint8_t *cmd,
+                                     uint16_t       cmd_len,
+                                     uint8_t       *data,
+                                     uint16_t       data_len )
+{
+    (void)ctx;
+    while (gpio_get_level(SX126X_BUSY_PIN)) vTaskDelay(1);
 
-	if (sx126x_spi == NULL) {
-		ESP_LOGE(TAG, "SPI not initialized");
-		return SX126X_HAL_STATUS_ERROR;
-	}
+    gpio_set_level(SX126X_CS_PIN, 0);           /* ↓CS */
 
-	// Wait for SX126x to be ready (BUSY pin goes low)
-	while (gpio_get_level(SX126X_BUSY_PIN) == 1) {
-		vTaskDelay(pdMS_TO_TICKS(1));
-	}
+    /* send command (bus lock released afterwards) */
+    spi_transaction_t t_cmd = { 0 };
+    t_cmd.tx_buffer = cmd;
+    t_cmd.length    = cmd_len * 8;
+    ESP_ERROR_CHECK_WITHOUT_ABORT(spi_device_polling_transmit(sx126x_spi, &t_cmd));
 
-	// CS low to begin communication
-	gpio_set_level(SX126X_CS_PIN, 0);
+    /* clock out ‘data_len’ dummy bytes while reading MISO */
+    uint8_t dummy = 0;
+    spi_transaction_t t_rd  = { 0 };
+    t_rd.tx_buffer = &dummy;          /* same byte reused */
+    t_rd.length    = data_len * 8;    /* bits out  */
+    t_rd.rx_buffer = data;
+    t_rd.rxlength  = data_len * 8;    /* bits in   */
+    ESP_ERROR_CHECK_WITHOUT_ABORT(spi_device_polling_transmit(sx126x_spi, &t_rd));
 
-	// Transmit command
-	spi_transaction_t trans = {
-		.tx_buffer = command,
-		.length = command_length * 8, // Length in bits
-	};
-
-	esp_err_t ret = spi_device_transmit(sx126x_spi, &trans);
-	if (ret != ESP_OK) {
-		ESP_LOGE(TAG, "SPI command transmit failed: %s", esp_err_to_name(ret));
-		gpio_set_level(SX126X_CS_PIN, 1); // CS high on failure
-		return SX126X_HAL_STATUS_ERROR;
-	}
-
-	// Receive data (if any)
-	if (data != NULL && data_length > 0) {
-		uint8_t dummy_byte = SX126X_NOP;
-		trans.tx_buffer = &dummy_byte; // Send NOP while receiving
-		trans.rx_buffer = data;
-		trans.length = data_length * 8;	  // Length in bits
-		trans.rxlength = data_length * 8; // Receive length in bits
-		ret = spi_device_transmit(sx126x_spi, &trans);
-		if (ret != ESP_OK) {
-			ESP_LOGE(TAG, "SPI data receive failed: %s", esp_err_to_name(ret));
-			gpio_set_level(SX126X_CS_PIN, 1); // CS high on failure
-			return SX126X_HAL_STATUS_ERROR;
-		}
-	}
-
-	// CS high when done
-	gpio_set_level(SX126X_CS_PIN, 1);
-
-	return SX126X_HAL_STATUS_OK;
+    gpio_set_level(SX126X_CS_PIN, 1);           /* ↑CS */
+    return SX126X_HAL_STATUS_OK;
 }

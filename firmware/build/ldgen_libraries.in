@@ -41,10 +41,12 @@ $<TARGET_FILE:__idf_esp_coex>
 $<TARGET_FILE:__idf_esp_wifi>
 $<TARGET_FILE:__idf_esp_driver_spi>
 $<TARGET_FILE:__idf_esp_gdbstub>
-$<TARGET_FILE:__idf_bt>
 $<TARGET_FILE:__idf_unity>
 $<TARGET_FILE:__idf_cmock>
 $<TARGET_FILE:__idf_console>
+$<TARGET_FILE:__idf_esp_driver_pcnt>
+$<TARGET_FILE:__idf_esp_driver_mcpwm>
+$<TARGET_FILE:__idf_esp_driver_ana_cmpr>
 $<TARGET_FILE:__idf_esp_driver_i2s>
 $<TARGET_FILE:__idf_sdmmc>
 $<TARGET_FILE:__idf_esp_driver_sdspi>
@@ -53,10 +55,12 @@ $<TARGET_FILE:__idf_esp_driver_tsens>
 $<TARGET_FILE:__idf_esp_driver_sdm>
 $<TARGET_FILE:__idf_esp_driver_i2c>
 $<TARGET_FILE:__idf_esp_driver_ledc>
+$<TARGET_FILE:__idf_esp_driver_parlio>
 $<TARGET_FILE:__idf_driver>
 $<TARGET_FILE:__idf_http_parser>
 $<TARGET_FILE:__idf_esp-tls>
 $<TARGET_FILE:__idf_esp_adc>
+$<TARGET_FILE:__idf_esp_driver_bitscrambler>
 $<TARGET_FILE:__idf_esp_driver_cam>
 $<TARGET_FILE:__idf_esp_eth>
 $<TARGET_FILE:__idf_esp_hid>
@@ -72,6 +76,7 @@ $<TARGET_FILE:__idf_esp_local_ctrl>
 $<TARGET_FILE:__idf_espcoredump>
 $<TARGET_FILE:__idf_wear_levelling>
 $<TARGET_FILE:__idf_fatfs>
+$<TARGET_FILE:__idf_ieee802154>
 $<TARGET_FILE:__idf_json>
 $<TARGET_FILE:__idf_mqtt>
 $<TARGET_FILE:__idf_nvs_sec_provider>

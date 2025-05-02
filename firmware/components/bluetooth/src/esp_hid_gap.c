@@ -787,7 +787,7 @@ esp_err_t esp_hid_ble_gap_adv_init(uint16_t appearance, const char *device_name)
     fields.uuids16_is_complete = 1;
 
     /* Initialize the security configuration */
-    ble_hs_cfg.sm_io_cap = BLE_SM_IO_CAP_DISP_ONLY;
+    ble_hs_cfg.sm_io_cap = BLE_SM_IO_CAP_DISP_YES_NO;
     ble_hs_cfg.sm_bonding = 1;
     ble_hs_cfg.sm_mitm = 1;
     ble_hs_cfg.sm_sc = 1;

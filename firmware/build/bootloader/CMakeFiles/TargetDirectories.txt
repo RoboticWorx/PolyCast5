@@ -59,8 +59,8 @@ C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/esp-idf/esp_sys
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/esp-idf/esp_hw_support/CMakeFiles/__idf_esp_hw_support.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/esp-idf/esp_hw_support/CMakeFiles/edit_cache.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/esp-idf/esp_hw_support/CMakeFiles/rebuild_cache.dir
-C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/esp-idf/esp_hw_support/port/esp32c3/CMakeFiles/edit_cache.dir
-C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/esp-idf/esp_hw_support/port/esp32c3/CMakeFiles/rebuild_cache.dir
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/esp-idf/esp_hw_support/port/esp32c5/CMakeFiles/edit_cache.dir
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/esp-idf/esp_hw_support/port/esp32c5/CMakeFiles/rebuild_cache.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/esp-idf/esp_hw_support/lowpower/CMakeFiles/edit_cache.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/esp-idf/esp_hw_support/lowpower/CMakeFiles/rebuild_cache.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/esp-idf/esp_common/CMakeFiles/__idf_esp_common.dir
