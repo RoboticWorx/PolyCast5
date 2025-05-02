@@ -24,6 +24,9 @@
 //#include "bluetooth_task.h"
 //#include "bluetooth_funcs.h"
 
+#include "gpio_task.h"
+#include "gpio_funcs.h"
+
 // Logging tag
 static const char *TAG = "MAIN";
 
@@ -51,30 +54,7 @@ void spi_sx126x_init(void)
     assert(ret == ESP_OK);
 }
 
-// Initialize GPIOs
-static void gpio_init(void) {
-	gpio_config_t io_conf_out = {
-	    .pin_bit_mask =
-	        (1ULL << ST7789_LEDK_PIN) |
-	        (1ULL << ST7789_DC_PIN)   |
-	        (1ULL << ST7789_RST_PIN),
-	    .mode           = GPIO_MODE_OUTPUT,
-	    .pull_up_en     = GPIO_PULLUP_DISABLE,
-	    .pull_down_en   = GPIO_PULLDOWN_DISABLE,
-	    .intr_type      = GPIO_INTR_DISABLE
-	};
-	gpio_config(&io_conf_out);
-	
-		/*gpio_config_t io_conf_in = {
-		.pin_bit_mask =
-			(1ULL << BUTTON_GPIO), // | (1ULL << ST7789_RST_PIN),
-		.mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-		.intr_type = GPIO_INTR_DISABLE};
 
-	gpio_config(&io_conf_in);*/
-}
 
 void app_main(void) {
 	
@@ -82,7 +62,14 @@ void app_main(void) {
 	lcd_init_driver();
     lcd_lvgl_init();
 	spi_sx126x_init();
-	gpio_init();
+	
+	ESP_LOGI(TAG, "Initializing GPIO expander...");
+    if (gpio_init() != ESP_OK) {
+        ESP_LOGE(TAG, "GPIO_Init failed, stopping task");
+        vTaskDelete(NULL);
+        return;
+    }
+    ESP_LOGI(TAG, "GPIO expander ready");
 	
 	gpio_set_level(ST7789_LEDK_PIN, 1);
 	
@@ -99,6 +86,7 @@ void app_main(void) {
 	// Create tasks
 	//lora_task_create();
 	lcd_task_create();
+	gpio_task_create();
 	//infrared_task_create();
 	//ble_hid_task_start_up();
 

@@ -21,6 +21,10 @@ idf_component_register(
         "${CMAKE_SOURCE_DIR}/components/infrared/src/infrared_funcs.c"
         "${CMAKE_SOURCE_DIR}/components/infrared/src/infrared_task.c"
         
+        "${CMAKE_SOURCE_DIR}/components/gpio/src/tca9535.c"
+        "${CMAKE_SOURCE_DIR}/components/gpio/src/gpio_funcs.c"
+        "${CMAKE_SOURCE_DIR}/components/gpio/src/gpio_task.c"
+        
         #"${CMAKE_SOURCE_DIR}/components/bluetooth/src/bluetooth_funcs.c"
         #"${CMAKE_SOURCE_DIR}/components/bluetooth/src/bluetooth_task.c"
         #"${CMAKE_SOURCE_DIR}/components/bluetooth/src/esp_hid_gap.c"
@@ -30,6 +34,7 @@ idf_component_register(
     	"${CMAKE_SOURCE_DIR}/components/lora/include"
     	"${CMAKE_SOURCE_DIR}/components/lcd/include"
     	"${CMAKE_SOURCE_DIR}/components/infrared/include"
+    	"${CMAKE_SOURCE_DIR}/components/gpio/include"
     	#"${CMAKE_SOURCE_DIR}/components/bluetooth/include"
     PRIV_INCLUDE_DIRS   # optional, add here private include directories
     REQUIRES            # optional, list the public requirements (component names)
