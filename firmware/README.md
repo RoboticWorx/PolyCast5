@@ -1,7 +1,7 @@
-PolyCast5 Firmware
+ESP-IDF ESP32-C5 Firmware
 ====================
 
-This is an application used with [Espressif IoT Development Framework](https://github.com/espressif/esp-idf).
+This is a application used with [Espressif IoT Development Framework](https://github.com/espressif/esp-idf).
 
 Please check [ESP-IDF docs](https://docs.espressif.com/projects/esp-idf/en/latest/get-started/index.html) for getting started instructions if you have any difficulties.
 

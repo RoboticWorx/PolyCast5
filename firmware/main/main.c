@@ -39,6 +39,7 @@ spi_device_handle_t spi_st7789; // For ST7789
 // Global SX126x instance
 sx126x_t sx126x;
 
+// MOVE TO GPIO_FUNCS ><
 void spi_sx126x_init(void)
 {
     esp_err_t ret;

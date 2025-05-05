@@ -5,47 +5,52 @@
 #include "freertos/task.h"
 #include "esp_attr.h"
 
-#define HOR_RES      240
-#define VER_RES      135
+#include "esp_log.h"
+
+#include <stdlib.h>
+#include <string.h>
+
 #define DRAW_LINES   20
 #define FLUSH_CHUNK  2
 
-static TFT_t         tft;
-static lv_display_t *disp;       /* LVGL display handle             */
+static const char *TAG = "LCD_FUNCS";
 
-static void st7789_flush_cb(lv_display_t *d,
-                            const lv_area_t *area,
-                            uint8_t *px_map)
+static TFT_t tft;
+static lv_display_t *disp; // LVGL display handle
+
+typedef struct {
+    lv_obj_t * top;    // the label that sits at the top line
+    lv_obj_t * mid;    // the label in the center
+    lv_obj_t * bot;    // the label at the bottom (this one moves)
+    const char * txt;  // the next string to show
+    bool up;           // direction: true=you’re scrolling up, false=scrolling down
+} scroll_ctx_t;
+
+static void st7789_flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_map)
 {
     const uint16_t *color_ptr = (const uint16_t *)px_map;
     int16_t x1 = area->x1, x2 = area->x2;
     int16_t y1 = area->y1, y2 = area->y2;
-    int16_t width     = x2 - x1 + 1;
+    int16_t width = x2 - x1 + 1;
     int16_t remaining = y2 - y1 + 1;
-    int16_t y         = y1;
+    int16_t y = y1;
 
     while (remaining > 0) {
         int16_t chunk = remaining > FLUSH_CHUNK ? FLUSH_CHUNK : remaining;
 
         /* 1) Window: columns = [x1..x2], rows = [y..y+chunk−1] */
         spi_master_write_command(&tft, 0x2A);
-        spi_master_write_addr(&tft,
-                              x1 + tft._offsetx,
-                              x2 + tft._offsetx);
+        spi_master_write_addr(&tft, x1 + tft._offsetx, x2 + tft._offsetx);
         spi_master_write_command(&tft, 0x2B);
-        spi_master_write_addr(&tft,
-                              y + tft._offsety,
-                              (y + chunk - 1) + tft._offsety);
+        spi_master_write_addr(&tft, y + tft._offsety, (y + chunk - 1) + tft._offsety);
 
         /* 2) Push chunk-worth of pixels */
         spi_master_write_command(&tft, 0x2C);
-        spi_master_write_colors(&tft,
-                                color_ptr,
-                                (uint32_t)width * chunk);
+        spi_master_write_colors(&tft, color_ptr, (uint32_t)width * chunk);
 
-        /* advance */
+        /* Advance */
         color_ptr += (uint32_t)width * chunk;
-        y         += chunk;
+        y += chunk;
         remaining -= chunk;
     }
 
@@ -74,13 +79,13 @@ void lcd_init_driver(void)
     /* 3) ST7789 panel init (nopnop2002 driver) */
     lcdInit(&tft, HOR_RES, VER_RES, 0, 0);
 
-    /* 4) Hardware‐side 90° rotation via MADCTL */
-    spi_master_write_command(&tft, 0x36);      // MADCTL
-    spi_master_write_data_byte(&tft, 0x60);    // MX=1, MV=1 → 90° CW
+    /* 4) Hardware 270° rotation (90° CCW) */
+    spi_master_write_command(&tft, 0x36);   // MADCTL
+    spi_master_write_data_byte(&tft, 0x60); // MY=1, MV=1: 0xA0 for 270deg, 0xC0 for 180deg, 0x60 for 90deg
 
-    /* 5) Offsets for your specific 135×240 module in landscape */
+    /* 5) Restore portrait offsets */
     tft._offsetx = 40;
-    tft._offsety = 53;
+    tft._offsety = 53; // 52 if 270 
 }
 
 void lcd_lvgl_init(void)
@@ -118,4 +123,116 @@ void lcd_lvgl_init(void)
 lv_display_t *lcd_get_display(void)
 {
     return disp;
+}
+
+void lcd_format_label(lv_obj_t *label, const char *text, lv_color_t color,
+					  const lv_font_t *font, lv_align_t alignment,
+					  lv_coord_t x_offset, lv_coord_t y_offset)
+{
+	lv_label_set_text(label, text);
+	lv_obj_set_style_text_color(label, color, 0);
+	lv_obj_set_style_text_font(label, font, 0);
+	lv_obj_align(label, alignment, x_offset, y_offset);
+}
+
+
+void lcd_scroll_up(lv_obj_t *lbl_top, lv_obj_t *lbl_mid, lv_obj_t *lbl_bot, const char *new_bot_text)
+{
+    const char *mid_txt = lv_label_get_text(lbl_mid);
+    const char *bot_txt = lv_label_get_text(lbl_bot);
+    
+    lv_label_set_text(lbl_top, mid_txt);
+    lv_label_set_text(lbl_mid, bot_txt);
+    lv_label_set_text(lbl_bot, new_bot_text);
+    
+}
+
+void lcd_scroll_down(lv_obj_t *lbl_top, lv_obj_t *lbl_mid, lv_obj_t *lbl_bot, const char *new_top_text)
+{
+    const char *top_txt = lv_label_get_text(lbl_top);
+    const char *mid_txt = lv_label_get_text(lbl_mid);
+
+    lv_label_set_text(lbl_bot, mid_txt);
+    lv_label_set_text(lbl_mid, top_txt);
+    lv_label_set_text(lbl_top, new_top_text);
+}
+
+/** Called when the scroll animation is finished. */
+static void scroll_ready_cb(lv_anim_t * a)
+{
+    scroll_ctx_t * ctx = (scroll_ctx_t *)a->user_data;
+    if(ctx->up) {
+        lcd_scroll_up(ctx->top, ctx->mid, ctx->bot, ctx->txt);
+        lv_obj_align(ctx->bot, LV_ALIGN_BOTTOM_MID, 0, -15);
+    }
+    else {
+        lcd_scroll_down(ctx->top, ctx->mid, ctx->bot, ctx->txt);
+        lv_obj_align(ctx->top, LV_ALIGN_TOP_MID, 0, 15);
+    }
+    
+    free(ctx);
+}
+
+void lcd_scroll_anim(lv_obj_t *top, lv_obj_t *mid, lv_obj_t *bot, const char *txt, bool scrolling_up, uint32_t speed_px_s)
+{
+	// 1) Decide your start/end Y based on direction
+	// Bottom element
+    const lv_coord_t start_b = scrolling_up ? -15 : -25;
+    const lv_coord_t end_b = scrolling_up ? -25 : -15;
+    // Top element
+    const lv_coord_t start_t = scrolling_up ? 25 : 15;
+    const lv_coord_t end_t = scrolling_up ? 15 : 35;
+
+
+    // 2) Compute how long the move should take (ms)
+    const uint32_t dist = LV_ABS(end_b - start_b);
+    const uint32_t dur  = (dist * 1000U) / speed_px_s;
+
+
+    // 3) Allocate and populate your callback context
+    scroll_ctx_t *ctx = malloc(sizeof(*ctx));
+    *ctx = (scroll_ctx_t){
+      .top = top,
+      .mid = mid,
+      .bot = bot,
+      .txt = txt,
+      .up  = scrolling_up
+    };
+
+
+    // 4) Build the LVGL animation object
+    
+    // Bottom animation
+	lv_anim_t a1;
+	lv_anim_init(&a1);
+	lv_anim_set_var(&a1, bot);
+	if (!scrolling_up)
+		lv_label_set_text(bot, lv_label_get_text(mid));
+	lv_anim_set_exec_cb(&a1, (lv_anim_exec_xcb_t)lv_obj_set_y);
+	lv_anim_set_path_cb(&a1, lv_anim_path_linear);
+	lv_anim_set_values(&a1, start_b, end_b);
+	lv_anim_set_time(&a1, dur);
+	
+	// Top animation
+	lv_anim_t a2;
+	lv_anim_init(&a2);
+	lv_anim_set_var(&a2, top);
+	if (scrolling_up)
+		lv_label_set_text(top, lv_label_get_text(mid));
+	lv_anim_set_exec_cb(&a2, (lv_anim_exec_xcb_t)lv_obj_set_y);
+	lv_anim_set_path_cb(&a2, lv_anim_path_linear);
+	lv_anim_set_values(&a2, start_t, end_t);
+	lv_anim_set_time(&a2, dur);
+
+
+	// 5) Hook up the ready callback
+    lv_anim_set_ready_cb(&a1,  scroll_ready_cb);
+    lv_anim_set_user_data(&a1, ctx);
+ 
+    lv_anim_set_user_data(&a2, ctx);
+
+
+    // 6) Finally enqueue it
+    lv_anim_start(&a1);
+    lv_anim_start(&a2);
 }

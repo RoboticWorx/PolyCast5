@@ -27,8 +27,10 @@ static void gpio_task(void *arg)
         if (state == 1) state = 0;
         else if (state == 0) state = 1;
         
+        //charge status on P06
+        
         gpio_write_output(2, state); // Blue LED
-        gpio_write_output(1, !state); // Green LED
+        //gpio_write_output(1, !state); // Green LED
 
 		/*int level = gpio_read_input(1);
 		if (level >= 0) {

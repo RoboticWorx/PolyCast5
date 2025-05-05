@@ -29,10 +29,13 @@ idf_component_register(
         #"${CMAKE_SOURCE_DIR}/components/bluetooth/src/bluetooth_task.c"
         #"${CMAKE_SOURCE_DIR}/components/bluetooth/src/esp_hid_gap.c"
         
+        "${CMAKE_SOURCE_DIR}/components/lcd/media/src/resolutiontest.c"
+        
     INCLUDE_DIRS "."    # optional, add here public include directories
     	"${CMAKE_SOURCE_DIR}/drivers/sx126x"
     	"${CMAKE_SOURCE_DIR}/components/lora/include"
     	"${CMAKE_SOURCE_DIR}/components/lcd/include"
+    	"${CMAKE_SOURCE_DIR}/components/lcd/media/include"
     	"${CMAKE_SOURCE_DIR}/components/infrared/include"
     	"${CMAKE_SOURCE_DIR}/components/gpio/include"
     	#"${CMAKE_SOURCE_DIR}/components/bluetooth/include"

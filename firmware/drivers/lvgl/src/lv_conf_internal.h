@@ -4,6 +4,8 @@
  * Make sure all the defines of lv_conf.h have a default value
 **/
 
+#include "lv_conf.h"
+
 #ifndef LV_CONF_INTERNAL_H
 #define LV_CONF_INTERNAL_H
 /* clang-format off */
