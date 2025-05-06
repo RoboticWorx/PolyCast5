@@ -5,11 +5,15 @@
 #include "esp_log.h"
 
 static const char *TAG = "GPIO_TASK";
-#define TASK_STACK_SIZE 4096
-#define TASK_PRIORITY   5
+
+SemaphoreHandle_t xGpioEventSemaphore;
+SemaphoreHandle_t xUpButtonSemaphore;
+SemaphoreHandle_t xDownButtonSemaphore;
 
 static void gpio_task(void *arg)
 {
+	xUpButtonSemaphore = xSemaphoreCreateBinary();
+    xDownButtonSemaphore = xSemaphoreCreateBinary();
 
 	gpio_write_output(0, 0); // Red LED
 	gpio_write_output(1, 0); // Green LED
@@ -19,37 +23,39 @@ static void gpio_task(void *arg)
 	gpio_write_output(5, 0); // NA
 	gpio_write_output(6, 0); // NA
 	gpio_write_output(7, 0); // NA
+
+	bool one_button_press = true;
 	
-	uint8_t state = 1;
-
 	while (1) {
-        
-        if (state == 1) state = 0;
-        else if (state == 0) state = 1;
-        
-        //charge status on P06
-        
-        gpio_write_output(2, state); // Blue LED
-        //gpio_write_output(1, !state); // Green LED
+		// If a button is pressed
+	    if (xSemaphoreTake(xGpioEventSemaphore, portMAX_DELAY)) {
+	        vTaskDelay(pdMS_TO_TICKS(50)); // Ignore bounce window
+	
+	        if (one_button_press) {
+	            if (gpio_read_input(USER_BUTTON_UP) == 0) {
+	                xSemaphoreGive(xUpButtonSemaphore);
+	            }
+	            else if (gpio_read_input(USER_BUTTON_DOWN) == 0) {
+	                xSemaphoreGive(xDownButtonSemaphore);
+	            }
+	            
+	            one_button_press = false;
+	        }
+	    }
 
-		/*int level = gpio_read_input(1);
-		if (level >= 0) {
-			ESP_LOGI(TAG, "P0.%d = %d → setting P1.%d", 1, level, 1);
-			gpio_write_output(1, (bool)level);
-		}*/
-
-		vTaskDelay(pdMS_TO_TICKS(500));
-    }
+	    // Re-arm logic
+	    if (!one_button_press) {
+	        if (gpio_read_input(USER_BUTTON_UP) == 1 && gpio_read_input(USER_BUTTON_DOWN) == 1) {
+	            one_button_press = true;
+	        }
+	    }
+		
+	    vTaskDelay(pdMS_TO_TICKS(10));
+	}
 }
 
 void gpio_task_create(void)
 {
-    xTaskCreate(
-        gpio_task,
-        "gpio_task",
-        TASK_STACK_SIZE,
-        NULL,
-        TASK_PRIORITY,
-        NULL
-    );
+	xTaskCreate(gpio_task, "gpio_task", 4096, NULL, tskIDLE_PRIORITY + 1,
+				NULL);
 }

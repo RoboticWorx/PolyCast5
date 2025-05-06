@@ -1,4 +1,4 @@
-# Install script for directory: C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/drivers/lvgl
+# Install script for directory: C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

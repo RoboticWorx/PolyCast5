@@ -64,13 +64,12 @@ void app_main(void) {
     lcd_lvgl_init();
 	spi_sx126x_init();
 	
-	ESP_LOGI(TAG, "Initializing GPIO expander...");
+	xGpioEventSemaphore = xSemaphoreCreateBinary();
     if (gpio_init() != ESP_OK) {
         ESP_LOGE(TAG, "GPIO_Init failed, stopping task");
         vTaskDelete(NULL);
         return;
     }
-    ESP_LOGI(TAG, "GPIO expander ready");
 	
 	gpio_set_level(ST7789_LEDK_PIN, 1);
 	

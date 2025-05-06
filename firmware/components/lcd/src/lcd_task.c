@@ -11,6 +11,9 @@
 #include "misc/lv_style_gen.h"
 #include "resolutiontest.h"
 
+#include "gpio_funcs.h"
+#include "gpio_task.h"
+
 #define ACTIVE_SCR (lv_disp_get_scr_act(lcd_get_display()))
 
 static const char *TAG = "LCD_TASK";
@@ -65,7 +68,7 @@ static void lcd_task(void *pvParameters)
 					 &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
 
 	lv_obj_t *user_top_option = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(user_top_option, "Infrared", user_secondary_color,
+	lcd_format_label(user_top_option, "Bluetooth", user_secondary_color,
 					 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
 
 	/*lv_obj_t *user_left_arrow = lv_label_create(ACTIVE_SCR);
@@ -82,7 +85,7 @@ static void lcd_task(void *pvParameters)
 					 &lv_font_montserrat_14, LV_ALIGN_RIGHT_MID, -4, 0);
 
 	lv_obj_t *user_bottom_option = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(user_bottom_option, "Wi-Fi", user_secondary_color,
+	lcd_format_label(user_bottom_option, "ESP-NOW", user_secondary_color,
 					 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -15);
 
 	lv_obj_t *user_bottom_arrow = lv_label_create(ACTIVE_SCR);
@@ -98,30 +101,43 @@ static void lcd_task(void *pvParameters)
 					 &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
 
 
-	const char *menu_options[] = {"Infrared", "LoRa", "Wi-Fi", "ESP-NOW", "Settings"};
+	const char *menu_options[] = {"Bluetooth", "LoRa", "ESP-NOW", "Infrared", "Settings", "Wi-Fi"};
 	const int menu_size = sizeof(menu_options) / sizeof(menu_options[0]);
 	int menu_index = 1;
+	
+	bool scrolling_menu = false;
 	bool scrolling_up = false;
 
-	TickType_t last = xTaskGetTickCount();
-	const TickType_t interval = pdMS_TO_TICKS(500);
-
+	TickType_t timer_last = xTaskGetTickCount();
+	const TickType_t timer_interval = pdMS_TO_TICKS(300);
+	
+	
 	while (1) {
-		if (xTaskGetTickCount() - last >= interval) {
-			last = xTaskGetTickCount();
+		if (xTaskGetTickCount() - timer_last >= timer_interval) {
+			timer_last = xTaskGetTickCount();
 			
-			if (scrolling_up) {
-				menu_index = (menu_index + 1) % menu_size;
-			    const char *next_bottom = menu_options[(menu_index + 1) % menu_size];
-				lcd_scroll_anim(user_top_option, user_center_option_button_label, user_bottom_option, next_bottom, scrolling_up, 400);
+	        if (xSemaphoreTake(xUpButtonSemaphore, 10)) {
+	            scrolling_menu = true;
+	            scrolling_up   = false;
+	        }
+	        if (xSemaphoreTake(xDownButtonSemaphore, 10)) {
+	            scrolling_menu = true;
+	            scrolling_up   = true;
+	        }
+			
+			if (scrolling_menu) {
+				if (scrolling_up) {
+					menu_index = (menu_index + 1) % menu_size;
+				    const char *next_bottom = menu_options[(menu_index + 1) % menu_size];
+					lcd_scroll_anim(user_top_option, user_center_option_button_label, user_bottom_option, next_bottom, scrolling_up, 400);
+				}
+				else {
+					menu_index = (menu_index + menu_size - 1) % menu_size;
+				    const char *next_top = menu_options[(menu_index + menu_size - 1) % menu_size];
+					lcd_scroll_anim(user_top_option, user_center_option_button_label, user_bottom_option, next_top, scrolling_up, 400);
+				}
+				scrolling_menu = false;
 			}
-			else {
-				menu_index = (menu_index + menu_size - 1) % menu_size;
-			    const char *next_top = menu_options[(menu_index + menu_size - 1) % menu_size];
-				lcd_scroll_anim(user_top_option, user_center_option_button_label, user_bottom_option, next_top, scrolling_up, 400);
-			}
-
-			//scrolling_up = !scrolling_up;
 		}
 		lv_timer_handler();
 		vTaskDelay(pdMS_TO_TICKS(10));

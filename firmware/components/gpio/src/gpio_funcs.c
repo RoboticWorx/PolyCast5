@@ -4,10 +4,19 @@
 #include "esp_log.h"
 #include "lcd_funcs.h"
 
+#include "gpio_task.h"
+
 static const char *TAG = "GPIO_FUNCS";
+
+static void IRAM_ATTR tca9535_int_isr(void *arg) {
+    BaseType_t woken = pdFALSE;
+    xSemaphoreGiveFromISR(xGpioEventSemaphore, &woken);
+    portYIELD_FROM_ISR(woken);
+}
 
 esp_err_t gpio_init(void)
 {
+	// Configure outputs
 	gpio_config_t io_conf_out = {
 	    .pin_bit_mask =
 	        (1ULL << ST7789_LEDK_PIN) |
@@ -20,18 +29,22 @@ esp_err_t gpio_init(void)
 	};
 	gpio_config(&io_conf_out);
 	
+	// Configure inputs
 	gpio_config_t io_conf_in = {
-		.pin_bit_mask =
-			(1ULL << TCA9535_INT_GPIO), // | (1ULL << ST7789_RST_PIN),
-		.mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-		.intr_type = GPIO_INTR_DISABLE};
-
+	    .pin_bit_mask = (1ULL << TCA9535_INT_GPIO),
+	    .mode         = GPIO_MODE_INPUT,
+	    .intr_type    = GPIO_INTR_NEGEDGE,
+	    .pull_up_en     = GPIO_PULLUP_DISABLE,
+	    .pull_down_en   = GPIO_PULLDOWN_DISABLE,
+	};
 	gpio_config(&io_conf_in);
+
+	// ISR service
+	gpio_install_isr_service(0);
+	gpio_isr_handler_add(TCA9535_INT_GPIO, tca9535_int_isr, NULL);
 	
-	
-    esp_err_t ret = TCA9535Init();
+
+	esp_err_t ret = TCA9535Init();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "TCA9535Init failed: %s", esp_err_to_name(ret));
         return ret;
@@ -55,7 +68,7 @@ esp_err_t gpio_init(void)
 	return ret;
 }
 
-int  gpio_read_input(uint8_t pin)
+int gpio_read_input(uint8_t pin)
 {
     if (pin > 7) {
         ESP_LOGE(TAG, "Invalid input pin %d", pin);

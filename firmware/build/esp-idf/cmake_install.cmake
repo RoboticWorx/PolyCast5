@@ -554,6 +554,31 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
+  include("C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/lora/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/sx126x/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/infrared/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/lcd/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/gpio/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
   include("C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/main/cmake_install.cmake")
 endif()
 

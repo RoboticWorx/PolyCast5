@@ -16,7 +16,7 @@ esp_err_t TCA9535Init(void)
 	esp_err_t ret;
 
 	int i2c_master_port = I2C_MASTER_NUM;
-	i2c_config_t conf;
+	i2c_config_t conf = {0};
 
 	conf.mode = I2C_MODE_MASTER;
 	conf.sda_io_num = I2C_MASTER_SDA_IO;
