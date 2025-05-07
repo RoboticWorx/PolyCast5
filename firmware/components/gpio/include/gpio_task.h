@@ -4,9 +4,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
-//#define USER_BUTTON_LEFT 
+#define USER_BUTTON_LEFT 3
 #define USER_BUTTON_UP 1
-//#define USER_BUTTON_RIGHT 
+#define USER_BUTTON_RIGHT 4
 #define USER_BUTTON_DOWN 5
 //#define USER_BUTTON_HOME 
 //#define USER_BUTTON_MISC 
@@ -14,6 +14,8 @@
 
 extern SemaphoreHandle_t xUpButtonSemaphore;
 extern SemaphoreHandle_t xDownButtonSemaphore;
+extern SemaphoreHandle_t xRightButtonSemaphore;
+extern SemaphoreHandle_t xLeftButtonSemaphore;
 extern SemaphoreHandle_t xGpioEventSemaphore;
 
 /**

@@ -9,11 +9,15 @@ static const char *TAG = "GPIO_TASK";
 SemaphoreHandle_t xGpioEventSemaphore;
 SemaphoreHandle_t xUpButtonSemaphore;
 SemaphoreHandle_t xDownButtonSemaphore;
+SemaphoreHandle_t xRightButtonSemaphore;
+SemaphoreHandle_t xLeftButtonSemaphore;
 
 static void gpio_task(void *arg)
 {
 	xUpButtonSemaphore = xSemaphoreCreateBinary();
     xDownButtonSemaphore = xSemaphoreCreateBinary();
+    xRightButtonSemaphore = xSemaphoreCreateBinary();
+    xLeftButtonSemaphore = xSemaphoreCreateBinary();
 
 	gpio_write_output(0, 0); // Red LED
 	gpio_write_output(1, 0); // Green LED
@@ -26,7 +30,8 @@ static void gpio_task(void *arg)
 
 	bool one_button_press = true;
 	
-	while (1) {
+	while (1) 
+	{
 		// If a button is pressed
 	    if (xSemaphoreTake(xGpioEventSemaphore, portMAX_DELAY)) {
 	        vTaskDelay(pdMS_TO_TICKS(50)); // Ignore bounce window
@@ -35,22 +40,32 @@ static void gpio_task(void *arg)
 	            if (gpio_read_input(USER_BUTTON_UP) == 0) {
 	                xSemaphoreGive(xUpButtonSemaphore);
 	            }
-	            else if (gpio_read_input(USER_BUTTON_DOWN) == 0) {
-	                xSemaphoreGive(xDownButtonSemaphore);
+	            //else if (gpio_read_input(USER_BUTTON_DOWN) == 0) {
+	            //    xSemaphoreGive(xDownButtonSemaphore);
+	            //}
+	            else if (gpio_read_input(USER_BUTTON_RIGHT) == 0) {
+	                xSemaphoreGive(xRightButtonSemaphore);
+	            }
+	            else if (gpio_read_input(USER_BUTTON_LEFT) == 0) {
+	                xSemaphoreGive(xLeftButtonSemaphore);
 	            }
 	            
 	            one_button_press = false;
 	        }
 	    }
 
-	    // Re-arm logic
-	    if (!one_button_press) {
-	        if (gpio_read_input(USER_BUTTON_UP) == 1 && gpio_read_input(USER_BUTTON_DOWN) == 1) {
-	            one_button_press = true;
-	        }
-	    }
+		//ESP_LOGI(TAG, "GPIO_UP: %d GPIO_DOWN: %d GPIO_RIGHT: %d", gpio_read_input(USER_BUTTON_UP), gpio_read_input(USER_BUTTON_DOWN), gpio_read_input(USER_BUTTON_RIGHT));
+	
+		// Re-arm logic
+		if (!one_button_press) {
+	
+			if (gpio_read_input(USER_BUTTON_UP) == 1) // && gpio_read_input(USER_BUTTON_DOWN) == 1)
+			{
+				one_button_press = true;
+			}
+		}
 		
-	    vTaskDelay(pdMS_TO_TICKS(10));
+		vTaskDelay(pdMS_TO_TICKS(10));
 	}
 }
 

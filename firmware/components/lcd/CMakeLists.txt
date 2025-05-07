@@ -7,7 +7,7 @@ idf_component_register(
         "src/lcd_task.c"
         "src/st7789.c"
         
-        "media/src/resolutiontest.c"
+        "media/src/espressif_logo.c"
         
     INCLUDE_DIRS 
     	"include"
