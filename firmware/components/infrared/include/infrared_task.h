@@ -4,6 +4,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+extern SemaphoreHandle_t xInfraredRXEventSemaphore;
+
 // Function to create the infrared task
 void infrared_task_create(void);
 

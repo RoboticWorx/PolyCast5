@@ -87,7 +87,7 @@ void app_main(void) {
 	//lora_task_create();
 	lcd_task_create();
 	gpio_task_create();
-	//infrared_task_create();
+	infrared_task_create();
 	//ble_hid_task_start_up();
 
 	ESP_LOGI(TAG, "Main initialized and tasks created");
