@@ -1,4 +1,5 @@
 #include "lcd_funcs.h"
+#include "core/lv_obj_scroll.h"
 #include "lcd_task.h"
 #include "gpio_task.h"
 
@@ -9,6 +10,7 @@
 #include "esp_attr.h"
 
 #include "esp_log.h"
+#include "misc/lv_area.h"
 #include "st7789.h"
 #include "widgets/label/lv_label.h"
 
@@ -20,12 +22,15 @@
 
 #define SWIPE_SPEED 1200
 #define SCROLL_SPEED 400
+#define IR_LABELS_OFFSET 20
 
 static const char *TAG = "LCD_FUNCS";
 
 
 static TFT_t tft;
 static lv_display_t *disp; // LVGL display handle
+
+static bool already_scrolling = false;
 
 typedef struct {
     lv_obj_t * top;    // the label that sits at the top line
@@ -37,6 +42,7 @@ typedef struct {
 
 static bool scrolling_menu = false;
 static bool scrolling_up = false;
+static bool infrared_page_updated = false;
 	
 	
 
@@ -95,7 +101,7 @@ void lcd_init_driver(void)
 
     // Hardware 270° rotation (90° CCW)
     spi_master_write_command(&tft, 0x36); // MADCTL
-    spi_master_write_data_byte(&tft, 0x60); // MY=1, MV=1: 0xA0 for 270deg, 0xC0 for 180deg, 0x60 for 90deg
+    spi_master_write_data_byte(&tft, 0xA0); // MY=1, MV=1: 0xA0 for 270deg, 0xC0 for 180deg, 0x60 for 90deg
 
     // Restore portrait offsets
     tft._offsetx = 40;
@@ -185,6 +191,10 @@ void lcd_format_center_button(lv_obj_t *btn_mid, lv_color_t user_primary_color, 
 
 static void scroll_ready_cb(lv_anim_t * a)
 {
+	// Able to start new animation
+	already_scrolling = false;
+	
+	// Adjust labels for scroll up or down
     scroll_ctx_t * ctx = (scroll_ctx_t *)a->user_data;
     if (ctx->up) {
         lcd_scroll_up(ctx->top, ctx->mid, ctx->bot, ctx->txt);
@@ -195,11 +205,19 @@ static void scroll_ready_cb(lv_anim_t * a)
         lv_obj_align(ctx->top, LV_ALIGN_TOP_MID, 0, 15);
     }
     
+    // Delete when done
+    lv_anim_del(ctx->bot, (lv_anim_exec_xcb_t)lv_obj_set_y);
+	lv_anim_del(ctx->top, (lv_anim_exec_xcb_t)lv_obj_set_y);
     free(ctx);
 }
 
 void lcd_scroll_anim(menu_t *menu, const char *txt, bool scrolling_up, uint32_t speed_px_s)
 {
+	// If already in animation, don't make a new one
+	if (already_scrolling) 
+		return;
+    already_scrolling = true;
+    
 	// Decide start/end Y
 	// Bottom element
     const lv_coord_t start_b = scrolling_up ? -15 : -25;
@@ -268,6 +286,10 @@ void lcd_selection_btn_pressed(menu_t *menu)
 
 	if (strcmp(option, "Infrared") == 0) {
 		lcd_swipe_anim(menu, 1, SWIPE_SPEED);
+		lv_obj_add_flag(menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		vTaskDelay(pdMS_TO_TICKS(50));
+		lcd_update_infrared_menu(&ir_menu);
 		menu->page = INFRARED_PAGE;
 	}
 	else if (strcmp(option, "Bluetooth") == 0) {
@@ -350,6 +372,130 @@ void lcd_swipe_anim(menu_t *menu, bool swipe_left, uint32_t speed_px_s)
     }
 }
 
+void lcd_setup_infrared_page(ir_menu_t *menu)
+{
+
+	// Create list
+    menu->main_list = lv_list_create(ACTIVE_SCR);
+    lv_obj_set_size(menu->main_list, 105, 209);
+    
+    // Format
+    lv_obj_set_scrollbar_mode(menu->main_list, LV_SCROLLBAR_MODE_OFF);     // never draw bars
+    lv_obj_set_style_bg_color(menu->main_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_align(menu->main_list, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_border_width(menu->main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_scrollbar_mode(menu->main_list, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_scroll_dir(menu->main_list, LV_DIR_VER);
+    
+    // Set rotation pivot
+	lv_obj_set_style_transform_pivot_x(menu->main_list, 120, LV_PART_MAIN | LV_STATE_DEFAULT);
+	lv_obj_set_style_transform_pivot_y(menu->main_list, 67, LV_PART_MAIN | LV_STATE_DEFAULT);
+	
+	// Rotate
+	lv_obj_set_style_transform_angle(menu->main_list, 2700, LV_PART_MAIN | LV_STATE_DEFAULT);
+	
+	// Adjust rotation
+	lv_obj_set_x(menu->main_list, -105);
+	lv_obj_set_y(menu->main_list, -31); // More pos = left
+	
+	// Adjust spacing
+	lv_obj_set_style_pad_row(menu->main_list, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+	
+	// Create button style
+	lv_style_init(&menu->btn_style);
+	
+	lv_style_set_radius(&menu->btn_style, 8);
+	lv_style_set_bg_color(&menu->btn_style, user_primary_color);
+	
+	lv_style_set_border_width(&menu->btn_style, 2);
+	lv_style_set_border_color(&menu->btn_style, user_secondary_color);
+	lv_style_set_border_side(&menu->btn_style, LV_BORDER_SIDE_FULL);
+	
+	lv_style_set_pad_top(&menu->btn_style, 3);
+	lv_style_set_pad_bottom(&menu->btn_style, 3);
+	
+	lv_style_set_text_font(&menu->btn_style, &lv_font_montserrat_16);
+	lv_style_set_text_color(&menu->btn_style, user_secondary_color);
+	lv_style_set_text_align(&menu->btn_style, LV_TEXT_ALIGN_CENTER);
+	
+	
+	// Create selected button style
+	lv_style_init(&menu->selected_btn_style);
+	
+	lv_style_set_radius(&menu->selected_btn_style, 8);
+	lv_style_set_bg_color(&menu->selected_btn_style, user_secondary_color);
+	
+	lv_style_set_border_width(&menu->selected_btn_style, 2);
+	lv_style_set_border_color(&menu->selected_btn_style, user_secondary_color);
+	lv_style_set_border_side(&menu->selected_btn_style, LV_BORDER_SIDE_FULL);
+	
+	lv_style_set_pad_top(&menu->selected_btn_style, 3);
+	lv_style_set_pad_bottom(&menu->selected_btn_style, 3);
+	
+	lv_style_set_text_font(&menu->selected_btn_style, &lv_font_montserrat_16);
+	lv_style_set_text_color(&menu->selected_btn_style, user_primary_color);
+	lv_style_set_text_align(&menu->selected_btn_style, LV_TEXT_ALIGN_CENTER);
+	
+	lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
+}
+
+void lcd_update_infrared_menu(ir_menu_t *menu)
+{
+	if (lv_obj_has_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN)) {
+		lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
+	}
+	
+	
+	ESP_LOGI(TAG, "in IR!");
+	// Start with clean slate
+	if(menu->cont != NULL) {
+        lv_obj_clean(menu->cont);
+    }
+
+	// Re-update all based on saved
+	for(int i = 0; i < menu->size; i++) {
+	
+	    lv_obj_t *btn = lv_list_add_btn(menu->main_list, NULL, menu->options[i]);
+	    lv_obj_set_size(btn, 100, 28);
+	    
+	    if (menu->index >= menu->size) {
+	    	menu->index = 0;
+	    }
+	   	else if (menu->index < 0) {
+	    	menu->index = menu->size - 1;
+	    }
+	    	
+	    if (menu->index == i) {
+	    	lv_obj_add_style(btn, &menu->selected_btn_style, LV_PART_MAIN | LV_STATE_DEFAULT);
+	    }
+	    else {
+ 			lv_obj_add_style(btn, &menu->btn_style, LV_PART_MAIN | LV_STATE_DEFAULT);
+ 		}
+	
+	    // First time through, the button’s parent is now the content cont
+	    if(i == 0) {
+	        menu->cont = lv_obj_get_parent(btn);
+	        
+	        // Format container
+	        lv_obj_set_flex_flow(menu->cont,  LV_FLEX_FLOW_COLUMN);
+	        lv_obj_set_flex_align(menu->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+	        
+	        // Disable scroll-bar
+			//lv_obj_set_scrollbar_mode(menu->cont, LV_SCROLLBAR_MODE_OFF);
+			//lv_obj_clear_flag(menu->cont, LV_OBJ_FLAG_SCROLLABLE);
+	    }
+	
+	    // Format label
+	    lv_obj_t *lbl = lv_obj_get_child(btn, 0);
+	    lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL); 
+	    lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+	    lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
+	}
+	
+}
+
+
 void lcd_page_1_selected(menu_t *menu) 
 {
 	if (xSemaphoreTake(xUpButtonSemaphore, 1)) {
@@ -380,5 +526,24 @@ void lcd_page_1_selected(menu_t *menu)
 		}
 		scrolling_menu = false;
 	}
+}
+
+void lcd_page_2_selected(menu_t *ui_menu, ir_menu_t *ir_menu) 
+{
+	if (xSemaphoreTake(xUpButtonSemaphore, 0)) {
+		ir_menu->index--;
+		lcd_update_infrared_menu(ir_menu);
+	}
+	else if (xSemaphoreTake(xDownButtonSemaphore, 0)) {
+		ir_menu->index++;
+		lcd_update_infrared_menu(ir_menu);
+	}
+	else if (xSemaphoreTake(xRightButtonSemaphore, 0)) {
+		lcd_selection_btn_pressed(ui_menu);
+	}
+	else if (xSemaphoreTake(xLeftButtonSemaphore, 0)) {
+		ui_menu->page = SELECTION_PAGE;
+	}
+
 }
 

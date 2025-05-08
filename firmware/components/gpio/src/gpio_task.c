@@ -21,7 +21,7 @@ static void gpio_task(void *arg)
 
 	gpio_write_output(0, 0); // Red LED
 	gpio_write_output(1, 0); // Green LED
-	gpio_write_output(2, 0); // Blue LED
+	gpio_write_output(2, 1); // Blue LED
 	gpio_write_output(3, 1); // 3V enable
 	gpio_write_output(4, 0); // NA
 	gpio_write_output(5, 0); // NA
@@ -32,8 +32,11 @@ static void gpio_task(void *arg)
 	
 	while (1) 
 	{
+		
+		//ESP_LOGI(TAG, "GPIO_UP: %d GPIO_DOWN: %d GPIO_RIGHT: %d", gpio_read_input(USER_BUTTON_UP), gpio_read_input(USER_BUTTON_DOWN), gpio_read_input(USER_BUTTON_RIGHT));
+	
 		// If a button is pressed
-	    if (xSemaphoreTake(xGpioEventSemaphore, portMAX_DELAY)) {
+	    if (xSemaphoreTake(xGpioEventSemaphore, 10)) {
 	        vTaskDelay(pdMS_TO_TICKS(50)); // Ignore bounce window
 	
 	        if (one_button_press) {
@@ -54,8 +57,6 @@ static void gpio_task(void *arg)
 	        }
 	    }
 
-		//ESP_LOGI(TAG, "GPIO_UP: %d GPIO_DOWN: %d GPIO_RIGHT: %d", gpio_read_input(USER_BUTTON_UP), gpio_read_input(USER_BUTTON_DOWN), gpio_read_input(USER_BUTTON_RIGHT));
-	
 		// Re-arm logic
 		if (!one_button_press) {
 	

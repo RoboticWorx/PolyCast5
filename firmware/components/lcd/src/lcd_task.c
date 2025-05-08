@@ -27,6 +27,15 @@ menu_t ui_menu = {
     .lbl_top = NULL,
     .lbl_mid = NULL,
     .lbl_bot = NULL,
+    .arrow_bot = NULL,
+    .arrow_top = NULL,
+};
+
+ir_menu_t ir_menu = {
+    .options = {"Add New", "test1", "test2", "test3"},
+    .size = 4,
+    .index = 0,
+    .cont = NULL,
 };
 
 lv_color_t user_primary_color = LV_COLOR_MAKE(0x00, 0x00, 0x8B); 
@@ -44,6 +53,8 @@ static void lcd_task(void *pvParameters)
 {
 	user_primary_color = lv_color_hex(0x00008B);
 	
+	// No scroll-bar
+	lv_obj_set_scrollbar_mode(ACTIVE_SCR, LV_SCROLLBAR_MODE_OFF);
 	
 	// Set background
     lv_obj_set_style_bg_color(ACTIVE_SCR, user_primary_color, 0);
@@ -56,8 +67,8 @@ static void lcd_task(void *pvParameters)
 
 
 	// Format labels
-	lv_obj_t *user_top_arrow = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(user_top_arrow, LV_SYMBOL_UP, user_secondary_color,
+	ui_menu.arrow_top = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(ui_menu.arrow_top, LV_SYMBOL_UP, user_secondary_color,
 					 &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
 
 	ui_menu.lbl_top = lv_label_create(ACTIVE_SCR);
@@ -85,8 +96,8 @@ static void lcd_task(void *pvParameters)
 	lcd_format_label(ui_menu.lbl_bot, "ESP-NOW", user_secondary_color,
 					 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -15);
 
-	lv_obj_t *user_bottom_arrow = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(user_bottom_arrow, LV_SYMBOL_DOWN, user_secondary_color,
+	ui_menu.arrow_bot = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(ui_menu.arrow_bot, LV_SYMBOL_DOWN, user_secondary_color,
 					 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
 
 	lv_obj_t *battery_icon_text = lv_label_create(ACTIVE_SCR);
@@ -108,6 +119,9 @@ static void lcd_task(void *pvParameters)
 
 	TickType_t timer_last = xTaskGetTickCount();
 	const TickType_t timer_interval = pdMS_TO_TICKS(300);
+	
+	
+	lcd_setup_infrared_page(&ir_menu);
     
 
 	while (1)
@@ -116,14 +130,24 @@ static void lcd_task(void *pvParameters)
 
 		} 
 		else if (ui_menu.page == SELECTION_PAGE) {
+
 			if (xTaskGetTickCount() - timer_last >= timer_interval) {
+				
 				timer_last = xTaskGetTickCount();
+				
+				/*lv_obj_remove_flag(ui_menu.lbl_top, LV_OBJ_FLAG_HIDDEN);
+				lv_obj_remove_flag(ui_menu.lbl_mid, LV_OBJ_FLAG_HIDDEN);
+				lv_obj_remove_flag(ui_menu.lbl_bot, LV_OBJ_FLAG_HIDDEN);
+				lv_obj_remove_flag(ui_menu.arrow_top, LV_OBJ_FLAG_HIDDEN);
+				lv_obj_remove_flag(ui_menu.arrow_bot, LV_OBJ_FLAG_HIDDEN);*/
+				
 				lcd_page_1_selected(&ui_menu);
 			}
-
+		
 		}
-		else if (ui_menu.page == LORA_PAGE) {
-			//lcd_swipe_anim(&ui_menu, 1, 400);
+		else if (ui_menu.page == INFRARED_PAGE) {
+			lcd_page_2_selected(&ui_menu, &ir_menu);
+
 		}
 
 		lv_timer_handler();

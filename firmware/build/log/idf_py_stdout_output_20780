@@ -1,0 +1,1218 @@
+Command: ninja flash
+[1/16] Performing build step for 'bootloader'
+[1/1] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\build\bootloader\esp-idf\esptool_py && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-master/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x2000 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/bootloader.bin"
+Bootloader binary size 0x5510 bytes. 0xaf0 bytes (11%) free.
+[2/16] Building C object esp-idf/gpio/CMakeFiles/__idf_gpio.dir/src/gpio_funcs.c.obj
+FAILED: esp-idf/gpio/CMakeFiles/__idf_gpio.dir/src/gpio_funcs.c.obj 
+C:\Espressif\tools\riscv32-esp-elf\esp-14.2.0_20241119\riscv32-esp-elf\bin\riscv32-esp-elf-gcc.exe -DESP_PLATFORM -DIDF_VER=\"v5.5-dev-2715-ga45d713b03\" -DLV_CONF_INCLUDE_SIMPLE -DSOC_MMU_PAGE_SIZE=CONFIG_MMU_PAGE_SIZE -DSOC_XTAL_FREQ_MHZ=CONFIG_XTAL_FREQ -D_GLIBCXX_HAVE_POSIX_SEMAPHORE -D_GLIBCXX_USE_POSIX_SEMAPHORE -D_GNU_SOURCE -D_POSIX_READER_WRITER_LOCKS -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/config -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include -IC:/Espressif/frameworks/esp-idf-master/components/newlib/platform_include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/config/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/config/include/freertos -IC:/Espressif/frameworks/esp-idf-master/components/freertos/config/riscv/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/FreeRTOS-Kernel/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/FreeRTOS-Kernel/portable/riscv/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/FreeRTOS-Kernel/portable/riscv/include/freertos -IC:/Espressif/frameworks/esp-idf-master/components/freertos/esp_additions/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/soc -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/soc/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/dma/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/ldo/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/debug_probe/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/mspi_timing_tuning/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/power_supply/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/. -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/private_include -IC:/Espressif/frameworks/esp-idf-master/components/heap/include -IC:/Espressif/frameworks/esp-idf-master/components/heap/tlsf -IC:/Espressif/frameworks/esp-idf-master/components/log/include -IC:/Espressif/frameworks/esp-idf-master/components/soc/include -IC:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/register -IC:/Espressif/frameworks/esp-idf-master/components/hal/platform_port/include -IC:/Espressif/frameworks/esp-idf-master/components/hal/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/hal/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/include/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/esp_common/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/port/soc -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/port/include/riscv -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/port/include/private -IC:/Espressif/frameworks/esp-idf-master/components/riscv/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/include/apps -IC:/Espressif/frameworks/esp-idf-master/components/lwip/include/apps/sntp -IC:/Espressif/frameworks/esp-idf-master/components/lwip/lwip/src/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/freertos/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/esp32xx/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/esp32xx/include/arch -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/esp32xx/include/sys -IC:/Espressif/frameworks/esp-idf-master/components/driver/deprecated -IC:/Espressif/frameworks/esp-idf-master/components/driver/i2c/include -IC:/Espressif/frameworks/esp-idf-master/components/driver/touch_sensor/include -IC:/Espressif/frameworks/esp-idf-master/components/driver/twai/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_pm/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_ringbuf/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_pcnt/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_gptimer/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_spi/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_mcpwm/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_ana_cmpr/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_i2s/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdmmc/include -IC:/Espressif/frameworks/esp-idf-master/components/sdmmc/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdspi/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdio/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_dac/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_tsens/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdm/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_i2c/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_uart/include -IC:/Espressif/frameworks/esp-idf-master/components/vfs/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_ledc/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_parlio/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_usb_serial_jtag/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/media/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl/src -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl/examples -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl/demos -IC:/Espressif/frameworks/esp-idf-master/components/esp_timer/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/sx126x/include -march=rv32imac_zicsr_zifencei  -fdiagnostics-color=always -ffunction-sections -fdata-sections -Wall -Werror=all -Wno-error=unused-function -Wno-error=unused-variable -Wno-error=unused-but-set-variable -Wno-error=deprecated-declarations -Wextra -Wno-error=extra -Wno-unused-parameter -Wno-sign-compare -Wno-enum-conversion -gdwarf-4 -ggdb -nostartfiles -Og -fno-shrink-wrap -fmacro-prefix-map=C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5=. -fmacro-prefix-map=C:/Espressif/frameworks/esp-idf-master=/IDF -fstrict-volatile-bitfields -fno-jump-tables -fno-tree-switch-conversion -std=gnu17 -Wno-old-style-declaration -MD -MT esp-idf/gpio/CMakeFiles/__idf_gpio.dir/src/gpio_funcs.c.obj -MF esp-idf\gpio\CMakeFiles\__idf_gpio.dir\src\gpio_funcs.c.obj.d -o esp-idf/gpio/CMakeFiles/__idf_gpio.dir/src/gpio_funcs.c.obj -c C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/src/gpio_funcs.c
+In file included from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/src/gpio_funcs.c:5:
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_funcs.h:143:6: error: conflicting types for 'lcd_page_2_selected'; have 'void(menu_t *, ir_menu_t *)'
+  143 | void lcd_page_2_selected(menu_t *ui_menu, ir_menu_t *ir_menu)
+      |      ^~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_funcs.h:141:6: note: previous declaration of 'lcd_page_2_selected' with type 'void(menu_t *)'
+  141 | void lcd_page_2_selected(menu_t *menu);
+      |      ^~~~~~~~~~~~~~~~~~~
+In file included from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/src/gpio_funcs.c:7:
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h: In function 'lcd_page_2_selected':
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:15:26: error: storage class specified for parameter 'xUpButtonSemaphore'
+   15 | extern SemaphoreHandle_t xUpButtonSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:16:26: error: storage class specified for parameter 'xDownButtonSemaphore'
+   16 | extern SemaphoreHandle_t xDownButtonSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:17:26: error: storage class specified for parameter 'xRightButtonSemaphore'
+   17 | extern SemaphoreHandle_t xRightButtonSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:18:26: error: storage class specified for parameter 'xLeftButtonSemaphore'
+   18 | extern SemaphoreHandle_t xLeftButtonSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:19:26: error: storage class specified for parameter 'xGpioEventSemaphore'
+   19 | extern SemaphoreHandle_t xGpioEventSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/src/gpio_funcs.c:9:20: error: storage class specified for parameter 'TAG'
+    9 | static const char *TAG = "GPIO_FUNCS";
+      |                    ^~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/src/gpio_funcs.c:9:1: error: parameter 'TAG' is initialized
+    9 | static const char *TAG = "GPIO_FUNCS";
+      | ^~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/src/gpio_funcs.c:11:50: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+   11 | static void IRAM_ATTR tca9535_int_isr(void *arg) {
+      |                                                  ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/src/gpio_funcs.c:18:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+   18 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/src/gpio_funcs.c:72:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+   72 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/src/gpio_funcs.c:82:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+   82 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_funcs.h:143:6: error: old-style parameter declarations in prototyped function definition
+  143 | void lcd_page_2_selected(menu_t *ui_menu, ir_menu_t *ir_menu)
+      |      ^~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/src/gpio_funcs.c:96: error: expected '{' at end of input
+[3/16] No install step for 'bootloader'
+[4/16] Building C object esp-idf/lcd/CMakeFiles/__idf_lcd.dir/src/lcd_funcs.c.obj
+FAILED: esp-idf/lcd/CMakeFiles/__idf_lcd.dir/src/lcd_funcs.c.obj 
+C:\Espressif\tools\riscv32-esp-elf\esp-14.2.0_20241119\riscv32-esp-elf\bin\riscv32-esp-elf-gcc.exe -DESP_PLATFORM -DIDF_VER=\"v5.5-dev-2715-ga45d713b03\" -DLV_CONF_INCLUDE_SIMPLE -DSOC_MMU_PAGE_SIZE=CONFIG_MMU_PAGE_SIZE -DSOC_XTAL_FREQ_MHZ=CONFIG_XTAL_FREQ -D_GLIBCXX_HAVE_POSIX_SEMAPHORE -D_GLIBCXX_USE_POSIX_SEMAPHORE -D_GNU_SOURCE -D_POSIX_READER_WRITER_LOCKS -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/config -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/media/include -IC:/Espressif/frameworks/esp-idf-master/components/newlib/platform_include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/config/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/config/include/freertos -IC:/Espressif/frameworks/esp-idf-master/components/freertos/config/riscv/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/FreeRTOS-Kernel/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/FreeRTOS-Kernel/portable/riscv/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/FreeRTOS-Kernel/portable/riscv/include/freertos -IC:/Espressif/frameworks/esp-idf-master/components/freertos/esp_additions/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/soc -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/soc/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/dma/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/ldo/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/debug_probe/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/mspi_timing_tuning/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/power_supply/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/. -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/private_include -IC:/Espressif/frameworks/esp-idf-master/components/heap/include -IC:/Espressif/frameworks/esp-idf-master/components/heap/tlsf -IC:/Espressif/frameworks/esp-idf-master/components/log/include -IC:/Espressif/frameworks/esp-idf-master/components/soc/include -IC:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/register -IC:/Espressif/frameworks/esp-idf-master/components/hal/platform_port/include -IC:/Espressif/frameworks/esp-idf-master/components/hal/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/hal/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/include/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/esp_common/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/port/soc -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/port/include/riscv -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/port/include/private -IC:/Espressif/frameworks/esp-idf-master/components/riscv/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/include/apps -IC:/Espressif/frameworks/esp-idf-master/components/lwip/include/apps/sntp -IC:/Espressif/frameworks/esp-idf-master/components/lwip/lwip/src/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/freertos/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/esp32xx/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/esp32xx/include/arch -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/esp32xx/include/sys -IC:/Espressif/frameworks/esp-idf-master/components/driver/deprecated -IC:/Espressif/frameworks/esp-idf-master/components/driver/i2c/include -IC:/Espressif/frameworks/esp-idf-master/components/driver/touch_sensor/include -IC:/Espressif/frameworks/esp-idf-master/components/driver/twai/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_pm/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_ringbuf/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_pcnt/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_gptimer/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_spi/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_mcpwm/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_ana_cmpr/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_i2s/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdmmc/include -IC:/Espressif/frameworks/esp-idf-master/components/sdmmc/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdspi/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdio/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_dac/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_tsens/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdm/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_i2c/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_uart/include -IC:/Espressif/frameworks/esp-idf-master/components/vfs/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_ledc/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_parlio/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_usb_serial_jtag/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl/src -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl/examples -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl/demos -IC:/Espressif/frameworks/esp-idf-master/components/esp_timer/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/sx126x/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/infrared/include -IC:/Espressif/frameworks/esp-idf-master/components/nvs_flash/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_partition/include -march=rv32imac_zicsr_zifencei  -fdiagnostics-color=always -ffunction-sections -fdata-sections -Wall -Werror=all -Wno-error=unused-function -Wno-error=unused-variable -Wno-error=unused-but-set-variable -Wno-error=deprecated-declarations -Wextra -Wno-error=extra -Wno-unused-parameter -Wno-sign-compare -Wno-enum-conversion -gdwarf-4 -ggdb -nostartfiles -Og -fno-shrink-wrap -fmacro-prefix-map=C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5=. -fmacro-prefix-map=C:/Espressif/frameworks/esp-idf-master=/IDF -fstrict-volatile-bitfields -fno-jump-tables -fno-tree-switch-conversion -std=gnu17 -Wno-old-style-declaration -MD -MT esp-idf/lcd/CMakeFiles/__idf_lcd.dir/src/lcd_funcs.c.obj -MF esp-idf\lcd\CMakeFiles\__idf_lcd.dir\src\lcd_funcs.c.obj.d -o esp-idf/lcd/CMakeFiles/__idf_lcd.dir/src/lcd_funcs.c.obj -c C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c
+In file included from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:1:
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_funcs.h:143:6: error: conflicting types for 'lcd_page_2_selected'; have 'void(menu_t *, ir_menu_t *)'
+  143 | void lcd_page_2_selected(menu_t *ui_menu, ir_menu_t *ir_menu)
+      |      ^~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_funcs.h:141:6: note: previous declaration of 'lcd_page_2_selected' with type 'void(menu_t *)'
+  141 | void lcd_page_2_selected(menu_t *menu);
+      |      ^~~~~~~~~~~~~~~~~~~
+In file included from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:3:
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_task.h: In function 'lcd_page_2_selected':
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_task.h:8:19: error: storage class specified for parameter 'user_primary_color'
+    8 | extern lv_color_t user_primary_color;
+      |                   ^~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_task.h:9:19: error: storage class specified for parameter 'user_secondary_color'
+    9 | extern lv_color_t user_secondary_color;
+      |                   ^~~~~~~~~~~~~~~~~~~~
+In file included from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:4:
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:15:26: error: storage class specified for parameter 'xUpButtonSemaphore'
+   15 | extern SemaphoreHandle_t xUpButtonSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:16:26: error: storage class specified for parameter 'xDownButtonSemaphore'
+   16 | extern SemaphoreHandle_t xDownButtonSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:17:26: error: storage class specified for parameter 'xRightButtonSemaphore'
+   17 | extern SemaphoreHandle_t xRightButtonSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:18:26: error: storage class specified for parameter 'xLeftButtonSemaphore'
+   18 | extern SemaphoreHandle_t xLeftButtonSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:19:26: error: storage class specified for parameter 'xGpioEventSemaphore'
+   19 | extern SemaphoreHandle_t xGpioEventSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~~
+In file included from C:/Espressif/frameworks/esp-idf-master/components/esp_timer/include/esp_timer.h:39,
+                 from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:6:
+C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/esp_etm.h:19:35: error: storage class specified for parameter 'esp_etm_channel_handle_t'
+   19 | typedef struct esp_etm_channel_t *esp_etm_channel_handle_t;
+      |                                   ^~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/esp_etm.h:24:33: error: storage class specified for parameter 'esp_etm_event_handle_t'
+   24 | typedef struct esp_etm_event_t *esp_etm_event_handle_t;
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/esp_etm.h:29:32: error: storage class specified for parameter 'esp_etm_task_handle_t'
+   29 | typedef struct esp_etm_task_t *esp_etm_task_handle_t;
+      |                                ^~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/esp_etm.h:40:3: error: storage class specified for parameter 'esp_etm_channel_config_t'
+   40 | } esp_etm_channel_config_t;
+      |   ^~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/esp_etm.h:56:37: error: type defaults to 'int' in declaration of 'esp_etm_channel_config_t' [-Wimplicit-int]
+   56 | esp_err_t esp_etm_new_channel(const esp_etm_channel_config_t *config, esp_etm_channel_handle_t *ret_chan);
+      |                                     ^~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/esp_etm.h:56:62: error: expected ';', ',' or ')' before '*' token
+   56 | esp_err_t esp_etm_new_channel(const esp_etm_channel_config_t *config, esp_etm_channel_handle_t *ret_chan);
+      |                                                              ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/esp_etm.h:67:31: error: expected declaration specifiers or '...' before 'esp_etm_channel_handle_t'
+   67 | esp_err_t esp_etm_del_channel(esp_etm_channel_handle_t chan);
+      |                               ^~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/esp_etm.h:81:34: error: expected declaration specifiers or '...' before 'esp_etm_channel_handle_t'
+   81 | esp_err_t esp_etm_channel_enable(esp_etm_channel_handle_t chan);
+      |                                  ^~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/esp_etm.h:95:35: error: expected declaration specifiers or '...' before 'esp_etm_channel_handle_t'
+   95 | esp_err_t esp_etm_channel_disable(esp_etm_channel_handle_t chan);
+      |                                   ^~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/esp_etm.h:110:35: error: expected declaration specifiers or '...' before 'esp_etm_channel_handle_t'
+  110 | esp_err_t esp_etm_channel_connect(esp_etm_channel_handle_t chan, esp_etm_event_handle_t event, esp_etm_task_handle_t task);
+      |                                   ^~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/esp_etm.h:110:66: error: expected declaration specifiers or '...' before 'esp_etm_event_handle_t'
+  110 | esp_err_t esp_etm_channel_connect(esp_etm_channel_handle_t chan, esp_etm_event_handle_t event, esp_etm_task_handle_t task);
+      |                                                                  ^~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/esp_etm.h:110:96: error: expected declaration specifiers or '...' before 'esp_etm_task_handle_t'
+  110 | esp_err_t esp_etm_channel_connect(esp_etm_channel_handle_t chan, esp_etm_event_handle_t event, esp_etm_task_handle_t task);
+      |                                                                                                ^~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/esp_etm.h:123:29: error: expected declaration specifiers or '...' before 'esp_etm_event_handle_t'
+  123 | esp_err_t esp_etm_del_event(esp_etm_event_handle_t event);
+      |                             ^~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/esp_etm.h:136:28: error: expected declaration specifiers or '...' before 'esp_etm_task_handle_t'
+  136 | esp_err_t esp_etm_del_task(esp_etm_task_handle_t task);
+      |                            ^~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_timer/include/esp_timer.h:49:27: error: storage class specified for parameter 'esp_timer_handle_t'
+   49 | typedef struct esp_timer* esp_timer_handle_t;
+      |                           ^~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_timer/include/esp_timer.h:55:16: error: storage class specified for parameter 'esp_timer_cb_t'
+   55 | typedef void (*esp_timer_cb_t)(void* arg);
+      |                ^~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_timer/include/esp_timer.h:66:3: error: storage class specified for parameter 'esp_timer_dispatch_t'
+   66 | } esp_timer_dispatch_t;
+      |   ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_timer/include/esp_timer.h:72:5: error: expected specifier-qualifier-list before 'esp_timer_cb_t'
+   72 |     esp_timer_cb_t callback;        //!< Callback function to execute when timer expires
+      |     ^~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_timer/include/esp_timer.h:79:3: error: storage class specified for parameter 'esp_timer_create_args_t'
+   79 | } esp_timer_create_args_t;
+      |   ^~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_timer/include/esp_timer.h:143:34: error: type defaults to 'int' in declaration of 'esp_timer_create_args_t' [-Wimplicit-int]
+  143 | esp_err_t esp_timer_create(const esp_timer_create_args_t* create_args,
+      |                                  ^~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_timer/include/esp_timer.h:143:57: error: expected ';', ',' or ')' before '*' token
+  143 | esp_err_t esp_timer_create(const esp_timer_create_args_t* create_args,
+      |                                                         ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_timer/include/esp_timer.h:158:32: error: expected declaration specifiers or '...' before 'esp_timer_handle_t'
+  158 | esp_err_t esp_timer_start_once(esp_timer_handle_t timer, uint64_t timeout_us);
+      |                                ^~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_timer/include/esp_timer.h:173:36: error: expected declaration specifiers or '...' before 'esp_timer_handle_t'
+  173 | esp_err_t esp_timer_start_periodic(esp_timer_handle_t timer, uint64_t period);
+      |                                    ^~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_timer/include/esp_timer.h:191:29: error: expected declaration specifiers or '...' before 'esp_timer_handle_t'
+  191 | esp_err_t esp_timer_restart(esp_timer_handle_t timer, uint64_t timeout_us);
+      |                             ^~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_timer/include/esp_timer.h:204:26: error: expected declaration specifiers or '...' before 'esp_timer_handle_t'
+  204 | esp_err_t esp_timer_stop(esp_timer_handle_t timer);
+      |                          ^~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_timer/include/esp_timer.h:217:28: error: expected declaration specifiers or '...' before 'esp_timer_handle_t'
+  217 | esp_err_t esp_timer_delete(esp_timer_handle_t timer);
+      |                            ^~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_timer/include/esp_timer.h:253:32: error: expected declaration specifiers or '...' before 'esp_timer_handle_t'
+  253 | esp_err_t esp_timer_get_period(esp_timer_handle_t timer, uint64_t *period);
+      |                                ^~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_timer/include/esp_timer.h:269:37: error: expected declaration specifiers or '...' before 'esp_timer_handle_t'
+  269 | esp_err_t esp_timer_get_expiry_time(esp_timer_handle_t timer, uint64_t *expiry);
+      |                                     ^~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_timer/include/esp_timer.h:322:26: error: expected declaration specifiers or '...' before 'esp_timer_handle_t'
+  322 | bool esp_timer_is_active(esp_timer_handle_t timer);
+      |                          ^~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_timer/include/esp_timer.h:337:41: error: expected declaration specifiers or '...' before 'esp_etm_event_handle_t'
+  337 | esp_err_t esp_timer_new_etm_alarm_event(esp_etm_event_handle_t *out_event);
+      |                                         ^~~~~~~~~~~~~~~~~~~~~~
+In file included from C:/Espressif/frameworks/esp-idf-master/components/hal/include/hal/gpio_types.h:12,
+                 from C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:15,
+                 from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:7:
+C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/include/soc/gpio_num.h:48:3: error: storage class specified for parameter 'gpio_num_t'
+   48 | } gpio_num_t;
+      |   ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/hal/include/hal/gpio_types.h:22:3: error: storage class specified for parameter 'gpio_port_t'
+   22 | } gpio_port_t;
+      |   ^~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/hal/include/hal/gpio_types.h:88:3: error: storage class specified for parameter 'gpio_int_type_t'
+   88 | } gpio_int_type_t;
+      |   ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/hal/include/hal/gpio_types.h:104:3: error: storage class specified for parameter 'gpio_mode_t'
+  104 | } gpio_mode_t;
+      |   ^~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/hal/include/hal/gpio_types.h:109:3: error: storage class specified for parameter 'gpio_pullup_t'
+  109 | } gpio_pullup_t;
+      |   ^~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/hal/include/hal/gpio_types.h:114:3: error: storage class specified for parameter 'gpio_pulldown_t'
+  114 | } gpio_pulldown_t;
+      |   ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/hal/include/hal/gpio_types.h:121:3: error: storage class specified for parameter 'gpio_pull_mode_t'
+  121 | } gpio_pull_mode_t;
+      |   ^~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/hal/include/hal/gpio_types.h:130:3: error: storage class specified for parameter 'gpio_drive_cap_t'
+  130 | } gpio_drive_cap_t;
+      |   ^~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/hal/include/hal/gpio_types.h:142:3: error: storage class specified for parameter 'gpio_hys_ctrl_mode_t'
+  142 | } gpio_hys_ctrl_mode_t;
+      |   ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/hal/include/hal/gpio_types.h:151:5: error: expected specifier-qualifier-list before 'gpio_drive_cap_t'
+  151 |     gpio_drive_cap_t drv;           /*!< Value of drive strength */
+      |     ^~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/hal/include/hal/gpio_types.h:160:3: error: storage class specified for parameter 'gpio_io_config_t'
+  160 | } gpio_io_config_t;
+      |   ^~~~~~~~~~~~~~~~
+In file included from C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:17:
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio_etm.h:26:3: error: storage class specified for parameter 'gpio_etm_event_edge_t'
+   26 | } gpio_etm_event_edge_t;
+      |   ^~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio_etm.h:36:9: error: expected specifier-qualifier-list before 'gpio_etm_event_edge_t'
+   36 |         gpio_etm_event_edge_t edge;                                 /*!< Which kind of edge can trigger the ETM event module */
+      |         ^~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio_etm.h:39:3: error: storage class specified for parameter 'gpio_etm_event_config_t'
+   39 | } gpio_etm_event_config_t;
+      |   ^~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio_etm.h:58:36: error: type defaults to 'int' in declaration of 'gpio_etm_event_config_t' [-Wimplicit-int]
+   58 | esp_err_t gpio_new_etm_event(const gpio_etm_event_config_t *config, esp_etm_event_handle_t *ret_event, ...);
+      |                                    ^~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio_etm.h:58:60: error: expected ';', ',' or ')' before '*' token
+   58 | esp_err_t gpio_new_etm_event(const gpio_etm_event_config_t *config, esp_etm_event_handle_t *ret_event, ...);
+      |                                                            ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio_etm.h:73:36: error: expected declaration specifiers or '...' before 'esp_etm_event_handle_t'
+   73 | esp_err_t gpio_etm_event_bind_gpio(esp_etm_event_handle_t event, int gpio_num);
+      |                                    ^~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio_etm.h:82:3: error: storage class specified for parameter 'gpio_etm_task_action_t'
+   82 | } gpio_etm_task_action_t;
+      |   ^~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio_etm.h:91:9: error: expected specifier-qualifier-list before 'gpio_etm_task_action_t'
+   91 |         gpio_etm_task_action_t action;                                  /*!< Action to take by the ETM task module */
+      |         ^~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio_etm.h:94:3: error: storage class specified for parameter 'gpio_etm_task_config_t'
+   94 | } gpio_etm_task_config_t;
+      |   ^~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio_etm.h:114:35: error: type defaults to 'int' in declaration of 'gpio_etm_task_config_t' [-Wimplicit-int]
+  114 | esp_err_t gpio_new_etm_task(const gpio_etm_task_config_t *config, esp_etm_task_handle_t *ret_task, ...);
+      |                                   ^~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio_etm.h:114:58: error: expected ';', ',' or ')' before '*' token
+  114 | esp_err_t gpio_new_etm_task(const gpio_etm_task_config_t *config, esp_etm_task_handle_t *ret_task, ...);
+      |                                                          ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio_etm.h:130:34: error: expected declaration specifiers or '...' before 'esp_etm_task_handle_t'
+  130 | esp_err_t gpio_etm_task_add_gpio(esp_etm_task_handle_t task, int gpio_num);
+      |                                  ^~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio_etm.h:146:33: error: expected declaration specifiers or '...' before 'esp_etm_task_handle_t'
+  146 | esp_err_t gpio_etm_task_rm_gpio(esp_etm_task_handle_t task, int gpio_num);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:34:23: error: storage class specified for parameter 'gpio_isr_handle_t'
+   34 | typedef intr_handle_t gpio_isr_handle_t;
+      |                       ^~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:41:16: error: storage class specified for parameter 'gpio_isr_t'
+   41 | typedef void (*gpio_isr_t)(void *arg);
+      |                ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:48:5: error: expected specifier-qualifier-list before 'gpio_mode_t'
+   48 |     gpio_mode_t mode;               /*!< GPIO mode: set input/output mode                     */
+      |     ^~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:55:3: error: storage class specified for parameter 'gpio_config_t'
+   55 | } gpio_config_t;
+      |   ^~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:71:29: error: type defaults to 'int' in declaration of 'gpio_config_t' [-Wimplicit-int]
+   71 | esp_err_t gpio_config(const gpio_config_t *pGPIOConfig);
+      |                             ^~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:71:43: error: expected ';', ',' or ')' before '*' token
+   71 | esp_err_t gpio_config(const gpio_config_t *pGPIOConfig);
+      |                                           ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:82:26: error: expected declaration specifiers or '...' before 'gpio_num_t'
+   82 | esp_err_t gpio_reset_pin(gpio_num_t gpio_num);
+      |                          ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:95:30: error: expected declaration specifiers or '...' before 'gpio_num_t'
+   95 | esp_err_t gpio_set_intr_type(gpio_num_t gpio_num, gpio_int_type_t intr_type);
+      |                              ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:95:51: error: expected declaration specifiers or '...' before 'gpio_int_type_t'
+   95 | esp_err_t gpio_set_intr_type(gpio_num_t gpio_num, gpio_int_type_t intr_type);
+      |                                                   ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:112:28: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  112 | esp_err_t gpio_intr_enable(gpio_num_t gpio_num);
+      |                            ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:126:29: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  126 | esp_err_t gpio_intr_disable(gpio_num_t gpio_num);
+      |                             ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:141:26: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  141 | esp_err_t gpio_set_level(gpio_num_t gpio_num, uint32_t level);
+      |                          ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:155:20: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  155 | int gpio_get_level(gpio_num_t gpio_num);
+      |                    ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:172:30: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  172 | esp_err_t gpio_set_direction(gpio_num_t gpio_num, gpio_mode_t mode);
+      |                              ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:172:51: error: expected declaration specifiers or '...' before 'gpio_mode_t'
+  172 | esp_err_t gpio_set_direction(gpio_num_t gpio_num, gpio_mode_t mode);
+      |                                                   ^~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:183:29: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  183 | esp_err_t gpio_input_enable(gpio_num_t gpio_num);
+      |                             ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:199:30: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  199 | esp_err_t gpio_set_pull_mode(gpio_num_t gpio_num, gpio_pull_mode_t pull);
+      |                              ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:199:51: error: expected declaration specifiers or '...' before 'gpio_pull_mode_t'
+  199 | esp_err_t gpio_set_pull_mode(gpio_num_t gpio_num, gpio_pull_mode_t pull);
+      |                                                   ^~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:212:30: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  212 | esp_err_t gpio_wakeup_enable(gpio_num_t gpio_num, gpio_int_type_t intr_type);
+      |                              ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:212:51: error: expected declaration specifiers or '...' before 'gpio_int_type_t'
+  212 | esp_err_t gpio_wakeup_enable(gpio_num_t gpio_num, gpio_int_type_t intr_type);
+      |                                                   ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:223:31: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  223 | esp_err_t gpio_wakeup_disable(gpio_num_t gpio_num);
+      |                               ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:249:82: error: expected declaration specifiers or '...' before 'gpio_isr_handle_t'
+  249 | esp_err_t gpio_isr_register(void (*fn)(void *), void *arg, int intr_alloc_flags, gpio_isr_handle_t *handle);
+      |                                                                                  ^~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:260:26: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  260 | esp_err_t gpio_pullup_en(gpio_num_t gpio_num);
+      |                          ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:271:27: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  271 | esp_err_t gpio_pullup_dis(gpio_num_t gpio_num);
+      |                           ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:282:28: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  282 | esp_err_t gpio_pulldown_en(gpio_num_t gpio_num);
+      |                            ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:293:29: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  293 | esp_err_t gpio_pulldown_dis(gpio_num_t gpio_num);
+      |                             ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:341:32: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  341 | esp_err_t gpio_isr_handler_add(gpio_num_t gpio_num, gpio_isr_t isr_handler, void *args);
+      |                                ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:341:53: error: expected declaration specifiers or '...' before 'gpio_isr_t'
+  341 | esp_err_t gpio_isr_handler_add(gpio_num_t gpio_num, gpio_isr_t isr_handler, void *args);
+      |                                                     ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:353:35: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  353 | esp_err_t gpio_isr_handler_remove(gpio_num_t gpio_num);
+      |                                   ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:365:37: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  365 | esp_err_t gpio_set_drive_capability(gpio_num_t gpio_num, gpio_drive_cap_t strength);
+      |                                     ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:365:58: error: expected declaration specifiers or '...' before 'gpio_drive_cap_t'
+  365 | esp_err_t gpio_set_drive_capability(gpio_num_t gpio_num, gpio_drive_cap_t strength);
+      |                                                          ^~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:377:37: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  377 | esp_err_t gpio_get_drive_capability(gpio_num_t gpio_num, gpio_drive_cap_t *strength);
+      |                                     ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:377:58: error: expected declaration specifiers or '...' before 'gpio_drive_cap_t'
+  377 | esp_err_t gpio_get_drive_capability(gpio_num_t gpio_num, gpio_drive_cap_t *strength);
+      |                                                          ^~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:409:24: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  409 | esp_err_t gpio_hold_en(gpio_num_t gpio_num);
+      |                        ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:428:25: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  428 | esp_err_t gpio_hold_dis(gpio_num_t gpio_num);
+      |                         ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:507:29: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  507 | esp_err_t gpio_sleep_sel_en(gpio_num_t gpio_num);
+      |                             ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:516:30: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  516 | esp_err_t gpio_sleep_sel_dis(gpio_num_t gpio_num);
+      |                              ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:530:36: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  530 | esp_err_t gpio_sleep_set_direction(gpio_num_t gpio_num, gpio_mode_t mode);
+      |                                    ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:530:57: error: expected declaration specifiers or '...' before 'gpio_mode_t'
+  530 | esp_err_t gpio_sleep_set_direction(gpio_num_t gpio_num, gpio_mode_t mode);
+      |                                                         ^~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:544:36: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  544 | esp_err_t gpio_sleep_set_pull_mode(gpio_num_t gpio_num, gpio_pull_mode_t pull);
+      |                                    ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:544:57: error: expected declaration specifiers or '...' before 'gpio_pull_mode_t'
+  544 | esp_err_t gpio_sleep_set_pull_mode(gpio_num_t gpio_num, gpio_pull_mode_t pull);
+      |                                                         ^~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:564:41: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  564 | esp_err_t gpio_deep_sleep_wakeup_enable(gpio_num_t gpio_num, gpio_int_type_t intr_type);
+      |                                         ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:564:62: error: expected declaration specifiers or '...' before 'gpio_int_type_t'
+  564 | esp_err_t gpio_deep_sleep_wakeup_enable(gpio_num_t gpio_num, gpio_int_type_t intr_type);
+      |                                                              ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:575:42: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  575 | esp_err_t gpio_deep_sleep_wakeup_disable(gpio_num_t gpio_num);
+      |                                          ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:601:30: error: expected declaration specifiers or '...' before 'gpio_num_t'
+  601 | esp_err_t gpio_get_io_config(gpio_num_t gpio_num, gpio_io_config_t *out_io_config);
+      |                              ^~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include/driver/gpio.h:601:51: error: expected declaration specifiers or '...' before 'gpio_io_config_t'
+  601 | esp_err_t gpio_get_io_config(gpio_num_t gpio_num, gpio_io_config_t *out_io_config);
+      |                                                   ^~~~~~~~~~~~~~~~
+In file included from C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_config.h:13,
+                 from C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log.h:14,
+                 from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:12:
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_level.h:28:3: error: storage class specified for parameter 'esp_log_level_t'
+   28 | } esp_log_level_t;
+      |   ^~~~~~~~~~~~~~~
+In file included from C:/Espressif/frameworks/esp-idf-master/components/newlib/platform_include/assert.h:15,
+                 from C:/Espressif/tools/riscv32-esp-elf/esp-14.2.0_20241119/riscv32-esp-elf/riscv32-esp-elf/include/sys/reent.h:458,
+                 from C:/Espressif/frameworks/esp-idf-master/components/newlib/platform_include/sys/reent.h:15,
+                 from C:/Espressif/tools/riscv32-esp-elf/esp-14.2.0_20241119/riscv32-esp-elf/riscv32-esp-elf/include/stdio.h:60,
+                 from C:/Espressif/frameworks/esp-idf-master/components/newlib/platform_include/stdio.h:10,
+                 from C:/Espressif/frameworks/esp-idf-master/components/esp_common/include/esp_err.h:10,
+                 from C:/Espressif/frameworks/esp-idf-master/components/esp_driver_spi/include/driver/spi_master.h:9,
+                 from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/st7789.h:4,
+                 from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_funcs.h:5:
+C:/Espressif/frameworks/esp-idf-master/components/esp_common/include/esp_assert.h:13:27: error: expected declaration specifiers before '_Static_assert'
+   13 | #define ESP_STATIC_ASSERT static_assert
+      |                           ^~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_level.h:36:1: note: in expansion of macro 'ESP_STATIC_ASSERT'
+   36 | ESP_STATIC_ASSERT(ESP_LOG_MAX <= ESP_LOG_LEVEL_MASK, "Log level items of esp_log_level_t must fit ESP_LOG_LEVEL_MASK");
+      | ^~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_level.h:107:1: error: expected declaration specifiers before '__attribute__'
+  107 | __attribute__((always_inline))
+      | ^~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_level.h:168:41: error: expected declaration specifiers or '...' before 'esp_log_level_t'
+  168 | void esp_log_level_set(const char* tag, esp_log_level_t level);
+      |                                         ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_level.h:180:1: error: expected declaration specifiers before 'esp_log_level_t'
+  180 | esp_log_level_t esp_log_level_get(const char* tag);
+      | ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_config.h:95:13: error: expected specifier-qualifier-list before 'esp_log_level_t'
+   95 |             esp_log_level_t log_level: ESP_LOG_LEVEL_LEN; /*!< Log level */
+      |             ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_config.h:104:3: error: storage class specified for parameter 'esp_log_config_t'
+  104 | } esp_log_config_t;
+      |   ^~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_common/include/esp_assert.h:13:27: error: expected declaration specifiers before '_Static_assert'
+   13 | #define ESP_STATIC_ASSERT static_assert
+      |                           ^~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_config.h:112:1: note: in expansion of macro 'ESP_STATIC_ASSERT'
+  112 | ESP_STATIC_ASSERT(ESP_LOG_OFFSET_CONSTRAINED_ENV == ESP_LOG_LEVEL_LEN, "The log level should not overlap the following fields in esp_log_config_t");
+      | ^~~~~~~~~~~~~~~~~
+In file included from C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log.h:17:
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_buffer.h:30:90: error: expected declaration specifiers or '...' before 'esp_log_level_t'
+   30 | void esp_log_buffer_hex_internal(const char *tag, const void *buffer, uint16_t buff_len, esp_log_level_t level);
+      |                                                                                          ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_buffer.h:45:91: error: expected declaration specifiers or '...' before 'esp_log_level_t'
+   45 | void esp_log_buffer_char_internal(const char *tag, const void *buffer, uint16_t buff_len, esp_log_level_t level);
+      |                                                                                           ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_buffer.h:62:94: error: expected declaration specifiers or '...' before 'esp_log_level_t'
+   62 | void esp_log_buffer_hexdump_internal(const char *tag, const void *buffer, uint16_t buff_len, esp_log_level_t log_level);
+      |                                                                                              ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_buffer.h:156:1: error: expected declaration specifiers before '__attribute__'
+  156 | __attribute__((deprecated("Use 'ESP_LOG_BUFFER_HEX' instead")))
+      | ^~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_buffer.h:167:1: error: expected declaration specifiers before '__attribute__'
+  167 | __attribute__((deprecated("Use 'ESP_LOG_BUFFER_CHAR' instead")))
+      | ^~~~~~~~~~~~~
+In file included from C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log.h:19:
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_write.h:17:15: error: storage class specified for parameter 'vprintf_like_t'
+   17 | typedef int (*vprintf_like_t)(const char *, va_list);
+      |               ^~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_write.h:33:1: error: expected declaration specifiers before 'vprintf_like_t'
+   33 | vprintf_like_t esp_log_set_vprintf(vprintf_like_t func);
+      | ^~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_write.h:51:20: error: expected declaration specifiers or '...' before 'esp_log_level_t'
+   51 | void esp_log_write(esp_log_level_t level, const char* tag, const char* format, ...) __attribute__((format(printf, 3, 4)));
+      |                    ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_write.h:68:21: error: expected declaration specifiers or '...' before 'esp_log_level_t'
+   68 | void esp_log_writev(esp_log_level_t level, const char* tag, const char* format, va_list args);
+      |                     ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log.h:36:14: error: expected declaration specifiers or '...' before 'esp_log_config_t'
+   36 | void esp_log(esp_log_config_t config, const char* tag, const char* format, ...);
+      |              ^~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log.h:48:17: error: expected declaration specifiers or '...' before 'esp_log_config_t'
+   48 | void esp_log_va(esp_log_config_t config, const char *tag, const char *format, va_list args);
+      |                 ^~~~~~~~~~~~~~~~
+In file included from C:/Espressif/tools/riscv32-esp-elf/esp-14.2.0_20241119/riscv32-esp-elf/riscv32-esp-elf/include/string.h:175,
+                 from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:18:
+C:/Espressif/tools/riscv32-esp-elf/esp-14.2.0_20241119/riscv32-esp-elf/riscv32-esp-elf/include/sys/string.h:16:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+   16 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:27:20: error: storage class specified for parameter 'TAG'
+   27 | static const char *TAG = "LCD_FUNCS";
+      |                    ^~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:27:1: error: parameter 'TAG' is initialized
+   27 | static const char *TAG = "LCD_FUNCS";
+      | ^~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:30:14: error: storage class specified for parameter 'tft'
+   30 | static TFT_t tft;
+      |              ^~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:31:22: error: storage class specified for parameter 'disp'
+   31 | static lv_display_t *disp; // LVGL display handle
+      |                      ^~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:33:13: error: storage class specified for parameter 'already_scrolling'
+   33 | static bool already_scrolling = false;
+      |             ^~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:33:1: error: parameter 'already_scrolling' is initialized
+   33 | static bool already_scrolling = false;
+      | ^~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:41:3: error: storage class specified for parameter 'scroll_ctx_t'
+   41 | } scroll_ctx_t;
+      |   ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:43:13: error: storage class specified for parameter 'scrolling_menu'
+   43 | static bool scrolling_menu = false;
+      |             ^~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:43:1: error: parameter 'scrolling_menu' is initialized
+   43 | static bool scrolling_menu = false;
+      | ^~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:44:13: error: storage class specified for parameter 'scrolling_up'
+   44 | static bool scrolling_up = false;
+      |             ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:44:1: error: parameter 'scrolling_up' is initialized
+   44 | static bool scrolling_up = false;
+      | ^~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:49:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+   49 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:81:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+   81 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:87:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+   87 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:111:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  111 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:145:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  145 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:154:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  154 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:162:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  162 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:169:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  169 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:192:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  192 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:214:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  214 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:283:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  283 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:319:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  319 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:329:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  329 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:374:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  374 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:442:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  442 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:490:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  490 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:522:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  522 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_funcs.h:143:6: error: old-style parameter declarations in prototyped function definition
+  143 | void lcd_page_2_selected(menu_t *ui_menu, ir_menu_t *ir_menu)
+      |      ^~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c:541: error: expected '{' at end of input
+[5/16] Building C object esp-idf/lcd/CMakeFiles/__idf_lcd.dir/src/lcd_task.c.obj
+FAILED: esp-idf/lcd/CMakeFiles/__idf_lcd.dir/src/lcd_task.c.obj 
+C:\Espressif\tools\riscv32-esp-elf\esp-14.2.0_20241119\riscv32-esp-elf\bin\riscv32-esp-elf-gcc.exe -DESP_PLATFORM -DIDF_VER=\"v5.5-dev-2715-ga45d713b03\" -DLV_CONF_INCLUDE_SIMPLE -DSOC_MMU_PAGE_SIZE=CONFIG_MMU_PAGE_SIZE -DSOC_XTAL_FREQ_MHZ=CONFIG_XTAL_FREQ -D_GLIBCXX_HAVE_POSIX_SEMAPHORE -D_GLIBCXX_USE_POSIX_SEMAPHORE -D_GNU_SOURCE -D_POSIX_READER_WRITER_LOCKS -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/config -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/media/include -IC:/Espressif/frameworks/esp-idf-master/components/newlib/platform_include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/config/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/config/include/freertos -IC:/Espressif/frameworks/esp-idf-master/components/freertos/config/riscv/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/FreeRTOS-Kernel/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/FreeRTOS-Kernel/portable/riscv/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/FreeRTOS-Kernel/portable/riscv/include/freertos -IC:/Espressif/frameworks/esp-idf-master/components/freertos/esp_additions/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/soc -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/soc/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/dma/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/ldo/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/debug_probe/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/mspi_timing_tuning/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/power_supply/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/. -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/private_include -IC:/Espressif/frameworks/esp-idf-master/components/heap/include -IC:/Espressif/frameworks/esp-idf-master/components/heap/tlsf -IC:/Espressif/frameworks/esp-idf-master/components/log/include -IC:/Espressif/frameworks/esp-idf-master/components/soc/include -IC:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/register -IC:/Espressif/frameworks/esp-idf-master/components/hal/platform_port/include -IC:/Espressif/frameworks/esp-idf-master/components/hal/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/hal/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/include/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/esp_common/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/port/soc -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/port/include/riscv -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/port/include/private -IC:/Espressif/frameworks/esp-idf-master/components/riscv/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/include/apps -IC:/Espressif/frameworks/esp-idf-master/components/lwip/include/apps/sntp -IC:/Espressif/frameworks/esp-idf-master/components/lwip/lwip/src/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/freertos/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/esp32xx/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/esp32xx/include/arch -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/esp32xx/include/sys -IC:/Espressif/frameworks/esp-idf-master/components/driver/deprecated -IC:/Espressif/frameworks/esp-idf-master/components/driver/i2c/include -IC:/Espressif/frameworks/esp-idf-master/components/driver/touch_sensor/include -IC:/Espressif/frameworks/esp-idf-master/components/driver/twai/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_pm/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_ringbuf/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_pcnt/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_gptimer/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_spi/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_mcpwm/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_ana_cmpr/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_i2s/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdmmc/include -IC:/Espressif/frameworks/esp-idf-master/components/sdmmc/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdspi/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdio/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_dac/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_tsens/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdm/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_i2c/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_uart/include -IC:/Espressif/frameworks/esp-idf-master/components/vfs/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_ledc/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_parlio/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_usb_serial_jtag/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl/src -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl/examples -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl/demos -IC:/Espressif/frameworks/esp-idf-master/components/esp_timer/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/sx126x/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/infrared/include -IC:/Espressif/frameworks/esp-idf-master/components/nvs_flash/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_partition/include -march=rv32imac_zicsr_zifencei  -fdiagnostics-color=always -ffunction-sections -fdata-sections -Wall -Werror=all -Wno-error=unused-function -Wno-error=unused-variable -Wno-error=unused-but-set-variable -Wno-error=deprecated-declarations -Wextra -Wno-error=extra -Wno-unused-parameter -Wno-sign-compare -Wno-enum-conversion -gdwarf-4 -ggdb -nostartfiles -Og -fno-shrink-wrap -fmacro-prefix-map=C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5=. -fmacro-prefix-map=C:/Espressif/frameworks/esp-idf-master=/IDF -fstrict-volatile-bitfields -fno-jump-tables -fno-tree-switch-conversion -std=gnu17 -Wno-old-style-declaration -MD -MT esp-idf/lcd/CMakeFiles/__idf_lcd.dir/src/lcd_task.c.obj -MF esp-idf\lcd\CMakeFiles\__idf_lcd.dir\src\lcd_task.c.obj.d -o esp-idf/lcd/CMakeFiles/__idf_lcd.dir/src/lcd_task.c.obj -c C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_task.c
+In file included from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_task.h:4,
+                 from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_task.c:1:
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_funcs.h:143:6: error: conflicting types for 'lcd_page_2_selected'; have 'void(menu_t *, ir_menu_t *)'
+  143 | void lcd_page_2_selected(menu_t *ui_menu, ir_menu_t *ir_menu)
+      |      ^~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_funcs.h:141:6: note: previous declaration of 'lcd_page_2_selected' with type 'void(menu_t *)'
+  141 | void lcd_page_2_selected(menu_t *menu);
+      |      ^~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_task.h: In function 'lcd_page_2_selected':
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_task.h:8:19: error: storage class specified for parameter 'user_primary_color'
+    8 | extern lv_color_t user_primary_color;
+      |                   ^~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_task.h:9:19: error: storage class specified for parameter 'user_secondary_color'
+    9 | extern lv_color_t user_secondary_color;
+      |                   ^~~~~~~~~~~~~~~~~~~~
+In file included from C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_config.h:13,
+                 from C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log.h:14,
+                 from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_task.c:8:
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_level.h:28:3: error: storage class specified for parameter 'esp_log_level_t'
+   28 | } esp_log_level_t;
+      |   ^~~~~~~~~~~~~~~
+In file included from C:/Espressif/frameworks/esp-idf-master/components/newlib/platform_include/assert.h:15,
+                 from C:/Espressif/tools/riscv32-esp-elf/esp-14.2.0_20241119/riscv32-esp-elf/riscv32-esp-elf/include/sys/reent.h:458,
+                 from C:/Espressif/frameworks/esp-idf-master/components/newlib/platform_include/sys/reent.h:15,
+                 from C:/Espressif/tools/riscv32-esp-elf/esp-14.2.0_20241119/riscv32-esp-elf/riscv32-esp-elf/include/stdio.h:60,
+                 from C:/Espressif/frameworks/esp-idf-master/components/newlib/platform_include/stdio.h:10,
+                 from C:/Espressif/frameworks/esp-idf-master/components/esp_common/include/esp_err.h:10,
+                 from C:/Espressif/frameworks/esp-idf-master/components/esp_driver_spi/include/driver/spi_master.h:9,
+                 from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/st7789.h:4,
+                 from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_funcs.h:5:
+C:/Espressif/frameworks/esp-idf-master/components/esp_common/include/esp_assert.h:13:27: error: expected declaration specifiers before '_Static_assert'
+   13 | #define ESP_STATIC_ASSERT static_assert
+      |                           ^~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_level.h:36:1: note: in expansion of macro 'ESP_STATIC_ASSERT'
+   36 | ESP_STATIC_ASSERT(ESP_LOG_MAX <= ESP_LOG_LEVEL_MASK, "Log level items of esp_log_level_t must fit ESP_LOG_LEVEL_MASK");
+      | ^~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_level.h:107:1: error: expected declaration specifiers before '__attribute__'
+  107 | __attribute__((always_inline))
+      | ^~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_level.h:168:41: error: expected declaration specifiers or '...' before 'esp_log_level_t'
+  168 | void esp_log_level_set(const char* tag, esp_log_level_t level);
+      |                                         ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_level.h:180:1: error: expected declaration specifiers before 'esp_log_level_t'
+  180 | esp_log_level_t esp_log_level_get(const char* tag);
+      | ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_config.h:95:13: error: expected specifier-qualifier-list before 'esp_log_level_t'
+   95 |             esp_log_level_t log_level: ESP_LOG_LEVEL_LEN; /*!< Log level */
+      |             ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_config.h:104:3: error: storage class specified for parameter 'esp_log_config_t'
+  104 | } esp_log_config_t;
+      |   ^~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_common/include/esp_assert.h:13:27: error: expected declaration specifiers before '_Static_assert'
+   13 | #define ESP_STATIC_ASSERT static_assert
+      |                           ^~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_config.h:112:1: note: in expansion of macro 'ESP_STATIC_ASSERT'
+  112 | ESP_STATIC_ASSERT(ESP_LOG_OFFSET_CONSTRAINED_ENV == ESP_LOG_LEVEL_LEN, "The log level should not overlap the following fields in esp_log_config_t");
+      | ^~~~~~~~~~~~~~~~~
+In file included from C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log.h:17:
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_buffer.h:30:90: error: expected declaration specifiers or '...' before 'esp_log_level_t'
+   30 | void esp_log_buffer_hex_internal(const char *tag, const void *buffer, uint16_t buff_len, esp_log_level_t level);
+      |                                                                                          ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_buffer.h:45:91: error: expected declaration specifiers or '...' before 'esp_log_level_t'
+   45 | void esp_log_buffer_char_internal(const char *tag, const void *buffer, uint16_t buff_len, esp_log_level_t level);
+      |                                                                                           ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_buffer.h:62:94: error: expected declaration specifiers or '...' before 'esp_log_level_t'
+   62 | void esp_log_buffer_hexdump_internal(const char *tag, const void *buffer, uint16_t buff_len, esp_log_level_t log_level);
+      |                                                                                              ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_buffer.h:156:1: error: expected declaration specifiers before '__attribute__'
+  156 | __attribute__((deprecated("Use 'ESP_LOG_BUFFER_HEX' instead")))
+      | ^~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_buffer.h:167:1: error: expected declaration specifiers before '__attribute__'
+  167 | __attribute__((deprecated("Use 'ESP_LOG_BUFFER_CHAR' instead")))
+      | ^~~~~~~~~~~~~
+In file included from C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log.h:19:
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_write.h:17:15: error: storage class specified for parameter 'vprintf_like_t'
+   17 | typedef int (*vprintf_like_t)(const char *, va_list);
+      |               ^~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_write.h:33:1: error: expected declaration specifiers before 'vprintf_like_t'
+   33 | vprintf_like_t esp_log_set_vprintf(vprintf_like_t func);
+      | ^~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_write.h:51:20: error: expected declaration specifiers or '...' before 'esp_log_level_t'
+   51 | void esp_log_write(esp_log_level_t level, const char* tag, const char* format, ...) __attribute__((format(printf, 3, 4)));
+      |                    ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log_write.h:68:21: error: expected declaration specifiers or '...' before 'esp_log_level_t'
+   68 | void esp_log_writev(esp_log_level_t level, const char* tag, const char* format, va_list args);
+      |                     ^~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log.h:36:14: error: expected declaration specifiers or '...' before 'esp_log_config_t'
+   36 | void esp_log(esp_log_config_t config, const char* tag, const char* format, ...);
+      |              ^~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/log/include/esp_log.h:48:17: error: expected declaration specifiers or '...' before 'esp_log_config_t'
+   48 | void esp_log_va(esp_log_config_t config, const char *tag, const char *format, va_list args);
+      |                 ^~~~~~~~~~~~~~~~
+In file included from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_task.c:17:
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:15:26: error: storage class specified for parameter 'xUpButtonSemaphore'
+   15 | extern SemaphoreHandle_t xUpButtonSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:16:26: error: storage class specified for parameter 'xDownButtonSemaphore'
+   16 | extern SemaphoreHandle_t xDownButtonSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:17:26: error: storage class specified for parameter 'xRightButtonSemaphore'
+   17 | extern SemaphoreHandle_t xRightButtonSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:18:26: error: storage class specified for parameter 'xLeftButtonSemaphore'
+   18 | extern SemaphoreHandle_t xLeftButtonSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:19:26: error: storage class specified for parameter 'xGpioEventSemaphore'
+   19 | extern SemaphoreHandle_t xGpioEventSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_task.c:20:20: error: storage class specified for parameter 'TAG'
+   20 | static const char *TAG = "LCD_TASK";
+      |                    ^~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_task.c:20:1: error: parameter 'TAG' is initialized
+   20 | static const char *TAG = "LCD_TASK";
+      | ^~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_task.c:22:1: error: parameter 'ui_menu' is initialized
+   22 | menu_t ui_menu = {
+      | ^~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_task.c:34:1: error: parameter 'ir_menu' is initialized
+   34 | ir_menu_t ir_menu = {
+      | ^~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_task.c:41:1: error: parameter 'user_primary_color' is initialized
+   41 | lv_color_t user_primary_color = LV_COLOR_MAKE(0x00, 0x00, 0x8B);
+      | ^~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_task.c:41:12: error: redefinition of parameter 'user_primary_color'
+   41 | lv_color_t user_primary_color = LV_COLOR_MAKE(0x00, 0x00, 0x8B);
+      |            ^~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_task.h:8:19: note: previous definition of 'user_primary_color' with type 'lv_color_t'
+    8 | extern lv_color_t user_primary_color;
+      |                   ^~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_task.c:42:1: error: parameter 'user_secondary_color' is initialized
+   42 | lv_color_t user_secondary_color = LV_COLOR_MAKE(0xFF, 0xFF, 0xFF);
+      | ^~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_task.c:42:12: error: redefinition of parameter 'user_secondary_color'
+   42 | lv_color_t user_secondary_color = LV_COLOR_MAKE(0xFF, 0xFF, 0xFF);
+      |            ^~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_task.h:9:19: note: previous definition of 'user_secondary_color' with type 'lv_color_t'
+    9 | extern lv_color_t user_secondary_color;
+      |                   ^~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_task.c:53:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+   53 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_task.c:159:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  159 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_funcs.h:143:6: error: old-style parameter declarations in prototyped function definition
+  143 | void lcd_page_2_selected(menu_t *ui_menu, ir_menu_t *ir_menu)
+      |      ^~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_task.c:163: error: expected '{' at end of input
+[6/16] Building C object esp-idf/lcd/CMakeFiles/__idf_lcd.dir/src/st7789.c.obj
+FAILED: esp-idf/lcd/CMakeFiles/__idf_lcd.dir/src/st7789.c.obj 
+C:\Espressif\tools\riscv32-esp-elf\esp-14.2.0_20241119\riscv32-esp-elf\bin\riscv32-esp-elf-gcc.exe -DESP_PLATFORM -DIDF_VER=\"v5.5-dev-2715-ga45d713b03\" -DLV_CONF_INCLUDE_SIMPLE -DSOC_MMU_PAGE_SIZE=CONFIG_MMU_PAGE_SIZE -DSOC_XTAL_FREQ_MHZ=CONFIG_XTAL_FREQ -D_GLIBCXX_HAVE_POSIX_SEMAPHORE -D_GLIBCXX_USE_POSIX_SEMAPHORE -D_GNU_SOURCE -D_POSIX_READER_WRITER_LOCKS -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/config -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/media/include -IC:/Espressif/frameworks/esp-idf-master/components/newlib/platform_include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/config/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/config/include/freertos -IC:/Espressif/frameworks/esp-idf-master/components/freertos/config/riscv/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/FreeRTOS-Kernel/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/FreeRTOS-Kernel/portable/riscv/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/FreeRTOS-Kernel/portable/riscv/include/freertos -IC:/Espressif/frameworks/esp-idf-master/components/freertos/esp_additions/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/soc -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/soc/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/dma/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/ldo/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/debug_probe/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/mspi_timing_tuning/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/power_supply/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/. -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/private_include -IC:/Espressif/frameworks/esp-idf-master/components/heap/include -IC:/Espressif/frameworks/esp-idf-master/components/heap/tlsf -IC:/Espressif/frameworks/esp-idf-master/components/log/include -IC:/Espressif/frameworks/esp-idf-master/components/soc/include -IC:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/register -IC:/Espressif/frameworks/esp-idf-master/components/hal/platform_port/include -IC:/Espressif/frameworks/esp-idf-master/components/hal/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/hal/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/include/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/esp_common/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/port/soc -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/port/include/riscv -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/port/include/private -IC:/Espressif/frameworks/esp-idf-master/components/riscv/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/include/apps -IC:/Espressif/frameworks/esp-idf-master/components/lwip/include/apps/sntp -IC:/Espressif/frameworks/esp-idf-master/components/lwip/lwip/src/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/freertos/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/esp32xx/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/esp32xx/include/arch -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/esp32xx/include/sys -IC:/Espressif/frameworks/esp-idf-master/components/driver/deprecated -IC:/Espressif/frameworks/esp-idf-master/components/driver/i2c/include -IC:/Espressif/frameworks/esp-idf-master/components/driver/touch_sensor/include -IC:/Espressif/frameworks/esp-idf-master/components/driver/twai/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_pm/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_ringbuf/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_pcnt/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_gptimer/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_spi/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_mcpwm/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_ana_cmpr/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_i2s/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdmmc/include -IC:/Espressif/frameworks/esp-idf-master/components/sdmmc/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdspi/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdio/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_dac/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_tsens/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdm/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_i2c/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_uart/include -IC:/Espressif/frameworks/esp-idf-master/components/vfs/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_ledc/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_parlio/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_usb_serial_jtag/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl/src -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl/examples -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl/demos -IC:/Espressif/frameworks/esp-idf-master/components/esp_timer/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/sx126x/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/infrared/include -IC:/Espressif/frameworks/esp-idf-master/components/nvs_flash/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_partition/include -march=rv32imac_zicsr_zifencei  -fdiagnostics-color=always -ffunction-sections -fdata-sections -Wall -Werror=all -Wno-error=unused-function -Wno-error=unused-variable -Wno-error=unused-but-set-variable -Wno-error=deprecated-declarations -Wextra -Wno-error=extra -Wno-unused-parameter -Wno-sign-compare -Wno-enum-conversion -gdwarf-4 -ggdb -nostartfiles -Og -fno-shrink-wrap -fmacro-prefix-map=C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5=. -fmacro-prefix-map=C:/Espressif/frameworks/esp-idf-master=/IDF -fstrict-volatile-bitfields -fno-jump-tables -fno-tree-switch-conversion -std=gnu17 -Wno-old-style-declaration -MD -MT esp-idf/lcd/CMakeFiles/__idf_lcd.dir/src/st7789.c.obj -MF esp-idf\lcd\CMakeFiles\__idf_lcd.dir\src\st7789.c.obj.d -o esp-idf/lcd/CMakeFiles/__idf_lcd.dir/src/st7789.c.obj -c C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c
+In file included from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:13:
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_funcs.h:143:6: error: conflicting types for 'lcd_page_2_selected'; have 'void(menu_t *, ir_menu_t *)'
+  143 | void lcd_page_2_selected(menu_t *ui_menu, ir_menu_t *ir_menu)
+      |      ^~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_funcs.h:141:6: note: previous declaration of 'lcd_page_2_selected' with type 'void(menu_t *)'
+  141 | void lcd_page_2_selected(menu_t *menu);
+      |      ^~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c: In function 'lcd_page_2_selected':
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:27:18: error: storage class specified for parameter 'SPI_Command_Mode'
+   27 | static const int SPI_Command_Mode = 0;
+      |                  ^~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:27:1: error: parameter 'SPI_Command_Mode' is initialized
+   27 | static const int SPI_Command_Mode = 0;
+      | ^~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:28:18: error: storage class specified for parameter 'SPI_Data_Mode'
+   28 | static const int SPI_Data_Mode = 1;
+      |                  ^~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:28:1: error: parameter 'SPI_Data_Mode' is initialized
+   28 | static const int SPI_Data_Mode = 1;
+      | ^~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:35:1: error: parameter 'clock_speed_hz' is initialized
+   35 | int clock_speed_hz = SPI_DEFAULT_FREQUENCY;
+      | ^~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:35:43: error: expected declaration specifiers before ';' token
+   35 | int clock_speed_hz = SPI_DEFAULT_FREQUENCY;
+      |                                           ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:37:33: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+   37 | void spi_clock_speed(int speed) {
+      |                                 ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:43:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+   43 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:122:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  122 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:142:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  142 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:150:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  150 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:159:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  159 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:168:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  168 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:179:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  179 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:192:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  192 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:203:22: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  203 | void delayMS(int ms) {
+      |                      ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:212:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  212 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:280:71: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  280 | void lcdDrawPixel(TFT_t * dev, uint16_t x, uint16_t y, uint16_t color){
+      |                                                                       ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:306:96: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  306 | void lcdDrawMultiPixels(TFT_t * dev, uint16_t x, uint16_t y, uint16_t size, uint16_t * colors) {
+      |                                                                                                ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:342:103: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  342 | void lcdDrawFillRect(TFT_t * dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t color) {
+      |                                                                                                       ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:379:94: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  379 | void lcdDrawFillSquare(TFT_t * dev, uint16_t x0, uint16_t y0, uint16_t size, uint16_t color) {
+      |                                                                                              ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:388:33: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  388 | void lcdDisplayOff(TFT_t * dev) {
+      |                                 ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:393:32: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  393 | void lcdDisplayOn(TFT_t * dev) {
+      |                                ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:399:49: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  399 | void lcdFillScreen(TFT_t * dev, uint16_t color) {
+      |                                                 ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:409:99: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  409 | void lcdDrawLine(TFT_t * dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t color) {
+      |                                                                                                   ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:457:99: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  457 | void lcdDrawRect(TFT_t * dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t color) {
+      |                                                                                                   ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:475:118: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  475 | void lcdDrawRectAngle(TFT_t * dev, uint16_t xc, uint16_t yc, uint16_t w, uint16_t h, uint16_t angle, uint16_t color) {
+      |                                                                                                                      ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:517:117: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  517 | void lcdDrawTriangle(TFT_t * dev, uint16_t xc, uint16_t yc, uint16_t w, uint16_t h, uint16_t angle, uint16_t color) {
+      |                                                                                                                     ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:550:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  550 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:578:87: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  578 | void lcdDrawCircle(TFT_t * dev, uint16_t x0, uint16_t y0, uint16_t r, uint16_t color) {
+      |                                                                                       ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:602:91: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  602 | void lcdDrawFillCircle(TFT_t * dev, uint16_t x0, uint16_t y0, uint16_t r, uint16_t color) {
+      |                                                                                           ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:631:116: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  631 | void lcdDrawRoundRect(TFT_t * dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t r, uint16_t color) {
+      |                                                                                                                    ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:682:107: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  682 | void lcdDrawArrow(TFT_t * dev, uint16_t x0,uint16_t y0,uint16_t x1,uint16_t y1,uint16_t w,uint16_t color) {
+      |                                                                                                           ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:711:111: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  711 | void lcdDrawFillArrow(TFT_t * dev, uint16_t x0,uint16_t y0,uint16_t x1,uint16_t y1,uint16_t w,uint16_t color) {
+      |                                                                                                               ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:749:101: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  749 | int lcdDrawChar(TFT_t * dev, FontxFile *fxs, uint16_t x, uint16_t y, uint8_t ascii, uint16_t color) {
+      |                                                                                                     ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:877:104: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  877 | int lcdDrawString(TFT_t * dev, FontxFile *fx, uint16_t x, uint16_t y, uint8_t * ascii, uint16_t color) {
+      |                                                                                                        ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:904:96: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  904 | int lcdDrawCode(TFT_t * dev, FontxFile *fx, uint16_t x,uint16_t y,uint8_t code,uint16_t color) {
+      |                                                                                                ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:968:53: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  968 | void lcdSetFontDirection(TFT_t * dev, uint16_t dir) {
+      |                                                     ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:974:50: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  974 | void lcdSetFontFill(TFT_t * dev, uint16_t color) {
+      |                                                  ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:980:36: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  980 | void lcdUnsetFontFill(TFT_t * dev) {
+      |                                    ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:986:55: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  986 | void lcdSetFontUnderLine(TFT_t * dev, uint16_t color) {
+      |                                                       ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:992:41: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  992 | void lcdUnsetFontUnderLine(TFT_t * dev) {
+      |                                         ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:997:35: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+  997 | void lcdBacklightOff(TFT_t * dev) {
+      |                                   ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:1004:34: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+ 1004 | void lcdBacklightOn(TFT_t * dev) {
+      |                                  ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:1011:35: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+ 1011 | void lcdInversionOff(TFT_t * dev) {
+      |                                   ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:1016:34: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+ 1016 | void lcdInversionOn(TFT_t * dev) {
+      |                                  ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:1020:76: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+ 1020 | void lcdWrapArround(TFT_t * dev, SCROLL_TYPE_t scroll, int start, int end) {
+      |                                                                            ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:1079:104: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+ 1079 | void lcdInversionArea(TFT_t * dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t *save) {
+      |                                                                                                        ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:1105:98: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+ 1105 | void lcdGetRect(TFT_t * dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t *save) {
+      |                                                                                                  ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:1130:98: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+ 1130 | void lcdSetRect(TFT_t * dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t *save) {
+      |                                                                                                  ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:1154:102: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+ 1154 | void lcdSetCursor(TFT_t * dev, uint16_t x0, uint16_t y0, uint16_t r, uint16_t color, uint16_t *save) {
+      |                                                                                                      ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:1159:104: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+ 1159 | void lcdResetCursor(TFT_t * dev, uint16_t x0, uint16_t y0, uint16_t r, uint16_t color, uint16_t *save) {
+      |                                                                                                        ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:1166:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+ 1166 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_funcs.h:143:6: error: old-style parameter declarations in prototyped function definition
+  143 | void lcd_page_2_selected(menu_t *ui_menu, ir_menu_t *ir_menu)
+      |      ^~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c:1187: error: expected '{' at end of input
+[7/16] Building C object esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj
+FAILED: esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj 
+C:\Espressif\tools\riscv32-esp-elf\esp-14.2.0_20241119\riscv32-esp-elf\bin\riscv32-esp-elf-gcc.exe -DESP_PLATFORM -DIDF_VER=\"v5.5-dev-2715-ga45d713b03\" -DLV_CONF_INCLUDE_SIMPLE -DSOC_MMU_PAGE_SIZE=CONFIG_MMU_PAGE_SIZE -DSOC_XTAL_FREQ_MHZ=CONFIG_XTAL_FREQ -D_GLIBCXX_HAVE_POSIX_SEMAPHORE -D_GLIBCXX_USE_POSIX_SEMAPHORE -D_GNU_SOURCE -D_POSIX_READER_WRITER_LOCKS -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/config -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/main -IC:/Espressif/frameworks/esp-idf-master/components/newlib/platform_include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/config/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/config/include/freertos -IC:/Espressif/frameworks/esp-idf-master/components/freertos/config/riscv/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/FreeRTOS-Kernel/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/FreeRTOS-Kernel/portable/riscv/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/FreeRTOS-Kernel/portable/riscv/include/freertos -IC:/Espressif/frameworks/esp-idf-master/components/freertos/esp_additions/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/soc -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/soc/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/dma/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/ldo/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/debug_probe/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/mspi_timing_tuning/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/power_supply/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/. -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/private_include -IC:/Espressif/frameworks/esp-idf-master/components/heap/include -IC:/Espressif/frameworks/esp-idf-master/components/heap/tlsf -IC:/Espressif/frameworks/esp-idf-master/components/log/include -IC:/Espressif/frameworks/esp-idf-master/components/soc/include -IC:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/register -IC:/Espressif/frameworks/esp-idf-master/components/hal/platform_port/include -IC:/Espressif/frameworks/esp-idf-master/components/hal/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/hal/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/include/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/esp_common/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/port/soc -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/port/include/riscv -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/port/include/private -IC:/Espressif/frameworks/esp-idf-master/components/riscv/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/include/apps -IC:/Espressif/frameworks/esp-idf-master/components/lwip/include/apps/sntp -IC:/Espressif/frameworks/esp-idf-master/components/lwip/lwip/src/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/freertos/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/esp32xx/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/esp32xx/include/arch -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/esp32xx/include/sys -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include -IC:/Espressif/frameworks/esp-idf-master/components/driver/deprecated -IC:/Espressif/frameworks/esp-idf-master/components/driver/i2c/include -IC:/Espressif/frameworks/esp-idf-master/components/driver/touch_sensor/include -IC:/Espressif/frameworks/esp-idf-master/components/driver/twai/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_pm/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_ringbuf/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_pcnt/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_gptimer/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_spi/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_mcpwm/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_ana_cmpr/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_i2s/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdmmc/include -IC:/Espressif/frameworks/esp-idf-master/components/sdmmc/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdspi/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdio/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_dac/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_tsens/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdm/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_i2c/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_uart/include -IC:/Espressif/frameworks/esp-idf-master/components/vfs/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_ledc/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_parlio/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_usb_serial_jtag/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/media/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl/src -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl/examples -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl/demos -IC:/Espressif/frameworks/esp-idf-master/components/esp_timer/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/sx126x/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lora/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/infrared/include -IC:/Espressif/frameworks/esp-idf-master/components/nvs_flash/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_partition/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_wifi/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_wifi/include/local -IC:/Espressif/frameworks/esp-idf-master/components/esp_wifi/wifi_apps/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_wifi/wifi_apps/nan_app/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_event/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_phy/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_phy/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_netif/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hid/include -IC:/Espressif/frameworks/esp-idf-master/components/console -IC:/Espressif/frameworks/esp-idf-master/components/esp_vfs_console/include -march=rv32imac_zicsr_zifencei  -fdiagnostics-color=always -ffunction-sections -fdata-sections -Wall -Werror=all -Wno-error=unused-function -Wno-error=unused-variable -Wno-error=unused-but-set-variable -Wno-error=deprecated-declarations -Wextra -Wno-error=extra -Wno-unused-parameter -Wno-sign-compare -Wno-enum-conversion -gdwarf-4 -ggdb -nostartfiles -Og -fno-shrink-wrap -fmacro-prefix-map=C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5=. -fmacro-prefix-map=C:/Espressif/frameworks/esp-idf-master=/IDF -fstrict-volatile-bitfields -fno-jump-tables -fno-tree-switch-conversion -std=gnu17 -Wno-old-style-declaration -MD -MT esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj -MF esp-idf\main\CMakeFiles\__idf_main.dir\main.c.obj.d -o esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj -c C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/main/main.c
+In file included from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/main/main.c:17:
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_funcs.h:143:6: error: conflicting types for 'lcd_page_2_selected'; have 'void(menu_t *, ir_menu_t *)'
+  143 | void lcd_page_2_selected(menu_t *ui_menu, ir_menu_t *ir_menu)
+      |      ^~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_funcs.h:141:6: note: previous declaration of 'lcd_page_2_selected' with type 'void(menu_t *)'
+  141 | void lcd_page_2_selected(menu_t *menu);
+      |      ^~~~~~~~~~~~~~~~~~~
+In file included from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/main/main.c:18:
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_task.h: In function 'lcd_page_2_selected':
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_task.h:8:19: error: storage class specified for parameter 'user_primary_color'
+    8 | extern lv_color_t user_primary_color;
+      |                   ^~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_task.h:9:19: error: storage class specified for parameter 'user_secondary_color'
+    9 | extern lv_color_t user_secondary_color;
+      |                   ^~~~~~~~~~~~~~~~~~~~
+In file included from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/main/main.c:21:
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/infrared/include/infrared_task.h:7:26: error: storage class specified for parameter 'xInfraredRXEventSemaphore'
+    7 | extern SemaphoreHandle_t xInfraredRXEventSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_types.h:12,
+                 from C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_common.h:11,
+                 from C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_rx.h:12,
+                 from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/infrared/include/infrared_funcs.h:4,
+                 from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/main/main.c:22:
+C:/Espressif/frameworks/esp-idf-master/components/hal/include/hal/rmt_types.h:22:34: error: storage class specified for parameter 'rmt_clock_source_t'
+   22 | typedef soc_periph_rmt_clk_src_t rmt_clock_source_t;
+      |                                  ^~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/hal/include/hal/rmt_types.h:38:3: error: storage class specified for parameter 'rmt_symbol_word_t'
+   38 | } rmt_symbol_word_t;
+      |   ^~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_types.h:22:31: error: storage class specified for parameter 'rmt_channel_handle_t'
+   22 | typedef struct rmt_channel_t *rmt_channel_handle_t;
+      |                               ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_types.h:27:36: error: storage class specified for parameter 'rmt_sync_manager_handle_t'
+   27 | typedef struct rmt_sync_manager_t *rmt_sync_manager_handle_t;
+      |                                    ^~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_types.h:32:31: error: storage class specified for parameter 'rmt_encoder_handle_t'
+   32 | typedef struct rmt_encoder_t *rmt_encoder_handle_t;
+      |                               ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_types.h:40:3: error: storage class specified for parameter 'rmt_tx_done_event_data_t'
+   40 | } rmt_tx_done_event_data_t;
+      |   ^~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_types.h:51:40: error: expected declaration specifiers or '...' before 'rmt_channel_handle_t'
+   51 | typedef bool (*rmt_tx_done_callback_t)(rmt_channel_handle_t tx_chan, const rmt_tx_done_event_data_t *edata, void *user_ctx);
+      |                                        ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_types.h:51:76: error: type defaults to 'int' in declaration of 'rmt_tx_done_event_data_t' [-Wimplicit-int]
+   51 | typedef bool (*rmt_tx_done_callback_t)(rmt_channel_handle_t tx_chan, const rmt_tx_done_event_data_t *edata, void *user_ctx);
+      |                                                                            ^~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_types.h:51:101: error: expected ';', ',' or ')' before '*' token
+   51 | typedef bool (*rmt_tx_done_callback_t)(rmt_channel_handle_t tx_chan, const rmt_tx_done_event_data_t *edata, void *user_ctx);
+      |                                                                                                     ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_types.h:57:5: error: expected specifier-qualifier-list before 'rmt_symbol_word_t'
+   57 |     rmt_symbol_word_t *received_symbols; /*!< Point to the received RMT symbols */
+      |     ^~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_types.h:62:3: error: storage class specified for parameter 'rmt_rx_done_event_data_t'
+   62 | } rmt_rx_done_event_data_t;
+      |   ^~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_types.h:73:40: error: expected declaration specifiers or '...' before 'rmt_channel_handle_t'
+   73 | typedef bool (*rmt_rx_done_callback_t)(rmt_channel_handle_t rx_chan, const rmt_rx_done_event_data_t *edata, void *user_ctx);
+      |                                        ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_types.h:73:76: error: type defaults to 'int' in declaration of 'rmt_rx_done_event_data_t' [-Wimplicit-int]
+   73 | typedef bool (*rmt_rx_done_callback_t)(rmt_channel_handle_t rx_chan, const rmt_rx_done_event_data_t *edata, void *user_ctx);
+      |                                                                            ^~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_types.h:73:101: error: expected ';', ',' or ')' before '*' token
+   73 | typedef bool (*rmt_rx_done_callback_t)(rmt_channel_handle_t rx_chan, const rmt_rx_done_event_data_t *edata, void *user_ctx);
+      |                                                                                                     ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_types.h:85:3: error: storage class specified for parameter 'rmt_carrier_config_t'
+   85 | } rmt_carrier_config_t;
+      |   ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_common.h:27:27: error: expected declaration specifiers or '...' before 'rmt_channel_handle_t'
+   27 | esp_err_t rmt_del_channel(rmt_channel_handle_t channel);
+      |                           ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_common.h:39:29: error: expected declaration specifiers or '...' before 'rmt_channel_handle_t'
+   39 | esp_err_t rmt_apply_carrier(rmt_channel_handle_t channel, const rmt_carrier_config_t *config);
+      |                             ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_common.h:39:65: error: type defaults to 'int' in declaration of 'rmt_carrier_config_t' [-Wimplicit-int]
+   39 | esp_err_t rmt_apply_carrier(rmt_channel_handle_t channel, const rmt_carrier_config_t *config);
+      |                                                                 ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_common.h:39:86: error: expected ';', ',' or ')' before '*' token
+   39 | esp_err_t rmt_apply_carrier(rmt_channel_handle_t channel, const rmt_carrier_config_t *config);
+      |                                                                                      ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_common.h:53:22: error: expected declaration specifiers or '...' before 'rmt_channel_handle_t'
+   53 | esp_err_t rmt_enable(rmt_channel_handle_t channel);
+      |                      ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_common.h:67:23: error: expected declaration specifiers or '...' before 'rmt_channel_handle_t'
+   67 | esp_err_t rmt_disable(rmt_channel_handle_t channel);
+      |                       ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_rx.h:25:5: error: unknown type name 'rmt_rx_done_callback_t'
+   25 |     rmt_rx_done_callback_t on_recv_done; /*!< Event callback, invoked when the RMT channel reception is finished
+      |     ^~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_rx.h:27:3: error: storage class specified for parameter 'rmt_rx_event_callbacks_t'
+   27 | } rmt_rx_event_callbacks_t;
+      |   ^~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_rx.h:34:5: error: expected specifier-qualifier-list before 'rmt_clock_source_t'
+   34 |     rmt_clock_source_t clk_src; /*!< Clock source of RMT RX channel, channels in the same group must use the same clock source */
+      |     ^~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_rx.h:48:3: error: storage class specified for parameter 'rmt_rx_channel_config_t'
+   48 | } rmt_rx_channel_config_t;
+      |   ^~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_rx.h:62:3: error: storage class specified for parameter 'rmt_receive_config_t'
+   62 | } rmt_receive_config_t;
+      |   ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_rx.h:77:36: error: type defaults to 'int' in declaration of 'rmt_rx_channel_config_t' [-Wimplicit-int]
+   77 | esp_err_t rmt_new_rx_channel(const rmt_rx_channel_config_t *config, rmt_channel_handle_t *ret_chan);
+      |                                    ^~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_rx.h:77:60: error: expected ';', ',' or ')' before '*' token
+   77 | esp_err_t rmt_new_rx_channel(const rmt_rx_channel_config_t *config, rmt_channel_handle_t *ret_chan);
+      |                                                            ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_rx.h:97:23: error: expected declaration specifiers or '...' before 'rmt_channel_handle_t'
+   97 | esp_err_t rmt_receive(rmt_channel_handle_t rx_channel, void *buffer, size_t buffer_size, const rmt_receive_config_t *config);
+      |                       ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_rx.h:97:96: error: type defaults to 'int' in declaration of 'rmt_receive_config_t' [-Wimplicit-int]
+   97 | esp_err_t rmt_receive(rmt_channel_handle_t rx_channel, void *buffer, size_t buffer_size, const rmt_receive_config_t *config);
+      |                                                                                                ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_rx.h:97:117: error: expected ';', ',' or ')' before '*' token
+   97 | esp_err_t rmt_receive(rmt_channel_handle_t rx_channel, void *buffer, size_t buffer_size, const rmt_receive_config_t *config);
+      |                                                                                                                     ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_rx.h:114:43: error: expected declaration specifiers or '...' before 'rmt_channel_handle_t'
+  114 | esp_err_t rmt_rx_register_event_callbacks(rmt_channel_handle_t rx_channel, const rmt_rx_event_callbacks_t *cbs, void *user_data);
+      |                                           ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_rx.h:114:82: error: type defaults to 'int' in declaration of 'rmt_rx_event_callbacks_t' [-Wimplicit-int]
+  114 | esp_err_t rmt_rx_register_event_callbacks(rmt_channel_handle_t rx_channel, const rmt_rx_event_callbacks_t *cbs, void *user_data);
+      |                                                                                  ^~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_rx.h:114:107: error: expected ';', ',' or ')' before '*' token
+  114 | esp_err_t rmt_rx_register_event_callbacks(rmt_channel_handle_t rx_channel, const rmt_rx_event_callbacks_t *cbs, void *user_data);
+      |                                                                                                           ^
+In file included from C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:13,
+                 from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/infrared/include/infrared_funcs.h:5:
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:19:30: error: storage class specified for parameter 'rmt_encoder_t'
+   19 | typedef struct rmt_encoder_t rmt_encoder_t;
+      |                              ^~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:29:3: error: storage class specified for parameter 'rmt_encode_state_t'
+   29 | } rmt_encode_state_t;
+      |   ^~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:48:22: error: expected declaration specifiers or '...' before 'rmt_encoder_t'
+   48 |     size_t (*encode)(rmt_encoder_t *encoder, rmt_channel_handle_t tx_channel, const void *primary_data, size_t data_size, rmt_encode_state_t *ret_state);
+      |                      ^~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:48:46: error: expected declaration specifiers or '...' before 'rmt_channel_handle_t'
+   48 |     size_t (*encode)(rmt_encoder_t *encoder, rmt_channel_handle_t tx_channel, const void *primary_data, size_t data_size, rmt_encode_state_t *ret_state);
+      |                                              ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:48:123: error: expected declaration specifiers or '...' before 'rmt_encode_state_t'
+   48 |     size_t (*encode)(rmt_encoder_t *encoder, rmt_channel_handle_t tx_channel, const void *primary_data, size_t data_size, rmt_encode_state_t *ret_state);
+      |                                                                                                                           ^~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:58:24: error: expected declaration specifiers or '...' before 'rmt_encoder_t'
+   58 |     esp_err_t (*reset)(rmt_encoder_t *encoder);
+      |                        ^~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:68:22: error: expected declaration specifiers or '...' before 'rmt_encoder_t'
+   68 |     esp_err_t (*del)(rmt_encoder_t *encoder);
+      |                      ^~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:69:1: warning: no semicolon at end of struct or union
+   69 | };
+      | ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:34:1: warning: empty declaration
+   34 | struct rmt_encoder_t {
+      | ^~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:110:42: error: expected declaration specifiers or '...' before 'rmt_symbol_word_t'
+  110 |                                          rmt_symbol_word_t *symbols, bool *done, void *arg);
+      |                                          ^~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:116:5: error: expected specifier-qualifier-list before 'rmt_symbol_word_t'
+  116 |     rmt_symbol_word_t bit0; /*!< How to represent BIT0 in RMT symbol */
+      |     ^~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:121:3: error: storage class specified for parameter 'rmt_bytes_encoder_config_t'
+  121 | } rmt_bytes_encoder_config_t;
+      |   ^~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:127:3: error: storage class specified for parameter 'rmt_copy_encoder_config_t'
+  127 | } rmt_copy_encoder_config_t;
+      |   ^~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:133:5: error: unknown type name 'rmt_encode_simple_cb_t'
+  133 |     rmt_encode_simple_cb_t callback;  /*!< Callback to call for encoding data into RMT items */
+      |     ^~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:139:3: error: storage class specified for parameter 'rmt_simple_encoder_config_t'
+  139 | } rmt_simple_encoder_config_t;
+      |   ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:152:39: error: type defaults to 'int' in declaration of 'rmt_bytes_encoder_config_t' [-Wimplicit-int]
+  152 | esp_err_t rmt_new_bytes_encoder(const rmt_bytes_encoder_config_t *config, rmt_encoder_handle_t *ret_encoder);
+      |                                       ^~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:152:66: error: expected ';', ',' or ')' before '*' token
+  152 | esp_err_t rmt_new_bytes_encoder(const rmt_bytes_encoder_config_t *config, rmt_encoder_handle_t *ret_encoder);
+      |                                                                  ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:167:43: error: expected declaration specifiers or '...' before 'rmt_encoder_handle_t'
+  167 | esp_err_t rmt_bytes_encoder_update_config(rmt_encoder_handle_t bytes_encoder, const rmt_bytes_encoder_config_t *config);
+      |                                           ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:167:85: error: type defaults to 'int' in declaration of 'rmt_bytes_encoder_config_t' [-Wimplicit-int]
+  167 | esp_err_t rmt_bytes_encoder_update_config(rmt_encoder_handle_t bytes_encoder, const rmt_bytes_encoder_config_t *config);
+      |                                                                                     ^~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:167:112: error: expected ';', ',' or ')' before '*' token
+  167 | esp_err_t rmt_bytes_encoder_update_config(rmt_encoder_handle_t bytes_encoder, const rmt_bytes_encoder_config_t *config);
+      |                                                                                                                ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:180:38: error: type defaults to 'int' in declaration of 'rmt_copy_encoder_config_t' [-Wimplicit-int]
+  180 | esp_err_t rmt_new_copy_encoder(const rmt_copy_encoder_config_t *config, rmt_encoder_handle_t *ret_encoder);
+      |                                      ^~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:180:64: error: expected ';', ',' or ')' before '*' token
+  180 | esp_err_t rmt_new_copy_encoder(const rmt_copy_encoder_config_t *config, rmt_encoder_handle_t *ret_encoder);
+      |                                                                ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:194:40: error: type defaults to 'int' in declaration of 'rmt_simple_encoder_config_t' [-Wimplicit-int]
+  194 | esp_err_t rmt_new_simple_encoder(const rmt_simple_encoder_config_t *config, rmt_encoder_handle_t *ret_encoder);
+      |                                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:194:68: error: expected ';', ',' or ')' before '*' token
+  194 | esp_err_t rmt_new_simple_encoder(const rmt_simple_encoder_config_t *config, rmt_encoder_handle_t *ret_encoder);
+      |                                                                    ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:205:27: error: expected declaration specifiers or '...' before 'rmt_encoder_handle_t'
+  205 | esp_err_t rmt_del_encoder(rmt_encoder_handle_t encoder);
+      |                           ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_encoder.h:216:29: error: expected declaration specifiers or '...' before 'rmt_encoder_handle_t'
+  216 | esp_err_t rmt_encoder_reset(rmt_encoder_handle_t encoder);
+      |                             ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:26:5: error: unknown type name 'rmt_tx_done_callback_t'
+   26 |     rmt_tx_done_callback_t on_trans_done; /*!< Event callback, invoked when transmission is finished */
+      |     ^~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:27:3: error: storage class specified for parameter 'rmt_tx_event_callbacks_t'
+   27 | } rmt_tx_event_callbacks_t;
+      |   ^~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:34:5: error: expected specifier-qualifier-list before 'rmt_clock_source_t'
+   34 |     rmt_clock_source_t clk_src; /*!< Clock source of RMT TX channel, channels in the same group must use the same clock source */
+      |     ^~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:50:3: error: storage class specified for parameter 'rmt_tx_channel_config_t'
+   50 | } rmt_tx_channel_config_t;
+      |   ^~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:61:3: error: storage class specified for parameter 'rmt_transmit_config_t'
+   61 | } rmt_transmit_config_t;
+      |   ^~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:67:32: error: expected ':', ',', ';', '}' or '__attribute__' before '*' token
+   67 |     const rmt_channel_handle_t *tx_channel_array; /*!< Array of TX channels that are about to be managed by a synchronous controller */
+      |                                ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:69:3: error: storage class specified for parameter 'rmt_sync_manager_config_t'
+   69 | } rmt_sync_manager_config_t;
+      |   ^~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:84:36: error: type defaults to 'int' in declaration of 'rmt_tx_channel_config_t' [-Wimplicit-int]
+   84 | esp_err_t rmt_new_tx_channel(const rmt_tx_channel_config_t *config, rmt_channel_handle_t *ret_chan);
+      |                                    ^~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:84:60: error: expected ';', ',' or ')' before '*' token
+   84 | esp_err_t rmt_new_tx_channel(const rmt_tx_channel_config_t *config, rmt_channel_handle_t *ret_chan);
+      |                                                            ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:109:24: error: expected declaration specifiers or '...' before 'rmt_channel_handle_t'
+  109 | esp_err_t rmt_transmit(rmt_channel_handle_t tx_channel, rmt_encoder_handle_t encoder, const void *payload, size_t payload_bytes, const rmt_transmit_config_t *config);
+      |                        ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:109:57: error: expected declaration specifiers or '...' before 'rmt_encoder_handle_t'
+  109 | esp_err_t rmt_transmit(rmt_channel_handle_t tx_channel, rmt_encoder_handle_t encoder, const void *payload, size_t payload_bytes, const rmt_transmit_config_t *config);
+      |                                                         ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:109:136: error: type defaults to 'int' in declaration of 'rmt_transmit_config_t' [-Wimplicit-int]
+  109 | esp_err_t rmt_transmit(rmt_channel_handle_t tx_channel, rmt_encoder_handle_t encoder, const void *payload, size_t payload_bytes, const rmt_transmit_config_t *config);
+      |                                                                                                                                        ^~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:109:158: error: expected ';', ',' or ')' before '*' token
+  109 | esp_err_t rmt_transmit(rmt_channel_handle_t tx_channel, rmt_encoder_handle_t encoder, const void *payload, size_t payload_bytes, const rmt_transmit_config_t *config);
+      |                                                                                                                                                              ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:125:32: error: expected declaration specifiers or '...' before 'rmt_channel_handle_t'
+  125 | esp_err_t rmt_tx_wait_all_done(rmt_channel_handle_t tx_channel, int timeout_ms);
+      |                                ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:142:43: error: expected declaration specifiers or '...' before 'rmt_channel_handle_t'
+  142 | esp_err_t rmt_tx_register_event_callbacks(rmt_channel_handle_t tx_channel, const rmt_tx_event_callbacks_t *cbs, void *user_data);
+      |                                           ^~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:142:82: error: type defaults to 'int' in declaration of 'rmt_tx_event_callbacks_t' [-Wimplicit-int]
+  142 | esp_err_t rmt_tx_register_event_callbacks(rmt_channel_handle_t tx_channel, const rmt_tx_event_callbacks_t *cbs, void *user_data);
+      |                                                                                  ^~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:142:107: error: expected ';', ',' or ')' before '*' token
+  142 | esp_err_t rmt_tx_register_event_callbacks(rmt_channel_handle_t tx_channel, const rmt_tx_event_callbacks_t *cbs, void *user_data);
+      |                                                                                                           ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:160:38: error: type defaults to 'int' in declaration of 'rmt_sync_manager_config_t' [-Wimplicit-int]
+  160 | esp_err_t rmt_new_sync_manager(const rmt_sync_manager_config_t *config, rmt_sync_manager_handle_t *ret_synchro);
+      |                                      ^~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:160:64: error: expected ';', ',' or ')' before '*' token
+  160 | esp_err_t rmt_new_sync_manager(const rmt_sync_manager_config_t *config, rmt_sync_manager_handle_t *ret_synchro);
+      |                                                                ^
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:171:32: error: expected declaration specifiers or '...' before 'rmt_sync_manager_handle_t'
+  171 | esp_err_t rmt_del_sync_manager(rmt_sync_manager_handle_t synchro);
+      |                                ^~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include/driver/rmt_tx.h:182:26: error: expected declaration specifiers or '...' before 'rmt_sync_manager_handle_t'
+  182 | esp_err_t rmt_sync_reset(rmt_sync_manager_handle_t synchro);
+      |                          ^~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/infrared/include/infrared_funcs.h:32:5: error: expected specifier-qualifier-list before 'rmt_symbol_word_t'
+   32 |     rmt_symbol_word_t pulses[MAX_PULSES];
+      |     ^~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/infrared/include/infrared_funcs.h:34:3: error: storage class specified for parameter 'ir_signal_t'
+   34 | } ir_signal_t;
+      |   ^~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/infrared/include/infrared_funcs.h:37:15: error: storage class specified for parameter 'stored_signals_capacity'
+   37 | extern size_t stored_signals_capacity;
+      |               ^~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/infrared/include/infrared_funcs.h:38:20: error: expected '=', ',', ';', 'asm' or '__attribute__' before '*' token
+   38 | extern ir_signal_t **stored_signals; // Array of pointers to signals
+      |                    ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/infrared/include/infrared_funcs.h:39:15: error: storage class specified for parameter 'num_stored_signals'
+   39 | extern size_t num_stored_signals;
+      |               ^~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/infrared/include/infrared_funcs.h:40:26: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'ir_signal'
+   40 | extern rmt_symbol_word_t ir_signal[MAX_PULSES];
+      |                          ^~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/infrared/include/infrared_funcs.h:41:15: error: storage class specified for parameter 'ir_signal_length'
+   41 | extern size_t ir_signal_length;
+      |               ^~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/infrared/include/infrared_funcs.h:69:27: error: expected declaration specifiers or '...' before 'rmt_symbol_word_t'
+   69 | void infrared_transmit_ir(rmt_symbol_word_t *signal, size_t length);
+      |                           ^~~~~~~~~~~~~~~~~
+In file included from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/main/main.c:27:
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:15:26: error: storage class specified for parameter 'xUpButtonSemaphore'
+   15 | extern SemaphoreHandle_t xUpButtonSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:16:26: error: storage class specified for parameter 'xDownButtonSemaphore'
+   16 | extern SemaphoreHandle_t xDownButtonSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:17:26: error: storage class specified for parameter 'xRightButtonSemaphore'
+   17 | extern SemaphoreHandle_t xRightButtonSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:18:26: error: storage class specified for parameter 'xLeftButtonSemaphore'
+   18 | extern SemaphoreHandle_t xLeftButtonSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include/gpio_task.h:19:26: error: storage class specified for parameter 'xGpioEventSemaphore'
+   19 | extern SemaphoreHandle_t xGpioEventSemaphore;
+      |                          ^~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/main/main.c:31:20: error: storage class specified for parameter 'TAG'
+   31 | static const char *TAG = "MAIN";
+      |                    ^~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/main/main.c:31:1: error: parameter 'TAG' is initialized
+   31 | static const char *TAG = "MAIN";
+      | ^~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/main/main.c:44:1: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+   44 | {
+      | ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/main/main.c:60:21: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+   60 | void app_main(void) {
+      |                     ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_funcs.h:143:6: error: old-style parameter declarations in prototyped function definition
+  143 | void lcd_page_2_selected(menu_t *ui_menu, ir_menu_t *ir_menu)
+      |      ^~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/main/main.c:96: error: expected '{' at end of input
+ninja: build stopped: subcommand failed.
