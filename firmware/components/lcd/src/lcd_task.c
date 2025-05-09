@@ -126,32 +126,31 @@ static void lcd_task(void *pvParameters)
 
 	while (1)
 	{
-		if (ui_menu.page == HOME_PAGE) {
-
-		} 
-		else if (ui_menu.page == SELECTION_PAGE) {
-
-			if (xTaskGetTickCount() - timer_last >= timer_interval) {
-				
-				timer_last = xTaskGetTickCount();
-				
+		if (xTaskGetTickCount() - timer_last >= timer_interval) {
+			timer_last = xTaskGetTickCount();
+			
+			if (ui_menu.page == HOME_PAGE) {
+	
+			} 
+			else if (ui_menu.page == SELECTION_PAGE) {
+		
 				/*lv_obj_remove_flag(ui_menu.lbl_top, LV_OBJ_FLAG_HIDDEN);
 				lv_obj_remove_flag(ui_menu.lbl_mid, LV_OBJ_FLAG_HIDDEN);
 				lv_obj_remove_flag(ui_menu.lbl_bot, LV_OBJ_FLAG_HIDDEN);
 				lv_obj_remove_flag(ui_menu.arrow_top, LV_OBJ_FLAG_HIDDEN);
 				lv_obj_remove_flag(ui_menu.arrow_bot, LV_OBJ_FLAG_HIDDEN);*/
-				
+					
 				lcd_page_1_selected(&ui_menu);
 			}
-		
-		}
-		else if (ui_menu.page == INFRARED_PAGE) {
-			lcd_page_2_selected(&ui_menu, &ir_menu);
-
+			else if (ui_menu.page == INFRARED_PAGE) {
+					
+				lcd_page_2_selected(&ui_menu, &ir_menu);
+	
+			}
 		}
 
 		lv_timer_handler();
-		vTaskDelay(pdMS_TO_TICKS(10));
+		vTaskDelay(pdMS_TO_TICKS(20));
 	}
 }
 

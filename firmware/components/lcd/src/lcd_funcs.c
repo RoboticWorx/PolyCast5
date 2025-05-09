@@ -1,7 +1,11 @@
 #include "lcd_funcs.h"
 #include "core/lv_obj_scroll.h"
+#include "core/lv_obj_tree.h"
+#include "freertos/idf_additions.h"
+#include "freertos/projdefs.h"
 #include "lcd_task.h"
 #include "gpio_task.h"
+#include "infrared_funcs.h"
 
 #include "esp_timer.h"
 #include "driver/gpio.h"
@@ -11,6 +15,7 @@
 
 #include "esp_log.h"
 #include "misc/lv_area.h"
+#include "portmacro.h"
 #include "st7789.h"
 #include "widgets/label/lv_label.h"
 
@@ -105,7 +110,7 @@ void lcd_init_driver(void)
 
     // Restore portrait offsets
     tft._offsetx = 40;
-    tft._offsety = 53; // 52 if 270 
+    tft._offsety = 52; // 52 if 270 
 }
 
 void lcd_lvgl_init(void)
@@ -285,6 +290,7 @@ void lcd_selection_btn_pressed(menu_t *menu)
     const char *option = lv_label_get_text(menu->lbl_mid);
 
 	if (strcmp(option, "Infrared") == 0) {
+		xSemaphoreGive(xEnableInfraredSemaphore);
 		lcd_swipe_anim(menu, 1, SWIPE_SPEED);
 		lv_obj_add_flag(menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
@@ -421,78 +427,110 @@ void lcd_setup_infrared_page(ir_menu_t *menu)
 	
 	
 	// Create selected button style
-	lv_style_init(&menu->selected_btn_style);
+	lv_style_init(&menu->sel_style);
 	
-	lv_style_set_radius(&menu->selected_btn_style, 8);
-	lv_style_set_bg_color(&menu->selected_btn_style, user_secondary_color);
+	lv_style_set_radius(&menu->sel_style, 8);
+	lv_style_set_bg_color(&menu->sel_style, user_secondary_color);
 	
-	lv_style_set_border_width(&menu->selected_btn_style, 2);
-	lv_style_set_border_color(&menu->selected_btn_style, user_secondary_color);
-	lv_style_set_border_side(&menu->selected_btn_style, LV_BORDER_SIDE_FULL);
+	lv_style_set_border_width(&menu->sel_style, 2);
+	lv_style_set_border_color(&menu->sel_style, user_secondary_color);
+	lv_style_set_border_side(&menu->sel_style, LV_BORDER_SIDE_FULL);
 	
-	lv_style_set_pad_top(&menu->selected_btn_style, 3);
-	lv_style_set_pad_bottom(&menu->selected_btn_style, 3);
+	lv_style_set_pad_top(&menu->sel_style, 3);
+	lv_style_set_pad_bottom(&menu->sel_style, 3);
 	
-	lv_style_set_text_font(&menu->selected_btn_style, &lv_font_montserrat_16);
-	lv_style_set_text_color(&menu->selected_btn_style, user_primary_color);
-	lv_style_set_text_align(&menu->selected_btn_style, LV_TEXT_ALIGN_CENTER);
+	lv_style_set_text_font(&menu->sel_style, &lv_font_montserrat_16);
+	lv_style_set_text_color(&menu->sel_style, user_primary_color);
+	lv_style_set_text_align(&menu->sel_style, LV_TEXT_ALIGN_CENTER);
 	
+	
+	// Create buttons
+	// Wrap index
+	if (menu->index >= menu->size) {
+		menu->index = 0;
+	}
+	else if (menu->index < 0) {
+		menu->index = menu->size - 1;
+	}
+	
+	// Create button for each option
+    for (int i = 0; i < menu->size; i++) {
+
+        menu->btns[i] = lv_list_add_btn(menu->main_list, NULL, menu->options[i]);
+        lv_obj_set_size(menu->btns[i], 100, 28);
+
+        // Style selected
+        if (i == menu->index) {
+            lv_obj_add_style(menu->btns[i], &menu->sel_style, 0);
+        }
+        else {
+            lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
+        }
+
+        // Create and format text label
+        lv_obj_t *lbl = lv_obj_get_child(menu->btns[i], 0);
+        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
+    }
+
+    // Format buttons as container
+    menu->cont = lv_obj_get_parent(menu->btns[0]);
+    lv_obj_set_flex_flow (menu->cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(menu->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+	
+	// Hide for now
 	lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
 }
 
 void lcd_update_infrared_menu(ir_menu_t *menu)
 {
-	if (lv_obj_has_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN)) {
-		lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
+	// Reveal
+    lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+    // Wrap index
+	if (menu->index >= menu->size) {
+		menu->index = 0;
 	}
-	
-	
-	ESP_LOGI(TAG, "in IR!");
-	// Start with clean slate
-	if(menu->cont != NULL) {
-        lv_obj_clean(menu->cont);
+	else if (menu->index < 0) {
+		menu->index = menu->size - 1;
+	}
+
+    // Remember previous selection across calls
+    static int prev = -1;
+    if (prev == menu->index) // If the same, return
+        return;
+
+    // Remove highlight from previous button
+    if (prev >= 0 && prev < menu->size) {
+        lv_obj_remove_style(menu->btns[prev], &menu->sel_style, 0);
+        lv_obj_add_style(menu->btns[prev], &menu->btn_style, 0);
     }
 
-	// Re-update all based on saved
-	for(int i = 0; i < menu->size; i++) {
-	
-	    lv_obj_t *btn = lv_list_add_btn(menu->main_list, NULL, menu->options[i]);
-	    lv_obj_set_size(btn, 100, 28);
-	    
-	    if (menu->index >= menu->size) {
-	    	menu->index = 0;
-	    }
-	   	else if (menu->index < 0) {
-	    	menu->index = menu->size - 1;
-	    }
-	    	
-	    if (menu->index == i) {
-	    	lv_obj_add_style(btn, &menu->selected_btn_style, LV_PART_MAIN | LV_STATE_DEFAULT);
-	    }
-	    else {
- 			lv_obj_add_style(btn, &menu->btn_style, LV_PART_MAIN | LV_STATE_DEFAULT);
- 		}
-	
-	    // First time through, the button’s parent is now the content cont
-	    if(i == 0) {
-	        menu->cont = lv_obj_get_parent(btn);
-	        
-	        // Format container
-	        lv_obj_set_flex_flow(menu->cont,  LV_FLEX_FLOW_COLUMN);
-	        lv_obj_set_flex_align(menu->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-	        
-	        // Disable scroll-bar
-			//lv_obj_set_scrollbar_mode(menu->cont, LV_SCROLLBAR_MODE_OFF);
-			//lv_obj_clear_flag(menu->cont, LV_OBJ_FLAG_SCROLLABLE);
-	    }
-	
-	    // Format label
-	    lv_obj_t *lbl = lv_obj_get_child(btn, 0);
-	    lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL); 
-	    lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-	    lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
+    // Add highlight to new button
+    lv_obj_remove_style(menu->btns[menu->index], &menu->btn_style, 0);
+    lv_obj_add_style(menu->btns[menu->index], &menu->sel_style, 0);
+
+    prev = menu->index;
+}
+
+void lcd_selected_infrared_option(ir_menu_t *menu)
+{
+	if (menu->index == 0)
+	{
+		lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		lv_obj_t *text_label = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(text_label, "Present signal!", user_secondary_color,
+					 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+		lv_timer_handler();
+		xSemaphoreTake(xSignalSavedSemaphore, portMAX_DELAY);
+		lv_label_set_text(text_label, "Signal saved!");
+		lv_timer_handler();
+		vTaskDelay(pdMS_TO_TICKS(1500));
+		lv_obj_delete(text_label);
+
 	}
-	
 }
 
 
@@ -539,11 +577,13 @@ void lcd_page_2_selected(menu_t *ui_menu, ir_menu_t *ir_menu)
 		lcd_update_infrared_menu(ir_menu);
 	}
 	else if (xSemaphoreTake(xRightButtonSemaphore, 0)) {
-		lcd_selection_btn_pressed(ui_menu);
+		lcd_selected_infrared_option(ir_menu);
 	}
 	else if (xSemaphoreTake(xLeftButtonSemaphore, 0)) {
 		ui_menu->page = SELECTION_PAGE;
 	}
+	
+
 
 }
 

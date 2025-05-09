@@ -40,11 +40,12 @@ typedef struct {
 
 typedef struct {
     const char *options[MAX_IR_OPTIONS];
+    lv_obj_t *btns[MAX_IR_OPTIONS];
     int size;
     int index;
     lv_obj_t *main_list;
 	lv_style_t btn_style;
-	lv_style_t selected_btn_style;
+	lv_style_t sel_style;
 	lv_obj_t *cont;
 } ir_menu_t;
 
@@ -144,5 +145,6 @@ void lcd_page_2_selected(menu_t *ui_menu, ir_menu_t *ir_menu);
 
 void lcd_setup_infrared_page(ir_menu_t *menu);
 void lcd_update_infrared_menu(ir_menu_t *menu);
+void lcd_selected_infrared_option(ir_menu_t *menu);
 
 #endif /* LCD_FUNCS_H */

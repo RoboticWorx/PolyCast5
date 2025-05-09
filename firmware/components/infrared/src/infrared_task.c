@@ -1,6 +1,7 @@
 #include "infrared_task.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
 #include "freertos/task.h"
 #include "infrared_funcs.h"
 #include <stdlib.h>
@@ -9,6 +10,12 @@
 static const char *TAG = "IR_TASK";
 
 SemaphoreHandle_t xInfraredRXEventSemaphore;
+
+SemaphoreHandle_t xStartInfraredRXSemaphore;
+SemaphoreHandle_t xEnableInfraredSemaphore;
+
+SemaphoreHandle_t xSignalSavedSemaphore;
+SemaphoreHandle_t xSignalReceivedSemaphore;
 
 ir_signal_t **stored_signals;
 rmt_symbol_word_t ir_signal[MAX_PULSES];
@@ -19,6 +26,16 @@ size_t ir_signal_length = 0;
 
 
 static void infrared_task(void *pvParameters) {
+	// Create semaphores
+	xEnableInfraredSemaphore = xSemaphoreCreateBinary();
+	xStartInfraredRXSemaphore = xSemaphoreCreateBinary();
+	xSignalSavedSemaphore = xSemaphoreCreateBinary();
+	xSignalReceivedSemaphore = xSemaphoreCreateBinary();
+	
+	
+	// Wait until enabled
+	xSemaphoreTake(xEnableInfraredSemaphore, portMAX_DELAY);
+		
     ESP_LOGI(TAG, "Initializing IR system...");
     init_nvs();
     infrared_init_rx();
@@ -38,8 +55,15 @@ static void infrared_task(void *pvParameters) {
     ESP_LOGI(TAG, "Loaded %d signals from NVS", num_stored_signals);
 
     while (1) {
+		
+		if (xSemaphoreTake(xStartInfraredRXSemaphore, 10) == pdTRUE) {
+			infrared_restart_rx();
+		}
+		
+		
         // Wait for IR signal
         if (xSemaphoreTake(xInfraredRXEventSemaphore, 10) == pdTRUE) {
+			
             ESP_LOGI(TAG, "Received IR signal with %d pulses", ir_signal_length);
 
             // Filter out noise
@@ -82,15 +106,16 @@ static void infrared_task(void *pvParameters) {
                      "Stored signal %zu (%zu pulses), SRAM=%zu/%zu",
                      num_stored_signals, sig->length,
                      num_stored_signals, stored_signals_capacity);
+                     
+            xSemaphoreGive(xSignalSavedSemaphore);
 
-            infrared_restart_rx();
         }
 
         // Random transmission after threshold
-        if (num_stored_signals >= RANDOM_TX_THRESHOLD) {
+        /*if (num_stored_signals >= RANDOM_TX_THRESHOLD) {
             vTaskDelay(pdMS_TO_TICKS(RANDOM_TX_DELAY_MS));
 
-            size_t random_idx = 3;                     /* fixed for now */
+            size_t random_idx = 3;                     // fixed for now 
             ir_signal_t *sig  = stored_signals[random_idx];
 
             if (sig) {
@@ -98,7 +123,7 @@ static void infrared_task(void *pvParameters) {
                          random_idx + 1, sig->length);
                 infrared_transmit_ir(sig->pulses, sig->length);
             }
-        }
+        }*/
     }
 }
 

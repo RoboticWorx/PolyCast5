@@ -5,6 +5,11 @@
 #include "freertos/task.h"
 
 extern SemaphoreHandle_t xInfraredRXEventSemaphore;
+extern SemaphoreHandle_t xStartInfraredRXSemaphore;
+extern SemaphoreHandle_t xEnableInfraredSemaphore;
+
+extern SemaphoreHandle_t xSignalSavedSemaphore;
+extern SemaphoreHandle_t xSignalReceivedSemaphore;
 
 // Function to create the infrared task
 void infrared_task_create(void);
