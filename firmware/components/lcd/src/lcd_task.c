@@ -182,9 +182,9 @@ static void lcd_task(void *pvParameters)
 					
 				lcd_page_2_selected(&ui_menu, &ir_menu, &ui_btns);
 			}
-			else if (ui_menu.page == INFRARED_NAME_PAGE) {
+			else if (ui_menu.page == INFRARED_SIGNAL_NAME_PAGE || ui_menu.page == INFRARED_REMOTE_NAME_PAGE) {
 				
-				lcd_infrared_create_custom_name(&ui_menu, &ui_btns);
+				lcd_infrared_create_custom_name(&ui_menu, &ir_menu, &ui_btns);
 			}
 		}
 

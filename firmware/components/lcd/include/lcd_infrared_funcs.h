@@ -25,8 +25,8 @@ typedef struct {
 
 extern ir_menu_t ir_menu;
 
-
-void lcd_infrared_create_custom_name(ui_menu_t *ui_menu, ui_btns_t *ui_btns);
+void lcd_infrared_create_new_remote(ui_menu_t *ui_menu, ir_menu_t *ir_menu);
+void lcd_infrared_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns);
 
 /**
  * @brief Create initial structures to display IR data
@@ -47,6 +47,6 @@ void lcd_infrared_update_menu(ir_menu_t *menu);
  *
  * @param [in] menu Infrared menu structure
  */
-void lcd_infrared_selected_option(ir_menu_t *menu);
+void lcd_infrared_save_new_signal(ir_menu_t *menu);
 
 #endif // LCD_INFRARED_FUNCS_H

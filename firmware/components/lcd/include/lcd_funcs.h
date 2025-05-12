@@ -25,7 +25,8 @@
 #define WIFI_PAGE 7
 #define BLUETOOTH_PAGE 8
 
-#define INFRARED_NAME_PAGE 9
+#define INFRARED_SIGNAL_NAME_PAGE 9
+#define INFRARED_REMOTE_NAME_PAGE 10
 
 
 typedef struct ui_menu_t {

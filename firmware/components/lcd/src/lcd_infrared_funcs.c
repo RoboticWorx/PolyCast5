@@ -6,8 +6,8 @@
 #include "infrared_task.h"
 
 ir_menu_t ir_menu = {
-    .options = {"Add New", "test1", "test2", "test3"},
-    .size = 4,
+    .options = {"Add New"},
+    .size = 1,
     .index = 0,
     .cont = NULL,
 };
@@ -22,7 +22,7 @@ const char *lcd_infrared_get_saved_name(void) {
     return saved_name[0] ? saved_name : NULL;
 }
 
-void lcd_infrared_create_custom_name(ui_menu_t *ui_menu, ui_btns_t *ui_btns) {
+void lcd_infrared_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns) {
 	
     // Declare statics
     static int cur_pos = 0; // User position
@@ -33,8 +33,6 @@ void lcd_infrared_create_custom_name(ui_menu_t *ui_menu, ui_btns_t *ui_btns) {
     
     // Create initial label
     if (!lbl_name) {
-		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 		
         lbl_name = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_name, "", user_secondary_color,
@@ -110,9 +108,38 @@ void lcd_infrared_create_custom_name(ui_menu_t *ui_menu, ui_btns_t *ui_btns) {
         name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
         memcpy(saved_name, name_buf, MAX_CUSTOM_NAME_LEN + 1);
         ESP_LOGI(TAG, "%s", saved_name);
+        
+        // Delete labels since no longer used
         lv_obj_delete(lbl_name);
         lv_obj_delete(lbl_ins);
+        
+        // Reset statics for next time
+        lbl_name = NULL;
+	    lbl_ins  = NULL;
+	    cur_pos  = 0;
+	    cur_char = '_';
+	    memset(name_buf, 0, sizeof name_buf);
+        
+        // Update options
+        if (ui_menu->page == INFRARED_REMOTE_NAME_PAGE) {
+			ir_menu->size++;
+			
+			char *name_copy = strdup(saved_name);
+			ir_menu->options[ir_menu->size - 1] = name_copy;
+			
+			// Create new button for new option
+			ir_menu->btns[ir_menu->size - 1] = lv_list_add_btn(ir_menu->main_list, NULL, ir_menu->options[ir_menu->size - 1]);
+	        lv_obj_set_size(ir_menu->btns[ir_menu->size - 1], 100, 28);
+	        lv_obj_add_style(ir_menu->btns[ir_menu->size - 1], &ir_menu->btn_style, 0);
+
+	        // Create and format text label
+	        lv_obj_t *lbl = lv_obj_get_child(ir_menu->btns[ir_menu->size - 1], 0);
+	        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+	        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+	        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
+		}
         ui_menu->page = INFRARED_PAGE;
+        return;
     }
 
     // Build and show the text
@@ -266,10 +293,11 @@ void lcd_infrared_update_menu(ir_menu_t *menu)
 
 
 
-void lcd_infrared_selected_option(ir_menu_t *menu)
+void lcd_infrared_save_new_signal(ir_menu_t *menu)
 {
 	if (menu->index == 0)
 	{
+		// Hide IR menu
 		lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
 		// Restart infrared RX
@@ -290,4 +318,12 @@ void lcd_infrared_selected_option(ir_menu_t *menu)
 		vTaskDelay(pdMS_TO_TICKS(500));
 		lv_obj_delete(text_label);
 	}
+}
+
+void lcd_infrared_create_new_remote(ui_menu_t *ui_menu, ir_menu_t *ir_menu)
+{
+	// Hide IR menu
+	lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+	ui_menu->page = INFRARED_REMOTE_NAME_PAGE;
 }

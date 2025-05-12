@@ -442,8 +442,8 @@ void lcd_page_2_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
 	
 	// New remote selected
 	if (ui_btns->up_btn == 1 && ir_menu->index == 0) {
-		lcd_infrared_selected_option(ir_menu);
-		ui_menu->page = INFRARED_NAME_PAGE;
+		lcd_infrared_create_new_remote(ui_menu, ir_menu);
+		ui_menu->page = INFRARED_REMOTE_NAME_PAGE;
 	}
 	// Back selected
 	else if (ui_btns->down_btn == 1) {
@@ -468,6 +468,5 @@ void lcd_page_2_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
 		ir_menu->index--;
 		lcd_infrared_update_menu(ir_menu);
 	}
-	
 }
 
