@@ -1,27 +1,21 @@
-#include "lcd_task.h"
-#include "core/lv_obj_pos.h"
-#include "font/lv_symbol_def.h"
-#include "lcd_funcs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
 #include "esp_log.h"
 
-#include "lv_api_map_v8.h"
-#include "misc/lv_area.h"
-#include "misc/lv_style_gen.h"
+#include "lcd_task.h"
+#include "lcd_funcs.h"
+#include "gpio_task.h"
+#include "lcd_infrared_funcs.h"
 
 //#include "espressif_logo.h"
-
-#include "gpio_funcs.h"
-#include "gpio_task.h"
 
 
 static const char *TAG = "LCD_TASK";
 
-menu_t ui_menu = {
-    .options = (const char *[]) {"Bluetooth","LoRa","ESP-NOW","Infrared","Settings","Wi-Fi"},
-    .size = 6,
+ui_menu_t ui_menu = {
+    .options = (const char *[]) {"Bluetooth","LoRa","ESP-NOW","Infrared","Tools", "Settings","Wi-Fi"},
+    .size = 7,
     .index = 1, // “LoRa” starts in the middle
     .page = SELECTION_PAGE,
     .lbl_top = NULL,
@@ -29,14 +23,19 @@ menu_t ui_menu = {
     .lbl_bot = NULL,
     .arrow_bot = NULL,
     .arrow_top = NULL,
+    .arrow_right = NULL,
+    .arrow_left = NULL,
 };
 
-ir_menu_t ir_menu = {
-    .options = {"Add New", "test1", "test2", "test3"},
-    .size = 4,
-    .index = 0,
-    .cont = NULL,
+ui_btns_t ui_btns = {
+    .up_btn = 0,
+    .down_btn = 0,
+    .right_btn = 0,
+    .left_btn = 0,
+    .back_btn = 0,
+    .home_btn = 0,
 };
+
 
 lv_color_t user_primary_color = LV_COLOR_MAKE(0x00, 0x00, 0x8B); 
 lv_color_t user_secondary_color = LV_COLOR_MAKE(0xFF, 0xFF, 0xFF);
@@ -84,12 +83,12 @@ static void lcd_task(void *pvParameters)
 					 user_secondary_color, &lv_font_montserrat_30,
 					 LV_ALIGN_CENTER, 0, 0);
 					 
-	lv_obj_t *user_left_arrow = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(user_left_arrow, LV_SYMBOL_LEFT, user_secondary_color,
+	ui_menu.arrow_left = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(ui_menu.arrow_left, LV_SYMBOL_LEFT, user_secondary_color,
 					 &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 0);
 
-	lv_obj_t *user_right_arrow = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(user_right_arrow, LV_SYMBOL_RIGHT, user_secondary_color,
+	ui_menu.arrow_right = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(ui_menu.arrow_right, LV_SYMBOL_RIGHT, user_secondary_color,
 					 &lv_font_montserrat_14, LV_ALIGN_RIGHT_MID, -4, 0);
 
 	ui_menu.lbl_bot = lv_label_create(ACTIVE_SCR);
@@ -121,7 +120,7 @@ static void lcd_task(void *pvParameters)
 	const TickType_t timer_interval = pdMS_TO_TICKS(300);
 	
 	
-	lcd_setup_infrared_page(&ir_menu);
+	lcd_infrared_setup_page(&ir_menu);
     
 
 	while (1)
@@ -129,6 +128,43 @@ static void lcd_task(void *pvParameters)
 		if (xTaskGetTickCount() - timer_last >= timer_interval) {
 			timer_last = xTaskGetTickCount();
 			
+			if (xSemaphoreTake(xUpButtonSemaphore, 1)) {
+				ui_btns.up_btn = 1;
+			}
+			else {
+				ui_btns.up_btn = 0;
+			}
+			if (xSemaphoreTake(xDownButtonSemaphore, 1)) {
+				ui_btns.down_btn = 1;
+			}
+			else {
+				ui_btns.down_btn = 0;
+			}
+			if (xSemaphoreTake(xRightButtonSemaphore, 1)) {
+				ui_btns.right_btn = 1;
+			}
+			else {
+				ui_btns.right_btn = 0;
+			}
+			if (xSemaphoreTake(xLeftButtonSemaphore, 1)) {
+				ui_btns.left_btn = 1;
+			}
+			else {
+				ui_btns.left_btn = 0;
+			}
+			if (xSemaphoreTake(xBackButtonSemaphore, 1)) {
+				ui_btns.back_btn = 1;
+			}
+			else {
+				ui_btns.back_btn = 0;
+			}
+			if (xSemaphoreTake(xHomeButtonSemaphore, 1)) {
+				ui_btns.home_btn = 1;
+			}
+			else {
+				ui_btns.home_btn = 0;
+			}
+	
 			if (ui_menu.page == HOME_PAGE) {
 	
 			} 
@@ -139,13 +175,16 @@ static void lcd_task(void *pvParameters)
 				lv_obj_remove_flag(ui_menu.lbl_bot, LV_OBJ_FLAG_HIDDEN);
 				lv_obj_remove_flag(ui_menu.arrow_top, LV_OBJ_FLAG_HIDDEN);
 				lv_obj_remove_flag(ui_menu.arrow_bot, LV_OBJ_FLAG_HIDDEN);*/
-					
-				lcd_page_1_selected(&ui_menu);
+				
+				lcd_page_1_selected(&ui_menu, &ui_btns);
 			}
 			else if (ui_menu.page == INFRARED_PAGE) {
 					
-				lcd_page_2_selected(&ui_menu, &ir_menu);
-	
+				lcd_page_2_selected(&ui_menu, &ir_menu, &ui_btns);
+			}
+			else if (ui_menu.page == INFRARED_NAME_PAGE) {
+				
+				lcd_infrared_create_custom_name(&ui_menu, &ui_btns);
 			}
 		}
 

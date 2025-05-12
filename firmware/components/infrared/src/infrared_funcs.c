@@ -1,9 +1,11 @@
-#include "infrared_funcs.h"
-#include "infrared_task.h"
+#include "string.h"
+
+#include "nvs_flash.h"
 
 #include "esp_log.h"
-#include "string.h"
-#include "nvs_flash.h"
+
+#include "infrared_funcs.h"
+#include "infrared_task.h"
 
 #define SIGNAL_MIN_NS 1000
 #define SIGNAL_MAX_NS 15000000 // 15ms

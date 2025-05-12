@@ -2,7 +2,7 @@
 #define LCD_FUNCS_H
 
 #include "lvgl.h"
-#include "st7789.h"
+#include "lcd_infrared_funcs.h"
 
 #define SPI_MISO_PIN 2 // MISO for SX126x
 #define SPI_MOSI_PIN 7 // SPI2 MOSI
@@ -21,12 +21,14 @@
 #define ESPNOW_PAGE 3
 #define INFRARED_PAGE 4
 #define SETTINGS_PAGE 5
-#define WIFI_PAGE 6
-#define BLUETOOTH_PAGE 7
+#define TOOLS_PAGE 6
+#define WIFI_PAGE 7
+#define BLUETOOTH_PAGE 8
 
-#define MAX_IR_OPTIONS 20
+#define INFRARED_NAME_PAGE 9
 
-typedef struct {
+
+typedef struct ui_menu_t {
     const char **options; // your array of strings
     int size; // how many entries
     int index; // the one that’s currently in the middle
@@ -36,19 +38,20 @@ typedef struct {
     lv_obj_t *lbl_bot;
     lv_obj_t *arrow_bot;
     lv_obj_t *arrow_top;
-} menu_t;
+    lv_obj_t *arrow_right;
+    lv_obj_t *arrow_left;
+} ui_menu_t;
 
-typedef struct {
-    const char *options[MAX_IR_OPTIONS];
-    lv_obj_t *btns[MAX_IR_OPTIONS];
-    int size;
-    int index;
-    lv_obj_t *main_list;
-	lv_style_t btn_style;
-	lv_style_t sel_style;
-	lv_obj_t *cont;
-} ir_menu_t;
+typedef struct ui_btns_t {
+    bool up_btn;
+    bool down_btn;
+    bool right_btn;
+    bool left_btn;
+    bool back_btn;
+    bool home_btn;
+} ui_btns_t;
 
+extern ui_btns_t ui_btns;
 
 /** 
  * @brief Initialise SPI bus + ST7789 panel (blocking).
@@ -101,7 +104,7 @@ void lcd_scroll_down(lv_obj_t *lbl_top, lv_obj_t *lbl_mid, lv_obj_t *lbl_bot, co
  * @param [in] scrolling_up Direction being scrolled (up/!up)
  * @param [in] speed_px_s Speed to move animation
  */
-void lcd_scroll_anim(menu_t *menu, const char *txt, bool scrolling_up, uint32_t speed_px_s);
+void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32_t speed_px_s);
 
 /**
  * @brief Perform swipe animation for wireless selection page (left or right)
@@ -110,7 +113,7 @@ void lcd_scroll_anim(menu_t *menu, const char *txt, bool scrolling_up, uint32_t 
  * @param [in] swipe_left Direction being swiped (left/!left)
  * @param [in] speed_px_s Speed to move animation
  */
-void lcd_swipe_anim(menu_t *menu, bool swipe_left, uint32_t speed_px_s);
+void lcd_swipe_anim(ui_menu_t *menu, bool swipe_left, uint32_t speed_px_s);
 							  
 /**
  * @brief Format main center button for wireless selection page
@@ -126,25 +129,25 @@ void lcd_format_center_button(lv_obj_t *btn_mid, lv_color_t user_primary_color, 
  *
  * @param [in] menu UI menu structure
  */
-void lcd_selection_btn_pressed(menu_t *menu);
+void lcd_selection_btn_pressed(ui_menu_t *menu);
 
 /**
  * @brief Everything to be done on wireless selection page
  *
  * @param [in] menu UI menu structure
+ * @param [in] menu UI input structure
  */
-void lcd_page_1_selected(menu_t *menu);
+void lcd_page_1_selected(ui_menu_t *menu, ui_btns_t *ui_btns);
 
 /**
  * @brief Everything to be done on infrared page
  *
  * @param [in] ui_menu UI menu structure
  * @param [in] ir_menu Infrared menu structure
+ * @param [in] menu UI input structure
  */
-void lcd_page_2_selected(menu_t *ui_menu, ir_menu_t *ir_menu); 
+void lcd_page_2_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns); 
 
-void lcd_setup_infrared_page(ir_menu_t *menu);
-void lcd_update_infrared_menu(ir_menu_t *menu);
-void lcd_selected_infrared_option(ir_menu_t *menu);
+
 
 #endif /* LCD_FUNCS_H */
