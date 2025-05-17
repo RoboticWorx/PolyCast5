@@ -119,10 +119,9 @@ static void lcd_task(void *pvParameters)
 	TickType_t timer_last = xTaskGetTickCount();
 	const TickType_t timer_interval = pdMS_TO_TICKS(300);
 	
-	
+	lcd_infrared_ir_menu_nvs_load(&ir_menu);
 	lcd_infrared_setup_page(&ir_menu);
     
-
 	while (1)
 	{
 		if (xTaskGetTickCount() - timer_last >= timer_interval) {

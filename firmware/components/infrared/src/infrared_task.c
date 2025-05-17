@@ -37,7 +37,7 @@ static void infrared_task(void *pvParameters) {
 	xSemaphoreTake(xEnableInfraredSemaphore, portMAX_DELAY);
 		
     ESP_LOGI(TAG, "Initializing IR system...");
-    init_nvs();
+    
     infrared_init_rx();
     infrared_init_tx();
 

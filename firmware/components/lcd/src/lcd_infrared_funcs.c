@@ -1,9 +1,14 @@
 #include "esp_log.h"
+#include "nvs.h"
 
 #include "lcd_infrared_funcs.h"
 #include "lcd_funcs.h"
 #include "lcd_task.h"
 #include "infrared_task.h"
+
+#define NS "ir_names" // NVS namespace
+#define KEY_COUNT "count" // u8: number of user remotes
+#define KEY_FMT "n%02d" // n00, n01 …
 
 ir_menu_t ir_menu = {
     .options = {"Add New"},
@@ -124,8 +129,10 @@ void lcd_infrared_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_
         if (ui_menu->page == INFRARED_REMOTE_NAME_PAGE) {
 			ir_menu->size++;
 			
+			// Save to options then to NVS
 			char *name_copy = strdup(saved_name);
 			ir_menu->options[ir_menu->size - 1] = name_copy;
+			lcd_infrared_ir_menu_nvs_save(ir_menu);
 			
 			// Create new button for new option
 			ir_menu->btns[ir_menu->size - 1] = lv_list_add_btn(ir_menu->main_list, NULL, ir_menu->options[ir_menu->size - 1]);
@@ -289,9 +296,10 @@ void lcd_infrared_update_menu(ir_menu_t *menu)
     lv_obj_add_style(menu->btns[menu->index], &menu->sel_style, 0);
 
     prev = menu->index;
+    
+    // Enable scrolling if list gets too long
+    lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_OFF);
 }
-
-
 
 void lcd_infrared_save_new_signal(ir_menu_t *menu)
 {
@@ -327,3 +335,129 @@ void lcd_infrared_create_new_remote(ui_menu_t *ui_menu, ir_menu_t *ir_menu)
 		
 	ui_menu->page = INFRARED_REMOTE_NAME_PAGE;
 }
+
+
+
+
+
+esp_err_t lcd_infrared_ir_menu_nvs_save(const ir_menu_t *menu)
+{
+    nvs_handle_t h;
+    
+    // Open NVS
+    esp_err_t err = nvs_open(NS, NVS_READWRITE, &h);
+    if (err != ESP_OK)
+    	return err;
+
+    // menu->options[0] is default "Add New":
+    // If menu->size == 1 there are no user names, otherwise there are menu->size - 1 names
+    uint8_t user_cnt = (menu->size > 1) ? menu->size - 1 : 0;
+    err = nvs_set_u8(h, KEY_COUNT, user_cnt);
+    
+    // If error, exit
+    if (err != ESP_OK)
+    	goto out;
+
+	// Loop through all and number them: n00, n01, etc.
+    for (uint8_t i = 0; i < user_cnt; ++i) {
+        char key[6];
+        sprintf(key, KEY_FMT, i);
+        
+        // Store the menu option string at each key starting at index 1
+        err = nvs_set_str(h, key, menu->options[i + 1]);
+        
+        // Exit if error
+        if (err != ESP_OK)
+        	goto out;
+    }
+    
+    // Flush pending writes to flash
+    err = nvs_commit(h);
+
+	// Close NVS
+	out: nvs_close(h);
+	
+    return err;
+}
+
+esp_err_t lcd_infrared_ir_menu_nvs_load(ir_menu_t *menu)
+{
+    nvs_handle_t h;
+    
+    // Open NVS
+    esp_err_t err = nvs_open(NS, NVS_READONLY, &h);
+    if (err != ESP_OK)
+    	return err;
+
+	// Get number of saved items
+    uint8_t user_cnt = 0;
+    err = nvs_get_u8(h, KEY_COUNT, &user_cnt);
+    if (err != ESP_OK) {
+		nvs_close(h);
+		return err;
+	}
+
+    menu->size = 1; // Don't change first option
+    menu->index = 0;
+
+	// Loop through all keys
+    for (uint8_t i = 0; i < user_cnt; ++i) {
+        char key[6];
+        sprintf(key, KEY_FMT, i);
+        size_t len = 0;
+        
+        // Extract the size of the string
+        if (nvs_get_str(h, key, NULL, &len) != ESP_OK) {
+        	break;
+        }
+
+		// Ensure enough memory is available
+        char *buf = malloc(len);
+        if (!buf)
+        	break;
+        
+        // Extract the string
+        if (nvs_get_str(h, key, buf, &len) != ESP_OK) {
+			free(buf);
+			break;
+		}
+
+		// Update menu struct
+        menu->options[menu->size++] = buf;
+    }
+    
+    // Close NVS
+    nvs_close(h);
+    
+    return ESP_OK;
+}
+
+esp_err_t lcd_infrared_ir_menu_nvs_delete(ir_menu_t *menu, uint8_t idx)
+{
+	// Make sure index is > 0 (not "Add New") and not larger than size
+    if (idx == 0 || idx >= menu->size) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Remove the string
+    free(menu->options[idx]);
+    for (uint8_t i = idx; i < menu->size - 1; ++i) {
+        menu->options[i] = menu->options[i + 1]; // Shift all after left
+    }
+    menu->size--; // One less entry
+    
+    // Erase the stale key from flash
+    nvs_handle_t h;
+	esp_err_t err = nvs_open(NS, NVS_READWRITE, &h);
+	if (err == ESP_OK) {
+	    char stale_key[6];
+	    sprintf(stale_key, KEY_FMT, menu->size);
+	    nvs_erase_key(h, stale_key);
+	    nvs_commit(h);
+	    nvs_close(h);
+	}
+
+    // Rewrite flash with the new list
+    return lcd_infrared_ir_menu_nvs_save(menu);
+}
+

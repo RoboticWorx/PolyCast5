@@ -82,6 +82,8 @@ void app_main(void) {
 	sx126x.hal_wakeup = sx126x_hal_wakeup;
 	sx126x.hal_write = sx126x_hal_write;
 	sx126x.hal_read = sx126x_hal_read;
+	
+	init_nvs();
 
 	// Create tasks
 	//lora_task_create();
