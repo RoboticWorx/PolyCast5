@@ -11,6 +11,8 @@ extern SemaphoreHandle_t xEnableInfraredSemaphore;
 extern SemaphoreHandle_t xSignalSavedSemaphore;
 extern SemaphoreHandle_t xSignalReceivedSemaphore;
 
+extern QueueHandle_t xSignalToTXQueue;
+
 // Function to create the infrared task
 void infrared_task_create(void);
 

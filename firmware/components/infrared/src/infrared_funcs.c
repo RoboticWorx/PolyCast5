@@ -222,7 +222,7 @@ bool ensure_capacity(void)
     return true;
 }
 
-void infrared_save_stored_signal(size_t index) {
+void infrared_save_stored_signal(void) {
 	// Open NVS
     nvs_handle_t nvs_handle;
     esp_err_t ret = nvs_open("ir_storage", NVS_READWRITE, &nvs_handle);
@@ -233,14 +233,14 @@ void infrared_save_stored_signal(size_t index) {
 
     // Save signal
     char key[16];
-    snprintf(key, sizeof(key), "signal_%d", index);
-    ret = nvs_set_blob(nvs_handle, key, stored_signals[index], sizeof(ir_signal_t));
+    snprintf(key, sizeof(key), "signal_%d", num_stored_signals);
+    ret = nvs_set_blob(nvs_handle, key, stored_signals[num_stored_signals], sizeof(ir_signal_t));
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to save signal %d: %s", index, esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to save signal %d: %s", num_stored_signals, esp_err_to_name(ret));
     }
 
     // Save num_stored_signals
-    ret = nvs_set_u32(nvs_handle, "num_signals", num_stored_signals);
+    ret = nvs_set_u32(nvs_handle, "num_signals", num_stored_signals + 1);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to save num_signals: %s", esp_err_to_name(ret));
     }

@@ -2,7 +2,7 @@
 #define LCD_FUNCS_H
 
 #include "lvgl.h"
-#include "lcd_infrared_funcs.h"
+#include "lcd_ir_funcs.h"
 
 #define SPI_MISO_PIN 2 // MISO for SX126x
 #define SPI_MOSI_PIN 7 // SPI2 MOSI
@@ -24,10 +24,7 @@
 #define TOOLS_PAGE 6
 #define WIFI_PAGE 7
 #define BLUETOOTH_PAGE 8
-#define INFRARED_SIGNAL_PAGE 12
 
-#define INFRARED_SIGNAL_NAME_PAGE 9
-#define INFRARED_SIGNAL_EDIT_PAGE 13
 #define INFRARED_REMOTE_NAME_PAGE 10
 #define INFRARED_REMOTE_EDIT_PAGE 11
 

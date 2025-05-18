@@ -17,12 +17,16 @@ SemaphoreHandle_t xEnableInfraredSemaphore;
 SemaphoreHandle_t xSignalSavedSemaphore;
 SemaphoreHandle_t xSignalReceivedSemaphore;
 
+QueueHandle_t xSignalToTXQueue;
+
 ir_signal_t **stored_signals;
 rmt_symbol_word_t ir_signal[MAX_PULSES];
 
 size_t stored_signals_capacity = INITIAL_CAPACITY;
 size_t num_stored_signals = 0;
 size_t ir_signal_length = 0;
+
+int menu_idx;
 
 
 static void infrared_task(void *pvParameters) {
@@ -31,6 +35,8 @@ static void infrared_task(void *pvParameters) {
 	xStartInfraredRXSemaphore = xSemaphoreCreateBinary();
 	xSignalSavedSemaphore = xSemaphoreCreateBinary();
 	xSignalReceivedSemaphore = xSemaphoreCreateBinary();
+	
+	xSignalToTXQueue = xQueueCreate(1, sizeof(int));
 	
 	
 	// Wait until enabled
@@ -51,18 +57,18 @@ static void infrared_task(void *pvParameters) {
     
     // Load signals from NVS
     infrared_load_stored_signals();
-    infrared_clear_stored_signals();
+    //infrared_clear_stored_signals();
     ESP_LOGI(TAG, "Loaded %d signals from NVS", num_stored_signals);
 
     while (1) {
 		
-		if (xSemaphoreTake(xStartInfraredRXSemaphore, 10) == pdTRUE) {
+		if (xSemaphoreTake(xStartInfraredRXSemaphore, 1) == pdTRUE) {
 			infrared_restart_rx();
 		}
 		
 		
         // Wait for IR signal
-        if (xSemaphoreTake(xInfraredRXEventSemaphore, 10) == pdTRUE) {
+        if (xSemaphoreTake(xInfraredRXEventSemaphore, 1) == pdTRUE) {
 			
             ESP_LOGI(TAG, "Received IR signal with %d pulses", ir_signal_length);
 
@@ -99,7 +105,7 @@ static void infrared_task(void *pvParameters) {
             stored_signals[num_stored_signals] = sig;
             
             // Save to flash
-            infrared_save_stored_signal(num_stored_signals);
+            infrared_save_stored_signal();
             num_stored_signals++;
 				
 			ESP_LOGI(TAG,
@@ -110,6 +116,23 @@ static void infrared_task(void *pvParameters) {
             xSemaphoreGive(xSignalSavedSemaphore);
 
         }
+        
+        if (xQueueReceive(xSignalToTXQueue, &menu_idx, 1) == pdTRUE) {
+			if (menu_idx < 0) {
+				menu_idx = -menu_idx; // Make pos
+				size_t sig_idx = (size_t) menu_idx - 2; // 0-based user list
+				
+				infrared_delete_stored_signal(sig_idx);
+			}
+			else {
+				size_t sig_idx = (size_t) menu_idx - 2; // 0-based user list
+			
+			    ir_signal_t *sig = stored_signals[sig_idx];
+			    ESP_LOGI(TAG, "Replaying signal %zu (%zu pulses)", sig_idx, sig->length);
+			    infrared_transmit_ir(sig->pulses, sig->length);
+		    }
+		    
+		}
 
         // Random transmission after threshold
         /*if (num_stored_signals >= RANDOM_TX_THRESHOLD) {
@@ -128,7 +151,7 @@ static void infrared_task(void *pvParameters) {
 }
 
 void infrared_task_create(void) {
-    if (xTaskCreate(infrared_task, "infrared_task", 8192, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
+    if (xTaskCreate(infrared_task, "infrared_task", 4096 * 2, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
 	    ESP_LOGE(TAG, "Failed to start infrared_task");
 	}
 }

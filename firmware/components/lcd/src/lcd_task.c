@@ -6,7 +6,7 @@
 #include "lcd_task.h"
 #include "lcd_funcs.h"
 #include "gpio_task.h"
-#include "lcd_infrared_funcs.h"
+#include "lcd_ir_funcs.h"
 
 //#include "espressif_logo.h"
 
@@ -119,12 +119,10 @@ static void lcd_task(void *pvParameters)
 	TickType_t timer_last = xTaskGetTickCount();
 	const TickType_t timer_interval = pdMS_TO_TICKS(300);
 	
-	//lcd_infrared_ir_menu_nvs_clear();
-	lcd_infrared_ir_menu_nvs_load(&ir_menu);
-	lcd_infrared_setup_page(&ir_menu);
-	
-	lcd_infrared_setup_page(&ir_signal_menu);
-    
+	//lcd_ir_ir_menu_nvs_clear();
+	lcd_ir_ir_menu_nvs_load(&ir_menu, A_IR_REMOTE_NS, A_REMOTE_KEY_COUNT, A_REMOTE_KEY_FMT);
+	lcd_ir_setup_page(&ir_menu);
+	    
 	while (1)
 	{
 		if (xTaskGetTickCount() - timer_last >= timer_interval) {
@@ -182,25 +180,13 @@ static void lcd_task(void *pvParameters)
 			}
 			else if (ui_menu.page == INFRARED_REMOTE_NAME_PAGE) {
 				
-				lcd_infrared_create_custom_name(&ui_menu, &ir_menu, &ui_btns);
+				lcd_ir_create_custom_name(&ui_menu, &ir_menu, &ui_btns);
 			}
 			else if (ui_menu.page == INFRARED_REMOTE_EDIT_PAGE) {
 				
-				lcd_infrared_edit_remotes(&ui_menu, &ir_menu, &ui_btns);
+				lcd_ir_edit_remotes(&ui_menu, &ir_menu, &ui_btns);
 			}
-			// IR signals
-			else if (ui_menu.page == INFRARED_SIGNAL_PAGE) {
-				
-				lcd_infrared_page_selected(&ui_menu, &ir_signal_menu, &ui_btns);
-			}
-			else if (ui_menu.page == INFRARED_SIGNAL_NAME_PAGE) {
-				
-				lcd_infrared_create_custom_name(&ui_menu, &ir_signal_menu, &ui_btns);
-			}
-			else if (ui_menu.page == INFRARED_SIGNAL_EDIT_PAGE) {
-				
-				lcd_infrared_edit_remotes(&ui_menu, &ir_signal_menu, &ui_btns);
-			}
+
 		}
 
 		lv_timer_handler();

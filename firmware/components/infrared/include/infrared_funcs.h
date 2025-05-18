@@ -81,7 +81,7 @@ void infrared_load_stored_signals(void);
 /** 
  * @brief Saves signal to NVS flash
  */
-void infrared_save_stored_signal(size_t index);
+void infrared_save_stored_signal(void);
 
 /** 
  * @brief Deletes signal from NVS flash
