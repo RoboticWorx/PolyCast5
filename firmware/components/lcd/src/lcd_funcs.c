@@ -403,7 +403,7 @@ static void unhide_selection_widgets(ui_menu_t *m)
     lv_obj_set_x(m->lbl_bot, 0);
 }
 
-void lcd_page_1_selected(ui_menu_t *menu, ui_btns_t *ui_btns) 
+void lcd_selection_page_selected(ui_menu_t *menu, ui_btns_t *ui_btns) 
 {
 	if (ui_btns->up_btn == 1) {
 		scrolling_menu = true;
@@ -435,14 +435,22 @@ void lcd_page_1_selected(ui_menu_t *menu, ui_btns_t *ui_btns)
 	}
 }
 
-void lcd_page_2_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns) 
+void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns) 
 {
 	// Show IR list
 	lv_obj_remove_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 	
 	// New remote selected
 	if (ui_btns->up_btn == 1 && ir_menu->index == 0) {
-		lcd_infrared_create_new_remote(ui_menu, ir_menu);
+		
+		lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN); // Hide IR menu
+		ui_menu->page = INFRARED_REMOTE_NAME_PAGE;
+	}
+	// Edit remote selected
+	else if (ui_btns->up_btn == 1 && ir_menu->index == 1) {
+		
+		lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN); // Hide IR menu
+		ui_menu->page = INFRARED_REMOTE_EDIT_PAGE;
 	}
 	// Back selected
 	else if (ui_btns->down_btn == 1) {

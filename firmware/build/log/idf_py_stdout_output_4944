@@ -1,6 +1,6 @@
 Command: ninja flash
 [1/5] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\build\esp-idf\esptool_py && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-master/components/partition_table/check_sizes.py --offset 0x8000 partition --type app C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/partition_table/partition-table.bin C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/app-template.bin"
-app-template.bin binary size 0x9b450 bytes. Smallest app partition is 0x100000 bytes. 0x64bb0 bytes (39%) free.
+app-template.bin binary size 0x9b860 bytes. Smallest app partition is 0x100000 bytes. 0x647a0 bytes (39%) free.
 [2/5] Performing build step for 'bootloader'
 [1/1] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\build\bootloader\esp-idf\esptool_py && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-master/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x2000 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/bootloader.bin"
 Bootloader binary size 0x5510 bytes. 0xaf0 bytes (11%) free.
@@ -29,34 +29,34 @@ Flash will be erased from 0x00010000 to 0x000abfff...
 Flash will be erased from 0x00008000 to 0x00008fff...
 Compressed 21776 bytes to 13299...
 Writing at 0x00002000... (100 %)
-Wrote 21776 bytes (13299 compressed) at 0x00002000 in 0.2 seconds (effective 976.1 kbit/s)...
+Wrote 21776 bytes (13299 compressed) at 0x00002000 in 0.2 seconds (effective 924.4 kbit/s)...
 Hash of data verified.
-Compressed 635984 bytes to 320193...
+Compressed 637024 bytes to 320697...
 Writing at 0x00010000... (5 %)
-Writing at 0x0001bee4... (10 %)
-Writing at 0x00023b78... (15 %)
-Writing at 0x0002c362... (20 %)
-Writing at 0x00037415... (25 %)
-Writing at 0x0003f47b... (30 %)
-Writing at 0x000467c8... (35 %)
-Writing at 0x0004dd2e... (40 %)
-Writing at 0x00054c4d... (45 %)
-Writing at 0x0005adb7... (50 %)
-Writing at 0x000615e9... (55 %)
-Writing at 0x00068a56... (60 %)
-Writing at 0x0006e9c8... (65 %)
-Writing at 0x00074ba2... (70 %)
-Writing at 0x0007aaa4... (75 %)
-Writing at 0x00082fbf... (80 %)
-Writing at 0x0008b0c2... (85 %)
-Writing at 0x000921c8... (90 %)
-Writing at 0x00098fc5... (95 %)
-Writing at 0x000a002f... (100 %)
-Wrote 635984 bytes (320193 compressed) at 0x00010000 in 2.5 seconds (effective 2076.3 kbit/s)...
+Writing at 0x0001befc... (10 %)
+Writing at 0x00023a6e... (15 %)
+Writing at 0x0002c20c... (20 %)
+Writing at 0x000373fd... (25 %)
+Writing at 0x0003f49b... (30 %)
+Writing at 0x000467d8... (35 %)
+Writing at 0x0004dd70... (40 %)
+Writing at 0x00054d38... (45 %)
+Writing at 0x0005aecb... (50 %)
+Writing at 0x000616e7... (55 %)
+Writing at 0x00068b95... (60 %)
+Writing at 0x0006eae6... (65 %)
+Writing at 0x00074d36... (70 %)
+Writing at 0x0007ac08... (75 %)
+Writing at 0x0008303c... (80 %)
+Writing at 0x0008b1a7... (85 %)
+Writing at 0x00092268... (90 %)
+Writing at 0x00099094... (95 %)
+Writing at 0x000a0166... (100 %)
+Wrote 637024 bytes (320697 compressed) at 0x00010000 in 2.5 seconds (effective 2063.7 kbit/s)...
 Hash of data verified.
 Compressed 3072 bytes to 103...
 Writing at 0x00008000... (100 %)
-Wrote 3072 bytes (103 compressed) at 0x00008000 in 0.0 seconds (effective 1016.1 kbit/s)...
+Wrote 3072 bytes (103 compressed) at 0x00008000 in 0.0 seconds (effective 1062.7 kbit/s)...
 Hash of data verified.
 
 Leaving...

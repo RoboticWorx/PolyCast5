@@ -27,6 +27,7 @@
 
 #define INFRARED_SIGNAL_NAME_PAGE 9
 #define INFRARED_REMOTE_NAME_PAGE 10
+#define INFRARED_REMOTE_EDIT_PAGE 11
 
 
 typedef struct ui_menu_t {
@@ -138,7 +139,7 @@ void lcd_selection_btn_pressed(ui_menu_t *menu);
  * @param [in] menu UI menu structure
  * @param [in] menu UI input structure
  */
-void lcd_page_1_selected(ui_menu_t *menu, ui_btns_t *ui_btns);
+void lcd_selection_page_selected(ui_menu_t *menu, ui_btns_t *ui_btns);
 
 /**
  * @brief Everything to be done on infrared page
@@ -147,7 +148,7 @@ void lcd_page_1_selected(ui_menu_t *menu, ui_btns_t *ui_btns);
  * @param [in] ir_menu Infrared menu structure
  * @param [in] menu UI input structure
  */
-void lcd_page_2_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns); 
+void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns); 
 
 
 

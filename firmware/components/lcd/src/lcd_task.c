@@ -119,6 +119,7 @@ static void lcd_task(void *pvParameters)
 	TickType_t timer_last = xTaskGetTickCount();
 	const TickType_t timer_interval = pdMS_TO_TICKS(300);
 	
+	//lcd_infrared_ir_menu_nvs_clear();
 	lcd_infrared_ir_menu_nvs_load(&ir_menu);
 	lcd_infrared_setup_page(&ir_menu);
     
@@ -164,26 +165,25 @@ static void lcd_task(void *pvParameters)
 				ui_btns.home_btn = 0;
 			}
 	
+	
 			if (ui_menu.page == HOME_PAGE) {
 	
 			} 
 			else if (ui_menu.page == SELECTION_PAGE) {
-		
-				/*lv_obj_remove_flag(ui_menu.lbl_top, LV_OBJ_FLAG_HIDDEN);
-				lv_obj_remove_flag(ui_menu.lbl_mid, LV_OBJ_FLAG_HIDDEN);
-				lv_obj_remove_flag(ui_menu.lbl_bot, LV_OBJ_FLAG_HIDDEN);
-				lv_obj_remove_flag(ui_menu.arrow_top, LV_OBJ_FLAG_HIDDEN);
-				lv_obj_remove_flag(ui_menu.arrow_bot, LV_OBJ_FLAG_HIDDEN);*/
 				
-				lcd_page_1_selected(&ui_menu, &ui_btns);
+				lcd_selection_page_selected(&ui_menu, &ui_btns);
 			}
 			else if (ui_menu.page == INFRARED_PAGE) {
 					
-				lcd_page_2_selected(&ui_menu, &ir_menu, &ui_btns);
+				lcd_infrared_page_selected(&ui_menu, &ir_menu, &ui_btns);
 			}
 			else if (ui_menu.page == INFRARED_SIGNAL_NAME_PAGE || ui_menu.page == INFRARED_REMOTE_NAME_PAGE) {
 				
 				lcd_infrared_create_custom_name(&ui_menu, &ir_menu, &ui_btns);
+			}
+			else if (ui_menu.page == INFRARED_REMOTE_EDIT_PAGE) {
+				
+				lcd_infrared_edit_remotes(&ui_menu, &ir_menu, &ui_btns);
 			}
 		}
 

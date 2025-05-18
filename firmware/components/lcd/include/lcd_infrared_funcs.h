@@ -8,7 +8,7 @@
 #include <string.h>
 
 #define MAX_IR_OPTIONS 20
-#define MAX_CUSTOM_NAME_LEN 10
+#define MAX_CUSTOM_NAME_LEN 12
 
 // Forward-declare structs (from lcd_funcs.h)
 typedef struct ui_btns_t ui_btns_t;
@@ -27,6 +27,12 @@ typedef struct {
 
 extern ir_menu_t ir_menu;
 
+void lcd_infrared_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns);
+
+/**
+ * @brief Clears all NVS for ir_names namespace
+ */
+void lcd_infrared_ir_menu_nvs_clear(void);
 
 /**
  * @brief Removes a given index from NVS
@@ -55,14 +61,6 @@ esp_err_t lcd_infrared_ir_menu_nvs_load(ir_menu_t *ir_menu);
  * @returns ESP error status
  */
 esp_err_t lcd_infrared_ir_menu_nvs_save(const ir_menu_t *ir_menu);
-
-/**
- * @brief Hides IR main_list and switches page to INFRARED_REMOTE_NAME_PAGE
- *
- * @param [in] ui_menu UI menu structure
- * @param [in] ir_menu IR menu structure
- */
-void lcd_infrared_create_new_remote(ui_menu_t *ui_menu, ir_menu_t *ir_menu);
 
 /**
  * @brief Create custom name for IR remote/signal and save to options in NVS
