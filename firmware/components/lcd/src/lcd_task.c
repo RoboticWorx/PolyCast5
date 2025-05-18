@@ -52,7 +52,7 @@ static void lcd_task(void *pvParameters)
 {
 	user_primary_color = lv_color_hex(0x00008B);
 	
-	// No scroll-bar
+	// No scrollbar
 	lv_obj_set_scrollbar_mode(ACTIVE_SCR, LV_SCROLLBAR_MODE_OFF);
 	
 	// Set background
@@ -122,43 +122,45 @@ static void lcd_task(void *pvParameters)
 	//lcd_infrared_ir_menu_nvs_clear();
 	lcd_infrared_ir_menu_nvs_load(&ir_menu);
 	lcd_infrared_setup_page(&ir_menu);
+	
+	lcd_infrared_setup_page(&ir_signal_menu);
     
 	while (1)
 	{
 		if (xTaskGetTickCount() - timer_last >= timer_interval) {
 			timer_last = xTaskGetTickCount();
 			
-			if (xSemaphoreTake(xUpButtonSemaphore, 1)) {
+			if (xSemaphoreTake(xUpButtonSemaphore, 0)) {
 				ui_btns.up_btn = 1;
 			}
 			else {
 				ui_btns.up_btn = 0;
 			}
-			if (xSemaphoreTake(xDownButtonSemaphore, 1)) {
+			if (xSemaphoreTake(xDownButtonSemaphore, 0)) {
 				ui_btns.down_btn = 1;
 			}
 			else {
 				ui_btns.down_btn = 0;
 			}
-			if (xSemaphoreTake(xRightButtonSemaphore, 1)) {
+			if (xSemaphoreTake(xRightButtonSemaphore, 0)) {
 				ui_btns.right_btn = 1;
 			}
 			else {
 				ui_btns.right_btn = 0;
 			}
-			if (xSemaphoreTake(xLeftButtonSemaphore, 1)) {
+			if (xSemaphoreTake(xLeftButtonSemaphore, 0)) {
 				ui_btns.left_btn = 1;
 			}
 			else {
 				ui_btns.left_btn = 0;
 			}
-			if (xSemaphoreTake(xBackButtonSemaphore, 1)) {
+			if (xSemaphoreTake(xBackButtonSemaphore, 0)) {
 				ui_btns.back_btn = 1;
 			}
 			else {
 				ui_btns.back_btn = 0;
 			}
-			if (xSemaphoreTake(xHomeButtonSemaphore, 1)) {
+			if (xSemaphoreTake(xHomeButtonSemaphore, 0)) {
 				ui_btns.home_btn = 1;
 			}
 			else {
@@ -167,23 +169,37 @@ static void lcd_task(void *pvParameters)
 	
 	
 			if (ui_menu.page == HOME_PAGE) {
-	
+				// Show cool two frame animation and allow user to change animation scrolling up/down
 			} 
 			else if (ui_menu.page == SELECTION_PAGE) {
 				
 				lcd_selection_page_selected(&ui_menu, &ui_btns);
 			}
+			// IR remotes
 			else if (ui_menu.page == INFRARED_PAGE) {
 					
 				lcd_infrared_page_selected(&ui_menu, &ir_menu, &ui_btns);
 			}
-			else if (ui_menu.page == INFRARED_SIGNAL_NAME_PAGE || ui_menu.page == INFRARED_REMOTE_NAME_PAGE) {
+			else if (ui_menu.page == INFRARED_REMOTE_NAME_PAGE) {
 				
 				lcd_infrared_create_custom_name(&ui_menu, &ir_menu, &ui_btns);
 			}
 			else if (ui_menu.page == INFRARED_REMOTE_EDIT_PAGE) {
 				
 				lcd_infrared_edit_remotes(&ui_menu, &ir_menu, &ui_btns);
+			}
+			// IR signals
+			else if (ui_menu.page == INFRARED_SIGNAL_PAGE) {
+				
+				lcd_infrared_page_selected(&ui_menu, &ir_signal_menu, &ui_btns);
+			}
+			else if (ui_menu.page == INFRARED_SIGNAL_NAME_PAGE) {
+				
+				lcd_infrared_create_custom_name(&ui_menu, &ir_signal_menu, &ui_btns);
+			}
+			else if (ui_menu.page == INFRARED_SIGNAL_EDIT_PAGE) {
+				
+				lcd_infrared_edit_remotes(&ui_menu, &ir_signal_menu, &ui_btns);
 			}
 		}
 

@@ -26,7 +26,15 @@ typedef struct {
 } ir_menu_t;
 
 extern ir_menu_t ir_menu;
+extern ir_menu_t ir_signal_menu;
 
+/**
+ * @brief Allows option to remove or rename a remote
+ *
+ * @param [in] ui_menu UI menu structure
+ * @param [in] ir_menu IR menu structure
+ * @param [in] ui_btns UI buttons structure
+ */
 void lcd_infrared_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns);
 
 /**

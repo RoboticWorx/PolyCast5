@@ -19,6 +19,13 @@ ir_menu_t ir_menu = {
     .cont = NULL,
 };
 
+ir_menu_t ir_signal_menu = {
+    .options = {"Add Sig", "Edit"},
+    .size = 2,
+    .index = 0,
+    .cont = NULL,
+};
+
 static const char* TAG = "LCD_LR_FUNCS";
 
 static char name_buf[MAX_CUSTOM_NAME_LEN + 1] = {0};
@@ -44,8 +51,15 @@ void lcd_infrared_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
 			
 			// Help text
 			lbl_title = lv_label_create(ACTIVE_SCR);
-			lcd_format_label(lbl_title, "No remotes to edit!", user_secondary_color,
-							 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+			
+			if (ui_menu->page == INFRARED_SIGNAL_EDIT_PAGE) {
+				lcd_format_label(lbl_title, "No signals to edit!", user_secondary_color,
+								 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+			}
+			else {
+				lcd_format_label(lbl_title, "No remotes to edit!", user_secondary_color,
+								 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+			}
 							 
 			// Show and wait
 			lv_timer_handler();
@@ -55,7 +69,12 @@ void lcd_infrared_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
 			lv_obj_delete(lbl_title);
 			lbl_title = NULL;
 			
-            ui_menu->page = INFRARED_PAGE;
+			// Go back
+			if (ui_menu->page == INFRARED_SIGNAL_EDIT_PAGE)
+				ui_menu->page = INFRARED_SIGNAL_PAGE;
+			else
+            	ui_menu->page = INFRARED_PAGE;
+            	
             return;
         }
         
@@ -64,8 +83,14 @@ void lcd_infrared_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
 
 		// Initial text
 		lbl_title = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_title, "Edit Remote:", user_secondary_color,
+		if (ui_menu->page == INFRARED_SIGNAL_EDIT_PAGE) {
+			lcd_format_label(lbl_title, "Edit Signal:", user_secondary_color,
 						 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 10);
+		}
+		else {
+			lcd_format_label(lbl_title, "Edit Remote:", user_secondary_color,
+						 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 10);
+		}
 
 		lbl_name = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_name, ir_menu->options[edit_idx],
@@ -115,7 +140,10 @@ void lcd_infrared_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
         lbl_hint = NULL;
         
         // Switch pages
-        ui_menu->page = INFRARED_PAGE;
+		if (ui_menu->page == INFRARED_SIGNAL_EDIT_PAGE)
+			ui_menu->page = INFRARED_SIGNAL_PAGE;
+		else
+            ui_menu->page = INFRARED_PAGE;
         return;
     }
 	// Exit
@@ -129,7 +157,10 @@ void lcd_infrared_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
         lbl_hint = NULL;
         
         // Switch pages
-        ui_menu->page = INFRARED_PAGE;
+       	if (ui_menu->page == INFRARED_SIGNAL_EDIT_PAGE)
+			ui_menu->page = INFRARED_SIGNAL_PAGE;
+		else
+            ui_menu->page = INFRARED_PAGE;
         return;
     }
 	// Iterate up
@@ -175,9 +206,15 @@ void lcd_infrared_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_
                          &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
                          
         lbl_dirs = lv_label_create(ACTIVE_SCR);
-        lcd_format_label(lbl_dirs, "Enter remote name\nwith arrow buttons:", user_secondary_color,
+        if (ui_menu->page == INFRARED_SIGNAL_NAME_PAGE) {
+			lcd_format_label(lbl_dirs, "Enter signal name\nwith arrow buttons:", user_secondary_color,
                          &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, -30);
-                         
+		}
+		else {
+			lcd_format_label(lbl_dirs, "Enter remote name\nwith arrow buttons:", user_secondary_color,
+			             &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, -30);
+		}
+        
         lbl_chars = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_chars, "(Up to 12 characters)", user_secondary_color,
                          &lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0);
@@ -232,7 +269,10 @@ void lcd_infrared_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_
 	    cur_char = '_';
 	    memset(name_buf, 0, sizeof name_buf);
 	    
-		ui_menu->page = INFRARED_PAGE;
+		if (ui_menu->page == INFRARED_SIGNAL_NAME_PAGE)
+			ui_menu->page = INFRARED_SIGNAL_PAGE;
+		else
+ 			ui_menu->page = INFRARED_PAGE;
 		return;
     }
     // If left and not at start
@@ -277,49 +317,53 @@ void lcd_infrared_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_
 	    cur_pos = 0;
 	    cur_char = '_';
 	    memset(name_buf, 0, sizeof name_buf);
-        
-        // Update options
-        if (ui_menu->page == INFRARED_REMOTE_NAME_PAGE) {
-			// If overwriting an existing as a rename
-			if (ir_menu_overwrite) {
-				// ir_menu->index is passed as edit_idx:
-				// Release old string then reallocate
-		        free(ir_menu->options[ir_index_overwrite]);
-		        ir_menu->options[ir_index_overwrite] = strdup(saved_name);
-				
-		        // Persist to NVS
-		        lcd_infrared_ir_menu_nvs_save(ir_menu);
-				
-		        // Update the button’s label in-place
-		        lv_obj_t *btn = ir_menu->btns[ir_index_overwrite];
-		        lv_obj_t *child_lbl = lv_obj_get_child(btn, 0);
-		        lv_label_set_text(child_lbl, ir_menu->options[ir_index_overwrite]);
-				
-		        // Clean up
-		        ir_menu_overwrite = false;
-			}
-			// Else adding a whole new remote
-			else {
-				ir_menu->size++;
-				
-				// Save to options, then to NVS
-				char *name_copy = strdup(saved_name);
-				ir_menu->options[ir_menu->size - 1] = name_copy;
-				lcd_infrared_ir_menu_nvs_save(ir_menu);
-				
-				// Create new button for new option
-				ir_menu->btns[ir_menu->size - 1] = lv_list_add_btn(ir_menu->main_list, NULL, ir_menu->options[ir_menu->size - 1]);
-		        lv_obj_set_size(ir_menu->btns[ir_menu->size - 1], 100, 28);
-		        lv_obj_add_style(ir_menu->btns[ir_menu->size - 1], &ir_menu->btn_style, 0);
-	
-		        // Create and format text label
-		        lv_obj_t *lbl = lv_obj_get_child(ir_menu->btns[ir_menu->size - 1], 0);
-		        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
-		        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-		        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
-	        }
+
+		// Update options
+		// If overwriting an existing as a rename
+		if (ir_menu_overwrite) {
+			// ir_menu->index is passed as edit_idx:
+			// Release old string then reallocate
+			free(ir_menu->options[ir_index_overwrite]);
+			ir_menu->options[ir_index_overwrite] = strdup(saved_name);
+
+			// Persist to NVS
+			lcd_infrared_ir_menu_nvs_save(ir_menu);
+
+			// Update the button’s label in-place
+			lv_obj_t *btn = ir_menu->btns[ir_index_overwrite];
+			lv_obj_t *child_lbl = lv_obj_get_child(btn, 0);
+			lv_label_set_text(child_lbl, ir_menu->options[ir_index_overwrite]);
+
+			// Clean up
+			ir_menu_overwrite = false;
 		}
-        ui_menu->page = INFRARED_PAGE;
+		// Else adding a whole new remote
+		else {
+			ir_menu->size++;
+
+			// Save to options, then to NVS
+			char *name_copy = strdup(saved_name);
+			ir_menu->options[ir_menu->size - 1] = name_copy;
+			lcd_infrared_ir_menu_nvs_save(ir_menu);
+
+			// Create new button for new option
+			ir_menu->btns[ir_menu->size - 1] = lv_list_add_btn(ir_menu->main_list, NULL, ir_menu->options[ir_menu->size - 1]);
+			lv_obj_set_size(ir_menu->btns[ir_menu->size - 1], 100, 28);
+			lv_obj_add_style(ir_menu->btns[ir_menu->size - 1],
+							 &ir_menu->btn_style, 0);
+
+			// Create and format text label
+			lv_obj_t *lbl = lv_obj_get_child(ir_menu->btns[ir_menu->size - 1], 0);
+			lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+			lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+			lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
+		}
+		
+		// Switch to previous page
+		if (ui_menu->page == INFRARED_SIGNAL_NAME_PAGE)
+			ui_menu->page = INFRARED_SIGNAL_PAGE;
+		else
+			ui_menu->page = INFRARED_PAGE;
         return;
     }
 
@@ -442,7 +486,7 @@ void lcd_infrared_setup_page(ir_menu_t *menu)
 }
 
 void lcd_infrared_update_menu(ir_menu_t *menu)
-{
+{    
 	// Reveal
     lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
@@ -454,22 +498,15 @@ void lcd_infrared_update_menu(ir_menu_t *menu)
 		menu->index = menu->size - 1;
 	}
 
-    // Remember previous selection across calls
-    static int prev = -1;
-    if (prev == menu->index) // If the same, return
-        return;
-
-    // Remove highlight from previous button
-    if (prev >= 0 && prev < menu->size) {
-        lv_obj_remove_style(menu->btns[prev], &menu->sel_style, 0);
-        lv_obj_add_style(menu->btns[prev], &menu->btn_style, 0);
+    // Reset every button to unselected
+    for (int i = 0; i < menu->size; ++i) {
+        lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
+        lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
     }
 
-    // Add highlight to new button
+    // Highlight only the current index
     lv_obj_remove_style(menu->btns[menu->index], &menu->btn_style, 0);
     lv_obj_add_style(menu->btns[menu->index], &menu->sel_style, 0);
-
-    prev = menu->index;
     
     // Enable scrolling if list gets too long
     lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_OFF);

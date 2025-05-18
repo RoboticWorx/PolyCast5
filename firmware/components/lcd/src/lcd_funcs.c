@@ -444,24 +444,51 @@ void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_
 	if (ui_btns->up_btn == 1 && ir_menu->index == 0) {
 		
 		lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN); // Hide IR menu
-		ui_menu->page = INFRARED_REMOTE_NAME_PAGE;
+		
+		// Switch to naming page
+		if (ui_menu->page == INFRARED_SIGNAL_PAGE) {
+			ui_menu->page = INFRARED_SIGNAL_NAME_PAGE;
+		}
+		else {
+			ui_menu->page = INFRARED_REMOTE_NAME_PAGE;
+		}
 	}
 	// Edit remote selected
 	else if (ui_btns->up_btn == 1 && ir_menu->index == 1) {
 		
 		lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN); // Hide IR menu
-		ui_menu->page = INFRARED_REMOTE_EDIT_PAGE;
+		
+		if (ui_menu->page == INFRARED_SIGNAL_PAGE) {
+			ui_menu->page = INFRARED_SIGNAL_EDIT_PAGE;
+		}
+		else {
+			ui_menu->page = INFRARED_REMOTE_EDIT_PAGE;
+		}
+	}
+	// Selected specific remote
+	else if (ui_btns->up_btn == 1) {
+		if (ui_menu->page == INFRARED_PAGE) {
+			lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN); // Hide IR menu
+			ui_menu->page = INFRARED_SIGNAL_PAGE;
+		}
 	}
 	// Back selected
 	else if (ui_btns->down_btn == 1) {
+		
 		// Hide IR menu
 		lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
-		// Show selection labels
-		unhide_selection_widgets(ui_menu);
-		
 		// Switch page
-		ui_menu->page = SELECTION_PAGE;
+		if (ui_menu->page == INFRARED_PAGE) {
+			// Show selection labels
+			unhide_selection_widgets(ui_menu);
+		
+			ui_menu->page = SELECTION_PAGE;
+		}
+		else if (ui_menu->page == INFRARED_SIGNAL_PAGE) {
+			ui_menu->page = INFRARED_PAGE;
+		}
+
 	}
 	// Down button pressed
 	else if (ui_btns->right_btn == 1) {
