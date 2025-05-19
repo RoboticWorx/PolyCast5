@@ -66,7 +66,6 @@ static void infrared_task(void *pvParameters) {
 			infrared_restart_rx();
 		}
 		
-		
         // Wait for IR signal
         if (xSemaphoreTake(xInfraredRXEventSemaphore, 1) == pdTRUE) {
 			

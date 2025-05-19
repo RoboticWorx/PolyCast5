@@ -97,16 +97,15 @@ void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
 	// Delete menu option
     else if (ui_btns->back_btn) {
 		// Deletion
-        if(lcd_ir_ir_menu_nvs_delete(ir_menu, edit_idx, A_IR_REMOTE_NS, A_REMOTE_KEY_COUNT, A_REMOTE_KEY_FMT) == ESP_OK) {
-			
-			// Wrap
-	        if (edit_idx >= ir_menu->size) {
-        		edit_idx = 2;
-	        }
-	        
-	        edit_idx = -edit_idx; // Change to neg to indicate deletion
-	        xQueueSend(xSignalToTXQueue, &edit_idx, 0);
-	        edit_idx = -edit_idx; // Flip back
+        int to_delete = edit_idx;
+	    if (lcd_ir_ir_menu_nvs_delete(ir_menu, to_delete, A_IR_REMOTE_NS, A_REMOTE_KEY_COUNT, A_REMOTE_KEY_FMT) == ESP_OK) {
+	        int q = -to_delete;
+	        xQueueSend(xSignalToTXQueue, &q, 0);
+	    }
+	
+	    // now that ir_menu->size has shrunk, wrap *for the UI*, not for the delete:
+	    if (edit_idx >= ir_menu->size) {
+	        edit_idx = 2;
 	    }
         
         // Reset for next time

@@ -458,6 +458,7 @@ void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_
 	}
 	// Selected specific remote
 	else if (ui_btns->up_btn == 1) {
+		
 		xQueueSend(xSignalToTXQueue, &ir_menu->index, 0);
 	}
 	// Back selected
@@ -486,4 +487,3 @@ void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_
 		lcd_ir_update_menu(ir_menu);
 	}
 }
-

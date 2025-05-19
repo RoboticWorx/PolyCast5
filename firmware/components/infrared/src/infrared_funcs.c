@@ -84,16 +84,6 @@ void infrared_init_rx(void) {
     };
     ESP_ERROR_CHECK(rmt_rx_register_event_callbacks(rx_channel, &callbacks, NULL));
     ESP_ERROR_CHECK(rmt_enable(rx_channel));
-
-	// Configure RX config
-    rmt_receive_config_t rx_receive_config = {
-        .signal_range_min_ns = SIGNAL_MIN_NS,
-        .signal_range_max_ns = SIGNAL_MAX_NS,
-    };
-    //ESP_LOGI(TAG, "Starting RX with mem_block=%d, resolution=%dHz, max_timeout=%dns", PULSE_BLOCK, RMT_RESOLUTION_HZ, rx_receive_config.signal_range_max_ns);
-             
-    // Start receiving
-    ESP_ERROR_CHECK(rmt_receive(rx_channel, ir_signal, sizeof(rmt_symbol_word_t) * MAX_PULSES, &rx_receive_config));
 }
 
 void infrared_init_tx(void) {
@@ -423,5 +413,3 @@ void infrared_clear_stored_signals(void) {
     nvs_close(nvs_handle);
     ESP_LOGI(TAG, "Cleared all signals from NVS");
 }
-
-
