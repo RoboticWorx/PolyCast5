@@ -112,8 +112,9 @@ void lcd_ir_update_menu(ir_menu_t *ir_menu);
 /**
  * @brief Select IR option to execute
  *
+ * @param [in] ui_menu UI menu structure
  * @param [in] ir_menu Infrared menu structure
  */
-void lcd_ir_save_new_signal(ir_menu_t *ir_menu);
+void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *ir_menu);
 
 #endif // LCD_IR_FUNCS_H

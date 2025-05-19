@@ -7,6 +7,7 @@
 #include "lcd_funcs.h"
 #include "lcd_task.h"
 #include "infrared_task.h"
+#include "gpio_task.h"
 
 ir_menu_t ir_menu = {
     .options = {"Add New", "Edit"},
@@ -471,7 +472,7 @@ void lcd_ir_update_menu(ir_menu_t *menu)
     lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_OFF);
 }
 
-void lcd_ir_save_new_signal(ir_menu_t *menu)
+void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
 {
 	// Hide IR menu
 	lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -484,12 +485,31 @@ void lcd_ir_save_new_signal(ir_menu_t *menu)
 	lcd_format_label(text_label, "Present signal!", user_secondary_color,
 				 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
 	lv_timer_handler();
-		
-	// Wait until signal received and saved
-	xSemaphoreTake(xSignalSavedSemaphore, portMAX_DELAY);
-	lv_label_set_text(text_label, "Saving...");
-	lv_timer_handler();
-		
+	
+	// Wait until signal received and saved	
+	while (1) {
+        if (xSemaphoreTake(xSignalSavedSemaphore, 10) == pdTRUE) {
+            // Signal arrived
+            lv_label_set_text(text_label, "Saving...");
+			lv_timer_handler();
+			
+			// Switch to naming page
+			ui_menu->page = INFRARED_REMOTE_NAME_PAGE;
+			
+            break;
+        }
+        if (xSemaphoreTake(xLeftButtonSemaphore, 10)) {
+            // User hit cancel
+            lv_label_set_text(text_label, "Canceling...");
+            lv_timer_handler();
+            
+            // Go back
+			ui_menu->page = INFRARED_PAGE;
+            
+            break;
+        }
+    }
+	
 	// Conclude
 	vTaskDelay(pdMS_TO_TICKS(500));
 	lv_obj_delete(text_label);

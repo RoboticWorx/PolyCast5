@@ -443,10 +443,8 @@ void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_
 	// New remote selected
 	if (ui_btns->up_btn == 1 && ir_menu->index == 0) {
 				
-		lcd_ir_save_new_signal(ir_menu);
+		lcd_ir_save_new_signal(ui_menu, ir_menu);
 		
-		// Switch to naming page
-		ui_menu->page = INFRARED_REMOTE_NAME_PAGE;
 	}
 	// Edit remote selected
 	else if (ui_btns->up_btn == 1 && ir_menu->index == 1) {
