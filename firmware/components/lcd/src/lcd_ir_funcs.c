@@ -103,7 +103,7 @@ void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
 	        xQueueSend(xSignalToTXQueue, &q, 0);
 	    }
 	
-	    // now that ir_menu->size has shrunk, wrap *for the UI*, not for the delete:
+	    // Now that ir_menu->size has shrunk, wrap
 	    if (edit_idx >= ir_menu->size) {
 	        edit_idx = 2;
 	    }
@@ -344,7 +344,7 @@ void lcd_ir_setup_page(ir_menu_t *menu)
 
 	// Create list
     menu->main_list = lv_list_create(ACTIVE_SCR);
-    lv_obj_set_size(menu->main_list, 105, 209);
+    lv_obj_set_size(menu->main_list, 105, 208);
     
     // Format
     lv_obj_set_scrollbar_mode(menu->main_list, LV_SCROLLBAR_MODE_OFF);     // never draw bars
