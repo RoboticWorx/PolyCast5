@@ -7,6 +7,7 @@
 extern SemaphoreHandle_t xInfraredRXEventSemaphore;
 extern SemaphoreHandle_t xStartInfraredRXSemaphore;
 extern SemaphoreHandle_t xEnableInfraredSemaphore;
+extern SemaphoreHandle_t xDisableInfraredSemaphore;
 
 extern SemaphoreHandle_t xSignalSavedSemaphore;
 extern SemaphoreHandle_t xSignalReceivedSemaphore;

@@ -503,6 +503,8 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
             lv_label_set_text(text_label, "Canceling...");
             lv_timer_handler();
             
+            xSemaphoreGive(xDisableInfraredSemaphore);
+            
             // Go back
 			ui_menu->page = INFRARED_PAGE;
             

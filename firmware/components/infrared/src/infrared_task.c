@@ -13,6 +13,7 @@ SemaphoreHandle_t xInfraredRXEventSemaphore;
 
 SemaphoreHandle_t xStartInfraredRXSemaphore;
 SemaphoreHandle_t xEnableInfraredSemaphore;
+SemaphoreHandle_t xDisableInfraredSemaphore;
 
 SemaphoreHandle_t xSignalSavedSemaphore;
 SemaphoreHandle_t xSignalReceivedSemaphore;
@@ -32,6 +33,7 @@ int menu_idx;
 static void infrared_task(void *pvParameters) {
 	// Create semaphores
 	xEnableInfraredSemaphore = xSemaphoreCreateBinary();
+	xDisableInfraredSemaphore = xSemaphoreCreateBinary();
 	xStartInfraredRXSemaphore = xSemaphoreCreateBinary();
 	xSignalSavedSemaphore = xSemaphoreCreateBinary();
 	xSignalReceivedSemaphore = xSemaphoreCreateBinary();
@@ -68,8 +70,6 @@ static void infrared_task(void *pvParameters) {
 		
         // Wait for IR signal
         if (xSemaphoreTake(xInfraredRXEventSemaphore, 1) == pdTRUE) {
-			
-            ESP_LOGI(TAG, "Received IR signal with %d pulses", ir_signal_length);
 
             // Filter out noise
             if (ir_signal_length < MIN_VALID_PULSES) {
@@ -77,6 +77,8 @@ static void infrared_task(void *pvParameters) {
                 infrared_restart_rx();
                 continue;
             }
+            
+            ESP_LOGI(TAG, "Received IR signal with %d pulses", ir_signal_length);
 
             // Pad final gap
             if (ir_signal[ir_signal_length - 1].duration1 < FINAL_GAP_US) {
@@ -106,7 +108,7 @@ static void infrared_task(void *pvParameters) {
             // Save to flash
             infrared_save_stored_signal();
             num_stored_signals++;
-				
+			
 			ESP_LOGI(TAG,
                      "Stored signal %zu (%zu pulses), SRAM=%zu/%zu",
                      num_stored_signals, sig->length,
@@ -115,6 +117,10 @@ static void infrared_task(void *pvParameters) {
             xSemaphoreGive(xSignalSavedSemaphore);
 
         }
+        
+        if (xSemaphoreTake(xDisableInfraredSemaphore, 1) == pdTRUE) {
+			infrared_disable_rx();
+		}	
         
         if (xQueueReceive(xSignalToTXQueue, &menu_idx, 1) == pdTRUE) {
 			if (menu_idx < 0) {

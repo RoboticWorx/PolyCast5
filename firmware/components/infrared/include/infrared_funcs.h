@@ -60,6 +60,11 @@ void infrared_init_tx(void);
  */
 void infrared_restart_rx(void);
 
+/** 
+ * @brief Disable RX config
+ */
+void infrared_disable_rx(void);
+
 /**
  * @brief Transmit infrared signal
  *

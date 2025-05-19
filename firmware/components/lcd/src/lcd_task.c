@@ -7,6 +7,7 @@
 #include "lcd_funcs.h"
 #include "gpio_task.h"
 #include "lcd_ir_funcs.h"
+#include "nvs.h"
 #include "nvs_flash.h"
 
 //#include "espressif_logo.h"
@@ -119,6 +120,8 @@ static void lcd_task(void *pvParameters)
 
 	TickType_t timer_last = xTaskGetTickCount();
 	const TickType_t timer_interval = pdMS_TO_TICKS(300);
+	
+	//nvs_flash_erase(); // Factory reset
 		
 	//lcd_ir_ir_menu_nvs_clear();
 	lcd_ir_ir_menu_nvs_load(&ir_menu, A_IR_REMOTE_NS, A_REMOTE_KEY_COUNT, A_REMOTE_KEY_FMT);

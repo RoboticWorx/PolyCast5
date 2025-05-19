@@ -179,6 +179,18 @@ void infrared_restart_rx(void) {
     ESP_ERROR_CHECK(rmt_receive(rx_channel, ir_signal, sizeof(rmt_symbol_word_t) * MAX_PULSES, &rx_receive_config));
 }
 
+void infrared_disable_rx(void)
+{
+	// Ensure initialized
+    if (rx_channel == NULL) {
+        ESP_LOGE(TAG, "Cannot disable RX: channel not initialized");
+        return;
+    }
+    
+    // Disable channel
+    rmt_disable(rx_channel);
+}
+
 bool ensure_capacity(void)
 {
 	// If space available
