@@ -5,10 +5,9 @@
 
 #include "lcd_task.h"
 #include "lcd_funcs.h"
-#include "gpio_task.h"
-#include "lcd_ir_funcs.h"
+
 #include "nvs.h"
-#include "nvs_flash.h"
+#include "nvs_flash.h" // nvs_flash_erase();
 
 //#include "espressif_logo.h"
 
@@ -122,10 +121,11 @@ static void lcd_task(void *pvParameters)
 	const TickType_t timer_interval = pdMS_TO_TICKS(300);
 	
 	//nvs_flash_erase(); // Factory reset
-		
+
 	//lcd_ir_ir_menu_nvs_clear();
 	lcd_ir_ir_menu_nvs_load(&ir_menu, A_IR_REMOTE_NS, A_REMOTE_KEY_COUNT, A_REMOTE_KEY_FMT);
 	lcd_ir_setup_page(&ir_menu);
+	lcd_lora_setup_page(&lora_menu);
 	    
 	while (1)
 	{
@@ -168,7 +168,7 @@ static void lcd_task(void *pvParameters)
 			else {
 				ui_btns.home_btn = 0;
 			}
-	
+
 	
 			if (ui_menu.page == HOME_PAGE) {
 				// Show cool two frame animation and allow user to change animation scrolling up/down
@@ -176,6 +176,11 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == SELECTION_PAGE) {
 				
 				lcd_selection_page_selected(&ui_menu, &ui_btns);
+			}
+			// LoRa page (PolyPlug)
+			else if (ui_menu.page == LORA_PAGE) {
+				
+				lcd_lora_page_selected(&ui_menu, &lora_menu, &ui_btns);
 			}
 			// IR remotes
 			else if (ui_menu.page == INFRARED_PAGE) {

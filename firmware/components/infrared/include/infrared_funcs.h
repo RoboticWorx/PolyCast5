@@ -29,8 +29,8 @@
 
 // Stored signal structure
 typedef struct {
-    rmt_symbol_word_t pulses[MAX_PULSES];
     size_t length;
+    rmt_symbol_word_t pulses[];
 } ir_signal_t;
 
 // Global variables
@@ -92,10 +92,5 @@ void infrared_save_stored_signal(void);
  * @brief Deletes signal from NVS flash
  */
 void infrared_delete_stored_signal(size_t index);
-
-/** 
- * @brief Deletes all signals from NVS flash
- */
-void infrared_clear_stored_signals(void);
 
 #endif // INFRARED_FUNCS_H

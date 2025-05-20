@@ -11,7 +11,6 @@
 
 #include "lcd_funcs.h"
 #include "lcd_task.h"
-#include "gpio_task.h"
 #include "infrared_funcs.h"
 
 #define DRAW_LINES   20
@@ -407,7 +406,7 @@ static void unhide_selection_widgets(ui_menu_t *m)
     lv_obj_set_x(m->lbl_bot, 0);
 }
 
-void lcd_selection_page_selected(ui_menu_t *menu, ui_btns_t *ui_btns) 
+void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns) 
 {
 	if (ui_btns->up_btn == 1) {
 		scrolling_menu = true;
@@ -418,22 +417,22 @@ void lcd_selection_page_selected(ui_menu_t *menu, ui_btns_t *ui_btns)
 		scrolling_up = true;
 	}
 	else if (ui_btns->right_btn == 1) {
-		lcd_selection_btn_pressed(menu);
+		lcd_selection_btn_pressed(ui_menu);
 	}
 	else if (ui_btns->left_btn == 1) {
-		menu->page = 0;
+		ui_menu->page = 0;
 	}
 
 	if (scrolling_menu) {
 		if (scrolling_up) {
-			menu->index = (menu->index + 1) % menu->size;
-			const char *next_bottom = menu->options[(menu->index + 1) % menu->size];
-			lcd_scroll_anim(menu, next_bottom, scrolling_up, SCROLL_SPEED);
+			ui_menu->index = (ui_menu->index + 1) % ui_menu->size;
+			const char *next_bottom = ui_menu->options[(ui_menu->index + 1) % ui_menu->size];
+			lcd_scroll_anim(ui_menu, next_bottom, scrolling_up, SCROLL_SPEED);
 		}
 		else {
-			menu->index = (menu->index + menu->size - 1) % menu->size;
-			const char *next_top = menu->options[(menu->index + menu->size - 1) % menu->size];
-			lcd_scroll_anim(menu, next_top, scrolling_up, SCROLL_SPEED);
+			ui_menu->index = (ui_menu->index + ui_menu->size - 1) % ui_menu->size;
+			const char *next_top = ui_menu->options[(ui_menu->index + ui_menu->size - 1) % ui_menu->size];
+			lcd_scroll_anim(ui_menu, next_top, scrolling_up, SCROLL_SPEED);
 		}
 		scrolling_menu = false;
 	}
@@ -488,4 +487,37 @@ void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_
 		ir_menu->index--;
 		lcd_ir_update_menu(ir_menu);
 	}
+}
+
+void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns) 
+{
+	// Show LoRa list
+	lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+	
+	// Up button pressed
+	if (ui_btns->up_btn == 1) {
+		// Update selection
+		lora_menu->index--;
+		lcd_lora_update_menu(lora_menu);
+	}
+	// Down button pressed
+	else if (ui_btns->down_btn == 1) {
+		// Update selection
+		lora_menu->index++;
+		lcd_lora_update_menu(lora_menu);
+	}
+	else if (ui_btns->right_btn == 1) {
+		
+	}
+	else if (ui_btns->left_btn == 1) {
+		
+		// Hide LoRa menu
+		lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show selection labels
+		unhide_selection_widgets(ui_menu);
+		
+		ui_menu->page = SELECTION_PAGE;
+	}
+
 }

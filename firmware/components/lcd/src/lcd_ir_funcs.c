@@ -488,7 +488,7 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
 	
 	// Wait until signal received and saved	
 	while (1) {
-        if (xSemaphoreTake(xSignalSavedSemaphore, 10) == pdTRUE) {
+        if (xSemaphoreTake(xInfraredSignalSavedSemaphore, 10) == pdTRUE) {
             // Signal arrived
             lv_label_set_text(text_label, "Saving...");
 			lv_timer_handler();
@@ -560,7 +560,7 @@ esp_err_t lcd_ir_ir_menu_nvs_save(const ir_menu_t *menu, const char* ns, const c
 esp_err_t lcd_ir_ir_menu_nvs_load(ir_menu_t *menu, const char* ns, const char* count, const char* fmt)
 {
     nvs_handle_t h;
-    
+        
     // Open NVS
     esp_err_t err = nvs_open(ns, NVS_READONLY, &h);
     if (err != ESP_OK)

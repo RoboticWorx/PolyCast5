@@ -10,6 +10,10 @@
 #define SIGNAL_MIN_NS 1000
 #define SIGNAL_MAX_NS 15000000 // 15ms
 
+#define IR_SIG_NS "is_ns"
+#define IR_SIG_COUNT_KEY "isc_key"
+#define IR_SIG_KEY "ir_sig%d"
+
 static const char *TAG = "IR_FUNCS";
 
 static rmt_channel_handle_t rx_channel = NULL;
@@ -227,22 +231,31 @@ bool ensure_capacity(void)
 void infrared_save_stored_signal(void) {
 	// Open NVS
     nvs_handle_t nvs_handle;
-    esp_err_t ret = nvs_open("ir_storage", NVS_READWRITE, &nvs_handle);
+    esp_err_t ret = nvs_open(IR_SIG_NS, NVS_READWRITE, &nvs_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to open NVS: %s", esp_err_to_name(ret));
         return;
     }
 
+	// Pick the signal we're about to store
+    ir_signal_t *sig = stored_signals[num_stored_signals];
+    
     // Save signal
     char key[16];
-    snprintf(key, sizeof(key), "signal_%d", num_stored_signals);
-    ret = nvs_set_blob(nvs_handle, key, stored_signals[num_stored_signals], sizeof(ir_signal_t));
+    snprintf(key, sizeof(key), IR_SIG_KEY, num_stored_signals);
+    
+    // Calculate how many bytes to write: header + actual pulses
+    size_t blob_size = sizeof(ir_signal_t) + sig->length * sizeof(rmt_symbol_word_t);
+                     
+    ret = nvs_set_blob(nvs_handle, key, sig, blob_size);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to save signal %d: %s", num_stored_signals, esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to save signal %d: %s",
+                 num_stored_signals,
+                 esp_err_to_name(ret));
     }
 
     // Save num_stored_signals
-    ret = nvs_set_u32(nvs_handle, "num_signals", num_stored_signals + 1);
+    ret = nvs_set_u32(nvs_handle, IR_SIG_COUNT_KEY, num_stored_signals + 1);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to save num_signals: %s", esp_err_to_name(ret));
     }
@@ -260,7 +273,7 @@ void infrared_save_stored_signal(void) {
 void infrared_load_stored_signals(void) {
 	// Open NVS
     nvs_handle_t nvs_handle;
-    esp_err_t ret = nvs_open("ir_storage", NVS_READONLY, &nvs_handle);
+    esp_err_t ret = nvs_open(IR_SIG_NS, NVS_READONLY, &nvs_handle);
     if (ret == ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGI(TAG, "No stored signals found in NVS");
         return;
@@ -272,7 +285,7 @@ void infrared_load_stored_signals(void) {
 
     // Load num_stored_signals
     uint32_t stored_count = 0;
-    ret = nvs_get_u32(nvs_handle, "num_signals", &stored_count);
+    ret = nvs_get_u32(nvs_handle, IR_SIG_COUNT_KEY, &stored_count);
     if (ret != ESP_OK && ret != ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGE(TAG, "Failed to read num_signals: %s", esp_err_to_name(ret));
         nvs_close(nvs_handle);
@@ -288,18 +301,35 @@ void infrared_load_stored_signals(void) {
     // Load signals
     for (size_t i = 0; i < stored_count; i++) {
         char key[16];
-        snprintf(key, sizeof(key), "signal_%d", i);
-        size_t length = sizeof(ir_signal_t);
+        snprintf(key, sizeof(key), IR_SIG_KEY, i);
+        
+        // Get blob size
+        size_t blob_size = 0;
+        ret = nvs_get_blob(nvs_handle, key, NULL, &blob_size);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Couldn't get size for %s: %s",
+                     key, esp_err_to_name(ret));
+            continue;
+        }
+        
+        // Make sure blob is good
+        if (blob_size < sizeof(ir_signal_t) || blob_size > sizeof(ir_signal_t) + MAX_PULSES * sizeof(rmt_symbol_word_t)) 
+		{
+		    ESP_LOGW(TAG, "Bad blob_size %u for %s—erasing", (unsigned)blob_size, key);
+		    nvs_erase_key(nvs_handle, key);
+		    nvs_commit(nvs_handle);
+		    continue;
+		}
         
         // Allocate space for signal
-        ir_signal_t *signal = malloc(sizeof(ir_signal_t));
+        ir_signal_t *signal = malloc(blob_size);
         if (signal == NULL) {
             ESP_LOGE(TAG, "Failed to allocate signal %d", i);
             break;
         }
         
         // Retrieve signal
-        ret = nvs_get_blob(nvs_handle, key, signal, &length);
+        ret = nvs_get_blob(nvs_handle, key, signal, &blob_size);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "Failed to read signal %d: %s", i, esp_err_to_name(ret));
             free(signal);
@@ -335,7 +365,7 @@ void infrared_delete_stored_signal(size_t index) {
 
     // Free the signal
     free(stored_signals[index]);
-    ESP_LOGI(TAG, "Deleted signal %d from SRAM", index + 1);
+    ESP_LOGI(TAG, "Deleted signal %d from SRAM", index);
 
     // Shift remaining signals
     for (size_t i = index; i < num_stored_signals - 1; i++) {
@@ -345,17 +375,22 @@ void infrared_delete_stored_signal(size_t index) {
 
     // Open NVS
     nvs_handle_t nvs_handle;
-    esp_err_t ret = nvs_open("ir_storage", NVS_READWRITE, &nvs_handle);
+    esp_err_t ret = nvs_open(IR_SIG_NS, NVS_READWRITE, &nvs_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to open NVS: %s", esp_err_to_name(ret));
         return;
     }
 
-    // Rewrite all signals with new indices
+    // Rewrite all signals with new indices and true blob size
     for (size_t i = 0; i < num_stored_signals; i++) {
+		ir_signal_t *sig = stored_signals[i];
+		
+        // Header + length * sizeof(pulse)
+        size_t blob_size = sizeof(ir_signal_t) + sig->length * sizeof(rmt_symbol_word_t);
+                         
         char key[16];
-        snprintf(key, sizeof(key), "signal_%d", i);
-        ret = nvs_set_blob(nvs_handle, key, stored_signals[i], sizeof(ir_signal_t));
+        snprintf(key, sizeof(key), IR_SIG_KEY, i);
+        ret = nvs_set_blob(nvs_handle, key, stored_signals[i], blob_size);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "Failed to save signal %d: %s", i, esp_err_to_name(ret));
         }
@@ -363,14 +398,14 @@ void infrared_delete_stored_signal(size_t index) {
 
     // Clear any leftover signal keys
     char key[16];
-    snprintf(key, sizeof(key), "signal_%d", num_stored_signals);
+    snprintf(key, sizeof(key), IR_SIG_KEY, num_stored_signals);
     ret = nvs_erase_key(nvs_handle, key);
 	if (ret != ESP_OK && ret != ESP_ERR_NVS_NOT_FOUND) {
 	  ESP_LOGE(TAG, "Erase key %s failed: %s", key, esp_err_to_name(ret));
 	}
 
     // Update num_signals
-    ret = nvs_set_u32(nvs_handle, "num_signals", num_stored_signals);
+    ret = nvs_set_u32(nvs_handle, IR_SIG_COUNT_KEY, num_stored_signals);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to save num_signals: %s", esp_err_to_name(ret));
     }
@@ -383,45 +418,4 @@ void infrared_delete_stored_signal(size_t index) {
     
     // Close NVS
     nvs_close(nvs_handle);
-}
-
-void infrared_clear_stored_signals(void) {
-	
-    // Free all signals
-    if (stored_signals != NULL) {
-        for (size_t i = 0; i < num_stored_signals; i++) {
-            if (stored_signals[i] != NULL) {
-                free(stored_signals[i]);
-                stored_signals[i] = NULL;
-            }
-        }
-        free(stored_signals);
-        stored_signals = calloc(stored_signals_capacity, sizeof(ir_signal_t *));;
-        stored_signals_capacity = INITIAL_CAPACITY;
-        num_stored_signals = 0;
-    }
-
-    // Open NVS
-    nvs_handle_t nvs_handle;
-    esp_err_t ret = nvs_open("ir_storage", NVS_READWRITE, &nvs_handle);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to open NVS: %s", esp_err_to_name(ret));
-        return;
-    }
-	
-	// Clear NVS
-    ret = nvs_erase_all(nvs_handle);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to erase NVS: %s", esp_err_to_name(ret));
-    }
-	
-	// Write changes
-    ret = nvs_commit(nvs_handle);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to commit NVS: %s", esp_err_to_name(ret));
-    }
-
-	// Close NVS
-    nvs_close(nvs_handle);
-    ESP_LOGI(TAG, "Cleared all signals from NVS");
 }

@@ -4,6 +4,7 @@ idf_component_register(
     SRCS
         "src/fontx.c"
         "src/lcd_ir_funcs.c"
+        "src/lcd_lora_funcs.c"
         "src/lcd_funcs.c"
         "src/lcd_task.c"
         "src/st7789.c"

@@ -2,7 +2,10 @@
 #define LCD_FUNCS_H
 
 #include "lvgl.h"
+
 #include "lcd_ir_funcs.h"
+#include "lcd_lora_funcs.h"
+#include "gpio_task.h"
 
 #define SPI_MISO_PIN 2 // MISO for SX126x
 #define SPI_MOSI_PIN 7 // SPI2 MOSI
@@ -149,6 +152,8 @@ void lcd_selection_page_selected(ui_menu_t *menu, ui_btns_t *ui_btns);
  */
 void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns); 
 
+
+void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
 
 
 #endif /* LCD_FUNCS_H */

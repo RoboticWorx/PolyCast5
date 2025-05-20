@@ -15,7 +15,7 @@ SemaphoreHandle_t xStartInfraredRXSemaphore;
 SemaphoreHandle_t xEnableInfraredSemaphore;
 SemaphoreHandle_t xDisableInfraredSemaphore;
 
-SemaphoreHandle_t xSignalSavedSemaphore;
+SemaphoreHandle_t xInfraredSignalSavedSemaphore;
 SemaphoreHandle_t xSignalReceivedSemaphore;
 
 QueueHandle_t xSignalToTXQueue;
@@ -35,7 +35,7 @@ static void infrared_task(void *pvParameters) {
 	xEnableInfraredSemaphore = xSemaphoreCreateBinary();
 	xDisableInfraredSemaphore = xSemaphoreCreateBinary();
 	xStartInfraredRXSemaphore = xSemaphoreCreateBinary();
-	xSignalSavedSemaphore = xSemaphoreCreateBinary();
+	xInfraredSignalSavedSemaphore = xSemaphoreCreateBinary();
 	xSignalReceivedSemaphore = xSemaphoreCreateBinary();
 	
 	xSignalToTXQueue = xQueueCreate(1, sizeof(int));
@@ -82,6 +82,11 @@ static void infrared_task(void *pvParameters) {
                 continue;
             }
             
+            if (ir_signal_length > MAX_PULSES) {
+			    ESP_LOGW(TAG, "IR length %u > MAX_PULSES (%u) – truncating", ir_signal_length, MAX_PULSES);
+			    ir_signal_length = MAX_PULSES;
+			}
+            
             ESP_LOGI(TAG, "Received IR signal with %d pulses", ir_signal_length);
 
             // Pad final gap
@@ -96,8 +101,12 @@ static void infrared_task(void *pvParameters) {
                 continue;
             }
             
-            // Allocate memory for signal
-            ir_signal_t *sig = malloc(sizeof(ir_signal_t));
+            // Compute exactly how many bytes we need:
+			// Header (length field) + ir_signal_length entries
+			size_t alloc_size = sizeof(ir_signal_t) + ir_signal_length * sizeof(rmt_symbol_word_t);
+			
+			// Allocate that full size
+			ir_signal_t *sig = malloc(alloc_size);
             if (!sig) {
                 ESP_LOGE(TAG, "Out of heap for new signal");
                 infrared_restart_rx();
@@ -118,7 +127,7 @@ static void infrared_task(void *pvParameters) {
                      num_stored_signals, sig->length,
                      num_stored_signals, stored_signals_capacity);
                      
-            xSemaphoreGive(xSignalSavedSemaphore);
+            xSemaphoreGive(xInfraredSignalSavedSemaphore);
 
         }
         
