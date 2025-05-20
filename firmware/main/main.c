@@ -86,7 +86,7 @@ void app_main(void) {
 	init_nvs();
 
 	// Create tasks
-	//lora_task_create();
+	lora_task_create();
 	lcd_task_create();
 	gpio_task_create();
 	infrared_task_create();

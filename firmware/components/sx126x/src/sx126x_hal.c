@@ -10,6 +10,8 @@
 #include "freertos/FreeRTOS.h" // For vTaskDelay
 #include "freertos/task.h"	   // For task delays
 
+#include "gpio_task.h"
+
 // Logging tag for debugging
 static const char *TAG = "SX126X_HAL";
 
@@ -62,6 +64,9 @@ sx126x_hal_status_t sx126x_hal_reset(const void *context) {
 
 // Wake up the SX126x chip
 sx126x_hal_status_t sx126x_hal_wakeup(const void *context) {
+	
+	xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
+	
 	// Ignore the context parameter
 	(void)context;
 
@@ -94,6 +99,8 @@ sx126x_hal_status_t sx126x_hal_wakeup(const void *context) {
 	while (gpio_get_level(SX126X_BUSY_PIN) == 1) {
 		vTaskDelay(pdMS_TO_TICKS(1)); // Small delay to avoid busy-waiting
 	}
+	
+	xSemaphoreGive(xSPIBusMutex); // Release SPI bus
 
 	return SX126X_HAL_STATUS_OK;
 }
@@ -105,6 +112,8 @@ sx126x_hal_status_t sx126x_hal_write( const void      *ctx,
                                       const uint8_t   *data,
                                       uint16_t         data_len )
 {
+	xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
+	
     (void)ctx;
     while (gpio_get_level(SX126X_BUSY_PIN)) vTaskDelay(1);
 
@@ -125,6 +134,9 @@ sx126x_hal_status_t sx126x_hal_write( const void      *ctx,
     }
 
     gpio_set_level(SX126X_CS_PIN, 1);           /* ↑CS */
+    
+    xSemaphoreGive(xSPIBusMutex); // Release SPI bus
+    
     return SX126X_HAL_STATUS_OK;
 }
 
@@ -135,6 +147,8 @@ sx126x_hal_status_t sx126x_hal_read( const void    *ctx,
                                      uint8_t       *data,
                                      uint16_t       data_len )
 {
+	xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
+	
     (void)ctx;
     while (gpio_get_level(SX126X_BUSY_PIN)) vTaskDelay(1);
 
@@ -156,5 +170,8 @@ sx126x_hal_status_t sx126x_hal_read( const void    *ctx,
     ESP_ERROR_CHECK_WITHOUT_ABORT(spi_device_polling_transmit(sx126x_spi, &t_rd));
 
     gpio_set_level(SX126X_CS_PIN, 1);           /* ↑CS */
+    
+    xSemaphoreGive(xSPIBusMutex); // Release SPI bus
+    
     return SX126X_HAL_STATUS_OK;
 }

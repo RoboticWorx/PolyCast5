@@ -43,6 +43,8 @@ static bool scrolling_up = false;
 
 static void st7789_flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_map)
 {
+	xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
+	
     const uint16_t *color_ptr = (const uint16_t *)px_map;
     int16_t x1 = area->x1, x2 = area->x2;
     int16_t y1 = area->y1, y2 = area->y2;
@@ -71,6 +73,8 @@ static void st7789_flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_
 
     // 3) Tell LVGL we’re done
     lv_disp_flush_ready(d);
+    
+    xSemaphoreGive(xSPIBusMutex); // Release SPI bus
 }
 
 static void lv_tick_cb(void *arg)

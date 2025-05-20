@@ -168,7 +168,7 @@ static void lora_task(void *pvParameters) {
 	};
 	gpio_config(&io_conf);
 
-	gpio_install_isr_service(0);
+	//gpio_install_isr_service(0);
 	gpio_isr_handler_add(SX126X_DIO1_PIN, dio1_isr_handler, NULL);
 
 	char payload[CYPHERTEXT_LENGTH] = {0}; // Hold data to send
@@ -179,7 +179,7 @@ static void lora_task(void *pvParameters) {
 		encrypt_and_transmit((uint8_t *)payload); // Encrypt and send over
 
 		// Wait for TX_DONE before switching to RX mode
-		if (xSemaphoreTake(tx_done_semaphore, pdMS_TO_TICKS(1000)) == pdTRUE) {
+		if (xSemaphoreTake(tx_done_semaphore, 1000) == pdTRUE) {
 			set_lora_rx_mode(); // Listen for receipt from receiver
 		} else {
 			ESP_LOGW(TAG, "TX_DONE timeout after 1000 ms, skipping RX mode");
@@ -246,5 +246,5 @@ static void lora_event_handler_task(void *pvParameters) {
 // Function to create the LoRa task
 void lora_task_create(void) {
 	// Create the LoRa task
-	xTaskCreate(lora_task, "lora_task", 4096, NULL, 5, NULL);
+	xTaskCreate(lora_task, "lora_task", 4096, NULL, tskIDLE_PRIORITY + 1, NULL);
 }

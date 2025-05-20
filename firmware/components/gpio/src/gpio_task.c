@@ -7,6 +7,8 @@
 
 static const char *TAG = "GPIO_TASK";
 
+SemaphoreHandle_t xSPIBusMutex;
+
 SemaphoreHandle_t xGpioEventSemaphore;
 SemaphoreHandle_t xUpButtonSemaphore;
 SemaphoreHandle_t xDownButtonSemaphore;
@@ -17,6 +19,9 @@ SemaphoreHandle_t xHomeButtonSemaphore;
 
 static void gpio_task(void *arg)
 {
+	xSPIBusMutex = xSemaphoreCreateMutex();
+	configASSERT(xSPIBusMutex); // Ensure success
+	
 	xUpButtonSemaphore = xSemaphoreCreateBinary();
     xDownButtonSemaphore = xSemaphoreCreateBinary();
     xRightButtonSemaphore = xSemaphoreCreateBinary();

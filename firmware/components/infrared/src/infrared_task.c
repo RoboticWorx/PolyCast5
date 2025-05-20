@@ -64,6 +64,10 @@ static void infrared_task(void *pvParameters) {
 
     while (1) {
 		
+		if (xSemaphoreTake(xDisableInfraredSemaphore, 1) == pdTRUE) {
+			infrared_disable_rx();
+		}	
+		
 		if (xSemaphoreTake(xStartInfraredRXSemaphore, 1) == pdTRUE) {
 			infrared_restart_rx();
 		}
@@ -117,10 +121,6 @@ static void infrared_task(void *pvParameters) {
             xSemaphoreGive(xSignalSavedSemaphore);
 
         }
-        
-        if (xSemaphoreTake(xDisableInfraredSemaphore, 1) == pdTRUE) {
-			infrared_disable_rx();
-		}	
         
         if (xQueueReceive(xSignalToTXQueue, &menu_idx, 1) == pdTRUE) {
 			if (menu_idx < 0) {

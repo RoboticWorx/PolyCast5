@@ -12,6 +12,8 @@
 #define USER_BUTTON_BACK 5
 //#define USER_BUTTON_POWER 
 
+extern SemaphoreHandle_t xSPIBusMutex;
+
 extern SemaphoreHandle_t xUpButtonSemaphore;
 extern SemaphoreHandle_t xDownButtonSemaphore;
 extern SemaphoreHandle_t xRightButtonSemaphore;
