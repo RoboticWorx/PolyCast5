@@ -16,6 +16,16 @@ lora_menu_t lora_menu = {
     .cont = NULL,
 };
 
+static const char *submenu_options[] = {
+    "SEND",
+    "TIMER",
+    "SCHED",
+    "AWAY",
+    "KEY",
+    "EDIT",
+};
+static const int submenu_count = sizeof(submenu_options)/sizeof(submenu_options[0]);
+
 static const char* TAG = "LCD_LORA_FUNCS";
 
 
@@ -115,6 +125,81 @@ void lcd_lora_setup_page(lora_menu_t *menu)
 	lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
 }
 
+void lcd_lora_setup_subpage(lora_menu_t *menu)
+{
+	// Initialize submenu struct
+    menu->submenu.size = submenu_count;
+    menu->submenu.index = 0;
+    for (int i = 0; i < submenu_count && i < MAX_LORA_OPTIONS; i++) {
+        menu->submenu.options[i] = (char*)submenu_options[i];
+    }
+    
+    // Create container
+	menu->submenu.cont = lv_obj_create(ACTIVE_SCR);
+	
+	// Format
+	lv_obj_set_size(menu->submenu.cont, 210, 106);
+	lv_obj_center(menu->submenu.cont);
+	lv_obj_set_style_bg_color(menu->submenu.cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+	lv_obj_set_style_border_width(menu->submenu.cont, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+	lv_obj_set_scrollbar_mode(menu->submenu.cont, LV_SCROLLBAR_MODE_OFF);
+	lv_obj_set_scroll_dir(menu->submenu.cont, LV_DIR_VER);
+	
+	// Set flow
+	lv_obj_set_flex_flow(menu->submenu.cont, LV_FLEX_FLOW_ROW_WRAP);
+	lv_obj_set_flex_align(menu->submenu.cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+	
+	// Set gap
+	lv_obj_set_style_pad_gap(menu->submenu.cont, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    // Prepare styles 
+    // Normal button style
+    lv_style_init(&menu->submenu.btn_style);
+    lv_style_set_radius(&menu->submenu.btn_style, 8);
+    lv_style_set_bg_color(&menu->submenu.btn_style, user_primary_color);
+    lv_style_set_border_width(&menu->submenu.btn_style, 2);
+    lv_style_set_border_color(&menu->submenu.btn_style, user_secondary_color);
+    lv_style_set_border_side(&menu->submenu.btn_style, LV_BORDER_SIDE_FULL);
+    lv_style_set_text_font(&menu->submenu.btn_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&menu->submenu.btn_style, user_secondary_color);
+    lv_style_set_text_align(&menu->submenu.btn_style, LV_TEXT_ALIGN_CENTER);
+
+    // Selected button style
+    lv_style_init(&menu->submenu.sel_style);
+    lv_style_set_radius(&menu->submenu.sel_style, 8);
+    lv_style_set_bg_color(&menu->submenu.sel_style, user_secondary_color);
+    lv_style_set_border_width(&menu->submenu.sel_style, 2);
+    lv_style_set_border_color(&menu->submenu.sel_style, user_secondary_color);
+    lv_style_set_border_side(&menu->submenu.sel_style, LV_BORDER_SIDE_FULL);
+    lv_style_set_text_font(&menu->submenu.sel_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&menu->submenu.sel_style, user_primary_color);
+    lv_style_set_text_align(&menu->submenu.sel_style, LV_TEXT_ALIGN_CENTER);
+
+    // Create button per option
+	for (int i = 0; i < menu->submenu.size; i++) {
+	    menu->submenu.btns[i] = lv_btn_create(menu->submenu.cont);
+    	lv_obj_set_size(menu->submenu.btns[i], 58, 50);
+    	
+	    // Add style
+	    if (i == menu->submenu.index)
+	    	lv_obj_add_style(menu->submenu.btns[i], &menu->submenu.sel_style, 0);
+	    else
+	    	lv_obj_add_style(menu->submenu.btns[i], &menu->submenu.btn_style, 0);
+	
+	    // Create child label
+	    lv_obj_t *lbl = lv_label_create(menu->submenu.btns[i]);
+	    lv_label_set_text(lbl, menu->submenu.options[i]);
+	    
+	    // Format
+        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
+	}
+	
+	// Hide for now
+	lv_obj_add_flag(menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+}
+
 void lcd_lora_update_menu(lora_menu_t *menu)
 {    
 	// Reveal
@@ -139,7 +224,34 @@ void lcd_lora_update_menu(lora_menu_t *menu)
     lv_obj_add_style(menu->btns[menu->index], &menu->sel_style, 0);
     
     // Enable scrolling if list gets too long
-    lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_OFF);
+    lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
+}
+
+void lcd_lora_update_submenu(lora_menu_t *menu)
+{    
+	// Reveal
+    lv_obj_remove_flag(menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+
+    // Wrap index
+	if (menu->submenu.index >= menu->submenu.size) {
+		menu->submenu.index = 0;
+	}
+	else if (menu->submenu.index < 0) {
+		menu->submenu.index = menu->submenu.size - 1;
+	}
+
+    // Reset every button to unselected
+    for (int i = 0; i < menu->submenu.size; ++i) {
+        lv_obj_remove_style(menu->submenu.btns[i], &menu->submenu.sel_style, 0);
+        lv_obj_add_style(menu->submenu.btns[i], &menu->submenu.btn_style, 0);
+    }
+
+    // Highlight only the current index
+    lv_obj_remove_style(menu->submenu.btns[menu->submenu.index], &menu->submenu.btn_style, 0);
+    lv_obj_add_style(menu->submenu.btns[menu->submenu.index], &menu->submenu.sel_style, 0);
+    
+    // Enable scrolling if list gets too long
+    //lv_obj_scroll_to_view(menu->submenu.btns[menu->submenu.index], LV_ANIM_ON); // LV_ANIM_OFF
 }
 
 void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns)
@@ -161,7 +273,7 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
                          &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
                          
         lbl_dirs = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_dirs, "Enter signal name\nwith arrow buttons:", user_secondary_color,
+		lcd_format_label(lbl_dirs, "  Enter plug name\nwith arrow buttons:", user_secondary_color,
                          &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, -30);
         
         lbl_chars = lv_label_create(ACTIVE_SCR);
@@ -321,6 +433,55 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
     display[MAX_CUSTOM_NAME_LEN + 1] = '\0';
 
     lv_label_set_text(lbl_user_in, display);
+}
+
+void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns) 
+{
+	// Show LoRa submenu cont
+	lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+	
+	// Scroll right
+	if (ui_btns->right_btn == 1) {
+		// Update selection
+		lora_menu->submenu.index++;
+		lcd_lora_update_submenu(lora_menu);
+	}
+	// Exit
+	else if (ui_btns->left_btn == 1 && lora_menu->submenu.index == 0) {
+		// Hide cont
+		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+		
+		// Go back
+		ui_menu->page = LORA_PAGE;
+	}
+	// Scroll left
+	else if (ui_btns->left_btn == 1) {
+		// Update selection
+		lora_menu->submenu.index--;
+		lcd_lora_update_submenu(lora_menu);
+	}
+	// Scroll up
+	else if (ui_btns->up_btn == 1 && lora_menu->submenu.index > 2) {
+		// Update selection
+		lora_menu->submenu.index -= 3;
+		lcd_lora_update_submenu(lora_menu);
+	}
+	// Select up
+	else if (ui_btns->up_btn == 1) {
+		
+	}
+	// Scroll down
+	else if (ui_btns->down_btn == 1 && lora_menu->submenu.index < 3) {
+		// Update selection
+		lora_menu->submenu.index += 3;
+		lcd_lora_update_submenu(lora_menu);
+	}
+	// Select down
+	else if (ui_btns->down_btn == 1) {
+		
+	}
+	
+
 }
 
 esp_err_t lcd_lora_menu_nvs_save(const lora_menu_t *menu, const char* ns, const char* count, const char* fmt)

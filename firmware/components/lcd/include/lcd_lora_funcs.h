@@ -20,16 +20,32 @@ typedef struct {
     lv_obj_t *btns[MAX_LORA_OPTIONS];
     int size;
     int index;
+    lv_obj_t *cont;
+	lv_style_t btn_style;
+	lv_style_t sel_style;
+} lora_submenu_t;
+
+typedef struct {
+    char *options[MAX_LORA_OPTIONS];
+    lv_obj_t *btns[MAX_LORA_OPTIONS];
+    int size;
+    int index;
     lv_obj_t *main_list;
 	lv_style_t btn_style;
 	lv_style_t sel_style;
 	lv_obj_t *cont;
+	lora_submenu_t submenu;
 } lora_menu_t;
 
 extern lora_menu_t lora_menu;
 
+void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
+
+void lcd_lora_update_submenu(lora_menu_t *menu);
 
 void lcd_lora_setup_page(lora_menu_t *menu);
+
+void lcd_lora_setup_subpage(lora_menu_t *menu);
 
 void lcd_lora_update_menu(lora_menu_t *menu);
 

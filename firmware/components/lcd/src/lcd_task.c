@@ -128,7 +128,9 @@ static void lcd_task(void *pvParameters)
 	lcd_lora_menu_nvs_load(&lora_menu, LORA_OPTIONS_NS, LORA_OPTIONS_KEY_COUNT, LORA_OPTIONS_KEY_FMT);
 	
 	lcd_ir_setup_page(&ir_menu);
+	
 	lcd_lora_setup_page(&lora_menu);
+	lcd_lora_setup_subpage(&lora_menu);
 	
 	while (1)
 	{
@@ -188,6 +190,10 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == LORA_REMOTE_NAME_PAGE) {
 				
 				lcd_lora_create_custom_name(&ui_menu, &lora_menu, &ui_btns);
+			}
+			else if (ui_menu.page == LORA_REMOTE_SUBPAGE) {
+				
+				lcd_lora_subpage_selected(&ui_menu, &lora_menu, &ui_btns);
 			}
 			// IR remotes
 			else if (ui_menu.page == INFRARED_PAGE) {

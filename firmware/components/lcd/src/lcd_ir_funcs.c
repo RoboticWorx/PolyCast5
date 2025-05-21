@@ -469,7 +469,7 @@ void lcd_ir_update_menu(ir_menu_t *menu)
     lv_obj_add_style(menu->btns[menu->index], &menu->sel_style, 0);
     
     // Enable scrolling if list gets too long
-    lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_OFF);
+    lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_OFF); // LV_ANIM_ON
 }
 
 void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)

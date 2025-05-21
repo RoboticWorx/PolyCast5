@@ -520,6 +520,7 @@ void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_
 		lora_menu->index++;
 		lcd_lora_update_menu(lora_menu);
 	}
+	// Add PolyPlug selected
 	else if (ui_btns->right_btn == 1 && lora_menu->index == 0) {
 		// Hide LoRa menu
 		lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -527,6 +528,15 @@ void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_
 		ui_menu->page = LORA_REMOTE_NAME_PAGE;
 	
 	}
+	// PolyPlug selected
+	else if (ui_btns->right_btn == 1) {
+		// Hide LoRa menu
+		lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		ui_menu->page = LORA_REMOTE_SUBPAGE;
+	
+	}
+	// Back selected
 	else if (ui_btns->left_btn == 1) {
 		
 		// Hide LoRa menu
