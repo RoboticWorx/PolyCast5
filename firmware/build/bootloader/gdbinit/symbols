@@ -6,4 +6,4 @@ set confirm off
 set confirm on
 
 # Load application symbols
-file C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/bootloader.elf
+file C:/Users/Jatki/Downloads/PolyCast5/firmware/build/bootloader/bootloader.elf

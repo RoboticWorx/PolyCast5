@@ -3,4 +3,4 @@ source "C:/Espressif/frameworks/esp-idf-master/components/esp_app_format/Kconfig
 source "C:/Espressif/frameworks/esp-idf-master/components/esp_rom/Kconfig.projbuild"
 source "C:/Espressif/frameworks/esp-idf-master/components/esptool_py/Kconfig.projbuild"
 source "C:/Espressif/frameworks/esp-idf-master/components/partition_table/Kconfig.projbuild"
-source "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/main/Kconfig.projbuild"
+source "C:/Users/Jatki/Downloads/PolyCast5/firmware/main/Kconfig.projbuild"

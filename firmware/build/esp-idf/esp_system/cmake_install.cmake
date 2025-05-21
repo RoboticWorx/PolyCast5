@@ -39,6 +39,6 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_system/port/cmake_install.cmake")
+  include("C:/Users/Jatki/Downloads/PolyCast5/firmware/build/esp-idf/esp_system/port/cmake_install.cmake")
 endif()
 

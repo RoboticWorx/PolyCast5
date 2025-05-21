@@ -2,8 +2,8 @@
 
 # Load bootloader symbols
 set confirm off
-    add-symbol-file C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/bootloader.elf
+    add-symbol-file C:/Users/Jatki/Downloads/PolyCast5/firmware/build/bootloader/bootloader.elf
 set confirm on
 
 # Load application symbols
-file C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/app-template.elf
+file C:/Users/Jatki/Downloads/PolyCast5/firmware/build/app-template.elf

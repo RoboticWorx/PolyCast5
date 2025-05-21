@@ -39,7 +39,7 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/esp-idf/cmake_install.cmake")
+  include("C:/Users/Jatki/Downloads/PolyCast5/firmware/build/bootloader/esp-idf/cmake_install.cmake")
 endif()
 
 if(CMAKE_INSTALL_COMPONENT)
@@ -57,6 +57,6 @@ endif()
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-  file(WRITE "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/${CMAKE_INSTALL_MANIFEST}"
+  file(WRITE "C:/Users/Jatki/Downloads/PolyCast5/firmware/build/bootloader/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()

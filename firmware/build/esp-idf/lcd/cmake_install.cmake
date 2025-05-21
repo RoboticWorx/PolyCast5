@@ -1,4 +1,4 @@
-# Install script for directory: C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd
+# Install script for directory: C:/Users/Jatki/Downloads/PolyCast5/firmware/components/lcd
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

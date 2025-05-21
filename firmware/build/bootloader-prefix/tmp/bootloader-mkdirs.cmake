@@ -10,18 +10,18 @@ if(NOT EXISTS "C:/Espressif/frameworks/esp-idf-master/components/bootloader/subp
   file(MAKE_DIRECTORY "C:/Espressif/frameworks/esp-idf-master/components/bootloader/subproject")
 endif()
 file(MAKE_DIRECTORY
-  "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader"
-  "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader-prefix"
-  "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader-prefix/tmp"
-  "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader-prefix/src/bootloader-stamp"
-  "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader-prefix/src"
-  "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader-prefix/src/bootloader-stamp"
+  "C:/Users/Jatki/Downloads/PolyCast5/firmware/build/bootloader"
+  "C:/Users/Jatki/Downloads/PolyCast5/firmware/build/bootloader-prefix"
+  "C:/Users/Jatki/Downloads/PolyCast5/firmware/build/bootloader-prefix/tmp"
+  "C:/Users/Jatki/Downloads/PolyCast5/firmware/build/bootloader-prefix/src/bootloader-stamp"
+  "C:/Users/Jatki/Downloads/PolyCast5/firmware/build/bootloader-prefix/src"
+  "C:/Users/Jatki/Downloads/PolyCast5/firmware/build/bootloader-prefix/src/bootloader-stamp"
 )
 
 set(configSubDirs )
 foreach(subDir IN LISTS configSubDirs)
-    file(MAKE_DIRECTORY "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader-prefix/src/bootloader-stamp/${subDir}")
+    file(MAKE_DIRECTORY "C:/Users/Jatki/Downloads/PolyCast5/firmware/build/bootloader-prefix/src/bootloader-stamp/${subDir}")
 endforeach()
 if(cfgdir)
-  file(MAKE_DIRECTORY "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader-prefix/src/bootloader-stamp${cfgdir}") # cfgdir has leading slash
+  file(MAKE_DIRECTORY "C:/Users/Jatki/Downloads/PolyCast5/firmware/build/bootloader-prefix/src/bootloader-stamp${cfgdir}") # cfgdir has leading slash
 endif()

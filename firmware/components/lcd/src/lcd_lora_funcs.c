@@ -1,4 +1,5 @@
 #include "esp_log.h"
+#include "font/lv_symbol_def.h"
 #include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
 #include "nvs.h"
@@ -21,8 +22,8 @@ static const char *submenu_options[] = {
     LV_SYMBOL_LOOP "\nLOOP",
     LV_SYMBOL_HOME "\nPLAN",
     LV_SYMBOL_WARNING "\nAWAY",
-    LV_SYMBOL_EYE_CLOSE "\nKEY",
-    LV_SYMBOL_SETTINGS "\nEDIT",
+    LV_SYMBOL_SETTINGS "\nNAME",
+    LV_SYMBOL_TRASH "\nKILL",
 };
 
 static const int submenu_count = sizeof(submenu_options)/sizeof(submenu_options[0]);
