@@ -182,7 +182,7 @@ static void lcd_task(void *pvParameters)
 				
 				lcd_selection_page_selected(&ui_menu, &ui_btns);
 			}
-			// LoRa page (PolyPlug)
+			// LoRa page (PolyPlugs)
 			else if (ui_menu.page == LORA_PAGE) {
 				
 				lcd_lora_page_selected(&ui_menu, &lora_menu, &ui_btns);
