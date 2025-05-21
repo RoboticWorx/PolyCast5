@@ -31,6 +31,8 @@
 #define INFRARED_REMOTE_NAME_PAGE 10
 #define INFRARED_REMOTE_EDIT_PAGE 11
 
+#define LORA_REMOTE_NAME_PAGE 12
+
 
 typedef struct ui_menu_t {
     const char **options; // your array of strings
@@ -66,6 +68,11 @@ void lcd_init_driver(void);
  * @brief Initialise LVGL draw buffers, tick timer and register flush cb.
  */
 void lcd_lvgl_init(void);
+
+/**
+ * @brief Clears all NVS for ir_names namespace
+ */
+void lcd_menu_nvs_clear(const char* ns);
 
 /**
  * @brief Format labels

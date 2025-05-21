@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "nvs.h"
+
 #include "esp_timer.h"
 #include "esp_log.h"
 
@@ -136,6 +138,18 @@ void lcd_lvgl_init(void)
     esp_timer_handle_t tick_timer;
     esp_timer_create(&tick_args, &tick_timer);
     esp_timer_start_periodic(tick_timer, 1000);
+}
+
+void lcd_menu_nvs_clear(const char* ns)
+{
+    nvs_handle_t h;
+    
+    // Clear all NVS
+    if (nvs_open(ns, NVS_READWRITE, &h) == ESP_OK) {
+        nvs_erase_all(h); // Wipes only keys in this namespace
+        nvs_commit(h);
+        nvs_close(h);
+    }
 }
 
 void lcd_format_label(lv_obj_t *label, const char *text, lv_color_t color,
@@ -506,8 +520,12 @@ void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_
 		lora_menu->index++;
 		lcd_lora_update_menu(lora_menu);
 	}
-	else if (ui_btns->right_btn == 1) {
+	else if (ui_btns->right_btn == 1 && lora_menu->index == 0) {
+		// Hide LoRa menu
+		lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
+		ui_menu->page = LORA_REMOTE_NAME_PAGE;
+	
 	}
 	else if (ui_btns->left_btn == 1) {
 		

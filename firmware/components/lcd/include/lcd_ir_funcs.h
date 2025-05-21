@@ -45,11 +45,6 @@ extern ir_menu_t ir_menu;
 void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns);
 
 /**
- * @brief Clears all NVS for ir_names namespace
- */
-void lcd_ir_ir_menu_nvs_clear(void);
-
-/**
  * @brief Removes a given index from NVS
  *
  * @param [in] ir_menu IR menu structure

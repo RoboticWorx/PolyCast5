@@ -648,15 +648,3 @@ esp_err_t lcd_ir_ir_menu_nvs_delete(ir_menu_t *menu, uint8_t idx, const char* ns
     // Rewrite flash with the new list
     return lcd_ir_ir_menu_nvs_save(menu, ns, count, fmt);
 }
-
-void lcd_ir_ir_menu_nvs_clear(void)
-{
-    nvs_handle_t h;
-    
-    // Clear all NVS
-    if (nvs_open("ir_names", NVS_READWRITE, &h) == ESP_OK) {
-        nvs_erase_all(h); // Wipes only keys in this namespace
-        nvs_commit(h);
-        nvs_close(h);
-    }
-}
