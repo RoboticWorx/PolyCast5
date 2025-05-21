@@ -95,6 +95,10 @@ void lcd_lora_setup_page(lora_menu_t *menu)
 		menu->index = menu->size - 1;
 	}
 	
+	if (menu->size > 1) {
+		menu->index = 1;
+	}
+	
 	// Create button for each option
     for (int i = 0; i < menu->size; i++) {
 
