@@ -17,13 +17,14 @@ lora_menu_t lora_menu = {
 };
 
 static const char *submenu_options[] = {
-    "SEND",
-    "TIMER",
-    "SCHED",
-    "AWAY",
-    "KEY",
-    "EDIT",
+    LV_SYMBOL_UPLOAD "\nSEND",
+    LV_SYMBOL_LOOP "\nLOOP",
+    LV_SYMBOL_HOME "\nPLAN",
+    LV_SYMBOL_WARNING "\nAWAY",
+    LV_SYMBOL_EYE_CLOSE "\nKEY",
+    LV_SYMBOL_SETTINGS "\nEDIT",
 };
+
 static const int submenu_count = sizeof(submenu_options)/sizeof(submenu_options[0]);
 
 static const char* TAG = "LCD_LORA_FUNCS";
