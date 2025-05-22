@@ -1,6 +1,0 @@
-#ifndef BLUETOOTH_FUNCS_H
-#define BLUETOOTH_FUNCS_H
-
-
-
-#endif /* BLUETOOTH_FUNCS_H */

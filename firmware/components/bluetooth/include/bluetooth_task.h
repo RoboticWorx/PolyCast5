@@ -1,6 +1,0 @@
-#ifndef BLUETOOTH_TASK_H
-#define BLUETOOTH_TASK_H
-
-
-
-#endif // BLUETOOTH_TASK_H
