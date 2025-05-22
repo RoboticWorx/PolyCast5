@@ -10,8 +10,10 @@
 
 static const char *TAG = "LORA_TASK";
 
-static SemaphoreHandle_t lora_event_semaphore;
-static SemaphoreHandle_t tx_done_semaphore;
+static SemaphoreHandle_t xLoraEventSemaphore;
+static SemaphoreHandle_t xTXDoneSemaphore;
+
+SemaphoreHandle_t xGenerateEncKeySemaphore;
 
 static void lora_event_handler_task(void *pvParameters);
 
@@ -22,7 +24,7 @@ static void IRAM_ATTR dio1_isr_handler(void *arg) {
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
 	// Signal the event handler task
-	xSemaphoreGiveFromISR(lora_event_semaphore, &xHigherPriorityTaskWoken);
+	xSemaphoreGiveFromISR(xLoraEventSemaphore, &xHigherPriorityTaskWoken);
 
 	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
@@ -30,16 +32,22 @@ static void IRAM_ATTR dio1_isr_handler(void *arg) {
 // LoRa Task
 static void lora_task(void *pvParameters) {
 	
-	// Create the semaphore for LoRa events
-	lora_event_semaphore = xSemaphoreCreateBinary();
-	if (lora_event_semaphore == NULL) {
-		ESP_LOGE(TAG, "Failed to create LoRa event semaphore");
+	// Create semaphores for LoRa events
+	xLoraEventSemaphore = xSemaphoreCreateBinary();
+	if (xLoraEventSemaphore == NULL) {
+		ESP_LOGE(TAG, "Failed to create xLoraEventSemaphore semaphore");
 		vTaskDelete(NULL);
 	}
 
-	tx_done_semaphore = xSemaphoreCreateBinary();
-	if (tx_done_semaphore == NULL) {
-		ESP_LOGE(TAG, "Failed to create TX_DONE semaphore");
+	xTXDoneSemaphore = xSemaphoreCreateBinary();
+	if (xTXDoneSemaphore == NULL) {
+		ESP_LOGE(TAG, "Failed to create xTXDoneSemaphore semaphore");
+		vTaskDelete(NULL);
+	}
+	
+	xGenerateEncKeySemaphore = xSemaphoreCreateBinary();
+	if (xGenerateEncKeySemaphore == NULL) {
+		ESP_LOGE(TAG, "Failed to create xGenerateEncKeySemaphore semaphore");
 		vTaskDelete(NULL);
 	}
 
@@ -173,19 +181,24 @@ static void lora_task(void *pvParameters) {
 
 	char payload[CYPHERTEXT_LENGTH] = {0}; // Hold data to send
 	for (;;) {
-		snprintf(payload, sizeof(payload), "PolyCast_Command_Value: %d",
+		
+		if (xSemaphoreTake(xGenerateEncKeySemaphore, 1) == pdTRUE) {
+			lora_generate_random_key();
+		}
+		
+		/*snprintf(payload, sizeof(payload), "PolyCast_Command_Value: %d",
 				 value_to_transmit); // Format command into string
 
 		encrypt_and_transmit((uint8_t *)payload); // Encrypt and send over
 
 		// Wait for TX_DONE before switching to RX mode
-		if (xSemaphoreTake(tx_done_semaphore, 1000) == pdTRUE) {
+		if (xSemaphoreTake(xTXDoneSemaphore, 1000) == pdTRUE) {
 			set_lora_rx_mode(); // Listen for receipt from receiver
 		} else {
 			ESP_LOGW(TAG, "TX_DONE timeout after 1000 ms, skipping RX mode");
 		}
 
-		value_to_transmit++;
+		value_to_transmit++;*/
 
 		vTaskDelay(pdMS_TO_TICKS(500));
 	}
@@ -194,7 +207,7 @@ static void lora_task(void *pvParameters) {
 static void lora_event_handler_task(void *pvParameters) {
 	for (;;) {
 		// Wait for an event from the ISR
-		if (xSemaphoreTake(lora_event_semaphore, portMAX_DELAY) == pdTRUE) {
+		if (xSemaphoreTake(xLoraEventSemaphore, portMAX_DELAY) == pdTRUE) {
 			// Check IRQ flags
 			uint16_t irq_flags = 0;
 			sx126x_get_irq_status(NULL, &irq_flags);
@@ -202,7 +215,7 @@ static void lora_event_handler_task(void *pvParameters) {
 			if (irq_flags & SX126X_IRQ_TX_DONE) {
 				ESP_LOGI(TAG, "Transmission completed");
 				sx126x_clear_irq_status(NULL, SX126X_IRQ_TX_DONE);
-				xSemaphoreGive(tx_done_semaphore); // Signal TX_DONE
+				xSemaphoreGive(xTXDoneSemaphore); // Signal TX_DONE
 			}
 
 			if (irq_flags & SX126X_IRQ_RX_DONE) {

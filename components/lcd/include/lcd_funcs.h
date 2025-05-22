@@ -32,8 +32,9 @@
 #define INFRARED_REMOTE_EDIT_PAGE 11
 
 #define LORA_NAME_PAGE 12
-#define LORA_SUBPAGE 13
-#define LORA_OPTIONS_SUBPAGE 14
+#define LORA_KEY_PAGE 13
+#define LORA_SUBPAGE 14
+#define LORA_OPTIONS_SUBPAGE 15
 
 
 typedef struct ui_menu_t {

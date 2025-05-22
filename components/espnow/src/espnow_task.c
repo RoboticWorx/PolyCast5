@@ -1,5 +1,3 @@
-// espnow_task.c  — minimal FreeRTOS wrapper for one-shot ESP-NOW send
-
 #include <string.h>
 
 #include "freertos/FreeRTOS.h"
@@ -13,13 +11,21 @@
 
 #define TAG "ESPNOW_TASK"
 
-static const uint8_t UNIVERSAL_MAC[ESP_NOW_ETH_ALEN] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+//static const uint8_t UNIVERSAL_MAC[ESP_NOW_ETH_ALEN] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+
+/*
+	SPI RAM Config:
+	- Try to allocate Wi-Fi firstly
+	- Allow .bss
+	- Allow .noinit
+*/
 
 static void espnow_task(void *param)
 {
     
     
 	while (1) {
+		/*
 		// Start radio and initialize ESP-NOW
 		ESP_ERROR_CHECK(esp_funcs_wifi_radio_start(WIFI_CHANNEL));
 	    ESP_ERROR_CHECK(esp_funcs_espnow_init(UNIVERSAL_MAC, WIFI_CHANNEL));
@@ -31,6 +37,7 @@ static void espnow_task(void *param)
 		// Stop radio and de-initialize ESP-NOW
 	    ESP_ERROR_CHECK(esp_funcs_espnow_deinit());
 	    ESP_ERROR_CHECK(esp_funcs_wifi_radio_stop());
+	    */
     
 		vTaskDelay(pdMS_TO_TICKS(10000));
 	}

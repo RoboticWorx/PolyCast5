@@ -1,12 +1,16 @@
 #include "esp_log.h"
 #include "font/lv_symbol_def.h"
 
-
+#include "freertos/idf_additions.h"
+#include "freertos/projdefs.h"
 #include "nvs.h"
 
 #include "lcd_lora_funcs.h"
+
 #include "lcd_funcs.h"
 #include "lcd_task.h"
+
+#include "lora_task.h"
 
 //#include "gpio_task.h"
 
@@ -258,6 +262,52 @@ void lcd_lora_update_submenu(lora_menu_t *menu)
     
     // Enable scrolling if list gets too long
     //lv_obj_scroll_to_view(menu->submenu.btns[menu->submenu.index], LV_ANIM_ON); // LV_ANIM_OFF
+}
+
+void lcd_lora_create_enc_key(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
+{
+	lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+	lv_obj_t *lbl_key_ins = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_key_ins, "1. Bring near desired PolyPlug.\n2. Press the top right button\non PolyPlug.\n3. Confirm LED is showing\ngreen on PolyPlug.\n4. On this device, hit the\nright arrow to confirm.", user_secondary_color,
+                         &lv_font_montserrat_14, LV_ALIGN_CENTER, 6, 6);
+                    
+    while (1) {
+		lv_timer_handler();
+		
+		// User hit cancel
+        if (xSemaphoreTake(xLeftButtonSemaphore, 10) == pdTRUE) {
+            lv_label_set_text(lbl_key_ins, "Canceling...");
+            lv_obj_center(lbl_key_ins);
+            lv_timer_handler();
+            vTaskDelay(pdMS_TO_TICKS(500));
+            
+            lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+            
+            lv_obj_del(lbl_key_ins);
+            
+            // Go back
+            return;
+        }
+        // User hit confirm
+        else if (xSemaphoreTake(xRightButtonSemaphore, 10) == pdTRUE) {
+            // Generate encryption key
+            xSemaphoreGive(xGenerateEncKeySemaphore);
+            
+            lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+            
+            // Prompt to enter name
+            ui_menu->page = LORA_NAME_PAGE;
+            
+            lv_obj_del(lbl_key_ins);
+            
+            // Go back            
+            return;
+        }
+    }
 }
 
 void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns)

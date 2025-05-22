@@ -2,6 +2,8 @@
 #include "lora_task.h"
 
 #include "esp_log.h"
+#include "esp_random.h"
+
 #include "sx126x_hal.h"
 
 #include <string.h>
@@ -14,6 +16,12 @@ static void generate_random_iv(uint8_t *iv, size_t length) {
 	for (size_t i = 0; i < length; i++) {
 		iv[i] = (uint8_t)(rand() % (255 + 1)); // Generate number 0 - 255
 	}
+}
+
+void lora_generate_random_key(void)
+{
+	esp_fill_random(encryption_key, sizeof(encryption_key));
+	ESP_LOG_BUFFER_HEX("LORA KEY GENERATED:", encryption_key, sizeof(encryption_key));
 }
 
 void set_lora_rx_mode(void) // Call once to set RX mode and receive on EXTI8

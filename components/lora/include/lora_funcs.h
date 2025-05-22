@@ -9,6 +9,8 @@
 #define IV_LENGTH 16
 #define PAYLOAD_LENGTH (CYPHERTEXT_LENGTH + IV_LENGTH)
 
+void lora_generate_random_key(void);
+
 void set_lora_rx_mode(void);
 void process_received_message(uint8_t *message, size_t message_len);
 

@@ -525,7 +525,7 @@ void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_
 		// Hide LoRa menu
 		lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
-		ui_menu->page = LORA_NAME_PAGE;
+		lcd_lora_create_enc_key(ui_menu, lora_menu);
 	
 	}
 	// PolyPlug selected

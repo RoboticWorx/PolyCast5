@@ -4,6 +4,8 @@
 #include "sx126x.h"
 #include "sx126x_hal.h"
 
+extern SemaphoreHandle_t xGenerateEncKeySemaphore;
+
 typedef struct sx126x_s {
 	void *context;
 	sx126x_hal_status_t (*hal_write)(const void *context,
