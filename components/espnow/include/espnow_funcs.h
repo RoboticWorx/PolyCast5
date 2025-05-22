@@ -53,5 +53,14 @@ esp_err_t esp_funcs_espnow_deinit(void);
  */
 esp_err_t esp_funcs_espnow_send_broadcast(const uint8_t *mac, const uint8_t *data, size_t len);
 
+/**
+ * @brief Register an ESP-NOW receive callback
+ *
+ * @param cb Function called on each incoming packet
+ *
+ * @return ESP_OK on success
+ */
+esp_err_t esp_funcs_espnow_register_recv_cb(esp_now_recv_cb_t cb);
+
 
 #endif // ESPNOW_FUNCS_H

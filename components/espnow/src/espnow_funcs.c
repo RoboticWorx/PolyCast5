@@ -116,3 +116,14 @@ esp_err_t esp_funcs_espnow_send_broadcast(const uint8_t *mac, const uint8_t *dat
     // Send to given MAC
     return esp_now_send(mac, data, len);
 }
+
+esp_err_t esp_funcs_espnow_register_recv_cb(esp_now_recv_cb_t cb)
+{
+	// Register receiver callback
+    esp_err_t err = esp_now_register_recv_cb(cb);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "recv_cb register failed: %s", esp_err_to_name(err));
+    }
+    
+    return err;
+}

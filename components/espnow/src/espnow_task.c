@@ -32,7 +32,7 @@ static void espnow_task(void *param)
 	    ESP_ERROR_CHECK(esp_funcs_espnow_deinit());
 	    ESP_ERROR_CHECK(esp_funcs_wifi_radio_stop());
     
-		vTaskDelay(pdMS_TO_TICKS(500));
+		vTaskDelay(pdMS_TO_TICKS(10000));
 	}
 }
 
