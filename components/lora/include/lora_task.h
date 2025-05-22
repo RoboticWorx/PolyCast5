@@ -4,7 +4,10 @@
 #include "sx126x.h"
 #include "sx126x_hal.h"
 
+#define ENC_KEY_LEN 16
+
 extern SemaphoreHandle_t xGenerateEncKeySemaphore;
+extern QueueHandle_t xSendEncKeyQueue;
 
 typedef struct sx126x_s {
 	void *context;

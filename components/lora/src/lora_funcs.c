@@ -8,6 +8,8 @@
 
 #include <string.h>
 
+
+
 static const char *TAG = "LORA_FUNCS";
 
 static uint8_t encryption_key[16] = {0};
@@ -21,7 +23,11 @@ static void generate_random_iv(uint8_t *iv, size_t length) {
 void lora_generate_random_key(void)
 {
 	esp_fill_random(encryption_key, sizeof(encryption_key));
-	ESP_LOG_BUFFER_HEX("LORA KEY GENERATED:", encryption_key, sizeof(encryption_key));
+	ESP_LOG_BUFFER_HEX("LORA KEY GENERATED", encryption_key, sizeof(encryption_key));
+	
+	if (xQueueSend(xSendEncKeyQueue, encryption_key, pdMS_TO_TICKS(100)) != pdPASS) {
+        ESP_LOGE("LORA", "Failed to queue encryption key");
+    }
 }
 
 void set_lora_rx_mode(void) // Call once to set RX mode and receive on EXTI8

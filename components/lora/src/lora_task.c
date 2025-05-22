@@ -14,6 +14,7 @@ static SemaphoreHandle_t xLoraEventSemaphore;
 static SemaphoreHandle_t xTXDoneSemaphore;
 
 SemaphoreHandle_t xGenerateEncKeySemaphore;
+QueueHandle_t xSendEncKeyQueue;
 
 static void lora_event_handler_task(void *pvParameters);
 
@@ -47,6 +48,12 @@ static void lora_task(void *pvParameters) {
 	
 	xGenerateEncKeySemaphore = xSemaphoreCreateBinary();
 	if (xGenerateEncKeySemaphore == NULL) {
+		ESP_LOGE(TAG, "Failed to create xGenerateEncKeySemaphore semaphore");
+		vTaskDelete(NULL);
+	}
+	
+	xSendEncKeyQueue = xQueueCreate(1, ENC_KEY_LEN);
+	if (xSendEncKeyQueue == NULL) {
 		ESP_LOGE(TAG, "Failed to create xGenerateEncKeySemaphore semaphore");
 		vTaskDelete(NULL);
 	}

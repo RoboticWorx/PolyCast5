@@ -6,12 +6,16 @@
 
 #include "esp_log.h"
 
+#include "lora_task.h"
+
 #include "espnow_funcs.h"
 #include "espnow_task.h"
 
 #define TAG "ESPNOW_TASK"
 
-//static const uint8_t UNIVERSAL_MAC[ESP_NOW_ETH_ALEN] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+static const uint8_t UNIVERSAL_MAC[ESP_NOW_ETH_ALEN] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+
+static uint8_t received_enc_key[ENC_KEY_LEN];
 
 /*
 	SPI RAM Config:
@@ -25,21 +29,23 @@ static void espnow_task(void *param)
     
     
 	while (1) {
-		/*
-		// Start radio and initialize ESP-NOW
-		ESP_ERROR_CHECK(esp_funcs_wifi_radio_start(WIFI_CHANNEL));
-	    ESP_ERROR_CHECK(esp_funcs_espnow_init(UNIVERSAL_MAC, WIFI_CHANNEL));
-	    
-	    // Send the data
-	    char* msg = "Hello from polycast!";
-	    esp_funcs_espnow_send_broadcast(UNIVERSAL_MAC, (uint8_t *)(msg), strlen(msg));
 		
-		// Stop radio and de-initialize ESP-NOW
-	    ESP_ERROR_CHECK(esp_funcs_espnow_deinit());
-	    ESP_ERROR_CHECK(esp_funcs_wifi_radio_stop());
-	    */
+		// Key generated and requesting send 
+		if (xQueueReceive(xSendEncKeyQueue, received_enc_key, portMAX_DELAY) == pdPASS) {
+			// Start radio and initialize ESP-NOW
+			ESP_ERROR_CHECK(esp_funcs_wifi_radio_start(WIFI_CHANNEL));
+		    ESP_ERROR_CHECK(esp_funcs_espnow_init(UNIVERSAL_MAC, WIFI_CHANNEL));
+		    
+		    // Send the data
+		    //char* msg = "Hello from polycast!";
+		    esp_funcs_espnow_send_broadcast(UNIVERSAL_MAC, received_enc_key, ENC_KEY_LEN);
+			
+			// Stop radio and de-initialize ESP-NOW
+		    ESP_ERROR_CHECK(esp_funcs_espnow_deinit());
+		    ESP_ERROR_CHECK(esp_funcs_wifi_radio_stop());
+		}
     
-		vTaskDelay(pdMS_TO_TICKS(10000));
+		vTaskDelay(pdMS_TO_TICKS(10));
 	}
 }
 
