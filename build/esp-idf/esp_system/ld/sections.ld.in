@@ -517,6 +517,30 @@ SECTIONS
     . = . + (_rodata_reserved_end - _flash_rodata_dummy_start);
     . = ALIGN (0x10000);
   } > extern_ram_seg
+  /* This section holds .ext_ram.bss data, and will be put in PSRAM */
+  .ext_ram.bss (NOLOAD) :
+  {
+    _ext_ram_bss_start = ABSOLUTE(.);
+    mapping[extern_ram]
+    
+ . = ALIGN(4); 
+ _ext_ram_bss_end = ABSOLUTE(.);
+  } > extern_ram_seg
+  /**
+
+   * This section holds data that won't be initialised when startup.
+
+   * This section locates in External RAM region.
+
+   */
+  .ext_ram_noinit (NOLOAD) :
+  {
+    _ext_ram_noinit_start = ABSOLUTE(.);
+    *(.ext_ram_noinit*)
+    
+ . = ALIGN(4); 
+ _ext_ram_noinit_end = ABSOLUTE(.);
+  } > extern_ram_seg
   /* DWARF 1 */
   .debug 0 : { *(.debug) }
   .line 0 : { *(.line) }

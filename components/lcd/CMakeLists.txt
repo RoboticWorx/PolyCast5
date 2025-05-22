@@ -19,5 +19,5 @@ idf_component_register(
     	driver freertos lvgl sx126x
     
     PRIV_REQUIRES
-    	gpio sx126x infrared
+    	gpio sx126x infrared espnow
 )

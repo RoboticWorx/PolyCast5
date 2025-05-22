@@ -20412,7 +20412,10 @@
                                         "help": "If malloc() is capable of also allocating SPI-connected ram, its allocation strategy will prefer to\nallocate chunks less than this size in internal memory, while allocations larger than this will be\ndone from external RAM. If allocation from the preferred region fails, an attempt is made to allocate\nfrom the non-preferred region instead, so malloc() will not suddenly fail when either internal or\nexternal memory is full.",
                                         "id": "SPIRAM_MALLOC_ALWAYSINTERNAL",
                                         "name": "SPIRAM_MALLOC_ALWAYSINTERNAL",
-                                        "range": null,
+                                        "range": [
+                                            0,
+                                            131072
+                                        ],
                                         "title": "Maximum malloc() size, in bytes, to always put in internal memory",
                                         "type": "int"
                                     },
@@ -20432,7 +20435,10 @@
                                         "help": "Because the external/internal RAM allocation strategy is not always perfect, it sometimes may happen\nthat the internal memory is entirely filled up. This causes allocations that are specifically done in\ninternal memory, for example the stack for new tasks or memory to service DMA or have memory that's\nalso available when SPI cache is down, to fail. This option reserves a pool specifically for requests\nlike that; the memory in this pool is not given out when a normal malloc() is called.\n\nSet this to 0 to disable this feature.\n\nNote that because FreeRTOS stacks are forced to internal memory, they will also use this memory pool;\nbe sure to keep this in mind when adjusting this value.\n\nNote also that the DMA reserved pool may not be one single contiguous memory region, depending on the\nconfigured size and the static memory usage of the app.",
                                         "id": "SPIRAM_MALLOC_RESERVE_INTERNAL",
                                         "name": "SPIRAM_MALLOC_RESERVE_INTERNAL",
-                                        "range": null,
+                                        "range": [
+                                            0,
+                                            262144
+                                        ],
                                         "title": "Reserve this amount of bytes for data that specifically needs to be in DMA or internal memory",
                                         "type": "int"
                                     },
@@ -21825,7 +21831,10 @@
                         "help": "Set the number of WiFi static TX buffers. Each buffer takes approximately 1.6KB of RAM.\nThe static RX buffers are allocated when esp_wifi_init() is called, they are not released\nuntil esp_wifi_deinit() is called.\n\nFor each transmitted data frame from the higher layer TCP/IP stack, the WiFi driver makes a\ncopy of it in a TX buffer.  For some applications especially UDP applications, the upper\nlayer can deliver frames faster than WiFi layer can transmit. In these cases, we may run out\nof TX buffers.",
                         "id": "ESP_WIFI_STATIC_TX_BUFFER_NUM",
                         "name": "ESP_WIFI_STATIC_TX_BUFFER_NUM",
-                        "range": null,
+                        "range": [
+                            1,
+                            64
+                        ],
                         "title": "Max number of WiFi static TX buffers",
                         "type": "int"
                     },
@@ -21835,7 +21844,10 @@
                         "help": "Set the number of WiFi cache TX buffer number.\n\nFor each TX packet from uplayer, such as LWIP etc, WiFi driver needs to allocate a static TX\nbuffer and makes a copy of uplayer packet. If WiFi driver fails to allocate the static TX buffer,\nit caches the uplayer packets to a dedicated buffer queue, this option is used to configure the\nsize of the cached TX queue.",
                         "id": "ESP_WIFI_CACHE_TX_BUFFER_NUM",
                         "name": "ESP_WIFI_CACHE_TX_BUFFER_NUM",
-                        "range": null,
+                        "range": [
+                            0,
+                            128
+                        ],
                         "title": "Max number of WiFi cache TX buffers",
                         "type": "int"
                     },
@@ -21845,10 +21857,7 @@
                         "help": "Set the number of WiFi dynamic TX buffers. The size of each dynamic TX buffer is not fixed,\nit depends on the size of each transmitted data frame.\n\nFor each transmitted frame from the higher layer TCP/IP stack, the WiFi driver makes a copy\nof it in a TX buffer. For some applications, especially UDP applications, the upper layer\ncan deliver frames faster than WiFi layer can transmit. In these cases, we may run out of TX\nbuffers.",
                         "id": "ESP_WIFI_DYNAMIC_TX_BUFFER_NUM",
                         "name": "ESP_WIFI_DYNAMIC_TX_BUFFER_NUM",
-                        "range": [
-                            1,
-                            128
-                        ],
+                        "range": null,
                         "title": "Max number of WiFi dynamic TX buffers",
                         "type": "int"
                     },

@@ -173,7 +173,7 @@ static void lora_task(void *pvParameters) {
 
 	char payload[CYPHERTEXT_LENGTH] = {0}; // Hold data to send
 	for (;;) {
-		/*snprintf(payload, sizeof(payload), "PolyCast_Command_Value: %d",
+		snprintf(payload, sizeof(payload), "PolyCast_Command_Value: %d",
 				 value_to_transmit); // Format command into string
 
 		encrypt_and_transmit((uint8_t *)payload); // Encrypt and send over
@@ -185,7 +185,7 @@ static void lora_task(void *pvParameters) {
 			ESP_LOGW(TAG, "TX_DONE timeout after 1000 ms, skipping RX mode");
 		}
 
-		value_to_transmit++;*/
+		value_to_transmit++;
 
 		vTaskDelay(pdMS_TO_TICKS(500));
 	}

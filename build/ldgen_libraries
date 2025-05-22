@@ -62,6 +62,7 @@ C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp-tls/libesp-tls
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_adc/libesp_adc.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_driver_bitscrambler/libesp_driver_bitscrambler.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_driver_cam/libesp_driver_cam.a
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_psram/libesp_psram.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_eth/libesp_eth.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_hid/libesp_hid.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/tcp_transport/libtcp_transport.a
@@ -87,6 +88,7 @@ C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/lvgl/liblvgl.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/lora/liblora.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/sx126x/libsx126x.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/infrared/libinfrared.a
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/espnow/libespnow.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/lcd/liblcd.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/gpio/libgpio.a
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/main/libmain.a

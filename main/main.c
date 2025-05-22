@@ -8,6 +8,7 @@
 #include "driver/spi_master.h"
 
 #include "esp_log.h"
+#include "esp_psram.h"
 
 #include "hal/gpio_types.h"
 #include "lora_task.h"
@@ -26,6 +27,9 @@
 
 #include "gpio_task.h"
 #include "gpio_funcs.h"
+
+#include "espnow_task.h"
+#include "espnow_funcs.h"
 
 // Logging tag
 static const char *TAG = "MAIN";
@@ -59,6 +63,26 @@ void spi_sx126x_init(void)
 
 void app_main(void) {
 	
+	// prints PSRAM chip size
+    size_t psram_size = esp_psram_get_size();
+    ESP_LOGI("PSRAM", "Detected PSRAM size = %u KB", psram_size/1024);
+
+    // prints how much of that is free for malloc()
+    size_t free_ext = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    ESP_LOGI("PSRAM", "Free PSRAM heap = %u KB", free_ext/1024);
+
+    // also show internal
+    size_t free_int = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    ESP_LOGI("PSRAM", "Free internal heap = %u KB", free_int/1024);
+    
+    // Initialize NVS flash
+    init_nvs();
+    
+    // Allocate Wi-Fi buffers now without fragmentation
+    ESP_ERROR_CHECK(esp_funcs_wifi_driver_init());
+    // Turn off radio to save power
+    ESP_ERROR_CHECK(esp_funcs_wifi_radio_stop());
+	
 	// Initialize various
 	lcd_init_driver();
     lcd_lvgl_init();
@@ -82,14 +106,13 @@ void app_main(void) {
 	sx126x.hal_wakeup = sx126x_hal_wakeup;
 	sx126x.hal_write = sx126x_hal_write;
 	sx126x.hal_read = sx126x_hal_read;
-	
-	init_nvs();
 
 	// Create tasks
 	lora_task_create();
 	lcd_task_create();
 	gpio_task_create();
 	infrared_task_create();
+	espnow_task_create();
 	//ble_hid_task_start_up();
 
 	ESP_LOGI(TAG, "Main initialized and tasks created");

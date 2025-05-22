@@ -41,8 +41,8 @@ idf_component_register(
     	#"${CMAKE_SOURCE_DIR}/components/bluetooth/include"
     
     REQUIRES            # List the public requirements (component names)
-    	gpio lcd lora infrared
-    	driver freertos nvs_flash bt esp_hid esp_driver_gpio console esp_driver_uart
+    	gpio lcd lora infrared espnow
+    	driver freertos nvs_flash bt esp_hid esp_driver_gpio console esp_driver_uart esp_psram
     	
     PRIV_REQUIRES       # List the private requirements
 )

@@ -62,6 +62,7 @@ $<TARGET_FILE:__idf_esp-tls>
 $<TARGET_FILE:__idf_esp_adc>
 $<TARGET_FILE:__idf_esp_driver_bitscrambler>
 $<TARGET_FILE:__idf_esp_driver_cam>
+$<TARGET_FILE:__idf_esp_psram>
 $<TARGET_FILE:__idf_esp_eth>
 $<TARGET_FILE:__idf_esp_hid>
 $<TARGET_FILE:__idf_tcp_transport>
@@ -87,6 +88,7 @@ $<TARGET_FILE:__idf_lvgl>
 $<TARGET_FILE:__idf_lora>
 $<TARGET_FILE:__idf_sx126x>
 $<TARGET_FILE:__idf_infrared>
+$<TARGET_FILE:__idf_espnow>
 $<TARGET_FILE:__idf_lcd>
 $<TARGET_FILE:__idf_gpio>
 $<TARGET_FILE:__idf_main>
