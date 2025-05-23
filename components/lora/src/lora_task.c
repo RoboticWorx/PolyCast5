@@ -1,12 +1,15 @@
-#include "lora_task.h"
-#include "lora_funcs.h"
-#include "sx126x.h"
-
-#include "esp_log.h"
-
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+
+#include "esp_log.h"
+
+#include "lora_task.h"
+#include "lora_funcs.h"
+
+#include "sx126x.h"
+
+
 
 static const char *TAG = "LORA_TASK";
 
@@ -15,6 +18,7 @@ static SemaphoreHandle_t xTXDoneSemaphore;
 
 SemaphoreHandle_t xGenerateEncKeySemaphore;
 QueueHandle_t xSendEncKeyQueue;
+QueueHandle_t xReceiveEncKeyQueue;
 
 static void lora_event_handler_task(void *pvParameters);
 
@@ -55,6 +59,12 @@ static void lora_task(void *pvParameters) {
 	xSendEncKeyQueue = xQueueCreate(1, ENC_KEY_LEN);
 	if (xSendEncKeyQueue == NULL) {
 		ESP_LOGE(TAG, "Failed to create xSendEncKeyQueue semaphore");
+		vTaskDelete(NULL);
+	}
+	
+	xReceiveEncKeyQueue = xQueueCreate(1, ENC_KEY_LEN);
+	if (xReceiveEncKeyQueue == NULL) {
+		ESP_LOGE(TAG, "Failed to create xReceiveEncKeyQueue semaphore");
 		vTaskDelete(NULL);
 	}
 
@@ -193,19 +203,22 @@ static void lora_task(void *pvParameters) {
 			lora_generate_random_key();
 		}
 		
-		/*snprintf(payload, sizeof(payload), "PolyCast_Command_Value: %d",
-				 value_to_transmit); // Format command into string
+		// Request to send
+		// Save received encryption key
+		if (xQueueReceive(xReceiveEncKeyQueue, &encryption_key, portMAX_DELAY) == pdPASS) {
+			snprintf(payload, sizeof(payload), "PolyCast_Command_Value: %d", value_to_transmit); // Format command into string
 
-		encrypt_and_transmit((uint8_t *)payload); // Encrypt and send over
-
-		// Wait for TX_DONE before switching to RX mode
-		if (xSemaphoreTake(xTXDoneSemaphore, 1000) == pdTRUE) {
-			set_lora_rx_mode(); // Listen for receipt from receiver
-		} else {
-			ESP_LOGW(TAG, "TX_DONE timeout after 1000 ms, skipping RX mode");
+			encrypt_and_transmit((uint8_t *)payload); // Encrypt and send over
+	
+			// Wait for TX_DONE before switching to RX mode
+			if (xSemaphoreTake(xTXDoneSemaphore, 1000) == pdTRUE) {
+				set_lora_rx_mode(); // Listen for receipt from receiver
+			} else {
+				ESP_LOGW(TAG, "TX_DONE timeout after 1000 ms, skipping RX mode");
+			}
+	
+			value_to_transmit++;
 		}
-
-		value_to_transmit++;*/
 
 		vTaskDelay(pdMS_TO_TICKS(500));
 	}

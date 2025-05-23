@@ -472,8 +472,8 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 		        // Save to keys at next available position
 		        lora_menu->keys[lora_menu->size - 1] = slot;
 		        
-		        ESP_LOGI(TAG, "Key saved at slot %d:", lora_menu->size - 1);
-				ESP_LOG_BUFFER_HEX("SAVED IN QUEUE", lora_menu->keys[lora_menu->size - 1], ENC_KEY_LEN);
+		        //ESP_LOGI(TAG, "Key saved at slot %d:", lora_menu->size - 1);
+				//ESP_LOG_BUFFER_HEX("SAVED IN QUEUE", lora_menu->keys[lora_menu->size - 1], ENC_KEY_LEN);
 				
 				lcd_lora_key_nvs_save(lora_menu, LORA_ENC_NS, LORA_ENC_KEY_COUNT, LORA_ENC_KEY_FMT);
 			}
@@ -540,8 +540,13 @@ void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_bt
 		lora_menu->submenu.index -= 3;
 		lcd_lora_update_submenu(lora_menu);
 	}
+	// Select send
+	else if (ui_btns->up_btn == 1 && lora_menu->submenu.index == 0) {
+		xQueueSend(xReceiveEncKeyQueue, lora_menu->keys[lora_menu->index], portMAX_DELAY);
+		ESP_LOG_BUFFER_HEX("SENDING WITH KEY", lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
+	}
 	// Select up
-	else if (ui_btns->up_btn == 1 && lora_menu->submenu.index != 0) {
+	else if (ui_btns->up_btn == 1) {
 		// Hide submenu
 		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 		
@@ -642,7 +647,7 @@ esp_err_t lcd_lora_key_nvs_save(const lora_menu_t *menu, const char* ns, const c
         char key[16];
         snprintf(key, sizeof(key), fmt, i);
         
-        // Store the key string at each key starting at index 1
+        // Store the key string at each key starting at index 1 to match user options
         err = nvs_set_blob(h, key, menu->keys[i + 1], ENC_KEY_LEN);
         
         // Exit if error
@@ -676,7 +681,7 @@ esp_err_t lcd_lora_menu_nvs_load(lora_menu_t *menu, const char* ns, const char* 
 		return err;
 	}
 
-    menu->size = 1; // Don't change first two options
+    menu->size = 1; // Don't change first option
     menu->index = 0;
 
 	// Loop through all keys
@@ -733,7 +738,7 @@ esp_err_t lcd_lora_key_nvs_load(lora_menu_t *menu, const char* ns, const char* c
 		return err;
 	}
 
-    menu->size = 1; // Don't change first two options
+    menu->size = 1; // Don't change first option
     menu->index = 0;
 
 	// Loop through all keys

@@ -5,9 +5,13 @@
 #include "sx126x.h"
 #include "sx126x_hal.h"
 
+#include "lora_task.h"
+
 #define CYPHERTEXT_LENGTH 64
 #define IV_LENGTH 16
 #define PAYLOAD_LENGTH (CYPHERTEXT_LENGTH + IV_LENGTH)
+
+extern uint8_t encryption_key[ENC_KEY_LEN];
 
 void lora_generate_random_key(void);
 

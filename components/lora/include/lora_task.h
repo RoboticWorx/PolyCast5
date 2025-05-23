@@ -8,6 +8,7 @@
 
 extern SemaphoreHandle_t xGenerateEncKeySemaphore;
 extern QueueHandle_t xSendEncKeyQueue;
+extern QueueHandle_t xReceiveEncKeyQueue;
 
 typedef struct sx126x_s {
 	void *context;

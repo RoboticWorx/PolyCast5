@@ -12,7 +12,7 @@
 
 static const char *TAG = "LORA_FUNCS";
 
-static uint8_t encryption_key[16] = {0};
+uint8_t encryption_key[ENC_KEY_LEN] = {0};
 
 static void generate_random_iv(uint8_t *iv, size_t length) {
 	for (size_t i = 0; i < length; i++) {
