@@ -135,16 +135,6 @@ static void lcd_task(void *pvParameters)
 	lcd_lora_setup_page(&lora_menu);
 	lcd_lora_setup_subpage(&lora_menu);
 	
-		for (int i = 0; i < lora_menu.size; i++) {
-        uint8_t *key = lora_menu.keys[i];
-        if (key) {
-            ESP_LOGI(TAG, "Key[%d]:", i);
-            ESP_LOG_BUFFER_HEX(TAG, key, 16);
-        } else {
-            ESP_LOGI(TAG, "Key[%d]: <NULL>", i);
-        }
-    }
-	
 	while (1)
 	{
 		if (xTaskGetTickCount() - timer_last >= timer_interval) {

@@ -543,6 +543,7 @@ void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_bt
 	// Select send
 	else if (ui_btns->up_btn == 1 && lora_menu->submenu.index == 0) {
 		xQueueSend(xReceiveEncKeyQueue, lora_menu->keys[lora_menu->index], portMAX_DELAY);
+		xQueueSend(xReceiveEncIndexQueue, &lora_menu->submenu.index, portMAX_DELAY);
 		ESP_LOG_BUFFER_HEX("SENDING WITH KEY", lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
 	}
 	// Select up

@@ -63,6 +63,7 @@ void spi_sx126x_init(void)
 
 void app_main(void) {
 	
+	/*
 	// prints PSRAM chip size
     size_t psram_size = esp_psram_get_size();
     ESP_LOGI("PSRAM", "Detected PSRAM size = %u KB", psram_size/1024);
@@ -74,6 +75,7 @@ void app_main(void) {
     // also show internal
     size_t free_int = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
     ESP_LOGI("PSRAM", "Free internal heap = %u KB", free_int/1024);
+    */
     
     // Initialize NVS flash
     init_nvs();

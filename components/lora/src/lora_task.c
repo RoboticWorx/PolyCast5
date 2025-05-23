@@ -17,12 +17,14 @@ static SemaphoreHandle_t xLoraEventSemaphore;
 static SemaphoreHandle_t xTXDoneSemaphore;
 
 SemaphoreHandle_t xGenerateEncKeySemaphore;
+
 QueueHandle_t xSendEncKeyQueue;
 QueueHandle_t xReceiveEncKeyQueue;
+QueueHandle_t xReceiveEncIndexQueue;
+
+static int submenu_index = -1;
 
 static void lora_event_handler_task(void *pvParameters);
-
-static uint8_t value_to_transmit = 0;
 
 // ISR handler for DIO1
 static void IRAM_ATTR dio1_isr_handler(void *arg) {
@@ -65,6 +67,12 @@ static void lora_task(void *pvParameters) {
 	xReceiveEncKeyQueue = xQueueCreate(1, ENC_KEY_LEN);
 	if (xReceiveEncKeyQueue == NULL) {
 		ESP_LOGE(TAG, "Failed to create xReceiveEncKeyQueue semaphore");
+		vTaskDelete(NULL);
+	}
+	
+	xReceiveEncIndexQueue = xQueueCreate(1, sizeof(int));
+	if (xReceiveEncIndexQueue == NULL) {
+		ESP_LOGE(TAG, "Failed to create xReceiveEncIndexQueue semaphore");
 		vTaskDelete(NULL);
 	}
 
@@ -205,19 +213,24 @@ static void lora_task(void *pvParameters) {
 		
 		// Request to send
 		// Save received encryption key
-		if (xQueueReceive(xReceiveEncKeyQueue, &encryption_key, portMAX_DELAY) == pdPASS) {
-			snprintf(payload, sizeof(payload), "PolyCast_Command_Value: %d", value_to_transmit); // Format command into string
-
-			encrypt_and_transmit((uint8_t *)payload); // Encrypt and send over
-	
-			// Wait for TX_DONE before switching to RX mode
-			if (xSemaphoreTake(xTXDoneSemaphore, 1000) == pdTRUE) {
-				set_lora_rx_mode(); // Listen for receipt from receiver
-			} else {
-				ESP_LOGW(TAG, "TX_DONE timeout after 1000 ms, skipping RX mode");
+		if (xQueueReceive(xReceiveEncKeyQueue, &encryption_key, 1) == pdPASS) {
+			if (xQueueReceive(xReceiveEncIndexQueue, &submenu_index, 1) == pdPASS) {
+				// Format command into string
+				snprintf(payload, sizeof(payload), "PolyCast_Command_Value: %d", submenu_index);
+				
+				ESP_LOGI(TAG, "SENDING: %s", payload);
+				
+				// Encrypt and send over
+				lora_encrypt_and_transmit((uint8_t *)payload);
+						
+				// Wait for TX_DONE before switching to RX mode
+				if (xSemaphoreTake(xTXDoneSemaphore, 1000) == pdTRUE) {
+					lora_set_rx_mode(); // Listen for receipt from receiver
+				}
+				else {
+					ESP_LOGW(TAG, "TX_DONE timeout after 1000 ms, skipping RX mode");
+				}
 			}
-	
-			value_to_transmit++;
 		}
 
 		vTaskDelay(pdMS_TO_TICKS(500));
@@ -252,7 +265,7 @@ static void lora_event_handler_task(void *pvParameters) {
 				ESP_LOGI(TAG, "Received packet of size %d: %.*s", rx_size,
 						 rx_size, rx_buffer);
 
-				process_received_message(rx_buffer, rx_size);
+				lora_process_received_message(rx_buffer, rx_size);
 
 				// Clear IRQ
 				sx126x_clear_irq_status(NULL, SX126X_IRQ_RX_DONE);

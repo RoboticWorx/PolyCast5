@@ -30,7 +30,7 @@ void lora_generate_random_key(void)
     }
 }
 
-void set_lora_rx_mode(void) // Call once to set RX mode and receive on EXTI8
+void lora_set_rx_mode(void) // Call once to set RX mode and receive on EXTI8
 {
 
 	while (gpio_get_level(SX126X_BUSY_PIN) == 1) {
@@ -69,7 +69,7 @@ void lora_tx(uint8_t tx_data[], uint8_t data_len) {
 	}
 }
 
-void process_received_message(uint8_t *message, size_t message_len) {
+void lora_process_received_message(uint8_t *message, size_t message_len) {
 	// Verify that the message length is at least 16 bytes (for IV) + 16 bytes
 	// (minimum ciphertext)
 	if (message_len < 32) {
@@ -122,7 +122,7 @@ void process_received_message(uint8_t *message, size_t message_len) {
 	ESP_LOGI(TAG, "Decrypted text: %s\n", ciphertext);
 }
 
-void encrypt_and_transmit(uint8_t plaintext[]) {
+void lora_encrypt_and_transmit(uint8_t plaintext[]) {
 
 	uint8_t buffer[CYPHERTEXT_LENGTH]; // Padded to 64 bytes (must be multiple
 									   // of 16)
