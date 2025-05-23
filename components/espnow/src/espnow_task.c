@@ -9,6 +9,7 @@
 #include "lora_task.h"
 
 #include "espnow_funcs.h"
+#include "portmacro.h"
 #include "espnow_task.h"
 
 #define TAG "ESPNOW_TASK"
@@ -16,6 +17,8 @@
 static const uint8_t UNIVERSAL_MAC[ESP_NOW_ETH_ALEN] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
 static uint8_t received_enc_key[ENC_KEY_LEN];
+
+QueueHandle_t xSendEncKeyQueueNVS;
 
 /*
 	SPI RAM Config:
@@ -26,7 +29,11 @@ static uint8_t received_enc_key[ENC_KEY_LEN];
 
 static void espnow_task(void *param)
 {
-    
+    xSendEncKeyQueueNVS = xQueueCreate(1, ENC_KEY_LEN);
+	if (xSendEncKeyQueueNVS == NULL) {
+		ESP_LOGE(TAG, "Failed to create xSendEncKeyQueueNVS semaphore");
+		vTaskDelete(NULL);
+	}
     
 	while (1) {
 		
@@ -43,6 +50,9 @@ static void espnow_task(void *param)
 			// Stop radio and de-initialize ESP-NOW
 		    ESP_ERROR_CHECK(esp_funcs_espnow_deinit());
 		    ESP_ERROR_CHECK(esp_funcs_wifi_radio_stop());
+		    
+		    // Send the data to LCD task to save to NVS under given option
+		    xQueueSend(xSendEncKeyQueueNVS, received_enc_key, portMAX_DELAY);
 		}
     
 		vTaskDelay(pdMS_TO_TICKS(10));

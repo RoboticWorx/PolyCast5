@@ -125,12 +125,24 @@ static void lcd_task(void *pvParameters)
 	//lcd_menu_nvs_clear(LORA_OPTIONS_NS);
 	
 	lcd_ir_ir_menu_nvs_load(&ir_menu, A_IR_REMOTE_NS, A_REMOTE_KEY_COUNT, A_REMOTE_KEY_FMT);
+	
 	lcd_lora_menu_nvs_load(&lora_menu, LORA_OPTIONS_NS, LORA_OPTIONS_KEY_COUNT, LORA_OPTIONS_KEY_FMT);
+	lcd_lora_key_nvs_load(&lora_menu, LORA_ENC_NS, LORA_ENC_KEY_COUNT, LORA_ENC_KEY_FMT);
 	
 	lcd_ir_setup_page(&ir_menu);
 	
 	lcd_lora_setup_page(&lora_menu);
 	lcd_lora_setup_subpage(&lora_menu);
+	
+	for (int i = 0; i < lora_menu.size; i++) {
+        uint8_t *key = lora_menu.keys[i];
+        if (key) {
+            ESP_LOGI(TAG, "Key[%d]:", i);
+            ESP_LOG_BUFFER_HEX(TAG, key, 16);
+        } else {
+            ESP_LOGI(TAG, "Key[%d]: <NULL>", i);
+        }
+    }
 	
 	while (1)
 	{

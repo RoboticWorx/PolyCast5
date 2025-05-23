@@ -3,6 +3,8 @@
 
 #define WIFI_CHANNEL 1
 
+extern QueueHandle_t xSendEncKeyQueueNVS;
+
 /**
  * @brief Create the ESP-NOW task
  */

@@ -54,7 +54,7 @@ static void lora_task(void *pvParameters) {
 	
 	xSendEncKeyQueue = xQueueCreate(1, ENC_KEY_LEN);
 	if (xSendEncKeyQueue == NULL) {
-		ESP_LOGE(TAG, "Failed to create xGenerateEncKeySemaphore semaphore");
+		ESP_LOGE(TAG, "Failed to create xSendEncKeyQueue semaphore");
 		vTaskDelete(NULL);
 	}
 
