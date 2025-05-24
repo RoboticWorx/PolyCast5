@@ -44,6 +44,8 @@ typedef struct {
 
 extern lora_menu_t lora_menu;
 
+void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
+
 void lcd_lora_create_enc_key(ui_menu_t *ui_menu, lora_menu_t *lora_menu);
 
 void lcd_lora_subpage_option_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);

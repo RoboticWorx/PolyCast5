@@ -289,6 +289,9 @@ void lcd_lora_create_enc_key(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
             
             lv_obj_del(lbl_key_ins);
             
+            // Show LoRa menu
+			lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+            
             // Go back
             return;
         }
@@ -375,7 +378,7 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
         name_buf[cur_pos] = cur_char;
     }
     // If left pressed and at start
-    else if (ui_btns->left_btn && cur_pos == 0) {
+    /*else if (ui_btns->left_btn && cur_pos == 0) {
 		// Delete labels since no longer used
         lv_obj_delete(lbl_user_in);
         lv_obj_delete(lbl_dirs);
@@ -383,15 +386,18 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
         
         // Reset statics for next time
         lbl_user_in = NULL;
-	    lbl_dirs  = NULL;
-	    cur_pos  = 0;
+	    lbl_dirs = NULL;
+	    cur_pos = 0;
 	    cur_char = '_';
 	    memset(name_buf, 0, sizeof name_buf);
 	    
+	    // Show LoRa menu
+		lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+	    
  		ui_menu->page = LORA_PAGE;
 		return;
-    }
-    // If left and not at start
+    }*/
+    // If left // and not at start
     else if (ui_btns->left_btn) {
         // Clear the current slot
 	    name_buf[cur_pos] = '\0';
@@ -567,78 +573,146 @@ void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_bt
 }
 
 void lcd_lora_subpage_option_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns)
-{
-	static lv_obj_t *lbl_subpage_ins_1 = NULL;
-	static lv_obj_t *lbl_selected_icon = NULL;
-	
-	static bool update_once = false;
-	
-	// Create once
-	if (!lbl_subpage_ins_1) {
-		lbl_subpage_ins_1 = lv_label_create(ACTIVE_SCR);
-	    lcd_format_label(lbl_subpage_ins_1, "", user_secondary_color,
-				 &lv_font_montserrat_18, LV_ALIGN_CENTER, -30, 20); // +y = down, +x = right
-		
-		lbl_selected_icon = lv_label_create(ACTIVE_SCR);		 
-		lcd_format_label(lbl_selected_icon, "", user_secondary_color,
-				 &lv_font_montserrat_16, LV_ALIGN_CENTER, -30, 60);
-	                     
-	}
-	
-
+{	
 	// Loop was selected
 	if (lora_menu->submenu.index == 1) {
-		static uint8_t selected_index = 1;
-		
-		if (!update_once) {
-			lv_label_set_text(lbl_subpage_ins_1,  "ON time:\n\nOFF time:");
-			lv_label_set_text(lbl_selected_icon, LV_SYMBOL_PLAY);
-			
-			lv_obj_align(lbl_subpage_ins_1, LV_ALIGN_TOP_MID, -15, 20);
-			lv_obj_align(lbl_selected_icon, LV_ALIGN_TOP_MID, -75, 63);
-			
-			update_once = true;
-		}
-		
-		// Move up
-		if (ui_btns->up_btn == 1 && selected_index == 1) {
-			lv_obj_set_y(lbl_selected_icon, 21);
-			
-			selected_index = 0;
-		}
-		// Move down
-		else if (ui_btns->down_btn == 1 && selected_index == 0) {
-			lv_obj_set_y(lbl_selected_icon, 63);
-			
-			selected_index = 1;
-		}
-		// Wrap
-		else if (ui_btns->up_btn == 1 && selected_index == 0) {
-			lv_obj_set_y(lbl_selected_icon, 63);
-			
-			selected_index = 1;
-		}
-		// Go back
-		else if (ui_btns->down_btn == 1) {
-			// Show LoRa submenu cont
-			lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
-			
-			// Reset objects
-			lv_obj_delete(lbl_subpage_ins_1);
-			lv_obj_delete(lbl_selected_icon);
-			lbl_subpage_ins_1 = NULL;
-			lbl_selected_icon = NULL;
-			
-			// Refresh statics 
-			update_once = false;
-			selected_index = 1;
-			
-			// Go back
-			ui_menu->page = LORA_SUBPAGE;
-			
-		}
+		lcd_lora_subpage_loop_selected(ui_menu, lora_menu, ui_btns);
 	}
 }
+
+void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns)
+{
+	#define TIME_OPT_COUNT (sizeof(time_opts)/sizeof(time_opts[0]))
+	#define Y_SEL_POS 42
+	
+	// Create statics
+	static lv_obj_t *lbl_subpage_times = NULL;
+	static lv_obj_t *lbl_subpage_ins = NULL;
+	static lv_obj_t *lbl_selected_icon = NULL;
+	static lv_obj_t *lbl_top_time = NULL;
+	static lv_obj_t *lbl_bot_time = NULL;
+	
+	static uint8_t selected_index = 1;
+	static int on_idx = 0;
+	static int off_idx = 0;
+	
+	static const char *time_opts[] = {
+		"1m", "3m", "5m", "15m",
+		"30m", "1h", "2h", "3h", 
+		"4h", "6h", "8h", "12h",
+		"16h", "24h"
+	};
+	
+	// Create once
+	if (!lbl_subpage_times) {
+		// Create and format text labels
+		lbl_subpage_times = lv_label_create(ACTIVE_SCR);
+	    lcd_format_label(lbl_subpage_times, "ON time:\nOFF time:", user_secondary_color,
+				 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, -15, 20); // +y = down, +x = right
+				 
+		lbl_subpage_ins = lv_label_create(ACTIVE_SCR);		 
+		lcd_format_label(lbl_subpage_ins, "- Right/left to adjust time.\n- All the way up to confirm.\n- All the way down to exit.", user_secondary_color,
+				 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, -15);
+		
+		lbl_selected_icon = lv_label_create(ACTIVE_SCR);		 
+		lcd_format_label(lbl_selected_icon, LV_SYMBOL_PLAY, user_secondary_color,
+			 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, -75, Y_SEL_POS);
+			 
+		lbl_top_time = lv_label_create(ACTIVE_SCR);		 
+		lcd_format_label(lbl_top_time, "", user_secondary_color,
+			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 60, 20);
+			 
+		lbl_bot_time = lv_label_create(ACTIVE_SCR);		 
+		lcd_format_label(lbl_bot_time, "", user_secondary_color,
+			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 60, Y_SEL_POS);
+			 
+		char buf[4];
+		snprintf(buf, sizeof(buf), "%s", time_opts[0]);
+		lv_label_set_text(lbl_top_time, buf);
+		lv_label_set_text(lbl_bot_time, buf);
+	}	
+	
+	// Move up
+	if (ui_btns->up_btn == 1 && selected_index == 1) {
+		// Move pointer up
+		lv_obj_set_y(lbl_selected_icon, 21);
+			
+		selected_index = 0;
+	}
+	// Move down
+	else if (ui_btns->down_btn == 1 && selected_index == 0) {
+		// Move pointer down
+		lv_obj_set_y(lbl_selected_icon, Y_SEL_POS);
+			
+		selected_index = 1;
+	}
+	// Shift time of selected right
+	else if(ui_btns->right_btn == 1) {
+		// Changing top time
+		if (selected_index == 0) {
+			on_idx = (on_idx  + 1) % TIME_OPT_COUNT;
+			char buf[4];
+			snprintf(buf, sizeof(buf), "%s", time_opts[on_idx]);
+			lv_label_set_text(lbl_top_time, buf);
+		}
+		// Changing bot time
+		else {
+			off_idx = (off_idx + 1) % TIME_OPT_COUNT;
+			char buf[4];
+			snprintf(buf, sizeof(buf), "%s", time_opts[off_idx]);
+			lv_label_set_text(lbl_bot_time, buf);
+		}
+	}
+	// Shift time of selected left
+	else if(ui_btns->left_btn == 1) {
+		// Changing top time
+		if (selected_index == 0) {
+			on_idx = (on_idx - 1 + TIME_OPT_COUNT) % TIME_OPT_COUNT;
+			char buf[4];
+			snprintf(buf, sizeof(buf), "%s", time_opts[on_idx]);
+			lv_label_set_text(lbl_top_time, buf);
+		}
+		// Changing bot time
+		else {
+			off_idx = (off_idx - 1 + TIME_OPT_COUNT) % TIME_OPT_COUNT;
+			char buf[4];
+			snprintf(buf, sizeof(buf), "%s", time_opts[off_idx]);
+			lv_label_set_text(lbl_bot_time, buf);
+		}
+	}
+	// Confirm
+	else if (ui_btns->up_btn == 1 && selected_index == 0) {
+		lv_obj_set_y(lbl_selected_icon, Y_SEL_POS);
+		
+		selected_index = 1;
+	}
+	// Go back
+	else if (ui_btns->down_btn == 1) {
+		// Show LoRa submenu cont
+		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+			
+		// Reset objects
+		lv_obj_delete(lbl_subpage_times);
+		lv_obj_delete(lbl_selected_icon);
+		lv_obj_delete(lbl_subpage_ins);
+		lv_obj_delete(lbl_top_time);
+		lv_obj_delete(lbl_bot_time);
+		lbl_subpage_times = NULL;
+		lbl_selected_icon = NULL;
+		lbl_subpage_ins = NULL;
+		lbl_top_time = NULL;
+		lbl_bot_time = NULL;
+		
+		// Refresh statics 
+		selected_index = 1;
+		on_idx = 0;
+		off_idx = 0;
+			
+		// Go back
+		ui_menu->page = LORA_SUBPAGE;
+	}
+}
+
 
 
 esp_err_t lcd_lora_menu_nvs_save(const lora_menu_t *menu, const char* ns, const char* count, const char* fmt)
