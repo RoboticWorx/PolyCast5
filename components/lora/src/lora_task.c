@@ -81,7 +81,7 @@ static void lora_task(void *pvParameters) {
 				NULL);
 
 	sx126x_mod_params_lora_t lora_mod_params = {
-		.sf = SX126X_LORA_SF9, // Spreading factor (higher value sends further
+		.sf = SX126X_LORA_SF7, // Spreading factor (higher value sends further
 							   // but takes more time)
 		.bw = SX126X_LORA_BW_125, // Bandwidth
 		.cr = SX126X_LORA_CR_4_5, // Error correction

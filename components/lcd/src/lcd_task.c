@@ -204,7 +204,7 @@ static void lcd_task(void *pvParameters)
 			}
 			// IR remotes
 			else if (ui_menu.page == INFRARED_PAGE) {
-					
+				
 				lcd_infrared_page_selected(&ui_menu, &ir_menu, &ui_btns);
 			}
 			else if (ui_menu.page == INFRARED_REMOTE_NAME_PAGE) {
@@ -219,7 +219,7 @@ static void lcd_task(void *pvParameters)
 		}
 
 		lv_timer_handler();
-		vTaskDelay(pdMS_TO_TICKS(20));
+		vTaskDelay(pdMS_TO_TICKS(10));
 	}
 }
 

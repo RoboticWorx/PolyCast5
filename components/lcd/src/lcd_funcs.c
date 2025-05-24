@@ -505,8 +505,14 @@ void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_
 
 void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns) 
 {
-	// Show LoRa list
-	lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+	// Only execute once
+	static bool update_once = false;
+	if (!update_once) {
+		// Show LoRa list
+		lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);	
+		
+		update_once = true;
+	}
 	
 	// Up button pressed
 	if (ui_btns->up_btn == 1) {
@@ -533,6 +539,9 @@ void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_
 		// Hide LoRa menu
 		lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
+		// Show submenu
+		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+		
 		ui_menu->page = LORA_SUBPAGE;
 	
 	}
@@ -544,6 +553,9 @@ void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_
 		
 		// Show selection labels
 		unhide_selection_widgets(ui_menu);
+		
+		// Reset static
+		update_once = false;
 		
 		ui_menu->page = SELECTION_PAGE;
 	}
