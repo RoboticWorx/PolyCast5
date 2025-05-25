@@ -500,6 +500,9 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 			lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
 		}
 		
+		// Show LoRa list
+		lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
 		// Switch to previous page
 		ui_menu->page = LORA_PAGE;
         return;
@@ -583,7 +586,7 @@ void lcd_lora_subpage_option_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu
 void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns)
 {
 	#define TIME_OPT_COUNT (sizeof(time_opts)/sizeof(time_opts[0]))
-	#define Y_SEL_POS 42
+	#define Y_SEL_POS 43
 	
 	// Create statics
 	static lv_obj_t *lbl_subpage_times = NULL;
@@ -598,9 +601,9 @@ void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 	
 	static const char *time_opts[] = {
 		"1m", "3m", "5m", "15m",
-		"30m", "1h", "2h", "3h", 
-		"4h", "6h", "8h", "12h",
-		"16h", "24h"
+		"30m", "45m", "1h", "2h",
+		"3h", "4h", "6h", "8h",
+		"12h", "16h", "24h"
 	};
 	
 	// Create once
@@ -616,16 +619,16 @@ void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 		
 		lbl_selected_icon = lv_label_create(ACTIVE_SCR);		 
 		lcd_format_label(lbl_selected_icon, LV_SYMBOL_PLAY, user_secondary_color,
-			 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, -75, Y_SEL_POS);
+			 &lv_font_montserrat_12, LV_ALIGN_TOP_MID, -75, Y_SEL_POS);
 			 
 		lbl_top_time = lv_label_create(ACTIVE_SCR);		 
 		lcd_format_label(lbl_top_time, "", user_secondary_color,
-			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 60, 20);
+			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 55, 20);
 			 
 		lbl_bot_time = lv_label_create(ACTIVE_SCR);		 
-		lcd_format_label(lbl_bot_time, "", user_secondary_color,
-			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 60, Y_SEL_POS);
-			 
+		lcd_format_label(lbl_bot_time, "", user_secondary_color, 
+			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 55, Y_SEL_POS - 2);
+		
 		char buf[4];
 		snprintf(buf, sizeof(buf), "%s", time_opts[0]);
 		lv_label_set_text(lbl_top_time, buf);
@@ -635,7 +638,7 @@ void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 	// Move up
 	if (ui_btns->up_btn == 1 && selected_index == 1) {
 		// Move pointer up
-		lv_obj_set_y(lbl_selected_icon, 21);
+		lv_obj_set_y(lbl_selected_icon, 22);
 			
 		selected_index = 0;
 	}
