@@ -703,7 +703,8 @@ void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 		lbl_top_time = NULL;
 		lbl_bot_time = NULL;
 		
-				lora_send.index = lora_menu->submenu.index;
+		// Send the data to lora_task
+		lora_send.index = lora_menu->submenu.index;
 		memcpy(lora_send.key, lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
 		snprintf(lora_send.instr, sizeof(lora_send.instr), "on %s off %s", time_opts[on_idx], time_opts[off_idx]);
 		xQueueSend(xReceiveEncQueue, &lora_send, portMAX_DELAY);

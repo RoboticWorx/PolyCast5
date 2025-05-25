@@ -210,7 +210,7 @@ static void lora_task(void *pvParameters) {
 			memcpy(encryption_key, lora_received.key, ENC_KEY_LEN);
 			
 			// Format command into string
-			snprintf(payload, sizeof(payload), "PolyCast_Command_Value: %d I: %s", lora_received.index, lora_received.instr);
+			snprintf(payload, sizeof(payload), "PolyCast_Command_Value: %d %s", lora_received.index, lora_received.instr);
 				
 			ESP_LOGI(TAG, "SENDING: %s", payload);
 				
