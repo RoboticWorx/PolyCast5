@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -9,7 +11,7 @@
 
 #include "sx126x.h"
 
-
+static lora_send_t lora_received;
 
 static const char *TAG = "LORA_TASK";
 
@@ -19,10 +21,7 @@ static SemaphoreHandle_t xTXDoneSemaphore;
 SemaphoreHandle_t xGenerateEncKeySemaphore;
 
 QueueHandle_t xSendEncKeyQueue;
-QueueHandle_t xReceiveEncKeyQueue;
-QueueHandle_t xReceiveEncIndexQueue;
-
-static int submenu_index = -1;
+QueueHandle_t xReceiveEncQueue;
 
 static void lora_event_handler_task(void *pvParameters);
 
@@ -64,15 +63,9 @@ static void lora_task(void *pvParameters) {
 		vTaskDelete(NULL);
 	}
 	
-	xReceiveEncKeyQueue = xQueueCreate(1, ENC_KEY_LEN);
-	if (xReceiveEncKeyQueue == NULL) {
+	xReceiveEncQueue = xQueueCreate(1, sizeof(lora_send_t));
+	if (xReceiveEncQueue == NULL) {
 		ESP_LOGE(TAG, "Failed to create xReceiveEncKeyQueue semaphore");
-		vTaskDelete(NULL);
-	}
-	
-	xReceiveEncIndexQueue = xQueueCreate(1, sizeof(int));
-	if (xReceiveEncIndexQueue == NULL) {
-		ESP_LOGE(TAG, "Failed to create xReceiveEncIndexQueue semaphore");
 		vTaskDelete(NULL);
 	}
 
@@ -213,23 +206,23 @@ static void lora_task(void *pvParameters) {
 		
 		// Request to send
 		// Save received encryption key
-		if (xQueueReceive(xReceiveEncKeyQueue, &encryption_key, 1) == pdPASS) {
-			if (xQueueReceive(xReceiveEncIndexQueue, &submenu_index, 1) == pdPASS) {
-				// Format command into string
-				snprintf(payload, sizeof(payload), "PolyCast_Command_Value: %d", submenu_index);
+		if (xQueueReceive(xReceiveEncQueue, &lora_received, 1) == pdPASS) {
+			memcpy(encryption_key, lora_received.key, ENC_KEY_LEN);
+			
+			// Format command into string
+			snprintf(payload, sizeof(payload), "PolyCast_Command_Value: %d I: %s", lora_received.index, lora_received.instr);
 				
-				ESP_LOGI(TAG, "SENDING: %s", payload);
+			ESP_LOGI(TAG, "SENDING: %s", payload);
 				
-				// Encrypt and send over
-				lora_encrypt_and_transmit((uint8_t *)payload);
+			// Encrypt and send over
+			lora_encrypt_and_transmit((uint8_t *)payload);
 						
-				// Wait for TX_DONE before switching to RX mode
-				if (xSemaphoreTake(xTXDoneSemaphore, 1000) == pdTRUE) {
-					lora_set_rx_mode(); // Listen for receipt from receiver
-				}
-				else {
-					ESP_LOGW(TAG, "TX_DONE timeout after 1000 ms, skipping RX mode");
-				}
+			// Wait for TX_DONE before switching to RX mode
+			if (xSemaphoreTake(xTXDoneSemaphore, 1000) == pdTRUE) {
+				lora_set_rx_mode(); // Listen for receipt from receiver
+			}
+			else {
+				ESP_LOGW(TAG, "TX_DONE timeout after 1000 ms, skipping RX mode");
 			}
 		}
 

@@ -5,11 +5,17 @@
 #include "sx126x_hal.h"
 
 #define ENC_KEY_LEN 16
+#define INSTR_LEN 16
+
+typedef struct {
+    uint8_t key[ENC_KEY_LEN];
+    int index;
+    char instr[INSTR_LEN];
+} lora_send_t;
 
 extern SemaphoreHandle_t xGenerateEncKeySemaphore;
 extern QueueHandle_t xSendEncKeyQueue;
-extern QueueHandle_t xReceiveEncKeyQueue;
-extern QueueHandle_t xReceiveEncIndexQueue;
+extern QueueHandle_t xReceiveEncQueue;
 
 typedef struct sx126x_s {
 	void *context;

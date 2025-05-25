@@ -8,8 +8,6 @@
 
 #include <string.h>
 
-
-
 static const char *TAG = "LORA_FUNCS";
 
 uint8_t encryption_key[ENC_KEY_LEN] = {0};

@@ -5,6 +5,7 @@
 
 #include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
+#include "misc/lv_timer.h"
 #include "nvs.h"
 
 #include "lcd_lora_funcs.h"
@@ -25,6 +26,12 @@ lora_menu_t lora_menu = {
     .size = 1,
     .index = 0,
     .cont = NULL,
+};
+
+static lora_send_t lora_send = {
+    .key = {0},
+    .index = -1,
+    .instr = {0}
 };
 
 static const char *submenu_options[] = {
@@ -555,8 +562,9 @@ void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_bt
 	}
 	// Select send
 	else if (ui_btns->up_btn == 1 && lora_menu->submenu.index == 0) {
-		xQueueSend(xReceiveEncKeyQueue, lora_menu->keys[lora_menu->index], portMAX_DELAY);
-		xQueueSend(xReceiveEncIndexQueue, &lora_menu->submenu.index, portMAX_DELAY);
+		lora_send.index = lora_menu->submenu.index;
+		memcpy(lora_send.key, lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
+		xQueueSend(xReceiveEncQueue, &lora_send, portMAX_DELAY);
 		ESP_LOG_BUFFER_HEX("SENDING WITH KEY", lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
 	}
 	// Scroll down
@@ -684,10 +692,42 @@ void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 		}
 	}
 	// Confirm
-	else if (ui_btns->up_btn == 1 && selected_index == 0) {
-		lv_obj_set_y(lbl_selected_icon, Y_SEL_POS);
+	else if (ui_btns->up_btn == 1 && selected_index == 0) {				 
+		// Reset objects
+		lv_obj_delete(lbl_subpage_times);
+		lv_obj_delete(lbl_selected_icon);
+		lv_obj_delete(lbl_top_time);
+		lv_obj_delete(lbl_bot_time);
+		lbl_subpage_times = NULL;
+		lbl_selected_icon = NULL;
+		lbl_top_time = NULL;
+		lbl_bot_time = NULL;
 		
+				lora_send.index = lora_menu->submenu.index;
+		memcpy(lora_send.key, lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
+		snprintf(lora_send.instr, sizeof(lora_send.instr), "on %s off %s", time_opts[on_idx], time_opts[off_idx]);
+		xQueueSend(xReceiveEncQueue, &lora_send, portMAX_DELAY);
+
+		// Confirmation text
+		lcd_format_label(lbl_subpage_ins, "Sending to PolyPlug...", user_secondary_color,
+				 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+		lv_timer_handler();
+		vTaskDelay(pdMS_TO_TICKS(1000));
+		
+		// Reset confirmation lbl
+		lv_obj_delete(lbl_subpage_ins);
+		lbl_subpage_ins = NULL;
+		
+		// Refresh statics 
 		selected_index = 1;
+		on_idx = 0;
+		off_idx = 0;
+		
+		// Show LoRa submenu cont
+		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+			
+		// Go back
+		ui_menu->page = LORA_SUBPAGE;
 	}
 	// Go back
 	else if (ui_btns->down_btn == 1) {

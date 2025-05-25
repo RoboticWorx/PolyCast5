@@ -42,7 +42,7 @@ typedef struct {
 	lora_submenu_t submenu;
 } lora_menu_t;
 
-extern lora_menu_t lora_menu;
+extern lora_menu_t lora_menu; 
 
 void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
 
