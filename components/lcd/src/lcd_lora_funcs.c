@@ -622,7 +622,7 @@ void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 				 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, -15, 20); // +y = down, +x = right
 				 
 		lbl_subpage_ins = lv_label_create(ACTIVE_SCR);		 
-		lcd_format_label(lbl_subpage_ins, "- Right/left to adjust time.\n- All the way up to confirm.\n- All the way down to exit.", user_secondary_color,
+		lcd_format_label(lbl_subpage_ins, "- Right/left to adjust time.\n- Up twice to confirm.\n- Down to exit.", user_secondary_color,
 				 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, -15);
 		
 		lbl_selected_icon = lv_label_create(ACTIVE_SCR);		 
@@ -713,7 +713,7 @@ void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 		lcd_format_label(lbl_subpage_ins, "Sending to PolyPlug...", user_secondary_color,
 				 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
 		lv_timer_handler();
-		vTaskDelay(pdMS_TO_TICKS(1000));
+		vTaskDelay(pdMS_TO_TICKS(500));
 		
 		// Reset confirmation lbl
 		lv_obj_delete(lbl_subpage_ins);
