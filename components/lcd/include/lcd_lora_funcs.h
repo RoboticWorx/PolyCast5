@@ -70,4 +70,8 @@ esp_err_t lcd_lora_menu_nvs_load(lora_menu_t *menu, const char* ns, const char* 
 
 esp_err_t lcd_lora_key_nvs_load(lora_menu_t *menu, const char* ns, const char* count, const char* fmt);
 
+esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx, const char *ns, const char *count_key, const char *fmt_key);
+
+esp_err_t lcd_lora_menu_nvs_delete(uint8_t del_idx, const char *ns, const char *count_key, const char *fmt_key);
+
 #endif // LCD_LORA_FUNCS_H

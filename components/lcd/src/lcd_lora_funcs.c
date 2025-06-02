@@ -236,7 +236,7 @@ void lcd_lora_update_menu(lora_menu_t *menu)
 	}
 
     // Reset every button to unselected
-    for (int i = 0; i < menu->size; ++i) {
+    for (int i = 0; i < menu->size; i++) {
         lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
         lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
     }
@@ -263,7 +263,7 @@ void lcd_lora_update_submenu(lora_menu_t *menu)
 	}
 
     // Reset every button to unselected
-    for (int i = 0; i < menu->submenu.size; ++i) {
+    for (int i = 0; i < menu->submenu.size; i++) {
         lv_obj_remove_style(menu->submenu.btns[i], &menu->submenu.sel_style, 0);
         lv_obj_add_style(menu->submenu.btns[i], &menu->submenu.btn_style, 0);
     }
@@ -560,12 +560,68 @@ void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_bt
 		lora_menu->submenu.index -= 3;
 		lcd_lora_update_submenu(lora_menu);
 	}
-	// Select send
+	// Send selected
 	else if (ui_btns->up_btn == 1 && lora_menu->submenu.index == 0) {
 		lora_send.index = lora_menu->submenu.index;
 		memcpy(lora_send.key, lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
 		xQueueSend(xReceiveEncQueue, &lora_send, portMAX_DELAY);
 		ESP_LOG_BUFFER_HEX("SENDING WITH KEY", lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
+	}
+	// Delete selected
+	else if (ui_btns->down_btn == 1 && lora_menu->submenu.index == 5) {
+		
+		// Get user entry to remove
+	    int del_idx = lora_menu->index;     
+	    
+	    // Can't be "Add PolyPlug"     
+	    if (del_idx == 0)
+	    	return;
+	    
+	    // Free any heap buffers allocated for that slot
+	    free(lora_menu->options[del_idx]); // Name string
+	    free(lora_menu->keys[del_idx]); // Key blob
+	    lv_obj_del(lora_menu->btns[del_idx]); // LVGL list button
+	
+	    // Shift everything above it down one
+	    for (int i = del_idx; i < lora_menu->size - 1; i++) {
+			// Change each to the one after
+	        lora_menu->options[i] = lora_menu->options[i + 1];
+	        lora_menu->keys[i] = lora_menu->keys[i + 1];
+	        lora_menu->btns[i] = lora_menu->btns[i + 1];
+	
+	        // Update the label inside the button
+	        lv_obj_t *lbl = lv_obj_get_child(lora_menu->btns[i], 0);
+	        lv_label_set_text(lbl, lora_menu->options[i]);
+	    }
+	
+		// List is now one shorter
+	    lora_menu->size--;
+	    
+	    // Null out dangling index
+		lora_menu->options[lora_menu->size] = NULL;
+		lora_menu->keys[lora_menu->size] = NULL;
+		lora_menu->btns[lora_menu->size] = NULL;
+	    
+	    // Adjust if was last
+	    if (lora_menu->index >= lora_menu->size)
+	        lora_menu->index = lora_menu->size-1;
+	        
+	    // Remove entry from NVS
+	    lcd_lora_menu_nvs_delete(del_idx, LORA_OPTIONS_NS, LORA_OPTIONS_KEY_COUNT, LORA_OPTIONS_KEY_FMT);
+		lcd_lora_key_nvs_delete(del_idx, LORA_ENC_NS, LORA_ENC_KEY_COUNT, LORA_ENC_KEY_FMT);
+	
+	    // Refresh the list UI
+	    lcd_lora_update_menu(lora_menu);
+	    
+	    // Reset submenu index
+	    lora_menu->submenu.index = 0;
+	    // Refresh the submenu UI
+	    lcd_lora_update_submenu(lora_menu);
+	    
+	    // Go back to LoRa page
+	    lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+    	lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+    	ui_menu->page = LORA_PAGE;
 	}
 	// Scroll down
 	else if (ui_btns->down_btn == 1 && lora_menu->submenu.index < 3) {
@@ -778,7 +834,7 @@ esp_err_t lcd_lora_menu_nvs_save(const lora_menu_t *menu, const char* ns, const 
     	goto out;
 
 	// Loop through all and number them: n00, n01, etc.
-    for (uint8_t i = 0; i < user_cnt; ++i) {
+    for (uint8_t i = 0; i < user_cnt; i++) {
         char key[16];
         snprintf(key, sizeof(key), fmt, i);
         
@@ -818,7 +874,7 @@ esp_err_t lcd_lora_key_nvs_save(const lora_menu_t *menu, const char* ns, const c
     	goto out;
 
 	// Loop through all and number them: n00, n01, etc.
-    for (uint8_t i = 0; i < user_cnt; ++i) {
+    for (uint8_t i = 0; i < user_cnt; i++) {
         char key[16];
         snprintf(key, sizeof(key), fmt, i);
         
@@ -860,7 +916,7 @@ esp_err_t lcd_lora_menu_nvs_load(lora_menu_t *menu, const char* ns, const char* 
     menu->index = 0;
 
 	// Loop through all keys
-    for (uint8_t i = 0; i < user_cnt; ++i) {
+    for (uint8_t i = 0; i < user_cnt; i++) {
 		
         char key[16];
         snprintf(key, sizeof(key), fmt, i);
@@ -917,7 +973,7 @@ esp_err_t lcd_lora_key_nvs_load(lora_menu_t *menu, const char* ns, const char* c
     menu->index = 0;
 
 	// Loop through all keys
-    for (uint8_t i = 0; i < user_cnt; ++i) {
+    for (uint8_t i = 0; i < user_cnt; i++) {
         
         char key[16];
         snprintf(key, sizeof(key), fmt, i);
@@ -957,5 +1013,137 @@ esp_err_t lcd_lora_key_nvs_load(lora_menu_t *menu, const char* ns, const char* c
     // Close NVS
     nvs_close(h);
     
+    return err;
+}
+
+esp_err_t lcd_lora_menu_nvs_delete(uint8_t del_idx, const char *ns, const char *count_key, const char *fmt_key)
+{
+	// Open NVS
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(ns, NVS_READWRITE, &h);
+    
+    // Error check
+    if (err != ESP_OK)
+    	return err;
+
+    // Get current number of items in menu
+    uint8_t user_cnt = 0;
+    err = nvs_get_u8(h, count_key, &user_cnt);
+    
+    // Error check/if out of range
+    if (err != ESP_OK || del_idx >= user_cnt + 1) {
+        nvs_close(h);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Shift every key above del_idx down one slot
+    for (uint8_t i = del_idx; i < user_cnt; i++) {
+        char key_src[16], key_dst[16];
+        
+        // Format key
+        snprintf(key_src, sizeof key_src, fmt_key, i);
+        snprintf(key_dst, sizeof key_dst, fmt_key, i - 1);
+
+		// Get key length
+        size_t len = 0;
+        if ((err = nvs_get_str(h, key_src, NULL, &len)) != ESP_OK)
+        	break;
+		
+		// Store
+        char *buf = malloc(len);
+        if (!buf) {
+			err = ESP_ERR_NO_MEM; 
+			break;
+		}
+
+		// Get the string
+        err = nvs_get_str(h, key_src, buf, &len);
+        
+        // Set it to new destination
+        if (err == ESP_OK)
+        	err = nvs_set_str(h, key_dst, buf);
+		
+		// Free buffer
+        free(buf);
+        
+        if (err != ESP_OK)
+        	break;
+    }
+
+    // Erase the dangling last slot
+    if (err == ESP_OK) {
+        char key_last[16];
+        snprintf(key_last, sizeof key_last, fmt_key, user_cnt - 1);
+        err = nvs_erase_key(h, key_last);
+    }
+
+    // Update count and commit changes to NVS
+    if (err == ESP_OK) {
+        err = nvs_set_u8(h, count_key, user_cnt - 1);
+        if (err == ESP_OK)
+        	err = nvs_commit(h);
+    }
+	
+	// Close NVS
+    nvs_close(h);
+    return err;
+}
+
+esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx, const char *ns, const char *count_key, const char *fmt_key)
+{
+	// Open NVS
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(ns, NVS_READWRITE, &h);
+    
+    // Error check
+    if (err != ESP_OK)
+    	return err;
+
+	// Get number of keys
+    uint8_t user_cnt = 0;
+    err = nvs_get_u8(h, count_key, &user_cnt);
+    
+    // Error check
+    if (err != ESP_OK || del_idx >= user_cnt + 1) {
+        nvs_close(h);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+	// Buffer
+    uint8_t tmp[ENC_KEY_LEN];
+
+	// Shift all keys down one
+    for (uint8_t i = del_idx; i < user_cnt; i++) {
+        char src[16], dst[16];
+        
+        // Format key
+        snprintf(src, sizeof src, fmt_key, i);
+        snprintf(dst, sizeof dst, fmt_key, i - 1);
+
+        size_t len = ENC_KEY_LEN;
+        // Get key from src
+        err = nvs_get_blob(h, src, tmp, &len);
+        if (err != ESP_OK || len != ENC_KEY_LEN) break;
+
+		// Set key to new dst
+        err = nvs_set_blob(h, dst, tmp, ENC_KEY_LEN);
+        if (err != ESP_OK) break;
+    }
+
+	// Erase dangling key
+    if (err == ESP_OK) {
+        char last[16];
+        snprintf(last, sizeof last, fmt_key, user_cnt - 1);
+        err = nvs_erase_key(h, last);
+    }
+	
+	// Set new count
+    if (err == ESP_OK) {
+        err = nvs_set_u8(h, count_key, user_cnt - 1);
+        if (err == ESP_OK) err = nvs_commit(h);
+    }
+	
+	// Close NVS
+    nvs_close(h);
     return err;
 }

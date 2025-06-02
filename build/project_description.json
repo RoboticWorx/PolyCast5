@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "app-template",
-    "project_version":    "2ccb764f-dirty",
+    "project_version":    "14e24e49-dirty",
     "project_path":       "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5",
     "idf_path":           "C:/Espressif/frameworks/esp-idf-master",
     "build_dir":          "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build",
