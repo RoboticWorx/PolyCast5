@@ -328,6 +328,8 @@ void lcd_lora_create_enc_key(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
             // Go back
             return;
         }
+        
+        vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
 
@@ -675,6 +677,9 @@ void lcd_lora_subpage_option_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu
 	}
 	// Away was selected
 	if (lora_menu->submenu.index == 3) {
+		// Hide left arrow
+	    lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+	    
 		lcd_lora_subpage_away_selected(ui_menu, lora_menu, ui_btns);
 	}
 }
@@ -699,7 +704,7 @@ void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 		"1m", "3m", "5m", "15m",
 		"30m", "45m", "1h", "2h",
 		"3h", "4h", "6h", "8h",
-		"12h", "16h", "24h"
+		"12h", "16h", "18h", "24h"
 	};
 	
 	// Create once
@@ -863,14 +868,15 @@ void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 	    memset(away_menu, 0, sizeof(*away_menu));
 	
 		// Fill entries
-	    away_menu->size = 6;
+	    away_menu->size = 7;
 	    away_menu->index = 0;
-	    away_menu->options[0] = "Randomness level:";
-		away_menu->options[1] = "Totally Predictable";
-		away_menu->options[2] = "Mostly Structured";
-		away_menu->options[3] = "Somewhat Random";
-		away_menu->options[4] = "Highly Random";
-		away_menu->options[5] = "Utterly Chaotic";
+	    away_menu->options[0] = "30-60m ON/OFF";
+		away_menu->options[1] = "10-60m ON/OFF";
+		away_menu->options[2] = "5-30m ON/OFF";
+		away_menu->options[3] = "1-20m ON/OFF";
+		away_menu->options[4] = "1-10m ON/OFF";
+		away_menu->options[5] = "1-3m ON/OFF";
+		away_menu->options[6] = "0-1m ON/OFF";
 	    
 	    // Create everything
 	    lcd_lora_setup_page(away_menu);
@@ -879,15 +885,12 @@ void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 	    away_menu->index = 0;
 	    lcd_lora_update_menu(away_menu);
 	    
-	    // Hide unused arrow
-	    lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-	    
 	    do_once = true;
 	}
-
+	
 	// Back selected
 	if (ui_btns->up_btn == 1 && away_menu->index == 0) {
-		// Delete away_menu
+		// Delete away_menu lv_obj
 		lv_obj_del(away_menu->main_list);
 		
 		// Free the styles
@@ -904,7 +907,7 @@ void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 		// Show LoRa submenu cont
 		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 		
-		// Put back menu arrow
+		// Put back left menu arrow
 		lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 		
 		ui_menu->page = LORA_SUBPAGE;
@@ -920,6 +923,32 @@ void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 		// Update selection
 		away_menu->index++;
 		lcd_lora_update_menu(away_menu);
+	}
+	// Specific option selected
+	else if (ui_btns->right_btn == 1) {
+		// Do whatever
+		
+		// Delete away_menu lv_obj
+		lv_obj_del(away_menu->main_list);
+
+		// Free the styles
+		lv_style_reset(&away_menu->btn_style);
+		lv_style_reset(&away_menu->sel_style);
+
+		// Free what was allocated
+		free(away_menu);
+
+		// Reset statics
+		do_once = false;
+		away_menu = NULL;
+
+		// Show LoRa submenu cont
+		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+
+		// Put back left menu arrow
+		lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+
+		ui_menu->page = LORA_SUBPAGE;
 	}
 }
 
