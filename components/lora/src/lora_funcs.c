@@ -1,12 +1,14 @@
-#include "lora_funcs.h"
-#include "lora_task.h"
+#include <string.h>
 
 #include "esp_log.h"
 #include "esp_random.h"
 
 #include "sx126x_hal.h"
 
-#include <string.h>
+#include "lora_funcs.h"
+#include "lora_task.h"
+
+#include "espnow_task.h"
 
 static const char *TAG = "LORA_FUNCS";
 
@@ -23,7 +25,7 @@ void lora_generate_random_key(void)
 	esp_fill_random(encryption_key, sizeof(encryption_key));
 	ESP_LOG_BUFFER_HEX("LORA KEY GENERATED", encryption_key, sizeof(encryption_key));
 	
-	if (xQueueSend(xSendEncKeyQueue, encryption_key, pdMS_TO_TICKS(100)) != pdPASS) {
+	if (xQueueSend(xEspSendEncKeyQueue, encryption_key, pdMS_TO_TICKS(100)) != pdPASS) {
         ESP_LOGE("LORA", "Failed to queue encryption key");
     }
 }
@@ -89,11 +91,7 @@ void lora_process_received_message(uint8_t *message, size_t message_len) {
 		   CYPHERTEXT_LENGTH); // Extract the ciphertext (remaining 64 bytes)
 
 	// Print the received IV
-	ESP_LOGI(TAG, "Received IV: ");
-	for (int i = 0; i < 16; i++) {
-		ESP_LOGI(TAG, "%s", iv[i]);
-	}
-	ESP_LOGI(TAG, "\n");
+	/*ESP_LOG_BUFFER_HEX(TAG, iv, IV_LENGTH);*/
 
 	// osStatus_t status = osMessageQueuePut(lora_hex_queue_rx, message, 0, 0);
 	// if (status != osOK)
@@ -118,6 +116,19 @@ void lora_process_received_message(uint8_t *message, size_t message_len) {
 
 	// "cyphertext" is now decrypted - print
 	ESP_LOGI(TAG, "Decrypted text: %s\n", ciphertext);
+	
+	const char expected[] = "PolyCast_Command_Value_Received";
+
+	// If received valid receipt
+	if (strcmp((char*)ciphertext, expected) == 0) {
+	    ESP_LOGI(TAG, "Decrypted text exactly matches expected string");
+	    
+	    // Signal LCD
+	    xSemaphoreGive(xLoraReceiptValidSemaphore);
+	} 
+	else {
+	    ESP_LOGI(TAG, "Decrypted text does NOT match. Got: \"%s\"", ciphertext);
+	}
 }
 
 void lora_encrypt_and_transmit(uint8_t plaintext[]) {

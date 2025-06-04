@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "app-template",
-    "project_version":    "14e24e49-dirty",
+    "project_version":    "49c60232-dirty",
     "project_path":       "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5",
     "idf_path":           "C:/Espressif/frameworks/esp-idf-master",
     "build_dir":          "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build",
@@ -1251,7 +1251,7 @@
             "type": "LIBRARY",
             "lib": "__idf_lora",
             "reqs": [ "driver", "freertos", "sx126x" ],
-            "priv_reqs": [ "gpio", "lcd" ],
+            "priv_reqs": [ "gpio", "lcd", "espnow" ],
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/lora/liblora.a",
@@ -3031,7 +3031,7 @@
             "dir": "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lora",
             "lib": "__idf_lora",
             "reqs": [ "driver", "freertos", "sx126x" ],
-            "priv_reqs": [ "gpio", "lcd" ],
+            "priv_reqs": [ "gpio", "lcd", "espnow" ],
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "include_dirs": [ "include" ]

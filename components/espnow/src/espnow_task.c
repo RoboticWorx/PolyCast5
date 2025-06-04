@@ -18,7 +18,8 @@ static const uint8_t UNIVERSAL_MAC[ESP_NOW_ETH_ALEN] = {0xFF,0xFF,0xFF,0xFF,0xFF
 
 static uint8_t received_enc_key[ENC_KEY_LEN];
 
-QueueHandle_t xSendEncKeyQueueNVS;
+QueueHandle_t xEspSendEncKeyQueueNVS;
+QueueHandle_t xEspSendEncKeyQueue;
 
 /*
 	SPI RAM Config:
@@ -29,16 +30,22 @@ QueueHandle_t xSendEncKeyQueueNVS;
 
 static void espnow_task(void *param)
 {
-    xSendEncKeyQueueNVS = xQueueCreate(1, ENC_KEY_LEN);
-	if (xSendEncKeyQueueNVS == NULL) {
-		ESP_LOGE(TAG, "Failed to create xSendEncKeyQueueNVS semaphore");
+    xEspSendEncKeyQueueNVS = xQueueCreate(1, ENC_KEY_LEN);
+	if (xEspSendEncKeyQueueNVS == NULL) {
+		ESP_LOGE(TAG, "Failed to create xEspSendEncKeyQueueNVS semaphore");
+		vTaskDelete(NULL);
+	}
+	
+	xEspSendEncKeyQueue = xQueueCreate(1, ENC_KEY_LEN);
+	if (xEspSendEncKeyQueue == NULL) {
+		ESP_LOGE(TAG, "Failed to create xEspSendEncKeyQueue semaphore");
 		vTaskDelete(NULL);
 	}
     
 	while (1) {
 		
 		// Key generated and requesting send 
-		if (xQueueReceive(xSendEncKeyQueue, received_enc_key, portMAX_DELAY) == pdPASS) {
+		if (xQueueReceive(xEspSendEncKeyQueue, received_enc_key, portMAX_DELAY) == pdPASS) {
 			// Start radio and initialize ESP-NOW
 			ESP_ERROR_CHECK(esp_funcs_wifi_radio_start(WIFI_CHANNEL));
 		    ESP_ERROR_CHECK(esp_funcs_espnow_init(UNIVERSAL_MAC, WIFI_CHANNEL));
@@ -52,7 +59,7 @@ static void espnow_task(void *param)
 		    ESP_ERROR_CHECK(esp_funcs_wifi_radio_stop());
 		    
 		    // Send the data to LCD task to save to NVS under given option
-		    xQueueSend(xSendEncKeyQueueNVS, received_enc_key, portMAX_DELAY);
+		    xQueueSend(xEspSendEncKeyQueueNVS, received_enc_key, portMAX_DELAY);
 		}
     
 		vTaskDelay(pdMS_TO_TICKS(10));

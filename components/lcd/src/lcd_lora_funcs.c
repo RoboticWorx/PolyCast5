@@ -149,6 +149,11 @@ void lcd_lora_setup_page(lora_menu_t *menu)
 
 void lcd_lora_setup_subpage(lora_menu_t *menu)
 {
+	// Create receipt label (check/x) for send confirmation
+	menu->submenu.lbl_receipt = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(menu->submenu.lbl_receipt, "", user_secondary_color,
+					 &lv_font_montserrat_18, LV_ALIGN_TOP_LEFT, 6, 2);
+	
 	// Initialize submenu struct
     menu->submenu.size = submenu_count;
     menu->submenu.index = 0;
@@ -220,6 +225,7 @@ void lcd_lora_setup_subpage(lora_menu_t *menu)
 	
 	// Hide for now
 	lv_obj_add_flag(menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
 }
 
 void lcd_lora_update_menu(lora_menu_t *menu)
@@ -251,6 +257,10 @@ void lcd_lora_update_menu(lora_menu_t *menu)
 
 void lcd_lora_update_submenu(lora_menu_t *menu)
 {    
+	// Hide and reset receipt label
+	lv_obj_add_flag(menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
+	lv_label_set_text(menu->submenu.lbl_receipt, "");
+		
 	// Reveal
     lv_obj_remove_flag(menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 
@@ -305,7 +315,7 @@ void lcd_lora_create_enc_key(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
         // User hit confirm
         else if (xSemaphoreTake(xRightButtonSemaphore, 10) == pdTRUE) {
             // Generate encryption key
-            xSemaphoreGive(xGenerateEncKeySemaphore);
+            xSemaphoreGive(xLoraGenerateEncKeySemaphore);
             
             lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
@@ -476,7 +486,7 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 			lcd_lora_menu_nvs_save(lora_menu, LORA_OPTIONS_NS, LORA_OPTIONS_KEY_COUNT, LORA_OPTIONS_KEY_FMT);
 			
 			// Get shared encryption key and do the same under the same index
-			if (xQueueReceive(xSendEncKeyQueueNVS, received_enc_key_nvs, portMAX_DELAY) == pdPASS) {
+			if (xQueueReceive(xEspSendEncKeyQueueNVS, received_enc_key_nvs, portMAX_DELAY) == pdPASS) {
 				// Allocate a fresh buffer for this entry
 		        uint8_t *slot = malloc(ENC_KEY_LEN);
 		        if (!slot) {
@@ -530,6 +540,11 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 
 void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns) 
 {
+	// If received a valid receipt from the receiver
+	if (xSemaphoreTake(xLoraReceiptValidSemaphore, 1) == pdTRUE) {
+		lv_obj_remove_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
+		lv_label_set_text(lora_menu->submenu.lbl_receipt, LV_SYMBOL_OK);
+	}
 	
 	// Scroll right
 	if (ui_btns->right_btn == 1) {
@@ -541,6 +556,10 @@ void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_bt
 	else if (ui_btns->left_btn == 1 && lora_menu->submenu.index == 0) {
 		// Hide cont
 		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+		
+		// Hide and reset receipt label
+		lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
+		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
 		
 		// Show LoRa list
 		lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -564,8 +583,11 @@ void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_bt
 	else if (ui_btns->up_btn == 1 && lora_menu->submenu.index == 0) {
 		lora_send.index = lora_menu->submenu.index;
 		memcpy(lora_send.key, lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
-		xQueueSend(xReceiveEncQueue, &lora_send, portMAX_DELAY);
+		xQueueSend(xLoraSendEncQueue, &lora_send, portMAX_DELAY);
 		ESP_LOG_BUFFER_HEX("SENDING WITH KEY", lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
+		
+		// Reset receipt label
+		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
 	}
 	// Delete selected
 	else if (ui_btns->down_btn == 1 && lora_menu->submenu.index == 5) {
@@ -631,6 +653,10 @@ void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_bt
 	}
 	// Select other
 	else if (ui_btns->up_btn == 1 || ui_btns->down_btn == 1) {
+		// Hide and reset receipt label
+		lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
+		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
+		
 		// Hide submenu
 		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 		
@@ -763,7 +789,7 @@ void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 		lora_send.index = lora_menu->submenu.index;
 		memcpy(lora_send.key, lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
 		snprintf(lora_send.instr, sizeof(lora_send.instr), "on %s off %s", time_opts[on_idx], time_opts[off_idx]);
-		xQueueSend(xReceiveEncQueue, &lora_send, portMAX_DELAY);
+		xQueueSend(xLoraSendEncQueue, &lora_send, portMAX_DELAY);
 
 		// Confirmation text
 		lcd_format_label(lbl_subpage_ins, "Sending to PolyPlug...", user_secondary_color,

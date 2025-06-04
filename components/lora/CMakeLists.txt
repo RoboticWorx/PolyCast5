@@ -13,5 +13,5 @@ idf_component_register(
     	driver freertos sx126x
     
     PRIV_REQUIRES
-    	gpio lcd
+    	gpio lcd espnow
 )

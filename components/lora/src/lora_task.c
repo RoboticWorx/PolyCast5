@@ -11,17 +11,16 @@
 
 #include "sx126x.h"
 
-static lora_send_t lora_received;
+static lora_send_t lora_send;
 
 static const char *TAG = "LORA_TASK";
 
 static SemaphoreHandle_t xLoraEventSemaphore;
-static SemaphoreHandle_t xTXDoneSemaphore;
 
-SemaphoreHandle_t xGenerateEncKeySemaphore;
+SemaphoreHandle_t xLoraGenerateEncKeySemaphore;
+SemaphoreHandle_t xLoraReceiptValidSemaphore;
 
-QueueHandle_t xSendEncKeyQueue;
-QueueHandle_t xReceiveEncQueue;
+QueueHandle_t xLoraSendEncQueue;
 
 static void lora_event_handler_task(void *pvParameters);
 
@@ -44,28 +43,22 @@ static void lora_task(void *pvParameters) {
 		ESP_LOGE(TAG, "Failed to create xLoraEventSemaphore semaphore");
 		vTaskDelete(NULL);
 	}
-
-	xTXDoneSemaphore = xSemaphoreCreateBinary();
-	if (xTXDoneSemaphore == NULL) {
-		ESP_LOGE(TAG, "Failed to create xTXDoneSemaphore semaphore");
+	
+	xLoraGenerateEncKeySemaphore = xSemaphoreCreateBinary();
+	if (xLoraGenerateEncKeySemaphore == NULL) {
+		ESP_LOGE(TAG, "Failed to create xLoraGenerateEncKeySemaphore semaphore");
 		vTaskDelete(NULL);
 	}
 	
-	xGenerateEncKeySemaphore = xSemaphoreCreateBinary();
-	if (xGenerateEncKeySemaphore == NULL) {
-		ESP_LOGE(TAG, "Failed to create xGenerateEncKeySemaphore semaphore");
-		vTaskDelete(NULL);
-	}
-	
-	xSendEncKeyQueue = xQueueCreate(1, ENC_KEY_LEN);
-	if (xSendEncKeyQueue == NULL) {
-		ESP_LOGE(TAG, "Failed to create xSendEncKeyQueue semaphore");
-		vTaskDelete(NULL);
-	}
-	
-	xReceiveEncQueue = xQueueCreate(1, sizeof(lora_send_t));
-	if (xReceiveEncQueue == NULL) {
+	xLoraReceiptValidSemaphore = xSemaphoreCreateBinary();
+	if (xLoraReceiptValidSemaphore == NULL) {
 		ESP_LOGE(TAG, "Failed to create xReceiveEncKeyQueue semaphore");
+		vTaskDelete(NULL);
+	}
+	
+	xLoraSendEncQueue = xQueueCreate(1, sizeof(lora_send_t));
+	if (xLoraSendEncQueue == NULL) {
+		ESP_LOGE(TAG, "Failed to create xReceiveEncKeyQueue queue");
 		vTaskDelete(NULL);
 	}
 
@@ -200,30 +193,22 @@ static void lora_task(void *pvParameters) {
 	char payload[CYPHERTEXT_LENGTH] = {0}; // Hold data to send
 	for (;;) {
 		
-		if (xSemaphoreTake(xGenerateEncKeySemaphore, 1) == pdTRUE) {
+		if (xSemaphoreTake(xLoraGenerateEncKeySemaphore, 1) == pdTRUE) {
 			lora_generate_random_key();
 		}
 		
 		// Request to send
 		// Save received encryption key
-		if (xQueueReceive(xReceiveEncQueue, &lora_received, 1) == pdPASS) {
-			memcpy(encryption_key, lora_received.key, ENC_KEY_LEN);
+		if (xQueueReceive(xLoraSendEncQueue, &lora_send, 1) == pdPASS) {
+			memcpy(encryption_key, lora_send.key, ENC_KEY_LEN);
 			
 			// Format command into string
-			snprintf(payload, sizeof(payload), "PolyCast_Command_Value: %d %s", lora_received.index, lora_received.instr);
+			snprintf(payload, sizeof(payload), "PolyCast_Command_Value: %d %s", lora_send.index, lora_send.instr);
 				
 			ESP_LOGI(TAG, "SENDING: %s", payload);
-				
+			
 			// Encrypt and send over
 			lora_encrypt_and_transmit((uint8_t *)payload);
-						
-			// Wait for TX_DONE before switching to RX mode
-			if (xSemaphoreTake(xTXDoneSemaphore, 1000) == pdTRUE) {
-				lora_set_rx_mode(); // Listen for receipt from receiver
-			}
-			else {
-				ESP_LOGW(TAG, "TX_DONE timeout after 1000 ms, skipping RX mode");
-			}
 		}
 
 		vTaskDelay(pdMS_TO_TICKS(500));
@@ -238,26 +223,34 @@ static void lora_event_handler_task(void *pvParameters) {
 			uint16_t irq_flags = 0;
 			sx126x_get_irq_status(NULL, &irq_flags);
 
+			// If transmission complete
 			if (irq_flags & SX126X_IRQ_TX_DONE) {
 				ESP_LOGI(TAG, "Transmission completed");
 				sx126x_clear_irq_status(NULL, SX126X_IRQ_TX_DONE);
-				xSemaphoreGive(xTXDoneSemaphore); // Signal TX_DONE
+				lora_set_rx_mode(); // Listen for receipt from receiver
 			}
-
-			if (irq_flags & SX126X_IRQ_RX_DONE) {
+			// Else if receive complete
+			else if (irq_flags & SX126X_IRQ_RX_DONE) {
 				// Read the received packet
+				
 				uint8_t rx_buffer[PAYLOAD_LENGTH];
 				uint8_t rx_size = 0;
+				
 				sx126x_rx_buffer_status_t rx_status;
+				
+				// Check RX
 				sx126x_get_rx_buffer_status(NULL, &rx_status);
+				
+				// Get size of packet
 				rx_size = rx_status.pld_len_in_bytes;
 
+				// Read data into buffer
 				sx126x_read_buffer(NULL, rx_status.buffer_start_pointer,
 								   rx_buffer, rx_size);
 
-				ESP_LOGI(TAG, "Received packet of size %d: %.*s", rx_size,
-						 rx_size, rx_buffer);
+				ESP_LOGI(TAG, "Received packet of size %d", rx_size);
 
+				// Process received
 				lora_process_received_message(rx_buffer, rx_size);
 
 				// Clear IRQ

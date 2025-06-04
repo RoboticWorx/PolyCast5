@@ -13,9 +13,10 @@ typedef struct {
     char instr[INSTR_LEN];
 } lora_send_t;
 
-extern SemaphoreHandle_t xGenerateEncKeySemaphore;
-extern QueueHandle_t xSendEncKeyQueue;
-extern QueueHandle_t xReceiveEncQueue;
+extern SemaphoreHandle_t xLoraGenerateEncKeySemaphore;
+extern SemaphoreHandle_t xLoraReceiptValidSemaphore;
+
+extern QueueHandle_t xLoraSendEncQueue;
 
 typedef struct sx126x_s {
 	void *context;

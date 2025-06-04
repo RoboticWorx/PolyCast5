@@ -25,6 +25,7 @@ typedef struct {
     int size;
     int index;
     lv_obj_t *cont;
+    lv_obj_t *lbl_receipt;
 	lv_style_t btn_style;
 	lv_style_t sel_style;
 } lora_submenu_t;
