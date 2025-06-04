@@ -161,7 +161,6 @@ void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
 
 void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns)
 {
-	
     // Declare statics
     static int cur_pos = 0; // User position
     static char cur_char = '_';
@@ -488,7 +487,7 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
 	
 	// Wait until signal received and saved	
 	while (1) {
-        if (xSemaphoreTake(xInfraredSignalSavedSemaphore, 10) == pdTRUE) {
+        if (xSemaphoreTake(xInfraredSignalSavedSemaphore, 1) == pdTRUE) {
             // Signal arrived
             lv_label_set_text(text_label, "Saving...");
 			lv_timer_handler();
@@ -498,7 +497,7 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
 			
             break;
         }
-        if (xSemaphoreTake(xLeftButtonSemaphore, 10)) {
+        if (xSemaphoreTake(xLeftButtonSemaphore, 1)) {
             // User hit cancel
             lv_label_set_text(text_label, "Canceling...");
             lv_timer_handler();

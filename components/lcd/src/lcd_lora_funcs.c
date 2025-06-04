@@ -299,7 +299,7 @@ void lcd_lora_create_enc_key(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
 		lv_timer_handler();
 		
 		// User hit cancel
-        if (xSemaphoreTake(xLeftButtonSemaphore, 10) == pdTRUE) {
+        if (xSemaphoreTake(xLeftButtonSemaphore, 0) == pdTRUE) {
             
             lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
@@ -313,7 +313,7 @@ void lcd_lora_create_enc_key(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
             return;
         }
         // User hit confirm
-        else if (xSemaphoreTake(xRightButtonSemaphore, 10) == pdTRUE) {
+        else if (xSemaphoreTake(xRightButtonSemaphore, 0) == pdTRUE) {
             // Generate encryption key
             xSemaphoreGive(xLoraGenerateEncKeySemaphore);
             
@@ -540,31 +540,13 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 
 void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns) 
 {
-	static TickType_t xReceiptStartTick = 0;
-	static bool receipt_timer_active = false;
-	static const TickType_t xReceiptTimeout = pdMS_TO_TICKS(3000); 
 	
 	// If received a valid receipt from the receiver
 	if (xSemaphoreTake(xLoraReceiptValidSemaphore, 0) == pdTRUE) {
 		// Show check in top left corner
 		lv_obj_remove_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
 		lv_label_set_text(lora_menu->submenu.lbl_receipt, LV_SYMBOL_OK);
-		
-		// Log time the receipt was received for timer
-		xReceiptStartTick = xTaskGetTickCount();
-        receipt_timer_active = true;
 	}
-	
-	// Remove receipt check after "xReceiptTimeout" time
-	if (receipt_timer_active) {
-        TickType_t now = xTaskGetTickCount();
-        if ((now - xReceiptStartTick) >= xReceiptTimeout) {
-            lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
-            lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
-            
-            receipt_timer_active = false;
-        }
-    }
 	
 	// Scroll right
 	if (ui_btns->right_btn == 1) {
@@ -690,6 +672,10 @@ void lcd_lora_subpage_option_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu
 	// Loop was selected
 	if (lora_menu->submenu.index == 1) {
 		lcd_lora_subpage_loop_selected(ui_menu, lora_menu, ui_btns);
+	}
+	// Away was selected
+	if (lora_menu->submenu.index == 3) {
+		lcd_lora_subpage_away_selected(ui_menu, lora_menu, ui_btns);
 	}
 }
 
@@ -859,7 +845,83 @@ void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 	}
 }
 
+void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns)
+{
+	// Create statics
+	static lora_menu_t *away_menu;
+	static bool do_once = false;
+	
+	if (!do_once) {		
+		// Allocate for away_menu
+	    away_menu = malloc(sizeof(lora_menu_t));
+	    if (!away_menu) {
+	        ESP_LOGE(TAG, "Failed to allocate away_menu");
+	        return;
+	    }
+	    
+	    // Zero out the struct
+	    memset(away_menu, 0, sizeof(*away_menu));
+	
+		// Fill entries
+	    away_menu->size = 6;
+	    away_menu->index = 0;
+	    away_menu->options[0] = "Randomness level:";
+		away_menu->options[1] = "Totally Predictable";
+		away_menu->options[2] = "Mostly Structured";
+		away_menu->options[3] = "Somewhat Random";
+		away_menu->options[4] = "Highly Random";
+		away_menu->options[5] = "Utterly Chaotic";
+	    
+	    // Create everything
+	    lcd_lora_setup_page(away_menu);
+	    
+	    // Show and assign to first element
+	    away_menu->index = 0;
+	    lcd_lora_update_menu(away_menu);
+	    
+	    // Hide unused arrow
+	    lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+	    
+	    do_once = true;
+	}
 
+	// Back selected
+	if (ui_btns->up_btn == 1 && away_menu->index == 0) {
+		// Delete away_menu
+		lv_obj_del(away_menu->main_list);
+		
+		// Free the styles
+		lv_style_reset(&away_menu->btn_style);
+		lv_style_reset(&away_menu->sel_style);
+		
+		// Free what was allocated
+		free(away_menu);
+		
+		// Reset statics
+		do_once = false;
+		away_menu = NULL;
+		
+		// Show LoRa submenu cont
+		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+		
+		// Put back menu arrow
+		lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+		
+		ui_menu->page = LORA_SUBPAGE;
+	}
+	// Scroll up pressed
+	else if (ui_btns->up_btn == 1) {
+		// Update selection
+		away_menu->index--;
+		lcd_lora_update_menu(away_menu);
+	}
+	// Scroll down pressed
+	else if (ui_btns->down_btn == 1) {
+		// Update selection
+		away_menu->index++;
+		lcd_lora_update_menu(away_menu);
+	}
+}
 
 esp_err_t lcd_lora_menu_nvs_save(const lora_menu_t *menu, const char* ns, const char* count, const char* fmt)
 {

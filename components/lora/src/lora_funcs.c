@@ -123,7 +123,7 @@ void lora_process_received_message(uint8_t *message, size_t message_len) {
 	if (strcmp((char*)ciphertext, expected) == 0) {
 	    ESP_LOGI(TAG, "Decrypted text exactly matches expected string");
 	    
-	    // Signal LCD
+	    // Signal LCD to show check
 	    xSemaphoreGive(xLoraReceiptValidSemaphore);
 	} 
 	else {

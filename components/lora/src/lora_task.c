@@ -193,13 +193,13 @@ static void lora_task(void *pvParameters) {
 	char payload[CYPHERTEXT_LENGTH] = {0}; // Hold data to send
 	for (;;) {
 		
-		if (xSemaphoreTake(xLoraGenerateEncKeySemaphore, 1) == pdTRUE) {
+		if (xSemaphoreTake(xLoraGenerateEncKeySemaphore, 0) == pdTRUE) {
 			lora_generate_random_key();
 		}
 		
 		// Request to send
 		// Save received encryption key
-		if (xQueueReceive(xLoraSendEncQueue, &lora_send, 1) == pdPASS) {
+		if (xQueueReceive(xLoraSendEncQueue, &lora_send, 0) == pdPASS) {
 			memcpy(encryption_key, lora_send.key, ENC_KEY_LEN);
 			
 			// Format command into string
