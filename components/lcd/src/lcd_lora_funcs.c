@@ -540,11 +540,31 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 
 void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns) 
 {
+	static TickType_t xReceiptStartTick = 0;
+	static bool receipt_timer_active = false;
+	static const TickType_t xReceiptTimeout = pdMS_TO_TICKS(3000); 
+	
 	// If received a valid receipt from the receiver
-	if (xSemaphoreTake(xLoraReceiptValidSemaphore, 1) == pdTRUE) {
+	if (xSemaphoreTake(xLoraReceiptValidSemaphore, 0) == pdTRUE) {
+		// Show check in top left corner
 		lv_obj_remove_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
 		lv_label_set_text(lora_menu->submenu.lbl_receipt, LV_SYMBOL_OK);
+		
+		// Log time the receipt was received for timer
+		xReceiptStartTick = xTaskGetTickCount();
+        receipt_timer_active = true;
 	}
+	
+	// Remove receipt check after "xReceiptTimeout" time
+	if (receipt_timer_active) {
+        TickType_t now = xTaskGetTickCount();
+        if ((now - xReceiptStartTick) >= xReceiptTimeout) {
+            lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
+            lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
+            
+            receipt_timer_active = false;
+        }
+    }
 	
 	// Scroll right
 	if (ui_btns->right_btn == 1) {
