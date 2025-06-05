@@ -42,6 +42,7 @@ typedef struct ui_menu_t {
     int size; // how many entries
     int index; // the one that’s currently in the middle
     int page;
+    lv_obj_t *btn_mid;
     lv_obj_t *lbl_top; // the three labels on screen
     lv_obj_t *lbl_mid;
     lv_obj_t *lbl_bot;
@@ -73,7 +74,12 @@ void lcd_init_driver(void);
 void lcd_lvgl_init(void);
 
 /**
- * @brief Clears all NVS for ir_names namespace
+ * @brief Initialize and create selection labels
+ */
+void lcd_init_selection_labels(ui_menu_t *ui_menu);
+
+/**
+ * @brief Clears all NVS for namespace
  */
 void lcd_menu_nvs_clear(const char* ns);
 
@@ -144,6 +150,19 @@ void lcd_format_center_button(lv_obj_t *btn_mid, lv_color_t user_primary_color, 
  * @param [in] menu UI menu structure
  */
 void lcd_selection_btn_pressed(ui_menu_t *menu);
+
+/**
+ * @brief Initialize images to be used in animation
+ */
+void lcd_init_images();
+
+/**
+ * @brief Display/scroll through home page animations
+ *
+ * @param [in] menu UI menu structure
+ * @param [in] menu UI input structure
+ */
+void lcd_home_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns);
 
 /**
  * @brief Everything to be done on wireless selection page

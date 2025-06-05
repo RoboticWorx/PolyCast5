@@ -15,6 +15,9 @@
 #include "lcd_task.h"
 #include "infrared_funcs.h"
 
+#include "anim_city_1.h"
+
+
 #define DRAW_LINES   20
 #define FLUSH_CHUNK  2
 
@@ -37,6 +40,13 @@ typedef struct {
     const char * txt;  // the next string to show
     bool up;           // direction: true=you’re scrolling up, false=scrolling down
 } scroll_ctx_t;
+
+typedef struct {
+	uint8_t index;
+    lv_obj_t *anim_city_1_obj;
+} lcd_animations_t;
+
+static lcd_animations_t lcd_animations;
 
 static bool scrolling_menu = false;
 static bool scrolling_up = false;	
@@ -420,6 +430,100 @@ static void unhide_selection_widgets(ui_menu_t *m)
     lv_obj_set_x(m->lbl_bot, 0);
 }
 
+void lcd_init_images()
+{
+	lcd_animations.anim_city_1_obj = lv_img_create(ACTIVE_SCR);
+    lv_img_set_src(lcd_animations.anim_city_1_obj, &anim_city_1);
+    lv_obj_center(lcd_animations.anim_city_1_obj);
+    //lv_obj_add_flag(lcd_animations.anim_city_1_obj, LV_OBJ_FLAG_HIDDEN);
+}
+
+void lcd_home_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
+{
+	
+	if (ui_btns->up_btn == 1) {
+
+	}
+	else if (ui_btns->down_btn == 1) {
+
+	}
+	else if (ui_btns->right_btn == 1) {
+		lv_obj_add_flag(lcd_animations.anim_city_1_obj, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show selection labels
+		lv_obj_remove_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->lbl_mid, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->lbl_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		ui_menu->page = SELECTION_PAGE;
+	}
+	else if (ui_btns->left_btn == 1) {
+		
+	}
+}
+
+void lcd_init_selection_labels(ui_menu_t *ui_menu)
+{
+	// Create and format center button
+    ui_menu->btn_mid = lv_btn_create(ACTIVE_SCR);
+    lcd_format_center_button(ui_menu->btn_mid, user_primary_color, user_secondary_color);
+
+	// Format labels
+	ui_menu->lbl_top = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(ui_menu->lbl_top, "Bluetooth", user_secondary_color,
+					 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
+
+	ui_menu->lbl_mid = lv_label_create(ui_menu->btn_mid);
+	lcd_format_label(ui_menu->lbl_mid, "LoRa",
+					 user_secondary_color, &lv_font_montserrat_30,
+					 LV_ALIGN_CENTER, 0, 0);
+					 
+	ui_menu->lbl_bot = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(ui_menu->lbl_bot, "ESP-NOW", user_secondary_color,
+					 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -15);
+	
+	// Arrows		 
+	ui_menu->arrow_top = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(ui_menu->arrow_top, LV_SYMBOL_UP, user_secondary_color,
+					 &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+					 
+	ui_menu->arrow_left = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(ui_menu->arrow_left, LV_SYMBOL_LEFT, user_secondary_color,
+					 &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 0);
+
+	ui_menu->arrow_right = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(ui_menu->arrow_right, LV_SYMBOL_RIGHT, user_secondary_color,
+					 &lv_font_montserrat_14, LV_ALIGN_RIGHT_MID, -4, 0);
+
+	ui_menu->arrow_bot = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(ui_menu->arrow_bot, LV_SYMBOL_DOWN, user_secondary_color,
+					 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+	// Battery icon
+	lv_obj_t *battery_icon_text = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(battery_icon_text, "100", user_secondary_color,
+					 &lv_font_montserrat_14, LV_ALIGN_TOP_RIGHT, -28, 0);
+
+	lv_obj_t *battery_icon = lv_label_create(ACTIVE_SCR); // 3, 2, 1, EMPTY
+	lcd_format_label(battery_icon, LV_SYMBOL_BATTERY_FULL, user_secondary_color,
+					 &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
+					 
+	// Hide all for now
+	lv_obj_add_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->lbl_mid, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->lbl_bot, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+}
+
 void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns) 
 {
 	if (ui_btns->up_btn == 1) {
@@ -433,8 +537,21 @@ void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
 	else if (ui_btns->right_btn == 1) {
 		lcd_selection_btn_pressed(ui_menu);
 	}
+	// Go back
 	else if (ui_btns->left_btn == 1) {
-		ui_menu->page = 0;
+		// Hide selection labels
+		lv_obj_add_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->lbl_mid, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->lbl_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show desired home page frame
+		lv_obj_remove_flag(lcd_animations.anim_city_1_obj, LV_OBJ_FLAG_HIDDEN);
+		ui_menu->page = HOME_PAGE;
 	}
 
 	if (scrolling_menu) {

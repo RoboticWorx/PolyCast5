@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "app-template",
-    "project_version":    "e908d837-dirty",
+    "project_version":    "5cced343-dirty",
     "project_path":       "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5",
     "idf_path":           "C:/Espressif/frameworks/esp-idf-master",
     "build_dir":          "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build",
@@ -1225,7 +1225,7 @@
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/lcd/liblcd.a",
-            "sources": [ "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/fontx.c", "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_ir_funcs.c", "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_lora_funcs.c", "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c", "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_task.c", "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c", "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/media/src/espressif_logo.c" ],
+            "sources": [ "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/fontx.c", "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_ir_funcs.c", "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_lora_funcs.c", "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_funcs.c", "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_task.c", "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/st7789.c", "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/media/src/anim_city_1.c" ],
             "include_dirs": [ "include", "media/include" ]
         },
         "log": {

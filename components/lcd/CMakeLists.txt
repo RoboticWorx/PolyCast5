@@ -9,7 +9,7 @@ idf_component_register(
         "src/lcd_task.c"
         "src/st7789.c"
         
-        "media/src/espressif_logo.c"
+        "media/src/anim_city_1.c"
         
     INCLUDE_DIRS 
     	"include"
