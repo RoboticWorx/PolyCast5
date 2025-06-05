@@ -16,7 +16,7 @@ uint8_t encryption_key[ENC_KEY_LEN] = {0};
 
 static void generate_random_iv(uint8_t *iv, size_t length) {
 	for (size_t i = 0; i < length; i++) {
-		iv[i] = (uint8_t)(rand() % (255 + 1)); // Generate number 0 - 255
+		iv[i] = (uint8_t)(esp_random() % (255 + 1)); // Generate number 0 - 255
 	}
 }
 

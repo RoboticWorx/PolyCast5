@@ -5,7 +5,7 @@
 #include "sx126x_hal.h"
 
 #define ENC_KEY_LEN 16
-#define INSTR_LEN 16
+#define INSTR_LEN 20
 
 typedef struct {
     uint8_t key[ENC_KEY_LEN];

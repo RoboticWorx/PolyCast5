@@ -868,15 +868,14 @@ void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 	    memset(away_menu, 0, sizeof(*away_menu));
 	
 		// Fill entries
-	    away_menu->size = 7;
+	    away_menu->size = 6;
 	    away_menu->index = 0;
-	    away_menu->options[0] = "30-60m ON/OFF";
+	    away_menu->options[0] = "Add Custom";
 		away_menu->options[1] = "10-60m ON/OFF";
 		away_menu->options[2] = "5-30m ON/OFF";
-		away_menu->options[3] = "1-20m ON/OFF";
-		away_menu->options[4] = "1-10m ON/OFF";
-		away_menu->options[5] = "1-3m ON/OFF";
-		away_menu->options[6] = "0-1m ON/OFF";
+		away_menu->options[3] = "1-15m ON/OFF";
+		away_menu->options[4] = "1-5m ON/OFF";
+		away_menu->options[5] = "0-1m ON/OFF";
 	    
 	    // Create everything
 	    lcd_lora_setup_page(away_menu);
@@ -925,8 +924,23 @@ void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 		lcd_lora_update_menu(away_menu);
 	}
 	// Specific option selected
-	else if (ui_btns->right_btn == 1) {
-		// Do whatever
+	else if (ui_btns->right_btn == 1 && away_menu->index != 0) {
+		// Hide away_menu
+		lv_obj_add_flag(away_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Send the data to lora_task
+		lora_send.index = lora_menu->submenu.index;
+		memcpy(lora_send.key, lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
+		snprintf(lora_send.instr, sizeof(lora_send.instr), "away %s", away_menu->options[away_menu->index]);
+		xQueueSend(xLoraSendEncQueue, &lora_send, portMAX_DELAY);
+
+		// Confirmation text
+		lv_obj_t *lbl_send_conf = lv_label_create(ACTIVE_SCR); // Create and format label
+		lcd_format_label(lbl_send_conf, "Sending to PolyPlug...", user_secondary_color,
+				 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+		lv_timer_handler();
+		vTaskDelay(pdMS_TO_TICKS(500)); // Wait 500ms
+		lv_obj_del(lbl_send_conf); // Delete label
 		
 		// Delete away_menu lv_obj
 		lv_obj_del(away_menu->main_list);
