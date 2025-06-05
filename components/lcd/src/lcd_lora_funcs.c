@@ -51,7 +51,6 @@ static char name_buf[MAX_CUSTOM_NAME_LEN + 1] = {0};
 static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
 
 static bool lora_menu_overwrite = false;
-static uint8_t lora_index_overwrite = 0;
 
 
 void lcd_lora_setup_page(lora_menu_t *menu)
@@ -355,6 +354,9 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
         lbl_dirs = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_dirs, "  Enter plug name\nwith arrow buttons:", user_secondary_color,
                          &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, -30);
+                         
+        if (lora_menu_overwrite)
+        	lv_label_set_text(lbl_dirs, "Enter new plug name\n with arrow buttons:");
         
         lbl_chars = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_chars, "(Up to 12 characters)", user_secondary_color,
@@ -396,8 +398,8 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 		// Save to array
         name_buf[cur_pos] = cur_char;
     }
-    // If left pressed and at start
-    /*else if (ui_btns->left_btn && cur_pos == 0) {
+    // Can back out if at start and renaming
+    else if (ui_btns->left_btn && cur_pos == 0 && lora_menu_overwrite) {
 		// Delete labels since no longer used
         lv_obj_delete(lbl_user_in);
         lv_obj_delete(lbl_dirs);
@@ -409,15 +411,16 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 	    cur_pos = 0;
 	    cur_char = '_';
 	    memset(name_buf, 0, sizeof name_buf);
+		
+		// Reset submenu to first index
+		lora_menu->submenu.index = 0;
+		lcd_lora_update_submenu(lora_menu);
 	    
-	    // Show LoRa menu
-		lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-	    
- 		ui_menu->page = LORA_PAGE;
+ 		ui_menu->page = LORA_SUBPAGE;
 		return;
-    }*/
-    // If left // and not at start
-    else if (ui_btns->left_btn) {
+    }
+    // If left and not at start
+    else if (ui_btns->left_btn && cur_pos != 0) {
         // Clear the current slot
 	    name_buf[cur_pos] = '\0';
 	
@@ -462,21 +465,26 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 		// Update options
 		// If overwriting an existing as a rename
 		if (lora_menu_overwrite) {
-			// lora_menu->index is passed as edit_idx:
+			// lora_menu->index is edit_idx
 			// Release old string then reallocate
-			free(lora_menu->options[lora_index_overwrite]);
-			lora_menu->options[lora_index_overwrite] = strdup(saved_name);
+			free(lora_menu->options[lora_menu->index]);
+			lora_menu->options[lora_menu->index] = strdup(saved_name);
 
 			// Persist to NVS
 			lcd_lora_menu_nvs_save(lora_menu, LORA_OPTIONS_NS, LORA_OPTIONS_KEY_COUNT, LORA_OPTIONS_KEY_FMT);
 
 			// Update the button’s label in-place
-			lv_obj_t *btn = lora_menu->btns[lora_index_overwrite];
+			lv_obj_t *btn = lora_menu->btns[lora_menu->index];
 			lv_obj_t *child_lbl = lv_obj_get_child(btn, 0);
-			lv_label_set_text(child_lbl, lora_menu->options[lora_index_overwrite]);
+			lv_label_set_text(child_lbl, lora_menu->options[lora_menu->index]);
 
-			// Clean up
+			// Reset flag
 			lora_menu_overwrite = false;
+			
+			// Reset submenu to first index
+			lora_menu->submenu.index = 0;
+			lcd_lora_update_submenu(lora_menu);
+			lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN); // Hide
 		}
 		// Else adding a whole new remote
 		else {
@@ -676,11 +684,25 @@ void lcd_lora_subpage_option_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu
 		lcd_lora_subpage_loop_selected(ui_menu, lora_menu, ui_btns);
 	}
 	// Away was selected
-	if (lora_menu->submenu.index == 3) {
+	else if (lora_menu->submenu.index == 3) {
 		// Hide left arrow
 	    lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 	    
 		lcd_lora_subpage_away_selected(ui_menu, lora_menu, ui_btns);
+	}
+	// Edit was selected
+	else if (lora_menu->submenu.index == 4) {
+		
+		// Don’t allow renaming the first index
+	    if (lora_menu->index == 0) {
+	        return;
+	    }
+	
+	    // Trigger overwrite 
+	    lora_menu_overwrite = true;
+	
+	    // Prompt rename
+	    ui_menu->page = LORA_NAME_PAGE;
 	}
 }
 
@@ -866,7 +888,7 @@ void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 	    
 	    // Zero out the struct
 	    memset(away_menu, 0, sizeof(*away_menu));
-	
+
 		// Fill entries
 	    away_menu->size = 6;
 	    away_menu->index = 0;
