@@ -47,9 +47,6 @@ static const int submenu_count = sizeof(submenu_options)/sizeof(submenu_options[
 
 static const char* TAG = "LCD_LORA_FUNCS";
 
-static char name_buf[MAX_CUSTOM_NAME_LEN + 1] = {0};
-static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
-
 static bool lora_menu_overwrite = false;
 
 
@@ -334,6 +331,9 @@ void lcd_lora_create_enc_key(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
 
 void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns)
 {
+	static char name_buf[MAX_CUSTOM_NAME_LEN + 1] = {0};
+	static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
+
 	static uint8_t received_enc_key_nvs[ENC_KEY_LEN];
 	
     // Declare statics

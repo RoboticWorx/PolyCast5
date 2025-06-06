@@ -45,6 +45,15 @@ typedef struct {
 
 extern lora_menu_t lora_menu; 
 
+/**
+ * @brief Everything to be done on lora page
+ *
+ * @param [in] ui_menu UI menu structure
+ * @param [in] lora_meun LoRa menu structure
+ * @param [in] ui_btns UI input structure
+ */
+ 
+ 
 void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
 
 void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);

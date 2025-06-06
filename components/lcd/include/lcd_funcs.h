@@ -5,6 +5,8 @@
 
 #include "lcd_ir_funcs.h"
 #include "lcd_lora_funcs.h"
+#include "lcd_espnow_funcs.h"
+
 #include "gpio_task.h"
 
 #define SPI_MISO_PIN 2 // MISO for SX126x
@@ -35,6 +37,8 @@
 #define LORA_KEY_PAGE 13
 #define LORA_SUBPAGE 14
 #define LORA_OPTIONS_SUBPAGE 15
+
+#define ESPNOW_RX_MAC_PAGE 16
 
 
 typedef struct ui_menu_t {
@@ -159,30 +163,45 @@ void lcd_init_images();
 /**
  * @brief Display/scroll through home page animations
  *
- * @param [in] menu UI menu structure
- * @param [in] menu UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] ui_btns UI input structure
  */
 void lcd_home_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns);
 
 /**
- * @brief Everything to be done on wireless selection page
+ * @brief Executes on selection page
  *
- * @param [in] menu UI menu structure
- * @param [in] menu UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] ui_btns UI input structure
  */
-void lcd_selection_page_selected(ui_menu_t *menu, ui_btns_t *ui_btns);
+void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns);
 
 /**
- * @brief Everything to be done on infrared page
+ * @brief Executes on infrared page
  *
  * @param [in] ui_menu UI menu structure
  * @param [in] ir_menu Infrared menu structure
- * @param [in] menu UI input structure
+ * @param [in] ui_btns UI input structure
  */
 void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns); 
 
-
+/**
+ * @brief Executes on LoRa page
+ *
+ * @param [in] ui_menu UI menu structure
+ * @param [in] lora_meun LoRa menu structure
+ * @param [in] ui_btns UI input structure
+ */
 void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
+
+/**
+ * @brief Executes on ESP-NOW page
+ *
+ * @param [in] ui_menu UI menu structure
+ * @param [in] espnow_menu_t LoRa menu structure
+ * @param [in] ui_btns UI input structure
+ */
+void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns);
 
 
 #endif /* LCD_FUNCS_H */

@@ -5,11 +5,13 @@ idf_component_register(
         "src/fontx.c"
         "src/lcd_ir_funcs.c"
         "src/lcd_lora_funcs.c"
+        "src/lcd_espnow_funcs.c"
         "src/lcd_funcs.c"
         "src/lcd_task.c"
         "src/st7789.c"
         
         "media/src/anim_city_1.c"
+        "media/src/anim_city_2.c"
         
     INCLUDE_DIRS 
     	"include"

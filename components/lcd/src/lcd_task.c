@@ -72,15 +72,19 @@ static void lcd_task(void *pvParameters)
 	// Create common items
 	lcd_init_selection_labels(&ui_menu);
 	
+	// Load user data from NVS
 	lcd_ir_ir_menu_nvs_load(&ir_menu, A_IR_REMOTE_NS, A_REMOTE_KEY_COUNT, A_REMOTE_KEY_FMT);
 	
 	lcd_lora_menu_nvs_load(&lora_menu, LORA_OPTIONS_NS, LORA_OPTIONS_KEY_COUNT, LORA_OPTIONS_KEY_FMT);
 	lcd_lora_key_nvs_load(&lora_menu, LORA_ENC_NS, LORA_ENC_KEY_COUNT, LORA_ENC_KEY_FMT);
 		
+	// Create common pages
 	lcd_ir_setup_page(&ir_menu);
 	
 	lcd_lora_setup_page(&lora_menu);
 	lcd_lora_setup_subpage(&lora_menu);
+	
+	lcd_espnow_setup_page(&espnow_menu);
 	
 	while (1)
 	{
@@ -130,37 +134,36 @@ static void lcd_task(void *pvParameters)
 				lcd_home_page_selected(&ui_menu, &ui_btns);
 			} 
 			else if (ui_menu.page == SELECTION_PAGE) {
-				
 				lcd_selection_page_selected(&ui_menu, &ui_btns);
 			}
 			// LoRa page (PolyPlugs)
 			else if (ui_menu.page == LORA_PAGE) {
-				
 				lcd_lora_page_selected(&ui_menu, &lora_menu, &ui_btns);
 			}
 			else if (ui_menu.page == LORA_NAME_PAGE) {
-				
 				lcd_lora_create_custom_name(&ui_menu, &lora_menu, &ui_btns);
 			}
 			else if (ui_menu.page == LORA_SUBPAGE) {
-				
 				lcd_lora_subpage_selected(&ui_menu, &lora_menu, &ui_btns);
 			}
 			else if (ui_menu.page == LORA_OPTIONS_SUBPAGE) {
-				
 				lcd_lora_subpage_option_selected(&ui_menu, &lora_menu, &ui_btns);
+			}
+			// ESP-NOW page
+			else if (ui_menu.page == ESPNOW_PAGE) {
+				lcd_espnow_page_selected(&ui_menu, &espnow_menu, &ui_btns);
+			}
+			else if (ui_menu.page == ESPNOW_RX_MAC_PAGE) {
+				lcd_espnow_get_rx_mac(&ui_menu, &espnow_menu, &ui_btns);
 			}
 			// IR remotes
 			else if (ui_menu.page == INFRARED_PAGE) {
-				
 				lcd_infrared_page_selected(&ui_menu, &ir_menu, &ui_btns);
 			}
 			else if (ui_menu.page == INFRARED_REMOTE_NAME_PAGE) {
-				
 				lcd_ir_create_custom_name(&ui_menu, &ir_menu, &ui_btns);
 			}
 			else if (ui_menu.page == INFRARED_REMOTE_EDIT_PAGE) {
-				
 				lcd_ir_edit_remotes(&ui_menu, &ir_menu, &ui_btns);
 			}
 

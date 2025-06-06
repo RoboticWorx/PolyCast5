@@ -623,12 +623,12 @@ void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_
 void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns) 
 {
 	// Only execute once
-	static bool update_once = false;
-	if (!update_once) {
+	static bool do_once = false;
+	if (!do_once) {
 		// Show LoRa list
 		lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);	
 		
-		update_once = true;
+		do_once = true;
 	}
 	
 	// Up button pressed
@@ -672,9 +672,65 @@ void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_
 		unhide_selection_widgets(ui_menu);
 		
 		// Reset static
-		update_once = false;
+		do_once = false;
 		
 		ui_menu->page = SELECTION_PAGE;
 	}
+}
 
+void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns)
+{
+	// Statics
+	static bool do_once = false;
+	
+	// Only execute once
+	if (!do_once) {
+		// Show ESP-NOW list
+		lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		do_once = true;
+	}
+	
+	// Up button pressed
+	if (ui_btns->up_btn == 1) {
+		// Update selection
+		espnow_menu->index--;
+		lcd_espnow_update_menu(espnow_menu);
+	}
+	// Down button pressed
+	else if (ui_btns->down_btn == 1) {
+		// Update selection
+		espnow_menu->index++;
+		lcd_espnow_update_menu(espnow_menu);
+	}
+	// Add ESP32 selected
+	else if (ui_btns->right_btn == 1 && espnow_menu->index == 0) {
+		// Hide ESP-NOW menu
+		lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		ui_menu->page = ESPNOW_RX_MAC_PAGE;
+
+	}
+	// Specific selected
+	else if (ui_btns->right_btn == 1) {
+		// Hide ESP-NOW menu
+		lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+	
+	}
+	// Back selected
+	else if (ui_btns->left_btn == 1) {
+		
+		// Hide ESP-NOW menu
+		lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show selection labels
+		unhide_selection_widgets(ui_menu);
+		
+		// Reset static
+		do_once = false;
+		
+		// Switch pages
+		ui_menu->page = SELECTION_PAGE;
+	}
 }
