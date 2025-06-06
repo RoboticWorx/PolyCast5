@@ -16,7 +16,25 @@
 #include "infrared_funcs.h"
 
 #include "anim_city_1.h"
-
+#include "anim_city_2.h"
+#include "anim_city_3.h"
+#include "anim_city_4.h"
+#include "anim_city_5.h"
+#include "anim_city_6.h"
+#include "anim_city_7.h"
+#include "anim_city_8.h"
+#include "anim_city_9.h"
+#include "anim_city_10.h"
+#include "anim_city_11.h"
+#include "anim_city_12.h"
+#include "anim_city_13.h"
+#include "anim_city_14.h"
+#include "anim_city_15.h"
+#include "anim_city_16.h"
+#include "anim_city_17.h"
+#include "anim_city_18.h"
+#include "anim_city_19.h"
+#include "anim_city_20.h"
 
 #define DRAW_LINES   20
 #define FLUSH_CHUNK  2
@@ -24,6 +42,11 @@
 #define SWIPE_SPEED 1200
 #define SCROLL_SPEED 400
 #define IR_LABELS_OFFSET 20
+
+#define CITY_FRAME_CNT  20
+#define CITY_FRAME_PERIOD 120
+
+#define CITY_PING_PONG 1
 
 static const char *TAG = "LCD_FUNCS";
 
@@ -34,19 +57,21 @@ static lv_display_t *disp; // LVGL display handle
 static bool already_scrolling = false;
 
 typedef struct {
-    lv_obj_t * top;    // the label that sits at the top line
-    lv_obj_t * mid;    // the label in the center
-    lv_obj_t * bot;    // the label at the bottom (this one moves)
-    const char * txt;  // the next string to show
+    lv_obj_t *top;    // the label that sits at the top line
+    lv_obj_t *mid;    // the label in the center
+    lv_obj_t *bot;    // the label at the bottom (this one moves)
+    const char *txt;  // the next string to show
     bool up;           // direction: true=you’re scrolling up, false=scrolling down
 } scroll_ctx_t;
 
 typedef struct {
-	uint8_t index;
-    lv_obj_t *anim_city_1_obj;
-} lcd_animations_t;
+    lv_obj_t *frames[CITY_FRAME_CNT];   /* img0 … img6 */
+    uint8_t   cur;                      /* 0…6, index of visible frame */
+    bool       forward;   // true = counting up, false = counting down
+    lv_timer_t *timer;                  /* NULL until created */
+} city_anim_t;
 
-static lcd_animations_t lcd_animations;
+static city_anim_t city_anim;
 
 static bool scrolling_menu = false;
 static bool scrolling_up = false;	
@@ -430,12 +455,80 @@ static void unhide_selection_widgets(ui_menu_t *m)
     lv_obj_set_x(m->lbl_bot, 0);
 }
 
+static void city_anim_cb(lv_timer_t *t)
+{
+	#ifdef CITY_PING_PONG // Loop animation back and forth
+	    // Hide the current frame
+	    lv_obj_add_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN);
+	
+	    // Decide next frame index based on direction
+	    if (city_anim.forward) {
+	        if (city_anim.cur + 1 < CITY_FRAME_CNT) {
+	            // Still room to go up
+	            city_anim.cur++;
+	        }
+	        else {
+	            // Reached the last frame: reverse direction & step down
+	            city_anim.forward = false;
+	            city_anim.cur--;
+	        }
+	    }
+	    else {
+	        // Currently counting down
+	        if (city_anim.cur > 0) {
+	            city_anim.cur--;
+	        }
+	        else {
+	            // Reached frame 0: flip direction back up
+	            city_anim.forward = true;
+	            city_anim.cur++;
+	        }
+	    }
+	    
+	    // Show the newly chosen frame
+	    lv_obj_clear_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN);
+	    
+    #elif // Go all the way through and then reset
+	    // Hide current frame
+	    lv_obj_add_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN);
+	
+	    // Advance with wrap
+	    city_anim.cur = (city_anim.cur + 1) % CITY_FRAME_CNT;
+	
+	    // Show next frame
+	    lv_obj_clear_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN);
+    #endif
+}
+
 void lcd_init_images()
 {
-	lcd_animations.anim_city_1_obj = lv_img_create(ACTIVE_SCR);
-    lv_img_set_src(lcd_animations.anim_city_1_obj, &anim_city_1);
-    lv_obj_center(lcd_animations.anim_city_1_obj);
-    //lv_obj_add_flag(lcd_animations.anim_city_1_obj, LV_OBJ_FLAG_HIDDEN);
+	const lv_img_dsc_t *src_arr[CITY_FRAME_CNT] = {
+        &anim_city_1, &anim_city_2, &anim_city_3,
+        &anim_city_4, &anim_city_5, &anim_city_6,
+        &anim_city_7, &anim_city_8, &anim_city_9,
+        &anim_city_10, &anim_city_11, &anim_city_12,
+        &anim_city_13, &anim_city_14, &anim_city_15,
+        &anim_city_16, &anim_city_17, &anim_city_18,
+        &anim_city_19, &anim_city_20
+    };
+
+	// Create and center every image
+    for (int i = 0; i < CITY_FRAME_CNT; i++) {
+        city_anim.frames[i] = lv_img_create(ACTIVE_SCR);
+        lv_img_set_src(city_anim.frames[i], src_arr[i]);
+        lv_obj_center(city_anim.frames[i]);
+
+        if (i > 0) {
+			// Hide all but frame 0
+            lv_obj_add_flag(city_anim.frames[i], LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    // First frame going up
+    city_anim.cur = 0;
+    city_anim.forward = true;
+
+    // Create timer to update frames
+    city_anim.timer = lv_timer_create(city_anim_cb, CITY_FRAME_PERIOD, NULL);
 }
 
 void lcd_home_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
@@ -448,7 +541,11 @@ void lcd_home_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
 
 	}
 	else if (ui_btns->right_btn == 1) {
-		lv_obj_add_flag(lcd_animations.anim_city_1_obj, LV_OBJ_FLAG_HIDDEN);
+		// Stop cycling animation frames
+        lv_timer_pause(city_anim.timer);
+
+        // Hide the visible frame
+        lv_obj_add_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN);
 		
 		// Show selection labels
 		lv_obj_remove_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
@@ -549,8 +646,12 @@ void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
-		// Show desired home page frame
-		lv_obj_remove_flag(lcd_animations.anim_city_1_obj, LV_OBJ_FLAG_HIDDEN);
+		// Show the visible frame
+        lv_obj_add_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN);
+        
+		// Start cycling animation frames again
+        lv_timer_resume(city_anim.timer);
+
 		ui_menu->page = HOME_PAGE;
 	}
 

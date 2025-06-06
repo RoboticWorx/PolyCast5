@@ -517,8 +517,7 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 			// Create new button for new option
 			lora_menu->btns[lora_menu->size - 1] = lv_list_add_btn(lora_menu->main_list, NULL, lora_menu->options[lora_menu->size - 1]);
 			lv_obj_set_size(lora_menu->btns[lora_menu->size - 1], 200, 30);
-			lv_obj_add_style(lora_menu->btns[lora_menu->size - 1],
-							 &lora_menu->btn_style, 0);
+			lv_obj_add_style(lora_menu->btns[lora_menu->size - 1], &lora_menu->btn_style, 0);
 
 			// Create and format text label
 			lv_obj_t *lbl = lv_obj_get_child(lora_menu->btns[lora_menu->size - 1], 0);

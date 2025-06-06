@@ -6,6 +6,7 @@
 #include "lcd_task.h"
 #include "lcd_funcs.h"
 
+#include "libs/gif/lv_gif.h"
 #include "nvs.h"
 #include "nvs_flash.h" // nvs_flash_erase();
 
@@ -45,7 +46,6 @@ lv_color_t user_secondary_color = LV_COLOR_MAKE(0xFF, 0xFF, 0xFF);
     lv_obj_center(img);
 */
 
-
 static void lcd_task(void *pvParameters)
 {
 	user_primary_color = lv_color_hex(0x00008B);
@@ -59,8 +59,8 @@ static void lcd_task(void *pvParameters)
 					 
 	// Create images
 	lcd_init_images();
-
-	TickType_t timer_last = xTaskGetTickCount();
+    
+    TickType_t timer_last = xTaskGetTickCount();
 	const TickType_t timer_interval = pdMS_TO_TICKS(300);
 	
 	//nvs_flash_erase(); // Factory reset
