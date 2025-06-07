@@ -32,7 +32,7 @@ ui_btns_t ui_btns = {
     .right_btn = 0,
     .left_btn = 0,
     .back_btn = 0,
-    .home_btn = 0,
+    .select_btn = 0,
 };
 
 
@@ -118,11 +118,11 @@ static void lcd_task(void *pvParameters)
 			else {
 				ui_btns.back_btn = 0;
 			}
-			if (xSemaphoreTake(xHomeButtonSemaphore, 0)) {
-				ui_btns.home_btn = 1;
+			if (xSemaphoreTake(xSelectButtonSemaphore, 0)) {
+				ui_btns.select_btn = 1;
 			}
 			else {
-				ui_btns.home_btn = 0;
+				ui_btns.select_btn = 0;
 			}
 
 			

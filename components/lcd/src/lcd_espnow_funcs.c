@@ -751,6 +751,9 @@ void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, 
 		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
+		// Back to default
+		//espnow_menu->espnow_submenu.cmd_to_send = 0;
+		
 		// Show ESP-NOW list
 		lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -768,6 +771,14 @@ void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, 
 	// Decrement command
 	else if (ui_btns->down_btn == 1) {
 		espnow_menu->espnow_submenu.cmd_to_send--;
+		
+		char buf[6];
+		snprintf(buf, sizeof(buf), "%u", espnow_menu->espnow_submenu.cmd_to_send);
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_cmd, buf);
+	}
+	// Increment command by 3
+	else if (ui_btns->select_btn == 1) {
+		espnow_menu->espnow_submenu.cmd_to_send += 3;
 		
 		char buf[6];
 		snprintf(buf, sizeof(buf), "%u", espnow_menu->espnow_submenu.cmd_to_send);

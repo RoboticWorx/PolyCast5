@@ -7,9 +7,9 @@
 #define USER_BUTTON_LEFT 1
 #define USER_BUTTON_UP 0
 #define USER_BUTTON_RIGHT 2
-#define USER_BUTTON_HOME 3
+#define USER_BUTTON_BACK 3
 #define USER_BUTTON_DOWN 4
-#define USER_BUTTON_BACK 5
+#define USER_BUTTON_SELECT 5
 //#define USER_BUTTON_POWER 
 
 extern SemaphoreHandle_t xSPIBusMutex;
@@ -19,7 +19,7 @@ extern SemaphoreHandle_t xDownButtonSemaphore;
 extern SemaphoreHandle_t xRightButtonSemaphore;
 extern SemaphoreHandle_t xLeftButtonSemaphore;
 extern SemaphoreHandle_t xBackButtonSemaphore;
-extern SemaphoreHandle_t xHomeButtonSemaphore;
+extern SemaphoreHandle_t xSelectButtonSemaphore;
 extern SemaphoreHandle_t xGpioEventSemaphore;
 
 /**

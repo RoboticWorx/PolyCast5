@@ -15,7 +15,7 @@ SemaphoreHandle_t xDownButtonSemaphore;
 SemaphoreHandle_t xRightButtonSemaphore;
 SemaphoreHandle_t xLeftButtonSemaphore;
 SemaphoreHandle_t xBackButtonSemaphore;
-SemaphoreHandle_t xHomeButtonSemaphore;
+SemaphoreHandle_t xSelectButtonSemaphore;
 
 static void gpio_task(void *arg)
 {
@@ -27,7 +27,7 @@ static void gpio_task(void *arg)
     xRightButtonSemaphore = xSemaphoreCreateBinary();
     xLeftButtonSemaphore = xSemaphoreCreateBinary();
     xBackButtonSemaphore = xSemaphoreCreateBinary();
-    xHomeButtonSemaphore = xSemaphoreCreateBinary();
+    xSelectButtonSemaphore = xSemaphoreCreateBinary();
 
 	gpio_write_output(0, 0); // Red LED
 	gpio_write_output(1, 0); // Green LED
@@ -60,10 +60,12 @@ static void gpio_task(void *arg)
 				xSemaphoreGive(xLeftButtonSemaphore);
 			}
 			else if (gpio_read_input(USER_BUTTON_BACK) == 0) {
-				xSemaphoreGive(xBackButtonSemaphore);
+				xSemaphoreGive(xBackButtonSemaphore); // THIS IS PWR ON NEW HW
+				//ESP_LOGI(TAG, "BACK");
 			}
-			else if (gpio_read_input(USER_BUTTON_HOME) == 0) {
-				xSemaphoreGive(xHomeButtonSemaphore);
+			else if (gpio_read_input(USER_BUTTON_SELECT) == 0) {
+				xSemaphoreGive(xSelectButtonSemaphore);
+				//ESP_LOGI(TAG, "SELECT");
 			}
 		}
 	}

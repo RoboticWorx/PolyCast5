@@ -444,7 +444,7 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
         }
     }
     // If save button pressed
-    else if (ui_btns->back_btn) {
+    else if (ui_btns->select_btn) {
 		// Save final
         name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
         memcpy(saved_name, name_buf, MAX_CUSTOM_NAME_LEN + 1);

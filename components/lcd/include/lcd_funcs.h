@@ -64,7 +64,7 @@ typedef struct ui_btns_t {
     bool right_btn;
     bool left_btn;
     bool back_btn;
-    bool home_btn;
+    bool select_btn;
 } ui_btns_t;
 
 extern ui_btns_t ui_btns;

@@ -96,7 +96,7 @@ void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
        
     }
 	// Delete menu option
-    else if (ui_btns->back_btn) {
+    else if (ui_btns->select_btn) {
 		// Deletion
         int to_delete = edit_idx;
 	    if (lcd_ir_ir_menu_nvs_delete(ir_menu, to_delete, A_IR_REMOTE_NS, A_REMOTE_KEY_COUNT, A_REMOTE_KEY_FMT) == ESP_OK) {
@@ -262,7 +262,7 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
         }
     }
     // If save button pressed
-    else if (ui_btns->back_btn) {
+    else if (ui_btns->select_btn) {
 		// Save final
         name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
         memcpy(saved_name, name_buf, MAX_CUSTOM_NAME_LEN + 1);
