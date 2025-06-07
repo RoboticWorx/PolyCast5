@@ -1,3 +1,4 @@
+#include "core/lv_obj_pos.h"
 #include "nvs.h"
 
 #include "esp_log.h"
@@ -12,6 +13,8 @@
 
 #include "espnow_task.h"
 #include "misc/lv_area.h"
+
+#include "qr_esp_rx_example.h"
 
 #define RX_MAC_IN_SEL_COLOR lv_palette_main(LV_PALETTE_RED)
 
@@ -221,7 +224,7 @@ static void prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 }
 
 void lcd_espnow_get_rx_mac(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns)
-{
+{	
     // Statics
     static uint8_t mac_bytes[ESPNOW_MAC_SIZE]; // 6 bytes of the MAC
     static uint8_t digit_index = 0; // Which hex‐digit is selected
@@ -411,6 +414,50 @@ void lcd_espnow_get_rx_mac(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_bt
 	}
 }
 
+static void prompt_upload_qr(ui_menu_t *ui_menu)
+{
+	// Hide arrows
+	lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+	
+	// Create and format ins labels
+	lv_obj_t *lbl_ask_enc = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_ask_enc, "Example receiver\ncode:", user_secondary_color,
+    			 &lv_font_montserrat_18, LV_ALIGN_TOP_LEFT, 5, 5);
+    			 
+    lv_obj_t *lbl_qr_ok = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_qr_ok, "OK", user_secondary_color,
+    			 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, 0);
+    			 
+    // Create QR code (100x100px)
+    lv_obj_t *qr_code = lv_img_create(ACTIVE_SCR);
+    lv_img_set_src(qr_code, &qr_esp_rx_example);
+    lv_obj_align(qr_code, LV_ALIGN_CENTER, 0, 12);
+                    
+    while (1) {
+		lv_timer_handler();
+		
+		// OK
+        if (xSemaphoreTake(xRightButtonSemaphore, 0) == pdTRUE) {
+			// Show arrows
+            lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+            
+            // Delete used
+            lv_obj_del(lbl_ask_enc);
+            lv_obj_del(lbl_qr_ok);
+            lv_obj_del(qr_code);
+            
+            // Go back
+            return;
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+}
+
 void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns)
 {
 	static char name_buf[MAX_CUSTOM_NAME_LEN + 1] = {0};
@@ -590,6 +637,8 @@ void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
 			// Save RX MAC from earlier to NVS
 	        lcd_espnow_rx_mac_nvs_save(espnow_menu);
 		}
+		
+		prompt_upload_qr(ui_menu);
 		
 		// Show ESP-NOW list
 		lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);

@@ -39,15 +39,6 @@ ui_btns_t ui_btns = {
 lv_color_t user_primary_color = LV_COLOR_MAKE(0x00, 0x00, 0x8B); 
 lv_color_t user_secondary_color = LV_COLOR_MAKE(0xFF, 0xFF, 0xFF);
 
-/*
-	// Show image
-    lv_obj_t *img = lv_img_create(ACTIVE_SCR);
-    lv_img_set_src(img, &resolutiontest);
-    lv_obj_center(img);
-*/
-
-
-
 static void lcd_task(void *pvParameters)
 {
 	user_primary_color = lv_color_hex(0x00008B);

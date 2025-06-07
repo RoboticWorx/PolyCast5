@@ -10,6 +10,8 @@ idf_component_register(
         "src/lcd_task.c"
         "src/st7789.c"
         
+        "media/qr/src/qr_esp_rx_example.c"
+        
         "media/city/src/anim_city_1.c"
         "media/city/src/anim_city_2.c"
         "media/city/src/anim_city_3.c"
@@ -33,6 +35,7 @@ idf_component_register(
         
     INCLUDE_DIRS 
     	"include"
+    	"media/qr/include"
     	"media/city/include"
     
     REQUIRES

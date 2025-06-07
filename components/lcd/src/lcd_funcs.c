@@ -817,7 +817,7 @@ void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui
 		// Hide ESP-NOW menu
 		lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
-	
+		
 	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {
