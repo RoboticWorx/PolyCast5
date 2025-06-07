@@ -817,7 +817,20 @@ void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui
 		// Hide ESP-NOW menu
 		lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
+		// Show ESP-NOW submenu
+		lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send_plus, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send_minus, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send_cmd, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send_box, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(espnow_menu->espnow_submenu.arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(espnow_menu->espnow_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
+		// Hide up and down arrows
+		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		ui_menu->page = ESPNOW_OPTION_PAGE;
 	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {

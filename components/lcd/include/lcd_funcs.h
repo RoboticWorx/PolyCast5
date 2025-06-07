@@ -40,6 +40,7 @@
 
 #define ESPNOW_RX_MAC_PAGE 16
 #define ESPNOW_NAME_PAGE 17
+#define ESPNOW_OPTION_PAGE 18
 
 
 typedef struct ui_menu_t {

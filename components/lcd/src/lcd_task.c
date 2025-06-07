@@ -54,7 +54,7 @@ static void lcd_task(void *pvParameters)
 	lcd_init_images();
     
     TickType_t timer_last = xTaskGetTickCount();
-	const TickType_t timer_interval = pdMS_TO_TICKS(300);
+	const TickType_t timer_interval = pdMS_TO_TICKS(200);
 	
 	//nvs_flash_erase(); // Factory reset
 
@@ -81,6 +81,7 @@ static void lcd_task(void *pvParameters)
 	lcd_lora_setup_subpage(&lora_menu);
 	
 	lcd_espnow_setup_page(&espnow_menu);
+	lcd_espnow_setup_send_page(&espnow_menu);
 		
 	while (1)
 	{
@@ -154,6 +155,9 @@ static void lcd_task(void *pvParameters)
 			}
 			else if (ui_menu.page == ESPNOW_NAME_PAGE) {
 				lcd_espnow_create_custom_name(&ui_menu, &espnow_menu, &ui_btns);
+			}
+			else if (ui_menu.page == ESPNOW_OPTION_PAGE) {
+				lcd_espnow_option_selected(&ui_menu, &espnow_menu, &ui_btns);
 			}
 			// IR remotes
 			else if (ui_menu.page == INFRARED_PAGE) {

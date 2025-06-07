@@ -22,6 +22,17 @@ typedef struct ui_btns_t ui_btns_t;
 typedef struct ui_menu_t ui_menu_t;
 
 typedef struct {
+    lv_obj_t *lbl_send_plus;
+    lv_obj_t *lbl_send_minus;
+	lv_obj_t *lbl_send_cmd;
+	lv_obj_t *lbl_send_box;
+	lv_obj_t *lbl_send;
+	lv_obj_t *arrow_top;
+	lv_obj_t *arrow_bot;
+	uint8_t cmd_to_send;
+} espnow_submenu_t;
+
+typedef struct {
     char *options[MAX_ESPNOW_OPTIONS];
     uint8_t rx_mac[MAX_ESPNOW_OPTIONS][ESPNOW_MAC_SIZE];
     lv_obj_t *btns[MAX_ESPNOW_OPTIONS];
@@ -31,9 +42,14 @@ typedef struct {
 	lv_style_t btn_style;
 	lv_style_t sel_style;
 	lv_obj_t *cont;
+	espnow_submenu_t espnow_submenu;
 } espnow_menu_t;
 
 extern espnow_menu_t espnow_menu; 
+
+void lcd_espnow_setup_send_page(espnow_menu_t *espnow_menu);
+
+void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns);
 
 void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns);
 

@@ -24,7 +24,6 @@ static const char *TAG = "LCD_ESPNOW_FUNCS";
 
 espnow_menu_t espnow_menu = {
     .options = {"Add ESP32"},
-    //.keys = {},
     .size = 1,
     .index = 0,
     .cont = NULL,
@@ -659,6 +658,121 @@ void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
     display[MAX_CUSTOM_NAME_LEN + 1] = '\0';
 
     lv_label_set_text(lbl_user_in, display);
+}
+
+void lcd_espnow_setup_send_page(espnow_menu_t *espnow_menu)
+{
+	#define X_POS -30
+	espnow_menu->espnow_submenu.cmd_to_send = 0; // Set default
+	
+	// Create labels
+	espnow_menu->espnow_submenu.lbl_send_plus = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(espnow_menu->espnow_submenu.lbl_send_plus, LV_SYMBOL_PLUS, user_secondary_color,
+					 &lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS, -53);
+					 
+	espnow_menu->espnow_submenu.lbl_send_minus = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(espnow_menu->espnow_submenu.lbl_send_minus, LV_SYMBOL_MINUS, user_secondary_color,
+					 &lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS, 57);
+
+	espnow_menu->espnow_submenu.lbl_send_cmd = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(espnow_menu->espnow_submenu.lbl_send_cmd, "0", user_secondary_color,
+					 &lv_font_montserrat_30, LV_ALIGN_CENTER, X_POS, 0);
+
+	espnow_menu->espnow_submenu.lbl_send_box = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(espnow_menu->espnow_submenu.lbl_send_box, "", user_secondary_color,
+					 &lv_font_montserrat_24, LV_ALIGN_CENTER, X_POS, 0);
+					 
+	espnow_menu->espnow_submenu.lbl_send = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(espnow_menu->espnow_submenu.lbl_send, "SEND", user_secondary_color,
+					 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
+					 
+	espnow_menu->espnow_submenu.arrow_top = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(espnow_menu->espnow_submenu.arrow_top, LV_SYMBOL_UP, user_secondary_color,
+					 &lv_font_montserrat_14, LV_ALIGN_CENTER, X_POS, -30);
+					 
+	espnow_menu->espnow_submenu.arrow_bot = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(espnow_menu->espnow_submenu.arrow_bot, LV_SYMBOL_DOWN, user_secondary_color,
+					 &lv_font_montserrat_14, LV_ALIGN_CENTER, X_POS, 30);
+
+	// Create a style for the border
+	static lv_style_t outline_style;
+	lv_style_init(&outline_style);
+
+	lv_style_init(&outline_style);
+	lv_style_set_radius(&outline_style, 8);
+	lv_style_set_bg_color(&outline_style, user_primary_color);
+	lv_style_set_border_width(&outline_style, 2);
+	lv_style_set_border_color(&outline_style, user_secondary_color);
+	lv_style_set_border_side(&outline_style, LV_BORDER_SIDE_FULL);
+	
+	lv_color_t darker_user_primary_color = lv_color_darken(user_primary_color, 100); // % darker 
+	lv_style_set_shadow_spread(&outline_style, 3);
+	lv_style_set_shadow_width(&outline_style, 6);
+	lv_style_set_shadow_offset_x(&outline_style, 3);
+	lv_style_set_shadow_offset_y(&outline_style, 3);
+	lv_style_set_shadow_color(&outline_style, darker_user_primary_color);
+	    
+	lv_style_set_pad_left(&outline_style, 55);
+	lv_style_set_pad_right(&outline_style, 55);
+	lv_style_set_pad_top(&outline_style, 25);
+	lv_style_set_pad_bottom(&outline_style, 25);
+		
+	lv_obj_add_style(espnow_menu->espnow_submenu.lbl_send_box, &outline_style, 0);
+	
+	// Hide everything for now
+	lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_plus, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_minus, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_cmd, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_box, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(espnow_menu->espnow_submenu.arrow_top, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(espnow_menu->espnow_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
+}
+
+void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns)
+{
+	
+	// Send command
+	if (ui_btns->right_btn == 1) {
+		
+	}
+	// Exit
+	else if (ui_btns->left_btn == 1) {
+		// Hide everything
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_plus, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_minus, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_cmd, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_box, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show up and down arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show ESP-NOW list
+		lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Go back
+		ui_menu->page = ESPNOW_PAGE;
+	}
+	// Increment command
+	else if (ui_btns->up_btn == 1) {
+		espnow_menu->espnow_submenu.cmd_to_send++;
+		
+		char buf[6];
+		snprintf(buf, sizeof(buf), "%u", espnow_menu->espnow_submenu.cmd_to_send);
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_cmd, buf);
+	}
+	// Decrement command
+	else if (ui_btns->down_btn == 1) {
+		espnow_menu->espnow_submenu.cmd_to_send--;
+		
+		char buf[6];
+		snprintf(buf, sizeof(buf), "%u", espnow_menu->espnow_submenu.cmd_to_send);
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_cmd, buf);
+	}
 }
 
 esp_err_t lcd_espnow_menu_nvs_save(const espnow_menu_t *menu)
