@@ -9,6 +9,10 @@
 #define ESPNOW_RX_MAC_KEY_COUNT "es_rxm_ke" // u8: number of option
 #define ESPNOW_RX_MAC_KEY_FMT "es_rxm%d"
 
+#define ESPNOW_MENU_NS "es_me_ns" // NVS namespace
+#define ESPNOW_MENU_KEY_COUNT "es_me_ke" // u8: number of option
+#define ESPNOW_MENU_KEY_FMT "es_me%02d"
+
 #define MAX_ESPNOW_OPTIONS 20
 
 #define ESPNOW_MAC_SIZE 6
@@ -31,11 +35,17 @@ typedef struct {
 
 extern espnow_menu_t espnow_menu; 
 
+void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns);
+
 void lcd_espnow_setup_page(espnow_menu_t *menu);
 
 void lcd_espnow_update_menu(espnow_menu_t *menu);
 
 void lcd_espnow_get_rx_mac(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns);
+
+esp_err_t lcd_espnow_menu_nvs_save(const espnow_menu_t *menu);
+
+esp_err_t lcd_espnow_menu_nvs_load(espnow_menu_t *menu);
 
 esp_err_t lcd_espnow_rx_mac_nvs_save(const espnow_menu_t *espnow_menu);
 

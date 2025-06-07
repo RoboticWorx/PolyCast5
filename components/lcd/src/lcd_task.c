@@ -46,6 +46,8 @@ lv_color_t user_secondary_color = LV_COLOR_MAKE(0xFF, 0xFF, 0xFF);
     lv_obj_center(img);
 */
 
+
+
 static void lcd_task(void *pvParameters)
 {
 	user_primary_color = lv_color_hex(0x00008B);
@@ -65,8 +67,8 @@ static void lcd_task(void *pvParameters)
 	
 	//nvs_flash_erase(); // Factory reset
 
-	//lcd_menu_nvs_clear(LORA_OPTIONS_NS);
-	//lcd_menu_nvs_clear(LORA_ENC_NS);
+	//lcd_ns_nvs_clear(ESPNOW_RX_MAC_NS);
+	//lcd_ns_nvs_clear(ESPNOW_MENU_NS);
 	
 	
 	// Create common items
@@ -77,6 +79,9 @@ static void lcd_task(void *pvParameters)
 	
 	lcd_lora_menu_nvs_load(&lora_menu, LORA_OPTIONS_NS, LORA_OPTIONS_KEY_COUNT, LORA_OPTIONS_KEY_FMT);
 	lcd_lora_key_nvs_load(&lora_menu, LORA_ENC_NS, LORA_ENC_KEY_COUNT, LORA_ENC_KEY_FMT);
+	
+	lcd_espnow_menu_nvs_load(&espnow_menu);
+	lcd_espnow_rx_mac_nvs_load(&espnow_menu);
 		
 	// Create common pages
 	lcd_ir_setup_page(&ir_menu);
@@ -85,7 +90,7 @@ static void lcd_task(void *pvParameters)
 	lcd_lora_setup_subpage(&lora_menu);
 	
 	lcd_espnow_setup_page(&espnow_menu);
-	
+		
 	while (1)
 	{
 		if (xTaskGetTickCount() - timer_last >= timer_interval) {
@@ -155,6 +160,9 @@ static void lcd_task(void *pvParameters)
 			}
 			else if (ui_menu.page == ESPNOW_RX_MAC_PAGE) {
 				lcd_espnow_get_rx_mac(&ui_menu, &espnow_menu, &ui_btns);
+			}
+			else if (ui_menu.page == ESPNOW_NAME_PAGE) {
+				lcd_espnow_create_custom_name(&ui_menu, &espnow_menu, &ui_btns);
 			}
 			// IR remotes
 			else if (ui_menu.page == INFRARED_PAGE) {

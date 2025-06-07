@@ -39,6 +39,7 @@
 #define LORA_OPTIONS_SUBPAGE 15
 
 #define ESPNOW_RX_MAC_PAGE 16
+#define ESPNOW_NAME_PAGE 17
 
 
 typedef struct ui_menu_t {
@@ -85,7 +86,7 @@ void lcd_init_selection_labels(ui_menu_t *ui_menu);
 /**
  * @brief Clears all NVS for namespace
  */
-void lcd_menu_nvs_clear(const char* ns);
+void lcd_ns_nvs_clear(const char* ns);
 
 /**
  * @brief Format labels

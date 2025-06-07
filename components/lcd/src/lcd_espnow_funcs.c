@@ -1,5 +1,8 @@
 #include "nvs.h"
 
+#include "esp_log.h"
+#include "esp_err.h"
+
 #include "core/lv_obj.h"
 #include "lcd_lora_funcs.h"
 #include "lcd_espnow_funcs.h"
@@ -11,6 +14,10 @@
 #include "misc/lv_area.h"
 
 #define RX_MAC_IN_SEL_COLOR lv_palette_main(LV_PALETTE_RED)
+
+static bool espnow_menu_overwrite = false;
+
+static const char *TAG = "LCD_ESPNOW_FUNCS";
 
 espnow_menu_t espnow_menu = {
     .options = {"Add ESP32"},
@@ -138,6 +145,79 @@ void lcd_espnow_update_menu(espnow_menu_t *menu)
     
     // Enable scrolling if list gets too long
     lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
+}
+
+static void prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
+{
+	lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+	
+	// Create and format ins labels
+	lv_obj_t *lbl_ask_enc = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_ask_enc, "     Would you like\nto setup encryption?", user_secondary_color,
+    			 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+    			 
+    lv_obj_t *lbl_enc_yes = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_enc_yes, "YES", user_secondary_color,
+    			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 13);
+    			 
+    lv_obj_t *lbl_enc_no = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_enc_no, "NO", user_secondary_color,
+    			 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
+                    
+    while (1) {
+		lv_timer_handler();
+		
+		// User hit cancel
+        if (xSemaphoreTake(xLeftButtonSemaphore, 0) == pdTRUE) {
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            
+            lv_obj_del(lbl_ask_enc);
+            lv_obj_del(lbl_enc_yes);
+            lv_obj_del(lbl_enc_no);
+            
+            // Show ESP-NOW menu
+			lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// Switch pages
+			ui_menu->page = ESPNOW_PAGE;
+            
+            // Go back
+            return;
+        }
+        // Yes encryption 
+        else if (xSemaphoreTake(xUpButtonSemaphore, 0) == pdTRUE) {
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            
+            lv_obj_del(lbl_ask_enc);
+            lv_obj_del(lbl_enc_yes);
+            lv_obj_del(lbl_enc_no);
+            
+            // Show ESP-NOW menu
+			lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// Switch pages
+			ui_menu->page = ESPNOW_PAGE;
+            
+            // Go back
+            return;
+        }
+        // No encryption 
+        else if (xSemaphoreTake(xDownButtonSemaphore, 0) == pdTRUE) {
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            
+            lv_obj_del(lbl_ask_enc);
+            lv_obj_del(lbl_enc_yes);
+            lv_obj_del(lbl_enc_no);
+            
+            // Prompt to enter name
+            ui_menu->page = ESPNOW_NAME_PAGE;
+            
+            // Go back
+            return;
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
 }
 
 void lcd_espnow_get_rx_mac(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns)
@@ -285,7 +365,7 @@ void lcd_espnow_get_rx_mac(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_bt
 		// Reset selected digit
 		digit_index = 0;
 		
-		// Show espnow_menu
+		// Show ESP-NOW list
 		lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
 		// Go back
@@ -304,31 +384,10 @@ void lcd_espnow_get_rx_mac(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_bt
 	}
     // Confirm
     else if (ui_btns->right_btn) {
-		
-		espnow_menu->size++;
-		
-		// Create a temp to rename later
-		espnow_menu->options[espnow_menu->size - 1] = "Temp ESP32";
-		
         // Copy the 6 bytes into espnow_menu->rx_mac[] for later use.
         for (int b = 0; b < ESPNOW_MAC_SIZE; b++) {
-            espnow_menu->rx_mac[espnow_menu->size - 1][b] = mac_bytes[b];
-        }
-        
-        // Create new button for new option
-		espnow_menu->btns[espnow_menu->size - 1] = lv_list_add_btn(espnow_menu->main_list, NULL, espnow_menu->options[espnow_menu->size - 1]);
-		lv_obj_set_size(espnow_menu->btns[espnow_menu->size - 1], 200, 30);
-		lv_obj_add_style(espnow_menu->btns[espnow_menu->size - 1], &espnow_menu->btn_style, 0);
-		
-		// Create and format text label
-		lv_obj_t *lbl = lv_obj_get_child(espnow_menu->btns[espnow_menu->size - 1], 0);
-		lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
-		lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-		lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
-
-		// Save to NVS
-        lcd_espnow_rx_mac_nvs_save(espnow_menu);
-		
+            espnow_menu->rx_mac[espnow_menu->size][b] = mac_bytes[b];
+        }		
 		
 		// Clean all
 		for (int i = 0; i < 12; i++) {
@@ -346,10 +405,308 @@ void lcd_espnow_get_rx_mac(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_bt
 		
 		// Reset selected digit
 		digit_index = 0;
-
-		// Go to next
-		ui_menu->page = ESPNOW_PAGE;
+		
+		// Ask if encryption is needed
+		prompt_yn_encryption(ui_menu, espnow_menu);
 	}
+}
+
+void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns)
+{
+	static char name_buf[MAX_CUSTOM_NAME_LEN + 1] = {0};
+	static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
+	
+    // Declare statics
+    static int cur_pos = 0; // User position
+    static char cur_char = '_';
+    static lv_obj_t *lbl_dirs = NULL;
+    static lv_obj_t *lbl_chars = NULL;
+    static lv_obj_t *lbl_user_in = NULL;
+    char display[MAX_CUSTOM_NAME_LEN + 2];
+    
+    // Create initial label
+    if (!lbl_user_in) {
+		
+        lbl_user_in = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_user_in, "", user_secondary_color,
+                         &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
+                         
+        lbl_dirs = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_dirs, "Enter ESP32 name\nwith arrow buttons:", user_secondary_color,
+                         &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, -30);
+                         
+        //if (espnow_menu_overwrite)
+        //	lv_label_set_text(lbl_dirs, "Enter new plug name\n with arrow buttons:");
+        
+        lbl_chars = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_chars, "(Up to 12 characters)", user_secondary_color,
+                         &lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0);
+    }
+
+    // Take user input
+    // If up, iterate up
+    if (ui_btns->up_btn) {
+		// Wrap
+        if (cur_char == '_') {
+			cur_char = 'A';
+		}
+        else if (cur_char == 'Z') {
+			cur_char = '_';
+		}
+		// Else iterate 1 char
+        else {
+			cur_char = (char)(cur_char + 1);
+		}
+		
+		// Save to array
+        name_buf[cur_pos] = cur_char;
+    }
+    // If down, iterate down
+    else if (ui_btns->down_btn) {
+		// Wrap
+        if (cur_char == '_') {
+			cur_char = 'Z';
+		}
+        else if (cur_char == 'A') {
+			cur_char = '_';
+		}
+		// Else iterate down 1 char
+        else {
+			cur_char = (char)(cur_char - 1);
+		}
+		
+		// Save to array
+        name_buf[cur_pos] = cur_char;
+    }
+    // Can back out if at start
+    else if (ui_btns->left_btn && cur_pos == 0) { // && espnow_menu_overwrite
+		// Delete labels since no longer used
+        lv_obj_delete(lbl_user_in);
+        lv_obj_delete(lbl_dirs);
+        lv_obj_delete(lbl_chars);
+        
+        // Reset statics for next time
+        lbl_user_in = NULL;
+	    lbl_dirs = NULL;
+	    cur_pos = 0;
+	    cur_char = '_';
+	    memset(name_buf, 0, sizeof name_buf);
+	    
+	    // Show ESP-NOW list
+		lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+ 		ui_menu->page = ESPNOW_PAGE;
+		return;
+    }
+    // If left and not at start
+    else if (ui_btns->left_btn && cur_pos != 0) {
+        // Clear the current slot
+	    name_buf[cur_pos] = '\0';
+	
+	    // De-increment left
+	    if (cur_pos > 0) {
+	        cur_pos--;
+	    }
+	
+	    // Reload cur_char from the new slot
+	    cur_char = name_buf[cur_pos] ? name_buf[cur_pos] : '_';
+    }
+    // If right
+    else if (ui_btns->right_btn) {
+		// Handle case where up/down wasn't pressed
+        name_buf[cur_pos] = cur_char;
+        
+        // If not yet at end
+        if (cur_pos < MAX_CUSTOM_NAME_LEN - 1) {
+            cur_pos++;
+            cur_char = '_';
+        }
+    }
+    // If save button pressed
+    else if (ui_btns->back_btn) {
+		// Save final
+        name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
+        memcpy(saved_name, name_buf, MAX_CUSTOM_NAME_LEN + 1);
+        ESP_LOGI(TAG, "%s", saved_name);
+        
+        // Delete labels since no longer used
+        lv_obj_delete(lbl_user_in);
+        lv_obj_delete(lbl_dirs);
+        lv_obj_delete(lbl_chars);
+        
+        // Reset statics for next time
+        lbl_user_in = NULL;
+	    lbl_dirs = NULL;
+	    cur_pos = 0;
+	    cur_char = '_';
+	    memset(name_buf, 0, sizeof name_buf);
+
+		// Update options
+		// If overwriting an existing as a rename
+		if (espnow_menu_overwrite) {
+			// espnow_menu->index is edit_idx
+			// Release old string then reallocate
+			free(espnow_menu->options[espnow_menu->index]);
+			espnow_menu->options[espnow_menu->index] = strdup(saved_name);
+
+			// Persist to NVS
+			//lcd_espnow_menu_nvs_save(espnow_menu, LORA_OPTIONS_NS, LORA_OPTIONS_KEY_COUNT, LORA_OPTIONS_KEY_FMT);
+
+			// Update the button’s label in-place
+			lv_obj_t *btn = espnow_menu->btns[espnow_menu->index];
+			lv_obj_t *child_lbl = lv_obj_get_child(btn, 0);
+			lv_label_set_text(child_lbl, espnow_menu->options[espnow_menu->index]);
+
+			// Reset flag
+			espnow_menu_overwrite = false;
+			
+			// Reset submenu to first index
+			espnow_menu->index = 0;
+			lcd_espnow_update_menu(espnow_menu);
+			lv_obj_add_flag(espnow_menu->cont, LV_OBJ_FLAG_HIDDEN); // Hide
+		}
+		// Else adding a whole new ESP32
+		else {
+			// Size one bigger
+			espnow_menu->size++;
+		
+			// Save to options, then to NVS
+			char *name_copy = strdup(saved_name);
+			espnow_menu->options[espnow_menu->size - 1] = name_copy;
+			lcd_espnow_menu_nvs_save(espnow_menu);
+	        
+	        // Create new button for new option
+			espnow_menu->btns[espnow_menu->size - 1] = lv_list_add_btn(espnow_menu->main_list, NULL, espnow_menu->options[espnow_menu->size - 1]);
+			lv_obj_set_size(espnow_menu->btns[espnow_menu->size - 1], 200, 30);
+			lv_obj_add_style(espnow_menu->btns[espnow_menu->size - 1], &espnow_menu->btn_style, 0);
+			
+			// Create and format text label
+			lv_obj_t *lbl = lv_obj_get_child(espnow_menu->btns[espnow_menu->size - 1], 0);
+			lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+			lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+			lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
+	
+			// Save RX MAC from earlier to NVS
+	        lcd_espnow_rx_mac_nvs_save(espnow_menu);
+		}
+		
+		// Show ESP-NOW list
+		lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch to ESP-NOW page
+		ui_menu->page = ESPNOW_PAGE;
+        return;
+    }
+
+    // Build and show the text
+    for (int i = 0; i < MAX_CUSTOM_NAME_LEN; i++) {
+		if (i < cur_pos)
+        	display[i] = name_buf[i] ? name_buf[i] : '_';
+        else
+        	display[i] = name_buf[i] ? name_buf[i] : ' ';
+    }
+    display[cur_pos] = cur_char;
+    display[MAX_CUSTOM_NAME_LEN + 1] = '\0';
+
+    lv_label_set_text(lbl_user_in, display);
+}
+
+esp_err_t lcd_espnow_menu_nvs_save(const espnow_menu_t *menu)
+{
+    nvs_handle_t h;
+
+    // Open NVS
+    esp_err_t err = nvs_open(ESPNOW_MENU_NS, NVS_READWRITE, &h);
+    if (err != ESP_OK)
+    	return err;
+
+    // menu->options[0] is default "Add New"
+    // If menu->size == 1 there are no user names, otherwise there are menu->size - 1 names
+    uint8_t user_cnt = (menu->size > 1) ? menu->size - 1 : 0;
+    err = nvs_set_u8(h, ESPNOW_MENU_KEY_COUNT, user_cnt);
+    
+    // If error, exit
+    if (err != ESP_OK)
+    	goto out;
+
+	// Loop through all and number them: 00, 01, etc.
+    for (uint8_t i = 0; i < user_cnt; i++) {
+        char key[16];
+        snprintf(key, sizeof(key), ESPNOW_MENU_KEY_FMT, i);
+        
+        // Store the menu option string at each key starting at index 1
+        err = nvs_set_str(h, key, menu->options[i + 1]);
+        
+        // Exit if error
+        if (err != ESP_OK)
+        	goto out;
+    }
+    
+    // Flush pending writes to flash
+    err = nvs_commit(h);
+
+	// Close NVS
+	out: nvs_close(h);
+	
+    return err;
+}
+
+esp_err_t lcd_espnow_menu_nvs_load(espnow_menu_t *menu)
+{
+    nvs_handle_t h;
+        
+    // Open NVS
+    esp_err_t err = nvs_open(ESPNOW_MENU_NS, NVS_READONLY, &h);
+    if (err != ESP_OK)
+    	return err;
+
+	// Get number of saved items
+    uint8_t user_cnt = 0;
+    err = nvs_get_u8(h, ESPNOW_MENU_KEY_COUNT, &user_cnt);
+    if (err != ESP_OK) {
+		nvs_close(h);
+		return err;
+	}
+
+    menu->size = 1; // Don't change first option
+    menu->index = 0;
+
+	// Loop through all keys
+    for (uint8_t i = 0; i < user_cnt; i++) {
+		
+        char key[16];
+        snprintf(key, sizeof(key), ESPNOW_MENU_KEY_FMT, i);
+        size_t len = 0;
+        
+        // Extract the size of the string
+        if (nvs_get_str(h, key, NULL, &len) != ESP_OK) {
+        	break;
+        }
+
+		// Ensure enough memory is available
+        char *buf = malloc(len);
+        if (!buf)
+        	break;
+        
+        // Extract the string
+        if (nvs_get_str(h, key, buf, &len) != ESP_OK) {
+			free(buf);
+			break;
+		}
+
+		// Update menu struct
+		if (menu->size >= MAX_LORA_OPTIONS) {
+		    free(buf);
+		    break;
+		}
+        menu->options[menu->size++] = buf;
+    }
+    
+    // Close NVS
+    nvs_close(h);
+    
+    return ESP_OK;
 }
 
 esp_err_t lcd_espnow_rx_mac_nvs_save(const espnow_menu_t *espnow_menu)
@@ -379,7 +736,7 @@ esp_err_t lcd_espnow_rx_mac_nvs_save(const espnow_menu_t *espnow_menu)
 		// Up to num of MACs saved
         if (i < user_cnt) {
             // Save MAC in 6-byte blob
-            err = nvs_set_blob(nvs_handle, key, espnow_menu->rx_mac[i + 1],  ESPNOW_MAC_SIZE); // Skip 0 to allign with index
+            err = nvs_set_blob(nvs_handle, key, espnow_menu->rx_mac[i + 1], ESPNOW_MAC_SIZE); // Skip 0 to allign with index
         }
         else {
             // Erase leftover key if it exists
@@ -405,61 +762,152 @@ esp_err_t lcd_espnow_rx_mac_nvs_save(const espnow_menu_t *espnow_menu)
 esp_err_t lcd_espnow_rx_mac_nvs_load(espnow_menu_t *espnow_menu)
 {
     nvs_handle_t nvs;
+    
+    // Open NVS
     esp_err_t err = nvs_open(ESPNOW_RX_MAC_NS, NVS_READONLY, &nvs);
-    if (err != ESP_OK) return err;                    /* could be ERR_NVS_NOT_FOUND */
+    if (err != ESP_OK) 
+    	return err;
 
-    /* 1. How many MACs were saved? (defaults to 0 on first boot) */
+    // Get number of MACs saved
     uint8_t cnt = 0;
     err = nvs_get_u8(nvs, ESPNOW_RX_MAC_KEY_COUNT, &cnt);
-    if (err == ESP_ERR_NVS_NOT_FOUND)  cnt = 0;       /* nothing stored yet        */
-    else if (err != ESP_OK)            { nvs_close(nvs); return err; }
+    
+    if (err == ESP_ERR_NVS_NOT_FOUND)
+		cnt = 0; // Nothing stored yet
+    else if (err != ESP_OK) {
+		nvs_close(nvs);
+		return err;
+	}
 
-    /* 2. Clear whole table first */
+    // Zero out macs
     memset(espnow_menu->rx_mac, 0, sizeof(espnow_menu->rx_mac));
 
-    /* 3. Read each valid blob */
+    // Read each MAC into a blob
     for (uint8_t i = 0; i < cnt; i++) {
+		// Format key
         char key[16];
         snprintf(key, sizeof(key), ESPNOW_RX_MAC_KEY_FMT, i);
 
         size_t len = ESPNOW_MAC_SIZE;
-        err = nvs_get_blob(nvs, key, espnow_menu->rx_mac[i], &len);
-        if (err == ESP_ERR_NVS_NOT_FOUND) {            /* hole in list? -> zeroed   */
-            memset(espnow_menu->rx_mac[i], 0, ESPNOW_MAC_SIZE);
+        
+        // Get the MAC blob
+        err = nvs_get_blob(nvs, key, espnow_menu->rx_mac[i + 1], &len);
+        
+        if (err == ESP_ERR_NVS_NOT_FOUND) { // If there's a hole, zero it out
+            memset(espnow_menu->rx_mac[i + 1], 0, ESPNOW_MAC_SIZE);
             continue;
         }
-        if (err != ESP_OK || len != ESPNOW_MAC_SIZE) { /* corrupt entry            */
+        if (err != ESP_OK || len != ESPNOW_MAC_SIZE) {
             nvs_close(nvs);
             return ESP_ERR_INVALID_STATE;
         }
     }
 
+	// Close NVS
     nvs_close(nvs);
 
-    /* 4. Re-initialise menu bookkeeping */
-    espnow_menu->size   = cnt + 1;              /* +1 keeps sentinel row 0      */
-    espnow_menu->index  = 0;                    /* highlight first row          */
+    // Bookkeeping
+    espnow_menu->size = cnt + 1; // Menu size is number of MACs + 1
+    espnow_menu->index = 0;
 
     return (cnt > 0) ? ESP_OK : ESP_ERR_NVS_NOT_FOUND;
 }
 
 esp_err_t lcd_espnow_rx_mac_nvs_delete(espnow_menu_t *espnow_menu, uint8_t slot)
 {
-    /* current number of user MACs (rows 1..size-1) */
-    if (espnow_menu->size <= 1) return ESP_ERR_INVALID_ARG;   /* nothing to delete   */
+    // If nothing to delete
+    if (espnow_menu->size <= 1) 
+    	return ESP_ERR_INVALID_ARG;
+    	
+    // Num macs
     uint8_t user_cnt = espnow_menu->size - 1;
-    if (slot >= user_cnt)          return ESP_ERR_INVALID_ARG; /* out of range        */
+    
+    // If out of range
+    if (slot >= user_cnt)
+    	return ESP_ERR_INVALID_ARG;
 
-    /* 1. Shift rows slot+1 … end down by one */
+    // Shift everything after slot up one remove slot
     for (uint8_t i = slot; i < user_cnt - 1; i++) {
-        memcpy(espnow_menu->rx_mac[i], espnow_menu->rx_mac[i+1], ESPNOW_MAC_SIZE);
+        memcpy(espnow_menu->rx_mac[i + 1], espnow_menu->rx_mac[i + 2], ESPNOW_MAC_SIZE);
     }
-    /* Blank the last now-unused row */
-    memset(espnow_menu->rx_mac[user_cnt - 1], 0, ESPNOW_MAC_SIZE);
+    
+    // Zero out the dangling
+    memset(espnow_menu->rx_mac[user_cnt], 0, ESPNOW_MAC_SIZE);
 
-    /* 2. Decrement size (but keep sentinel) */
+    // Size one less
     espnow_menu->size--;
 
-    /* 3. Persist the compacted list with the save helper already written */
+    // Persist changes to NVS
     return lcd_espnow_rx_mac_nvs_save(espnow_menu);
 }
+
+
+
+
+/*
+static void dump_names(void)
+{
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(ESPNOW_MENU_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "menu-ns open failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    uint8_t cnt = 0;
+    nvs_get_u8(h, ESPNOW_MENU_KEY_COUNT, &cnt);
+    ESP_LOGI(TAG, "=== ESP-NOW peer names (%u) ===", cnt);
+
+    for (uint8_t i = 0; i < cnt; i++) {
+        char key[16];  snprintf(key, sizeof(key), ESPNOW_MENU_KEY_FMT, i);
+
+        size_t len = 0;
+        err = nvs_get_str(h, key, NULL, &len);
+        if (err == ESP_OK && len > 1 && len < 64) {
+            char *buf = malloc(len);
+            if (buf) {
+                nvs_get_str(h, key, buf, &len);
+                ESP_LOGI(TAG, "  [%u] \"%s\"", i, buf);
+                free(buf);
+            }
+        } else {
+            ESP_LOGW(TAG, "  [%u] missing or too long (%s)", i, esp_err_to_name(err));
+        }
+    }
+    nvs_close(h);
+}
+
+static void dump_macs(void)
+{
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(ESPNOW_RX_MAC_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "mac-ns open failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    uint8_t cnt = 0;
+    nvs_get_u8(h, ESPNOW_RX_MAC_KEY_COUNT, &cnt);
+    ESP_LOGI(TAG, "=== ESP-NOW peer MACs (%u) ===", cnt);
+
+    for (uint8_t i = 0; i < cnt; i++) {
+        char key[16];  snprintf(key, sizeof(key), ESPNOW_RX_MAC_KEY_FMT, i);
+        uint8_t mac[6]; size_t len = sizeof(mac);
+
+        err = nvs_get_blob(h, key, mac, &len);
+        if (err == ESP_OK && len == 6) {
+            ESP_LOGI(TAG, "  [%u] %02X:%02X:%02X:%02X:%02X:%02X",
+                     i, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        } else {
+            ESP_LOGW(TAG, "  [%u] missing / wrong size (%s)", i, esp_err_to_name(err));
+        }
+    }
+    nvs_close(h);
+}
+
+	ESP_LOGI(TAG, "========================================");
+    dump_names();
+    dump_macs();
+    ESP_LOGI(TAG, "========================================");
+
+*/
