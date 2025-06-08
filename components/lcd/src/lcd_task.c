@@ -13,7 +13,7 @@
 static const char *TAG = "LCD_TASK";
 
 ui_menu_t ui_menu = {
-    .options = (const char *[]) {"Bluetooth","LoRa","ESP-NOW","Infrared","Tools", "Settings","Wi-Fi"},
+    .options = (const char *[]) {"Bluetooth","PolyPlug","ESP32","Infrared","Tools", "Settings","Wi-Fi"},
     .size = 7,
     .index = 1, // “LoRa” starts in the middle
     .page = HOME_PAGE,

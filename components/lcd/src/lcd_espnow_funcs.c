@@ -14,6 +14,7 @@
 #include "espnow_task.h"
 #include "misc/lv_area.h"
 
+#include "portmacro.h"
 #include "qr_esp_rx_example.h"
 
 #define RX_MAC_IN_SEL_COLOR lv_palette_main(LV_PALETTE_RED)
@@ -663,24 +664,24 @@ void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
 void lcd_espnow_setup_send_page(espnow_menu_t *espnow_menu)
 {
 	#define X_POS -30
-	espnow_menu->espnow_submenu.cmd_to_send = 0; // Set default
+	espnow_menu->espnow_submenu.cmd_to_send = 1; // Set default
 	
 	// Create labels
-	espnow_menu->espnow_submenu.lbl_send_plus = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(espnow_menu->espnow_submenu.lbl_send_plus, LV_SYMBOL_PLUS, user_secondary_color,
-					 &lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS, -53);
+	espnow_menu->espnow_submenu.lbl_send_tx = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(espnow_menu->espnow_submenu.lbl_send_tx, "TX Status:", user_secondary_color,
+					 &lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS, 37);
 					 
-	espnow_menu->espnow_submenu.lbl_send_minus = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(espnow_menu->espnow_submenu.lbl_send_minus, LV_SYMBOL_MINUS, user_secondary_color,
+	espnow_menu->espnow_submenu.lbl_send_rx = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(espnow_menu->espnow_submenu.lbl_send_rx, "RX Status:", user_secondary_color,
 					 &lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS, 57);
 
 	espnow_menu->espnow_submenu.lbl_send_cmd = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(espnow_menu->espnow_submenu.lbl_send_cmd, "0", user_secondary_color,
-					 &lv_font_montserrat_30, LV_ALIGN_CENTER, X_POS, 0);
+	lcd_format_label(espnow_menu->espnow_submenu.lbl_send_cmd, "1", user_secondary_color,
+					 &lv_font_montserrat_30, LV_ALIGN_CENTER, X_POS, -20);
 
 	espnow_menu->espnow_submenu.lbl_send_box = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(espnow_menu->espnow_submenu.lbl_send_box, "", user_secondary_color,
-					 &lv_font_montserrat_24, LV_ALIGN_CENTER, X_POS, 0);
+					 &lv_font_montserrat_24, LV_ALIGN_CENTER, X_POS, -20);
 					 
 	espnow_menu->espnow_submenu.lbl_send = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(espnow_menu->espnow_submenu.lbl_send, "SEND", user_secondary_color,
@@ -688,11 +689,11 @@ void lcd_espnow_setup_send_page(espnow_menu_t *espnow_menu)
 					 
 	espnow_menu->espnow_submenu.arrow_top = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(espnow_menu->espnow_submenu.arrow_top, LV_SYMBOL_UP, user_secondary_color,
-					 &lv_font_montserrat_14, LV_ALIGN_CENTER, X_POS, -30);
+					 &lv_font_montserrat_14, LV_ALIGN_CENTER, X_POS, -50);
 					 
 	espnow_menu->espnow_submenu.arrow_bot = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(espnow_menu->espnow_submenu.arrow_bot, LV_SYMBOL_DOWN, user_secondary_color,
-					 &lv_font_montserrat_14, LV_ALIGN_CENTER, X_POS, 30);
+					 &lv_font_montserrat_14, LV_ALIGN_CENTER, X_POS, 10);
 
 	// Create a style for the border
 	static lv_style_t outline_style;
@@ -720,8 +721,8 @@ void lcd_espnow_setup_send_page(espnow_menu_t *espnow_menu)
 	lv_obj_add_style(espnow_menu->espnow_submenu.lbl_send_box, &outline_style, 0);
 	
 	// Hide everything for now
-	lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_plus, LV_OBJ_FLAG_HIDDEN);
-	lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_minus, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_tx, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_rx, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_cmd, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_box, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send, LV_OBJ_FLAG_HIDDEN);
@@ -731,16 +732,43 @@ void lcd_espnow_setup_send_page(espnow_menu_t *espnow_menu)
 
 void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns)
 {
+	#define BUF_SIZE 4
+	
+	if (xSemaphoreTake(xEspCmdStatusSemaphore, 0) == pdTRUE) {
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, "RX Status: " LV_SYMBOL_OK);
+	}
 	
 	// Send command
 	if (ui_btns->right_btn == 1) {
+		// Reset receipts
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, "TX Status: ");
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, "RX Status: ");
 		
+        // Build the packet
+        espnow_cmd_t espnow_cmd = {0};
+        memcpy(espnow_cmd.mac_selected, espnow_menu->rx_mac[espnow_menu->index], ESPNOW_MAC_SIZE);
+        espnow_cmd.cmd_to_send = espnow_menu->espnow_submenu.cmd_to_send;
+
+        // Send it to ESP-NOW task
+        if (xQueueSend(xEspSendCmdQueue, &espnow_cmd, portMAX_DELAY) == pdPASS) {
+			lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, "TX Status: " LV_SYMBOL_OK);
+		}
 	}
 	// Exit
 	else if (ui_btns->left_btn == 1) {
+		// Reset receipts
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, "TX Status: ");
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, "RX Status: ");
+		
+		// Back to default
+		espnow_menu->espnow_submenu.cmd_to_send = 1;
+		char buf[BUF_SIZE];
+		snprintf(buf, sizeof(buf), "%u", espnow_menu->espnow_submenu.cmd_to_send);
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_cmd, buf);
+		
 		// Hide everything
-		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_plus, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_minus, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_tx, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_rx, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_cmd, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_box, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send, LV_OBJ_FLAG_HIDDEN);
@@ -751,9 +779,6 @@ void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, 
 		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
-		// Back to default
-		//espnow_menu->espnow_submenu.cmd_to_send = 0;
-		
 		// Show ESP-NOW list
 		lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -762,17 +787,25 @@ void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, 
 	}
 	// Increment command
 	else if (ui_btns->up_btn == 1) {
+		// Reset receipts
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, "TX Status: ");
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, "RX Status: ");
+		
 		espnow_menu->espnow_submenu.cmd_to_send++;
 		
-		char buf[6];
+		char buf[BUF_SIZE];
 		snprintf(buf, sizeof(buf), "%u", espnow_menu->espnow_submenu.cmd_to_send);
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_cmd, buf);
 	}
 	// Decrement command
 	else if (ui_btns->down_btn == 1) {
+		// Reset receipts
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, "TX Status: ");
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, "RX Status: ");
+		
 		espnow_menu->espnow_submenu.cmd_to_send--;
 		
-		char buf[6];
+		char buf[BUF_SIZE];
 		snprintf(buf, sizeof(buf), "%u", espnow_menu->espnow_submenu.cmd_to_send);
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_cmd, buf);
 	}
@@ -780,7 +813,7 @@ void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, 
 	else if (ui_btns->select_btn == 1) {
 		espnow_menu->espnow_submenu.cmd_to_send += 3;
 		
-		char buf[6];
+		char buf[BUF_SIZE];
 		snprintf(buf, sizeof(buf), "%u", espnow_menu->espnow_submenu.cmd_to_send);
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_cmd, buf);
 	}

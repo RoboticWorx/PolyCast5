@@ -51,7 +51,7 @@ esp_err_t esp_funcs_espnow_deinit(void);
  *
  * @return ESP_OK on success
  */
-esp_err_t esp_funcs_espnow_send_broadcast(const uint8_t *mac, const uint8_t *data, size_t len);
+esp_err_t esp_funcs_espnow_send_data(const uint8_t *mac, const uint8_t *data, size_t len);
 
 /**
  * @brief Register an ESP-NOW receive callback

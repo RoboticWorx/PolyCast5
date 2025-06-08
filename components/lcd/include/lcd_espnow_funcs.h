@@ -22,8 +22,8 @@ typedef struct ui_btns_t ui_btns_t;
 typedef struct ui_menu_t ui_menu_t;
 
 typedef struct {
-    lv_obj_t *lbl_send_plus;
-    lv_obj_t *lbl_send_minus;
+    lv_obj_t *lbl_send_tx;
+    lv_obj_t *lbl_send_rx;
 	lv_obj_t *lbl_send_cmd;
 	lv_obj_t *lbl_send_box;
 	lv_obj_t *lbl_send;

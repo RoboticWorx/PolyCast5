@@ -8,6 +8,7 @@
 #include "esp_err.h"
 
 #include "espnow_funcs.h"
+#include "espnow_task.h"
 
 #define TAG "ESP_FUNCS"
 
@@ -51,7 +52,10 @@ esp_err_t esp_funcs_wifi_radio_stop(void)
 
 static void send_cb(const uint8_t *mac, esp_now_send_status_t status)
 {
-    ESP_LOGI(TAG, "Send to %02X:%02X:%02X:%02X:%02X:%02X → %s", mac[0],mac[1],mac[2],mac[3],mac[4],mac[5], status == ESP_NOW_SEND_SUCCESS ? "OK" : "FAIL");
+    //ESP_LOGI(TAG, "Send to %02X:%02X:%02X:%02X:%02X:%02X | %s", mac[0],mac[1],mac[2],mac[3],mac[4],mac[5], status == ESP_NOW_SEND_SUCCESS ? "OK" : "FAIL");
+    if (status == ESP_NOW_SEND_SUCCESS) {
+		xSemaphoreGive(xEspCmdStatusSemaphore);
+	}
 }
 
 esp_err_t esp_funcs_espnow_init(const uint8_t *mac, uint8_t channel)
@@ -101,7 +105,7 @@ esp_err_t esp_funcs_espnow_deinit(void)
     return err;
 }
 
-esp_err_t esp_funcs_espnow_send_broadcast(const uint8_t *mac, const uint8_t *data, size_t len)
+esp_err_t esp_funcs_espnow_send_data(const uint8_t *mac, const uint8_t *data, size_t len)
 {
 	// Cap at max length
     if (len > ESP_NOW_MAX_DATA_LEN) {

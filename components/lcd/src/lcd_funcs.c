@@ -352,11 +352,11 @@ void lcd_selection_btn_pressed(ui_menu_t *menu)
 		lcd_swipe_anim(menu, 1, SWIPE_SPEED);
 		menu->page = BLUETOOTH_PAGE;
 	}
-	else if (strcmp(option, "LoRa") == 0) {
+	else if (strcmp(option, "PolyPlug") == 0) {
 		lcd_swipe_anim(menu, 1, SWIPE_SPEED);
 		menu->page = LORA_PAGE;
 	}
-	else if (strcmp(option, "ESP-NOW") == 0) {
+	else if (strcmp(option, "ESP32") == 0) {
 		lcd_swipe_anim(menu, 1, SWIPE_SPEED);
 		menu->page = ESPNOW_PAGE;
 	}
@@ -576,12 +576,12 @@ void lcd_init_selection_labels(ui_menu_t *ui_menu)
 					 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
 
 	ui_menu->lbl_mid = lv_label_create(ui_menu->btn_mid);
-	lcd_format_label(ui_menu->lbl_mid, "LoRa",
+	lcd_format_label(ui_menu->lbl_mid, "PolyPlug",
 					 user_secondary_color, &lv_font_montserrat_30,
 					 LV_ALIGN_CENTER, 0, 0);
 					 
 	ui_menu->lbl_bot = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(ui_menu->lbl_bot, "ESP-NOW", user_secondary_color,
+	lcd_format_label(ui_menu->lbl_bot, "ESP32", user_secondary_color,
 					 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -15);
 	
 	// Arrows		 
@@ -818,8 +818,8 @@ void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui
 		lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
 		// Show ESP-NOW submenu
-		lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send_plus, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send_minus, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send_tx, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send_rx, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send_cmd, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send_box, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send, LV_OBJ_FLAG_HIDDEN);
