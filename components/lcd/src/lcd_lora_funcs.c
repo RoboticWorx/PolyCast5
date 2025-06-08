@@ -415,6 +415,8 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 	    cur_pos = 0;
 	    cur_char = '_';
 	    memset(name_buf, 0, sizeof name_buf);
+	    
+	    lora_menu_overwrite = false; // Switch back
 		
 		// Reset submenu to first index
 		lora_menu->submenu.index = 0;
@@ -475,7 +477,7 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 			lora_menu->options[lora_menu->index] = strdup(saved_name);
 
 			// Persist to NVS
-			lcd_lora_menu_nvs_save(lora_menu, LORA_OPTIONS_NS, LORA_OPTIONS_KEY_COUNT, LORA_OPTIONS_KEY_FMT);
+			lcd_lora_menu_nvs_save(lora_menu);
 
 			// Update the button’s label in-place
 			lv_obj_t *btn = lora_menu->btns[lora_menu->index];
@@ -497,7 +499,7 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 			// Save to options, then to NVS
 			char *name_copy = strdup(saved_name);
 			lora_menu->options[lora_menu->size - 1] = name_copy;
-			lcd_lora_menu_nvs_save(lora_menu, LORA_OPTIONS_NS, LORA_OPTIONS_KEY_COUNT, LORA_OPTIONS_KEY_FMT);
+			lcd_lora_menu_nvs_save(lora_menu);
 			
 			// Get shared encryption key and do the same under the same index
 			if (xQueueReceive(xEspSendEncKeyQueueNVS, received_enc_key_nvs, portMAX_DELAY) == pdPASS) {
@@ -515,7 +517,7 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 		        //ESP_LOGI(TAG, "Key saved at slot %d:", lora_menu->size - 1);
 				//ESP_LOG_BUFFER_HEX("SAVED IN QUEUE", lora_menu->keys[lora_menu->size - 1], ENC_KEY_LEN);
 				
-				lcd_lora_key_nvs_save(lora_menu, LORA_ENC_NS, LORA_ENC_KEY_COUNT, LORA_ENC_KEY_FMT);
+				lcd_lora_key_nvs_save(lora_menu);
 			}
 
 			// Create new button for new option
@@ -644,8 +646,8 @@ void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_bt
 	        lora_menu->index = lora_menu->size-1;
 	        
 	    // Remove entry from NVS
-	    lcd_lora_menu_nvs_delete(del_idx, LORA_OPTIONS_NS, LORA_OPTIONS_KEY_COUNT, LORA_OPTIONS_KEY_FMT);
-		lcd_lora_key_nvs_delete(del_idx, LORA_ENC_NS, LORA_ENC_KEY_COUNT, LORA_ENC_KEY_FMT);
+	    lcd_lora_menu_nvs_delete(del_idx);
+		lcd_lora_key_nvs_delete(del_idx);
 	
 	    // Refresh the list UI
 	    lcd_lora_update_menu(lora_menu);
@@ -991,19 +993,19 @@ void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 	}
 }
 
-esp_err_t lcd_lora_menu_nvs_save(const lora_menu_t *menu, const char* ns, const char* count, const char* fmt)
+esp_err_t lcd_lora_menu_nvs_save(const lora_menu_t *menu)
 {
     nvs_handle_t h;
 
     // Open NVS
-    esp_err_t err = nvs_open(ns, NVS_READWRITE, &h);
+    esp_err_t err = nvs_open(LORA_OPTIONS_NS, NVS_READWRITE, &h);
     if (err != ESP_OK)
     	return err;
 
     // menu->options[0] is default "Add New"
     // If menu->size == 1 there are no user names, otherwise there are menu->size - 1 names
     uint8_t user_cnt = (menu->size > 1) ? menu->size - 1 : 0;
-    err = nvs_set_u8(h, count, user_cnt);
+    err = nvs_set_u8(h, LORA_OPTIONS_KEY_COUNT, user_cnt);
     
     // If error, exit
     if (err != ESP_OK)
@@ -1012,7 +1014,7 @@ esp_err_t lcd_lora_menu_nvs_save(const lora_menu_t *menu, const char* ns, const 
 	// Loop through all and number them: n00, n01, etc.
     for (uint8_t i = 0; i < user_cnt; i++) {
         char key[16];
-        snprintf(key, sizeof(key), fmt, i);
+        snprintf(key, sizeof(key), LORA_OPTIONS_KEY_FMT, i);
         
         // Store the menu option string at each key starting at index 1
         err = nvs_set_str(h, key, menu->options[i + 1]);
@@ -1031,19 +1033,19 @@ esp_err_t lcd_lora_menu_nvs_save(const lora_menu_t *menu, const char* ns, const 
     return err;
 }
 
-esp_err_t lcd_lora_key_nvs_save(const lora_menu_t *menu, const char* ns, const char* count, const char* fmt)
+esp_err_t lcd_lora_key_nvs_save(const lora_menu_t *menu)
 {
     nvs_handle_t h;
 
     // Open NVS
-    esp_err_t err = nvs_open(ns, NVS_READWRITE, &h);
+    esp_err_t err = nvs_open(LORA_ENC_NS, NVS_READWRITE, &h);
     if (err != ESP_OK)
     	return err;
 
     // menu->options[0] is default "Add New"
     // If menu->size == 1 there are no user names, otherwise there are menu->size - 1 names
     uint8_t user_cnt = (menu->size > 1) ? menu->size - 1 : 0;
-    err = nvs_set_u8(h, count, user_cnt);
+    err = nvs_set_u8(h, LORA_ENC_KEY_COUNT, user_cnt);
     
     // If error, exit
     if (err != ESP_OK)
@@ -1052,7 +1054,7 @@ esp_err_t lcd_lora_key_nvs_save(const lora_menu_t *menu, const char* ns, const c
 	// Loop through all and number them: n00, n01, etc.
     for (uint8_t i = 0; i < user_cnt; i++) {
         char key[16];
-        snprintf(key, sizeof(key), fmt, i);
+        snprintf(key, sizeof(key), LORA_ENC_KEY_FMT, i);
         
         // Store the key string at each key starting at index 1 to match user options
         err = nvs_set_blob(h, key, menu->keys[i + 1], ENC_KEY_LEN);
@@ -1071,18 +1073,18 @@ esp_err_t lcd_lora_key_nvs_save(const lora_menu_t *menu, const char* ns, const c
     return err;
 }
 
-esp_err_t lcd_lora_menu_nvs_load(lora_menu_t *menu, const char* ns, const char* count, const char* fmt)
+esp_err_t lcd_lora_menu_nvs_load(lora_menu_t *menu)
 {
     nvs_handle_t h;
         
     // Open NVS
-    esp_err_t err = nvs_open(ns, NVS_READONLY, &h);
+    esp_err_t err = nvs_open(LORA_OPTIONS_NS, NVS_READONLY, &h);
     if (err != ESP_OK)
     	return err;
 
 	// Get number of saved items
     uint8_t user_cnt = 0;
-    err = nvs_get_u8(h, count, &user_cnt);
+    err = nvs_get_u8(h, LORA_OPTIONS_KEY_COUNT, &user_cnt);
     if (err != ESP_OK) {
 		nvs_close(h);
 		return err;
@@ -1095,7 +1097,7 @@ esp_err_t lcd_lora_menu_nvs_load(lora_menu_t *menu, const char* ns, const char* 
     for (uint8_t i = 0; i < user_cnt; i++) {
 		
         char key[16];
-        snprintf(key, sizeof(key), fmt, i);
+        snprintf(key, sizeof(key), LORA_OPTIONS_KEY_FMT, i);
         size_t len = 0;
         
         // Extract the size of the string
@@ -1128,18 +1130,18 @@ esp_err_t lcd_lora_menu_nvs_load(lora_menu_t *menu, const char* ns, const char* 
     return ESP_OK;
 }
 
-esp_err_t lcd_lora_key_nvs_load(lora_menu_t *menu, const char* ns, const char* count, const char* fmt)
+esp_err_t lcd_lora_key_nvs_load(lora_menu_t *menu)
 {
     nvs_handle_t h;
         
     // Open NVS
-    esp_err_t err = nvs_open(ns, NVS_READONLY, &h);
+    esp_err_t err = nvs_open(LORA_ENC_NS, NVS_READONLY, &h);
     if (err != ESP_OK)
     	return err;
 
 	// Get number of saved items
     uint8_t user_cnt = 0;
-    err = nvs_get_u8(h, count, &user_cnt);
+    err = nvs_get_u8(h, LORA_ENC_KEY_COUNT, &user_cnt);
     if (err != ESP_OK) {
 		nvs_close(h);
 		return err;
@@ -1152,7 +1154,7 @@ esp_err_t lcd_lora_key_nvs_load(lora_menu_t *menu, const char* ns, const char* c
     for (uint8_t i = 0; i < user_cnt; i++) {
         
         char key[16];
-        snprintf(key, sizeof(key), fmt, i);
+        snprintf(key, sizeof(key), LORA_ENC_KEY_FMT, i);
         
         // Read exactly ENC_KEY_LEN bytes
         size_t blob_len = ENC_KEY_LEN;
@@ -1192,11 +1194,11 @@ esp_err_t lcd_lora_key_nvs_load(lora_menu_t *menu, const char* ns, const char* c
     return err;
 }
 
-esp_err_t lcd_lora_menu_nvs_delete(uint8_t del_idx, const char *ns, const char *count_key, const char *fmt_key)
+esp_err_t lcd_lora_menu_nvs_delete(uint8_t del_idx)
 {
 	// Open NVS
     nvs_handle_t h;
-    esp_err_t err = nvs_open(ns, NVS_READWRITE, &h);
+    esp_err_t err = nvs_open(LORA_OPTIONS_NS, NVS_READWRITE, &h);
     
     // Error check
     if (err != ESP_OK)
@@ -1204,7 +1206,7 @@ esp_err_t lcd_lora_menu_nvs_delete(uint8_t del_idx, const char *ns, const char *
 
     // Get current number of items in menu
     uint8_t user_cnt = 0;
-    err = nvs_get_u8(h, count_key, &user_cnt);
+    err = nvs_get_u8(h, LORA_OPTIONS_KEY_COUNT, &user_cnt);
     
     // Error check/if out of range
     if (err != ESP_OK || del_idx >= user_cnt + 1) {
@@ -1217,8 +1219,8 @@ esp_err_t lcd_lora_menu_nvs_delete(uint8_t del_idx, const char *ns, const char *
         char key_src[16], key_dst[16];
         
         // Format key
-        snprintf(key_src, sizeof key_src, fmt_key, i);
-        snprintf(key_dst, sizeof key_dst, fmt_key, i - 1);
+        snprintf(key_src, sizeof key_src, LORA_OPTIONS_KEY_FMT, i);
+        snprintf(key_dst, sizeof key_dst, LORA_OPTIONS_KEY_FMT, i - 1);
 
 		// Get key length
         size_t len = 0;
@@ -1249,13 +1251,13 @@ esp_err_t lcd_lora_menu_nvs_delete(uint8_t del_idx, const char *ns, const char *
     // Erase the dangling last slot
     if (err == ESP_OK) {
         char key_last[16];
-        snprintf(key_last, sizeof key_last, fmt_key, user_cnt - 1);
+        snprintf(key_last, sizeof key_last, LORA_OPTIONS_KEY_FMT, user_cnt - 1);
         err = nvs_erase_key(h, key_last);
     }
 
     // Update count and commit changes to NVS
     if (err == ESP_OK) {
-        err = nvs_set_u8(h, count_key, user_cnt - 1);
+        err = nvs_set_u8(h, LORA_OPTIONS_KEY_COUNT, user_cnt - 1);
         if (err == ESP_OK)
         	err = nvs_commit(h);
     }
@@ -1265,11 +1267,11 @@ esp_err_t lcd_lora_menu_nvs_delete(uint8_t del_idx, const char *ns, const char *
     return err;
 }
 
-esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx, const char *ns, const char *count_key, const char *fmt_key)
+esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx)
 {
 	// Open NVS
     nvs_handle_t h;
-    esp_err_t err = nvs_open(ns, NVS_READWRITE, &h);
+    esp_err_t err = nvs_open(LORA_ENC_NS, NVS_READWRITE, &h);
     
     // Error check
     if (err != ESP_OK)
@@ -1277,7 +1279,7 @@ esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx, const char *ns, const char *c
 
 	// Get number of keys
     uint8_t user_cnt = 0;
-    err = nvs_get_u8(h, count_key, &user_cnt);
+    err = nvs_get_u8(h, LORA_ENC_KEY_COUNT, &user_cnt);
     
     // Error check
     if (err != ESP_OK || del_idx >= user_cnt + 1) {
@@ -1293,8 +1295,8 @@ esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx, const char *ns, const char *c
         char src[16], dst[16];
         
         // Format key
-        snprintf(src, sizeof src, fmt_key, i);
-        snprintf(dst, sizeof dst, fmt_key, i - 1);
+        snprintf(src, sizeof src, LORA_ENC_KEY_FMT, i);
+        snprintf(dst, sizeof dst, LORA_ENC_KEY_FMT, i - 1);
 
         size_t len = ENC_KEY_LEN;
         // Get key from src
@@ -1309,13 +1311,13 @@ esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx, const char *ns, const char *c
 	// Erase dangling key
     if (err == ESP_OK) {
         char last[16];
-        snprintf(last, sizeof last, fmt_key, user_cnt - 1);
+        snprintf(last, sizeof last, LORA_ENC_KEY_FMT, user_cnt - 1);
         err = nvs_erase_key(h, last);
     }
 	
 	// Set new count
     if (err == ESP_OK) {
-        err = nvs_set_u8(h, count_key, user_cnt - 1);
+        err = nvs_set_u8(h, LORA_ENC_KEY_COUNT, user_cnt - 1);
         if (err == ESP_OK) err = nvs_commit(h);
     }
 	

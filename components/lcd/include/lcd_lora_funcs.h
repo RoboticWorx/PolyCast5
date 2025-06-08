@@ -52,38 +52,128 @@ extern lora_menu_t lora_menu;
  * @param [in] lora_meun LoRa menu structure
  * @param [in] ui_btns UI input structure
  */
- 
- 
-void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
 
-void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
+/**
+ * @brief Creates the central LoRa page then hides it for quick access
+ *
+ * @param [in] lora_menu LoRa menu structure
+ */
+void lcd_lora_setup_page(lora_menu_t *lora_menu);
 
-void lcd_lora_create_enc_key(ui_menu_t *ui_menu, lora_menu_t *lora_menu);
+/**
+ * @brief Creates the LoRa subpage then hides it for quick access
+ *
+ * @param [in] lora_menu LoRa menu structure
+ */
+void lcd_lora_setup_subpage(lora_menu_t *lora_menu);
 
-void lcd_lora_subpage_option_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
-
+/**
+ * @brief Executes when navigating the LoRa subpage to display LoRa options in a container
+ *
+ * @param [in] ui_menu UI menu structure
+ * @param [in] lora_menu LoRa menu structure
+ * @param [in] ui_btns UI input structure
+ */
 void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
 
-void lcd_lora_update_submenu(lora_menu_t *menu);
+/**
+ * @brief Updates the LoRa menu labels based on user menu input
+ *
+ * @param [in] lora_menu LoRa menu structure
+ */
+void lcd_lora_update_menu(lora_menu_t *lora_menu);
 
-void lcd_lora_setup_page(lora_menu_t *menu);
+/**
+ * @brief Updates the LoRa subpage labels based on user submenu input
+ *
+ * @param [in] lora_menu LoRa menu structure
+ */
+void lcd_lora_update_submenu(lora_menu_t *lora_menu);
 
-void lcd_lora_setup_subpage(lora_menu_t *menu);
+/**
+ * @brief Executes when a specific LoRa subpage option is selected by the user
+ *
+ * @param [in] ui_menu UI menu structure
+ * @param [in] lora_menu LoRa menu structure
+ * @param [in] ui_btns UI input structure
+ */
+void lcd_lora_subpage_option_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
 
-void lcd_lora_update_menu(lora_menu_t *menu);
+/**
+ * @brief Executes when user selects "AWAY" from LoRa subpage
+ *
+ * @param [in] ui_menu UI menu structure
+ * @param [in] lora_menu LoRa menu structure
+ * @param [in] ui_btns UI input structure
+ */
+void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
 
+/**
+ * @brief Executes when user selects "LOOP" from LoRa subpage
+ *
+ * @param [in] ui_menu UI menu structure
+ * @param [in] lora_menu LoRa menu structure
+ * @param [in] ui_btns UI input structure
+ */
+void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
+
+/**
+ * @brief Prompts user on how to pair a PolyPlug then sends a Semaphore to generate a random enc key to share
+ *
+ * @param [in] ui_menu UI menu structure
+ * @param [in] lora_menu LoRa menu structure
+ */
+void lcd_lora_create_enc_key(ui_menu_t *ui_menu, lora_menu_t *lora_menu);
+
+/**
+ * @brief Takes user input to create a name for/rename a designated PolyPlug
+ *
+ * @param [in] ui_menu UI menu structure
+ * @param [in] lora_menu LoRa menu structure
+ * @param [in] ui_btns UI input structure
+ */
 void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
 
-esp_err_t lcd_lora_menu_nvs_save(const lora_menu_t *menu, const char* ns, const char* count, const char* fmt);
+/**
+ * @brief Saves new LoRa menu option and name to NVS
+ *
+ * @param [in] lora_menu LoRa menu structure
+ */
+esp_err_t lcd_lora_menu_nvs_save(const lora_menu_t *lora_menu);
 
-esp_err_t lcd_lora_key_nvs_save(const lora_menu_t *menu, const char* ns, const char* count, const char* fmt);
+/**
+ * @brief Saves new LoRa enc key to NVS
+ *
+ * @param [in] lora_menu ESP-NOW menu structure
+ */
+esp_err_t lcd_lora_key_nvs_save(const lora_menu_t *lora_menu);
 
-esp_err_t lcd_lora_menu_nvs_load(lora_menu_t *menu, const char* ns, const char* count, const char* fmt);
+/**
+ * @brief Loads all LoRa menu options and names from NVS
+ *
+ * @param [in] lora_menu ESP-NOW menu structure
+ */
+esp_err_t lcd_lora_menu_nvs_load(lora_menu_t *lora_menu);
 
-esp_err_t lcd_lora_key_nvs_load(lora_menu_t *menu, const char* ns, const char* count, const char* fmt);
+/**
+ * @brief Loads all LoRa enc keys from NVS
+ *
+ * @param [in] lora_menu ESP-NOW menu structure
+ */
+esp_err_t lcd_lora_key_nvs_load(lora_menu_t *lora_menu);
 
-esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx, const char *ns, const char *count_key, const char *fmt_key);
+/**
+ * @brief Deletes a given enc key from NVS
+ *
+ * @param [in] lora_menu ESP-NOW menu structure
+ */
+esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx);
 
-esp_err_t lcd_lora_menu_nvs_delete(uint8_t del_idx, const char *ns, const char *count_key, const char *fmt_key);
+/**
+ * @brief Deletes a given menu option from NVS
+ *
+ * @param [in] lora_menu ESP-NOW menu structure
+ */
+esp_err_t lcd_lora_menu_nvs_delete(uint8_t del_idx);
 
 #endif // LCD_LORA_FUNCS_H

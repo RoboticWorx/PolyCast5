@@ -47,26 +47,87 @@ typedef struct {
 
 extern espnow_menu_t espnow_menu; 
 
+/**
+ * @brief Pre-load ESP-NOW send page labels and data
+ *
+ * @param [in] espnow_menu ESP-NOW menu structure
+ */
 void lcd_espnow_setup_send_page(espnow_menu_t *espnow_menu);
 
+/**
+ * @brief Pre-load ESP-NOW page labels and data
+ *
+ * @param [in] espnow_menu ESP-NOW menu structure
+ */
+void lcd_espnow_setup_page(espnow_menu_t *espnow_menu);
+
+/**
+ * @brief Update ESP-NOW page labels and data for user input
+ *
+ * @param [in] espnow_menu ESP-NOW menu structure
+ */
+void lcd_espnow_update_menu(espnow_menu_t *espnow_menu);
+
+/**
+ * @brief Executes when specific ESP-NOW option is selected
+ *
+ * @param [in] ui_menu UI menu structure
+ * @param [in] espnow_menu ESP-NOW menu structure
+ * @param [in] ui_btns UI input structure
+ */
 void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns);
 
+/**
+ * @brief Takes user input to create a name for adding/renaming a selected ESP32
+ *
+ * @param [in] ui_menu UI menu structure
+ * @param [in] espnow_menu ESP-NOW menu structure
+ * @param [in] ui_btns UI input structure
+ */
 void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns);
 
-void lcd_espnow_setup_page(espnow_menu_t *menu);
-
-void lcd_espnow_update_menu(espnow_menu_t *menu);
-
+/**
+ * @brief Takes user input to obtain the MAC address of a specific ESP32 receiver
+ *
+ * @param [in] ui_menu UI menu structure
+ * @param [in] espnow_menu ESP-NOW menu structure
+ * @param [in] ui_btns UI input structure
+ */
 void lcd_espnow_get_rx_mac(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns);
 
+/**
+ * @brief Saves new ESP32 menu option and name to NVS
+ *
+ * @param [in] espnow_menu ESP-NOW menu structure
+ */
 esp_err_t lcd_espnow_menu_nvs_save(const espnow_menu_t *menu);
 
+/**
+ * @brief Loads all ESP32 menu options and names from NVS
+ *
+ * @param [in] espnow_menu ESP-NOW menu structure
+ */
 esp_err_t lcd_espnow_menu_nvs_load(espnow_menu_t *menu);
 
+/**
+ * @brief Saves new ESP32 receiver MAC to NVS
+ *
+ * @param [in] espnow_menu ESP-NOW menu structure
+ */
 esp_err_t lcd_espnow_rx_mac_nvs_save(const espnow_menu_t *espnow_menu);
 
+/**
+ * @brief Loads all ESP32 receiver MACs from NVS
+ *
+ * @param [in] espnow_menu ESP-NOW menu structure
+ */
 esp_err_t lcd_espnow_rx_mac_nvs_load(espnow_menu_t *espnow_menu);
 
+/**
+ * @brief Deletes a ESP32 receiver MACs from NVS
+ *
+ * @param [in] espnow_menu ESP-NOW menu structure
+ */
 esp_err_t lcd_espnow_rx_mac_nvs_delete(espnow_menu_t *espnow_menu, uint8_t slot);
 
 #endif // LCD_ESPNOW_FUNCS_H

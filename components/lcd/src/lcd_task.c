@@ -69,8 +69,8 @@ static void lcd_task(void *pvParameters)
 	// Load user data from NVS
 	lcd_ir_ir_menu_nvs_load(&ir_menu, A_IR_REMOTE_NS, A_REMOTE_KEY_COUNT, A_REMOTE_KEY_FMT);
 	
-	lcd_lora_menu_nvs_load(&lora_menu, LORA_OPTIONS_NS, LORA_OPTIONS_KEY_COUNT, LORA_OPTIONS_KEY_FMT);
-	lcd_lora_key_nvs_load(&lora_menu, LORA_ENC_NS, LORA_ENC_KEY_COUNT, LORA_ENC_KEY_FMT);
+	lcd_lora_menu_nvs_load(&lora_menu);
+	lcd_lora_key_nvs_load(&lora_menu);
 	
 	lcd_espnow_menu_nvs_load(&espnow_menu);
 	lcd_espnow_rx_mac_nvs_load(&espnow_menu);

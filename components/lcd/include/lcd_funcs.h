@@ -154,9 +154,9 @@ void lcd_format_center_button(lv_obj_t *btn_mid, lv_color_t user_primary_color, 
 /**
  * @brief Determine which page was selected by the user in the wireless selection page
  *
- * @param [in] menu UI menu structure
+ * @param [in] ui_menu UI menu structure
  */
-void lcd_selection_btn_pressed(ui_menu_t *menu);
+void lcd_selection_btn_pressed(ui_menu_t *ui_menu);
 
 /**
  * @brief Initialize images to be used in animation
