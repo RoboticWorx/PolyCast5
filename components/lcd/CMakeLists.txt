@@ -12,6 +12,8 @@ idf_component_register(
         
         "media/qr/src/qr_esp_rx_example.c"
         
+        "media/other/src/img_ir_save_new_remote.c"
+        
         "media/city/src/anim_city_1.c"
         "media/city/src/anim_city_2.c"
         "media/city/src/anim_city_3.c"
@@ -37,6 +39,7 @@ idf_component_register(
     	"include"
     	"media/qr/include"
     	"media/city/include"
+    	"media/other/include"
     
     REQUIRES
     	driver freertos lvgl sx126x

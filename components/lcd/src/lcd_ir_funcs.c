@@ -1,6 +1,8 @@
 #include "esp_log.h"
 #include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
+#include "img_ir_save_new_remote.h"
+#include "misc/lv_area.h"
 #include "nvs.h"
 
 #include "lcd_ir_funcs.h"
@@ -8,6 +10,8 @@
 #include "lcd_task.h"
 #include "infrared_task.h"
 #include "gpio_task.h"
+
+#include "img_ir_save_new_remote.h"
 
 ir_menu_t ir_menu = {
     .options = {"Add New", "Edit"},
@@ -475,34 +479,61 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
 {
 	// Hide IR menu
 	lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
+	
+	// Hide arrows
+	lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 	// Restart infrared RX
 	xSemaphoreGive(xStartInfraredRXSemaphore);
 		
 	// Create texts
 	lv_obj_t *text_label = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(text_label, "Present signal!", user_secondary_color,
-				 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+	lcd_format_label(text_label, "Point the remote at the\nIR lens and send the signal.", user_secondary_color,
+				 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 13);
+				 
+	// Create present signal img
+    lv_obj_t *img_save_remote = lv_img_create(ACTIVE_SCR);
+    lv_img_set_src(img_save_remote, &img_ir_save_new_remote);
+    lv_obj_align(img_save_remote, LV_ALIGN_CENTER, 0, 25);
+    
 	lv_timer_handler();
 	
 	// Wait until signal received and saved	
 	while (1) {
-        if (xSemaphoreTake(xInfraredSignalSavedSemaphore, 1) == pdTRUE) {
+        if (xSemaphoreTake(xInfraredSignalSavedSemaphore, 0) == pdTRUE) {
+			lv_obj_delete(img_save_remote); // Delete img
+			
             // Signal arrived
             lv_label_set_text(text_label, "Saving...");
 			lv_timer_handler();
+			
+			vTaskDelay(pdMS_TO_TICKS(500));
+			lv_obj_delete(text_label);
+			
+			// Show arrows
+			lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 			
 			// Switch to naming page
 			ui_menu->page = INFRARED_REMOTE_NAME_PAGE;
 			
             break;
         }
-        if (xSemaphoreTake(xLeftButtonSemaphore, 1)) {
+        if (xSemaphoreTake(xLeftButtonSemaphore, 0)) {
             // User hit cancel
-            lv_label_set_text(text_label, "Canceling...");
-            lv_timer_handler();
-            
             xSemaphoreGive(xDisableInfraredSemaphore);
+            
+            // Delete objects
+            lv_obj_delete(text_label);
+            lv_obj_delete(img_save_remote);
+            
+            // Show arrows
+			lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
             
             // Go back
 			ui_menu->page = INFRARED_PAGE;
@@ -511,9 +542,7 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
         }
     }
 	
-	// Conclude
-	vTaskDelay(pdMS_TO_TICKS(500));
-	lv_obj_delete(text_label);
+	vTaskDelay(pdMS_TO_TICKS(10));
 }
 
 esp_err_t lcd_ir_ir_menu_nvs_save(const ir_menu_t *menu, const char* ns, const char* count, const char* fmt)

@@ -668,11 +668,11 @@ void lcd_espnow_setup_send_page(espnow_menu_t *espnow_menu)
 	
 	// Create labels
 	espnow_menu->espnow_submenu.lbl_send_tx = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(espnow_menu->espnow_submenu.lbl_send_tx, "TX Status:", user_secondary_color,
-					 &lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS, 37);
+	lcd_format_label(espnow_menu->espnow_submenu.lbl_send_tx, "TX Status: ", user_secondary_color,
+					 &lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS, 39);
 					 
 	espnow_menu->espnow_submenu.lbl_send_rx = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(espnow_menu->espnow_submenu.lbl_send_rx, "RX Status:", user_secondary_color,
+	lcd_format_label(espnow_menu->espnow_submenu.lbl_send_rx, "RX Status: ", user_secondary_color,
 					 &lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS, 57);
 
 	espnow_menu->espnow_submenu.lbl_send_cmd = lv_label_create(ACTIVE_SCR);
@@ -811,6 +811,10 @@ void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, 
 	}
 	// Increment command by 3
 	else if (ui_btns->select_btn == 1) {
+		// Reset receipts
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, "TX Status: ");
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, "RX Status: ");
+		
 		espnow_menu->espnow_submenu.cmd_to_send += 3;
 		
 		char buf[BUF_SIZE];
