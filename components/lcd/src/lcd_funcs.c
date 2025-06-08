@@ -35,6 +35,46 @@
 #include "anim_city_18.h"
 #include "anim_city_19.h"
 #include "anim_city_20.h"
+#include "anim_city_21.h"
+#include "anim_city_22.h"
+#include "anim_city_23.h"
+#include "anim_city_24.h"
+#include "anim_city_25.h"
+#include "anim_city_26.h"
+#include "anim_city_27.h"
+#include "anim_city_28.h"
+#include "anim_city_29.h"
+#include "anim_city_30.h"
+#include "anim_city_31.h"
+#include "anim_city_32.h"
+#include "anim_city_33.h"
+#include "anim_city_34.h"
+#include "anim_city_35.h"
+#include "anim_city_36.h"
+#include "anim_city_37.h"
+#include "anim_city_38.h"
+#include "anim_city_39.h"
+#include "anim_city_40.h"
+#include "anim_city_41.h"
+#include "anim_city_42.h"
+#include "anim_city_43.h"
+#include "anim_city_44.h"
+#include "anim_city_45.h"
+#include "anim_city_46.h"
+#include "anim_city_47.h"
+#include "anim_city_48.h"
+#include "anim_city_49.h"
+#include "anim_city_50.h"
+#include "anim_city_51.h"
+#include "anim_city_52.h"
+#include "anim_city_53.h"
+#include "anim_city_54.h"
+#include "anim_city_55.h"
+#include "anim_city_56.h"
+#include "anim_city_57.h"
+#include "anim_city_58.h"
+#include "anim_city_59.h"
+#include "anim_city_60.h"
 
 #define DRAW_LINES   20
 #define FLUSH_CHUNK  2
@@ -43,13 +83,12 @@
 #define SCROLL_SPEED 400
 #define IR_LABELS_OFFSET 20
 
-#define CITY_FRAME_CNT  20
+#define CITY_FRAME_CNT  60
 #define CITY_FRAME_PERIOD 120
 
-#define CITY_PING_PONG 1
+//#define CITY_PING_PONG 1
 
 static const char *TAG = "LCD_FUNCS";
-
 
 static TFT_t tft;
 static lv_display_t *disp; // LVGL display handle
@@ -488,7 +527,7 @@ static void city_anim_cb(lv_timer_t *t)
 	    // Show the newly chosen frame
 	    lv_obj_clear_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN);
 	    
-    #elif // Go all the way through and then reset
+    #else // Go all the way through and then reset
 	    // Hide current frame
 	    lv_obj_add_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN);
 	
@@ -503,14 +542,27 @@ static void city_anim_cb(lv_timer_t *t)
 void lcd_init_images()
 {
 	const lv_img_dsc_t *src_arr[CITY_FRAME_CNT] = { // 65KB each
-        &anim_city_1, &anim_city_2, &anim_city_3,
-        &anim_city_4, &anim_city_5, &anim_city_6,
-        &anim_city_7, &anim_city_8, &anim_city_9,
-        &anim_city_10, &anim_city_11, &anim_city_12,
-        &anim_city_13, &anim_city_14, &anim_city_15,
-        &anim_city_16, &anim_city_17, &anim_city_18,
-        &anim_city_19, &anim_city_20
-    };
+	    &anim_city_1,  &anim_city_2,  &anim_city_3,
+	    &anim_city_4,  &anim_city_5,  &anim_city_6,
+	    &anim_city_7,  &anim_city_8,  &anim_city_9,
+	    &anim_city_10, &anim_city_11, &anim_city_12,
+	    &anim_city_13, &anim_city_14, &anim_city_15,
+	    &anim_city_16, &anim_city_17, &anim_city_18,
+	    &anim_city_19, &anim_city_20, &anim_city_21,
+	    &anim_city_22, &anim_city_23, &anim_city_24,
+	    &anim_city_25, &anim_city_26, &anim_city_27,
+	    &anim_city_28, &anim_city_29, &anim_city_30,
+	    &anim_city_31, &anim_city_32, &anim_city_33,
+	    &anim_city_34, &anim_city_35, &anim_city_36,
+	    &anim_city_37, &anim_city_38, &anim_city_39,
+	    &anim_city_40, &anim_city_41, &anim_city_42,
+	    &anim_city_43, &anim_city_44, &anim_city_45,
+	    &anim_city_46, &anim_city_47, &anim_city_48,
+	    &anim_city_49, &anim_city_50, &anim_city_51,
+	    &anim_city_52, &anim_city_53, &anim_city_54,
+	    &anim_city_55, &anim_city_56, &anim_city_57,
+	    &anim_city_58, &anim_city_59, &anim_city_60,
+	};
 
 	// Create and center every image
     for (int i = 0; i < CITY_FRAME_CNT; i++) {

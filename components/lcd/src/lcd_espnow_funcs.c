@@ -491,7 +491,7 @@ void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
                          &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, -30);
                          
         if (espnow_menu_overwrite)
-        	lv_label_set_text(lbl_dirs, "Enter new ESP32 name\n with arrow buttons:");
+        	lv_label_set_text(lbl_dirs, "Enter new ESP32 name\n   with arrow buttons:");
         
         lbl_chars = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_chars, "(Up to 12 characters)", user_secondary_color,
