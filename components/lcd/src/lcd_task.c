@@ -35,6 +35,7 @@ ui_btns_t ui_btns = {
     .select_btn = 0,
 };
 
+volatile bool lcd_clear_pending_inputs = false;
 
 lv_color_t user_primary_color = LV_COLOR_MAKE(0x00, 0x00, 0x8B); 
 lv_color_t user_secondary_color = LV_COLOR_MAKE(0xFF, 0xFF, 0xFF);
@@ -123,6 +124,11 @@ static void lcd_task(void *pvParameters)
 			}
 			else {
 				ui_btns.select_btn = 0;
+			}
+			// If in loop screen and extra buttons were pressed -> clear them
+			if (lcd_clear_pending_inputs) {
+				lcd_clear_user_in(); // Clear any pending inputs
+				lcd_clear_pending_inputs = false;
 			}
 
 			

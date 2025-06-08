@@ -621,6 +621,16 @@ void lcd_init_selection_labels(ui_menu_t *ui_menu)
 	lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 }
 
+void lcd_clear_user_in()
+{
+	ui_btns.up_btn = 0;
+	ui_btns.down_btn = 0;
+	ui_btns.left_btn = 0;
+	ui_btns.right_btn = 0;
+	ui_btns.back_btn = 0;
+	ui_btns.select_btn = 0;
+}
+
 void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns) 
 {
 	if (ui_btns->up_btn == 1) {

@@ -181,6 +181,8 @@ static void prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
             // Show ESP-NOW menu
 			lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 			
+			lcd_clear_pending_inputs = true; // Clear any false buttons
+			
 			// Switch pages
 			ui_menu->page = ESPNOW_PAGE;
             
@@ -198,6 +200,8 @@ static void prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
             // Show ESP-NOW menu
 			lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 			
+			lcd_clear_pending_inputs = true; // Clear any false buttons
+			
 			// Switch pages
 			ui_menu->page = ESPNOW_PAGE;
             
@@ -211,6 +215,8 @@ static void prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
             lv_obj_del(lbl_ask_enc);
             lv_obj_del(lbl_enc_yes);
             lv_obj_del(lbl_enc_no);
+            
+            lcd_clear_pending_inputs = true; // Clear any false buttons
             
             // Prompt to enter name
             ui_menu->page = ESPNOW_NAME_PAGE;
@@ -449,6 +455,8 @@ static void prompt_upload_qr(ui_menu_t *ui_menu)
             lv_obj_del(lbl_ask_enc);
             lv_obj_del(lbl_qr_ok);
             lv_obj_del(qr_code);
+            
+            lcd_clear_pending_inputs = true; // Clear any false buttons
             
             // Go back
             return;

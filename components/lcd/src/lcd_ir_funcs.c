@@ -517,6 +517,8 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
 			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 			
+			lcd_clear_pending_inputs = true; // Clear any false buttons
+			
 			// Switch to naming page
 			ui_menu->page = INFRARED_REMOTE_NAME_PAGE;
 			
@@ -534,6 +536,8 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
 			lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+			
+			lcd_clear_pending_inputs = true; // Clear any false buttons
             
             // Go back
 			ui_menu->page = INFRARED_PAGE;

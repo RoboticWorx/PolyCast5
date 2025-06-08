@@ -42,6 +42,7 @@
 #define ESPNOW_NAME_PAGE 17
 #define ESPNOW_OPTION_PAGE 18
 
+extern volatile bool lcd_clear_pending_inputs;
 
 typedef struct ui_menu_t {
     const char **options; // your array of strings
@@ -161,6 +162,11 @@ void lcd_selection_btn_pressed(ui_menu_t *menu);
  * @brief Initialize images to be used in animation
  */
 void lcd_init_images();
+
+/**
+ * @brief Clear all user inputs
+ */
+void lcd_clear_user_in();
 
 /**
  * @brief Display/scroll through home page animations

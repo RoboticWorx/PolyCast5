@@ -81,8 +81,8 @@ static void espnow_task(void *param)
 			ESP_ERROR_CHECK(esp_funcs_wifi_radio_start(WIFI_CHANNEL));
 		    ESP_ERROR_CHECK(esp_funcs_espnow_init(espnow_cmd.mac_selected, WIFI_CHANNEL));
 		    
-		    //ESP_LOGI(TAG, "Sending: %u", espnow_cmd.cmd_to_send);
-		    //ESP_LOG_BUFFER_HEX("To MAC", espnow_cmd.mac_selected, ESPNOW_MAC_SIZE);
+		    ESP_LOGI(TAG, "Sending: %u", espnow_cmd.cmd_to_send);
+		    ESP_LOG_BUFFER_HEX("To MAC", espnow_cmd.mac_selected, ESPNOW_MAC_SIZE);
 		    
 		    // Send the data
 		    esp_funcs_espnow_send_data(espnow_cmd.mac_selected, &espnow_cmd.cmd_to_send, sizeof(espnow_cmd.cmd_to_send));

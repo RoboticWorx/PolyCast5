@@ -302,6 +302,8 @@ void lcd_lora_create_enc_key(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
             
             lv_obj_del(lbl_key_ins);
             
+            lcd_clear_pending_inputs = true; // Clear any false buttons
+            
             // Show LoRa menu
 			lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
             
@@ -315,6 +317,8 @@ void lcd_lora_create_enc_key(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
             
             lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+			
+			lcd_clear_pending_inputs = true; // Clear any false buttons
             
             // Prompt to enter name
             ui_menu->page = LORA_NAME_PAGE;
