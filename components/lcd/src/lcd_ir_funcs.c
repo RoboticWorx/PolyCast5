@@ -77,7 +77,7 @@ void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
 						 LV_ALIGN_CENTER, 0, -10);
 
 		lbl_hint = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_hint, "U/D select BACK delete\nR rename L exit",
+		lcd_format_label(lbl_hint, "SELECT to delete\nR rename L exit",
 						 user_secondary_color, &lv_font_montserrat_14,
 						 LV_ALIGN_BOTTOM_MID, 0, -20);
 	}
@@ -517,7 +517,7 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
 			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 			
-			lcd_clear_pending_inputs = true; // Clear any false buttons
+			lcd_clear_pending_inputs = true; // Clear any false inputs
 			
 			// Switch to naming page
 			ui_menu->page = INFRARED_REMOTE_NAME_PAGE;
@@ -537,7 +537,7 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
 			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 			
-			lcd_clear_pending_inputs = true; // Clear any false buttons
+			lcd_clear_pending_inputs = true; // Clear any false inputs
             
             // Go back
 			ui_menu->page = INFRARED_PAGE;

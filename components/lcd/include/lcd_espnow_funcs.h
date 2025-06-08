@@ -27,6 +27,7 @@ typedef struct {
 	lv_obj_t *lbl_send_cmd;
 	lv_obj_t *lbl_send_box;
 	lv_obj_t *lbl_send;
+	lv_obj_t *lbl_edit;
 	lv_obj_t *arrow_top;
 	lv_obj_t *arrow_bot;
 	uint8_t cmd_to_send;
@@ -124,7 +125,7 @@ esp_err_t lcd_espnow_rx_mac_nvs_save(const espnow_menu_t *espnow_menu);
 esp_err_t lcd_espnow_rx_mac_nvs_load(espnow_menu_t *espnow_menu);
 
 /**
- * @brief Deletes a ESP32 receiver MACs from NVS
+ * @brief Deletes a ESP32 receiver MAC from NVS
  *
  * @param [in] espnow_menu ESP-NOW menu structure
  */

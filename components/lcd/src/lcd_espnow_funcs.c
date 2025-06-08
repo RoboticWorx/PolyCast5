@@ -181,7 +181,7 @@ static void prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
             // Show ESP-NOW menu
 			lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 			
-			lcd_clear_pending_inputs = true; // Clear any false buttons
+			lcd_clear_pending_inputs = true; // Clear any false inputs
 			
 			// Switch pages
 			ui_menu->page = ESPNOW_PAGE;
@@ -200,7 +200,7 @@ static void prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
             // Show ESP-NOW menu
 			lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 			
-			lcd_clear_pending_inputs = true; // Clear any false buttons
+			lcd_clear_pending_inputs = true; // Clear any false inputs
 			
 			// Switch pages
 			ui_menu->page = ESPNOW_PAGE;
@@ -216,7 +216,7 @@ static void prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
             lv_obj_del(lbl_enc_yes);
             lv_obj_del(lbl_enc_no);
             
-            lcd_clear_pending_inputs = true; // Clear any false buttons
+            lcd_clear_pending_inputs = true; // Clear any false inputs
             
             // Prompt to enter name
             ui_menu->page = ESPNOW_NAME_PAGE;
@@ -456,7 +456,7 @@ static void prompt_upload_qr(ui_menu_t *ui_menu)
             lv_obj_del(lbl_qr_ok);
             lv_obj_del(qr_code);
             
-            lcd_clear_pending_inputs = true; // Clear any false buttons
+            lcd_clear_pending_inputs = true; // Clear any false inputs
             
             // Go back
             return;
@@ -490,8 +490,8 @@ void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
 		lcd_format_label(lbl_dirs, "Enter ESP32 name\nwith arrow buttons:", user_secondary_color,
                          &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, -30);
                          
-        //if (espnow_menu_overwrite)
-        //	lv_label_set_text(lbl_dirs, "Enter new plug name\n with arrow buttons:");
+        if (espnow_menu_overwrite)
+        	lv_label_set_text(lbl_dirs, "Enter new ESP32 name\n with arrow buttons:");
         
         lbl_chars = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_chars, "(Up to 12 characters)", user_secondary_color,
@@ -547,6 +547,8 @@ void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
 	    cur_char = '_';
 	    memset(name_buf, 0, sizeof name_buf);
 	    
+	    espnow_menu_overwrite = false;
+	    
 	    // Show ESP-NOW list
 		lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -579,7 +581,7 @@ void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
         }
     }
     // If save button pressed
-    else if (ui_btns->back_btn) {
+    else if (ui_btns->select_btn) {
 		// Save final
         name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
         memcpy(saved_name, name_buf, MAX_CUSTOM_NAME_LEN + 1);
@@ -606,7 +608,7 @@ void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
 			espnow_menu->options[espnow_menu->index] = strdup(saved_name);
 
 			// Persist to NVS
-			//lcd_espnow_menu_nvs_save(espnow_menu, LORA_OPTIONS_NS, LORA_OPTIONS_KEY_COUNT, LORA_OPTIONS_KEY_FMT);
+			lcd_espnow_menu_nvs_save(espnow_menu);
 
 			// Update the button’s label in-place
 			lv_obj_t *btn = espnow_menu->btns[espnow_menu->index];
@@ -616,9 +618,7 @@ void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
 			// Reset flag
 			espnow_menu_overwrite = false;
 			
-			// Reset submenu to first index
-			espnow_menu->index = 0;
-			lcd_espnow_update_menu(espnow_menu);
+			// Redraw menu
 			lv_obj_add_flag(espnow_menu->cont, LV_OBJ_FLAG_HIDDEN); // Hide
 		}
 		// Else adding a whole new ESP32
@@ -644,9 +644,9 @@ void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
 	
 			// Save RX MAC from earlier to NVS
 	        lcd_espnow_rx_mac_nvs_save(espnow_menu);
+	        
+	        prompt_upload_qr(ui_menu);
 		}
-		
-		prompt_upload_qr(ui_menu);
 		
 		// Show ESP-NOW list
 		lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -671,7 +671,7 @@ void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
 
 void lcd_espnow_setup_send_page(espnow_menu_t *espnow_menu)
 {
-	#define X_POS -30
+	#define X_POS -38
 	espnow_menu->espnow_submenu.cmd_to_send = 1; // Set default
 	
 	// Create labels
@@ -695,6 +695,10 @@ void lcd_espnow_setup_send_page(espnow_menu_t *espnow_menu)
 	lcd_format_label(espnow_menu->espnow_submenu.lbl_send, "SEND", user_secondary_color,
 					 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
 					 
+	espnow_menu->espnow_submenu.lbl_edit = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(espnow_menu->espnow_submenu.lbl_edit, LV_SYMBOL_PREV " EDIT", user_secondary_color,
+					 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_RIGHT, -5, -4);
+					 
 	espnow_menu->espnow_submenu.arrow_top = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(espnow_menu->espnow_submenu.arrow_top, LV_SYMBOL_UP, user_secondary_color,
 					 &lv_font_montserrat_14, LV_ALIGN_CENTER, X_POS, -50);
@@ -703,30 +707,50 @@ void lcd_espnow_setup_send_page(espnow_menu_t *espnow_menu)
 	lcd_format_label(espnow_menu->espnow_submenu.arrow_bot, LV_SYMBOL_DOWN, user_secondary_color,
 					 &lv_font_montserrat_14, LV_ALIGN_CENTER, X_POS, 10);
 
-	// Create a style for the border
-	static lv_style_t outline_style;
-	lv_style_init(&outline_style);
+	// Create a style for the send cmd box
+	static lv_style_t style_cmd;
+	lv_style_init(&style_cmd);
 
-	lv_style_init(&outline_style);
-	lv_style_set_radius(&outline_style, 8);
-	lv_style_set_bg_color(&outline_style, user_primary_color);
-	lv_style_set_border_width(&outline_style, 2);
-	lv_style_set_border_color(&outline_style, user_secondary_color);
-	lv_style_set_border_side(&outline_style, LV_BORDER_SIDE_FULL);
+	lv_style_init(&style_cmd);
+	lv_style_set_radius(&style_cmd, 8);
+	lv_style_set_bg_color(&style_cmd, user_primary_color);
+	lv_style_set_border_width(&style_cmd, 2);
+	lv_style_set_border_color(&style_cmd, user_secondary_color);
+	lv_style_set_border_side(&style_cmd, LV_BORDER_SIDE_FULL);
+	lv_style_set_text_color(&style_cmd, user_secondary_color);
 	
 	lv_color_t darker_user_primary_color = lv_color_darken(user_primary_color, 100); // % darker 
-	lv_style_set_shadow_spread(&outline_style, 3);
-	lv_style_set_shadow_width(&outline_style, 6);
-	lv_style_set_shadow_offset_x(&outline_style, 3);
-	lv_style_set_shadow_offset_y(&outline_style, 3);
-	lv_style_set_shadow_color(&outline_style, darker_user_primary_color);
+	lv_style_set_shadow_spread(&style_cmd, 3);
+	lv_style_set_shadow_width(&style_cmd, 6);
+	lv_style_set_shadow_offset_x(&style_cmd, 3);
+	lv_style_set_shadow_offset_y(&style_cmd, 3);
+	lv_style_set_shadow_color(&style_cmd, darker_user_primary_color);
 	    
-	lv_style_set_pad_left(&outline_style, 55);
-	lv_style_set_pad_right(&outline_style, 55);
-	lv_style_set_pad_top(&outline_style, 25);
-	lv_style_set_pad_bottom(&outline_style, 25);
+	lv_style_set_pad_left(&style_cmd, 55);
+	lv_style_set_pad_right(&style_cmd, 55);
+	lv_style_set_pad_top(&style_cmd, 25);
+	lv_style_set_pad_bottom(&style_cmd, 25);
 		
-	lv_obj_add_style(espnow_menu->espnow_submenu.lbl_send_box, &outline_style, 0);
+	lv_obj_add_style(espnow_menu->espnow_submenu.lbl_send_box, &style_cmd, 0);
+	
+	// Create a style for the edit box
+	static lv_style_t style_edit;
+	lv_style_init(&style_edit);
+
+	lv_style_init(&style_edit);
+	lv_style_set_radius(&style_edit, 8);
+	lv_style_set_bg_color(&style_edit, user_primary_color);
+	lv_style_set_border_width(&style_edit, 2);
+	lv_style_set_border_color(&style_edit, user_secondary_color);
+	lv_style_set_border_side(&style_edit, LV_BORDER_SIDE_FULL);
+	lv_style_set_text_color(&style_edit, user_secondary_color);
+	
+	lv_style_set_pad_left(&style_edit, 10);
+	lv_style_set_pad_right(&style_edit, 10);
+	lv_style_set_pad_top(&style_edit, 6);
+	lv_style_set_pad_bottom(&style_edit, 6);
+	
+	lv_obj_add_style(espnow_menu->espnow_submenu.lbl_edit, &style_edit, 0);
 	
 	// Hide everything for now
 	lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_tx, LV_OBJ_FLAG_HIDDEN);
@@ -734,8 +758,149 @@ void lcd_espnow_setup_send_page(espnow_menu_t *espnow_menu)
 	lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_cmd, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_box, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_edit, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(espnow_menu->espnow_submenu.arrow_top, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(espnow_menu->espnow_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void prompt_name_or_del(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
+{
+	lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+	
+	// Create and format ins labels
+	lv_obj_t *lbl_ins = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_ins, LV_SYMBOL_SETTINGS, user_secondary_color,
+    			 &lv_font_montserrat_30, LV_ALIGN_CENTER, 0, 0);
+    			 
+	lv_obj_t *lbl_exit = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_exit, "BACK", user_secondary_color,
+    			 &lv_font_montserrat_18, LV_ALIGN_LEFT_MID, 16, -1);
+    			 
+    lv_obj_t *lbl_name = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_name, "RENAME", user_secondary_color,
+    			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 13);
+    			 
+    lv_obj_t *lbl_del = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_del, "DELETE", user_secondary_color,
+    			 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
+                    
+    while (1) {
+		lv_timer_handler();
+		
+		// User hit cancel
+        if (xSemaphoreTake(xLeftButtonSemaphore, 0) == pdTRUE) {
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            
+            lv_obj_del(lbl_exit);
+            lv_obj_del(lbl_name);
+            lv_obj_del(lbl_del);
+            lv_obj_del(lbl_ins);
+            
+            // Show ESP-NOW submenu
+			lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send_tx, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send_rx, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send_cmd, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send_box, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_edit, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(espnow_menu->espnow_submenu.arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(espnow_menu->espnow_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
+			
+			// Hide up and down arrows
+			lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+				
+			lcd_clear_pending_inputs = true; // Clear any false inputs
+			
+			// Switch pages
+			ui_menu->page = ESPNOW_OPTION_PAGE;
+            
+            // Go back
+            return;
+        }
+        // Rename
+        else if (xSemaphoreTake(xUpButtonSemaphore, 0) == pdTRUE) {
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            
+            lv_obj_del(lbl_exit);
+            lv_obj_del(lbl_name);
+            lv_obj_del(lbl_del);
+            lv_obj_del(lbl_ins);
+			
+			lcd_clear_pending_inputs = true; // Clear any false inputs
+			
+			espnow_menu_overwrite = true; // Set overwrite flag
+			
+			// Prompt to enter name
+            ui_menu->page = ESPNOW_NAME_PAGE;
+            
+            // Go back
+            return;
+        }
+        // Delete
+        else if (xSemaphoreTake(xDownButtonSemaphore, 0) == pdTRUE) {
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            
+            lv_obj_del(lbl_exit);
+            lv_obj_del(lbl_name);
+            lv_obj_del(lbl_del);
+            lv_obj_del(lbl_ins);
+            
+            lcd_clear_pending_inputs = true; // Clear any false inputs
+            
+            // Delete the entry
+            // Get user entry to remove
+		    int del_idx = espnow_menu->index;     
+		    
+		    // Just in case
+		    if (del_idx == 0) {
+		        lcd_clear_pending_inputs = true;
+				lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		        ui_menu->page = ESPNOW_PAGE;
+		        return;
+		    }
+		    
+		    // Free any heap buffers allocated for that slot
+		    free(espnow_menu->options[del_idx]); // Name string
+		    lv_obj_del(espnow_menu->btns[del_idx]); // LVGL list button
+		
+		    // Shift everything above it down one
+		    for (int i = del_idx; i < espnow_menu->size - 1; i++) {
+				// Change each to the one after
+		        espnow_menu->options[i] = espnow_menu->options[i + 1];
+		        espnow_menu->btns[i] = espnow_menu->btns[i + 1];
+		
+		        // Update the label inside the button
+		        lv_obj_t *lbl = lv_obj_get_child(espnow_menu->btns[i], 0);
+		        lv_label_set_text(lbl, espnow_menu->options[i]);
+		    }
+		    
+		    // Delete RX MAC (espnow_menu->size--)
+		    lcd_espnow_rx_mac_nvs_delete(espnow_menu, (uint8_t)(del_idx - 1));
+		    
+		    // Null out dangling index
+			espnow_menu->options[espnow_menu->size] = NULL;
+			espnow_menu->btns[espnow_menu->size] = NULL;
+		    
+		    // Adjust if was last
+		    if (espnow_menu->index >= espnow_menu->size)
+		        espnow_menu->index = espnow_menu->size - 1;
+		        
+		    // Persist to NVS
+		    lcd_espnow_menu_nvs_save(espnow_menu);
+		
+		    // Refresh the list UI
+		    lcd_espnow_update_menu(espnow_menu);
+            
+            // Switch pages
+			ui_menu->page = ESPNOW_PAGE;
+            
+            // Go back
+            return;
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
 }
 
 void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns)
@@ -780,6 +945,7 @@ void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, 
 		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_cmd, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_box, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_edit, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(espnow_menu->espnow_submenu.arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(espnow_menu->espnow_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
@@ -828,6 +994,34 @@ void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, 
 		char buf[BUF_SIZE];
 		snprintf(buf, sizeof(buf), "%u", espnow_menu->espnow_submenu.cmd_to_send);
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_cmd, buf);
+	}
+	// Edit
+	else if (ui_btns->back_btn == 1) {
+		// Reset receipts
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, "TX Status: ");
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, "RX Status: ");
+		
+		// Back to default
+		espnow_menu->espnow_submenu.cmd_to_send = 1;
+		char buf[BUF_SIZE];
+		snprintf(buf, sizeof(buf), "%u", espnow_menu->espnow_submenu.cmd_to_send);
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_cmd, buf);
+		
+		// Hide everything
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_tx, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_rx, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_cmd, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_box, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_edit, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show up and down arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		prompt_name_or_del(ui_menu, espnow_menu);
 	}
 }
 

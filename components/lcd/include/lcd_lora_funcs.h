@@ -46,14 +46,6 @@ typedef struct {
 extern lora_menu_t lora_menu; 
 
 /**
- * @brief Everything to be done on lora page
- *
- * @param [in] ui_menu UI menu structure
- * @param [in] lora_meun LoRa menu structure
- * @param [in] ui_btns UI input structure
- */
-
-/**
  * @brief Creates the central LoRa page then hides it for quick access
  *
  * @param [in] lora_menu LoRa menu structure
