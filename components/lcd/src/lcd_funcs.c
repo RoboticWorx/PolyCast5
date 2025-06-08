@@ -15,66 +15,7 @@
 #include "lcd_task.h"
 #include "infrared_funcs.h"
 
-#include "anim_city_1.h"
-#include "anim_city_2.h"
-#include "anim_city_3.h"
-#include "anim_city_4.h"
-#include "anim_city_5.h"
-#include "anim_city_6.h"
-#include "anim_city_7.h"
-#include "anim_city_8.h"
-#include "anim_city_9.h"
-#include "anim_city_10.h"
-#include "anim_city_11.h"
-#include "anim_city_12.h"
-#include "anim_city_13.h"
-#include "anim_city_14.h"
-#include "anim_city_15.h"
-#include "anim_city_16.h"
-#include "anim_city_17.h"
-#include "anim_city_18.h"
-#include "anim_city_19.h"
-#include "anim_city_20.h"
-#include "anim_city_21.h"
-#include "anim_city_22.h"
-#include "anim_city_23.h"
-#include "anim_city_24.h"
-#include "anim_city_25.h"
-#include "anim_city_26.h"
-#include "anim_city_27.h"
-#include "anim_city_28.h"
-#include "anim_city_29.h"
-#include "anim_city_30.h"
-#include "anim_city_31.h"
-#include "anim_city_32.h"
-#include "anim_city_33.h"
-#include "anim_city_34.h"
-#include "anim_city_35.h"
-#include "anim_city_36.h"
-#include "anim_city_37.h"
-#include "anim_city_38.h"
-#include "anim_city_39.h"
-#include "anim_city_40.h"
-#include "anim_city_41.h"
-#include "anim_city_42.h"
-#include "anim_city_43.h"
-#include "anim_city_44.h"
-#include "anim_city_45.h"
-#include "anim_city_46.h"
-#include "anim_city_47.h"
-#include "anim_city_48.h"
-#include "anim_city_49.h"
-#include "anim_city_50.h"
-#include "anim_city_51.h"
-#include "anim_city_52.h"
-#include "anim_city_53.h"
-#include "anim_city_54.h"
-#include "anim_city_55.h"
-#include "anim_city_56.h"
-#include "anim_city_57.h"
-#include "anim_city_58.h"
-#include "anim_city_59.h"
-#include "anim_city_60.h"
+#include "anim_city.h"
 
 #define DRAW_LINES   20
 #define FLUSH_CHUNK  2
@@ -83,10 +24,10 @@
 #define SCROLL_SPEED 400
 #define IR_LABELS_OFFSET 20
 
-#define CITY_FRAME_CNT  60
-#define CITY_FRAME_PERIOD 120
+#define CITY_FRAME_CNT 60
+#define CITY_FRAME_PERIOD 120 // 160
 
-//#define CITY_PING_PONG 1
+//#define CITY_PING_PONG 1 // Animation will go back and forth instead of looping
 
 static const char *TAG = "LCD_FUNCS";
 
