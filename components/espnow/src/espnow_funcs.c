@@ -59,7 +59,7 @@ static void send_cb(const uint8_t *mac, esp_now_send_status_t status)
     #endif
     
     if (status == ESP_NOW_SEND_SUCCESS) {
-		xSemaphoreGive(xEspCmdStatusSemaphore);
+		xSemaphoreGive(xEspCmdRxStatusSemaphore);
 	}
 }
 

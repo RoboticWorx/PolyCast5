@@ -1007,7 +1007,11 @@ void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, 
 {
 	#define BUF_SIZE 4
 	
-	if (xSemaphoreTake(xEspCmdStatusSemaphore, 0) == pdTRUE) {
+	if (xSemaphoreTake(xEspCmdTxStatusSemaphore, 0) == pdTRUE) { // If transmission successful
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, "TX Status: " LV_SYMBOL_OK);
+	}
+	
+	if (xSemaphoreTake(xEspCmdRxStatusSemaphore, 0) == pdTRUE) { // If data received
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, "RX Status: " LV_SYMBOL_OK);
 	}
 	
@@ -1028,9 +1032,7 @@ void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, 
 			memcpy(espnow_cmd.lmk, espnow_menu->lmk[espnow_menu->index], LMK_LEN);
 
         // Send it to ESP-NOW task
-        if (xQueueSend(xEspSendCmdQueue, &espnow_cmd, portMAX_DELAY) == pdPASS) {
-			lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, "TX Status: " LV_SYMBOL_OK);
-		}
+        xQueueSend(xEspSendCmdQueue, &espnow_cmd, portMAX_DELAY);
 	}
 	// Exit
 	else if (ui_btns->left_btn == 1) {

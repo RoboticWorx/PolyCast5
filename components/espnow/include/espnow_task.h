@@ -12,7 +12,8 @@ typedef struct {
     uint8_t lmk[LMK_LEN]; // Local master key (if enc)
 } espnow_cmd_t;
 
-extern SemaphoreHandle_t xEspCmdStatusSemaphore;
+extern SemaphoreHandle_t xEspCmdRxStatusSemaphore;
+extern SemaphoreHandle_t xEspCmdTxStatusSemaphore;
 
 extern QueueHandle_t xEspSendEncKeyQueueNVS;
 extern QueueHandle_t xEspSendEncKeyQueue;

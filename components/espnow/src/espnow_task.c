@@ -25,7 +25,8 @@ static const uint8_t UNIVERSAL_MAC[ESP_NOW_ETH_ALEN] = {0xFF,0xFF,0xFF,0xFF,0xFF
 static uint8_t received_enc_key[ENC_KEY_LEN];
 static uint8_t received_lmk[LMK_LEN];
 
-SemaphoreHandle_t xEspCmdStatusSemaphore;
+SemaphoreHandle_t xEspCmdRxStatusSemaphore;
+SemaphoreHandle_t xEspCmdTxStatusSemaphore;
 
 QueueHandle_t xEspSendEncKeyQueueNVS;
 QueueHandle_t xEspSendEncKeyQueue;
@@ -40,7 +41,8 @@ QueueHandle_t xEspSendCmdQueue;
 
 static void espnow_task(void *param)
 {
-	xEspCmdStatusSemaphore = xSemaphoreCreateBinary();
+	xEspCmdRxStatusSemaphore = xSemaphoreCreateBinary();
+	xEspCmdTxStatusSemaphore = xSemaphoreCreateBinary();
 	
     xEspSendEncKeyQueueNVS = xQueueCreate(1, ENC_KEY_LEN);
 	if (xEspSendEncKeyQueueNVS == NULL) {
@@ -84,7 +86,9 @@ static void espnow_task(void *param)
 		if (xQueueReceive(xEspSendCmdQueue, &espnow_cmd, 0) == pdPASS) {
 			// Start radio and initialize ESP-NOW
 			ESP_ERROR_CHECK(esp_funcs_wifi_radio_start(WIFI_CHANNEL));
-		    ESP_ERROR_CHECK(esp_funcs_espnow_init(espnow_cmd.mac_selected, WIFI_CHANNEL, espnow_cmd.enc, espnow_cmd.enc ? espnow_cmd.lmk : NULL));
+		    if (esp_funcs_espnow_init(espnow_cmd.mac_selected, WIFI_CHANNEL, espnow_cmd.enc, espnow_cmd.enc ? espnow_cmd.lmk : NULL) != ESP_OK) {
+				continue; // Skip if error
+			}
 		    
 		    // Build a text payload from the cmd (more secure)
 		    char tx_payload[ESP_NOW_MAX_DATA_LEN];
@@ -104,7 +108,10 @@ static void espnow_task(void *param)
 		    #endif
 		    
 		    // Send the data
-		    esp_funcs_espnow_send_data(espnow_cmd.mac_selected, (uint8_t*)tx_payload, tx_payload_len);
+		    if (esp_funcs_espnow_send_data(espnow_cmd.mac_selected, (uint8_t*)tx_payload, tx_payload_len) == ESP_OK) {
+				// Notify the LCD that the transmission was successful
+				xSemaphoreGive(xEspCmdTxStatusSemaphore);
+			}
 		    
 		    // Wait for ACK frame
 		    vTaskDelay(pdMS_TO_TICKS(100));
