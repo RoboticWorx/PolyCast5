@@ -1545,7 +1545,7 @@ static void dump_lmks(void)
         err = nvs_get_blob(h, key, lmk, &len);
         if (err == ESP_OK && len == LMK_LEN) {
 
-            // build a 32-char hex string in a tiny buffer 
+            // build a 32-char hex string in a tiny buffer
             char hex[LMK_LEN * 2 + 1];
             for (int j = 0; j < LMK_LEN; j++) {
                 sprintf(&hex[j * 2], "%02X", lmk[j]);
