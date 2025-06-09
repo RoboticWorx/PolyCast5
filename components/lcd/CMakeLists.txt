@@ -11,6 +11,7 @@ idf_component_register(
         "src/st7789.c"
         
         "media/qr/src/qr_esp_rx_example.c"
+        "media/qr/src/qr_esp_enc_rx_example.c"
         
         "media/other/src/img_ir_save_new_remote.c"
         

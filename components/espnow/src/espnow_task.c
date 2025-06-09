@@ -62,7 +62,7 @@ static void espnow_task(void *param)
     
 	while (1) {
 
-		// Key generated and requesting send 
+		// Key generated and requesting send for LoRa handshake
 		if (xQueueReceive(xEspSendEncKeyQueue, received_enc_key, 0) == pdPASS) {
 			// Start radio and initialize ESP-NOW
 			ESP_ERROR_CHECK(esp_funcs_wifi_radio_start(WIFI_CHANNEL));
@@ -80,13 +80,23 @@ static void espnow_task(void *param)
 		    xQueueSend(xEspSendEncKeyQueueNVS, received_enc_key, portMAX_DELAY);
 		}
 		
+		// Sending ESP32 -> ESP32 command via ESP-NOW
 		if (xQueueReceive(xEspSendCmdQueue, &espnow_cmd, 0) == pdPASS) {
 			// Start radio and initialize ESP-NOW
 			ESP_ERROR_CHECK(esp_funcs_wifi_radio_start(WIFI_CHANNEL));
 		    ESP_ERROR_CHECK(esp_funcs_espnow_init(espnow_cmd.mac_selected, WIFI_CHANNEL, espnow_cmd.enc, espnow_cmd.enc ? espnow_cmd.lmk : NULL));
 		    
+		    // Build a text payload from the cmd (more secure)
+		    char tx_payload[ESP_NOW_MAX_DATA_LEN];
+		    int tx_payload_len = snprintf(tx_payload, sizeof(tx_payload), "PolyCast_Command_Value: %u", espnow_cmd.cmd_to_send); // Send only number of bytes needed
+		    // Check payload
+		    if (tx_payload_len < 0 || tx_payload_len >= sizeof(tx_payload)) {
+		        ESP_LOGE(TAG, "Payload snprintf failed or too long.");
+		        tx_payload_len = 0;
+		    }
+		    
 		    #ifdef POLYCAST5_DEBUG
-			    ESP_LOGI(TAG, "Sending: %u", espnow_cmd.cmd_to_send);
+			    ESP_LOGI(TAG, "Sending: %s", tx_payload);
 			    ESP_LOG_BUFFER_HEX("To MAC", espnow_cmd.mac_selected, ESPNOW_MAC_SIZE);
 			    if (espnow_cmd.enc) {
 			        ESP_LOG_BUFFER_HEX("LMK", espnow_cmd.lmk, LMK_LEN);
@@ -94,7 +104,7 @@ static void espnow_task(void *param)
 		    #endif
 		    
 		    // Send the data
-		    esp_funcs_espnow_send_data(espnow_cmd.mac_selected, &espnow_cmd.cmd_to_send, sizeof(espnow_cmd.cmd_to_send));
+		    esp_funcs_espnow_send_data(espnow_cmd.mac_selected, (uint8_t*)tx_payload, tx_payload_len);
 		    
 		    // Wait for ACK frame
 		    vTaskDelay(pdMS_TO_TICKS(100));
@@ -110,7 +120,7 @@ static void espnow_task(void *param)
 
 void espnow_task_create(void)
 {
-    if (xTaskCreate(espnow_task, "espnow_task", 2048, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
+    if (xTaskCreate(espnow_task, "espnow_task", 1024 * 3, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
 	    ESP_LOGE(TAG, "Failed to start espnow_task");
 	}
 }
