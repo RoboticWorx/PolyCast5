@@ -1,18 +1,19 @@
+#include "polycast5_macros.h"
+
 #include <string.h>
 
-#include "esp_log_buffer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
 #include "freertos/task.h"
 
 #include "esp_log.h"
+#include "esp_log_buffer.h"
+#include "portmacro.h"
 
 #include "lora_task.h"
 #include "lcd_espnow_funcs.h"
-
 #include "espnow_funcs.h"
-#include "portmacro.h"
 #include "espnow_task.h"
 
 #define TAG "ESPNOW_TASK"
@@ -84,11 +85,13 @@ static void espnow_task(void *param)
 			ESP_ERROR_CHECK(esp_funcs_wifi_radio_start(WIFI_CHANNEL));
 		    ESP_ERROR_CHECK(esp_funcs_espnow_init(espnow_cmd.mac_selected, WIFI_CHANNEL, espnow_cmd.enc, espnow_cmd.enc ? espnow_cmd.lmk : NULL));
 		    
-		    ESP_LOGI(TAG, "Sending: %u", espnow_cmd.cmd_to_send);
-		    ESP_LOG_BUFFER_HEX("To MAC", espnow_cmd.mac_selected, ESPNOW_MAC_SIZE);
-		    if (espnow_cmd.enc) {
-		        ESP_LOG_BUFFER_HEX("LMK", espnow_cmd.lmk, LMK_LEN);
-		    }
+		    #ifdef POLYCAST5_DEBUG
+			    ESP_LOGI(TAG, "Sending: %u", espnow_cmd.cmd_to_send);
+			    ESP_LOG_BUFFER_HEX("To MAC", espnow_cmd.mac_selected, ESPNOW_MAC_SIZE);
+			    if (espnow_cmd.enc) {
+			        ESP_LOG_BUFFER_HEX("LMK", espnow_cmd.lmk, LMK_LEN);
+			    }
+		    #endif
 		    
 		    // Send the data
 		    esp_funcs_espnow_send_data(espnow_cmd.mac_selected, &espnow_cmd.cmd_to_send, sizeof(espnow_cmd.cmd_to_send));

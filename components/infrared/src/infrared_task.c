@@ -1,11 +1,16 @@
-#include "infrared_task.h"
-#include "esp_log.h"
+#include "polycast5_macros.h"
+
+#include <stdlib.h>
+#include <string.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
 #include "freertos/task.h"
+
+#include "esp_log.h"
+
+#include "infrared_task.h"
 #include "infrared_funcs.h"
-#include <stdlib.h>
-#include <string.h>
 
 static const char *TAG = "IR_TASK";
 
@@ -43,8 +48,11 @@ static void infrared_task(void *pvParameters) {
 	
 	// Wait until enabled
 	xSemaphoreTake(xEnableInfraredSemaphore, portMAX_DELAY);
-		
-    ESP_LOGI(TAG, "Initializing IR system...");
+	
+	#ifdef POLYCAST5_DEBUG
+        ESP_LOGI(TAG, "Initializing IR system...");
+    #endif
+    
     
     infrared_init_rx();
     infrared_init_tx();
@@ -60,7 +68,11 @@ static void infrared_task(void *pvParameters) {
     // Load signals from NVS
     infrared_load_stored_signals();
     //infrared_clear_stored_signals();
-    ESP_LOGI(TAG, "Loaded %d signals from NVS", num_stored_signals);
+    
+    #ifdef POLYCAST5_DEBUG
+        ESP_LOGI(TAG, "Loaded %d signals from NVS", num_stored_signals);
+    #endif
+    
 
     while (1) {
 		
@@ -77,22 +89,34 @@ static void infrared_task(void *pvParameters) {
 
             // Filter out noise
             if (ir_signal_length < MIN_VALID_PULSES) {
-                //ESP_LOGI(TAG, "Ignoring noise (only %d pulses)", ir_signal_length);
+				#ifdef POLYCAST5_DEBUG
+		        	ESP_LOGI(TAG, "Ignoring noise (only %d pulses)", ir_signal_length);
+		        #endif
+                
                 infrared_restart_rx();
                 continue;
             }
             
             if (ir_signal_length > MAX_PULSES) {
-			    ESP_LOGW(TAG, "IR length %u > MAX_PULSES (%u) – truncating", ir_signal_length, MAX_PULSES);
+				#ifdef POLYCAST5_DEBUG
+		        	ESP_LOGW(TAG, "IR length %u > MAX_PULSES (%u) – truncating", ir_signal_length, MAX_PULSES);
+		        #endif
+			    
 			    ir_signal_length = MAX_PULSES;
 			}
             
-            ESP_LOGI(TAG, "Received IR signal with %d pulses", ir_signal_length);
+            #ifdef POLYCAST5_DEBUG
+	        	ESP_LOGI(TAG, "Received IR signal with %d pulses", ir_signal_length);
+	        #endif
+            
 
             // Pad final gap
             if (ir_signal[ir_signal_length - 1].duration1 < FINAL_GAP_US) {
                 ir_signal[ir_signal_length - 1].duration1 = FINAL_GAP_US;
-                //ESP_LOGI(TAG, "Padded final gap to %dus", FINAL_GAP_US);
+                #ifdef POLYCAST5_DEBUG
+		        	ESP_LOGI(TAG, "Padded final gap to %dus", FINAL_GAP_US);
+		        #endif
+                
             }
 
 			// Check if able to add more signals
@@ -122,10 +146,13 @@ static void infrared_task(void *pvParameters) {
             infrared_save_stored_signal();
             num_stored_signals++;
 			
-			ESP_LOGI(TAG,
+			#ifdef POLYCAST5_DEBUG
+	        	ESP_LOGI(TAG,
                      "Stored signal %zu (%zu pulses), SRAM=%zu/%zu",
                      num_stored_signals, sig->length,
                      num_stored_signals, stored_signals_capacity);
+	        #endif
+			
                      
             xSemaphoreGive(xInfraredSignalSavedSemaphore);
 
@@ -142,27 +169,16 @@ static void infrared_task(void *pvParameters) {
 				size_t sig_idx = (size_t) menu_idx - 2; // 0-based user list
 			
 			    ir_signal_t *sig = stored_signals[sig_idx];
-			    ESP_LOGI(TAG, "Replaying signal %zu (%zu pulses)", sig_idx, sig->length);
+				#ifdef POLYCAST5_DEBUG
+		        	ESP_LOGI(TAG, "Replaying signal %zu (%zu pulses)", sig_idx, sig->length);
+		        #endif
+			    
 			    infrared_transmit_ir(sig->pulses, sig->length);
 		    }
 		    
 		}
 		
 		vTaskDelay(pdMS_TO_TICKS(10));
-
-        // Random transmission after threshold
-        /*if (num_stored_signals >= RANDOM_TX_THRESHOLD) {
-            vTaskDelay(pdMS_TO_TICKS(RANDOM_TX_DELAY_MS));
-
-            size_t random_idx = 3;                     // fixed for now 
-            ir_signal_t *sig  = stored_signals[random_idx];
-
-            if (sig) {
-                ESP_LOGI(TAG, "Replaying signal %zu (%zu pulses)",
-                         random_idx + 1, sig->length);
-                infrared_transmit_ir(sig->pulses, sig->length);
-            }
-        }*/
     }
 }
 

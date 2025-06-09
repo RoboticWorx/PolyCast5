@@ -1,9 +1,12 @@
-#include "esp_log.h"
+#include "polycast5_macros.h"
+
 #include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
 #include "img_ir_save_new_remote.h"
 #include "misc/lv_area.h"
+
 #include "nvs.h"
+#include "esp_log.h"
 
 #include "lcd_ir_funcs.h"
 #include "lcd_funcs.h"
@@ -270,7 +273,9 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
 		// Save final
         name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
         memcpy(saved_name, name_buf, MAX_CUSTOM_NAME_LEN + 1);
-        ESP_LOGI(TAG, "%s", saved_name);
+        #ifdef POLYCAST5_DEBUG
+        	ESP_LOGI(TAG, "%s", saved_name);
+        #endif
         
         // Delete labels since no longer used
         lv_obj_delete(lbl_user_in);

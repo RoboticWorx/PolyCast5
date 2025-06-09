@@ -1,3 +1,5 @@
+#include "polycast5_macros.h"
+
 #include <string.h>
 
 #include "esp_log.h"
@@ -7,7 +9,6 @@
 
 #include "lora_funcs.h"
 #include "lora_task.h"
-
 #include "espnow_task.h"
 
 static const char *TAG = "LORA_FUNCS";
@@ -23,7 +24,10 @@ static void generate_random_iv(uint8_t *iv, size_t length) {
 void lora_generate_random_key(void)
 {
 	esp_fill_random(encryption_key, sizeof(encryption_key));
-	ESP_LOG_BUFFER_HEX("LORA KEY GENERATED", encryption_key, sizeof(encryption_key));
+	
+	#ifdef POLYCAST5_DEBUG
+        ESP_LOG_BUFFER_HEX("LORA KEY GENERATED", encryption_key, sizeof(encryption_key));
+    #endif
 	
 	if (xQueueSend(xEspSendEncKeyQueue, encryption_key, pdMS_TO_TICKS(100)) != pdPASS) {
         ESP_LOGE("LORA", "Failed to queue encryption key");
@@ -90,15 +94,10 @@ void lora_process_received_message(uint8_t *message, size_t message_len) {
 	memcpy(ciphertext, message + IV_LENGTH,
 		   CYPHERTEXT_LENGTH); // Extract the ciphertext (remaining 64 bytes)
 
-	// Print the received IV
-	/*ESP_LOG_BUFFER_HEX(TAG, iv, IV_LENGTH);*/
-
-	// osStatus_t status = osMessageQueuePut(lora_hex_queue_rx, message, 0, 0);
-	// if (status != osOK)
-	//{
-	// printf("Failed to send lora_hex_queue_rx\n");
-	//}
-
+	#ifdef POLYCAST5_DEBUG
+        ESP_LOG_BUFFER_HEX(TAG, iv, IV_LENGTH);
+    #endif
+    
 	// Initialize the AES context with the key and received IV.
 	struct AES_ctx ctx;
 	AES_init_ctx_iv(&ctx, encryption_key, iv);
@@ -108,26 +107,26 @@ void lora_process_received_message(uint8_t *message, size_t message_len) {
 
 	ciphertext[sizeof(ciphertext) - 1] = '\0'; // Ensure null termination
 
-	// status = osMessageQueuePut(lora_decrypted_queue_rx, ciphertext, 0, 0);
-	// if (status != osOK)
-	//{
-	//	printf("Failed to send lora_decrypted_queue_rx\n");
-	// }
-
-	// "cyphertext" is now decrypted - print
-	ESP_LOGI(TAG, "Decrypted text: %s\n", ciphertext);
+	// "cyphertext" is now decrypted
+	#ifdef POLYCAST5_DEBUG
+        ESP_LOGI(TAG, "Decrypted text: %s\n", ciphertext);
+    #endif
 	
 	const char expected[] = "PolyCast_Command_Value_Received";
 
 	// If received valid receipt
 	if (strcmp((char*)ciphertext, expected) == 0) {
-	    ESP_LOGI(TAG, "Decrypted text exactly matches expected string");
+		#ifdef POLYCAST5_DEBUG
+        	ESP_LOGI(TAG, "Decrypted text exactly matches expected string");
+        #endif
 	    
 	    // Signal LCD to show check
 	    xSemaphoreGive(xLoraReceiptValidSemaphore);
 	} 
 	else {
-	    ESP_LOGI(TAG, "Decrypted text does NOT match. Got: \"%s\"", ciphertext);
+		#ifdef POLYCAST5_DEBUG
+        	ESP_LOGI(TAG, "Decrypted text does NOT match. Got: \"%s\"", ciphertext);
+        #endif
 	}
 }
 

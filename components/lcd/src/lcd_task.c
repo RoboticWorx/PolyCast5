@@ -85,7 +85,7 @@ static void lcd_task(void *pvParameters)
 	
 	lcd_espnow_setup_page(&espnow_menu);
 	lcd_espnow_setup_send_page(&espnow_menu);
-		
+	
 	while (1)
 	{
 		if (xTaskGetTickCount() - timer_last >= timer_interval) {

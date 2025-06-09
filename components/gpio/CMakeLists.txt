@@ -10,7 +10,7 @@ idf_component_register(
     	"include"
     
     REQUIRES
-    	driver freertos
+    	driver freertos common
     
     PRIV_REQUIRES
     	lcd

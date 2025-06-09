@@ -1,4 +1,6 @@
-#include "string.h"
+#include "polycast5_macros.h"
+
+#include <string.h>
 
 #include "nvs_flash.h"
 
@@ -32,7 +34,11 @@ void init_nvs(void) {
     }
     
     ESP_ERROR_CHECK(ret);
-    ESP_LOGI(TAG, "NVS initialized");
+    
+    #ifdef POLYCAST5_DEBUG
+        ESP_LOGI(TAG, "NVS initialized");
+    #endif
+    
 }
 
 // When IR signal received
@@ -49,9 +55,12 @@ static bool IRAM_ATTR infrared_rx_callback(rmt_channel_handle_t channel, const r
 
     // Log last symbol
     if (len > 0) {
-        ESP_LOGD(TAG, "RX last symbol: level0=%d, duration0=%d, level1=%d, duration1=%d",
+		#ifdef POLYCAST5_DEBUG
+        	ESP_LOGD(TAG, "RX last symbol: level0=%d, duration0=%d, level1=%d, duration1=%d",
                  ir_signal[len - 1].level0, ir_signal[len - 1].duration0,
                  ir_signal[len - 1].level1, ir_signal[len - 1].duration1);
+        #endif
+        
     }
 
 	// Notify semaphore that a signal was received
@@ -133,10 +142,13 @@ void infrared_transmit_ir(rmt_symbol_word_t *signal, size_t length) {
         ESP_LOGE(TAG, "TX channel or encoder not initialized");
         return;
     }
-
-	ESP_LOGI(TAG, "TX symbol: level0=%d, duration0=%d, level1=%d, duration1=%d",
+	
+	#ifdef POLYCAST5_DEBUG
+        ESP_LOGI(TAG, "TX symbol: level0=%d, duration0=%d, level1=%d, duration1=%d",
 			 signal[length - 1].level0, signal[length - 1].duration0,
 			 signal[length - 1].level1, signal[length - 1].duration1);
+    #endif
+	
 
 	// Make sure not to pick up our own transmission
 	rmt_disable(rx_channel);
@@ -154,7 +166,10 @@ void infrared_transmit_ir(rmt_symbol_word_t *signal, size_t length) {
         ESP_LOGE(TAG, "Transmit failed: %s", esp_err_to_name(ret));
     } 
     else {
-        ESP_LOGI(TAG, "Transmission complete (%d pulses)", length);
+		#ifdef POLYCAST5_DEBUG
+        	ESP_LOGI(TAG, "Transmission complete (%d pulses)", length);
+        #endif
+        
     }
 
 	// Re-enable RX channel
@@ -224,7 +239,10 @@ bool ensure_capacity(void)
     stored_signals = tmp;
     stored_signals_capacity = new_cap;
     
-    ESP_LOGD(TAG, "Resized stored_signals to %zu", new_cap);
+    #ifdef POLYCAST5_DEBUG
+        ESP_LOGI(TAG, "Resized stored_signals to %zu", new_cap);
+    #endif
+    
     return true;
 }
 
@@ -275,7 +293,10 @@ void infrared_load_stored_signals(void) {
     nvs_handle_t nvs_handle;
     esp_err_t ret = nvs_open(IR_SIG_NS, NVS_READONLY, &nvs_handle);
     if (ret == ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGI(TAG, "No stored signals found in NVS");
+		#ifdef POLYCAST5_DEBUG
+        	ESP_LOGI(TAG, "No stored signals found in NVS");
+        #endif
+        
         return;
     }
     if (ret != ESP_OK) {
@@ -295,7 +316,9 @@ void infrared_load_stored_signals(void) {
     // Limit to MAX_STORED_SIGNALS
     if (stored_count > MAX_STORED_SIGNALS) {
         stored_count = MAX_STORED_SIGNALS;
-        ESP_LOGW(TAG, "Capping stored signals at %d", MAX_STORED_SIGNALS);
+        #ifdef POLYCAST5_DEBUG
+        	ESP_LOGW(TAG, "Capping stored signals at %d", MAX_STORED_SIGNALS);
+        #endif
     }
 
     // Load signals
@@ -315,7 +338,10 @@ void infrared_load_stored_signals(void) {
         // Make sure blob is good
         if (blob_size < sizeof(ir_signal_t) || blob_size > sizeof(ir_signal_t) + MAX_PULSES * sizeof(rmt_symbol_word_t)) 
 		{
-		    ESP_LOGW(TAG, "Bad blob_size %u for %s—erasing", (unsigned)blob_size, key);
+			#ifdef POLYCAST5_DEBUG
+	        	ESP_LOGW(TAG, "Bad blob_size %u for %s—erasing", (unsigned)blob_size, key);
+	        #endif
+		    
 		    nvs_erase_key(nvs_handle, key);
 		    nvs_commit(nvs_handle);
 		    continue;
@@ -365,7 +391,11 @@ void infrared_delete_stored_signal(size_t index) {
 
     // Free the signal
     free(stored_signals[index]);
-    ESP_LOGI(TAG, "Deleted signal %d from SRAM", index);
+    
+    #ifdef POLYCAST5_DEBUG
+        ESP_LOGI(TAG, "Deleted signal %d from SRAM", index);
+    #endif
+    
 
     // Shift remaining signals
     for (size_t i = index; i < num_stored_signals - 1; i++) {

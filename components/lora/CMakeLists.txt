@@ -10,7 +10,7 @@ idf_component_register(
     	"include"
     
     REQUIRES
-    	driver freertos sx126x
+    	driver freertos sx126x common
     
     PRIV_REQUIRES
     	gpio lcd espnow

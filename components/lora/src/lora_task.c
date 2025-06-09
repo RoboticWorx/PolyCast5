@@ -1,3 +1,5 @@
+#include "polycast5_macros.h"
+
 #include <string.h>
 
 #include "freertos/FreeRTOS.h"
@@ -6,10 +8,10 @@
 
 #include "esp_log.h"
 
+#include "sx126x.h"
+
 #include "lora_task.h"
 #include "lora_funcs.h"
-
-#include "sx126x.h"
 
 static lora_send_t lora_send;
 
@@ -204,8 +206,10 @@ static void lora_task(void *pvParameters) {
 			
 			// Format command into string
 			snprintf(payload, sizeof(payload), "PolyCast_Command_Value: %d %s", lora_send.index, lora_send.instr);
-				
-			ESP_LOGI(TAG, "SENDING: %s", payload);
+			
+			#ifdef POLYCAST5_DEBUG
+	        	ESP_LOGI(TAG, "SENDING: %s", payload);
+	        #endif
 			
 			// Encrypt and send over
 			lora_encrypt_and_transmit((uint8_t *)payload);
@@ -225,7 +229,10 @@ static void lora_event_handler_task(void *pvParameters) {
 
 			// If transmission complete
 			if (irq_flags & SX126X_IRQ_TX_DONE) {
-				ESP_LOGI(TAG, "Transmission completed");
+				#ifdef POLYCAST5_DEBUG
+		        	ESP_LOGI(TAG, "Transmission completed");
+		        #endif
+				
 				sx126x_clear_irq_status(NULL, SX126X_IRQ_TX_DONE);
 				lora_set_rx_mode(); // Listen for receipt from receiver
 			}
@@ -247,8 +254,10 @@ static void lora_event_handler_task(void *pvParameters) {
 				// Read data into buffer
 				sx126x_read_buffer(NULL, rx_status.buffer_start_pointer,
 								   rx_buffer, rx_size);
-
-				ESP_LOGI(TAG, "Received packet of size %d", rx_size);
+				
+				#ifdef POLYCAST5_DEBUG
+		        	ESP_LOGI(TAG, "Received packet of size %d", rx_size);
+		        #endif
 
 				// Process received
 				lora_process_received_message(rx_buffer, rx_size);

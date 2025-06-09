@@ -85,7 +85,7 @@ idf_component_register(
     	"media/other/include"
     
     REQUIRES
-    	driver freertos lvgl sx126x
+    	driver freertos lvgl sx126x common
     
     PRIV_REQUIRES
     	gpio sx126x infrared espnow lora

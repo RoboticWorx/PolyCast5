@@ -1,12 +1,17 @@
+#include "polycast5_macros.h"
+
 #include "core/lv_obj_pos.h"
 #include "core/lv_obj_tree.h"
-#include "esp_log.h"
 #include "font/lv_symbol_def.h"
-
 #include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
+
 #include "misc/lv_timer.h"
+#include "portmacro.h"
+#include "widgets/label/lv_label.h"
+
 #include "nvs.h"
+#include "esp_log.h"
 
 #include "lcd_lora_funcs.h"
 #include "lora_task.h"
@@ -15,8 +20,6 @@
 #include "lcd_task.h"
 
 #include "espnow_task.h"
-#include "portmacro.h"
-#include "widgets/label/lv_label.h"
 
 //#include "gpio_task.h"
 
@@ -454,7 +457,9 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 		// Save final
         name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
         memcpy(saved_name, name_buf, MAX_CUSTOM_NAME_LEN + 1);
-        ESP_LOGI(TAG, "%s", saved_name);
+        #ifdef POLYCAST5_DEBUG
+		    ESP_LOGI(TAG, "%s", saved_name);
+		#endif
         
         // Delete labels since no longer used
         lv_obj_delete(lbl_user_in);
@@ -514,9 +519,11 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 		        // Save to keys at next available position
 		        lora_menu->keys[lora_menu->size - 1] = slot;
 		        
-		        //ESP_LOGI(TAG, "Key saved at slot %d:", lora_menu->size - 1);
-				//ESP_LOG_BUFFER_HEX("SAVED IN QUEUE", lora_menu->keys[lora_menu->size - 1], ENC_KEY_LEN);
-				
+		        #ifdef POLYCAST5_DEBUG
+				    ESP_LOGI(TAG, "Key saved at slot %d:", lora_menu->size - 1);
+					ESP_LOG_BUFFER_HEX("SAVED IN QUEUE", lora_menu->keys[lora_menu->size - 1], ENC_KEY_LEN);
+				#endif
+		        
 				lcd_lora_key_nvs_save(lora_menu);
 			}
 
@@ -601,7 +608,10 @@ void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_bt
 		lora_send.index = lora_menu->submenu.index;
 		memcpy(lora_send.key, lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
 		xQueueSend(xLoraSendEncQueue, &lora_send, portMAX_DELAY);
-		ESP_LOG_BUFFER_HEX("SENDING WITH KEY", lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
+		
+		#ifdef POLYCAST5_DEBUG
+		    ESP_LOG_BUFFER_HEX("SENDING WITH KEY", lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
+		#endif
 		
 		// Reset receipt label
 		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");

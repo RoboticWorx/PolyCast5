@@ -1,8 +1,10 @@
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include "polycast5_macros.h"
 
 #include <stdlib.h>
 #include <string.h>
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #include "nvs.h"
 
@@ -26,8 +28,6 @@
 
 #define CITY_FRAME_CNT 60
 #define CITY_FRAME_PERIOD 120 // 160
-
-//#define CITY_PING_PONG 1 // Animation will go back and forth instead of looping
 
 static const char *TAG = "LCD_FUNCS";
 
@@ -353,7 +353,9 @@ void lcd_selection_btn_pressed(ui_menu_t *menu)
 		menu->page = WIFI_PAGE;
 	}
 	else {
-		ESP_LOGW(TAG, "Invalid menu option selected");
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGW(TAG, "Invalid menu option selected");
+		#endif
 	}
 }
 

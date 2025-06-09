@@ -1,9 +1,13 @@
-#include "gpio_task.h"
-#include "gpio_funcs.h"
+#include "polycast5_macros.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+
 #include "esp_log.h"
 #include "portmacro.h"
+
+#include "gpio_task.h"
+#include "gpio_funcs.h"
 
 static const char *TAG = "GPIO_TASK";
 
@@ -40,8 +44,9 @@ static void gpio_task(void *arg)
 	
 	while (1) 
 	{
-		
-		//ESP_LOGI(TAG, "GPIO_UP: %d GPIO_DOWN: %d GPIO_RIGHT: %d", gpio_read_input(USER_BUTTON_UP), gpio_read_input(USER_BUTTON_DOWN), gpio_read_input(USER_BUTTON_RIGHT));
+		#ifdef POLYCAST5_GPIO_DEBUG
+        	//ESP_LOGI(TAG, "GPIO_UP: %d GPIO_DOWN: %d GPIO_RIGHT: %d", gpio_read_input(USER_BUTTON_UP), gpio_read_input(USER_BUTTON_DOWN), gpio_read_input(USER_BUTTON_RIGHT));
+        #endif
 		
 		// If a button is pressed
 	    if (xSemaphoreTake(xGpioEventSemaphore, portMAX_DELAY)) {
@@ -49,23 +54,41 @@ static void gpio_task(void *arg)
 
 			if (gpio_read_input(USER_BUTTON_UP) == 0) {
 				xSemaphoreGive(xUpButtonSemaphore);
+				#ifdef POLYCAST5_GPIO_DEBUG
+		        	ESP_LOGI(TAG, "xUpButtonSemaphore given");
+		        #endif
 			}
 			else if (gpio_read_input(USER_BUTTON_DOWN) == 0) {
 				xSemaphoreGive(xDownButtonSemaphore);
+				#ifdef POLYCAST5_GPIO_DEBUG
+		        	ESP_LOGI(TAG, "xDownButtonSemaphore given");
+		        #endif
 			}
 			else if (gpio_read_input(USER_BUTTON_RIGHT) == 0) {
 				xSemaphoreGive(xRightButtonSemaphore);
+				#ifdef POLYCAST5_GPIO_DEBUG
+		        	ESP_LOGI(TAG, "xRightButtonSemaphore given");
+		        #endif
 			}
 			else if (gpio_read_input(USER_BUTTON_LEFT) == 0) {
 				xSemaphoreGive(xLeftButtonSemaphore);
+				#ifdef POLYCAST5_GPIO_DEBUG
+		        	ESP_LOGI(TAG, "xLeftButtonSemaphore given");
+		        #endif
 			}
 			else if (gpio_read_input(USER_BUTTON_BACK) == 0) {
 				xSemaphoreGive(xBackButtonSemaphore); // THIS IS PWR ON NEW HW
-				//ESP_LOGI(TAG, "BACK");
+				#ifdef POLYCAST5_GPIO_DEBUG
+		        	ESP_LOGI(TAG, "xBackButtonSemaphore given");
+		        #endif
+				
 			}
 			else if (gpio_read_input(USER_BUTTON_SELECT) == 0) {
 				xSemaphoreGive(xSelectButtonSemaphore);
-				//ESP_LOGI(TAG, "SELECT");
+				#ifdef POLYCAST5_GPIO_DEBUG
+		        	ESP_LOGI(TAG, "xSelectButtonSemaphore given");
+		        #endif
+				
 			}
 		}
 	}

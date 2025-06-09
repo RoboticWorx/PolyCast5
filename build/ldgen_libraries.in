@@ -85,10 +85,10 @@ $<TARGET_FILE:__idf_rt>
 $<TARGET_FILE:__idf_spiffs>
 $<TARGET_FILE:__idf_wifi_provisioning>
 $<TARGET_FILE:__idf_lvgl>
-$<TARGET_FILE:__idf_espnow>
 $<TARGET_FILE:__idf_lora>
 $<TARGET_FILE:__idf_sx126x>
 $<TARGET_FILE:__idf_infrared>
 $<TARGET_FILE:__idf_lcd>
+$<TARGET_FILE:__idf_espnow>
 $<TARGET_FILE:__idf_gpio>
 $<TARGET_FILE:__idf_main>
