@@ -1,4 +1,9 @@
 #include "core/lv_obj_pos.h"
+
+#include "core/lv_obj.h"
+#include "portmacro.h"
+#include "misc/lv_area.h"
+
 #include "nvs.h"
 
 #include "esp_log.h"
@@ -6,18 +11,16 @@
 #include "esp_mac.h"
 #include "esp_random.h"
 
-#include "core/lv_obj.h"
-#include "lcd_lora_funcs.h"
-#include "lcd_espnow_funcs.h"
-
 #include "lcd_funcs.h"
 #include "lcd_task.h"
 
-#include "espnow_task.h"
-#include "misc/lv_area.h"
+#include "lcd_lora_funcs.h"
+#include "lcd_espnow_funcs.h"
 
-#include "portmacro.h"
+#include "espnow_task.h"
+
 #include "qr_esp_rx_example.h"
+#include "qr_esp_enc_rx_example.h"
 
 #define RX_MAC_IN_SEL_COLOR lv_palette_main(LV_PALETTE_RED)
 
@@ -500,7 +503,7 @@ void lcd_espnow_get_rx_mac(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_bt
 	}
 }
 
-static void prompt_upload_qr(ui_menu_t *ui_menu)
+static void prompt_upload_qr(ui_menu_t *ui_menu, bool encrypting)
 {
 	// Hide arrows
 	lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
@@ -518,7 +521,12 @@ static void prompt_upload_qr(ui_menu_t *ui_menu)
     			 
     // Create QR code (100x100px)
     lv_obj_t *qr_code = lv_img_create(ACTIVE_SCR);
-    lv_img_set_src(qr_code, &qr_esp_rx_example);
+    if (encrypting) {
+		lv_img_set_src(qr_code, &qr_esp_enc_rx_example);
+	}
+	else {
+		lv_img_set_src(qr_code, &qr_esp_rx_example);
+	}
     lv_obj_align(qr_code, LV_ALIGN_CENTER, 0, 12);
                     
     while (1) {
@@ -734,10 +742,10 @@ void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
 	        
 	        // If lmk
 	        if (memcmp(espnow_menu->lmk[espnow_menu->size - 1], (uint8_t[LMK_LEN]){0}, LMK_LEN) != 0) {
-				//prompt_upload_enc_qr(ui_menu);
+				prompt_upload_qr(ui_menu, true); // Show encryption example QR
 			}
 			else {
-				prompt_upload_qr(ui_menu);
+				prompt_upload_qr(ui_menu, false); // Show regular example QR
 			}
 		}
 		
@@ -1461,112 +1469,112 @@ esp_err_t lcd_espnow_rx_mac_lmk_nvs_delete(espnow_menu_t *espnow_menu, uint8_t s
 }
 
 
-
-
-/*
-static void dump_names(void)
-{
-    nvs_handle_t h;
-    esp_err_t err = nvs_open(ESPNOW_MENU_NS, NVS_READONLY, &h);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "menu-ns open failed: %s", esp_err_to_name(err));
-        return;
-    }
-
-    uint8_t cnt = 0;
-    nvs_get_u8(h, ESPNOW_MENU_KEY_COUNT, &cnt);
-    ESP_LOGI(TAG, "=== ESP-NOW peer names (%u) ===", cnt);
-
-    for (uint8_t i = 0; i < cnt; i++) {
-        char key[16];  snprintf(key, sizeof(key), ESPNOW_MENU_KEY_FMT, i);
-
-        size_t len = 0;
-        err = nvs_get_str(h, key, NULL, &len);
-        if (err == ESP_OK && len > 1 && len < 64) {
-            char *buf = malloc(len);
-            if (buf) {
-                nvs_get_str(h, key, buf, &len);
-                ESP_LOGI(TAG, "  [%u] \"%s\"", i, buf);
-                free(buf);
-            }
-        } else {
-            ESP_LOGW(TAG, "  [%u] missing or too long (%s)", i, esp_err_to_name(err));
-        }
-    }
-    nvs_close(h);
-}
-
-static void dump_macs(void)
-{
-    nvs_handle_t h;
-    esp_err_t err = nvs_open(ESPNOW_RX_MAC_NS, NVS_READONLY, &h);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "mac-ns open failed: %s", esp_err_to_name(err));
-        return;
-    }
-
-    uint8_t cnt = 0;
-    nvs_get_u8(h, ESPNOW_RX_MAC_KEY_COUNT, &cnt);
-    ESP_LOGI(TAG, "=== ESP-NOW peer MACs (%u) ===", cnt);
-
-    for (uint8_t i = 0; i < cnt; i++) {
-        char key[16];  snprintf(key, sizeof(key), ESPNOW_RX_MAC_KEY_FMT, i);
-        uint8_t mac[6]; size_t len = sizeof(mac);
-
-        err = nvs_get_blob(h, key, mac, &len);
-        if (err == ESP_OK && len == 6) {
-            ESP_LOGI(TAG, "  [%u] %02X:%02X:%02X:%02X:%02X:%02X",
-                     i, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-        } else {
-            ESP_LOGW(TAG, "  [%u] missing / wrong size (%s)", i, esp_err_to_name(err));
-        }
-    }
-    nvs_close(h);
-}
-
-static void dump_lmks(void)
-{
-    nvs_handle_t h;
-    esp_err_t err = nvs_open(ESPNOW_LMK_NS, NVS_READONLY, &h);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "lmk-ns open failed: %s", esp_err_to_name(err));
-        return;
-    }
-
-    uint8_t cnt = 0;
-    nvs_get_u8(h, ESPNOW_LMK_KEY_COUNT, &cnt);
-    ESP_LOGI(TAG, "=== ESP-NOW LMKs (%u) ===", cnt);
-
-    for (uint8_t i = 0; i < cnt; i++) {
-        char key[16];
-        snprintf(key, sizeof(key), ESPNOW_LMK_KEY_FMT, i);
-
-        uint8_t lmk[LMK_LEN];
-        size_t  len = sizeof(lmk);
-
-        err = nvs_get_blob(h, key, lmk, &len);
-        if (err == ESP_OK && len == LMK_LEN) {
-
-            // build a 32-char hex string in a tiny buffer
-            char hex[LMK_LEN * 2 + 1];
-            for (int j = 0; j < LMK_LEN; j++) {
-                sprintf(&hex[j * 2], "%02X", lmk[j]);
-            }
-            hex[LMK_LEN * 2] = '\0';
-
-            ESP_LOGI(TAG, "  [%u] %s", i, hex);
-        } else {
-            ESP_LOGW(TAG, "  [%u] missing / wrong size (%s)",
-                     i, esp_err_to_name(err));
-        }
-    }
-    nvs_close(h);
-}
-
-	ESP_LOGI(TAG, "========================================");
-    dump_names();
-    dump_macs();
-    dump_lmks();
-    ESP_LOGI(TAG, "========================================");
-
-*/
+#ifdef POLYCAST5_ESPNOW_DUMP_NVS
+	static void dump_names(void)
+	{
+	    nvs_handle_t h;
+	    esp_err_t err = nvs_open(ESPNOW_MENU_NS, NVS_READONLY, &h);
+	    if (err != ESP_OK) {
+	        ESP_LOGW(TAG, "menu-ns open failed: %s", esp_err_to_name(err));
+	        return;
+	    }
+	
+	    uint8_t cnt = 0;
+	    nvs_get_u8(h, ESPNOW_MENU_KEY_COUNT, &cnt);
+	    ESP_LOGI(TAG, "=== ESP-NOW peer names (%u) ===", cnt);
+	
+	    for (uint8_t i = 0; i < cnt; i++) {
+	        char key[16];  snprintf(key, sizeof(key), ESPNOW_MENU_KEY_FMT, i);
+	
+	        size_t len = 0;
+	        err = nvs_get_str(h, key, NULL, &len);
+	        if (err == ESP_OK && len > 1 && len < 64) {
+	            char *buf = malloc(len);
+	            if (buf) {
+	                nvs_get_str(h, key, buf, &len);
+	                ESP_LOGI(TAG, "  [%u] \"%s\"", i, buf);
+	                free(buf);
+	            }
+	        } else {
+	            ESP_LOGW(TAG, "  [%u] missing or too long (%s)", i, esp_err_to_name(err));
+	        }
+	    }
+	    nvs_close(h);
+	}
+	
+	static void dump_macs(void)
+	{
+	    nvs_handle_t h;
+	    esp_err_t err = nvs_open(ESPNOW_RX_MAC_NS, NVS_READONLY, &h);
+	    if (err != ESP_OK) {
+	        ESP_LOGW(TAG, "mac-ns open failed: %s", esp_err_to_name(err));
+	        return;
+	    }
+	
+	    uint8_t cnt = 0;
+	    nvs_get_u8(h, ESPNOW_RX_MAC_KEY_COUNT, &cnt);
+	    ESP_LOGI(TAG, "=== ESP-NOW peer MACs (%u) ===", cnt);
+	
+	    for (uint8_t i = 0; i < cnt; i++) {
+	        char key[16];  snprintf(key, sizeof(key), ESPNOW_RX_MAC_KEY_FMT, i);
+	        uint8_t mac[6]; size_t len = sizeof(mac);
+	
+	        err = nvs_get_blob(h, key, mac, &len);
+	        if (err == ESP_OK && len == 6) {
+	            ESP_LOGI(TAG, "  [%u] %02X:%02X:%02X:%02X:%02X:%02X",
+	                     i, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+	        } else {
+	            ESP_LOGW(TAG, "  [%u] missing / wrong size (%s)", i, esp_err_to_name(err));
+	        }
+	    }
+	    nvs_close(h);
+	}
+	
+	static void dump_lmks(void)
+	{
+	    nvs_handle_t h;
+	    esp_err_t err = nvs_open(ESPNOW_LMK_NS, NVS_READONLY, &h);
+	    if (err != ESP_OK) {
+	        ESP_LOGW(TAG, "lmk-ns open failed: %s", esp_err_to_name(err));
+	        return;
+	    }
+	
+	    uint8_t cnt = 0;
+	    nvs_get_u8(h, ESPNOW_LMK_KEY_COUNT, &cnt);
+	    ESP_LOGI(TAG, "=== ESP-NOW LMKs (%u) ===", cnt);
+	
+	    for (uint8_t i = 0; i < cnt; i++) {
+	        char key[16];
+	        snprintf(key, sizeof(key), ESPNOW_LMK_KEY_FMT, i);
+	
+	        uint8_t lmk[LMK_LEN];
+	        size_t  len = sizeof(lmk);
+	
+	        err = nvs_get_blob(h, key, lmk, &len);
+	        if (err == ESP_OK && len == LMK_LEN) {
+	
+	            // build a 32-char hex string in a tiny buffer
+	            char hex[LMK_LEN * 2 + 1];
+	            for (int j = 0; j < LMK_LEN; j++) {
+	                sprintf(&hex[j * 2], "%02X", lmk[j]);
+	            }
+	            hex[LMK_LEN * 2] = '\0';
+	
+	            ESP_LOGI(TAG, "  [%u] %s", i, hex);
+	        } else {
+	            ESP_LOGW(TAG, "  [%u] missing / wrong size (%s)",
+	                     i, esp_err_to_name(err));
+	        }
+	    }
+	    nvs_close(h);
+	}
+	
+	void lcd_espnow_dump_nvs(void)
+	{
+		ESP_LOGI(TAG, "========================================");
+	    dump_names();
+	    dump_macs();
+	    dump_lmks();
+	    ESP_LOGI(TAG, "========================================");
+	}
+#endif

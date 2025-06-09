@@ -86,6 +86,10 @@ static void lcd_task(void *pvParameters)
 	lcd_espnow_setup_page(&espnow_menu);
 	lcd_espnow_setup_send_page(&espnow_menu);
 	
+	#ifdef POLYCAST5_ESPNOW_DUMP_NVS
+		lcd_espnow_dump_nvs();
+	#endif
+	
 	while (1)
 	{
 		if (xTaskGetTickCount() - timer_last >= timer_interval) {

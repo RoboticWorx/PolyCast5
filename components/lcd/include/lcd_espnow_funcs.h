@@ -1,6 +1,8 @@
 #ifndef LCD_ESPNOW_FUNCS_H
 #define LCD_ESPNOW_FUNCS_H
 
+#include "polycast5_macros.h"
+
 #include "esp_err.h"
 
 #include "lvgl.h"
@@ -150,5 +152,12 @@ esp_err_t lcd_espnow_lmk_nvs_load(espnow_menu_t *espnow_menu);
  * @param [in] espnow_menu ESP-NOW menu structure
  */
 esp_err_t lcd_espnow_rx_mac_lmk_nvs_delete(espnow_menu_t *espnow_menu, uint8_t slot);
+
+#ifdef POLYCAST5_ESPNOW_DUMP_NVS
+	/**
+	 * @brief Logs ESP-NOW NVS state on startup
+	 */
+	void lcd_espnow_dump_nvs(void);
+#endif
 
 #endif // LCD_ESPNOW_FUNCS_H
