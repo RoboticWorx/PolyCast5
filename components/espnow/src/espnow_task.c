@@ -89,8 +89,13 @@ static void espnow_task(void *param)
 			// Start radio and initialize ESP-NOW
 			ESP_ERROR_CHECK(esp_funcs_wifi_radio_start(WIFI_CHANNEL));
 		    if (esp_funcs_espnow_init(espnow_cmd.mac_selected, WIFI_CHANNEL, espnow_cmd.enc, espnow_cmd.enc ? espnow_cmd.lmk : NULL) != ESP_OK) {
-				xSemaphoreGive(xEspCmdTxFailedSemaphore); // Mark as failed TX
-				continue; // Skip if error
+				xSemaphoreGive(xEspCmdTxFailedSemaphore); // Mark as failed TX for LCD
+				
+				// Stop radio and de-initialize ESP-NOW
+			    ESP_ERROR_CHECK(esp_funcs_espnow_deinit());
+			    ESP_ERROR_CHECK(esp_funcs_wifi_radio_stop());
+		    
+				continue;
 			}
 		    
 		    // Build a text payload from the cmd (more secure)
@@ -116,7 +121,7 @@ static void espnow_task(void *param)
 				xSemaphoreGive(xEspCmdTxSuccessSemaphore);
 			}
 			else {
-				xSemaphoreGive(xEspCmdTxFailedSemaphore); // Mark as failed TX
+				xSemaphoreGive(xEspCmdTxFailedSemaphore); // Mark as failed TX for LCD
 			}
 		    
 		    // Wait for ACK frame
