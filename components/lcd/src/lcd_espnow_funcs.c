@@ -1007,8 +1007,11 @@ void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, 
 {
 	#define BUF_SIZE 4
 	
-	if (xSemaphoreTake(xEspCmdTxStatusSemaphore, 0) == pdTRUE) { // If transmission successful
+	if (xSemaphoreTake(xEspCmdTxSuccessSemaphore, 0) == pdTRUE) { // If transmission successful
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, "TX Status: " LV_SYMBOL_OK);
+	}
+	else if (xSemaphoreTake(xEspCmdTxFailedSemaphore, 0) == pdTRUE) { // If transmission failed
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, "TX Status: " LV_SYMBOL_CLOSE);
 	}
 	
 	if (xSemaphoreTake(xEspCmdRxStatusSemaphore, 0) == pdTRUE) { // If data received

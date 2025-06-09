@@ -26,7 +26,8 @@ static uint8_t received_enc_key[ENC_KEY_LEN];
 static uint8_t received_lmk[LMK_LEN];
 
 SemaphoreHandle_t xEspCmdRxStatusSemaphore;
-SemaphoreHandle_t xEspCmdTxStatusSemaphore;
+SemaphoreHandle_t xEspCmdTxSuccessSemaphore;
+SemaphoreHandle_t xEspCmdTxFailedSemaphore;
 
 QueueHandle_t xEspSendEncKeyQueueNVS;
 QueueHandle_t xEspSendEncKeyQueue;
@@ -42,7 +43,8 @@ QueueHandle_t xEspSendCmdQueue;
 static void espnow_task(void *param)
 {
 	xEspCmdRxStatusSemaphore = xSemaphoreCreateBinary();
-	xEspCmdTxStatusSemaphore = xSemaphoreCreateBinary();
+	xEspCmdTxSuccessSemaphore = xSemaphoreCreateBinary();
+	xEspCmdTxFailedSemaphore = xSemaphoreCreateBinary();
 	
     xEspSendEncKeyQueueNVS = xQueueCreate(1, ENC_KEY_LEN);
 	if (xEspSendEncKeyQueueNVS == NULL) {
@@ -87,6 +89,7 @@ static void espnow_task(void *param)
 			// Start radio and initialize ESP-NOW
 			ESP_ERROR_CHECK(esp_funcs_wifi_radio_start(WIFI_CHANNEL));
 		    if (esp_funcs_espnow_init(espnow_cmd.mac_selected, WIFI_CHANNEL, espnow_cmd.enc, espnow_cmd.enc ? espnow_cmd.lmk : NULL) != ESP_OK) {
+				xSemaphoreGive(xEspCmdTxFailedSemaphore); // Mark as failed TX
 				continue; // Skip if error
 			}
 		    
@@ -110,7 +113,10 @@ static void espnow_task(void *param)
 		    // Send the data
 		    if (esp_funcs_espnow_send_data(espnow_cmd.mac_selected, (uint8_t*)tx_payload, tx_payload_len) == ESP_OK) {
 				// Notify the LCD that the transmission was successful
-				xSemaphoreGive(xEspCmdTxStatusSemaphore);
+				xSemaphoreGive(xEspCmdTxSuccessSemaphore);
+			}
+			else {
+				xSemaphoreGive(xEspCmdTxFailedSemaphore); // Mark as failed TX
 			}
 		    
 		    // Wait for ACK frame
