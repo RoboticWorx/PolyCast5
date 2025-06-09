@@ -30,10 +30,12 @@ esp_err_t esp_funcs_wifi_radio_stop(void);
  *
  * @param [in] mac MAC address to add as a peer
  * @param [in] channel Wi-Fi channel to configure to the peer
+ * @param [in] encrypt Yes or no to signal if peer should add encryption
+ * @param [in] lmk Local master key for said encryption
  *
  * @return ESP_OK on success
  */
-esp_err_t esp_funcs_espnow_init(const uint8_t *mac, uint8_t channel);
+esp_err_t esp_funcs_espnow_init(const uint8_t *mac, uint8_t channel, bool encrypt, const uint8_t *lmk);
 
 /**
  * @brief De-initialize ESP-NOW

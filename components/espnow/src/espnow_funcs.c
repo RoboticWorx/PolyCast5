@@ -58,7 +58,7 @@ static void send_cb(const uint8_t *mac, esp_now_send_status_t status)
 	}
 }
 
-esp_err_t esp_funcs_espnow_init(const uint8_t *mac, uint8_t channel)
+esp_err_t esp_funcs_espnow_init(const uint8_t *mac, uint8_t channel, bool encrypt, const uint8_t *lmk)
 {
     esp_err_t err;
 
@@ -80,9 +80,13 @@ esp_err_t esp_funcs_espnow_init(const uint8_t *mac, uint8_t channel)
     esp_now_peer_info_t peer = {
         .ifidx   = ESP_IF_WIFI_STA,
         .channel = channel,
-        .encrypt = false,
+        .encrypt = encrypt,
     };
     memcpy(peer.peer_addr, mac, ESP_NOW_ETH_ALEN);
+    
+    // If encrypting and LMK exists, add to LMK peer
+    if (encrypt && lmk)
+    	memcpy(peer.lmk, lmk, LMK_LEN);
     
     // Register peer
     err = esp_now_add_peer(&peer);

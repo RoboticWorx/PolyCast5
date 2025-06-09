@@ -3,6 +3,8 @@
 
 #include "esp_log.h"
 #include "esp_err.h"
+#include "esp_mac.h"
+#include "esp_random.h"
 
 #include "core/lv_obj.h"
 #include "lcd_lora_funcs.h"
@@ -150,7 +152,87 @@ void lcd_espnow_update_menu(espnow_menu_t *menu)
     lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
 }
 
-static void prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
+static bool display_mac_and_lmk(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
+{
+	// Hide all but right arrow
+	lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+	
+	// Get device MAC address
+	uint8_t my_mac[6];
+	esp_read_mac(my_mac, ESP_MAC_WIFI_STA);
+	char mac_str[30]; // “XX:XX:XX:XX:XX:XX\0” = 18 + "Device MAC:\n" = 30
+	snprintf(mac_str, sizeof(mac_str), "Device MAC:\n%02X:%02X:%02X:%02X:%02X:%02X", my_mac[0], my_mac[1], my_mac[2], my_mac[3], my_mac[4], my_mac[5]);
+	
+	// Generate ESP-NOW LMK
+	#define OUT_BUF_LEN (16*2 + 15 /*colons*/ + 1 /*newline*/ + 16 /*"Generated key:"*/ + 1 /*'\0'*/)
+	uint8_t lmk[LMK_LEN];
+	esp_fill_random(lmk, LMK_LEN);
+	char lmk_str[OUT_BUF_LEN];
+	char *p = lmk_str;
+	int written = snprintf(p, OUT_BUF_LEN, "Generated key:\n");
+	p += written;
+	// Append each byte as two‐digit hex + colon (except last)
+	for (int i = 0; i < LMK_LEN; i++) {
+		if (i == 8) {
+	        *p++ = '\n';
+	    }
+	    p += snprintf(p, OUT_BUF_LEN - (p - lmk_str), "%02X", lmk[i]);
+	    if (i + 1 < LMK_LEN) {
+	        *p++ = ':';  // Add colon separator
+	    }
+	}
+	*p = '\0'; // Ensure null‐termination
+	
+	memcpy(espnow_menu->lmk[espnow_menu->size], lmk, LMK_LEN); // Save to struct
+	
+	// Create and format ins labels
+	lv_obj_t *lbl_ins = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_ins, "Write this down!", user_secondary_color,
+    			 &lv_font_montserrat_18, LV_ALIGN_TOP_LEFT, 5, 2);
+    			 
+    lv_obj_t *lbl_ok = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_ok, "OK", user_secondary_color,
+    			 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
+    			 
+    lv_obj_t *lbl_my_mac = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_my_mac, mac_str, user_secondary_color,
+    			 &lv_font_montserrat_18, LV_ALIGN_LEFT_MID, 5, -20);
+    			 
+    lv_obj_t *lbl_lmk = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_lmk, lmk_str, user_secondary_color,
+    			 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_LEFT, 5, -2);    
+                    
+    while (1) {
+		lv_timer_handler();
+		
+		// OK
+        if (xSemaphoreTake(xRightButtonSemaphore, 0) == pdTRUE) {
+            // Show arrows
+			lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+            
+            lv_obj_del(lbl_ins);
+            lv_obj_del(lbl_my_mac);
+            lv_obj_del(lbl_lmk);
+            lv_obj_del(lbl_ok);
+			
+			lcd_clear_pending_inputs = true; // Clear any false inputs
+			
+			// Prompt to enter name
+            ui_menu->page = ESPNOW_NAME_PAGE;
+            
+            // Go back
+            return false;
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+static bool prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 {
 	lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 	
@@ -187,7 +269,7 @@ static void prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 			ui_menu->page = ESPNOW_PAGE;
             
             // Go back
-            return;
+            return false;
         }
         // Yes encryption 
         else if (xSemaphoreTake(xUpButtonSemaphore, 0) == pdTRUE) {
@@ -197,16 +279,8 @@ static void prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
             lv_obj_del(lbl_enc_yes);
             lv_obj_del(lbl_enc_no);
             
-            // Show ESP-NOW menu
-			lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-			
-			lcd_clear_pending_inputs = true; // Clear any false inputs
-			
-			// Switch pages
-			ui_menu->page = ESPNOW_PAGE;
-            
             // Go back
-            return;
+            return true;
         }
         // No encryption 
         else if (xSemaphoreTake(xDownButtonSemaphore, 0) == pdTRUE) {
@@ -217,15 +291,15 @@ static void prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
             lv_obj_del(lbl_enc_no);
             
             lcd_clear_pending_inputs = true; // Clear any false inputs
-            
+                        
             // Prompt to enter name
             ui_menu->page = ESPNOW_NAME_PAGE;
             
             // Go back
-            return;
+            return false;
         }
         
-        vTaskDelay(pdMS_TO_TICKS(5));
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
@@ -416,7 +490,13 @@ void lcd_espnow_get_rx_mac(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_bt
 		digit_index = 0;
 		
 		// Ask if encryption is needed
-		prompt_yn_encryption(ui_menu, espnow_menu);
+		bool enc_peer = prompt_yn_encryption(ui_menu, espnow_menu);
+		if (enc_peer) {
+			display_mac_and_lmk(ui_menu, espnow_menu);
+		}
+		else {
+			memset(espnow_menu->lmk[espnow_menu->size], 0, LMK_LEN); // Zero out enc entry
+		}
 	}
 }
 
@@ -434,7 +514,7 @@ static void prompt_upload_qr(ui_menu_t *ui_menu)
     			 
     lv_obj_t *lbl_qr_ok = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_qr_ok, "OK", user_secondary_color,
-    			 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, 0);
+    			 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
     			 
     // Create QR code (100x100px)
     lv_obj_t *qr_code = lv_img_create(ACTIVE_SCR);
@@ -462,7 +542,7 @@ static void prompt_upload_qr(ui_menu_t *ui_menu)
             return;
         }
         
-        vTaskDelay(pdMS_TO_TICKS(5));
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
@@ -548,6 +628,8 @@ void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
 	    memset(name_buf, 0, sizeof name_buf);
 	    
 	    espnow_menu_overwrite = false;
+	    
+	    memset(espnow_menu->lmk[espnow_menu->size], 0, LMK_LEN); // Zero out enc entry
 	    
 	    // Show ESP-NOW list
 		lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -645,7 +727,16 @@ void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
 			// Save RX MAC from earlier to NVS
 	        lcd_espnow_rx_mac_nvs_save(espnow_menu);
 	        
-	        prompt_upload_qr(ui_menu);
+	        // Save LMK if it exists
+	        lcd_espnow_lmk_nvs_save(espnow_menu);
+	        
+	        // If lmk
+	        if (memcmp(espnow_menu->lmk[espnow_menu->size - 1], (uint8_t[LMK_LEN]){0}, LMK_LEN) != 0) {
+				//prompt_upload_enc_qr(ui_menu);
+			}
+			else {
+				prompt_upload_qr(ui_menu);
+			}
 		}
 		
 		// Show ESP-NOW list
@@ -711,7 +802,6 @@ void lcd_espnow_setup_send_page(espnow_menu_t *espnow_menu)
 	static lv_style_t style_cmd;
 	lv_style_init(&style_cmd);
 
-	lv_style_init(&style_cmd);
 	lv_style_set_radius(&style_cmd, 8);
 	lv_style_set_bg_color(&style_cmd, user_primary_color);
 	lv_style_set_border_width(&style_cmd, 2);
@@ -737,7 +827,6 @@ void lcd_espnow_setup_send_page(espnow_menu_t *espnow_menu)
 	static lv_style_t style_edit;
 	lv_style_init(&style_edit);
 
-	lv_style_init(&style_edit);
 	lv_style_set_radius(&style_edit, 8);
 	lv_style_set_bg_color(&style_edit, user_primary_color);
 	lv_style_set_border_width(&style_edit, 2);
@@ -876,19 +965,20 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 		    }
 		    
 		    // Delete RX MAC (espnow_menu->size--)
-		    lcd_espnow_rx_mac_nvs_delete(espnow_menu, (uint8_t)(del_idx - 1));
+		    lcd_espnow_rx_mac_lmk_nvs_delete(espnow_menu, (uint8_t)(del_idx - 1));
 		    
 		    // Null out dangling index
 			espnow_menu->options[espnow_menu->size] = NULL;
 			espnow_menu->btns[espnow_menu->size] = NULL;
 		    
 		    // Adjust if was last
-		    if (espnow_menu->index >= espnow_menu->size)
+		    if (espnow_menu->index >= espnow_menu->size) {
 		        espnow_menu->index = espnow_menu->size - 1;
-		        
-		    // Persist to NVS
-		    lcd_espnow_menu_nvs_save(espnow_menu);
-		
+		    }
+			
+			// Persist to NVS
+			lcd_espnow_menu_nvs_save(espnow_menu);
+			
 		    // Refresh the list UI
 		    lcd_espnow_update_menu(espnow_menu);
             
@@ -899,7 +989,7 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
             return;
         }
         
-        vTaskDelay(pdMS_TO_TICKS(5));
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
@@ -921,6 +1011,11 @@ void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, 
         espnow_cmd_t espnow_cmd = {0};
         memcpy(espnow_cmd.mac_selected, espnow_menu->rx_mac[espnow_menu->index], ESPNOW_MAC_SIZE);
         espnow_cmd.cmd_to_send = espnow_menu->espnow_submenu.cmd_to_send;
+        // enc = true if no LMK
+        espnow_cmd.enc = memcmp(espnow_menu->lmk[espnow_menu->index], (uint8_t[LMK_LEN]){0}, LMK_LEN) != 0;
+        // If enc, copy LMK
+		if (espnow_cmd.enc)
+			memcpy(espnow_cmd.lmk, espnow_menu->lmk[espnow_menu->index], LMK_LEN);
 
         // Send it to ESP-NOW task
         if (xQueueSend(xEspSendCmdQueue, &espnow_cmd, portMAX_DELAY) == pdPASS) {
@@ -1109,7 +1204,7 @@ esp_err_t lcd_espnow_menu_nvs_load(espnow_menu_t *menu)
 		}
 
 		// Update menu struct
-		if (menu->size >= MAX_LORA_OPTIONS) {
+		if (menu->size >= MAX_ESPNOW_OPTIONS ) {
 		    free(buf);
 		    break;
 		}
@@ -1150,6 +1245,56 @@ esp_err_t lcd_espnow_rx_mac_nvs_save(const espnow_menu_t *espnow_menu)
         if (i < user_cnt) {
             // Save MAC in 6-byte blob
             err = nvs_set_blob(nvs_handle, key, espnow_menu->rx_mac[i + 1], ESPNOW_MAC_SIZE); // Skip 0 to allign with index
+        }
+        else {
+            // Erase leftover key if it exists
+            err = nvs_erase_key(nvs_handle, key);
+            if (err == ESP_ERR_NVS_NOT_FOUND)
+            	err = ESP_OK;
+        }
+
+        if (err != ESP_OK) {
+			nvs_close(nvs_handle);
+			return err;
+		}
+    }
+
+    // Commit changes
+    err = nvs_commit(nvs_handle);
+    
+    // Close NVS
+    nvs_close(nvs_handle);
+    return err;
+}
+
+esp_err_t lcd_espnow_lmk_nvs_save(const espnow_menu_t *espnow_menu)
+{
+    nvs_handle_t nvs_handle;
+    
+    // Open NVS
+    esp_err_t err = nvs_open(ESPNOW_LMK_NS, NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) 
+    	return err;
+
+    // Save how many LMKs we have 
+    // size - 1 since first is "Add ESP32"
+    uint8_t user_cnt = (espnow_menu->size > 1) ? espnow_menu->size - 1 : 0;
+    err = nvs_set_u8(nvs_handle, ESPNOW_LMK_KEY_COUNT, user_cnt);
+    if (err != ESP_OK) {
+		nvs_close(nvs_handle);
+		return err;
+	}
+
+    // Write each present LMK, erase any that were removed
+    for (int i = 0; i < MAX_ESPNOW_OPTIONS; i++) {
+		// Format key
+        char key[16];
+        snprintf(key, sizeof(key), ESPNOW_LMK_KEY_FMT, i);
+
+		// Up to num of LMKs saved
+        if (i < user_cnt) {
+            // Save LMK in 16-byte blob
+            err = nvs_set_blob(nvs_handle, key, espnow_menu->lmk[i + 1], LMK_LEN); // Skip 0 to allign with index
         }
         else {
             // Erase leftover key if it exists
@@ -1226,7 +1371,61 @@ esp_err_t lcd_espnow_rx_mac_nvs_load(espnow_menu_t *espnow_menu)
     return (cnt > 0) ? ESP_OK : ESP_ERR_NVS_NOT_FOUND;
 }
 
-esp_err_t lcd_espnow_rx_mac_nvs_delete(espnow_menu_t *espnow_menu, uint8_t slot)
+esp_err_t lcd_espnow_lmk_nvs_load(espnow_menu_t *espnow_menu)
+{
+    nvs_handle_t nvs;
+    
+    // Open NVS
+    esp_err_t err = nvs_open(ESPNOW_LMK_NS, NVS_READONLY, &nvs);
+    if (err != ESP_OK) 
+    	return err;
+
+    // Get number of LMKs saved
+    uint8_t cnt = 0;
+    err = nvs_get_u8(nvs, ESPNOW_LMK_KEY_COUNT, &cnt);
+    
+    if (err == ESP_ERR_NVS_NOT_FOUND)
+		cnt = 0; // Nothing stored yet
+    else if (err != ESP_OK) {
+		nvs_close(nvs);
+		return err;
+	}
+
+    // Zero out LMKs
+    memset(espnow_menu->lmk, 0, sizeof(espnow_menu->lmk));
+
+    // Read each MAC into a blob
+    for (uint8_t i = 0; i < cnt; i++) {
+		// Format key
+        char key[16];
+        snprintf(key, sizeof(key), ESPNOW_LMK_KEY_FMT, i);
+
+        size_t len = LMK_LEN;
+        
+        // Get the MAC blob
+        err = nvs_get_blob(nvs, key, espnow_menu->lmk[i + 1], &len);
+        
+        if (err == ESP_ERR_NVS_NOT_FOUND) { // If there's a hole, zero it out
+            memset(espnow_menu->lmk[i + 1], 0, LMK_LEN);
+            continue;
+        }
+        if (err != ESP_OK || len != LMK_LEN) {
+            nvs_close(nvs);
+            return ESP_ERR_INVALID_STATE;
+        }
+    }
+
+	// Close NVS
+    nvs_close(nvs);
+
+    // Bookkeeping
+    espnow_menu->size = cnt + 1; // Menu size is number of LMKs + 1
+    espnow_menu->index = 0;
+
+    return (cnt > 0) ? ESP_OK : ESP_ERR_NVS_NOT_FOUND;
+}
+
+esp_err_t lcd_espnow_rx_mac_lmk_nvs_delete(espnow_menu_t *espnow_menu, uint8_t slot)
 {
     // If nothing to delete
     if (espnow_menu->size <= 1) 
@@ -1242,16 +1441,21 @@ esp_err_t lcd_espnow_rx_mac_nvs_delete(espnow_menu_t *espnow_menu, uint8_t slot)
     // Shift everything after slot up one remove slot
     for (uint8_t i = slot; i < user_cnt - 1; i++) {
         memcpy(espnow_menu->rx_mac[i + 1], espnow_menu->rx_mac[i + 2], ESPNOW_MAC_SIZE);
+        memcpy(espnow_menu->lmk[i + 1], espnow_menu->lmk[i + 2], LMK_LEN);
     }
     
     // Zero out the dangling
     memset(espnow_menu->rx_mac[user_cnt], 0, ESPNOW_MAC_SIZE);
+    memset(espnow_menu->lmk[user_cnt], 0, LMK_LEN);
 
     // Size one less
     espnow_menu->size--;
 
     // Persist changes to NVS
-    return lcd_espnow_rx_mac_nvs_save(espnow_menu);
+    esp_err_t err = lcd_espnow_rx_mac_nvs_save(espnow_menu);
+	if (err == ESP_OK)
+	    err = lcd_espnow_lmk_nvs_save(espnow_menu);
+	return err;
 }
 
 
@@ -1318,9 +1522,49 @@ static void dump_macs(void)
     nvs_close(h);
 }
 
+static void dump_lmks(void)
+{
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(ESPNOW_LMK_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "lmk-ns open failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    uint8_t cnt = 0;
+    nvs_get_u8(h, ESPNOW_LMK_KEY_COUNT, &cnt);
+    ESP_LOGI(TAG, "=== ESP-NOW LMKs (%u) ===", cnt);
+
+    for (uint8_t i = 0; i < cnt; i++) {
+        char key[16];
+        snprintf(key, sizeof(key), ESPNOW_LMK_KEY_FMT, i);
+
+        uint8_t lmk[LMK_LEN];
+        size_t  len = sizeof(lmk);
+
+        err = nvs_get_blob(h, key, lmk, &len);
+        if (err == ESP_OK && len == LMK_LEN) {
+
+            // build a 32-char hex string in a tiny buffer 
+            char hex[LMK_LEN * 2 + 1];
+            for (int j = 0; j < LMK_LEN; j++) {
+                sprintf(&hex[j * 2], "%02X", lmk[j]);
+            }
+            hex[LMK_LEN * 2] = '\0';
+
+            ESP_LOGI(TAG, "  [%u] %s", i, hex);
+        } else {
+            ESP_LOGW(TAG, "  [%u] missing / wrong size (%s)",
+                     i, esp_err_to_name(err));
+        }
+    }
+    nvs_close(h);
+}
+
 	ESP_LOGI(TAG, "========================================");
     dump_names();
     dump_macs();
+    dump_lmks();
     ESP_LOGI(TAG, "========================================");
 
 */

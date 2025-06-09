@@ -13,9 +13,14 @@
 #define ESPNOW_MENU_KEY_COUNT "es_me_ke" // u8: number of option
 #define ESPNOW_MENU_KEY_FMT "es_me%02d"
 
+#define ESPNOW_LMK_NS "es_lm_ns"
+#define ESPNOW_LMK_KEY_COUNT "es_lm_ke"
+#define ESPNOW_LMK_KEY_FMT "es_lm%02d"
+
 #define MAX_ESPNOW_OPTIONS 20
 
 #define ESPNOW_MAC_SIZE 6
+#define LMK_LEN 16
 
 // Forward-declare structs (from lcd_funcs.h)
 typedef struct ui_btns_t ui_btns_t;
@@ -36,6 +41,7 @@ typedef struct {
 typedef struct {
     char *options[MAX_ESPNOW_OPTIONS];
     uint8_t rx_mac[MAX_ESPNOW_OPTIONS][ESPNOW_MAC_SIZE];
+    uint8_t lmk[MAX_ESPNOW_OPTIONS][LMK_LEN];
     lv_obj_t *btns[MAX_ESPNOW_OPTIONS];
     int size;
     int index;
@@ -118,6 +124,13 @@ esp_err_t lcd_espnow_menu_nvs_load(espnow_menu_t *menu);
 esp_err_t lcd_espnow_rx_mac_nvs_save(const espnow_menu_t *espnow_menu);
 
 /**
+ * @brief Saves new ESP32 receiver LMK to NVS
+ *
+ * @param [in] espnow_menu ESP-NOW menu structure
+ */
+esp_err_t lcd_espnow_lmk_nvs_save(const espnow_menu_t *espnow_menu);
+
+/**
  * @brief Loads all ESP32 receiver MACs from NVS
  *
  * @param [in] espnow_menu ESP-NOW menu structure
@@ -125,10 +138,17 @@ esp_err_t lcd_espnow_rx_mac_nvs_save(const espnow_menu_t *espnow_menu);
 esp_err_t lcd_espnow_rx_mac_nvs_load(espnow_menu_t *espnow_menu);
 
 /**
+ * @brief Loads all ESP32 receiver LMKs from NVS
+ *
+ * @param [in] espnow_menu ESP-NOW menu structure
+ */
+esp_err_t lcd_espnow_lmk_nvs_load(espnow_menu_t *espnow_menu);
+
+/**
  * @brief Deletes a ESP32 receiver MAC from NVS
  *
  * @param [in] espnow_menu ESP-NOW menu structure
  */
-esp_err_t lcd_espnow_rx_mac_nvs_delete(espnow_menu_t *espnow_menu, uint8_t slot);
+esp_err_t lcd_espnow_rx_mac_lmk_nvs_delete(espnow_menu_t *espnow_menu, uint8_t slot);
 
 #endif // LCD_ESPNOW_FUNCS_H

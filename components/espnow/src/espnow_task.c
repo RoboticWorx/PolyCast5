@@ -1,5 +1,6 @@
 #include <string.h>
 
+#include "esp_log_buffer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
@@ -8,6 +9,7 @@
 #include "esp_log.h"
 
 #include "lora_task.h"
+#include "lcd_espnow_funcs.h"
 
 #include "espnow_funcs.h"
 #include "portmacro.h"
@@ -20,6 +22,7 @@ espnow_cmd_t espnow_cmd;
 static const uint8_t UNIVERSAL_MAC[ESP_NOW_ETH_ALEN] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
 static uint8_t received_enc_key[ENC_KEY_LEN];
+static uint8_t received_lmk[LMK_LEN];
 
 SemaphoreHandle_t xEspCmdStatusSemaphore;
 
@@ -40,29 +43,29 @@ static void espnow_task(void *param)
 	
     xEspSendEncKeyQueueNVS = xQueueCreate(1, ENC_KEY_LEN);
 	if (xEspSendEncKeyQueueNVS == NULL) {
-		ESP_LOGE(TAG, "Failed to create xEspSendEncKeyQueueNVS semaphore");
+		ESP_LOGE(TAG, "Failed to create xEspSendEncKeyQueueNVS");
 		vTaskDelete(NULL);
 	}
 	
 	xEspSendEncKeyQueue = xQueueCreate(1, ENC_KEY_LEN);
 	if (xEspSendEncKeyQueue == NULL) {
-		ESP_LOGE(TAG, "Failed to create xEspSendEncKeyQueue semaphore");
+		ESP_LOGE(TAG, "Failed to create xEspSendEncKeyQueue");
 		vTaskDelete(NULL);
 	}
 	
 	xEspSendCmdQueue = xQueueCreate(1, sizeof(espnow_cmd_t));
 	if (xEspSendCmdQueue == NULL) {
-		ESP_LOGE(TAG, "Failed to create xEspSendCmdQueue semaphore");
+		ESP_LOGE(TAG, "Failed to create xEspSendCmdQueue");
 		vTaskDelete(NULL);
 	}
     
 	while (1) {
-		
+
 		// Key generated and requesting send 
 		if (xQueueReceive(xEspSendEncKeyQueue, received_enc_key, 0) == pdPASS) {
 			// Start radio and initialize ESP-NOW
 			ESP_ERROR_CHECK(esp_funcs_wifi_radio_start(WIFI_CHANNEL));
-		    ESP_ERROR_CHECK(esp_funcs_espnow_init(UNIVERSAL_MAC, WIFI_CHANNEL));
+		    ESP_ERROR_CHECK(esp_funcs_espnow_init(UNIVERSAL_MAC, WIFI_CHANNEL, false, NULL));
 		    
 		    // Send the data
 		    //char* msg = "Hello from polycast!";
@@ -79,10 +82,13 @@ static void espnow_task(void *param)
 		if (xQueueReceive(xEspSendCmdQueue, &espnow_cmd, 0) == pdPASS) {
 			// Start radio and initialize ESP-NOW
 			ESP_ERROR_CHECK(esp_funcs_wifi_radio_start(WIFI_CHANNEL));
-		    ESP_ERROR_CHECK(esp_funcs_espnow_init(espnow_cmd.mac_selected, WIFI_CHANNEL));
+		    ESP_ERROR_CHECK(esp_funcs_espnow_init(espnow_cmd.mac_selected, WIFI_CHANNEL, espnow_cmd.enc, espnow_cmd.enc ? espnow_cmd.lmk : NULL));
 		    
 		    ESP_LOGI(TAG, "Sending: %u", espnow_cmd.cmd_to_send);
 		    ESP_LOG_BUFFER_HEX("To MAC", espnow_cmd.mac_selected, ESPNOW_MAC_SIZE);
+		    if (espnow_cmd.enc) {
+		        ESP_LOG_BUFFER_HEX("LMK", espnow_cmd.lmk, LMK_LEN);
+		    }
 		    
 		    // Send the data
 		    esp_funcs_espnow_send_data(espnow_cmd.mac_selected, &espnow_cmd.cmd_to_send, sizeof(espnow_cmd.cmd_to_send));

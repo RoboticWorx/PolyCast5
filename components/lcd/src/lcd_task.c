@@ -40,6 +40,107 @@ volatile bool lcd_clear_pending_inputs = false;
 lv_color_t user_primary_color = LV_COLOR_MAKE(0x00, 0x00, 0x8B); 
 lv_color_t user_secondary_color = LV_COLOR_MAKE(0xFF, 0xFF, 0xFF);
 
+static void dump_names(void)
+{
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(ESPNOW_MENU_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "menu-ns open failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    uint8_t cnt = 0;
+    nvs_get_u8(h, ESPNOW_MENU_KEY_COUNT, &cnt);
+    ESP_LOGI(TAG, "=== ESP-NOW peer names (%u) ===", cnt);
+
+    for (uint8_t i = 0; i < cnt; i++) {
+        char key[16];  snprintf(key, sizeof(key), ESPNOW_MENU_KEY_FMT, i);
+
+        size_t len = 0;
+        err = nvs_get_str(h, key, NULL, &len);
+        if (err == ESP_OK && len > 1 && len < 64) {
+            char *buf = malloc(len);
+            if (buf) {
+                nvs_get_str(h, key, buf, &len);
+                ESP_LOGI(TAG, "  [%u] \"%s\"", i, buf);
+                free(buf);
+            }
+        } else {
+            ESP_LOGW(TAG, "  [%u] missing or too long (%s)", i, esp_err_to_name(err));
+        }
+    }
+    nvs_close(h);
+}
+
+static void dump_macs(void)
+{
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(ESPNOW_RX_MAC_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "mac-ns open failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    uint8_t cnt = 0;
+    nvs_get_u8(h, ESPNOW_RX_MAC_KEY_COUNT, &cnt);
+    ESP_LOGI(TAG, "=== ESP-NOW peer MACs (%u) ===", cnt);
+
+    for (uint8_t i = 0; i < cnt; i++) {
+        char key[16];  snprintf(key, sizeof(key), ESPNOW_RX_MAC_KEY_FMT, i);
+        uint8_t mac[6]; size_t len = sizeof(mac);
+
+        err = nvs_get_blob(h, key, mac, &len);
+        if (err == ESP_OK && len == 6) {
+            ESP_LOGI(TAG, "  [%u] %02X:%02X:%02X:%02X:%02X:%02X",
+                     i, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        } else {
+            ESP_LOGW(TAG, "  [%u] missing / wrong size (%s)", i, esp_err_to_name(err));
+        }
+    }
+    nvs_close(h);
+}
+
+static void dump_lmks(void)
+{
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(ESPNOW_LMK_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "lmk-ns open failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    uint8_t cnt = 0;
+    nvs_get_u8(h, ESPNOW_LMK_KEY_COUNT, &cnt);
+    ESP_LOGI(TAG, "=== ESP-NOW LMKs (%u) ===", cnt);
+
+    for (uint8_t i = 0; i < cnt; i++) {
+        char key[16];
+        snprintf(key, sizeof(key), ESPNOW_LMK_KEY_FMT, i);
+
+        uint8_t lmk[LMK_LEN];
+        size_t  len = sizeof(lmk);
+
+        err = nvs_get_blob(h, key, lmk, &len);
+        if (err == ESP_OK && len == LMK_LEN) {
+
+            /* build a 32-char hex string in a tiny buffer */
+            char hex[LMK_LEN * 2 + 1];
+            for (int j = 0; j < LMK_LEN; j++) {
+                sprintf(&hex[j * 2], "%02X", lmk[j]);
+            }
+            hex[LMK_LEN * 2] = '\0';
+
+            ESP_LOGI(TAG, "  [%u] %s", i, hex);
+        } else {
+            ESP_LOGW(TAG, "  [%u] missing / wrong size (%s)",
+                     i, esp_err_to_name(err));
+        }
+    }
+    nvs_close(h);
+}
+
+
+
 static void lcd_task(void *pvParameters)
 {
 	user_primary_color = lv_color_hex(0x00008B);
@@ -61,6 +162,7 @@ static void lcd_task(void *pvParameters)
 
 	//lcd_ns_nvs_clear(ESPNOW_RX_MAC_NS);
 	//lcd_ns_nvs_clear(ESPNOW_MENU_NS);
+	//lcd_ns_nvs_clear(ESPNOW_LMK_NS);
 	
 	
 	// Create common items
@@ -73,6 +175,7 @@ static void lcd_task(void *pvParameters)
 	lcd_lora_key_nvs_load(&lora_menu);
 	
 	lcd_espnow_menu_nvs_load(&espnow_menu);
+	lcd_espnow_lmk_nvs_load(&espnow_menu);
 	lcd_espnow_rx_mac_nvs_load(&espnow_menu);
 		
 	// Create common pages
@@ -83,6 +186,12 @@ static void lcd_task(void *pvParameters)
 	
 	lcd_espnow_setup_page(&espnow_menu);
 	lcd_espnow_setup_send_page(&espnow_menu);
+	
+		ESP_LOGI(TAG, "========================================");
+    dump_names();
+    dump_macs();
+    dump_lmks();
+    ESP_LOGI(TAG, "========================================");
 		
 	while (1)
 	{

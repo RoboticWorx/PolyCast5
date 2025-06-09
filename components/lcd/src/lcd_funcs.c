@@ -482,7 +482,7 @@ static void city_anim_cb(lv_timer_t *t)
 
 void lcd_init_images()
 {
-	const lv_img_dsc_t *src_arr[CITY_FRAME_CNT] = { // 65KB each
+	const lv_img_dsc_t *src_arr[CITY_FRAME_CNT] = { // 64.84KB each
 	    &anim_city_1,  &anim_city_2,  &anim_city_3,
 	    &anim_city_4,  &anim_city_5,  &anim_city_6,
 	    &anim_city_7,  &anim_city_8,  &anim_city_9,

@@ -64,16 +64,16 @@ static void infrared_task(void *pvParameters) {
 
     while (1) {
 		
-		if (xSemaphoreTake(xDisableInfraredSemaphore, 1) == pdTRUE) {
+		if (xSemaphoreTake(xDisableInfraredSemaphore, 0) == pdTRUE) {
 			infrared_disable_rx();
 		}	
 		
-		if (xSemaphoreTake(xStartInfraredRXSemaphore, 1) == pdTRUE) {
+		if (xSemaphoreTake(xStartInfraredRXSemaphore, 0) == pdTRUE) {
 			infrared_restart_rx();
 		}
 		
         // Wait for IR signal
-        if (xSemaphoreTake(xInfraredRXEventSemaphore, 1) == pdTRUE) {
+        if (xSemaphoreTake(xInfraredRXEventSemaphore, 0) == pdTRUE) {
 
             // Filter out noise
             if (ir_signal_length < MIN_VALID_PULSES) {
@@ -131,7 +131,7 @@ static void infrared_task(void *pvParameters) {
 
         }
         
-        if (xQueueReceive(xSignalToTXQueue, &menu_idx, 1) == pdTRUE) {
+        if (xQueueReceive(xSignalToTXQueue, &menu_idx, 0) == pdTRUE) {
 			if (menu_idx < 0) {
 				menu_idx = -menu_idx; // Make pos
 				size_t sig_idx = (size_t) menu_idx - 2; // 0-based user list
@@ -147,6 +147,8 @@ static void infrared_task(void *pvParameters) {
 		    }
 		    
 		}
+		
+		vTaskDelay(pdMS_TO_TICKS(10));
 
         // Random transmission after threshold
         /*if (num_stored_signals >= RANDOM_TX_THRESHOLD) {

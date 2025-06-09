@@ -105,7 +105,7 @@ void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
         int to_delete = edit_idx;
 	    if (lcd_ir_ir_menu_nvs_delete(ir_menu, to_delete, A_IR_REMOTE_NS, A_REMOTE_KEY_COUNT, A_REMOTE_KEY_FMT) == ESP_OK) {
 	        int q = -to_delete;
-	        xQueueSend(xSignalToTXQueue, &q, 0);
+	        xQueueSend(xSignalToTXQueue, &q, portMAX_DELAY);
 	    }
 	
 	    // Now that ir_menu->size has shrunk, wrap
@@ -490,7 +490,7 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
 		
 	// Create texts
 	lv_obj_t *text_label = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(text_label, "Point the remote at the\nIR lens and send the signal.", user_secondary_color,
+	lcd_format_label(text_label, "Point your device at the\nIR lens and send the signal.", user_secondary_color,
 				 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 13);
 				 
 	// Create present signal img

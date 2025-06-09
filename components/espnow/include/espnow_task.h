@@ -8,6 +8,8 @@
 typedef struct {
     uint8_t mac_selected[ESPNOW_MAC_SIZE];
     uint8_t cmd_to_send;
+    bool enc; // If encryption was enabled
+    uint8_t lmk[LMK_LEN]; // Local master key (if enc)
 } espnow_cmd_t;
 
 extern SemaphoreHandle_t xEspCmdStatusSemaphore;
