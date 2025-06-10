@@ -62,13 +62,14 @@ static void lcd_task(void *pvParameters)
 	//lcd_ns_nvs_clear(ESPNOW_RX_MAC_NS);
 	//lcd_ns_nvs_clear(ESPNOW_MENU_NS);
 	//lcd_ns_nvs_clear(ESPNOW_LMK_NS);
+	//lcd_ns_nvs_clear(A_IR_REMOTE_NS);
 	
 	
 	// Create common items
 	lcd_init_selection_labels(&ui_menu);
 	
 	// Load user data from NVS
-	lcd_ir_ir_menu_nvs_load(&ir_menu, A_IR_REMOTE_NS, A_REMOTE_KEY_COUNT, A_REMOTE_KEY_FMT);
+	lcd_ir_menu_nvs_load(&ir_menu, A_IR_REMOTE_NS, A_IR_REMOTE_KEY_COUNT, A_IR_REMOTE_KEY_FMT);
 	
 	lcd_lora_menu_nvs_load(&lora_menu);
 	lcd_lora_key_nvs_load(&lora_menu);

@@ -25,25 +25,12 @@
 #define RANDOM_TX_DELAY_MS 3000
 
 #define MAX_STORED_SIGNALS 100
-#define INITIAL_CAPACITY 5 // Initial SRAM capacity
 
 // Stored signal structure
 typedef struct {
     size_t length;
     rmt_symbol_word_t pulses[];
 } ir_signal_t;
-
-// Global variables
-extern size_t stored_signals_capacity;
-extern ir_signal_t **stored_signals; // Array of pointers to signals
-extern size_t num_stored_signals;
-extern rmt_symbol_word_t ir_signal[MAX_PULSES];
-extern size_t ir_signal_length;
-
-/** 
- * @brief Initialise NVS flash and check for errors
- */
-void init_nvs(void);
 
 /** 
  * @brief Initialise RMT RX
@@ -74,11 +61,6 @@ void infrared_disable_rx(void);
 void infrared_transmit_ir(rmt_symbol_word_t *signal, size_t length);
 
 /** 
- * @brief Checks if space is available to store another signal. Else, makes more space.
- */
-bool ensure_capacity(void);
-
-/** 
  * @brief Loads signals from NVS flash
  */
 void infrared_load_stored_signals(void);
@@ -92,5 +74,8 @@ void infrared_save_stored_signal(void);
  * @brief Deletes signal from NVS flash
  */
 void infrared_delete_stored_signal(size_t index);
+
+bool infrared_ensure_capacity(void);
+void infrared_clear_nvs(void);
 
 #endif // INFRARED_FUNCS_H

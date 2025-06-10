@@ -43,7 +43,7 @@ spi_device_handle_t spi_st7789; // For ST7789
 // Global SX126x instance
 sx126x_t sx126x;
 
-// MOVE TO GPIO_FUNCS ><
+// MOVE TO LORA_FUNCS ><
 void spi_sx126x_init(void)
 {
     esp_err_t ret;
@@ -78,7 +78,7 @@ void app_main(void) {
     */
     
     // Initialize NVS flash
-    init_nvs();
+    gpio_init_nvs();
     
     // Allocate Wi-Fi buffers now without fragmentation
     ESP_ERROR_CHECK(esp_funcs_wifi_driver_init());

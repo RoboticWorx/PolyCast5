@@ -16,30 +16,23 @@
 #define IR_SIG_COUNT_KEY "isc_key"
 #define IR_SIG_KEY "ir_sig%d"
 
+
+// Globals
+extern ir_signal_t *stored_signals[MAX_STORED_SIGNALS]; // Signal struct array with sig and len
+extern rmt_symbol_word_t ir_signal[MAX_PULSES]; // The signal
+
+extern size_t num_stored_signals;
+extern size_t ir_signal_length;
+
+extern volatile bool restart_rx_pending;
+
+
+// Statics
 static const char *TAG = "IR_FUNCS";
 
 static rmt_channel_handle_t rx_channel = NULL;
 static rmt_channel_handle_t tx_channel = NULL;
 static rmt_encoder_handle_t tx_encoder = NULL;
-
-void init_nvs(void) {
-	// Initialize flash
-    esp_err_t ret = nvs_flash_init();
-    
-    // Error check
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_LOGW(TAG, "Erasing NVS partition...");
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    
-    ESP_ERROR_CHECK(ret);
-    
-    #ifdef POLYCAST5_DEBUG
-        ESP_LOGI(TAG, "NVS initialized");
-    #endif
-    
-}
 
 // When IR signal received
 static bool IRAM_ATTR infrared_rx_callback(rmt_channel_handle_t channel, const rmt_rx_done_event_data_t *edata, void *user_data) {
@@ -49,34 +42,30 @@ static bool IRAM_ATTR infrared_rx_callback(rmt_channel_handle_t channel, const r
     if (len > MAX_PULSES) {
         len = MAX_PULSES;
     }
+    if (len < MIN_VALID_PULSES) {
+		restart_rx_pending = true;
+		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    	return (xHigherPriorityTaskWoken == pdTRUE);
+	}
+    
     // Copy received signal into ir_signal
     memcpy(ir_signal, edata->received_symbols, len * sizeof(rmt_symbol_word_t));
     ir_signal_length = len;
 
-    // Log last symbol
-    if (len > 0) {
-		#ifdef POLYCAST5_DEBUG
-        	ESP_LOGD(TAG, "RX last symbol: level0=%d, duration0=%d, level1=%d, duration1=%d",
-                 ir_signal[len - 1].level0, ir_signal[len - 1].duration0,
-                 ir_signal[len - 1].level1, ir_signal[len - 1].duration1);
-        #endif
-        
-    }
+	#ifdef POLYCAST5_DEBUG
+        ESP_LOGD(TAG, "RX last symbol: level0=%d, duration0=%d, level1=%d, duration1=%d",
+             ir_signal[len - 1].level0, ir_signal[len - 1].duration0,
+             ir_signal[len - 1].level1, ir_signal[len - 1].duration1);
+    #endif
 
 	// Notify semaphore that a signal was received
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    xSemaphoreGiveFromISR(xInfraredRXEventSemaphore, &xHigherPriorityTaskWoken);
+    xSemaphoreGiveFromISR(xInfraredRxEventSemaphore, &xHigherPriorityTaskWoken);
     return (xHigherPriorityTaskWoken == pdTRUE);
+    
 }
 
 void infrared_init_rx(void) {
-	// IR semaphore
-    xInfraredRXEventSemaphore = xSemaphoreCreateBinary();
-    if (xInfraredRXEventSemaphore == NULL) {
-        ESP_LOGE(TAG, "Failed to create RX semaphore");
-        return;
-    }
-
 	// Configure rmt channel
     rmt_rx_channel_config_t rx_config = {
         .gpio_num = RMT_RX_GPIO,
@@ -174,7 +163,6 @@ void infrared_transmit_ir(rmt_symbol_word_t *signal, size_t length) {
 
 	// Re-enable RX channel
     rmt_enable(rx_channel);
-    //infrared_restart_rx(); // Start receiving again
 }
 
 void infrared_restart_rx(void) {
@@ -210,40 +198,13 @@ void infrared_disable_rx(void)
     rmt_disable(rx_channel);
 }
 
-bool ensure_capacity(void)
+bool infrared_ensure_capacity(void)
 {
-	// If space available
-    if (num_stored_signals < stored_signals_capacity) {
+    if (num_stored_signals < MAX_STORED_SIGNALS) {
         return true;
     }
-
-	// If maxed out
-    if (stored_signals_capacity >= MAX_STORED_SIGNALS) {
-        ESP_LOGW(TAG, "Storage full (%zu signals)", stored_signals_capacity);
-        return false;
-    }
-	
-	// Else make more space
-    size_t new_cap = stored_signals_capacity + INITIAL_CAPACITY;
-    if (new_cap > MAX_STORED_SIGNALS) {
-        new_cap = MAX_STORED_SIGNALS; // Hard cap upper bound
-    }
-
-	// Allocate space for more signals
-    ir_signal_t **tmp = realloc(stored_signals, new_cap * sizeof(ir_signal_t *));
-    if (!tmp) {
-        ESP_LOGE(TAG, "Out of heap enlarging stored_signals to %zu", new_cap);
-        return false;
-    }
-
-    stored_signals = tmp;
-    stored_signals_capacity = new_cap;
-    
-    #ifdef POLYCAST5_DEBUG
-        ESP_LOGI(TAG, "Resized stored_signals to %zu", new_cap);
-    #endif
-    
-    return true;
+    ESP_LOGW(TAG, "Storage full (%zu signals)", num_stored_signals);
+    return false;
 }
 
 void infrared_save_stored_signal(void) {
@@ -258,18 +219,16 @@ void infrared_save_stored_signal(void) {
 	// Pick the signal we're about to store
     ir_signal_t *sig = stored_signals[num_stored_signals];
     
-    // Save signal
+    // Format key
     char key[16];
     snprintf(key, sizeof(key), IR_SIG_KEY, num_stored_signals);
     
     // Calculate how many bytes to write: header + actual pulses
-    size_t blob_size = sizeof(ir_signal_t) + sig->length * sizeof(rmt_symbol_word_t);
+    size_t blob_size = sizeof(ir_signal_t) + (sig->length * sizeof(rmt_symbol_word_t));
                      
     ret = nvs_set_blob(nvs_handle, key, sig, blob_size);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to save signal %d: %s",
-                 num_stored_signals,
-                 esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to save signal %zu: %s", num_stored_signals, esp_err_to_name(ret));
     }
 
     // Save num_stored_signals
@@ -296,13 +255,14 @@ void infrared_load_stored_signals(void) {
 		#ifdef POLYCAST5_DEBUG
         	ESP_LOGI(TAG, "No stored signals found in NVS");
         #endif
-        
         return;
     }
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to open NVS: %s", esp_err_to_name(ret));
         return;
     }
+    
+    num_stored_signals = 0;
 
     // Load num_stored_signals
     uint32_t stored_count = 0;
@@ -323,6 +283,7 @@ void infrared_load_stored_signals(void) {
 
     // Load signals
     for (size_t i = 0; i < stored_count; i++) {
+		// Format key
         char key[16];
         snprintf(key, sizeof(key), IR_SIG_KEY, i);
         
@@ -336,7 +297,7 @@ void infrared_load_stored_signals(void) {
         }
         
         // Make sure blob is good
-        if (blob_size < sizeof(ir_signal_t) || blob_size > sizeof(ir_signal_t) + MAX_PULSES * sizeof(rmt_symbol_word_t)) 
+        if (blob_size < sizeof(ir_signal_t) || blob_size > sizeof(ir_signal_t) + (MAX_PULSES * sizeof(rmt_symbol_word_t)))
 		{
 			#ifdef POLYCAST5_DEBUG
 	        	ESP_LOGW(TAG, "Bad blob_size %u for %s—erasing", (unsigned)blob_size, key);
@@ -362,18 +323,12 @@ void infrared_load_stored_signals(void) {
             break;
         }
         
-        // If reached initial capacity, allocate more space
-        if (num_stored_signals >= stored_signals_capacity) {
-            size_t new_capacity = stored_signals_capacity + INITIAL_CAPACITY;
-            ir_signal_t **new_signals = realloc(stored_signals, new_capacity * sizeof(ir_signal_t *));
-            if (new_signals == NULL) {
-                ESP_LOGE(TAG, "Failed to resize stored_signals");
-                free(signal);
-                break;
-            }
-            stored_signals = new_signals;
-            stored_signals_capacity = new_capacity;
-        }
+		// Cap total loaded signals
+    	if (num_stored_signals >= MAX_STORED_SIGNALS) {
+        	free(signal); // Drop the extra
+        	break;
+    	}
+    	
         stored_signals[num_stored_signals] = signal;
         num_stored_signals++;
     }
@@ -385,7 +340,7 @@ void infrared_load_stored_signals(void) {
 void infrared_delete_stored_signal(size_t index) {
 	// Check if in bounds
     if (index >= num_stored_signals) {
-        ESP_LOGE(TAG, "Invalid signal index %d, max %d", index, num_stored_signals - 1);
+        ESP_LOGE(TAG, "Invalid signal index %d, max %zu", index, num_stored_signals - 1);
         return;
     }
 
@@ -448,4 +403,16 @@ void infrared_delete_stored_signal(size_t index) {
     
     // Close NVS
     nvs_close(nvs_handle);
+}
+
+void infrared_clear_nvs()
+{
+	nvs_handle_t h;
+    
+    // Clear all NVS
+    if (nvs_open(IR_SIG_NS, NVS_READWRITE, &h) == ESP_OK) {
+        nvs_erase_all(h); // Wipes only keys in this namespace
+        nvs_commit(h);
+        nvs_close(h);
+    }
 }

@@ -5,6 +5,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/** 
+ * @brief Initialise NVS flash
+ */
+void gpio_init_nvs(void);
+
 /**
  * @brief Initialize the TCA9535 I²C expander and configure:
  *          - Port 0 = all inputs

@@ -1,3 +1,4 @@
+#include "core/lv_obj_pos.h"
 #include "polycast5_macros.h"
 
 #include "freertos/idf_additions.h"
@@ -15,10 +16,12 @@
 #include "gpio_task.h"
 
 #include "img_ir_save_new_remote.h"
+#include "widgets/label/lv_label.h"
+#include "widgets/list/lv_list.h"
 
 ir_menu_t ir_menu = {
-    .options = {"Add New", "Edit"},
-    .size = 2,
+    .options = {"RENAME_ME", "Add New", "Edit"},
+    .size = 3,
     .index = 0,
     .cont = NULL,
 };
@@ -35,7 +38,7 @@ static uint8_t ir_index_overwrite = 0;
 void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns)
 {
     // Declare statics
-    static int edit_idx = 2;
+    static int edit_idx = 3;
     static lv_obj_t *lbl_title = NULL;
     static lv_obj_t *lbl_name = NULL;
     static lv_obj_t *lbl_hint = NULL;
@@ -44,7 +47,7 @@ void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
     if (!lbl_title) {
 		
 		// If no user remotes
-        if (ir_menu->size <= 2) {
+        if (ir_menu->size <= 3) {
 			
 			// Help text
 			lbl_title = lv_label_create(ACTIVE_SCR);
@@ -67,7 +70,7 @@ void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
         }
         
         // Reset index to beginning
-        edit_idx = 2;
+        edit_idx = 3;
 
 		// Initial text
 		lbl_title = lv_label_create(ACTIVE_SCR);
@@ -106,14 +109,14 @@ void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
     else if (ui_btns->select_btn) {
 		// Deletion
         int to_delete = edit_idx;
-	    if (lcd_ir_ir_menu_nvs_delete(ir_menu, to_delete, A_IR_REMOTE_NS, A_REMOTE_KEY_COUNT, A_REMOTE_KEY_FMT) == ESP_OK) {
+	    if (lcd_ir_menu_nvs_delete(ir_menu, to_delete, A_IR_REMOTE_NS, A_IR_REMOTE_KEY_COUNT, A_IR_REMOTE_KEY_FMT) == ESP_OK) {
 	        int q = -to_delete;
-	        xQueueSend(xSignalToTXQueue, &q, portMAX_DELAY);
+	        xQueueSend(xInfraredSignalToTxQueue, &q, portMAX_DELAY);
 	    }
 	
 	    // Now that ir_menu->size has shrunk, wrap
 	    if (edit_idx >= ir_menu->size) {
-	        edit_idx = 2;
+	        edit_idx = 3;
 	    }
         
         // Reset for next time
@@ -148,7 +151,7 @@ void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
         
         // Wrap
         if (edit_idx >= ir_menu->size)
-        	edit_idx = 2;
+        	edit_idx = 3;
         	
         lv_label_set_text(lbl_name, ir_menu->options[edit_idx]);
         return;
@@ -158,7 +161,7 @@ void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
         edit_idx--;
 
 		// Wrap
-        if (edit_idx < 2)
+        if (edit_idx < 3)
         	edit_idx = ir_menu->size - 1;
 
         lv_label_set_text(lbl_name, ir_menu->options[edit_idx]);
@@ -298,7 +301,7 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
 			ir_menu->options[ir_index_overwrite] = strdup(saved_name);
 
 			// Persist to NVS
-			lcd_ir_ir_menu_nvs_save(ir_menu, A_IR_REMOTE_NS, A_REMOTE_KEY_COUNT, A_REMOTE_KEY_FMT);
+			lcd_ir_menu_nvs_save(ir_menu, A_IR_REMOTE_NS, A_IR_REMOTE_KEY_COUNT, A_IR_REMOTE_KEY_FMT);
 
 			// Update the button’s label in-place
 			lv_obj_t *btn = ir_menu->btns[ir_index_overwrite];
@@ -315,13 +318,12 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
 			// Save to options, then to NVS
 			char *name_copy = strdup(saved_name);
 			ir_menu->options[ir_menu->size - 1] = name_copy;
-			lcd_ir_ir_menu_nvs_save(ir_menu, A_IR_REMOTE_NS, A_REMOTE_KEY_COUNT, A_REMOTE_KEY_FMT);
+			lcd_ir_menu_nvs_save(ir_menu, A_IR_REMOTE_NS, A_IR_REMOTE_KEY_COUNT, A_IR_REMOTE_KEY_FMT);
 
 			// Create new button for new option
 			ir_menu->btns[ir_menu->size - 1] = lv_list_add_btn(ir_menu->main_list, NULL, ir_menu->options[ir_menu->size - 1]);
 			lv_obj_set_size(ir_menu->btns[ir_menu->size - 1], 100, 28);
-			lv_obj_add_style(ir_menu->btns[ir_menu->size - 1],
-							 &ir_menu->btn_style, 0);
+			lv_obj_add_style(ir_menu->btns[ir_menu->size - 1], &ir_menu->btn_style, 0);
 
 			// Create and format text label
 			lv_obj_t *lbl = lv_obj_get_child(ir_menu->btns[ir_menu->size - 1], 0);
@@ -350,7 +352,6 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
 
 void lcd_ir_setup_page(ir_menu_t *menu)
 {
-
 	// Create list
     menu->main_list = lv_list_create(ACTIVE_SCR);
     lv_obj_set_size(menu->main_list, 105, 208);
@@ -370,13 +371,13 @@ void lcd_ir_setup_page(ir_menu_t *menu)
 	// Rotate
 	lv_obj_set_style_transform_angle(menu->main_list, 2700, LV_PART_MAIN | LV_STATE_DEFAULT);
 	
-	// Adjust rotation
+	// Adjust position
 	lv_obj_set_x(menu->main_list, -105);
 	lv_obj_set_y(menu->main_list, -31); // More pos = left
 	
 	// Adjust spacing
 	lv_obj_set_style_pad_row(menu->main_list, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
-
+	
 	
 	// Create button style
 	lv_style_init(&menu->btn_style);
@@ -446,7 +447,7 @@ void lcd_ir_setup_page(ir_menu_t *menu)
 
     // Format buttons as container
     menu->cont = lv_obj_get_parent(menu->btns[0]);
-    lv_obj_set_flex_flow (menu->cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_flow(menu->cont, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(menu->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 	
 	// Hide for now
@@ -467,7 +468,7 @@ void lcd_ir_update_menu(ir_menu_t *menu)
 	}
 
     // Reset every button to unselected
-    for (int i = 0; i < menu->size; ++i) {
+    for (int i = 0; i < menu->size; i++) {
         lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
         lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
     }
@@ -491,7 +492,7 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
 	lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 	// Restart infrared RX
-	xSemaphoreGive(xStartInfraredRXSemaphore);
+	xSemaphoreGive(xInfraredStartRxSemaphore);
 		
 	// Create texts
 	lv_obj_t *text_label = lv_label_create(ACTIVE_SCR);
@@ -507,6 +508,9 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
 	
 	// Wait until signal received and saved	
 	while (1) {
+		
+		lv_timer_handler();
+		
         if (xSemaphoreTake(xInfraredSignalSavedSemaphore, 0) == pdTRUE) {
 			lv_obj_delete(img_save_remote); // Delete img
 			
@@ -531,7 +535,7 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
         }
         if (xSemaphoreTake(xLeftButtonSemaphore, 0)) {
             // User hit cancel
-            xSemaphoreGive(xDisableInfraredSemaphore);
+            xSemaphoreGive(xInfraredDisableSemaphore);
             
             // Delete objects
             lv_obj_delete(text_label);
@@ -554,7 +558,7 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
 	vTaskDelay(pdMS_TO_TICKS(10));
 }
 
-esp_err_t lcd_ir_ir_menu_nvs_save(const ir_menu_t *menu, const char* ns, const char* count, const char* fmt)
+esp_err_t lcd_ir_menu_nvs_save(const ir_menu_t *menu, const char* ns, const char* count, const char* fmt)
 {
     nvs_handle_t h;
     
@@ -563,9 +567,9 @@ esp_err_t lcd_ir_ir_menu_nvs_save(const ir_menu_t *menu, const char* ns, const c
     if (err != ESP_OK)
     	return err;
 
-    // menu->options[0] is default "Add New", and [1] is "Edit":
-    // If menu->size == 2 there are no user names, otherwise there are menu->size - 2 names
-    uint8_t user_cnt = (menu->size > 2) ? menu->size - 2 : 0;
+    // menu->options[0] is the default name, next is "Add New", and [2] is "Edit":
+    // If menu->size == 3 there are no user names, otherwise there are menu->size - 3 names
+    uint8_t user_cnt = (menu->size > 3) ? menu->size - 3 : 0;
     err = nvs_set_u8(h, count, user_cnt);
     
     // If error, exit
@@ -577,8 +581,8 @@ esp_err_t lcd_ir_ir_menu_nvs_save(const ir_menu_t *menu, const char* ns, const c
         char key[8];
         sprintf(key, fmt, i);
         
-        // Store the menu option string at each key starting at index 2
-        err = nvs_set_str(h, key, menu->options[i + 2]);
+        // Store the menu option string at each key starting at index 3
+        err = nvs_set_str(h, key, menu->options[i + 3]);
         
         // Exit if error
         if (err != ESP_OK)
@@ -594,7 +598,7 @@ esp_err_t lcd_ir_ir_menu_nvs_save(const ir_menu_t *menu, const char* ns, const c
     return err;
 }
 
-esp_err_t lcd_ir_ir_menu_nvs_load(ir_menu_t *menu, const char* ns, const char* count, const char* fmt)
+esp_err_t lcd_ir_menu_nvs_load(ir_menu_t *menu, const char* ns, const char* count, const char* fmt)
 {
     nvs_handle_t h;
         
@@ -611,7 +615,7 @@ esp_err_t lcd_ir_ir_menu_nvs_load(ir_menu_t *menu, const char* ns, const char* c
 		return err;
 	}
 
-    menu->size = 2; // Don't change first two options
+    menu->size = 3; // Don't change first three options
     menu->index = 0;
 
 	// Loop through all keys
@@ -650,10 +654,10 @@ esp_err_t lcd_ir_ir_menu_nvs_load(ir_menu_t *menu, const char* ns, const char* c
     return ESP_OK;
 }
 
-esp_err_t lcd_ir_ir_menu_nvs_delete(ir_menu_t *menu, uint8_t idx, const char* ns, const char* count, const char* fmt)
+esp_err_t lcd_ir_menu_nvs_delete(ir_menu_t *menu, uint8_t idx, const char* ns, const char* count, const char* fmt)
 {
-	// Make sure index is > 1 (not "Add New" or "Edit") and not larger than size
-    if (idx <= 1 || idx >= menu->size) {
+	// Make sure index is > 2 (not the name, "Add New" or "Edit") and not larger than size
+    if (idx <= 2 || idx >= menu->size) {
         return ESP_ERR_INVALID_ARG;
     }
     
@@ -683,5 +687,5 @@ esp_err_t lcd_ir_ir_menu_nvs_delete(ir_menu_t *menu, uint8_t idx, const char* ns
 	}
 
     // Rewrite flash with the new list
-    return lcd_ir_ir_menu_nvs_save(menu, ns, count, fmt);
+    return lcd_ir_menu_nvs_save(menu, ns, count, fmt);
 }

@@ -26,8 +26,13 @@
 #define SCROLL_SPEED 400
 #define IR_LABELS_OFFSET 20
 
-#define CITY_FRAME_CNT 60
 #define CITY_FRAME_PERIOD 120 // 160
+
+#ifdef POLYCAST5_BUILD_FULL_ANIMS
+	#define CITY_FRAME_CNT 60
+#else
+	#define CITY_FRAME_CNT 5
+#endif
 
 static const char *TAG = "LCD_FUNCS";
 
@@ -321,7 +326,7 @@ void lcd_selection_btn_pressed(ui_menu_t *menu)
     const char *option = lv_label_get_text(menu->lbl_mid);
 
 	if (strcmp(option, "Infrared") == 0) {
-		xSemaphoreGive(xEnableInfraredSemaphore);
+		xSemaphoreGive(xInfraredEnableSemaphore);
 		lcd_swipe_anim(menu, 1, SWIPE_SPEED);
 		
 		// Non-blocking delay
@@ -439,7 +444,7 @@ static void unhide_selection_widgets(ui_menu_t *m)
 
 static void city_anim_cb(lv_timer_t *t)
 {
-	#ifdef CITY_PING_PONG // Loop animation back and forth
+	#ifdef POLYCAST5_CITY_PING_PONG // Loop animation back and forth
 	    // Hide the current frame
 	    lv_obj_add_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN);
 	
@@ -469,7 +474,6 @@ static void city_anim_cb(lv_timer_t *t)
 	    
 	    // Show the newly chosen frame
 	    lv_obj_clear_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN);
-	    
     #else // Go all the way through and then reset
 	    // Hide current frame
 	    lv_obj_add_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN);
@@ -484,28 +488,35 @@ static void city_anim_cb(lv_timer_t *t)
 
 void lcd_init_images()
 {
-	const lv_img_dsc_t *src_arr[CITY_FRAME_CNT] = { // 64.84KB each
-	    &anim_city_1,  &anim_city_2,  &anim_city_3,
-	    &anim_city_4,  &anim_city_5,  &anim_city_6,
-	    &anim_city_7,  &anim_city_8,  &anim_city_9,
-	    &anim_city_10, &anim_city_11, &anim_city_12,
-	    &anim_city_13, &anim_city_14, &anim_city_15,
-	    &anim_city_16, &anim_city_17, &anim_city_18,
-	    &anim_city_19, &anim_city_20, &anim_city_21,
-	    &anim_city_22, &anim_city_23, &anim_city_24,
-	    &anim_city_25, &anim_city_26, &anim_city_27,
-	    &anim_city_28, &anim_city_29, &anim_city_30,
-	    &anim_city_31, &anim_city_32, &anim_city_33,
-	    &anim_city_34, &anim_city_35, &anim_city_36,
-	    &anim_city_37, &anim_city_38, &anim_city_39,
-	    &anim_city_40, &anim_city_41, &anim_city_42,
-	    &anim_city_43, &anim_city_44, &anim_city_45,
-	    &anim_city_46, &anim_city_47, &anim_city_48,
-	    &anim_city_49, &anim_city_50, &anim_city_51,
-	    &anim_city_52, &anim_city_53, &anim_city_54,
-	    &anim_city_55, &anim_city_56, &anim_city_57,
-	    &anim_city_58, &anim_city_59, &anim_city_60,
-	};
+	#ifdef POLYCAST5_BUILD_FULL_ANIMS
+		const lv_img_dsc_t *src_arr[CITY_FRAME_CNT] = { // 64.84KB each
+		    &anim_city_1,  &anim_city_2,  &anim_city_3,
+		    &anim_city_4,  &anim_city_5,  &anim_city_6,
+		    &anim_city_7,  &anim_city_8,  &anim_city_9,
+		    &anim_city_10, &anim_city_11, &anim_city_12,
+		    &anim_city_13, &anim_city_14, &anim_city_15,
+		    &anim_city_16, &anim_city_17, &anim_city_18,
+		    &anim_city_19, &anim_city_20, &anim_city_21,
+		    &anim_city_22, &anim_city_23, &anim_city_24,
+		    &anim_city_25, &anim_city_26, &anim_city_27,
+		    &anim_city_28, &anim_city_29, &anim_city_30,
+		    &anim_city_31, &anim_city_32, &anim_city_33,
+		    &anim_city_34, &anim_city_35, &anim_city_36,
+		    &anim_city_37, &anim_city_38, &anim_city_39,
+		    &anim_city_40, &anim_city_41, &anim_city_42,
+		    &anim_city_43, &anim_city_44, &anim_city_45,
+		    &anim_city_46, &anim_city_47, &anim_city_48,
+		    &anim_city_49, &anim_city_50, &anim_city_51,
+		    &anim_city_52, &anim_city_53, &anim_city_54,
+		    &anim_city_55, &anim_city_56, &anim_city_57,
+		    &anim_city_58, &anim_city_59, &anim_city_60,
+		};
+	#else
+		const lv_img_dsc_t *src_arr[CITY_FRAME_CNT] = { // 64.84KB each
+		    &anim_city_1,  &anim_city_2,  &anim_city_3,
+		    &anim_city_4,  &anim_city_5
+		};
+	#endif
 
 	// Create and center every image
     for (int i = 0; i < CITY_FRAME_CNT; i++) {
@@ -681,27 +692,21 @@ void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_
 	lv_obj_remove_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 	
 	// New remote selected
-	if (ui_btns->up_btn == 1 && ir_menu->index == 0) {
-				
+	if (ui_btns->up_btn == 1 && ir_menu->index == 1) {
 		lcd_ir_save_new_signal(ui_menu, ir_menu);
-		
 	}
 	// Edit remote selected
-	else if (ui_btns->up_btn == 1 && ir_menu->index == 1) {
-		
+	else if (ui_btns->up_btn == 1 && ir_menu->index == 2) {
 		lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN); // Hide IR menu
 		
 		ui_menu->page = INFRARED_REMOTE_EDIT_PAGE;
-		
 	}
 	// Selected specific remote
-	else if (ui_btns->up_btn == 1) {
-		
-		xQueueSend(xSignalToTXQueue, &ir_menu->index, 0);
+	else if (ui_btns->up_btn == 1 && ir_menu->index != 0) {
+		xQueueSend(xInfraredSignalToTxQueue, &ir_menu->index, 0);
 	}
 	// Back selected
 	else if (ui_btns->down_btn == 1) {
-		
 		// Hide IR menu
 		lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -709,8 +714,6 @@ void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_
 		unhide_selection_widgets(ui_menu);
 		
 		ui_menu->page = SELECTION_PAGE;
-
-
 	}
 	// Down button pressed
 	else if (ui_btns->right_btn == 1) {

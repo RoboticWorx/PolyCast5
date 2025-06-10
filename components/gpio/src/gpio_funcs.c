@@ -1,3 +1,5 @@
+#include "nvs_flash.h"
+
 #include "gpio_funcs.h"
 #include "TCA9535.h"          // your TCA9535 library header
 #include "driver/i2c.h"
@@ -12,6 +14,26 @@ static void IRAM_ATTR tca9535_int_isr(void *arg) {
     BaseType_t woken = pdFALSE;
     xSemaphoreGiveFromISR(xGpioEventSemaphore, &woken);
     portYIELD_FROM_ISR(woken);
+}
+
+void gpio_init_nvs(void)
+{
+	// Initialize flash
+    esp_err_t ret = nvs_flash_init();
+    
+    // Error check
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_LOGW(TAG, "Erasing NVS partition...");
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    
+    ESP_ERROR_CHECK(ret);
+    
+    #ifdef POLYCAST5_DEBUG
+        ESP_LOGI(TAG, "NVS initialized");
+    #endif
+    
 }
 
 esp_err_t gpio_init(void)
