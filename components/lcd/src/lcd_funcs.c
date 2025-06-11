@@ -250,9 +250,7 @@ void lcd_ns_nvs_clear(const char* ns)
     }
 }
 
-void lcd_format_label(lv_obj_t *label, const char *text, lv_color_t color,
-					  const lv_font_t *font, lv_align_t alignment,
-					  lv_coord_t x_offset, lv_coord_t y_offset)
+void lcd_format_label(lv_obj_t *label, const char *text, lv_color_t color, const lv_font_t *font, lv_align_t alignment, lv_coord_t x_offset, lv_coord_t y_offset)
 {
 	lv_label_set_text(label, text);
 	lv_obj_set_style_text_color(label, color, 0);

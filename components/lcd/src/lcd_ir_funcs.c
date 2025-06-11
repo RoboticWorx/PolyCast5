@@ -20,7 +20,7 @@
 #include "widgets/list/lv_list.h"
 
 ir_menu_t ir_menu = {
-    .options = {"Remote 1", "Add New", "Edit"},
+    .options = {"REMOTE", "Add New", "Edit"},
     .size = 3,
     .index = 0,
     .cont = NULL,
@@ -32,15 +32,17 @@ static char name_buf[MAX_CUSTOM_NAME_LEN + 1] = {0};
 
 static bool ir_menu_overwrite = false;
 static uint8_t ir_index_overwrite = 0;
+static int edit_idx = 0;
 
 
 void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns)
 {
 	#define REMOTE_TXT "Remote selected:"
 	#define SIG_TXT "Signal selected:"
+	#define SELECT_TXT "Press SELECT to delete."
+	#define EDIT_TXT "Press EDIT to rename."
 	
     // Declare statics
-    static int edit_idx = 0;
     static lv_obj_t *lbl_title = NULL;
     static lv_obj_t *lbl_name = NULL;
     static lv_obj_t *lbl_back = NULL;
@@ -70,7 +72,7 @@ void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
 					 &lv_font_montserrat_14, LV_ALIGN_RIGHT_MID, -3, -17);
 		
 		lbl_select = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_select, "Press SELECT to delete.", user_secondary_color, 
+		lcd_format_label(lbl_select, EDIT_TXT, user_secondary_color, 
 					 &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 35);
 	}
 
@@ -158,9 +160,11 @@ void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
         // Change title label if needed
         if (edit_idx == 0) {
 			lv_label_set_text(lbl_title, REMOTE_TXT);
+			lv_label_set_text(lbl_select, EDIT_TXT);
 		}
 		else {
 			lv_label_set_text(lbl_title, SIG_TXT);
+			lv_label_set_text(lbl_select, SELECT_TXT);
 		}
         	
         lv_label_set_text(lbl_name, ir_menu->options[edit_idx]);
@@ -181,9 +185,11 @@ void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
         // Change title label if needed
         if (edit_idx == 0) {
 			lv_label_set_text(lbl_title, REMOTE_TXT);
+			lv_label_set_text(lbl_select, EDIT_TXT);
 		}
 		else {
 			lv_label_set_text(lbl_title, SIG_TXT);
+			lv_label_set_text(lbl_select, SELECT_TXT);
 		}
 
         lv_label_set_text(lbl_name, ir_menu->options[edit_idx]);
@@ -244,6 +250,10 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
             memset(name_buf, 0, sizeof name_buf);
             cur_pos = 0;
             cur_char = '_';
+            
+            if (!ir_menu_overwrite) { // Can't go back if adding signal
+				lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+			}
         }
 		
         lbl_user_in = lv_label_create(ACTIVE_SCR);
@@ -254,7 +264,12 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
 		lcd_format_label(lbl_dirs, "Enter signal name\nwith arrow buttons:", user_secondary_color,
                          &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, -30);
         if (ir_menu_overwrite) {
-			lv_label_set_text(lbl_dirs, "Enter new signal name\n   with arrow buttons:");
+			if (edit_idx == 0) {
+				lv_label_set_text(lbl_dirs, "Enter new remote name\n    with arrow buttons:");
+			}
+			else {
+				lv_label_set_text(lbl_dirs, "Enter new signal name\n   with arrow buttons:");
+			}
 		}
         
         lbl_chars = lv_label_create(ACTIVE_SCR);
@@ -282,6 +297,14 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
 		// Save to array
         name_buf[cur_pos] = cur_char;
         
+        // If left arrow hidden -> remove
+        if (lv_obj_has_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN)) {
+			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+		}
+		else if (!ir_menu_overwrite && cur_pos == 0 && cur_char == '_') {
+			lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+		}
+        
         update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
     }
     // If down, iterate down
@@ -301,6 +324,14 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
 		// Save to array
         name_buf[cur_pos] = cur_char;
         
+        // If left arrow hidden -> remove
+        if (lv_obj_has_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN)) {
+			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+		}
+		else if (!ir_menu_overwrite && cur_pos == 0 && cur_char == '_') {
+			lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+		}
+        
         update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
     }
     // If left pressed and at start and overwriting
@@ -316,6 +347,8 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
 	    cur_pos  = 0;
 	    cur_char = '_';
 	    memset(name_buf, 0, sizeof name_buf);
+	    
+	    ir_menu_overwrite = false;
 	    
  		ui_menu->page = INFRARED_REMOTE_EDIT_PAGE;
 		return;
@@ -333,6 +366,11 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
 	    // Reload cur_char from the new slot
 	    cur_char = name_buf[cur_pos] ? name_buf[cur_pos] : '_';
 	    
+	    // If not able to go back and on first position
+	    if (cur_pos == 0 && cur_char == '_' && !ir_menu_overwrite) {
+			lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+		}
+	    
 	    update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
     }
     // If right
@@ -345,6 +383,11 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
             cur_pos++;
             cur_char = '_';
         }
+        
+        // If left arrow hidden -> remove
+        if (lv_obj_has_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN)) {
+			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+		}
         
         update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
     }
@@ -654,6 +697,8 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
 			lv_obj_delete(img_save_remote); // Delete img
 			
             // Signal arrived
+            lv_obj_center(text_label);
+            lv_obj_set_style_text_font(text_label, &lv_font_montserrat_24, 0);
             lv_label_set_text(text_label, "Saving...");
 			lv_timer_handler();
 			
@@ -694,7 +739,7 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
         }
     }
 	
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(pdMS_TO_TICKS(20));
 }
 
 esp_err_t lcd_ir_menu_nvs_save(const ir_menu_t *menu, const char* ns, const char* count, const char* fmt)
