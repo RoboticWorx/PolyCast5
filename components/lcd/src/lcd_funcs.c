@@ -1,4 +1,3 @@
-#include "misc/lv_timer.h"
 #include "polycast5_macros.h"
 
 #include <stdlib.h>
@@ -19,7 +18,6 @@
 #include "infrared_funcs.h"
 
 #include "anim_city.h"
-
 #include "anim_black_hole.h"
 
 #define DRAW_LINES   20
@@ -28,6 +26,9 @@
 #define SWIPE_SPEED 1200
 #define SCROLL_SPEED 400
 #define IR_LABELS_OFFSET 20
+
+#define LCD_ANIM_NS "lc_an_ns"
+#define LCD_ANIM_KEY "lc_an_ke"
 
 
 /* Animation macros */
@@ -45,7 +46,7 @@
 #define CITY 0
 #define BLACK_HOLE 1
 
-static int anim_active = BLACK_HOLE;
+static uint8_t anim_active = BLACK_HOLE;
 
 
 /* LCD */
@@ -142,7 +143,7 @@ static void st7789_flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_
 {
 	xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
 	
-    const uint16_t *color_ptr = (const uint16_t *)px_map;
+    const uint16_t *color_ptr = (uint16_t *)px_map;
     int16_t x1 = area->x1, x2 = area->x2;
     int16_t y1 = area->y1, y2 = area->y2;
     int16_t width = x2 - x1 + 1;
@@ -517,6 +518,69 @@ static void unhide_selection_widgets(ui_menu_t *m)
     lv_obj_set_x(m->lbl_bot, 0);
 }
 
+/* Write the current anim_active into flash */
+static esp_err_t lcd_anim_nvs_save(void)
+{
+    nvs_handle_t h;
+    
+    // Open NVS
+    esp_err_t err = nvs_open(LCD_ANIM_NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    // Store anim_active as a single byte
+    err = nvs_set_u8(h, LCD_ANIM_KEY, anim_active);
+    if (err == ESP_OK) {
+        // Commit to flash
+        err = nvs_commit(h);
+    }
+    
+    #ifdef POLYCAST5_DEBUG
+    	ESP_LOGI(TAG, "Saved NVS animation: %u", anim_active);
+	#endif
+	
+	// Close NVS
+    nvs_close(h);
+    return err;
+}
+
+/* Load the current anim_active from flash */
+static esp_err_t lcd_anim_nvs_load(void)
+{
+    nvs_handle_t h;
+    
+    // Open NVS
+    esp_err_t err = nvs_open(LCD_ANIM_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+        return err;
+    }
+	
+	// Get the uint8
+    uint8_t stored = 0;
+    err = nvs_get_u8(h, LCD_ANIM_KEY, &stored);
+    switch (err) {
+        case ESP_OK:
+            anim_active = stored;
+            break;
+        case ESP_ERR_NVS_NOT_FOUND:
+            // First‐boot or key erased -> default
+            anim_active = CITY;
+            err = ESP_OK;
+            break;
+        default:
+            break;
+    }
+    
+    #ifdef POLYCAST5_DEBUG
+    	ESP_LOGI(TAG, "Loaded NVS animation: %u", anim_active);
+	#endif
+	
+	// Close NVS
+    nvs_close(h);
+    return err;
+}
+
 static void anim_timer_cb(lv_timer_t *t)
 {
     anim_t *anim = (anim_t *)lv_timer_get_user_data(t);
@@ -553,6 +617,9 @@ static void anim_timer_cb(lv_timer_t *t)
 
 void lcd_init_images()
 {
+	// Load selected from NVS
+	lcd_anim_nvs_load();
+	
 	/* City */
 	// Create image
     city_anim.img = lv_img_create(ACTIVE_SCR);
@@ -561,7 +628,10 @@ void lcd_init_images()
     
     // Create timer
     city_anim.timer = lv_timer_create(anim_timer_cb, CITY_FRAME_PERIOD, &city_anim);
+    
+    // Check if set
     if(anim_active != CITY) {
+		lv_obj_add_flag(city_anim.img, LV_OBJ_FLAG_HIDDEN);
 		lv_timer_pause(city_anim.timer);
 	}
 
@@ -573,7 +643,10 @@ void lcd_init_images()
     
     // Create timer
     black_hole_anim.timer = lv_timer_create(anim_timer_cb, BLACK_HOLE_FRAME_PERIOD, &black_hole_anim);
+    
+    // Check if set
     if(anim_active != BLACK_HOLE) {
+		lv_obj_add_flag(black_hole_anim.img, LV_OBJ_FLAG_HIDDEN);
 		lv_timer_pause(black_hole_anim.timer);
 	}
 }
@@ -600,28 +673,33 @@ static void stop_animations(void)
     lv_obj_add_flag(black_hole_anim.img, LV_OBJ_FLAG_HIDDEN);
 }
 
-static void transition_animation(void)
+static void transition_animation(bool dir)
 {
-	if (anim_active == CITY) {
-		stop_animations();
-        anim_active = BLACK_HOLE;
-        start_animation();
-    }
-    else if (anim_active == BLACK_HOLE) {
-    	stop_animations();
-        anim_active = CITY;
-        start_animation();
-    }
+	#define NUM_ANIMS 2
+	
+	stop_animations();
+	
+	if (dir) {
+		anim_active = (anim_active + 1) % NUM_ANIMS; // + 1 with wrap
+	}
+	else {
+		anim_active = (anim_active + NUM_ANIMS - 1) % NUM_ANIMS; // - 1 with wrap
+	}
+	
+    start_animation();
+    
+    // Save choice to NVS
+    lcd_anim_nvs_save();
 }
 
 void lcd_home_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
 {
 	
 	if (ui_btns->up_btn == 1) {
-		transition_animation();
+		transition_animation(true);
 	}
 	else if (ui_btns->down_btn == 1) {
-		transition_animation();
+		transition_animation(false);
 	}
 	else if (ui_btns->right_btn == 1) {
 		stop_animations();
