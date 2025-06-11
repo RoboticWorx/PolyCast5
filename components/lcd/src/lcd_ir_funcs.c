@@ -421,12 +421,13 @@ void lcd_ir_setup_page(ir_menu_t *menu)
 	lv_style_set_radius(&menu->name_style, 8);
 	lv_style_set_bg_color(&menu->name_style, user_primary_color);
 	
-//lv_style_set_bg_grad_color(&menu->name_style, lv_color_darken(user_primary_color, 60));
-//lv_style_set_bg_grad_dir(&menu->name_style, LV_GRAD_DIR_VER);
+	//lv_style_set_bg_grad_color(&menu->name_style, lv_color_darken(user_primary_color, 60));
+	//lv_style_set_bg_grad_dir(&menu->name_style, LV_GRAD_DIR_VER);
 
-lv_style_set_outline_width(&menu->name_style, 2);
-lv_style_set_outline_color(&menu->name_style, user_secondary_color);
-lv_style_set_outline_pad(&menu->name_style, 3);
+	// Add outline for uniqueness
+	lv_style_set_outline_width(&menu->name_style, 2);
+	lv_style_set_outline_color(&menu->name_style, user_secondary_color);
+	lv_style_set_outline_pad(&menu->name_style, 1);
 	
 	lv_style_set_border_width(&menu->name_style, 2);
 	lv_style_set_border_color(&menu->name_style, user_secondary_color);
@@ -446,9 +447,10 @@ lv_style_set_outline_pad(&menu->name_style, 3);
 	lv_style_set_radius(&menu->name_sel_style, 8);
 	lv_style_set_bg_color(&menu->name_sel_style, user_secondary_color);
 
-lv_style_set_outline_width(&menu->name_sel_style, 2);
-lv_style_set_outline_color(&menu->name_sel_style, user_secondary_color);
-lv_style_set_outline_pad(&menu->name_sel_style, 3);
+	// Add outline for uniqueness
+	lv_style_set_outline_width(&menu->name_sel_style, 2);
+	lv_style_set_outline_color(&menu->name_sel_style, user_secondary_color);
+	lv_style_set_outline_pad(&menu->name_sel_style, 1);
 	
 	lv_style_set_border_width(&menu->name_sel_style, 2);
 	lv_style_set_border_color(&menu->name_sel_style, user_secondary_color);

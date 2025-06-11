@@ -43,10 +43,11 @@
 	#define BLACK_HOLE_FRAME_CNT 5
 #endif
 
+// Cycle order
 #define CITY 0
 #define BLACK_HOLE 1
 
-static uint8_t anim_active = BLACK_HOLE;
+static uint8_t anim_active = 0; // Default determined in lcd_anim_nvs_load
 
 
 /* LCD */
@@ -143,7 +144,7 @@ static void st7789_flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_
 {
 	xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
 	
-    const uint16_t *color_ptr = (uint16_t *)px_map;
+    uint16_t *color_ptr = (uint16_t *)px_map; // const const
     int16_t x1 = area->x1, x2 = area->x2;
     int16_t y1 = area->y1, y2 = area->y2;
     int16_t width = x2 - x1 + 1;
@@ -534,11 +535,16 @@ static esp_err_t lcd_anim_nvs_save(void)
     if (err == ESP_OK) {
         // Commit to flash
         err = nvs_commit(h);
+        
+        #ifdef POLYCAST5_DEBUG
+    		ESP_LOGI(TAG, "Saved NVS animation: %u", anim_active);
+		#endif
     }
-    
-    #ifdef POLYCAST5_DEBUG
-    	ESP_LOGI(TAG, "Saved NVS animation: %u", anim_active);
-	#endif
+    else {
+		#ifdef POLYCAST5_DEBUG
+    		ESP_LOGI(TAG, "Failed to save NVS animation");
+		#endif
+	}
 	
 	// Close NVS
     nvs_close(h);
