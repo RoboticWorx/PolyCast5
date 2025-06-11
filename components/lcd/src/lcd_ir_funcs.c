@@ -29,7 +29,6 @@ ir_menu_t ir_menu = {
 static const char* TAG = "LCD_IR_FUNCS";
 
 static char name_buf[MAX_CUSTOM_NAME_LEN + 1] = {0};
-static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
 
 static bool ir_menu_overwrite = false;
 static uint8_t ir_index_overwrite = 0;
@@ -37,60 +36,47 @@ static uint8_t ir_index_overwrite = 0;
 
 void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns)
 {
+	#define REMOTE_TXT "Remote selected:"
+	#define SIG_TXT "Signal selected:"
+	
     // Declare statics
-    static int edit_idx = 3;
+    static int edit_idx = 0;
     static lv_obj_t *lbl_title = NULL;
     static lv_obj_t *lbl_name = NULL;
-    static lv_obj_t *lbl_hint = NULL;
+    static lv_obj_t *lbl_back = NULL;
+    static lv_obj_t *lbl_edit = NULL;
+    static lv_obj_t *lbl_select = NULL;
 
 	// If not already done
     if (!lbl_title) {
-		
-		// If no user remotes
-        if (ir_menu->size <= 3) {
-			
-			// Help text
-			lbl_title = lv_label_create(ACTIVE_SCR);
-
-			lcd_format_label(lbl_title, "No signals to edit!", user_secondary_color, &lv_font_montserrat_18,
-							 LV_ALIGN_CENTER, 0, 0);
-
-			// Show and wait
-			lv_timer_handler();
-			vTaskDelay(pdMS_TO_TICKS(1000));
-			
-			// Clean up
-			lv_obj_delete(lbl_title);
-			lbl_title = NULL;
-			
-			// Go back
-            ui_menu->page = INFRARED_PAGE;
-            	
-            return;
-        }
-        
         // Reset index to beginning
-        edit_idx = 3;
+        edit_idx = 0;
 
 		// Initial text
 		lbl_title = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_title, "Edit Signal:", user_secondary_color,
-					 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 10);
+		lcd_format_label(lbl_title, REMOTE_TXT, user_secondary_color,
+					 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
 
 		lbl_name = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_name, ir_menu->options[edit_idx],
-						 user_secondary_color, &lv_font_montserrat_24,
-						 LV_ALIGN_CENTER, 0, -10);
+		lcd_format_label(lbl_name, ir_menu->options[edit_idx], user_secondary_color, 
+					 &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, -1);
 
-		lbl_hint = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_hint, "SELECT to delete\nR rename L exit",
-						 user_secondary_color, &lv_font_montserrat_14,
-						 LV_ALIGN_BOTTOM_MID, 0, -20);
+		lbl_back = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_back, "BACK", user_secondary_color, 
+					 &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 2, -17);
+						 
+		lbl_edit = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_edit, "EDIT", user_secondary_color,
+					 &lv_font_montserrat_14, LV_ALIGN_RIGHT_MID, -3, -17);
+		
+		lbl_select = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_select, "Press SELECT to delete.", user_secondary_color, 
+					 &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 35);
 	}
 
 	// Rename
     if (ui_btns->right_btn) {
-		// Pass index to edit as the active then switch pages
+		// Pass index to edit then switch to name page
 		ir_index_overwrite = edit_idx;
 		ir_menu_overwrite = true;
         ui_menu->page = INFRARED_REMOTE_NAME_PAGE;
@@ -98,23 +84,27 @@ void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
         // Reset for next time
         lv_obj_delete(lbl_title);
 		lv_obj_delete(lbl_name);
-		lv_obj_delete(lbl_hint);
+		lv_obj_delete(lbl_back);
+		lv_obj_delete(lbl_edit);
+		lv_obj_delete(lbl_select);
         lbl_title = NULL;
         lbl_name = NULL;
-        lbl_hint = NULL;
+        lbl_back = NULL;
+        lbl_edit = NULL;
+        lbl_select = NULL;
+        
         return;
-       
     }
 	// Delete menu option
-    else if (ui_btns->select_btn) {
+    else if (ui_btns->select_btn && edit_idx > 2) {
 		// Deletion
         int to_delete = edit_idx;
-	    if (lcd_ir_menu_nvs_delete(ir_menu, to_delete, A_IR_REMOTE_NS, A_IR_REMOTE_KEY_COUNT, A_IR_REMOTE_KEY_FMT) == ESP_OK) {
+	    if (lcd_ir_menu_nvs_delete(ir_menu, to_delete, A_IR_REMOTE_NS, A_IR_REMOTE_KEY_COUNT, A_IR_REMOTE_KEY_FMT) == ESP_OK) { // Delete menu item
 	        int q = -to_delete;
-	        xQueueSend(xInfraredSignalToTxQueue, &q, portMAX_DELAY);
+	        xQueueSend(xInfraredSignalToTxQueue, &q, portMAX_DELAY); // Signal ir_task to delete
 	    }
 	
-	    // Now that ir_menu->size has shrunk, wrap
+	    // Now that ir_menu->size has shrunk, wrap if needed
 	    if (edit_idx >= ir_menu->size) {
 	        edit_idx = 3;
 	    }
@@ -122,10 +112,14 @@ void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
         // Reset for next time
         lv_obj_delete(lbl_title);
 		lv_obj_delete(lbl_name);
-		lv_obj_delete(lbl_hint);
+		lv_obj_delete(lbl_back);
+		lv_obj_delete(lbl_edit);
+		lv_obj_delete(lbl_select);
         lbl_title = NULL;
         lbl_name = NULL;
-        lbl_hint = NULL;
+        lbl_back = NULL;
+        lbl_edit = NULL;
+        lbl_select = NULL;
         
         // Switch pages
         ui_menu->page = INFRARED_PAGE;
@@ -136,10 +130,14 @@ void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
         // Reset for next time
         lv_obj_delete(lbl_title);
 		lv_obj_delete(lbl_name);
-		lv_obj_delete(lbl_hint);
+		lv_obj_delete(lbl_back);
+		lv_obj_delete(lbl_edit);
+		lv_obj_delete(lbl_select);
         lbl_title = NULL;
         lbl_name = NULL;
-        lbl_hint = NULL;
+        lbl_back = NULL;
+        lbl_edit = NULL;
+        lbl_select = NULL;
         
         // Switch pages
         ui_menu->page = INFRARED_PAGE;
@@ -147,40 +145,106 @@ void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
     }
 	// Iterate up
     else if (ui_btns->up_btn) {
-        edit_idx++;
+		if (edit_idx == 0) {
+			edit_idx = 2; 
+		}
+        edit_idx++; // Makes 3
         
         // Wrap
-        if (edit_idx >= ir_menu->size)
-        	edit_idx = 3;
+        if (edit_idx >= ir_menu->size) {
+			edit_idx = 0;
+		}
+        
+        // Change title label if needed
+        if (edit_idx == 0) {
+			lv_label_set_text(lbl_title, REMOTE_TXT);
+		}
+		else {
+			lv_label_set_text(lbl_title, SIG_TXT);
+		}
         	
         lv_label_set_text(lbl_name, ir_menu->options[edit_idx]);
         return;
     }
 	// Iterate down
-    else if (ui_btns->down_btn) {
-        edit_idx--;
-
-		// Wrap
-        if (edit_idx < 3)
-        	edit_idx = ir_menu->size - 1;
+    else if (ui_btns->down_btn) {		
+		if (edit_idx == 0) { // From remote to last signal
+	        edit_idx = (ir_menu->size > 3) ? (ir_menu->size - 1) : 0;
+	    }
+	    else if (edit_idx == 3) { // From first signal to remote
+	        edit_idx = 0;
+	    }
+	    else {
+	        --edit_idx;
+	    }
+        
+        // Change title label if needed
+        if (edit_idx == 0) {
+			lv_label_set_text(lbl_title, REMOTE_TXT);
+		}
+		else {
+			lv_label_set_text(lbl_title, SIG_TXT);
+		}
 
         lv_label_set_text(lbl_name, ir_menu->options[edit_idx]);
         return;
     }
 }
 
+static void update_name_label_lcd(lv_obj_t *lbl_display, char cur_char, int cur_pos)
+{
+    char display[MAX_CUSTOM_NAME_LEN + 2]; // Buffer
+    
+    int len = cur_pos + 1; // Current length of name
+    
+    // Cap
+    if (len > MAX_CUSTOM_NAME_LEN + 1) {
+		len = MAX_CUSTOM_NAME_LEN + 1;
+	}
+	
+	// Copy name into display buffer
+    if (cur_pos > 0) {
+		memcpy(display, name_buf, cur_pos);
+	}
+	
+	// Get current
+    display[cur_pos] = cur_char;
+    display[len] = '\0';
+    
+    // Set text and re-center
+    lv_label_set_text(lbl_display, display);
+    lv_obj_align(lbl_display, LV_ALIGN_CENTER, 0, 30);
+}
+
 void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns)
 {
     // Declare statics
+    static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
     static int cur_pos = 0; // User position
     static char cur_char = '_';
     static lv_obj_t *lbl_dirs = NULL;
     static lv_obj_t *lbl_chars = NULL;
     static lv_obj_t *lbl_user_in = NULL;
-    char display[MAX_CUSTOM_NAME_LEN + 2];
     
     // Create initial label
     if (!lbl_user_in) {
+		
+		// If renaming, autofill what was there previously
+        if (ir_menu_overwrite) {
+            // Copy the old name into buffer
+            strncpy(name_buf, ir_menu->options[ir_index_overwrite], MAX_CUSTOM_NAME_LEN);
+
+            // Place cursor at the end
+            cur_pos = strlen(name_buf);
+            
+            // Start with '_'
+            cur_char = '_';
+        }
+        else { // Else blank slate
+            memset(name_buf, 0, sizeof name_buf);
+            cur_pos = 0;
+            cur_char = '_';
+        }
 		
         lbl_user_in = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_user_in, "", user_secondary_color,
@@ -189,10 +253,15 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
         lbl_dirs = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_dirs, "Enter signal name\nwith arrow buttons:", user_secondary_color,
                          &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, -30);
+        if (ir_menu_overwrite) {
+			lv_label_set_text(lbl_dirs, "Enter new signal name\n   with arrow buttons:");
+		}
         
         lbl_chars = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_chars, "(Up to 12 characters)", user_secondary_color,
                          &lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0);
+                         
+        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
     }
 
     // Take user input
@@ -212,6 +281,8 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
 		
 		// Save to array
         name_buf[cur_pos] = cur_char;
+        
+        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
     }
     // If down, iterate down
     else if (ui_btns->down_btn) {
@@ -229,9 +300,11 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
 		
 		// Save to array
         name_buf[cur_pos] = cur_char;
+        
+        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
     }
-    // If left pressed and at start
-    /*else if (ui_btns->left_btn && cur_pos == 0) {
+    // If left pressed and at start and overwriting
+    else if (ui_btns->left_btn && cur_pos == 0 && ir_menu_overwrite) {
 		// Delete labels since no longer used
         lv_obj_delete(lbl_user_in);
         lv_obj_delete(lbl_dirs);
@@ -244,9 +317,9 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
 	    cur_char = '_';
 	    memset(name_buf, 0, sizeof name_buf);
 	    
- 		ui_menu->page = INFRARED_PAGE;
+ 		ui_menu->page = INFRARED_REMOTE_EDIT_PAGE;
 		return;
-    }*/
+    }
     // If left and not at start
     else if (ui_btns->left_btn) {
         // Clear the current slot
@@ -259,6 +332,8 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
 	
 	    // Reload cur_char from the new slot
 	    cur_char = name_buf[cur_pos] ? name_buf[cur_pos] : '_';
+	    
+	    update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
     }
     // If right
     else if (ui_btns->right_btn) {
@@ -270,6 +345,8 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
             cur_pos++;
             cur_char = '_';
         }
+        
+        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
     }
     // If save button pressed
     else if (ui_btns->select_btn) {
@@ -297,7 +374,9 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
 		if (ir_menu_overwrite) {
 			// ir_menu->index is passed as edit_idx:
 			// Release old string then reallocate
-			free(ir_menu->options[ir_index_overwrite]);
+			if (ir_index_overwrite > 2) { // Can't free what wasn't allocated
+				free(ir_menu->options[ir_index_overwrite]);
+			}
 			ir_menu->options[ir_index_overwrite] = strdup(saved_name);
 
 			// Persist to NVS
@@ -336,18 +415,6 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
 		ui_menu->page = INFRARED_PAGE;
         return;
     }
-
-    // Build and show the text
-    for (int i = 0; i < MAX_CUSTOM_NAME_LEN; i++) {
-		if (i < cur_pos)
-        	display[i] = name_buf[i] ? name_buf[i] : '_';
-        else
-        	display[i] = name_buf[i] ? name_buf[i] : ' ';
-    }
-    display[cur_pos] = cur_char;
-    display[MAX_CUSTOM_NAME_LEN + 1] = '\0';
-
-    lv_label_set_text(lbl_user_in, display);
 }
 
 void lcd_ir_setup_page(ir_menu_t *menu)
@@ -649,12 +716,17 @@ esp_err_t lcd_ir_menu_nvs_save(const ir_menu_t *menu, const char* ns, const char
     	goto out;
 
 	// Loop through all and number them: n00, n01, etc.
-    for (uint8_t i = 0; i < user_cnt; ++i) {
+    for (uint8_t i = 0; i < user_cnt + 1; i++) { // + 1 for remote name
         char key[8];
         sprintf(key, fmt, i);
         
-        // Store the menu option string at each key starting at index 3
-        err = nvs_set_str(h, key, menu->options[i + 3]);
+        // Store the menu option string at each key
+        if (i == 0) { // Store remote name [0]
+			err = nvs_set_str(h, key, menu->options[i]);
+		}
+		else { // All the signals [3+]
+			err = nvs_set_str(h, key, menu->options[i + 2]); // 1 + 2 = 3 which is signal name offset
+		}
         
         // Exit if error
         if (err != ESP_OK)
@@ -687,14 +759,19 @@ esp_err_t lcd_ir_menu_nvs_load(ir_menu_t *menu, const char* ns, const char* coun
 		return err;
 	}
 
-    menu->size = 3; // Don't change first three options
+    menu->size = 3; // Signals start at [3]
     menu->index = 0;
 
 	// Loop through all keys
-    for (uint8_t i = 0; i < user_cnt; ++i) {
+    for (uint8_t i = 0; i < user_cnt + 1; i++) { // + 1 for remote name
         char key[8];
         sprintf(key, fmt, i);
         size_t len = 0;
+        
+        // Check size
+		if (menu->size >= MAX_IR_OPTIONS) {
+		    break;
+		}
         
         // Extract the size of the string
         if (nvs_get_str(h, key, NULL, &len) != ESP_OK) {
@@ -711,13 +788,13 @@ esp_err_t lcd_ir_menu_nvs_load(ir_menu_t *menu, const char* ns, const char* coun
 			free(buf);
 			break;
 		}
-
-		// Update menu struct
-		if (menu->size >= MAX_IR_OPTIONS) {
-		    free(buf);
-		    break;
+		
+		if (i == 0) { // Remote name [0]
+			menu->options[0] = buf;
 		}
-        menu->options[menu->size++] = buf;
+		else { // All the signal names [3] which is starting menu->size
+			menu->options[menu->size++] = buf;
+		}
     }
     
     // Close NVS

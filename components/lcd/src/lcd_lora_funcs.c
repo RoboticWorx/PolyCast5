@@ -46,10 +46,11 @@ static const char *submenu_options[] = {
     LV_SYMBOL_TRASH "\nDEL",
 };
 
-static const int submenu_count = sizeof(submenu_options)/sizeof(submenu_options[0]);
-
 static const char* TAG = "LCD_LORA_FUNCS";
 
+static const int submenu_count = sizeof(submenu_options)/sizeof(submenu_options[0]);
+
+static char name_buf[MAX_CUSTOM_NAME_LEN + 1] = {0};
 static bool lora_menu_overwrite = false;
 
 
@@ -336,14 +337,37 @@ void lcd_lora_create_enc_key(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
     }
 }
 
+static void update_name_label_lcd(lv_obj_t *lbl_display, char cur_char, int cur_pos)
+{
+    char display[MAX_CUSTOM_NAME_LEN + 2]; // Buffer
+    
+    int len = cur_pos + 1; // Current length of name
+    
+    // Cap
+    if (len > MAX_CUSTOM_NAME_LEN + 1) {
+		len = MAX_CUSTOM_NAME_LEN + 1;
+	}
+	
+	// Copy name into display buffer
+    if (cur_pos > 0) {
+		memcpy(display, name_buf, cur_pos);
+	}
+	
+	// Get current
+    display[cur_pos] = cur_char;
+    display[len] = '\0';
+    
+    // Set text and re-center
+    lv_label_set_text(lbl_display, display);
+    lv_obj_align(lbl_display, LV_ALIGN_CENTER, 0, 30);
+}
+
 void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns)
 {
-	static char name_buf[MAX_CUSTOM_NAME_LEN + 1] = {0};
-	static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
-
 	static uint8_t received_enc_key_nvs[ENC_KEY_LEN];
 	
     // Declare statics
+    static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
     static int cur_pos = 0; // User position
     static char cur_char = '_';
     static lv_obj_t *lbl_dirs = NULL;
@@ -353,6 +377,23 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
     
     // Create initial label
     if (!lbl_user_in) {
+		
+		// If renaming, autofill what was there previously
+        if (lora_menu_overwrite) {
+            // Copy the old name into buffer
+            strncpy(name_buf, lora_menu->options[lora_menu->index], MAX_CUSTOM_NAME_LEN);
+
+            // Place cursor at the end
+            cur_pos = strlen(name_buf);
+            
+            // Start with '_'
+            cur_char = '_';
+        }
+        else { // Else blank slate
+            memset(name_buf, 0, sizeof name_buf);
+            cur_pos = 0;
+            cur_char = '_';
+        }
 		
         lbl_user_in = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_user_in, "", user_secondary_color,
@@ -368,6 +409,8 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
         lbl_chars = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_chars, "(Up to 12 characters)", user_secondary_color,
                          &lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0);
+                         
+        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
     }
 
     // Take user input
@@ -387,6 +430,8 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 		
 		// Save to array
         name_buf[cur_pos] = cur_char;
+        
+        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
     }
     // If down, iterate down
     else if (ui_btns->down_btn) {
@@ -404,6 +449,8 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 		
 		// Save to array
         name_buf[cur_pos] = cur_char;
+        
+        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
     }
     // Can back out if at start and renaming
     else if (ui_btns->left_btn && cur_pos == 0 && lora_menu_overwrite) {
@@ -440,6 +487,8 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 	
 	    // Reload cur_char from the new slot
 	    cur_char = name_buf[cur_pos] ? name_buf[cur_pos] : '_';
+	    
+	    update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
     }
     // If right
     else if (ui_btns->right_btn) {
@@ -451,6 +500,8 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
             cur_pos++;
             cur_char = '_';
         }
+        
+        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
     }
     // If save button pressed
     else if (ui_btns->select_btn) {
@@ -546,18 +597,6 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 		ui_menu->page = LORA_PAGE;
         return;
     }
-
-    // Build and show the text
-    for (int i = 0; i < MAX_CUSTOM_NAME_LEN; i++) {
-		if (i < cur_pos)
-        	display[i] = name_buf[i] ? name_buf[i] : '_';
-        else
-        	display[i] = name_buf[i] ? name_buf[i] : ' ';
-    }
-    display[cur_pos] = cur_char;
-    display[MAX_CUSTOM_NAME_LEN + 1] = '\0';
-
-    lv_label_set_text(lbl_user_in, display);
 }
 
 void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns) 

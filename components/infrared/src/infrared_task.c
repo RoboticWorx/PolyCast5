@@ -49,7 +49,10 @@ static void infrared_task(void *pvParameters) {
     infrared_init_tx();
     
     // Load signals from NVS
-    //infrared_clear_nvs();
+    #ifdef POLYCAST5_IR_NVS_CLEAR
+    	infrared_clear_nvs();
+    #endif	
+    
     infrared_load_stored_signals();
     
     #ifdef POLYCAST5_DEBUG
