@@ -30,6 +30,8 @@ typedef struct {
     lv_obj_t *main_list;
 	lv_style_t btn_style;
 	lv_style_t sel_style;
+	lv_style_t name_style;
+	lv_style_t name_sel_style;
 	lv_obj_t *cont;
 } ir_menu_t;
 

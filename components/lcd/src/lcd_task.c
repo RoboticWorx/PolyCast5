@@ -10,6 +10,8 @@
 #include "nvs.h"
 #include "nvs_flash.h" // nvs_flash_erase();
 
+#include "anim_black_hole_1.h"
+
 static const char *TAG = "LCD_TASK";
 
 ui_menu_t ui_menu = {
@@ -53,6 +55,9 @@ static void lcd_task(void *pvParameters)
 					 
 	// Create images
 	lcd_init_images();
+	//lv_obj_t *img = lv_img_create(ACTIVE_SCR);
+	//lv_img_set_src(img, &anim_black_hole_1);
+    //lv_obj_center(img);
     
     TickType_t timer_last = xTaskGetTickCount();
 	const TickType_t timer_interval = pdMS_TO_TICKS(200);
@@ -63,7 +68,6 @@ static void lcd_task(void *pvParameters)
 	//lcd_ns_nvs_clear(ESPNOW_MENU_NS);
 	//lcd_ns_nvs_clear(ESPNOW_LMK_NS);
 	//lcd_ns_nvs_clear(A_IR_REMOTE_NS);
-	
 	
 	// Create common items
 	lcd_init_selection_labels(&ui_menu);

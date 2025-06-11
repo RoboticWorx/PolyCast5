@@ -78,11 +78,31 @@ idf_component_register(
 		"media/city/src/anim_city_58.c"
 		"media/city/src/anim_city_59.c"
 		"media/city/src/anim_city_60.c"
+		
+		"media/black_hole/src/anim_black_hole_1.c"
+		"media/black_hole/src/anim_black_hole_2.c"
+		"media/black_hole/src/anim_black_hole_3.c"
+		"media/black_hole/src/anim_black_hole_4.c"
+		"media/black_hole/src/anim_black_hole_5.c"
+		"media/black_hole/src/anim_black_hole_6.c"
+		"media/black_hole/src/anim_black_hole_7.c"
+		"media/black_hole/src/anim_black_hole_8.c"
+		"media/black_hole/src/anim_black_hole_9.c"
+		"media/black_hole/src/anim_black_hole_10.c"
+		"media/black_hole/src/anim_black_hole_11.c"
+		"media/black_hole/src/anim_black_hole_12.c"
+		"media/black_hole/src/anim_black_hole_13.c"
+		"media/black_hole/src/anim_black_hole_14.c"
+		"media/black_hole/src/anim_black_hole_15.c"
+		"media/black_hole/src/anim_black_hole_16.c"
+		"media/black_hole/src/anim_black_hole_17.c"
+		"media/black_hole/src/anim_black_hole_18.c"
         
     INCLUDE_DIRS 
     	"include"
     	"media/qr/include"
     	"media/city/include"
+    	"media/black_hole/include"
     	"media/other/include"
     
     REQUIRES

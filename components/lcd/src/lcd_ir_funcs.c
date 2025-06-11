@@ -20,7 +20,7 @@
 #include "widgets/list/lv_list.h"
 
 ir_menu_t ir_menu = {
-    .options = {"RENAME_ME", "Add New", "Edit"},
+    .options = {"Remote 1", "Add New", "Edit"},
     .size = 3,
     .index = 0,
     .cont = NULL,
@@ -415,6 +415,53 @@ void lcd_ir_setup_page(ir_menu_t *menu)
 	lv_style_set_text_align(&menu->sel_style, LV_TEXT_ALIGN_CENTER);
 	
 	
+	// Create remote name style
+	lv_style_init(&menu->name_style);
+	
+	lv_style_set_radius(&menu->name_style, 8);
+	lv_style_set_bg_color(&menu->name_style, user_primary_color);
+	
+//lv_style_set_bg_grad_color(&menu->name_style, lv_color_darken(user_primary_color, 60));
+//lv_style_set_bg_grad_dir(&menu->name_style, LV_GRAD_DIR_VER);
+
+lv_style_set_outline_width(&menu->name_style, 2);
+lv_style_set_outline_color(&menu->name_style, user_secondary_color);
+lv_style_set_outline_pad(&menu->name_style, 3);
+	
+	lv_style_set_border_width(&menu->name_style, 2);
+	lv_style_set_border_color(&menu->name_style, user_secondary_color);
+	lv_style_set_border_side(&menu->name_style, LV_BORDER_SIDE_FULL);
+	
+	lv_style_set_pad_top(&menu->name_style, 3);
+	lv_style_set_pad_bottom(&menu->name_style, 3);
+	
+	lv_style_set_text_font(&menu->name_style, &lv_font_montserrat_16);
+	lv_style_set_text_color(&menu->name_style, user_secondary_color);
+	lv_style_set_text_align(&menu->name_style, LV_TEXT_ALIGN_CENTER);
+	
+	
+	// Create selected remote name style
+	lv_style_init(&menu->name_sel_style);
+	
+	lv_style_set_radius(&menu->name_sel_style, 8);
+	lv_style_set_bg_color(&menu->name_sel_style, user_secondary_color);
+
+lv_style_set_outline_width(&menu->name_sel_style, 2);
+lv_style_set_outline_color(&menu->name_sel_style, user_secondary_color);
+lv_style_set_outline_pad(&menu->name_sel_style, 3);
+	
+	lv_style_set_border_width(&menu->name_sel_style, 2);
+	lv_style_set_border_color(&menu->name_sel_style, user_secondary_color);
+	lv_style_set_border_side(&menu->name_sel_style, LV_BORDER_SIDE_FULL);
+	
+	lv_style_set_pad_top(&menu->name_sel_style, 3);
+	lv_style_set_pad_bottom(&menu->name_sel_style, 3);
+	
+	lv_style_set_text_font(&menu->name_sel_style, &lv_font_montserrat_16);
+	lv_style_set_text_color(&menu->name_sel_style, user_primary_color);
+	lv_style_set_text_align(&menu->name_sel_style, LV_TEXT_ALIGN_CENTER);
+	
+	
 	// Create buttons
 	// Wrap index
 	if (menu->index >= menu->size) {
@@ -430,12 +477,22 @@ void lcd_ir_setup_page(ir_menu_t *menu)
         menu->btns[i] = lv_list_add_btn(menu->main_list, NULL, menu->options[i]);
         lv_obj_set_size(menu->btns[i], 100, 28);
 
-        // Style selected
-        if (i == menu->index) {
-            lv_obj_add_style(menu->btns[i], &menu->sel_style, 0);
+        // Style selected   
+        if (i == menu->index) { // Index match
+			if (i == 0) { // If remote name
+				lv_obj_add_style(menu->btns[i], &menu->name_sel_style, 0);
+			}
+			else {
+				lv_obj_add_style(menu->btns[i], &menu->sel_style, 0);
+			}   
         }
         else {
-            lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
+			if (i == 0) { // If remote name
+				lv_obj_add_style(menu->btns[i], &menu->name_style, 0);
+			}
+			else {
+				lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
+			}   
         }
 
         // Create and format text label
@@ -468,14 +525,27 @@ void lcd_ir_update_menu(ir_menu_t *menu)
 	}
 
     // Reset every button to unselected
-    for (int i = 0; i < menu->size; i++) {
-        lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
-        lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
+    for (int i = 0; i < menu->size; i++) {	
+		if (i == 0) { // If remote name
+			lv_obj_remove_style(menu->btns[i], &menu->name_sel_style, 0);
+    		lv_obj_add_style(menu->btns[i], &menu->name_style, 0);
+		}
+		else {
+			lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
+        	lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
+		}
     }
-
+    
     // Highlight only the current index
-    lv_obj_remove_style(menu->btns[menu->index], &menu->btn_style, 0);
-    lv_obj_add_style(menu->btns[menu->index], &menu->sel_style, 0);
+    if (menu->index == 0) { // If remote name
+		lv_obj_remove_style(menu->btns[menu->index], &menu->name_style, 0);
+		lv_obj_add_style(menu->btns[menu->index], &menu->name_sel_style, 0);
+	}
+	else {
+		lv_obj_remove_style(menu->btns[menu->index], &menu->btn_style, 0);
+    	lv_obj_add_style(menu->btns[menu->index], &menu->sel_style, 0);
+	}
+
     
     // Enable scrolling if list gets too long
     lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_OFF); // LV_ANIM_ON

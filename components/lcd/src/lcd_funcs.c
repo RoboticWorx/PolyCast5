@@ -19,6 +19,8 @@
 
 #include "anim_city.h"
 
+#include "anim_black_hole.h"
+
 #define DRAW_LINES   20
 #define FLUSH_CHUNK  2
 
@@ -27,12 +29,20 @@
 #define IR_LABELS_OFFSET 20
 
 #define CITY_FRAME_PERIOD 120 // 160
+#define BLACK_HOLE_FRAME_PERIOD 120
 
 #ifdef POLYCAST5_BUILD_FULL_ANIMS
 	#define CITY_FRAME_CNT 60
+	#define BLACK_HOLE_FRAME_CNT 18
 #else
 	#define CITY_FRAME_CNT 5
+	#define BLACK_HOLE_FRAME_CNT 5
 #endif
+
+#define CITY 0
+#define BLACK_HOLE 1
+
+static int anim_active = CITY;
 
 static const char *TAG = "LCD_FUNCS";
 
@@ -50,13 +60,14 @@ typedef struct {
 } scroll_ctx_t;
 
 typedef struct {
-    lv_obj_t *frames[CITY_FRAME_CNT];   /* img0 … img6 */
-    uint8_t   cur;                      /* 0…6, index of visible frame */
-    bool       forward;   // true = counting up, false = counting down
-    lv_timer_t *timer;                  /* NULL until created */
-} city_anim_t;
+    lv_obj_t *frames[CITY_FRAME_CNT]; // Images
+    uint8_t cur; // Index of visible frame
+    bool forward; // True = counting up, false = counting down
+    lv_timer_t *timer;
+} anim_t;
 
-static city_anim_t city_anim;
+static anim_t city_anim;
+static anim_t black_hole_anim;
 
 static bool scrolling_menu = false;
 static bool scrolling_up = false;	
@@ -326,7 +337,6 @@ void lcd_selection_btn_pressed(ui_menu_t *menu)
     const char *option = lv_label_get_text(menu->lbl_mid);
 
 	if (strcmp(option, "Infrared") == 0) {
-		xSemaphoreGive(xInfraredEnableSemaphore);
 		lcd_swipe_anim(menu, 1, SWIPE_SPEED);
 		
 		// Non-blocking delay
@@ -486,10 +496,54 @@ static void city_anim_cb(lv_timer_t *t)
     #endif
 }
 
+static void black_hole_anim_cb(lv_timer_t *t)
+{
+	#ifdef POLYCAST5_BLACK_HOLE_PING_PONG // Loop animation back and forth
+	    // Hide the current frame
+	    lv_obj_add_flag(black_hole_anim.frames[black_hole_anim.cur], LV_OBJ_FLAG_HIDDEN);
+	
+	    // Decide next frame index based on direction
+	    if (black_hole_anim.forward) {
+	        if (black_hole_anim.cur + 1 < BLACK_HOLE_FRAME_CNT) {
+	            // Still room to go up
+	            black_hole_anim.cur++;
+	        }
+	        else {
+	            // Reached the last frame: reverse direction & step down
+	            black_hole_anim.forward = false;
+	            black_hole_anim.cur--;
+	        }
+	    }
+	    else {
+	        // Currently counting down
+	        if (black_hole_anim.cur > 0) {
+	            black_hole_anim.cur--;
+	        }
+	        else {
+	            // Reached frame 0: flip direction back up
+	            black_hole_anim.forward = true;
+	            black_hole_anim.cur++;
+	        }
+	    }
+	    
+	    // Show the newly chosen frame
+	    lv_obj_clear_flag(black_hole_anim.frames[black_hole_anim.cur], LV_OBJ_FLAG_HIDDEN);
+    #else // Go all the way through and then reset
+	    // Hide current frame
+	    lv_obj_add_flag(black_hole_anim.frames[black_hole_anim.cur], LV_OBJ_FLAG_HIDDEN);
+	
+	    // Advance with wrap
+	    black_hole_anim.cur = (black_hole_anim.cur + 1) % BLACK_HOLE_FRAME_CNT;
+	
+	    // Show next frame
+	    lv_obj_clear_flag(black_hole_anim.frames[black_hole_anim.cur], LV_OBJ_FLAG_HIDDEN);
+    #endif
+}
+
 void lcd_init_images()
 {
 	#ifdef POLYCAST5_BUILD_FULL_ANIMS
-		const lv_img_dsc_t *src_arr[CITY_FRAME_CNT] = { // 64.84KB each
+		const lv_img_dsc_t *anim_arr_city[CITY_FRAME_CNT] = { // 64.84KB each
 		    &anim_city_1,  &anim_city_2,  &anim_city_3,
 		    &anim_city_4,  &anim_city_5,  &anim_city_6,
 		    &anim_city_7,  &anim_city_8,  &anim_city_9,
@@ -511,21 +565,33 @@ void lcd_init_images()
 		    &anim_city_55, &anim_city_56, &anim_city_57,
 		    &anim_city_58, &anim_city_59, &anim_city_60,
 		};
+		
+		const lv_img_dsc_t *anim_arr_black_hole[CITY_FRAME_CNT] = { // 64.84KB each
+		    &anim_black_hole_1, &anim_black_hole_2, &anim_black_hole_3,
+		    &anim_black_hole_4, &anim_black_hole_5, &anim_black_hole_6,
+		    &anim_black_hole_7, &anim_black_hole_8, &anim_black_hole_9,
+		    &anim_black_hole_10, &anim_black_hole_11, &anim_black_hole_12,
+		    &anim_black_hole_13, &anim_black_hole_14, &anim_black_hole_15,
+		    &anim_black_hole_16, &anim_black_hole_17, &anim_black_hole_18
+		};
 	#else
-		const lv_img_dsc_t *src_arr[CITY_FRAME_CNT] = { // 64.84KB each
+		const lv_img_dsc_t *anim_arr_city[CITY_FRAME_CNT] = { // 64.84KB each
 		    &anim_city_1,  &anim_city_2,  &anim_city_3,
 		    &anim_city_4,  &anim_city_5
 		};
 	#endif
 
+
 	// Create and center every image
+	
+	// City
     for (int i = 0; i < CITY_FRAME_CNT; i++) {
         city_anim.frames[i] = lv_img_create(ACTIVE_SCR);
-        lv_img_set_src(city_anim.frames[i], src_arr[i]);
+        lv_img_set_src(city_anim.frames[i], anim_arr_city[i]);
         lv_obj_center(city_anim.frames[i]);
 
-        if (i > 0) {
-			// Hide all but frame 0
+        if (i >= 0) {
+			// Hide all
             lv_obj_add_flag(city_anim.frames[i], LV_OBJ_FLAG_HIDDEN);
         }
     }
@@ -535,23 +601,87 @@ void lcd_init_images()
 
     // Create timer to update frames
     city_anim.timer = lv_timer_create(city_anim_cb, CITY_FRAME_PERIOD, NULL);
+    if (anim_active == CITY) { // If start anim
+		lv_obj_remove_flag(city_anim.frames[0], LV_OBJ_FLAG_HIDDEN);
+	}
+	else {
+		lv_timer_pause(city_anim.timer);
+	}
+    
+    // Black hole
+    for (int i = 0; i < CITY_FRAME_CNT; i++) {
+        black_hole_anim.frames[i] = lv_img_create(ACTIVE_SCR);
+        lv_img_set_src(black_hole_anim.frames[i], anim_arr_black_hole[i]);
+        lv_obj_center(black_hole_anim.frames[i]);
+
+        if (i >= 0) {
+			// Hide all
+            lv_obj_add_flag(black_hole_anim.frames[i], LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    // First frame going up
+    black_hole_anim.cur = 0;
+    black_hole_anim.forward = true;
+
+    // Create timer to update frames
+    black_hole_anim.timer = lv_timer_create(black_hole_anim_cb, BLACK_HOLE_FRAME_PERIOD, NULL);
+    if (anim_active == BLACK_HOLE) { // If start anim
+		lv_obj_remove_flag(black_hole_anim.frames[0], LV_OBJ_FLAG_HIDDEN);
+	}
+	else {
+		lv_timer_pause(black_hole_anim.timer);
+	}
+}
+
+static void transition_animation(bool dir)
+{
+	if (dir) {
+		if (anim_active == CITY) { // City -> black hole
+			// Stop cycling city animation frames
+	        lv_timer_pause(city_anim.timer);
+	        lv_obj_add_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN); // Hide the visible
+	        
+	        // Start cycling black hole animation frames
+			lv_obj_add_flag(black_hole_anim.frames[black_hole_anim.cur], LV_OBJ_FLAG_HIDDEN); // Hide the visible
+			lv_timer_resume(black_hole_anim.timer); 
+			
+			anim_active = BLACK_HOLE;
+		}
+	}
+	else {
+		if (anim_active == BLACK_HOLE) { // Black hole -> city
+			// Stop cycling black hole animation frames
+	        lv_timer_pause(black_hole_anim.timer);
+	        lv_obj_add_flag(black_hole_anim.frames[black_hole_anim.cur], LV_OBJ_FLAG_HIDDEN); // Hide the visible
+	        
+	        // Start cycling city animation frames
+			lv_obj_add_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN); // Hide the visible
+			lv_timer_resume(city_anim.timer); 
+			
+			anim_active = CITY;
+		}
+	}
 }
 
 void lcd_home_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
 {
 	
 	if (ui_btns->up_btn == 1) {
-
+		transition_animation(true); // Up
 	}
 	else if (ui_btns->down_btn == 1) {
-
+		transition_animation(false); // Down
 	}
 	else if (ui_btns->right_btn == 1) {
 		// Stop cycling animation frames
-        lv_timer_pause(city_anim.timer);
-
-        // Hide the visible frame
-        lv_obj_add_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN);
+		if (anim_active == CITY) {
+	        lv_timer_pause(city_anim.timer);
+	        lv_obj_add_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN); // Hide the visible frame
+		}
+		else if (anim_active == BLACK_HOLE) {
+	        lv_timer_pause(black_hole_anim.timer);
+	        lv_obj_add_flag(black_hole_anim.frames[black_hole_anim.cur], LV_OBJ_FLAG_HIDDEN); // Hide the visible frame
+		}
 		
 		// Show selection labels
 		lv_obj_remove_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
@@ -663,10 +793,14 @@ void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
 		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
 		// Show the visible frame
-        lv_obj_add_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN);
-        
-		// Start cycling animation frames again
-        lv_timer_resume(city_anim.timer);
+		if (anim_active == CITY) {
+			lv_obj_remove_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN);
+	        lv_timer_resume(city_anim.timer);
+		}
+		else if (anim_active == BLACK_HOLE) {
+			lv_obj_remove_flag(black_hole_anim.frames[black_hole_anim.cur], LV_OBJ_FLAG_HIDDEN);
+	        lv_timer_resume(black_hole_anim.timer);
+		}
 
 		ui_menu->page = HOME_PAGE;
 	}

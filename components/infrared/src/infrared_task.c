@@ -16,7 +16,6 @@ static const char *TAG = "IR_TASK";
 
 SemaphoreHandle_t xInfraredRxEventSemaphore;
 SemaphoreHandle_t xInfraredStartRxSemaphore;
-SemaphoreHandle_t xInfraredEnableSemaphore;
 SemaphoreHandle_t xInfraredDisableSemaphore;
 SemaphoreHandle_t xInfraredSignalSavedSemaphore;
 
@@ -35,17 +34,13 @@ int menu_idx; // Index received from menu
 
 static void infrared_task(void *pvParameters) {
 	// Create semaphores
-	xInfraredEnableSemaphore = xSemaphoreCreateBinary();
 	xInfraredDisableSemaphore = xSemaphoreCreateBinary();
 	xInfraredStartRxSemaphore = xSemaphoreCreateBinary();
 	xInfraredSignalSavedSemaphore = xSemaphoreCreateBinary();
 	xInfraredRxEventSemaphore = xSemaphoreCreateBinary();
 	
 	xInfraredSignalToTxQueue = xQueueCreate(1, sizeof(int));
-	
-	// Wait until enabled
-	xSemaphoreTake(xInfraredEnableSemaphore, portMAX_DELAY);
-	
+		
 	#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Initializing IR system...");
     #endif
