@@ -1,3 +1,4 @@
+#include "misc/lv_timer.h"
 #include "polycast5_macros.h"
 
 #include <stdlib.h>
@@ -28,6 +29,8 @@
 #define SCROLL_SPEED 400
 #define IR_LABELS_OFFSET 20
 
+
+/* Animation macros */
 #define CITY_FRAME_PERIOD 120 // 160
 #define BLACK_HOLE_FRAME_PERIOD 120
 
@@ -42,35 +45,97 @@
 #define CITY 0
 #define BLACK_HOLE 1
 
-static int anim_active = CITY;
+static int anim_active = BLACK_HOLE;
 
+
+/* LCD */
 static const char *TAG = "LCD_FUNCS";
 
 static TFT_t tft;
 static lv_display_t *disp; // LVGL display handle
 
 static bool already_scrolling = false;
+static bool scrolling_menu = false;
+static bool scrolling_up = false;	
 
 typedef struct {
     lv_obj_t *top;    // the label that sits at the top line
     lv_obj_t *mid;    // the label in the center
     lv_obj_t *bot;    // the label at the bottom (this one moves)
     const char *txt;  // the next string to show
-    bool up;           // direction: true=you’re scrolling up, false=scrolling down
+    bool up;          // direction: true=you’re scrolling up, false=scrolling down
 } scroll_ctx_t;
 
+
+/* Animation */
 typedef struct {
-    lv_obj_t *frames[CITY_FRAME_CNT]; // Images
-    uint8_t cur; // Index of visible frame
-    bool forward; // True = counting up, false = counting down
-    lv_timer_t *timer;
+    lv_obj_t *img; // Single lv_img
+    const lv_img_dsc_t **frames; // Pointer to the file‐scope array
+    uint8_t frame_cnt; // Num frames
+    bool pingpong; // False = wrap
+    bool forward; // Current direction in pingpong
+    uint8_t cur; // Current frame index
+    lv_timer_t *timer; // LVGL timer
 } anim_t;
 
-static anim_t city_anim;
-static anim_t black_hole_anim;
+// Define animation frames
+#ifdef POLYCAST5_BUILD_FULL_ANIMS
+	static const lv_img_dsc_t *city_frames[CITY_FRAME_CNT] = { // 64.84KB each
+		// 64.84KB each
+		&anim_city_1,  &anim_city_2,  &anim_city_3,	 &anim_city_4,	&anim_city_5,
+		&anim_city_6,  &anim_city_7,  &anim_city_8,	 &anim_city_9,	&anim_city_10,
+		&anim_city_11, &anim_city_12, &anim_city_13, &anim_city_14, &anim_city_15,
+		&anim_city_16, &anim_city_17, &anim_city_18, &anim_city_19, &anim_city_20,
+		&anim_city_21, &anim_city_22, &anim_city_23, &anim_city_24, &anim_city_25,
+		&anim_city_26, &anim_city_27, &anim_city_28, &anim_city_29, &anim_city_30,
+		&anim_city_31, &anim_city_32, &anim_city_33, &anim_city_34, &anim_city_35,
+		&anim_city_36, &anim_city_37, &anim_city_38, &anim_city_39, &anim_city_40,
+		&anim_city_41, &anim_city_42, &anim_city_43, &anim_city_44, &anim_city_45,
+		&anim_city_46, &anim_city_47, &anim_city_48, &anim_city_49, &anim_city_50,
+		&anim_city_51, &anim_city_52, &anim_city_53, &anim_city_54, &anim_city_55,
+		&anim_city_56, &anim_city_57, &anim_city_58, &anim_city_59, &anim_city_60,
+	};
+	
+	static const lv_img_dsc_t *black_hole_frames[BLACK_HOLE_FRAME_CNT] = {
+			&anim_black_hole_1,	 &anim_black_hole_2,  &anim_black_hole_3,
+			&anim_black_hole_4,	 &anim_black_hole_5,  &anim_black_hole_6,
+			&anim_black_hole_7,	 &anim_black_hole_8,  &anim_black_hole_9,
+			&anim_black_hole_10, &anim_black_hole_11, &anim_black_hole_12,
+			&anim_black_hole_13, &anim_black_hole_14, &anim_black_hole_15,
+			&anim_black_hole_16, &anim_black_hole_17, &anim_black_hole_18
+	};
+#else
+	static const lv_img_dsc_t *city_frames[CITY_FRAME_CNT] = {
+			&anim_city_1, &anim_city_2, &anim_city_3,
+			&anim_city_4, &anim_city_5
+	};
+	
+	static const lv_img_dsc_t *black_hole_frames[BLACK_HOLE_FRAME_CNT] = {
+			&anim_black_hole_1,	 &anim_black_hole_2,  &anim_black_hole_3,
+			&anim_black_hole_4,	 &anim_black_hole_5
+	};
+#endif
 
-static bool scrolling_menu = false;
-static bool scrolling_up = false;	
+// Animation structs
+static anim_t city_anim = {
+    .frames = city_frames,
+    .frame_cnt = CITY_FRAME_CNT,
+    .pingpong = false,
+    .forward = true,
+    .cur = 0,
+    .img = NULL,
+    .timer = NULL
+};
+
+static anim_t black_hole_anim = {
+    .frames = black_hole_frames,
+    .frame_cnt = BLACK_HOLE_FRAME_CNT,
+    .pingpong = false,
+    .forward = true,
+    .cur = 0,
+    .img = NULL,
+    .timer = NULL
+};
 	
 
 static void st7789_flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_map)
@@ -452,236 +517,114 @@ static void unhide_selection_widgets(ui_menu_t *m)
     lv_obj_set_x(m->lbl_bot, 0);
 }
 
-static void city_anim_cb(lv_timer_t *t)
+static void anim_timer_cb(lv_timer_t *t)
 {
-	#ifdef POLYCAST5_CITY_PING_PONG // Loop animation back and forth
-	    // Hide the current frame
-	    lv_obj_add_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN);
-	
-	    // Decide next frame index based on direction
-	    if (city_anim.forward) {
-	        if (city_anim.cur + 1 < CITY_FRAME_CNT) {
-	            // Still room to go up
-	            city_anim.cur++;
-	        }
-	        else {
-	            // Reached the last frame: reverse direction & step down
-	            city_anim.forward = false;
-	            city_anim.cur--;
-	        }
-	    }
-	    else {
-	        // Currently counting down
-	        if (city_anim.cur > 0) {
-	            city_anim.cur--;
-	        }
-	        else {
-	            // Reached frame 0: flip direction back up
-	            city_anim.forward = true;
-	            city_anim.cur++;
-	        }
-	    }
-	    
-	    // Show the newly chosen frame
-	    lv_obj_clear_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN);
-    #else // Go all the way through and then reset
-	    // Hide current frame
-	    lv_obj_add_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN);
-	
-	    // Advance with wrap
-	    city_anim.cur = (city_anim.cur + 1) % CITY_FRAME_CNT;
-	
-	    // Show next frame
-	    lv_obj_clear_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN);
-    #endif
-}
+    anim_t *anim = (anim_t *)lv_timer_get_user_data(t);
+    uint8_t current = anim->cur;
 
-static void black_hole_anim_cb(lv_timer_t *t)
-{
-	#ifdef POLYCAST5_BLACK_HOLE_PING_PONG // Loop animation back and forth
-	    // Hide the current frame
-	    lv_obj_add_flag(black_hole_anim.frames[black_hole_anim.cur], LV_OBJ_FLAG_HIDDEN);
+    if (anim->pingpong) { // If ping ponging
+        if (anim->forward) { // Going forward
+            if (current + 1 < anim->frame_cnt) {
+				current++; // Iterate frame
+			}
+            else { // When reached end
+				anim->forward = false; // Switch dir
+				current--; // Decrement frame
+			}
+        }
+        else { // Going back
+            if(current > 0) {
+				current--; // Decrement frame
+			} 
+            else { // When reached start
+				anim->forward = true; // Switch dir
+				current++;
+			}
+        }
+    }
+    else { // Wrapping
+        current = (current + 1) % anim->frame_cnt; // Iterate with wrap
+    }
 	
-	    // Decide next frame index based on direction
-	    if (black_hole_anim.forward) {
-	        if (black_hole_anim.cur + 1 < BLACK_HOLE_FRAME_CNT) {
-	            // Still room to go up
-	            black_hole_anim.cur++;
-	        }
-	        else {
-	            // Reached the last frame: reverse direction & step down
-	            black_hole_anim.forward = false;
-	            black_hole_anim.cur--;
-	        }
-	    }
-	    else {
-	        // Currently counting down
-	        if (black_hole_anim.cur > 0) {
-	            black_hole_anim.cur--;
-	        }
-	        else {
-	            // Reached frame 0: flip direction back up
-	            black_hole_anim.forward = true;
-	            black_hole_anim.cur++;
-	        }
-	    }
-	    
-	    // Show the newly chosen frame
-	    lv_obj_clear_flag(black_hole_anim.frames[black_hole_anim.cur], LV_OBJ_FLAG_HIDDEN);
-    #else // Go all the way through and then reset
-	    // Hide current frame
-	    lv_obj_add_flag(black_hole_anim.frames[black_hole_anim.cur], LV_OBJ_FLAG_HIDDEN);
-	
-	    // Advance with wrap
-	    black_hole_anim.cur = (black_hole_anim.cur + 1) % BLACK_HOLE_FRAME_CNT;
-	
-	    // Show next frame
-	    lv_obj_clear_flag(black_hole_anim.frames[black_hole_anim.cur], LV_OBJ_FLAG_HIDDEN);
-    #endif
+	// Set frame
+    anim->cur = current;
+    lv_img_set_src(anim->img, anim->frames[current]);
 }
 
 void lcd_init_images()
 {
-	#ifdef POLYCAST5_BUILD_FULL_ANIMS
-		const lv_img_dsc_t *anim_arr_city[CITY_FRAME_CNT] = { // 64.84KB each
-		    &anim_city_1,  &anim_city_2,  &anim_city_3,
-		    &anim_city_4,  &anim_city_5,  &anim_city_6,
-		    &anim_city_7,  &anim_city_8,  &anim_city_9,
-		    &anim_city_10, &anim_city_11, &anim_city_12,
-		    &anim_city_13, &anim_city_14, &anim_city_15,
-		    &anim_city_16, &anim_city_17, &anim_city_18,
-		    &anim_city_19, &anim_city_20, &anim_city_21,
-		    &anim_city_22, &anim_city_23, &anim_city_24,
-		    &anim_city_25, &anim_city_26, &anim_city_27,
-		    &anim_city_28, &anim_city_29, &anim_city_30,
-		    &anim_city_31, &anim_city_32, &anim_city_33,
-		    &anim_city_34, &anim_city_35, &anim_city_36,
-		    &anim_city_37, &anim_city_38, &anim_city_39,
-		    &anim_city_40, &anim_city_41, &anim_city_42,
-		    &anim_city_43, &anim_city_44, &anim_city_45,
-		    &anim_city_46, &anim_city_47, &anim_city_48,
-		    &anim_city_49, &anim_city_50, &anim_city_51,
-		    &anim_city_52, &anim_city_53, &anim_city_54,
-		    &anim_city_55, &anim_city_56, &anim_city_57,
-		    &anim_city_58, &anim_city_59, &anim_city_60,
-		};
-		
-		const lv_img_dsc_t *anim_arr_black_hole[CITY_FRAME_CNT] = { // 64.84KB each
-		    &anim_black_hole_1, &anim_black_hole_2, &anim_black_hole_3,
-		    &anim_black_hole_4, &anim_black_hole_5, &anim_black_hole_6,
-		    &anim_black_hole_7, &anim_black_hole_8, &anim_black_hole_9,
-		    &anim_black_hole_10, &anim_black_hole_11, &anim_black_hole_12,
-		    &anim_black_hole_13, &anim_black_hole_14, &anim_black_hole_15,
-		    &anim_black_hole_16, &anim_black_hole_17, &anim_black_hole_18
-		};
-	#else
-		const lv_img_dsc_t *anim_arr_city[CITY_FRAME_CNT] = { // 64.84KB each
-		    &anim_city_1,  &anim_city_2,  &anim_city_3,
-		    &anim_city_4,  &anim_city_5
-		};
-	#endif
-
-
-	// Create and center every image
-	
-	// City
-    for (int i = 0; i < CITY_FRAME_CNT; i++) {
-        city_anim.frames[i] = lv_img_create(ACTIVE_SCR);
-        lv_img_set_src(city_anim.frames[i], anim_arr_city[i]);
-        lv_obj_center(city_anim.frames[i]);
-
-        if (i >= 0) {
-			// Hide all
-            lv_obj_add_flag(city_anim.frames[i], LV_OBJ_FLAG_HIDDEN);
-        }
-    }
-    // First frame going up
-    city_anim.cur = 0;
-    city_anim.forward = true;
-
-    // Create timer to update frames
-    city_anim.timer = lv_timer_create(city_anim_cb, CITY_FRAME_PERIOD, NULL);
-    if (anim_active == CITY) { // If start anim
-		lv_obj_remove_flag(city_anim.frames[0], LV_OBJ_FLAG_HIDDEN);
-	}
-	else {
+	/* City */
+	// Create image
+    city_anim.img = lv_img_create(ACTIVE_SCR);
+    lv_img_set_src(city_anim.img, city_anim.frames[0]);
+    lv_obj_center(city_anim.img);
+    
+    // Create timer
+    city_anim.timer = lv_timer_create(anim_timer_cb, CITY_FRAME_PERIOD, &city_anim);
+    if(anim_active != CITY) {
 		lv_timer_pause(city_anim.timer);
 	}
+
+    /* Black hole */
+    // Create image
+    black_hole_anim.img = lv_img_create(ACTIVE_SCR);
+    lv_img_set_src(black_hole_anim.img, black_hole_anim.frames[0]);
+    lv_obj_center(black_hole_anim.img);
     
-    // Black hole
-    for (int i = 0; i < CITY_FRAME_CNT; i++) {
-        black_hole_anim.frames[i] = lv_img_create(ACTIVE_SCR);
-        lv_img_set_src(black_hole_anim.frames[i], anim_arr_black_hole[i]);
-        lv_obj_center(black_hole_anim.frames[i]);
-
-        if (i >= 0) {
-			// Hide all
-            lv_obj_add_flag(black_hole_anim.frames[i], LV_OBJ_FLAG_HIDDEN);
-        }
-    }
-    // First frame going up
-    black_hole_anim.cur = 0;
-    black_hole_anim.forward = true;
-
-    // Create timer to update frames
-    black_hole_anim.timer = lv_timer_create(black_hole_anim_cb, BLACK_HOLE_FRAME_PERIOD, NULL);
-    if (anim_active == BLACK_HOLE) { // If start anim
-		lv_obj_remove_flag(black_hole_anim.frames[0], LV_OBJ_FLAG_HIDDEN);
-	}
-	else {
+    // Create timer
+    black_hole_anim.timer = lv_timer_create(anim_timer_cb, BLACK_HOLE_FRAME_PERIOD, &black_hole_anim);
+    if(anim_active != BLACK_HOLE) {
 		lv_timer_pause(black_hole_anim.timer);
 	}
 }
 
-static void transition_animation(bool dir)
+static void start_animation(void)
 {
-	if (dir) {
-		if (anim_active == CITY) { // City -> black hole
-			// Stop cycling city animation frames
-	        lv_timer_pause(city_anim.timer);
-	        lv_obj_add_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN); // Hide the visible
-	        
-	        // Start cycling black hole animation frames
-			lv_obj_add_flag(black_hole_anim.frames[black_hole_anim.cur], LV_OBJ_FLAG_HIDDEN); // Hide the visible
-			lv_timer_resume(black_hole_anim.timer); 
-			
-			anim_active = BLACK_HOLE;
-		}
-	}
-	else {
-		if (anim_active == BLACK_HOLE) { // Black hole -> city
-			// Stop cycling black hole animation frames
-	        lv_timer_pause(black_hole_anim.timer);
-	        lv_obj_add_flag(black_hole_anim.frames[black_hole_anim.cur], LV_OBJ_FLAG_HIDDEN); // Hide the visible
-	        
-	        // Start cycling city animation frames
-			lv_obj_add_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN); // Hide the visible
-			lv_timer_resume(city_anim.timer); 
-			
-			anim_active = CITY;
-		}
-	}
+    // Start the active
+    if(anim_active == CITY) {
+        lv_obj_remove_flag(city_anim.img, LV_OBJ_FLAG_HIDDEN);
+        lv_timer_resume(city_anim.timer);
+    }
+    else {
+        lv_obj_remove_flag(black_hole_anim.img,  LV_OBJ_FLAG_HIDDEN);
+        lv_timer_resume(black_hole_anim.timer);
+    }
+}
+
+static void stop_animations(void)
+{
+    lv_timer_pause(city_anim.timer);
+    lv_timer_pause(black_hole_anim.timer);
+
+    lv_obj_add_flag(city_anim.img, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(black_hole_anim.img, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void transition_animation(void)
+{
+	if (anim_active == CITY) {
+		stop_animations();
+        anim_active = BLACK_HOLE;
+        start_animation();
+    }
+    else if (anim_active == BLACK_HOLE) {
+    	stop_animations();
+        anim_active = CITY;
+        start_animation();
+    }
 }
 
 void lcd_home_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
 {
 	
 	if (ui_btns->up_btn == 1) {
-		transition_animation(true); // Up
+		transition_animation();
 	}
 	else if (ui_btns->down_btn == 1) {
-		transition_animation(false); // Down
+		transition_animation();
 	}
 	else if (ui_btns->right_btn == 1) {
-		// Stop cycling animation frames
-		if (anim_active == CITY) {
-	        lv_timer_pause(city_anim.timer);
-	        lv_obj_add_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN); // Hide the visible frame
-		}
-		else if (anim_active == BLACK_HOLE) {
-	        lv_timer_pause(black_hole_anim.timer);
-	        lv_obj_add_flag(black_hole_anim.frames[black_hole_anim.cur], LV_OBJ_FLAG_HIDDEN); // Hide the visible frame
-		}
+		stop_animations();
 		
 		// Show selection labels
 		lv_obj_remove_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
@@ -792,15 +735,7 @@ void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
-		// Show the visible frame
-		if (anim_active == CITY) {
-			lv_obj_remove_flag(city_anim.frames[city_anim.cur], LV_OBJ_FLAG_HIDDEN);
-	        lv_timer_resume(city_anim.timer);
-		}
-		else if (anim_active == BLACK_HOLE) {
-			lv_obj_remove_flag(black_hole_anim.frames[black_hole_anim.cur], LV_OBJ_FLAG_HIDDEN);
-	        lv_timer_resume(black_hole_anim.timer);
-		}
+		start_animation();
 
 		ui_menu->page = HOME_PAGE;
 	}

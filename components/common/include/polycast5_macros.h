@@ -10,9 +10,5 @@
 
 #define POLYCAST5_BUILD_FULL_ANIMS 1 // Build all animation frames
 
-//#define POLYCAST5_CITY_PING_PONG 1 // City animation will go back and forth instead of looping
-
-//#define POLYCAST5_BLACK_HOLE_PING_PONG 1
-
 
 #endif // POLYCAST5_MACROS_H
