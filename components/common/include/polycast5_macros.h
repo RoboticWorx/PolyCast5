@@ -12,5 +12,7 @@
 
 #define POLYCAST5_EN_SLEEP_TIMER 1 // Enable sleep mode timer
 
+#define POLYCAST5_DEFAULT_SLEEP_TIME_MS (30 * 1000) // 30 sec
+
 
 #endif // POLYCAST5_MACROS_H

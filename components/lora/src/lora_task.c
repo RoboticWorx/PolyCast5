@@ -287,5 +287,7 @@ static void lora_event_handler_task(void *pvParameters) {
 // Function to create the LoRa task
 void lora_task_create(void) {
 	// Create the LoRa task
-	xTaskCreate(lora_task, "lora_task", 4096, NULL, tskIDLE_PRIORITY + 1, NULL);
+	if (xTaskCreate(lora_task, "lora_task", 1024 * 2, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
+	    ESP_LOGE(TAG, "Failed to start lora_task");
+	}
 }

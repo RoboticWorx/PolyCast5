@@ -8,6 +8,8 @@
 
 #include "nvs.h"
 
+#include "esp_sleep.h"
+#include "driver/gpio.h"
 #include "esp_timer.h"
 #include "esp_log.h"
 
@@ -176,10 +178,76 @@ static void st7789_flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_
     xSemaphoreGive(xSPIBusMutex); // Release SPI bus
 }
 
-static void lv_tick_cb(void *arg)
+static void lcd_panel_sleep(void)
 {
-    (void)arg;
-    lv_tick_inc(1);
+	xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
+	
+    // Display off, sleep in
+    spi_master_write_command(&tft,0x28); // DISPOFF
+    vTaskDelay(pdMS_TO_TICKS(10));
+    spi_master_write_command(&tft,0x10); // SLPIN
+    
+    xSemaphoreGive(xSPIBusMutex); // Release SPI bus
+}
+
+static void lcd_panel_wake(void)
+{
+	xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
+	
+    spi_master_write_command(&tft,0x11); // SLPOUT
+    vTaskDelay(pdMS_TO_TICKS(120)); 
+ 
+    // Pixel format back to 16-bit 565
+    spi_master_write_command(&tft, 0x3A); // COLMOD
+    spi_master_write_data_byte(&tft, 0x55); // 0x55 = 16-bit
+
+    // Hardware 270° rotation (90° CCW)
+    spi_master_write_command(&tft, 0x36); // MADCTL
+    spi_master_write_data_byte(&tft, 0xA0); // MY=1, MV=1: 0xA0 for 270deg, 0xC0 for 180deg, 0x60 for 90deg
+    
+    spi_master_write_command(&tft, 0x21); // INVON  ()
+    
+    spi_master_write_command(&tft,0x29); // DISPON
+    
+    xSemaphoreGive(xSPIBusMutex); // Release SPI bus
+}
+
+void lcd_device_sleep(void)
+{
+	lcd_panel_sleep(); // Put ST7789 to sleep
+	gpio_set_level(ST7789_LEDK_PIN, 0); // BL low
+
+	// Handle case where btn is putting device to sleep: don't auto wake
+	while (gpio_get_level(USER_BUTTON_POWER) != 1) {
+		vTaskDelay(pdMS_TO_TICKS(10));
+		lv_timer_handler();
+	}
+
+	// gpio_reset_pin(USER_BUTTON_POWER);
+
+	xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
+
+	#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Entering light sleep");
+	#endif
+
+	ESP_ERROR_CHECK(esp_light_sleep_start());
+
+	xSemaphoreGive(xSPIBusMutex); // Release SPI bus
+
+	lcd_panel_wake(); // Wake up ST7789
+	gpio_set_level(ST7789_LEDK_PIN, 1); // BL high
+
+	// rtc_gpio_deinit(USER_BUTTON_POWER);
+	//   then re-apply your gpio_config(…) for the digital input
+
+	// Handle case where waking from timer: don't auto sleep
+	while (gpio_get_level(USER_BUTTON_POWER) != 1) {
+		vTaskDelay(pdMS_TO_TICKS(10));
+		lv_timer_handler();
+	}
+
+	xQueueReset(xPowerButtonSemaphore); // Clear xPowerButtonSemaphore
 }
 
 void lcd_init_driver(void)
@@ -188,10 +256,7 @@ void lcd_init_driver(void)
     vTaskDelay(pdMS_TO_TICKS(50));
 
     // SPI bus + device init
-    spi_master_init(&tft,
-                    SPI_MOSI_PIN, SPI_SCLK_PIN,
-                    ST7789_CS_PIN, ST7789_DC_PIN,
-                    ST7789_RST_PIN, ST7789_LEDK_PIN);
+    spi_master_init(&tft, SPI_MOSI_PIN, SPI_SCLK_PIN, ST7789_CS_PIN, ST7789_DC_PIN, ST7789_RST_PIN, ST7789_LEDK_PIN);
     spi_clock_speed(40 * 1000 * 1000);  // 40 MHz
 
     // ST7789 panel init (nopnop2002 driver)
@@ -206,6 +271,12 @@ void lcd_init_driver(void)
     tft._offsety = 52; // 52 if 270 
 }
 
+static void lv_tick_cb(void *arg)
+{
+    (void)arg;
+    lv_tick_inc(1);
+}
+
 void lcd_lvgl_init(void)
 {
     // LVGL library init
@@ -215,23 +286,20 @@ void lcd_lvgl_init(void)
     // Allocate space for 20 lines of 240 px each (≈9.6 kB), DMA-capable in DRAM
     static DRAM_ATTR lv_color_t buf[HOR_RES * DRAW_LINES * 2]
         __attribute__((aligned(4)));
+        
     static lv_draw_buf_t draw_buf;
-    lv_draw_buf_init(&draw_buf,
-                     HOR_RES,      // 240 px logical width
-                     DRAW_LINES,   // 20 lines
-                     LV_COLOR_FORMAT_NATIVE,
-                     0, buf, sizeof(buf));
+    lv_draw_buf_init(&draw_buf, HOR_RES, DRAW_LINES, LV_COLOR_FORMAT_NATIVE, 0, buf, sizeof(buf));
                      
-
     // Create the “display” object
-    disp = lv_display_create(HOR_RES, VER_RES);  // 240×135 logical
+    disp = lv_display_create(HOR_RES, VER_RES); // 240x135 logical
     lv_display_set_flush_cb(disp, st7789_flush_cb);
     lv_display_set_draw_buffers(disp, &draw_buf, NULL);
 
     // 1 ms tick timer feeding lv_tick_inc()
     const esp_timer_create_args_t tick_args = {
         .callback = lv_tick_cb,
-        .name     = "lv_tick"
+        .name     = "lv_tick",
+        .skip_unhandled_events = true,
     };
     esp_timer_handle_t tick_timer;
     esp_timer_create(&tick_args, &tick_timer);
@@ -816,6 +884,8 @@ void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
 		lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		xQueueReset(xPowerButtonSemaphore); // Clear xPowerButtonSemaphore
 		
 		start_animation();
 

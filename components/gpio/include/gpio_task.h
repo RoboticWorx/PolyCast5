@@ -10,17 +10,24 @@
 #define USER_BUTTON_BACK 3
 #define USER_BUTTON_DOWN 4
 #define USER_BUTTON_SELECT 5
-//#define USER_BUTTON_POWER 
+#define USER_BUTTON_POWER 1
 
+// ISR semaphores
+extern SemaphoreHandle_t xPowerButtonSemaphore; // Select btn pressed
+extern SemaphoreHandle_t xGpioEventSemaphore; // A btn was pressed
+
+// Mutex
 extern SemaphoreHandle_t xSPIBusMutex;
 
-extern SemaphoreHandle_t xUpButtonSemaphore;
-extern SemaphoreHandle_t xDownButtonSemaphore;
-extern SemaphoreHandle_t xRightButtonSemaphore;
-extern SemaphoreHandle_t xLeftButtonSemaphore;
-extern SemaphoreHandle_t xBackButtonSemaphore;
-extern SemaphoreHandle_t xSelectButtonSemaphore;
-extern SemaphoreHandle_t xGpioEventSemaphore;
+// Regular
+extern SemaphoreHandle_t xUpButtonSemaphore; // Up btn pressed
+extern SemaphoreHandle_t xDownButtonSemaphore; // Down btn pressed
+extern SemaphoreHandle_t xRightButtonSemaphore; // Right btn pressed
+extern SemaphoreHandle_t xLeftButtonSemaphore; // Left btn pressed
+extern SemaphoreHandle_t xBackButtonSemaphore; // Back btn pressed
+extern SemaphoreHandle_t xSelectButtonSemaphore; // Select btn pressed
+
+
 
 /**
  * @brief  Create the GPIO expander task.

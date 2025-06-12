@@ -4,15 +4,13 @@
 #include "esp_log.h"
 
 #include "lcd_task.h"
+#include "gpio_task.h"
 #include "lcd_funcs.h"
 
-#include "libs/gif/lv_gif.h"
-#include "nvs.h"
-#include "nvs_flash.h" // nvs_flash_erase();
-
-#include "anim_black_hole_1.h"
-
 static const char *TAG = "LCD_TASK";
+
+static const TickType_t btn_timer_interval = pdMS_TO_TICKS(200);
+static const TickType_t sleep_timer_interval = pdMS_TO_TICKS(POLYCAST5_DEFAULT_SLEEP_TIME_MS);
 
 ui_menu_t ui_menu = {
     .options = (const char *[]) {"Bluetooth","PolyPlug","ESP32","Infrared","Tools", "Settings","Wi-Fi"},
@@ -56,8 +54,9 @@ static void lcd_task(void *pvParameters)
 	// Create images
 	lcd_init_images();
     
-    TickType_t timer_last = xTaskGetTickCount();
-	const TickType_t timer_interval = pdMS_TO_TICKS(200);
+    TickType_t btn_timer_last = xTaskGetTickCount();	
+	TickType_t sleep_timer_last = xTaskGetTickCount();
+	
 	
 	//nvs_flash_erase(); // Factory reset
 
@@ -97,41 +96,53 @@ static void lcd_task(void *pvParameters)
 	
 	while (1)
 	{
-		if (xTaskGetTickCount() - timer_last >= timer_interval) {
-			timer_last = xTaskGetTickCount();
+		if (xTaskGetTickCount() - btn_timer_last >= btn_timer_interval) {
+			btn_timer_last = xTaskGetTickCount();
 			
 			if (xSemaphoreTake(xUpButtonSemaphore, 0)) {
 				ui_btns.up_btn = 1;
+				
+				sleep_timer_last = xTaskGetTickCount(); // Reset sleep timer
 			}
 			else {
 				ui_btns.up_btn = 0;
 			}
 			if (xSemaphoreTake(xDownButtonSemaphore, 0)) {
 				ui_btns.down_btn = 1;
+				
+				sleep_timer_last = xTaskGetTickCount();
 			}
 			else {
 				ui_btns.down_btn = 0;
 			}
 			if (xSemaphoreTake(xRightButtonSemaphore, 0)) {
 				ui_btns.right_btn = 1;
+				
+				sleep_timer_last = xTaskGetTickCount();
 			}
 			else {
 				ui_btns.right_btn = 0;
 			}
 			if (xSemaphoreTake(xLeftButtonSemaphore, 0)) {
 				ui_btns.left_btn = 1;
+				
+				sleep_timer_last = xTaskGetTickCount();
 			}
 			else {
 				ui_btns.left_btn = 0;
 			}
 			if (xSemaphoreTake(xBackButtonSemaphore, 0)) {
 				ui_btns.back_btn = 1;
+				
+				sleep_timer_last = xTaskGetTickCount();
 			}
 			else {
 				ui_btns.back_btn = 0;
 			}
 			if (xSemaphoreTake(xSelectButtonSemaphore, 0)) {
 				ui_btns.select_btn = 1;
+				
+				sleep_timer_last = xTaskGetTickCount();
 			}
 			else {
 				ui_btns.select_btn = 0;
@@ -188,6 +199,13 @@ static void lcd_task(void *pvParameters)
 			}
 
 		}
+						
+		// Sleep condition
+		if ((ui_menu.page == HOME_PAGE) && ((xTaskGetTickCount() - sleep_timer_last >= sleep_timer_interval) || (xSemaphoreTake(xPowerButtonSemaphore, 0) == pdTRUE))) {
+			lcd_device_sleep();
+			
+			sleep_timer_last = xTaskGetTickCount();
+		}
 
 		lv_timer_handler();
 		vTaskDelay(pdMS_TO_TICKS(10));
@@ -196,6 +214,7 @@ static void lcd_task(void *pvParameters)
 
 void lcd_task_create(void)
 {
-	xTaskCreatePinnedToCore(lcd_task, "lcd_task", 4096 * 2, NULL,
-							tskIDLE_PRIORITY + 1, NULL, 0);
+	if (xTaskCreatePinnedToCore(lcd_task, "lcd_task", 1024 * 8, NULL, tskIDLE_PRIORITY + 1, NULL, 0) != pdPASS) {
+	    ESP_LOGE(TAG, "Failed to start lcd_task");
+	}
 }

@@ -71,12 +71,17 @@ typedef struct ui_btns_t {
 extern ui_btns_t ui_btns;
 
 /** 
- * @brief Initialise SPI bus + ST7789 panel (blocking).
+ * @brief Put device and LCD into sleep mode
+ */
+void lcd_device_sleep(void);
+
+/** 
+ * @brief Initialise SPI bus + ST7789 panel (blocking)
  */
 void lcd_init_driver(void);
 
 /**
- * @brief Initialise LVGL draw buffers, tick timer and register flush cb.
+ * @brief Initialise LVGL draw buffers, tick timer and register flush cb
  */
 void lcd_lvgl_init(void);
 

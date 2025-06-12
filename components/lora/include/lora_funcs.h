@@ -2,9 +2,6 @@
 #define LORA_FUNCS_H
 
 #include "aes.h"
-#include "sx126x.h"
-#include "sx126x_hal.h"
-
 #include "lora_task.h"
 
 #define CYPHERTEXT_LENGTH 64

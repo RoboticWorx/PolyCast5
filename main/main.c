@@ -6,21 +6,21 @@
 
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
+#include "driver/rtc_io.h"
 
 #include "esp_log.h"
 #include "esp_psram.h"
+#include "esp_sleep.h"
 
-#include "hal/gpio_types.h"
-#include "lora_task.h"
-#include "sx126x.h"
 #include "sx126x_hal.h"
+
+#include "lora_task.h"
+#include "lora_funcs.h"
 
 #include "lcd_funcs.h"
 #include "lcd_task.h"
-#include "lvgl.h"
 
 #include "infrared_task.h"
-#include "infrared_funcs.h"
 
 //#include "bluetooth_task.h"
 //#include "bluetooth_funcs.h"
@@ -34,17 +34,13 @@
 // Logging tag
 static const char *TAG = "MAIN";
 
-
-
-// SPI device handles
-spi_device_handle_t spi_sx126x; // For SX126x
-spi_device_handle_t spi_st7789; // For ST7789
+// SPI device handle
+spi_device_handle_t spi_sx126x;
 
 // Global SX126x instance
 sx126x_t sx126x;
 
-// MOVE TO LORA_FUNCS ><
-void spi_sx126x_init(void)
+static void spi_sx126x_init()
 {
     esp_err_t ret;
 
@@ -58,8 +54,6 @@ void spi_sx126x_init(void)
     ret = spi_bus_add_device(SPI2_HOST, &sx_cfg, &spi_sx126x);
     assert(ret == ESP_OK);
 }
-
-
 
 void app_main(void) {
 	
@@ -84,20 +78,40 @@ void app_main(void) {
     ESP_ERROR_CHECK(esp_funcs_wifi_driver_init());
     // Turn off radio to save power
     ESP_ERROR_CHECK(esp_funcs_wifi_radio_stop());
+
+	// Isolate and configure sleep wake up
+	//ESP_ERROR_CHECK(rtc_gpio_isolate(USER_BUTTON_POWER));
+	//ESP_ERROR_CHECK(rtc_gpio_set_direction(USER_BUTTON_POWER, RTC_GPIO_MODE_INPUT_ONLY));
+	//ESP_ERROR_CHECK(rtc_gpio_pullup_dis(USER_BUTTON_POWER));
+	//ESP_ERROR_CHECK(rtc_gpio_pulldown_dis(USER_BUTTON_POWER));
+	//ESP_ERROR_CHECK(esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON));
+	#ifdef POLYCAST5_DEBUG
+		//ESP_ERROR_CHECKesp_sleep_pd_config(ESP_PD_DOMAIN_MAX, ESP_PD_OPTION_ON));
+	#endif
+	ESP_ERROR_CHECK(esp_sleep_enable_ext1_wakeup(1ULL << USER_BUTTON_POWER, ESP_EXT1_WAKEUP_ANY_LOW));
+
+	// Reference so sleep code is pulled in now
+    if (false) {
+    	ESP_ERROR_CHECK(esp_light_sleep_start());
+    }
 	
 	// Initialize various
 	lcd_init_driver();
     lcd_lvgl_init();
 	spi_sx126x_init();
 	
-	xGpioEventSemaphore = xSemaphoreCreateBinary();
+	xSPIBusMutex = xSemaphoreCreateMutex();
+	configASSERT(xSPIBusMutex); // Ensure success
+	
+	xGpioEventSemaphore = xSemaphoreCreateBinary(); // ISR semaphores
+	xPowerButtonSemaphore = xSemaphoreCreateBinary();
     if (gpio_init() != ESP_OK) {
         ESP_LOGE(TAG, "GPIO_Init failed, stopping task");
         vTaskDelete(NULL);
         return;
     }
 	
-	gpio_set_level(ST7789_LEDK_PIN, 1);
+	gpio_set_level(ST7789_LEDK_PIN, 1); // LCD BL high on start
 	
 	// Initialize the SX126x HAL with the SPI handle
 	sx126x_hal_init(spi_sx126x);
@@ -110,9 +124,9 @@ void app_main(void) {
 	sx126x.hal_read = sx126x_hal_read;
 
 	// Create tasks
-	lora_task_create();
-	lcd_task_create();
 	gpio_task_create();
+	lcd_task_create();
+	lora_task_create();
 	infrared_task_create();
 	espnow_task_create();
 	//ble_hid_task_start_up();

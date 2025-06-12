@@ -23,7 +23,6 @@ espnow_cmd_t espnow_cmd;
 static const uint8_t UNIVERSAL_MAC[ESP_NOW_ETH_ALEN] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
 static uint8_t received_enc_key[ENC_KEY_LEN];
-static uint8_t received_lmk[LMK_LEN];
 
 SemaphoreHandle_t xEspCmdRxStatusSemaphore;
 SemaphoreHandle_t xEspCmdTxSuccessSemaphore;
