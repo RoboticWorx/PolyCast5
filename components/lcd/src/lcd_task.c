@@ -68,8 +68,10 @@ static void lcd_task(void *pvParameters)
 		lcd_ns_nvs_clear(A_IR_REMOTE_NS);
 	#endif
 	
+	
 	// Create common items
 	lcd_init_selection_labels(&ui_menu);
+	
 	
 	// Load user data from NVS
 	lcd_ir_menu_nvs_load(&ir_menu, A_IR_REMOTE_NS, A_IR_REMOTE_KEY_COUNT, A_IR_REMOTE_KEY_FMT);
@@ -80,6 +82,7 @@ static void lcd_task(void *pvParameters)
 	lcd_espnow_menu_nvs_load(&espnow_menu);
 	lcd_espnow_lmk_nvs_load(&espnow_menu);
 	lcd_espnow_rx_mac_nvs_load(&espnow_menu);
+	
 		
 	// Create common pages
 	lcd_ir_setup_page(&ir_menu);
@@ -90,9 +93,13 @@ static void lcd_task(void *pvParameters)
 	lcd_espnow_setup_page(&espnow_menu);
 	lcd_espnow_setup_send_page(&espnow_menu);
 	
+	lcd_wifi_setup_page(&wifi_menu);
+	
+	
 	#ifdef POLYCAST5_ESPNOW_DUMP_NVS
 		lcd_espnow_dump_nvs();
 	#endif
+	
 	
 	while (1)
 	{
@@ -187,7 +194,7 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == ESPNOW_OPTION_PAGE) {
 				lcd_espnow_option_selected(&ui_menu, &espnow_menu, &ui_btns);
 			}
-			// IR remotes
+			// IR remotes page
 			else if (ui_menu.page == INFRARED_PAGE) {
 				lcd_infrared_page_selected(&ui_menu, &ir_menu, &ui_btns);
 			}
@@ -197,6 +204,11 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == INFRARED_REMOTE_EDIT_PAGE) {
 				lcd_ir_edit_remotes(&ui_menu, &ir_menu, &ui_btns);
 			}
+			// Wi-Fi page
+			else if (ui_menu.page == WIFI_PAGE) {
+				lcd_wifi_page_selected(&ui_menu, &wifi_menu, &ui_btns);
+			}
+			
 
 		}
 						

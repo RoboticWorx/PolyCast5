@@ -31,6 +31,8 @@
 #include "espnow_task.h"
 #include "espnow_funcs.h"
 
+#include "wifi_task.h"
+
 // Logging tag
 static const char *TAG = "MAIN";
 
@@ -129,6 +131,7 @@ void app_main(void) {
 	lora_task_create();
 	infrared_task_create();
 	espnow_task_create();
+	wifi_task_create();
 	//ble_hid_task_start_up();
 
 	#ifdef POLYCAST5_DEBUG

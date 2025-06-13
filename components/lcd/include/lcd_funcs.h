@@ -6,6 +6,7 @@
 #include "lcd_ir_funcs.h"
 #include "lcd_lora_funcs.h"
 #include "lcd_espnow_funcs.h"
+#include "lcd_wifi_funcs.h"
 
 #include "gpio_task.h"
 
@@ -30,17 +31,17 @@
 #define WIFI_PAGE 7
 #define BLUETOOTH_PAGE 8
 
-#define INFRARED_REMOTE_NAME_PAGE 10
-#define INFRARED_REMOTE_EDIT_PAGE 11
+#define INFRARED_REMOTE_NAME_PAGE 9
+#define INFRARED_REMOTE_EDIT_PAGE 10
 
-#define LORA_NAME_PAGE 12
-#define LORA_KEY_PAGE 13
-#define LORA_SUBPAGE 14
-#define LORA_OPTIONS_SUBPAGE 15
+#define LORA_NAME_PAGE 11
+#define LORA_KEY_PAGE 12
+#define LORA_SUBPAGE 13
+#define LORA_OPTIONS_SUBPAGE 14
 
-#define ESPNOW_RX_MAC_PAGE 16
-#define ESPNOW_NAME_PAGE 17
-#define ESPNOW_OPTION_PAGE 18
+#define ESPNOW_RX_MAC_PAGE 15
+#define ESPNOW_NAME_PAGE 16
+#define ESPNOW_OPTION_PAGE 17
 
 extern volatile bool lcd_clear_pending_inputs;
 
@@ -211,10 +212,19 @@ void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_
  * @brief Executes on ESP-NOW page
  *
  * @param [in] ui_menu UI menu structure
- * @param [in] espnow_menu_t LoRa menu structure
+ * @param [in] espnow_menu LoRa menu structure
  * @param [in] ui_btns UI input structure
  */
 void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns);
+
+/**
+ * @brief Executes on Wi-Fi page
+ *
+ * @param [in] ui_menu UI menu structure
+ * @param [in] wifi_menu Wi-Fi menu structure
+ * @param [in] ui_btns UI input structure
+ */
+void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns);
 
 
 #endif /* LCD_FUNCS_H */

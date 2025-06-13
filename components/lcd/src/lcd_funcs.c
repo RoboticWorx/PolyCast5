@@ -1078,3 +1078,51 @@ void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui
 		ui_menu->page = SELECTION_PAGE;
 	}
 }
+
+void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
+{
+	// Statics
+	static bool do_once = false;
+	
+	// Only execute once
+	if (!do_once) {
+		// Show Wi-Fi list
+		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		do_once = true;
+	}
+	
+	// Up button pressed
+	if (ui_btns->up_btn == 1) {
+		// Update selection
+		wifi_menu->index--;
+		lcd_wifi_update_menu(wifi_menu);
+	}
+	// Down button pressed
+	else if (ui_btns->down_btn == 1) {
+		// Update selection
+		wifi_menu->index++;
+		lcd_wifi_update_menu(wifi_menu);
+	}
+	else if (ui_btns->right_btn == 1 && wifi_menu->index == 0) {
+		
+
+	}
+	else if (ui_btns->right_btn == 1) {
+
+	}
+	// Back selected
+	else if (ui_btns->left_btn == 1) {
+		// Hide Wi-Fi menu
+		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show selection labels
+		unhide_selection_widgets(ui_menu);
+		
+		// Reset static
+		do_once = false;
+		
+		// Switch pages
+		ui_menu->page = SELECTION_PAGE;
+	}
+}

@@ -6,6 +6,7 @@ idf_component_register(
         "src/lcd_ir_funcs.c"
         "src/lcd_lora_funcs.c"
         "src/lcd_espnow_funcs.c"
+        "src/lcd_wifi_funcs.c"
         "src/lcd_funcs.c"
         "src/lcd_task.c"
         "src/st7789.c"
@@ -109,5 +110,5 @@ idf_component_register(
     	driver freertos lvgl sx126x common
     
     PRIV_REQUIRES
-    	gpio sx126x infrared espnow lora
+    	gpio sx126x infrared espnow lora wifi
 )
