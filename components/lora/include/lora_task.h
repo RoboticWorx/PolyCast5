@@ -11,7 +11,7 @@ typedef struct {
     uint8_t key[ENC_KEY_LEN];
     int index;
     char instr[INSTR_LEN];
-} lora_send_t;
+} lora_cmd_t;
 
 extern SemaphoreHandle_t xLoraGenerateEncKeySemaphore;
 extern SemaphoreHandle_t xLoraReceiptValidSemaphore;
@@ -20,14 +20,8 @@ extern QueueHandle_t xLoraSendEncQueue;
 
 typedef struct sx126x_s {
 	void *context;
-	sx126x_hal_status_t (*hal_write)(const void *context,
-									 const uint8_t *command,
-									 const uint16_t command_length,
-									 const uint8_t *data,
-									 const uint16_t data_length);
-	sx126x_hal_status_t (*hal_read)(const void *context, const uint8_t *command,
-									const uint16_t command_length,
-									uint8_t *data, const uint16_t data_length);
+	sx126x_hal_status_t (*hal_write)(const void *context, const uint8_t *command, const uint16_t command_length, const uint8_t *data, const uint16_t data_length);
+	sx126x_hal_status_t (*hal_read)(const void *context, const uint8_t *command, const uint16_t command_length, uint8_t *data, const uint16_t data_length);
 	sx126x_hal_status_t (*hal_reset)(const void *context);
 	sx126x_hal_status_t (*hal_wakeup)(const void *context);
 } sx126x_t;

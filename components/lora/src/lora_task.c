@@ -13,7 +13,7 @@
 #include "lora_task.h"
 #include "lora_funcs.h"
 
-static lora_send_t lora_send;
+static lora_cmd_t lora_cmd;
 
 static const char *TAG = "LORA_TASK";
 
@@ -58,7 +58,7 @@ static void lora_task(void *pvParameters) {
 		vTaskDelete(NULL);
 	}
 	
-	xLoraSendEncQueue = xQueueCreate(1, sizeof(lora_send_t));
+	xLoraSendEncQueue = xQueueCreate(1, sizeof(lora_cmd_t));
 	if (xLoraSendEncQueue == NULL) {
 		ESP_LOGE(TAG, "Failed to create xReceiveEncKeyQueue queue");
 		vTaskDelete(NULL);
@@ -201,11 +201,11 @@ static void lora_task(void *pvParameters) {
 		
 		// Request to send
 		// Save received encryption key
-		if (xQueueReceive(xLoraSendEncQueue, &lora_send, 0) == pdPASS) {
-			memcpy(encryption_key, lora_send.key, ENC_KEY_LEN);
+		if (xQueueReceive(xLoraSendEncQueue, &lora_cmd, 0) == pdPASS) {
+			memcpy(encryption_key, lora_cmd.key, ENC_KEY_LEN);
 			
 			// Format command into string
-			snprintf(payload, sizeof(payload), "PolyCast_Command_Value: %d %s", lora_send.index, lora_send.instr);
+			snprintf(payload, sizeof(payload), "PolyCast_Command_Value: %d %s", lora_cmd.index, lora_cmd.instr);
 			
 			#ifdef POLYCAST5_DEBUG
 	        	ESP_LOGI(TAG, "SENDING: %s", payload);

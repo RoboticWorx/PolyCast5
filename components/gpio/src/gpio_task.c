@@ -45,7 +45,7 @@ static void gpio_task(void *arg)
 		
 	while (1) 
 	{
-		#ifdef POLYCAST5_GPIO_DEBUG
+		#ifdef POLYCAST5_DEBUG_GPIO
         	//ESP_LOGI(TAG, "GPIO_UP: %d GPIO_DOWN: %d GPIO_RIGHT: %d", gpio_read_input(USER_BUTTON_UP), gpio_read_input(USER_BUTTON_DOWN), gpio_read_input(USER_BUTTON_RIGHT));
         #endif
 		
@@ -55,38 +55,38 @@ static void gpio_task(void *arg)
 
 			if (gpio_read_input(USER_BUTTON_UP) == 0) {
 				xSemaphoreGive(xUpButtonSemaphore);
-				#ifdef POLYCAST5_GPIO_DEBUG
+				#ifdef POLYCAST5_DEBUG_GPIO
 		        	ESP_LOGI(TAG, "xUpButtonSemaphore given");
 		        #endif
 			}
 			else if (gpio_read_input(USER_BUTTON_DOWN) == 0) {
 				xSemaphoreGive(xDownButtonSemaphore);
-				#ifdef POLYCAST5_GPIO_DEBUG
+				#ifdef POLYCAST5_DEBUG_GPIO
 		        	ESP_LOGI(TAG, "xDownButtonSemaphore given");
 		        #endif
 			}
 			else if (gpio_read_input(USER_BUTTON_RIGHT) == 0) {
 				xSemaphoreGive(xRightButtonSemaphore);
-				#ifdef POLYCAST5_GPIO_DEBUG
+				#ifdef POLYCAST5_DEBUG_GPIO
 		        	ESP_LOGI(TAG, "xRightButtonSemaphore given");
 		        #endif
 			}
 			else if (gpio_read_input(USER_BUTTON_LEFT) == 0) {
 				xSemaphoreGive(xLeftButtonSemaphore);
-				#ifdef POLYCAST5_GPIO_DEBUG
+				#ifdef POLYCAST5_DEBUG_GPIO
 		        	ESP_LOGI(TAG, "xLeftButtonSemaphore given");
 		        #endif
 			}
 			else if (gpio_read_input(USER_BUTTON_BACK) == 0) {
 				xSemaphoreGive(xBackButtonSemaphore); // THIS IS PWR ON NEW HW
-				#ifdef POLYCAST5_GPIO_DEBUG
+				#ifdef POLYCAST5_DEBUG_GPIO
 		        	ESP_LOGI(TAG, "xBackButtonSemaphore given");
 		        #endif
 				
 			}
 			else if (gpio_read_input(USER_BUTTON_SELECT) == 0) {
 				xSemaphoreGive(xSelectButtonSemaphore);
-				#ifdef POLYCAST5_GPIO_DEBUG
+				#ifdef POLYCAST5_DEBUG_GPIO
 		        	ESP_LOGI(TAG, "xSelectButtonSemaphore given");
 		        #endif
 			}

@@ -31,7 +31,7 @@ lora_menu_t lora_menu = {
     .cont = NULL,
 };
 
-static lora_send_t lora_send = {
+static lora_cmd_t lora_cmd = {
     .key = {0},
     .index = -1,
     .instr = {0}
@@ -644,9 +644,9 @@ void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_bt
 	}
 	// Send selected
 	else if (ui_btns->up_btn == 1 && lora_menu->submenu.index == 0) {
-		lora_send.index = lora_menu->submenu.index;
-		memcpy(lora_send.key, lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
-		xQueueSend(xLoraSendEncQueue, &lora_send, portMAX_DELAY);
+		lora_cmd.index = lora_menu->submenu.index;
+		memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
+		xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY);
 		
 		#ifdef POLYCAST5_DEBUG
 		    ESP_LOG_BUFFER_HEX("SENDING WITH KEY", lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
@@ -873,10 +873,10 @@ void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 		lbl_bot_time = NULL;
 		
 		// Send the data to lora_task
-		lora_send.index = lora_menu->submenu.index;
-		memcpy(lora_send.key, lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
-		snprintf(lora_send.instr, sizeof(lora_send.instr), "on %s off %s", time_opts[on_idx], time_opts[off_idx]);
-		xQueueSend(xLoraSendEncQueue, &lora_send, portMAX_DELAY);
+		lora_cmd.index = lora_menu->submenu.index;
+		memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
+		snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "on %s off %s", time_opts[on_idx], time_opts[off_idx]);
+		xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY);
 
 		// Confirmation text
 		lcd_format_label(lbl_subpage_ins, "Sending to PolyPlug...", user_secondary_color,
@@ -1005,10 +1005,10 @@ void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 		lv_obj_add_flag(away_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
 		// Send the data to lora_task
-		lora_send.index = lora_menu->submenu.index;
-		memcpy(lora_send.key, lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
-		snprintf(lora_send.instr, sizeof(lora_send.instr), "away %s", away_menu->options[away_menu->index]);
-		xQueueSend(xLoraSendEncQueue, &lora_send, portMAX_DELAY);
+		lora_cmd.index = lora_menu->submenu.index;
+		memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
+		snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "away %s", away_menu->options[away_menu->index]);
+		xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY);
 
 		// Confirmation text
 		lv_obj_t *lbl_send_conf = lv_label_create(ACTIVE_SCR); // Create and format label
