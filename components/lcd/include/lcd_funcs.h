@@ -43,6 +43,8 @@
 #define ESPNOW_NAME_PAGE 16
 #define ESPNOW_OPTION_PAGE 17
 
+#define WIFI_SCAN_PAGE 18
+
 extern volatile bool lcd_clear_pending_inputs;
 
 typedef struct ui_menu_t {

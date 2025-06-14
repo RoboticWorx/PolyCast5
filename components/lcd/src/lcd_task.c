@@ -94,6 +94,7 @@ static void lcd_task(void *pvParameters)
 	lcd_espnow_setup_send_page(&espnow_menu);
 	
 	lcd_wifi_setup_page(&wifi_menu);
+	lcd_wifi_create_scan_list(&wifi_menu.scan_menu);
 	
 	
 	#ifdef POLYCAST5_ESPNOW_DUMP_NVS
@@ -208,6 +209,9 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == WIFI_PAGE) {
 				lcd_wifi_page_selected(&ui_menu, &wifi_menu, &ui_btns);
 			}
+			else if (ui_menu.page == WIFI_SCAN_PAGE) {
+				lcd_wifi_scan_page(&ui_menu, &wifi_menu, &ui_btns);
+			}
 			
 
 		}
@@ -226,7 +230,7 @@ static void lcd_task(void *pvParameters)
 
 void lcd_task_create(void)
 {
-	if (xTaskCreatePinnedToCore(lcd_task, "lcd_task", 1024 * 8, NULL, tskIDLE_PRIORITY + 1, NULL, 0) != pdPASS) {
+	if (xTaskCreatePinnedToCore(lcd_task, "lcd_task", 1024 * 8, NULL, tskIDLE_PRIORITY + 2, NULL, 0) != pdPASS) {
 	    ESP_LOGE(TAG, "Failed to start lcd_task");
 	}
 }

@@ -12,5 +12,5 @@ idf_component_register(
     	driver freertos common
     
     PRIV_REQUIRES
-    	lcd esp_wifi esp_netif
+    	lcd esp_wifi esp_netif espnow
 )

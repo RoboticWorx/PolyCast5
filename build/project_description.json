@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "app-template",
-    "project_version":    "97c99912-dirty",
+    "project_version":    "3f6bf481-dirty",
     "project_path":       "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5",
     "idf_path":           "C:/Espressif/frameworks/esp-idf-master",
     "build_dir":          "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build",
@@ -1671,7 +1671,7 @@
             "type": "LIBRARY",
             "lib": "__idf_wifi",
             "reqs": [ "driver", "freertos", "common" ],
-            "priv_reqs": [ "lcd", "esp_wifi", "esp_netif" ],
+            "priv_reqs": [ "lcd", "esp_wifi", "esp_netif", "espnow" ],
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/wifi/libwifi.a",
@@ -3109,7 +3109,7 @@
             "dir": "C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/wifi",
             "lib": "__idf_wifi",
             "reqs": [ "driver", "freertos", "common" ],
-            "priv_reqs": [ "lcd", "esp_wifi", "esp_netif" ],
+            "priv_reqs": [ "lcd", "esp_wifi", "esp_netif", "espnow" ],
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "include_dirs": [ "include" ]

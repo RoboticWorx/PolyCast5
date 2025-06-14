@@ -17,6 +17,7 @@
 
 #include "lcd_funcs.h"
 #include "lcd_task.h"
+#include "wifi_task.h"
 #include "infrared_funcs.h"
 
 #include "anim_city.h"
@@ -56,16 +57,16 @@ static uint8_t anim_active = 0; // Default determined in lcd_anim_nvs_load
 static const char *TAG = "LCD_FUNCS";
 
 static TFT_t tft;
-static lv_display_t *disp; // LVGL display handle
+static lv_display_t* disp; // LVGL display handle
 
 static bool already_scrolling = false;
 static bool scrolling_menu = false;
 static bool scrolling_up = false;	
 
 typedef struct {
-    lv_obj_t *top;    // the label that sits at the top line
-    lv_obj_t *mid;    // the label in the center
-    lv_obj_t *bot;    // the label at the bottom (this one moves)
+    lv_obj_t* top;    // the label that sits at the top line
+    lv_obj_t* mid;    // the label in the center
+    lv_obj_t* bot;    // the label at the bottom (this one moves)
     const char *txt;  // the next string to show
     bool up;          // direction: true=you’re scrolling up, false=scrolling down
 } scroll_ctx_t;
@@ -73,18 +74,18 @@ typedef struct {
 
 /* Animation */
 typedef struct {
-    lv_obj_t *img; // Single lv_img
-    const lv_img_dsc_t **frames; // Pointer to the file‐scope array
+    lv_obj_t* img; // Single lv_img
+    const lv_img_dsc_t* *frames; // Pointer to the file‐scope array
     uint8_t frame_cnt; // Num frames
     bool pingpong; // False = wrap
     bool forward; // Current direction in pingpong
     uint8_t cur; // Current frame index
-    lv_timer_t *timer; // LVGL timer
+    lv_timer_t* timer; // LVGL timer
 } anim_t;
 
 // Define animation frames
 #ifdef POLYCAST5_BUILD_FULL_ANIMS
-	static const lv_img_dsc_t *city_frames[CITY_FRAME_CNT] = { // 64.84KB each
+	static const lv_img_dsc_t* city_frames[CITY_FRAME_CNT] = { // 64.84KB each
 		// 64.84KB each
 		&anim_city_1,  &anim_city_2,  &anim_city_3,	 &anim_city_4,	&anim_city_5,
 		&anim_city_6,  &anim_city_7,  &anim_city_8,	 &anim_city_9,	&anim_city_10,
@@ -100,7 +101,7 @@ typedef struct {
 		&anim_city_56, &anim_city_57, &anim_city_58, &anim_city_59, &anim_city_60,
 	};
 	
-	static const lv_img_dsc_t *black_hole_frames[BLACK_HOLE_FRAME_CNT] = {
+	static const lv_img_dsc_t* black_hole_frames[BLACK_HOLE_FRAME_CNT] = {
 			&anim_black_hole_1,	 &anim_black_hole_2,  &anim_black_hole_3,
 			&anim_black_hole_4,	 &anim_black_hole_5,  &anim_black_hole_6,
 			&anim_black_hole_7,	 &anim_black_hole_8,  &anim_black_hole_9,
@@ -109,12 +110,12 @@ typedef struct {
 			&anim_black_hole_16, &anim_black_hole_17, &anim_black_hole_18
 	};
 #else
-	static const lv_img_dsc_t *city_frames[CITY_FRAME_CNT] = {
+	static const lv_img_dsc_t* city_frames[CITY_FRAME_CNT] = {
 			&anim_city_1, &anim_city_2, &anim_city_3,
 			&anim_city_4, &anim_city_5
 	};
 	
-	static const lv_img_dsc_t *black_hole_frames[BLACK_HOLE_FRAME_CNT] = {
+	static const lv_img_dsc_t* black_hole_frames[BLACK_HOLE_FRAME_CNT] = {
 			&anim_black_hole_1,	 &anim_black_hole_2,  &anim_black_hole_3,
 			&anim_black_hole_4,	 &anim_black_hole_5
 	};
@@ -142,11 +143,11 @@ static anim_t black_hole_anim = {
 };
 	
 
-static void st7789_flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_map)
+static void st7789_flush_cb(lv_display_t* d, const lv_area_t* area, uint8_t* px_map)
 {
 	xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
 	
-    uint16_t *color_ptr = (uint16_t *)px_map; // const const
+    uint16_t* color_ptr = (uint16_t* )px_map; // const const
     int16_t x1 = area->x1, x2 = area->x2;
     int16_t y1 = area->y1, y2 = area->y2;
     int16_t width = x2 - x1 + 1;
@@ -216,7 +217,7 @@ void lcd_device_sleep(void)
 {
 	lcd_panel_sleep(); // Put ST7789 to sleep
 	gpio_set_level(ST7789_LEDK_PIN, 0); // BL low
-
+	
 	// Handle case where btn is putting device to sleep: don't auto wake
 	while (gpio_get_level(USER_BUTTON_POWER) != 1) {
 		vTaskDelay(pdMS_TO_TICKS(10));
@@ -237,7 +238,7 @@ void lcd_device_sleep(void)
 
 	lcd_panel_wake(); // Wake up ST7789
 	gpio_set_level(ST7789_LEDK_PIN, 1); // BL high
-
+	
 	// rtc_gpio_deinit(USER_BUTTON_POWER);
 	//   then re-apply your gpio_config(…) for the digital input
 
@@ -318,7 +319,7 @@ void lcd_ns_nvs_clear(const char* ns)
     }
 }
 
-void lcd_format_label(lv_obj_t *label, const char *text, lv_color_t color, const lv_font_t *font, lv_align_t alignment, lv_coord_t x_offset, lv_coord_t y_offset)
+void lcd_format_label(lv_obj_t* label, const char *text, lv_color_t color, const lv_font_t* font, lv_align_t alignment, lv_coord_t x_offset, lv_coord_t y_offset)
 {
 	lv_label_set_text(label, text);
 	lv_obj_set_style_text_color(label, color, 0);
@@ -327,7 +328,7 @@ void lcd_format_label(lv_obj_t *label, const char *text, lv_color_t color, const
 }
 
 
-void lcd_scroll_up(lv_obj_t *lbl_top, lv_obj_t *lbl_mid, lv_obj_t *lbl_bot, const char *new_bot_text)
+void lcd_scroll_up(lv_obj_t* lbl_top, lv_obj_t* lbl_mid, lv_obj_t* lbl_bot, const char *new_bot_text)
 {    
     lv_label_set_text(lbl_top, lv_label_get_text(lbl_mid));
     lv_label_set_text(lbl_mid, lv_label_get_text(lbl_bot));
@@ -335,14 +336,14 @@ void lcd_scroll_up(lv_obj_t *lbl_top, lv_obj_t *lbl_mid, lv_obj_t *lbl_bot, cons
     
 }
 
-void lcd_scroll_down(lv_obj_t *lbl_top, lv_obj_t *lbl_mid, lv_obj_t *lbl_bot, const char *new_top_text)
+void lcd_scroll_down(lv_obj_t* lbl_top, lv_obj_t* lbl_mid, lv_obj_t* lbl_bot, const char *new_top_text)
 {
     lv_label_set_text(lbl_bot, lv_label_get_text(lbl_mid));
     lv_label_set_text(lbl_mid, lv_label_get_text(lbl_top));
     lv_label_set_text(lbl_top, new_top_text);
 }
 
-void lcd_format_center_button(lv_obj_t *btn_mid, lv_color_t user_primary_color, lv_color_t user_secondary_color)
+void lcd_format_center_button(lv_obj_t* btn_mid, lv_color_t user_primary_color, lv_color_t user_secondary_color)
 {
 	lv_obj_set_size(btn_mid, 175, 45);
 	lv_obj_align(btn_mid, LV_ALIGN_CENTER, 0, 0);
@@ -365,13 +366,13 @@ void lcd_format_center_button(lv_obj_t *btn_mid, lv_color_t user_primary_color, 
 	lv_obj_add_style(btn_mid, &lbl_mid_style, 0);
 }
 
-static void scroll_ready_cb(lv_anim_t * a)
+static void scroll_ready_cb(lv_anim_t*  a)
 {
 	// Able to start new animation
 	already_scrolling = false;
 	
 	// Adjust labels for scroll up or down
-    scroll_ctx_t * ctx = (scroll_ctx_t *)a->user_data;
+    scroll_ctx_t*  ctx = (scroll_ctx_t* )a->user_data;
     if (ctx->up) {
         lcd_scroll_up(ctx->top, ctx->mid, ctx->bot, ctx->txt);
         lv_obj_align(ctx->bot, LV_ALIGN_BOTTOM_MID, 0, -15);
@@ -387,7 +388,7 @@ static void scroll_ready_cb(lv_anim_t * a)
     free(ctx);
 }
 
-void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32_t speed_px_s)
+void lcd_scroll_anim(ui_menu_t* menu, const char *txt, bool scrolling_up, uint32_t speed_px_s)
 {
 	// If already in animation, don't make a new one
 	if (already_scrolling) 
@@ -409,7 +410,7 @@ void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32
 
 
     // Allocate and populate callback context
-    scroll_ctx_t *ctx = malloc(sizeof(*ctx));
+    scroll_ctx_t* ctx = malloc(sizeof(*ctx));
     *ctx = (scroll_ctx_t){
       .top = menu->lbl_top,
       .mid = menu->lbl_mid,
@@ -455,8 +456,8 @@ void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32
     lv_anim_start(&a2);
 }
 
-static void infrared_swipe_done_cb(lv_timer_t * t) {
-	ui_menu_t *menu = (ui_menu_t *)lv_timer_get_user_data(t);
+static void infrared_swipe_done_cb(lv_timer_t*  t) {
+	ui_menu_t* menu = (ui_menu_t* )lv_timer_get_user_data(t);
 	
     lv_timer_del(t); // Only once
     
@@ -465,7 +466,7 @@ static void infrared_swipe_done_cb(lv_timer_t * t) {
     menu->page = INFRARED_PAGE;
 }
 
-void lcd_selection_btn_pressed(ui_menu_t *menu)
+void lcd_selection_btn_pressed(ui_menu_t* menu)
 {
     const char *option = lv_label_get_text(menu->lbl_mid);
 
@@ -473,7 +474,7 @@ void lcd_selection_btn_pressed(ui_menu_t *menu)
 		lcd_swipe_anim(menu, 1, SWIPE_SPEED);
 		
 		// Non-blocking delay
-		lv_timer_t * timer = lv_timer_create(infrared_swipe_done_cb, 250, menu);
+		lv_timer_t*  timer = lv_timer_create(infrared_swipe_done_cb, 250, menu);
 		lv_timer_set_repeat_count(timer, 1);  // One-shot timer
 	}
 	else if (strcmp(option, "Bluetooth") == 0) {
@@ -507,9 +508,9 @@ void lcd_selection_btn_pressed(ui_menu_t *menu)
 	}
 }
 
-static void swipe_ready_cb(lv_anim_t * a)
+static void swipe_ready_cb(lv_anim_t*  a)
 {
-	scroll_ctx_t * ctx = (scroll_ctx_t *)a->user_data;
+	scroll_ctx_t*  ctx = (scroll_ctx_t* )a->user_data;
     lv_obj_add_flag(ctx->bot, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(ctx->mid, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(ctx->top, LV_OBJ_FLAG_HIDDEN);
@@ -517,15 +518,15 @@ static void swipe_ready_cb(lv_anim_t * a)
     free(ctx);
 }
 
-void lcd_swipe_anim(ui_menu_t *menu, bool swipe_left, uint32_t speed_px_s)
+void lcd_swipe_anim(ui_menu_t* menu, bool swipe_left, uint32_t speed_px_s)
 {
 	lv_obj_remove_flag(ACTIVE_SCR, LV_OBJ_FLAG_SCROLLABLE); // Disable scroll-bar
 	
 	// Get center button
-    lv_obj_t * btn_mid = lv_obj_get_parent(menu->lbl_mid);
+    lv_obj_t*  btn_mid = lv_obj_get_parent(menu->lbl_mid);
 
     // Animation objects
-    lv_obj_t * objs[3] = {
+    lv_obj_t*  objs[3] = {
       menu->lbl_top,
       btn_mid,
       menu->lbl_bot
@@ -538,7 +539,7 @@ void lcd_swipe_anim(ui_menu_t *menu, bool swipe_left, uint32_t speed_px_s)
     uint32_t dur = (dist * 1000U) / speed_px_s;
 
     // For callback
-    scroll_ctx_t *ctx = malloc(sizeof(*ctx));
+    scroll_ctx_t* ctx = malloc(sizeof(*ctx));
     *ctx = (scroll_ctx_t){ .top = menu->lbl_top,
                            .mid = btn_mid,
                            .bot = menu->lbl_bot };
@@ -562,10 +563,10 @@ void lcd_swipe_anim(ui_menu_t *menu, bool swipe_left, uint32_t speed_px_s)
     }
 }
 
-static void unhide_selection_widgets(ui_menu_t *m)
+static void unhide_selection_widgets(ui_menu_t* m)
 {
     // Show center button and it's label
-    lv_obj_t *btn_mid = lv_obj_get_parent(m->lbl_mid);
+    lv_obj_t* btn_mid = lv_obj_get_parent(m->lbl_mid);
     lv_obj_remove_flag(btn_mid, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(m->lbl_mid, LV_OBJ_FLAG_HIDDEN);
 
@@ -653,9 +654,9 @@ static esp_err_t lcd_anim_nvs_load(void)
     return err;
 }
 
-static void anim_timer_cb(lv_timer_t *t)
+static void anim_timer_cb(lv_timer_t* t)
 {
-    anim_t *anim = (anim_t *)lv_timer_get_user_data(t);
+    anim_t* anim = (anim_t* )lv_timer_get_user_data(t);
     uint8_t current = anim->cur;
 
     if (anim->pingpong) { // If ping ponging
@@ -764,7 +765,7 @@ static void transition_animation(bool dir)
     lcd_anim_nvs_save();
 }
 
-void lcd_home_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
+void lcd_home_page_selected(ui_menu_t* ui_menu, ui_btns_t* ui_btns)
 {
 	
 	if (ui_btns->up_btn == 1) {
@@ -793,7 +794,7 @@ void lcd_home_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
 	}
 }
 
-void lcd_init_selection_labels(ui_menu_t *ui_menu)
+void lcd_init_selection_labels(ui_menu_t* ui_menu)
 {
 	// Create and format center button
     ui_menu->btn_mid = lv_btn_create(ACTIVE_SCR);
@@ -831,11 +832,11 @@ void lcd_init_selection_labels(ui_menu_t *ui_menu)
 					 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
 
 	// Battery icon
-	lv_obj_t *battery_icon_text = lv_label_create(ACTIVE_SCR);
+	lv_obj_t* battery_icon_text = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(battery_icon_text, "100", user_secondary_color,
 					 &lv_font_montserrat_14, LV_ALIGN_TOP_RIGHT, -28, 0);
 
-	lv_obj_t *battery_icon = lv_label_create(ACTIVE_SCR); // 3, 2, 1, EMPTY
+	lv_obj_t* battery_icon = lv_label_create(ACTIVE_SCR); // 3, 2, 1, EMPTY
 	lcd_format_label(battery_icon, LV_SYMBOL_BATTERY_FULL, user_secondary_color,
 					 &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
 					 
@@ -860,7 +861,7 @@ void lcd_clear_user_in()
 	ui_btns.select_btn = 0;
 }
 
-void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns) 
+void lcd_selection_page_selected(ui_menu_t* ui_menu, ui_btns_t* ui_btns) 
 {
 	if (ui_btns->up_btn == 1) {
 		scrolling_menu = true;
@@ -907,7 +908,7 @@ void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
 	}
 }
 
-void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns) 
+void lcd_infrared_page_selected(ui_menu_t* ui_menu, ir_menu_t* ir_menu, ui_btns_t* ui_btns) 
 {
 	// Show IR list
 	lv_obj_remove_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -950,7 +951,7 @@ void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_
 	}
 }
 
-void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns) 
+void lcd_lora_page_selected(ui_menu_t* ui_menu, lora_menu_t* lora_menu, ui_btns_t* ui_btns) 
 {
 	// Only execute once
 	static bool do_once = false;
@@ -1008,7 +1009,7 @@ void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_
 	}
 }
 
-void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns)
+void lcd_espnow_page_selected(ui_menu_t* ui_menu, espnow_menu_t* espnow_menu, ui_btns_t* ui_btns)
 {
 	// Statics
 	static bool do_once = false;
@@ -1079,7 +1080,7 @@ void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui
 	}
 }
 
-void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
+void lcd_wifi_page_selected(ui_menu_t* ui_menu, wifi_menu_t* wifi_menu, ui_btns_t* ui_btns)
 {
 	// Statics
 	static bool do_once = false;
@@ -1104,12 +1105,34 @@ void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_
 		wifi_menu->index++;
 		lcd_wifi_update_menu(wifi_menu);
 	}
+	// Connect to network
 	else if (ui_btns->right_btn == 1 && wifi_menu->index == 0) {
+		// Hide Wi-Fi menu
+		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
-
+		// Show scan menu
+		lv_obj_remove_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		ui_menu->page = WIFI_SCAN_PAGE;
 	}
-	else if (ui_btns->right_btn == 1) {
-
+	// Send over Wi-Fi
+	else if (ui_btns->right_btn == 1 && wifi_menu->index == 1) {
+		// Hide Wi-Fi menu
+		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+	}
+	// Monitor packets
+	else if (ui_btns->right_btn == 1 && wifi_menu->index == 2) {
+		// Hide Wi-Fi menu
+		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
 	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {

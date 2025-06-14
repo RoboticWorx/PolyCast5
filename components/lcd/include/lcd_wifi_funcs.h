@@ -21,25 +21,36 @@ typedef struct ui_btns_t ui_btns_t;
 typedef struct ui_menu_t ui_menu_t;
 
 typedef struct {
-    char *options[MAX_WIFI_SUBOPTIONS];
-    lv_obj_t *btns[MAX_WIFI_SUBOPTIONS];
+	lv_obj_t* btns[MAX_WIFI_SUBOPTIONS];
+    lv_obj_t* main_list;
+    lv_obj_t* cont;
+    lv_style_t btn_style;
+	lv_style_t sel_style;
     int size;
     int index;
-    lv_obj_t *cont;
+} wifi_scan_menu_t;
+
+typedef struct {
+    char* options[MAX_WIFI_SUBOPTIONS];
+    lv_obj_t* btns[MAX_WIFI_SUBOPTIONS];
+    int size;
+    int index;
+    lv_obj_t* cont;
 	lv_style_t btn_style;
 	lv_style_t sel_style;
 } wifi_submenu_t;
 
 typedef struct {
-    char *options[MAX_WIFI_OPTIONS];
-    lv_obj_t *btns[MAX_WIFI_OPTIONS];
+    char* options[MAX_WIFI_OPTIONS];
+    lv_obj_t* btns[MAX_WIFI_OPTIONS];
     int size;
     int index;
-    lv_obj_t *main_list;
+    lv_obj_t* main_list;
 	lv_style_t btn_style;
 	lv_style_t sel_style;
-	lv_obj_t *cont;
+	lv_obj_t* cont;
 	wifi_submenu_t submenu;
+	wifi_scan_menu_t scan_menu;
 } wifi_menu_t;
 
 extern wifi_menu_t wifi_menu; 
@@ -49,14 +60,17 @@ extern wifi_menu_t wifi_menu;
  *
  * @param [in] wifi_menu Wi-Fi menu structure
  */
-void lcd_wifi_setup_page(wifi_menu_t *wifi_menu);
+void lcd_wifi_setup_page(wifi_menu_t* wifi_menu);
 
 /**
  * @brief Updates and shows Wi-Fi page user selection
  *
  * @param [in] wifi_menu Wi-Fi menu structure
  */
-void lcd_wifi_update_menu(wifi_menu_t *wifi_menu);
+void lcd_wifi_update_menu(wifi_menu_t* wifi_menu);
+
+void lcd_wifi_scan_page(ui_menu_t* ui_menu, wifi_menu_t* wifi_menu, ui_btns_t* ui_btns);
+void lcd_wifi_create_scan_list(wifi_scan_menu_t* menu);
 
 
 #endif // LCD_WIFI_FUNCS_H

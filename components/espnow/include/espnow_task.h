@@ -1,9 +1,10 @@
 #ifndef ESPNOW_TASK_H
 #define ESPNOW_TASK_H
 
-#define WIFI_CHANNEL 1
-
+#include "freertos/idf_additions.h"
 #include "lcd_espnow_funcs.h"
+
+#define WIFI_CHANNEL 1
 
 typedef struct {
     uint8_t mac_selected[ESPNOW_MAC_SIZE];

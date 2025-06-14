@@ -77,9 +77,9 @@ void app_main(void) {
     gpio_init_nvs();
     
     // Allocate Wi-Fi buffers now without fragmentation
-    ESP_ERROR_CHECK(esp_funcs_wifi_driver_init());
+    ESP_ERROR_CHECK(espnow_funcs_wifi_driver_init());
     // Turn off radio to save power
-    ESP_ERROR_CHECK(esp_funcs_wifi_radio_stop());
+    ESP_ERROR_CHECK(espnow_funcs_wifi_radio_stop());
 
 	// Isolate and configure sleep wake up
 	//ESP_ERROR_CHECK(rtc_gpio_isolate(USER_BUTTON_POWER));
