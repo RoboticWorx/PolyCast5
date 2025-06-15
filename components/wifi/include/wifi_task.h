@@ -4,6 +4,7 @@
 #include "freertos/idf_additions.h"
 
 extern QueueHandle_t xWifiScanQueue;
+extern QueueHandle_t xWifiSelectedNetworkQueue;
 
 extern SemaphoreHandle_t xWifiStartScanSemaphore;
 

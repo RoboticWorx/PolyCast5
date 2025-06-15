@@ -38,7 +38,7 @@ espnow_menu_t espnow_menu = {
     .cont = NULL,
 };
 
-void lcd_espnow_setup_page(espnow_menu_t* menu)
+void lcd_espnow_setup_page(espnow_menu_t *menu)
 {
 	// Create list
     menu->main_list = lv_list_create(ACTIVE_SCR);
@@ -115,7 +115,7 @@ void lcd_espnow_setup_page(espnow_menu_t* menu)
         }
 
         // Create and format text label
-        lv_obj_t* lbl = lv_obj_get_child(menu->btns[i], 0);
+        lv_obj_t *lbl = lv_obj_get_child(menu->btns[i], 0);
         lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
         lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
@@ -131,7 +131,7 @@ void lcd_espnow_setup_page(espnow_menu_t* menu)
 	lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
 }
 
-void lcd_espnow_update_menu(espnow_menu_t* menu)
+void lcd_espnow_update_menu(espnow_menu_t *menu)
 {    
 	// Reveal
     lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -158,7 +158,7 @@ void lcd_espnow_update_menu(espnow_menu_t* menu)
     lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
 }
 
-static bool display_mac_and_lmk(ui_menu_t* ui_menu, espnow_menu_t* espnow_menu)
+static bool display_mac_and_lmk(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 {
 	// Hide all but right arrow
 	lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
@@ -194,19 +194,19 @@ static bool display_mac_and_lmk(ui_menu_t* ui_menu, espnow_menu_t* espnow_menu)
 	memcpy(espnow_menu->lmk[espnow_menu->size], lmk, LMK_LEN); // Save to struct
 	
 	// Create and format ins labels
-	lv_obj_t* lbl_ins = lv_label_create(ACTIVE_SCR);
+	lv_obj_t *lbl_ins = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_ins, "Write this down!", user_secondary_color,
     			 &lv_font_montserrat_18, LV_ALIGN_TOP_LEFT, 5, 2);
     			 
-    lv_obj_t* lbl_ok = lv_label_create(ACTIVE_SCR);
+    lv_obj_t *lbl_ok = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_ok, "OK", user_secondary_color,
     			 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
     			 
-    lv_obj_t* lbl_my_mac = lv_label_create(ACTIVE_SCR);
+    lv_obj_t *lbl_my_mac = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_my_mac, mac_str, user_secondary_color,
     			 &lv_font_montserrat_18, LV_ALIGN_LEFT_MID, 5, -20);
     			 
-    lv_obj_t* lbl_lmk = lv_label_create(ACTIVE_SCR);
+    lv_obj_t *lbl_lmk = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_lmk, lmk_str, user_secondary_color,
     			 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_LEFT, 5, -2);    
                     
@@ -238,20 +238,20 @@ static bool display_mac_and_lmk(ui_menu_t* ui_menu, espnow_menu_t* espnow_menu)
     }
 }
 
-static bool prompt_yn_encryption(ui_menu_t* ui_menu, espnow_menu_t* espnow_menu)
+static bool prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 {
 	lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 	
 	// Create and format ins labels
-	lv_obj_t* lbl_ask_enc = lv_label_create(ACTIVE_SCR);
+	lv_obj_t *lbl_ask_enc = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_ask_enc, "     Would you like\nto setup encryption?", user_secondary_color,
     			 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
     			 
-    lv_obj_t* lbl_enc_yes = lv_label_create(ACTIVE_SCR);
+    lv_obj_t *lbl_enc_yes = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_enc_yes, "YES", user_secondary_color,
     			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 13);
     			 
-    lv_obj_t* lbl_enc_no = lv_label_create(ACTIVE_SCR);
+    lv_obj_t *lbl_enc_no = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_enc_no, "NO", user_secondary_color,
     			 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
                     
@@ -309,15 +309,15 @@ static bool prompt_yn_encryption(ui_menu_t* ui_menu, espnow_menu_t* espnow_menu)
     }
 }
 
-void lcd_espnow_get_rx_mac(ui_menu_t* ui_menu, espnow_menu_t* espnow_menu, ui_btns_t* ui_btns)
+void lcd_espnow_get_rx_mac(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns)
 {	
     // Statics
     static uint8_t mac_bytes[ESPNOW_MAC_SIZE]; // 6 bytes of the MAC
     static uint8_t digit_index = 0; // Which hex‐digit is selected
-    static lv_obj_t* lbl_sel_digit[12];
-    static lv_obj_t* lbl_enter_mac = NULL;
-    static lv_obj_t* lbl_how_to = NULL;
-    static lv_obj_t* container = NULL;
+    static lv_obj_t *lbl_sel_digit[12];
+    static lv_obj_t *lbl_enter_mac = NULL;
+    static lv_obj_t *lbl_how_to = NULL;
+    static lv_obj_t *container = NULL;
 
     // Create everything once
     if (!container) {
@@ -506,7 +506,7 @@ void lcd_espnow_get_rx_mac(ui_menu_t* ui_menu, espnow_menu_t* espnow_menu, ui_bt
 	}
 }
 
-static void prompt_upload_qr(ui_menu_t* ui_menu, bool encrypting)
+static void prompt_upload_qr(ui_menu_t *ui_menu, bool encrypting)
 {
 	// Hide arrows
 	lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
@@ -514,16 +514,16 @@ static void prompt_upload_qr(ui_menu_t* ui_menu, bool encrypting)
 	lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 	
 	// Create and format ins labels
-	lv_obj_t* lbl_ask_enc = lv_label_create(ACTIVE_SCR);
+	lv_obj_t *lbl_ask_enc = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_ask_enc, "Example receiver\ncode:", user_secondary_color,
     			 &lv_font_montserrat_18, LV_ALIGN_TOP_LEFT, 5, 5);
     			 
-    lv_obj_t* lbl_qr_ok = lv_label_create(ACTIVE_SCR);
+    lv_obj_t *lbl_qr_ok = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_qr_ok, "OK", user_secondary_color,
     			 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
     			 
     // Create QR code (100x100px)
-    lv_obj_t* qr_code = lv_img_create(ACTIVE_SCR);
+    lv_obj_t *qr_code = lv_img_create(ACTIVE_SCR);
     if (encrypting) {
 		lv_img_set_src(qr_code, &qr_esp_enc_rx_example);
 	}
@@ -557,7 +557,7 @@ static void prompt_upload_qr(ui_menu_t* ui_menu, bool encrypting)
     }
 }
 
-static void update_name_label_lcd(lv_obj_t* lbl_display, char cur_char, int cur_pos)
+static void update_name_label_lcd(lv_obj_t *lbl_display, char cur_char, int cur_pos)
 {
     char display[MAX_CUSTOM_NAME_LEN + 2]; // Buffer
     
@@ -582,16 +582,16 @@ static void update_name_label_lcd(lv_obj_t* lbl_display, char cur_char, int cur_
     lv_obj_align(lbl_display, LV_ALIGN_CENTER, 0, 30);
 }
 
-void lcd_espnow_create_custom_name(ui_menu_t* ui_menu, espnow_menu_t* espnow_menu, ui_btns_t* ui_btns)
+void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns)
 {
 	static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
 	
     // Declare statics
     static int cur_pos = 0; // User position
     static char cur_char = '_';
-    static lv_obj_t* lbl_dirs = NULL;
-    static lv_obj_t* lbl_chars = NULL;
-    static lv_obj_t* lbl_user_in = NULL;
+    static lv_obj_t *lbl_dirs = NULL;
+    static lv_obj_t *lbl_chars = NULL;
+    static lv_obj_t *lbl_user_in = NULL;
     
     // Create initial label
     if (!lbl_user_in) {
@@ -756,8 +756,8 @@ void lcd_espnow_create_custom_name(ui_menu_t* ui_menu, espnow_menu_t* espnow_men
 			lcd_espnow_menu_nvs_save(espnow_menu);
 
 			// Update the button’s label in-place
-			lv_obj_t* btn = espnow_menu->btns[espnow_menu->index];
-			lv_obj_t* child_lbl = lv_obj_get_child(btn, 0);
+			lv_obj_t *btn = espnow_menu->btns[espnow_menu->index];
+			lv_obj_t *child_lbl = lv_obj_get_child(btn, 0);
 			lv_label_set_text(child_lbl, espnow_menu->options[espnow_menu->index]);
 
 			// Reset flag
@@ -782,7 +782,7 @@ void lcd_espnow_create_custom_name(ui_menu_t* ui_menu, espnow_menu_t* espnow_men
 			lv_obj_add_style(espnow_menu->btns[espnow_menu->size - 1], &espnow_menu->btn_style, 0);
 			
 			// Create and format text label
-			lv_obj_t* lbl = lv_obj_get_child(espnow_menu->btns[espnow_menu->size - 1], 0);
+			lv_obj_t *lbl = lv_obj_get_child(espnow_menu->btns[espnow_menu->size - 1], 0);
 			lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
 			lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
 			lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
@@ -811,7 +811,7 @@ void lcd_espnow_create_custom_name(ui_menu_t* ui_menu, espnow_menu_t* espnow_men
     }
 }
 
-void lcd_espnow_setup_send_page(espnow_menu_t* espnow_menu)
+void lcd_espnow_setup_send_page(espnow_menu_t *espnow_menu)
 {
 	#define X_POS -38
 	espnow_menu->espnow_submenu.cmd_to_send = 1; // Set default
@@ -903,24 +903,24 @@ void lcd_espnow_setup_send_page(espnow_menu_t* espnow_menu)
 	lv_obj_add_flag(espnow_menu->espnow_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
 }
 
-static void prompt_name_or_del(ui_menu_t* ui_menu, espnow_menu_t* espnow_menu)
+static void prompt_name_or_del(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 {
 	lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 	
 	// Create and format ins labels
-	lv_obj_t* lbl_ins = lv_label_create(ACTIVE_SCR);
+	lv_obj_t *lbl_ins = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_ins, LV_SYMBOL_SETTINGS, user_secondary_color,
     			 &lv_font_montserrat_30, LV_ALIGN_CENTER, 0, 0);
     			 
-	lv_obj_t* lbl_exit = lv_label_create(ACTIVE_SCR);
+	lv_obj_t *lbl_exit = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_exit, "BACK", user_secondary_color,
     			 &lv_font_montserrat_18, LV_ALIGN_LEFT_MID, 16, -1);
     			 
-    lv_obj_t* lbl_name = lv_label_create(ACTIVE_SCR);
+    lv_obj_t *lbl_name = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_name, "RENAME", user_secondary_color,
     			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 13);
     			 
-    lv_obj_t* lbl_del = lv_label_create(ACTIVE_SCR);
+    lv_obj_t *lbl_del = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_del, "DELETE", user_secondary_color,
     			 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
                     
@@ -1011,7 +1011,7 @@ static void prompt_name_or_del(ui_menu_t* ui_menu, espnow_menu_t* espnow_menu)
 		        espnow_menu->btns[i] = espnow_menu->btns[i + 1];
 		
 		        // Update the label inside the button
-		        lv_obj_t* lbl = lv_obj_get_child(espnow_menu->btns[i], 0);
+		        lv_obj_t *lbl = lv_obj_get_child(espnow_menu->btns[i], 0);
 		        lv_label_set_text(lbl, espnow_menu->options[i]);
 		    }
 		    
@@ -1044,7 +1044,7 @@ static void prompt_name_or_del(ui_menu_t* ui_menu, espnow_menu_t* espnow_menu)
     }
 }
 
-void lcd_espnow_option_selected(ui_menu_t* ui_menu, espnow_menu_t* espnow_menu, ui_btns_t* ui_btns)
+void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns)
 {
 	#define BUF_SIZE 4
 	
@@ -1176,7 +1176,7 @@ void lcd_espnow_option_selected(ui_menu_t* ui_menu, espnow_menu_t* espnow_menu, 
 	}
 }
 
-esp_err_t lcd_espnow_menu_nvs_save(const espnow_menu_t* menu)
+esp_err_t lcd_espnow_menu_nvs_save(const espnow_menu_t *menu)
 {
     nvs_handle_t h;
 
@@ -1216,7 +1216,7 @@ esp_err_t lcd_espnow_menu_nvs_save(const espnow_menu_t* menu)
     return err;
 }
 
-esp_err_t lcd_espnow_menu_nvs_load(espnow_menu_t* menu)
+esp_err_t lcd_espnow_menu_nvs_load(espnow_menu_t *menu)
 {
     nvs_handle_t h;
         
@@ -1273,7 +1273,7 @@ esp_err_t lcd_espnow_menu_nvs_load(espnow_menu_t* menu)
     return ESP_OK;
 }
 
-esp_err_t lcd_espnow_rx_mac_nvs_save(const espnow_menu_t* espnow_menu)
+esp_err_t lcd_espnow_rx_mac_nvs_save(const espnow_menu_t *espnow_menu)
 {
     nvs_handle_t nvs_handle;
     
@@ -1323,7 +1323,7 @@ esp_err_t lcd_espnow_rx_mac_nvs_save(const espnow_menu_t* espnow_menu)
     return err;
 }
 
-esp_err_t lcd_espnow_lmk_nvs_save(const espnow_menu_t* espnow_menu)
+esp_err_t lcd_espnow_lmk_nvs_save(const espnow_menu_t *espnow_menu)
 {
     nvs_handle_t nvs_handle;
     
@@ -1373,7 +1373,7 @@ esp_err_t lcd_espnow_lmk_nvs_save(const espnow_menu_t* espnow_menu)
     return err;
 }
 
-esp_err_t lcd_espnow_rx_mac_nvs_load(espnow_menu_t* espnow_menu)
+esp_err_t lcd_espnow_rx_mac_nvs_load(espnow_menu_t *espnow_menu)
 {
     nvs_handle_t nvs;
     
@@ -1427,7 +1427,7 @@ esp_err_t lcd_espnow_rx_mac_nvs_load(espnow_menu_t* espnow_menu)
     return (cnt > 0) ? ESP_OK : ESP_ERR_NVS_NOT_FOUND;
 }
 
-esp_err_t lcd_espnow_lmk_nvs_load(espnow_menu_t* espnow_menu)
+esp_err_t lcd_espnow_lmk_nvs_load(espnow_menu_t *espnow_menu)
 {
     nvs_handle_t nvs;
     
@@ -1481,7 +1481,7 @@ esp_err_t lcd_espnow_lmk_nvs_load(espnow_menu_t* espnow_menu)
     return (cnt > 0) ? ESP_OK : ESP_ERR_NVS_NOT_FOUND;
 }
 
-esp_err_t lcd_espnow_rx_mac_lmk_nvs_delete(espnow_menu_t* espnow_menu, uint8_t slot)
+esp_err_t lcd_espnow_rx_mac_lmk_nvs_delete(espnow_menu_t *espnow_menu, uint8_t slot)
 {
     // If nothing to delete
     if (espnow_menu->size <= 1) 

@@ -54,7 +54,7 @@ static char name_buf[MAX_CUSTOM_NAME_LEN + 1] = {0};
 static bool lora_menu_overwrite = false;
 
 
-void lcd_lora_setup_page(lora_menu_t* menu)
+void lcd_lora_setup_page(lora_menu_t *menu)
 {
 	// Create list
     menu->main_list = lv_list_create(ACTIVE_SCR);
@@ -131,7 +131,7 @@ void lcd_lora_setup_page(lora_menu_t* menu)
         }
 
         // Create and format text label
-        lv_obj_t* lbl = lv_obj_get_child(menu->btns[i], 0);
+        lv_obj_t *lbl = lv_obj_get_child(menu->btns[i], 0);
         lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
         lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
@@ -147,7 +147,7 @@ void lcd_lora_setup_page(lora_menu_t* menu)
 	lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
 }
 
-void lcd_lora_setup_subpage(lora_menu_t* menu)
+void lcd_lora_setup_subpage(lora_menu_t *menu)
 {
 	// Create receipt label (check/x) for send confirmation
 	menu->submenu.lbl_receipt = lv_label_create(ACTIVE_SCR);
@@ -214,7 +214,7 @@ void lcd_lora_setup_subpage(lora_menu_t* menu)
 	    	lv_obj_add_style(menu->submenu.btns[i], &menu->submenu.btn_style, 0);
 	
 	    // Create child label
-	    lv_obj_t* lbl = lv_label_create(menu->submenu.btns[i]);
+	    lv_obj_t *lbl = lv_label_create(menu->submenu.btns[i]);
 	    lv_label_set_text(lbl, menu->submenu.options[i]);
 	    
 	    // Format
@@ -228,7 +228,7 @@ void lcd_lora_setup_subpage(lora_menu_t* menu)
 	lv_obj_add_flag(menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
 }
 
-void lcd_lora_update_menu(lora_menu_t* menu)
+void lcd_lora_update_menu(lora_menu_t *menu)
 {    
 	// Reveal
     lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -255,7 +255,7 @@ void lcd_lora_update_menu(lora_menu_t* menu)
     lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
 }
 
-void lcd_lora_update_submenu(lora_menu_t* menu)
+void lcd_lora_update_submenu(lora_menu_t *menu)
 {    
 	// Hide and reset receipt label
 	lv_obj_add_flag(menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
@@ -286,12 +286,12 @@ void lcd_lora_update_submenu(lora_menu_t* menu)
     //lv_obj_scroll_to_view(menu->submenu.btns[menu->submenu.index], LV_ANIM_ON); // LV_ANIM_OFF
 }
 
-void lcd_lora_create_enc_key(ui_menu_t* ui_menu, lora_menu_t* lora_menu)
+void lcd_lora_create_enc_key(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
 {
 	lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
-	lv_obj_t* lbl_key_ins = lv_label_create(ACTIVE_SCR);
+	lv_obj_t *lbl_key_ins = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_key_ins, "1. Bring near desired PolyPlug.\n2. Press the top right button\non PolyPlug.\n3. Confirm LED is showing\ngreen on PolyPlug.\n4. On this device, hit the\nright arrow to confirm.", user_secondary_color,
                          &lv_font_montserrat_14, LV_ALIGN_CENTER, 6, 6);
                     
@@ -337,7 +337,7 @@ void lcd_lora_create_enc_key(ui_menu_t* ui_menu, lora_menu_t* lora_menu)
     }
 }
 
-static void update_name_label_lcd(lv_obj_t* lbl_display, char cur_char, int cur_pos)
+static void update_name_label_lcd(lv_obj_t *lbl_display, char cur_char, int cur_pos)
 {
     char display[MAX_CUSTOM_NAME_LEN + 2]; // Buffer
     
@@ -362,7 +362,7 @@ static void update_name_label_lcd(lv_obj_t* lbl_display, char cur_char, int cur_
     lv_obj_align(lbl_display, LV_ALIGN_CENTER, 0, 30);
 }
 
-void lcd_lora_create_custom_name(ui_menu_t* ui_menu, lora_menu_t* lora_menu, ui_btns_t* ui_btns)
+void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns)
 {
 	static uint8_t received_enc_key_nvs[ENC_KEY_LEN];
 	
@@ -370,9 +370,9 @@ void lcd_lora_create_custom_name(ui_menu_t* ui_menu, lora_menu_t* lora_menu, ui_
     static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
     static int cur_pos = 0; // User position
     static char cur_char = '_';
-    static lv_obj_t* lbl_dirs = NULL;
-    static lv_obj_t* lbl_chars = NULL;
-    static lv_obj_t* lbl_user_in = NULL;
+    static lv_obj_t *lbl_dirs = NULL;
+    static lv_obj_t *lbl_chars = NULL;
+    static lv_obj_t *lbl_user_in = NULL;
     char display[MAX_CUSTOM_NAME_LEN + 2];
     
     // Create initial label
@@ -536,8 +536,8 @@ void lcd_lora_create_custom_name(ui_menu_t* ui_menu, lora_menu_t* lora_menu, ui_
 			lcd_lora_menu_nvs_save(lora_menu);
 
 			// Update the button’s label in-place
-			lv_obj_t* btn = lora_menu->btns[lora_menu->index];
-			lv_obj_t* child_lbl = lv_obj_get_child(btn, 0);
+			lv_obj_t *btn = lora_menu->btns[lora_menu->index];
+			lv_obj_t *child_lbl = lv_obj_get_child(btn, 0);
 			lv_label_set_text(child_lbl, lora_menu->options[lora_menu->index]);
 
 			// Reset flag
@@ -560,7 +560,7 @@ void lcd_lora_create_custom_name(ui_menu_t* ui_menu, lora_menu_t* lora_menu, ui_
 			// Get shared encryption key and do the same under the same index
 			if (xQueueReceive(xEspSendEncKeyQueueNVS, received_enc_key_nvs, portMAX_DELAY) == pdPASS) {
 				// Allocate a fresh buffer for this entry
-		        uint8_t* slot = malloc(ENC_KEY_LEN);
+		        uint8_t *slot = malloc(ENC_KEY_LEN);
 		        if (!slot) {
 		            ESP_LOGE(TAG, "Out of memory allocating key");
 		            return;
@@ -584,7 +584,7 @@ void lcd_lora_create_custom_name(ui_menu_t* ui_menu, lora_menu_t* lora_menu, ui_
 			lv_obj_add_style(lora_menu->btns[lora_menu->size - 1], &lora_menu->btn_style, 0);
 
 			// Create and format text label
-			lv_obj_t* lbl = lv_obj_get_child(lora_menu->btns[lora_menu->size - 1], 0);
+			lv_obj_t *lbl = lv_obj_get_child(lora_menu->btns[lora_menu->size - 1], 0);
 			lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
 			lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
 			lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
@@ -599,7 +599,7 @@ void lcd_lora_create_custom_name(ui_menu_t* ui_menu, lora_menu_t* lora_menu, ui_
     }
 }
 
-void lcd_lora_subpage_selected(ui_menu_t* ui_menu, lora_menu_t* lora_menu, ui_btns_t* ui_btns) 
+void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns) 
 {
 	
 	// If received a valid receipt from the receiver
@@ -678,7 +678,7 @@ void lcd_lora_subpage_selected(ui_menu_t* ui_menu, lora_menu_t* lora_menu, ui_bt
 	        lora_menu->btns[i] = lora_menu->btns[i + 1];
 	
 	        // Update the label inside the button
-	        lv_obj_t* lbl = lv_obj_get_child(lora_menu->btns[i], 0);
+	        lv_obj_t *lbl = lv_obj_get_child(lora_menu->btns[i], 0);
 	        lv_label_set_text(lbl, lora_menu->options[i]);
 	    }
 	
@@ -731,7 +731,7 @@ void lcd_lora_subpage_selected(ui_menu_t* ui_menu, lora_menu_t* lora_menu, ui_bt
 	}
 }
 
-void lcd_lora_subpage_option_selected(ui_menu_t* ui_menu, lora_menu_t* lora_menu, ui_btns_t* ui_btns)
+void lcd_lora_subpage_option_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns)
 {	
 	// Loop was selected
 	if (lora_menu->submenu.index == 1) {
@@ -760,17 +760,17 @@ void lcd_lora_subpage_option_selected(ui_menu_t* ui_menu, lora_menu_t* lora_menu
 	}
 }
 
-void lcd_lora_subpage_loop_selected(ui_menu_t* ui_menu, lora_menu_t* lora_menu, ui_btns_t* ui_btns)
+void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns)
 {
 	#define TIME_OPT_COUNT (sizeof(time_opts)/sizeof(time_opts[0]))
 	#define Y_SEL_POS 43
 	
 	// Create statics
-	static lv_obj_t* lbl_subpage_times = NULL;
-	static lv_obj_t* lbl_subpage_ins = NULL;
-	static lv_obj_t* lbl_selected_icon = NULL;
-	static lv_obj_t* lbl_top_time = NULL;
-	static lv_obj_t* lbl_bot_time = NULL;
+	static lv_obj_t *lbl_subpage_times = NULL;
+	static lv_obj_t *lbl_subpage_ins = NULL;
+	static lv_obj_t *lbl_selected_icon = NULL;
+	static lv_obj_t *lbl_top_time = NULL;
+	static lv_obj_t *lbl_bot_time = NULL;
 	
 	static uint8_t selected_index = 1;
 	static int on_idx = 0;
@@ -926,10 +926,10 @@ void lcd_lora_subpage_loop_selected(ui_menu_t* ui_menu, lora_menu_t* lora_menu, 
 	}
 }
 
-void lcd_lora_subpage_away_selected(ui_menu_t* ui_menu, lora_menu_t* lora_menu, ui_btns_t* ui_btns)
+void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns)
 {
 	// Create statics
-	static lora_menu_t* away_menu;
+	static lora_menu_t *away_menu;
 	static bool do_once = false;
 	
 	if (!do_once) {		
@@ -1011,7 +1011,7 @@ void lcd_lora_subpage_away_selected(ui_menu_t* ui_menu, lora_menu_t* lora_menu, 
 		xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY);
 
 		// Confirmation text
-		lv_obj_t* lbl_send_conf = lv_label_create(ACTIVE_SCR); // Create and format label
+		lv_obj_t *lbl_send_conf = lv_label_create(ACTIVE_SCR); // Create and format label
 		lcd_format_label(lbl_send_conf, "Sending to PolyPlug...", user_secondary_color,
 				 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
 		lv_timer_handler();
@@ -1042,7 +1042,7 @@ void lcd_lora_subpage_away_selected(ui_menu_t* ui_menu, lora_menu_t* lora_menu, 
 	}
 }
 
-esp_err_t lcd_lora_menu_nvs_save(const lora_menu_t* menu)
+esp_err_t lcd_lora_menu_nvs_save(const lora_menu_t *menu)
 {
     nvs_handle_t h;
 
@@ -1082,7 +1082,7 @@ esp_err_t lcd_lora_menu_nvs_save(const lora_menu_t* menu)
     return err;
 }
 
-esp_err_t lcd_lora_key_nvs_save(const lora_menu_t* menu)
+esp_err_t lcd_lora_key_nvs_save(const lora_menu_t *menu)
 {
     nvs_handle_t h;
 
@@ -1122,7 +1122,7 @@ esp_err_t lcd_lora_key_nvs_save(const lora_menu_t* menu)
     return err;
 }
 
-esp_err_t lcd_lora_menu_nvs_load(lora_menu_t* menu)
+esp_err_t lcd_lora_menu_nvs_load(lora_menu_t *menu)
 {
     nvs_handle_t h;
         
@@ -1179,7 +1179,7 @@ esp_err_t lcd_lora_menu_nvs_load(lora_menu_t* menu)
     return ESP_OK;
 }
 
-esp_err_t lcd_lora_key_nvs_load(lora_menu_t* menu)
+esp_err_t lcd_lora_key_nvs_load(lora_menu_t *menu)
 {
     nvs_handle_t h;
         
@@ -1217,7 +1217,7 @@ esp_err_t lcd_lora_key_nvs_load(lora_menu_t* menu)
             break;
         }
 
-        uint8_t* buf = malloc(ENC_KEY_LEN);
+        uint8_t *buf = malloc(ENC_KEY_LEN);
         if (!buf) {
             err = ESP_ERR_NO_MEM;
             break;

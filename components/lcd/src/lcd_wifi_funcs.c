@@ -16,17 +16,30 @@
 #include "lcd_funcs.h"
 #include "lcd_task.h"
 
+#define MAX_PASSWORD_LEN 32
+#define NUM_CHAR_ROWS 4
 
 wifi_menu_t wifi_menu = {
-    .options = {"Connect to network", "Send over Wi-Fi", "Monitor packets"},
-    .size = 3,
+    .options = {"Connect to network", "Send over Wi-Fi", "Monitor packets", "Sync with PolyPlug"},
+    .size = 4,
     .index = 0,
     .cont = NULL,
 };
 
+wifi_login_t selected_network = {0};
+
 static const char* TAG = "LCD_WIFI_FUNCS";
 
-void lcd_wifi_setup_page(wifi_menu_t* menu)
+// Character vars for user input
+static char name_buf[MAX_PASSWORD_LEN + 1] = {0};
+static const char* char_rows[NUM_CHAR_ROWS] = {
+    "_ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    "abcdefghijklmnopqrstuvwxyz",
+    "0123456789",
+    "!@#$%^&*()-_=+[]{};:'\",.<>/?\\|`~"
+};
+
+void lcd_wifi_setup_page(wifi_menu_t *menu)
 {
 	// Create list
     menu->main_list = lv_list_create(ACTIVE_SCR);
@@ -103,7 +116,7 @@ void lcd_wifi_setup_page(wifi_menu_t* menu)
         }
 
         // Create and format text label
-        lv_obj_t* lbl = lv_obj_get_child(menu->btns[i], 0);
+        lv_obj_t *lbl = lv_obj_get_child(menu->btns[i], 0);
         lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
         lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
@@ -119,7 +132,7 @@ void lcd_wifi_setup_page(wifi_menu_t* menu)
 	lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
 }
 
-void lcd_wifi_update_menu(wifi_menu_t* menu)
+void lcd_wifi_update_menu(wifi_menu_t *menu)
 {    
 	// Reveal
     lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -146,7 +159,7 @@ void lcd_wifi_update_menu(wifi_menu_t* menu)
     lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
 }
 
-void lcd_wifi_create_scan_list(wifi_scan_menu_t* menu)
+void lcd_wifi_create_scan_list(wifi_scan_menu_t *menu)
 {
 	menu->size = 0;
 	
@@ -214,7 +227,7 @@ void lcd_wifi_create_scan_list(wifi_scan_menu_t* menu)
 	lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
 }
 
-static void lcd_wifi_update_scan_menu(wifi_scan_menu_t* menu)
+static void lcd_wifi_update_scan_menu(wifi_scan_menu_t *menu)
 {    
     // Wrap index
 	if (menu->index >= menu->size) {
@@ -238,9 +251,10 @@ static void lcd_wifi_update_scan_menu(wifi_scan_menu_t* menu)
     lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
 }
 
-void lcd_wifi_scan_page(ui_menu_t* ui_menu, wifi_menu_t* wifi_menu, ui_btns_t* ui_btns)
+void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
 {	
-	static lv_obj_t* lbl_wait;
+	static lv_obj_t *lbl_wait;
+	static bool locked[WIFI_MAX_NETWORKS];
 	static bool initialized = false;
 	static bool scanned = false;
 	
@@ -267,11 +281,13 @@ void lcd_wifi_scan_page(ui_menu_t* ui_menu, wifi_menu_t* wifi_menu, ui_btns_t* u
 	        continue;
 	    }
 	    
-	    // Once networks have been delete help text
+	    // Once networks have been received: delete help text
 	    if (!scanned) {
 			lv_obj_delete(lbl_wait);
 			scanned = true;
 		}
+		
+		locked[wifi_menu->scan_menu.size] = (result.auth != 0) ? true : false; // != WIFI_AUTH_OPEN
 		
 		// Format SSID
         char buf[33];
@@ -290,7 +306,7 @@ void lcd_wifi_scan_page(ui_menu_t* ui_menu, wifi_menu_t* wifi_menu, ui_btns_t* u
         }
 
         // Create and format text label
-        lv_obj_t* lbl = lv_obj_get_child(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size], 0);
+        lv_obj_t *lbl = lv_obj_get_child(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size], 0);
         lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
         lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
@@ -301,6 +317,7 @@ void lcd_wifi_scan_page(ui_menu_t* ui_menu, wifi_menu_t* wifi_menu, ui_btns_t* u
 	    lv_obj_set_flex_align(wifi_menu->scan_menu.cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 	    lv_obj_set_style_pad_gap(wifi_menu->scan_menu.cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT); // Set button spacing
         
+        // Size one bigger now
         wifi_menu->scan_menu.size++;
     }
     
@@ -319,10 +336,13 @@ void lcd_wifi_scan_page(ui_menu_t* ui_menu, wifi_menu_t* wifi_menu, ui_btns_t* u
 		// Reset
 		initialized = false;
 		scanned = false;
+		for(int i = 0; i < WIFI_MAX_NETWORKS; i++) {
+			locked[i] = false;
+		}
 		wifi_menu->scan_menu.size = 0;
 		wifi_menu->scan_menu.index = 0;
 		lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
-				
+		
 		// Clear children
 		lv_obj_clean(wifi_menu->scan_menu.main_list);
 		
@@ -335,7 +355,244 @@ void lcd_wifi_scan_page(ui_menu_t* ui_menu, wifi_menu_t* wifi_menu, ui_btns_t* u
 		// Switch pages
 		ui_menu->page = WIFI_PAGE;
 	}
+	// Network selected
+	else if (scanned && ui_btns->right_btn == 1) {
+		// Copy over SSID
+		lv_obj_t *btn = wifi_menu->scan_menu.btns[wifi_menu->scan_menu.index];
+	    lv_obj_t *lbl = lv_obj_get_child(btn, 0);
+	    const char *ssid = lv_label_get_text(lbl);
+	    strlcpy((char*)selected_network.ssid, ssid, sizeof(selected_network.ssid));
+		
+		// If network requires password
+	    if (locked[wifi_menu->scan_menu.index]) {
+			// Reset
+			initialized = false;
+			scanned = false;
+			for(int i = 0; i < WIFI_MAX_NETWORKS; i++) {
+			    locked[i] = false;
+			}
+			wifi_menu->scan_menu.size = 0;
+			wifi_menu->scan_menu.index = 0;
+			lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
+			
+			// Clear children
+			lv_obj_clean(wifi_menu->scan_menu.main_list);
+			
+			// Hide scan menu
+			lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// Switch pages
+			ui_menu->page = WIFI_PASSWORD_PAGE;
+		}
+		// Else open network: go ahead and send
+		else {
+			selected_network.locked = false; // Doesn't require password
+			
+	    	if (xQueueSend(xWifiSelectedNetworkQueue, &selected_network, portMAX_DELAY) != pdPASS) {
+		        ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue SSID");
+		    }
+		    
+		    // Reset
+			initialized = false;
+			scanned = false;
+			for(int i = 0; i < WIFI_MAX_NETWORKS; i++) {
+				locked[i] = false;
+			}
+			wifi_menu->scan_menu.size = 0;
+			wifi_menu->scan_menu.index = 0;
+			lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
+			
+			// Clear children
+			lv_obj_clean(wifi_menu->scan_menu.main_list);
+			
+			// Hide scan menu
+			lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// Show Wi-Fi menu
+			lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// Switch pages
+			ui_menu->page = WIFI_PAGE;
+		}
+	}
 }
+
+static void update_password_label_lcd(lv_obj_t *lbl_display, char cur_char, int cur_pos)
+{
+    char display[MAX_PASSWORD_LEN + 2];
+    size_t len = cur_pos + 1;
+    if (len > MAX_PASSWORD_LEN) len = MAX_PASSWORD_LEN;
+    // copy existing
+    memcpy(display, name_buf, cur_pos);
+    // show current selection
+    display[cur_pos] = cur_char;
+    display[cur_pos + 1] = '\0';
+    lv_label_set_text(lbl_display, display);
+    lv_obj_align(lbl_display, LV_ALIGN_CENTER, 0, 30);
+}
+
+void lcd_wifi_get_password(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t  *ui_btns)
+{
+	// Statics
+    static lv_obj_t *lbl_dirs, *lbl_user_in;
+    static int cur_pos = 0;
+    static int row_idx = 0; // Active row
+    static int char_idx = 0; // Index within that row
+    static bool initialized = false;
+    static char cur_char; // Current character
+
+	// Do once
+    if (!initialized) {
+		// Everything is zero'd out to start
+        memset(name_buf, 0, sizeof name_buf);
+        row_idx = 0;
+        char_idx = 0;
+        cur_char = char_rows[0][0]; // Start at 0, 0
+
+		// Helper labels
+        lbl_user_in = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_user_in, "", user_secondary_color,
+                         &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
+                         
+        lbl_dirs = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_dirs, "Enter Wi-Fi password: Press\n  home to cycle characters.", user_secondary_color,
+                         &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -30);
+
+        update_password_label_lcd(lbl_user_in, cur_char, cur_pos);
+        
+        initialized = true;
+    }
+
+    // Switch rows (ex A->a)
+    if (ui_btns->back_btn) {
+		 // Increment with wrap
+        row_idx = (row_idx + 1) % NUM_CHAR_ROWS;
+        
+        // Update current char
+        char_idx = 0;
+        cur_char = char_rows[row_idx][char_idx];
+        
+        // Show to LCD
+        update_password_label_lcd(lbl_user_in, cur_char, cur_pos);
+    }
+    // Cycle specific character
+    else if (ui_btns->up_btn || ui_btns->down_btn) {
+		// Get length of selected row
+        size_t row_len = strlen(char_rows[row_idx]);
+        
+        // Increment/decrement that row with wrap
+        if (ui_btns->up_btn) {
+			char_idx = (char_idx + 1) % row_len;
+		}
+        else if (ui_btns->down_btn) {
+			char_idx = (char_idx + row_len - 1) % row_len;
+		}
+		
+		// Update the current character
+        cur_char = char_rows[row_idx][char_idx];
+        
+        // Show to LCD
+        update_password_label_lcd(lbl_user_in, cur_char, cur_pos);
+    }
+    // Move character position
+    else if (ui_btns->right_btn) {
+		// Save current char to name buffer
+        name_buf[cur_pos] = cur_char;
+        
+        // Increment position
+        if (cur_pos < MAX_PASSWORD_LEN) {
+            cur_pos++;
+            
+			// Reset possible characters
+            row_idx = 0; 
+            char_idx = 0;
+            cur_char = char_rows[0][0];
+        }
+        
+        // Show to LCD
+        update_password_label_lcd(lbl_user_in, cur_char, cur_pos);
+    }
+    // Back
+    else if (ui_btns->left_btn && cur_pos == 0) {
+		// Delete objects
+        lv_obj_del(lbl_user_in);
+        lv_obj_del(lbl_dirs);
+        
+        // Reset statics
+        lbl_user_in = lbl_dirs = NULL;
+        cur_pos = row_idx = char_idx = 0;
+        initialized = false;
+
+        // Show Wi-Fi menu
+        lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Switch pages
+        ui_menu->page = WIFI_PAGE;
+        
+        return;
+    }
+    // Backspace
+    else if (ui_btns->left_btn) {
+		// Save change to name buffer
+        name_buf[cur_pos] = '\0';
+        
+        // Decrement position
+	    if (cur_pos > 0) {
+	        cur_pos--;
+	    }
+
+        // Reload cur_char from the new slot
+        char target = name_buf[cur_pos] ? name_buf[cur_pos] : '_';
+        // Search each row for that character
+        for (row_idx = 0; row_idx < NUM_CHAR_ROWS; row_idx++) {
+            const char *row = char_rows[row_idx]; // Get active row
+            const char *p = strchr(row, target); // Scan row for character target
+            if (p) {
+                char_idx = (uint16_t)(p - row); // How many chars from row to reach p
+                break;
+            }
+        }
+
+        // Update cur_char
+        cur_char = char_rows[row_idx][char_idx];
+
+        update_password_label_lcd(lbl_user_in, cur_char, cur_pos);
+    }
+    // Save
+    else if (ui_btns->select_btn) {
+		// Commit the current character
+	    if (cur_pos < MAX_PASSWORD_LEN && name_buf[cur_pos] == '\0') {
+	        name_buf[cur_pos++] = cur_char;
+	    }
+    
+        name_buf[cur_pos] = '\0'; // Null-terminate
+        
+        // Send to Wi-Fi task
+        selected_network.locked = true; // Requires password
+	    strlcpy((char*)selected_network.password, name_buf, sizeof(selected_network.password));
+	    if (xQueueSend(xWifiSelectedNetworkQueue, &selected_network, portMAX_DELAY) != pdPASS) { // SSID was copied earlier
+		    ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue PASSWORD");
+		}
+
+        // Delete objects
+        lv_obj_del(lbl_user_in);
+        lv_obj_del(lbl_dirs);
+        
+        // Reset statics
+        lbl_user_in = lbl_dirs = NULL;
+        cur_pos = row_idx = char_idx = 0;
+        initialized = false;
+
+        // Show Wi-Fi menu
+        lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Switch pages
+        ui_menu->page = WIFI_PAGE;
+        
+        return;
+    }
+}
+
 
 
 

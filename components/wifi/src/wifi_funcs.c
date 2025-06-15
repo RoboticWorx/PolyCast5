@@ -12,7 +12,7 @@
 
 #define TAG "WIFI_FUNCS"
 
-esp_err_t wifi_funcs_wifi_scan(wifi_scan_t* wifi_scan)
+esp_err_t wifi_funcs_scan(wifi_scan_t *wifi_scan)
 {
     esp_err_t err;
     // Scan all SSIDs, all channels, include hidden networks
@@ -74,10 +74,42 @@ esp_err_t wifi_funcs_wifi_scan(wifi_scan_t* wifi_scan)
 	
 	    // Send to LCD
 	    if (xQueueSend(xWifiScanQueue, &wifi_scan[i], portMAX_DELAY) != pdPASS) {
-	        ESP_LOGE(TAG, "Failed to enqueue #%u", i);
+	        ESP_LOGE(TAG, "xWifiScanQueue: Failed to enqueue #%u", i);
 	    }
 	}
 
     free(ap_list);
     return ESP_OK;
 }
+
+esp_err_t wifi_funcs_connect(const char *ssid, const char *password)
+{
+    wifi_config_t cfg = {0};
+    
+    // Copy in SSID and password
+    strlcpy((char*)cfg.sta.ssid, ssid, sizeof(cfg.sta.ssid));
+    strlcpy((char*)cfg.sta.password, password, sizeof(cfg.sta.password));
+
+	#ifdef POLYCAST5_DEBUG
+    	ESP_LOGI(TAG, "Setting Wi-Fi config SSID='%s'", ssid);
+    	ESP_LOGI(TAG, "Setting Wi-Fi config password='%s'", password);
+    #endif
+    
+    esp_err_t err = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (err != ESP_OK) {
+		return err;
+	}
+
+    err = esp_wifi_set_config(ESP_IF_WIFI_STA, &cfg);
+    if (err != ESP_OK) {
+		return err;
+	}
+
+	#ifdef POLYCAST5_DEBUG
+    	ESP_LOGI(TAG, "Connecting to '%s' ...", ssid);
+    #endif
+    
+    return esp_wifi_connect();
+}
+
+

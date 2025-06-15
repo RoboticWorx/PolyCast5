@@ -35,7 +35,7 @@ static uint8_t ir_index_overwrite = 0;
 static int edit_idx = 0;
 
 
-void lcd_ir_edit_remotes(ui_menu_t* ui_menu, ir_menu_t* ir_menu, ui_btns_t* ui_btns)
+void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns)
 {
 	#define REMOTE_TXT "Remote selected:"
 	#define SIG_TXT "Signal selected:"
@@ -43,11 +43,11 @@ void lcd_ir_edit_remotes(ui_menu_t* ui_menu, ir_menu_t* ir_menu, ui_btns_t* ui_b
 	#define EDIT_TXT "Press EDIT to rename."
 	
     // Declare statics
-    static lv_obj_t* lbl_title = NULL;
-    static lv_obj_t* lbl_name = NULL;
-    static lv_obj_t* lbl_back = NULL;
-    static lv_obj_t* lbl_edit = NULL;
-    static lv_obj_t* lbl_select = NULL;
+    static lv_obj_t *lbl_title = NULL;
+    static lv_obj_t *lbl_name = NULL;
+    static lv_obj_t *lbl_back = NULL;
+    static lv_obj_t *lbl_edit = NULL;
+    static lv_obj_t *lbl_select = NULL;
 
 	// If not already done
     if (!lbl_title) {
@@ -197,7 +197,7 @@ void lcd_ir_edit_remotes(ui_menu_t* ui_menu, ir_menu_t* ir_menu, ui_btns_t* ui_b
     }
 }
 
-static void update_name_label_lcd(lv_obj_t* lbl_display, char cur_char, int cur_pos)
+static void update_name_label_lcd(lv_obj_t *lbl_display, char cur_char, int cur_pos)
 {
     char display[MAX_CUSTOM_NAME_LEN + 2]; // Buffer
     
@@ -222,15 +222,15 @@ static void update_name_label_lcd(lv_obj_t* lbl_display, char cur_char, int cur_
     lv_obj_align(lbl_display, LV_ALIGN_CENTER, 0, 30);
 }
 
-void lcd_ir_create_custom_name(ui_menu_t* ui_menu, ir_menu_t* ir_menu, ui_btns_t* ui_btns)
+void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns)
 {
     // Declare statics
     static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
     static int cur_pos = 0; // User position
     static char cur_char = '_';
-    static lv_obj_t* lbl_dirs = NULL;
-    static lv_obj_t* lbl_chars = NULL;
-    static lv_obj_t* lbl_user_in = NULL;
+    static lv_obj_t *lbl_dirs = NULL;
+    static lv_obj_t *lbl_chars = NULL;
+    static lv_obj_t *lbl_user_in = NULL;
     
     // Create initial label
     if (!lbl_user_in) {
@@ -426,8 +426,8 @@ void lcd_ir_create_custom_name(ui_menu_t* ui_menu, ir_menu_t* ir_menu, ui_btns_t
 			lcd_ir_menu_nvs_save(ir_menu, A_IR_REMOTE_NS, A_IR_REMOTE_KEY_COUNT, A_IR_REMOTE_KEY_FMT);
 
 			// Update the button’s label in-place
-			lv_obj_t* btn = ir_menu->btns[ir_index_overwrite];
-			lv_obj_t* child_lbl = lv_obj_get_child(btn, 0);
+			lv_obj_t *btn = ir_menu->btns[ir_index_overwrite];
+			lv_obj_t *child_lbl = lv_obj_get_child(btn, 0);
 			lv_label_set_text(child_lbl, ir_menu->options[ir_index_overwrite]);
 
 			// Clean up
@@ -448,7 +448,7 @@ void lcd_ir_create_custom_name(ui_menu_t* ui_menu, ir_menu_t* ir_menu, ui_btns_t
 			lv_obj_add_style(ir_menu->btns[ir_menu->size - 1], &ir_menu->btn_style, 0);
 
 			// Create and format text label
-			lv_obj_t* lbl = lv_obj_get_child(ir_menu->btns[ir_menu->size - 1], 0);
+			lv_obj_t *lbl = lv_obj_get_child(ir_menu->btns[ir_menu->size - 1], 0);
 			lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
 			lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
 			lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
@@ -460,7 +460,7 @@ void lcd_ir_create_custom_name(ui_menu_t* ui_menu, ir_menu_t* ir_menu, ui_btns_t
     }
 }
 
-void lcd_ir_setup_page(ir_menu_t* menu)
+void lcd_ir_setup_page(ir_menu_t *menu)
 {
 	// Create list
     menu->main_list = lv_list_create(ACTIVE_SCR);
@@ -608,7 +608,7 @@ void lcd_ir_setup_page(ir_menu_t* menu)
         }
 
         // Create and format text label
-        lv_obj_t* lbl = lv_obj_get_child(menu->btns[i], 0);
+        lv_obj_t *lbl = lv_obj_get_child(menu->btns[i], 0);
         lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
         lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
@@ -623,7 +623,7 @@ void lcd_ir_setup_page(ir_menu_t* menu)
 	lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
 }
 
-void lcd_ir_update_menu(ir_menu_t* menu)
+void lcd_ir_update_menu(ir_menu_t *menu)
 {    
 	// Reveal
     lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -663,7 +663,7 @@ void lcd_ir_update_menu(ir_menu_t* menu)
     lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_OFF); // LV_ANIM_ON
 }
 
-void lcd_ir_save_new_signal(ui_menu_t* ui_menu, ir_menu_t* menu)
+void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
 {
 	// Hide IR menu
 	lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -677,12 +677,12 @@ void lcd_ir_save_new_signal(ui_menu_t* ui_menu, ir_menu_t* menu)
 	xSemaphoreGive(xInfraredStartRxSemaphore);
 		
 	// Create texts
-	lv_obj_t* text_label = lv_label_create(ACTIVE_SCR);
+	lv_obj_t *text_label = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(text_label, "Point your device at the\nIR lens and send the signal.", user_secondary_color,
 				 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 13);
 				 
 	// Create present signal img
-    lv_obj_t* img_save_remote = lv_img_create(ACTIVE_SCR);
+    lv_obj_t *img_save_remote = lv_img_create(ACTIVE_SCR);
     lv_img_set_src(img_save_remote, &img_ir_save_new_remote);
     lv_obj_align(img_save_remote, LV_ALIGN_CENTER, 0, 25);
     
@@ -742,7 +742,7 @@ void lcd_ir_save_new_signal(ui_menu_t* ui_menu, ir_menu_t* menu)
 	vTaskDelay(pdMS_TO_TICKS(20));
 }
 
-esp_err_t lcd_ir_menu_nvs_save(const ir_menu_t* menu, const char* ns, const char* count, const char* fmt)
+esp_err_t lcd_ir_menu_nvs_save(const ir_menu_t *menu, const char* ns, const char* count, const char* fmt)
 {
     nvs_handle_t h;
     
@@ -787,7 +787,7 @@ esp_err_t lcd_ir_menu_nvs_save(const ir_menu_t* menu, const char* ns, const char
     return err;
 }
 
-esp_err_t lcd_ir_menu_nvs_load(ir_menu_t* menu, const char* ns, const char* count, const char* fmt)
+esp_err_t lcd_ir_menu_nvs_load(ir_menu_t *menu, const char* ns, const char* count, const char* fmt)
 {
     nvs_handle_t h;
         
@@ -848,7 +848,7 @@ esp_err_t lcd_ir_menu_nvs_load(ir_menu_t* menu, const char* ns, const char* coun
     return ESP_OK;
 }
 
-esp_err_t lcd_ir_menu_nvs_delete(ir_menu_t* menu, uint8_t idx, const char* ns, const char* count, const char* fmt)
+esp_err_t lcd_ir_menu_nvs_delete(ir_menu_t *menu, uint8_t idx, const char* ns, const char* count, const char* fmt)
 {
 	// Make sure index is > 2 (not the name, "Add New" or "Edit") and not larger than size
     if (idx <= 2 || idx >= menu->size) {
