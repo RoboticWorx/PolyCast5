@@ -39,6 +39,10 @@ static void wifi_task(void *param)
 	xWifiSelectedNetworkQueue = xQueueCreate(1, sizeof(wifi_login_t));
 	
 	wifi_funcs_wifi_event_init();
+	
+	/*wifi_config_t current;
+	ESP_ERROR_CHECK(esp_wifi_get_config(ESP_IF_WIFI_STA, &current));
+	ESP_LOGI(TAG, "At boot config SSID='%s', pass='%s'", current.sta.ssid, current.sta.password);*/
     
 	while (1) {
 		if (xSemaphoreTake(xWifiStartScanSemaphore, 0) == pdTRUE) {
@@ -46,18 +50,11 @@ static void wifi_task(void *param)
 			
 			wifi_funcs_scan(wifi_scan);
 			
-			if (esp_wifi_stop() == ESP_OK) {
-				xSemaphoreGive(xWifiNetworkDisconnectedSemaphore);
-			}
-			else {
-				ESP_LOGE(TAG, "esp_wifi_stop FAILED");
-			}
+			wifi_funcs_radio_stop();
 		}
 		
 		if (xSemaphoreTake(xWifiDisconnectSemaphore, 0) == pdTRUE) {			
-			if (esp_wifi_stop() == ESP_OK) {
-				xSemaphoreGive(xWifiNetworkDisconnectedSemaphore);
-			}
+			wifi_funcs_radio_stop();
 		}
 		
 		if (xQueueReceive(xWifiSelectedNetworkQueue, &selected_network, 0) == pdTRUE) {
@@ -71,7 +68,7 @@ static void wifi_task(void *param)
 			xQueueReset(xWifiNetworkDisconnectedSemaphore); // Reset previous gives
 			xSemaphoreGive(xWifiConnectingSemaphore); // Tell LCD we're trying
 			
-			ESP_ERROR_CHECK(wifi_funcs_start_radio(selected_network.ssid, selected_network.bssid, selected_network.password));
+			ESP_ERROR_CHECK(wifi_funcs_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password));
 						
 			ESP_ERROR_CHECK(wifi_funcs_connect());
 		}

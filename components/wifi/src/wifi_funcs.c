@@ -110,7 +110,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
         	ESP_LOGW(TAG, "Disconnected, reason=%d", d->reason);
         #endif
         
-        xSemaphoreGive(xWifiNetworkDisconnectedSemaphore); // Notify LCD we disconnected
+        wifi_funcs_radio_stop();
 
         xEventGroupSetBits(wifi_event_group, WIFI_DISCONNECTED_BIT);
     }
@@ -172,13 +172,13 @@ esp_err_t wifi_funcs_connect(void)
 	else {
 	    ESP_LOGE(TAG, "Failed to connect");
 	    // Notify LCD
-	    ESP_ERROR_CHECK(esp_wifi_stop());
+	    wifi_funcs_radio_stop();
 	}
 	
 	return err;
 }
 
-esp_err_t wifi_funcs_start_radio(const char *ssid, const uint8_t* bssid, const char *password)
+esp_err_t wifi_funcs_radio_start(const char *ssid, const uint8_t* bssid, const char *password)
 {
 	wifi_config_t cfg = {0};
     
@@ -214,4 +214,16 @@ esp_err_t wifi_funcs_start_radio(const char *ssid, const uint8_t* bssid, const c
     err = esp_wifi_start();
     
     return err;
+}
+
+esp_err_t wifi_funcs_radio_stop(void)
+{
+	// Stop Wi-Fi
+    if (esp_wifi_stop() == ESP_OK) {
+		xSemaphoreGive(xWifiNetworkDisconnectedSemaphore);
+		return ESP_OK;
+	}
+    
+    ESP_LOGE(TAG, "wifi_funcs_radio_stop not ESP_OK");
+    return ESP_FAIL;
 }

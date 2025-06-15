@@ -47,9 +47,10 @@ esp_err_t wifi_funcs_connect(void);
  *
  * @return ESP_ERR
  */
-esp_err_t wifi_funcs_start_radio(const char *ssid, const uint8_t* bssid, const char *password);
+esp_err_t wifi_funcs_radio_start(const char *ssid, const uint8_t* bssid, const char *password);
 
 void wifi_funcs_wifi_event_init(void);
+esp_err_t wifi_funcs_radio_stop(void);
 
 
 #endif // WIFI_FUNCS_H
