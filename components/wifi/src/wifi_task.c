@@ -22,29 +22,58 @@ QueueHandle_t xWifiScanQueue;
 QueueHandle_t xWifiSelectedNetworkQueue;
 
 SemaphoreHandle_t xWifiStartScanSemaphore;
+SemaphoreHandle_t xWifiNetworkConnectedSemaphore;
+SemaphoreHandle_t xWifiNetworkDisconnectedSemaphore;
+SemaphoreHandle_t xWifiDisconnectSemaphore;
+SemaphoreHandle_t xWifiConnectingSemaphore;
 
 static void wifi_task(void *param)
 {
 	xWifiStartScanSemaphore = xSemaphoreCreateBinary();
+	xWifiNetworkConnectedSemaphore = xSemaphoreCreateBinary();
+	xWifiNetworkDisconnectedSemaphore = xSemaphoreCreateBinary();
+	xWifiDisconnectSemaphore = xSemaphoreCreateBinary();
+	xWifiConnectingSemaphore = xSemaphoreCreateBinary();
 	
 	xWifiScanQueue = xQueueCreate(WIFI_MAX_NETWORKS, sizeof(wifi_scan_t));
 	xWifiSelectedNetworkQueue = xQueueCreate(1, sizeof(wifi_login_t));
+	
+	wifi_funcs_wifi_event_init();
     
 	while (1) {
 		if (xSemaphoreTake(xWifiStartScanSemaphore, 0) == pdTRUE) {
-			espnow_funcs_wifi_radio_start(WIFI_CHANNEL);
+			ESP_ERROR_CHECK(esp_wifi_start());
 			
 			wifi_funcs_scan(wifi_scan);
 			
-			espnow_funcs_wifi_radio_stop();
+			if (esp_wifi_stop() == ESP_OK) {
+				xSemaphoreGive(xWifiNetworkDisconnectedSemaphore);
+			}
+			else {
+				ESP_LOGE(TAG, "esp_wifi_stop FAILED");
+			}
+		}
+		
+		if (xSemaphoreTake(xWifiDisconnectSemaphore, 0) == pdTRUE) {			
+			if (esp_wifi_stop() == ESP_OK) {
+				xSemaphoreGive(xWifiNetworkDisconnectedSemaphore);
+			}
 		}
 		
 		if (xQueueReceive(xWifiSelectedNetworkQueue, &selected_network, 0) == pdTRUE) {
 			#ifdef POLYCAST5_DEBUG
 				ESP_LOGI(TAG, "xWifiSelectedNetworkQueue received: ssid='%s', pass='%s'", selected_network.ssid, selected_network.password);
+				ESP_LOGI(TAG, "xWifiSelectedNetworkQueue received: bssid='%02x:%02x:%02x:%02x:%02x:%02x'",
+				    selected_network.bssid[0], selected_network.bssid[1], selected_network.bssid[2],
+				    selected_network.bssid[3], selected_network.bssid[4], selected_network.bssid[5]);
 			#endif
 			
-			//wifi_funcs_connect(const char *ssid, const char *password)
+			xQueueReset(xWifiNetworkDisconnectedSemaphore); // Reset previous gives
+			xSemaphoreGive(xWifiConnectingSemaphore); // Tell LCD we're trying
+			
+			ESP_ERROR_CHECK(wifi_funcs_start_radio(selected_network.ssid, selected_network.bssid, selected_network.password));
+						
+			ESP_ERROR_CHECK(wifi_funcs_connect());
 		}
     
 		vTaskDelay(pdMS_TO_TICKS(10));

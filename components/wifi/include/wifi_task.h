@@ -7,6 +7,10 @@ extern QueueHandle_t xWifiScanQueue;
 extern QueueHandle_t xWifiSelectedNetworkQueue;
 
 extern SemaphoreHandle_t xWifiStartScanSemaphore;
+extern SemaphoreHandle_t xWifiNetworkConnectedSemaphore;
+extern SemaphoreHandle_t xWifiNetworkDisconnectedSemaphore;
+extern SemaphoreHandle_t xWifiDisconnectSemaphore;
+extern SemaphoreHandle_t xWifiConnectingSemaphore;
 
 /**
  * @brief Create the Wi-Fi task

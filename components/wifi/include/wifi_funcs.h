@@ -7,13 +7,15 @@
 
 typedef struct {
     uint8_t ssid[33];
+    uint8_t bssid[6];
     int8_t rssi;
     uint8_t channel;
     uint8_t auth;
 } wifi_scan_t;
 
 typedef struct {
-    uint8_t ssid[33];
+    char ssid[33];
+    uint8_t bssid[6];
     char password[33];
     bool locked;
 } wifi_login_t;
@@ -32,12 +34,22 @@ esp_err_t wifi_funcs_scan(wifi_scan_t *wifi_scan);
 /**
  * @brief Connect to a given Wi-Fi network
  *
+ * @return ESP_ERR
+ */
+esp_err_t wifi_funcs_connect(void);
+
+/**
+ * @brief Configure and start the radio to join a given network
+ *
  * @param [in] ssid Network SSID
+ * @param [in] bssid Network BSSID
  * @param [in] password Network password
  *
  * @return ESP_ERR
  */
-esp_err_t wifi_funcs_connect(const char *ssid, const char *password);
+esp_err_t wifi_funcs_start_radio(const char *ssid, const uint8_t* bssid, const char *password);
+
+void wifi_funcs_wifi_event_init(void);
 
 
 #endif // WIFI_FUNCS_H

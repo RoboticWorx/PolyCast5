@@ -124,7 +124,7 @@ void lcd_wifi_setup_page(wifi_menu_t *menu)
 
     // Format buttons as container
     menu->cont = lv_obj_get_parent(menu->btns[0]);
-    lv_obj_set_flex_flow (menu->cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_flow(menu->cont, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(menu->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(menu->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT); // Set button spacing
 	
@@ -258,6 +258,8 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 	static bool initialized = false;
 	static bool scanned = false;
 	
+	static uint8_t bssids[WIFI_MAX_NETWORKS][6];
+	
 	// Do once
     if (!initialized) {        
         // Wait label
@@ -287,7 +289,10 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 			scanned = true;
 		}
 		
-		locked[wifi_menu->scan_menu.size] = (result.auth != 0) ? true : false; // != WIFI_AUTH_OPEN
+		// Check if != WIFI_AUTH_OPEN
+		locked[wifi_menu->scan_menu.size] = (result.auth != 0) ? true : false; 
+		// Copy BSSID
+		memcpy(bssids[wifi_menu->scan_menu.size], result.bssid, sizeof(result.bssid));
 		
 		// Format SSID
         char buf[33];
@@ -338,6 +343,7 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		scanned = false;
 		for(int i = 0; i < WIFI_MAX_NETWORKS; i++) {
 			locked[i] = false;
+			memset(bssids[i], 0, sizeof(bssids[i]));
 		}
 		wifi_menu->scan_menu.size = 0;
 		wifi_menu->scan_menu.index = 0;
@@ -362,14 +368,18 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 	    lv_obj_t *lbl = lv_obj_get_child(btn, 0);
 	    const char *ssid = lv_label_get_text(lbl);
 	    strlcpy((char*)selected_network.ssid, ssid, sizeof(selected_network.ssid));
+	    
+	    // Copy BSSID
+	    memcpy(selected_network.bssid, bssids[wifi_menu->scan_menu.index], sizeof(bssids[wifi_menu->scan_menu.index]));
 		
 		// If network requires password
 	    if (locked[wifi_menu->scan_menu.index]) {
 			// Reset
 			initialized = false;
 			scanned = false;
-			for(int i = 0; i < WIFI_MAX_NETWORKS; i++) {
+			for(int i = 0; i < wifi_menu->scan_menu.size; i++) {
 			    locked[i] = false;
+			    memset(bssids[i], 0, sizeof(bssids[i]));
 			}
 			wifi_menu->scan_menu.size = 0;
 			wifi_menu->scan_menu.index = 0;
@@ -395,8 +405,9 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		    // Reset
 			initialized = false;
 			scanned = false;
-			for(int i = 0; i < WIFI_MAX_NETWORKS; i++) {
+			for(int i = 0; i < wifi_menu->scan_menu.size; i++) {
 				locked[i] = false;
+				memset(bssids[i], 0, sizeof(bssids[i]));
 			}
 			wifi_menu->scan_menu.size = 0;
 			wifi_menu->scan_menu.index = 0;
@@ -503,10 +514,9 @@ void lcd_wifi_get_password(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t
         if (cur_pos < MAX_PASSWORD_LEN) {
             cur_pos++;
             
-			// Reset possible characters
-            row_idx = 0; 
+			// Reset characters
             char_idx = 0;
-            cur_char = char_rows[0][0];
+            cur_char = char_rows[row_idx][0];
         }
         
         // Show to LCD

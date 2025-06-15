@@ -10,7 +10,14 @@
 #include "wifi_funcs.h"
 #include "wifi_task.h"
 
+#include "espnow_funcs.h"
+
 #define TAG "WIFI_FUNCS"
+
+#define WIFI_CONNECTED_BIT    (1 << 0)
+#define WIFI_DISCONNECTED_BIT (1 << 1)
+
+static EventGroupHandle_t wifi_event_group;
 
 esp_err_t wifi_funcs_scan(wifi_scan_t *wifi_scan)
 {
@@ -56,8 +63,17 @@ esp_err_t wifi_funcs_scan(wifi_scan_t *wifi_scan)
 	#ifdef POLYCAST5_DEBUG
 	    ESP_LOGI(TAG, "Found %d access point(s):", ap_num);
 	    for (int i = 0; i < ap_num; i++) {
-	        ESP_LOGI(TAG, "[%d] SSID: %-32s RSSI: %3d  CH: %2d  AUTH: %d",
-	        		i, (char*)ap_list[i].ssid, ap_list[i].rssi, ap_list[i].primary, ap_list[i].authmode);
+	        ESP_LOGI(TAG,
+			    "[%d] SSID: %-32s BSSID: %02x:%02x:%02x:%02x:%02x:%02x RSSI: %3d  CH:%2d  AUTH:%d",
+			     i,
+			     (char*)ap_list[i].ssid,
+			     ap_list[i].bssid[0], ap_list[i].bssid[1],
+			     ap_list[i].bssid[2], ap_list[i].bssid[3],
+			     ap_list[i].bssid[4], ap_list[i].bssid[5],
+			     ap_list[i].rssi,
+			     ap_list[i].primary,
+			     ap_list[i].authmode
+			);
 	    }
     #endif
     
@@ -66,6 +82,9 @@ esp_err_t wifi_funcs_scan(wifi_scan_t *wifi_scan)
 	for (size_t i = 0; i < count; i++) {
 	    // Copy the SSID
 	    strlcpy((char*)wifi_scan[i].ssid, (char*)ap_list[i].ssid, sizeof(wifi_scan[i].ssid));
+	    
+	    // Copy the BSSID
+	    memcpy(wifi_scan[i].bssid, ap_list[i].bssid, sizeof(ap_list[i].bssid));
 	
 	    // Fill the rest
 	    wifi_scan[i].rssi = ap_list[i].rssi;
@@ -82,19 +101,105 @@ esp_err_t wifi_funcs_scan(wifi_scan_t *wifi_scan)
     return ESP_OK;
 }
 
-esp_err_t wifi_funcs_connect(const char *ssid, const char *password)
+static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, void* data)
 {
-    wifi_config_t cfg = {0};
+    if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
+        wifi_event_sta_disconnected_t* d = (wifi_event_sta_disconnected_t*)data;
+        
+        #ifdef POLYCAST5_DEBUG
+        	ESP_LOGW(TAG, "Disconnected, reason=%d", d->reason);
+        #endif
+        
+        xSemaphoreGive(xWifiNetworkDisconnectedSemaphore); // Notify LCD we disconnected
+
+        xEventGroupSetBits(wifi_event_group, WIFI_DISCONNECTED_BIT);
+    }
+    else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
+        ip_event_got_ip_t* e = (ip_event_got_ip_t*)data;
+        
+        #ifdef POLYCAST5_DEBUG
+        	ESP_LOGI(TAG, "Got IP: " IPSTR, IP2STR(&e->ip_info.ip));
+        #endif
+        
+        xSemaphoreGive(xWifiNetworkConnectedSemaphore); // Notify LCD we connected
+
+        xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
+    }
+}
+
+void wifi_funcs_wifi_event_init(void)
+{
+    wifi_event_group = xEventGroupCreate();
     
-    // Copy in SSID and password
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler,
+    			 NULL, NULL));
+    			 
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, wifi_event_handler,
+    			 NULL, NULL));
+}
+
+static bool wait_for_connection(TickType_t timeout)
+{
+        
+    // Wait for either bit
+    EventBits_t bits = xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_BIT | WIFI_DISCONNECTED_BIT, pdTRUE,
+     			pdFALSE, timeout);
+
+    if (bits & WIFI_CONNECTED_BIT) {
+        return true; // Got IP
+    }
+    
+    if (bits & WIFI_DISCONNECTED_BIT) {
+        return false; // Disconnected
+    }
+    
+    // Timed out
+    return false;
+}
+
+esp_err_t wifi_funcs_connect(void)
+{
+	xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT | WIFI_DISCONNECTED_BIT);
+	
+    esp_err_t err = esp_wifi_connect();
+    
+    // Check connetion
+    if (wait_for_connection(pdMS_TO_TICKS(15000))) {
+		#ifdef POLYCAST5_DEBUG
+    		ESP_LOGI(TAG, "Wi-Fi connected and got IP!");
+    	#endif
+	}
+	else {
+	    ESP_LOGE(TAG, "Failed to connect");
+	    // Notify LCD
+	    ESP_ERROR_CHECK(esp_wifi_stop());
+	}
+	
+	return err;
+}
+
+esp_err_t wifi_funcs_start_radio(const char *ssid, const uint8_t* bssid, const char *password)
+{
+	wifi_config_t cfg = {0};
+    
+    // Copy in SSID, password, and BSSID
     strlcpy((char*)cfg.sta.ssid, ssid, sizeof(cfg.sta.ssid));
     strlcpy((char*)cfg.sta.password, password, sizeof(cfg.sta.password));
+    
+    //cfg.sta.bssid_set = true;
+	//memcpy(cfg.sta.bssid, bssid, sizeof(cfg.sta.bssid));
+	
+	cfg.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK; // Weakest auth mode to accept in the fast scan mode 
 
 	#ifdef POLYCAST5_DEBUG
     	ESP_LOGI(TAG, "Setting Wi-Fi config SSID='%s'", ssid);
+    	ESP_LOGI(TAG, "Setting Wi-Fi config BSSID=%02x:%02x:%02x:%02x:%02x:%02x",
+		     bssid[0], bssid[1], bssid[2],
+		     bssid[3], bssid[4], bssid[5]);
     	ESP_LOGI(TAG, "Setting Wi-Fi config password='%s'", password);
     #endif
     
+    // Set mode & config
     esp_err_t err = esp_wifi_set_mode(WIFI_MODE_STA);
     if (err != ESP_OK) {
 		return err;
@@ -104,12 +209,9 @@ esp_err_t wifi_funcs_connect(const char *ssid, const char *password)
     if (err != ESP_OK) {
 		return err;
 	}
-
-	#ifdef POLYCAST5_DEBUG
-    	ESP_LOGI(TAG, "Connecting to '%s' ...", ssid);
-    #endif
+	
+	// Start the driver (power up the radio)
+    err = esp_wifi_start();
     
-    return esp_wifi_connect();
+    return err;
 }
-
-

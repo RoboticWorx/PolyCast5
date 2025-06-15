@@ -17,6 +17,7 @@
 
 #include "lcd_funcs.h"
 #include "lcd_task.h"
+#include "wifi_funcs.h"
 #include "wifi_task.h"
 #include "infrared_funcs.h"
 
@@ -52,7 +53,6 @@
 
 static uint8_t anim_active = 0; // Default determined in lcd_anim_nvs_load
 
-
 /* LCD */
 static const char *TAG = "LCD_FUNCS";
 
@@ -62,6 +62,8 @@ static lv_display_t *disp; // LVGL display handle
 static bool already_scrolling = false;
 static bool scrolling_menu = false;
 static bool scrolling_up = false;	
+
+extern wifi_login_t selected_network;
 
 typedef struct {
     lv_obj_t *top;    // the label that sits at the top line
@@ -215,6 +217,8 @@ static void lcd_panel_wake(void)
 
 void lcd_device_sleep(void)
 {
+	xSemaphoreGive(xWifiDisconnectSemaphore); // Disconnect from Wi-Fi if connected
+	
 	lcd_panel_sleep(); // Put ST7789 to sleep
 	gpio_set_level(ST7789_LEDK_PIN, 0); // BL low
 	
@@ -1062,6 +1066,8 @@ void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui
 		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
 		ui_menu->page = ESPNOW_OPTION_PAGE;
+		
+		xSemaphoreGive(xWifiDisconnectSemaphore); // Disconnect from Wi-Fi if connected
 	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {
@@ -1093,6 +1099,24 @@ void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_
 		do_once = true;
 	}
 	
+	// Update label based on connection
+	if (xSemaphoreTake(xWifiConnectingSemaphore, 0) == pdTRUE) {
+		lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
+		lv_label_set_text(lbl, "Connecting...");
+	}
+	if (xSemaphoreTake(xWifiNetworkConnectedSemaphore, 0) == pdTRUE) {
+		char buf[44];
+		snprintf(buf, sizeof(buf), "Connected: %s", selected_network.ssid);
+		
+		lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
+		lv_label_set_text(lbl, buf);
+	}
+	if (xSemaphoreTake(xWifiNetworkDisconnectedSemaphore, 0) == pdTRUE) {
+		lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
+		lv_label_set_text(lbl, "Connect to network");
+	}
+		
+	
 	// Up button pressed
 	if (ui_btns->up_btn == 1) {
 		// Update selection
@@ -1107,16 +1131,25 @@ void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_
 	}
 	// Connect to network
 	else if (ui_btns->right_btn == 1 && wifi_menu->index == 0) {
-		// Hide Wi-Fi menu
-		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Show scan menu
-		lv_obj_remove_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Reset static
-		do_once = false;
-		
-		ui_menu->page = WIFI_SCAN_PAGE;
+		lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
+		const char *txt = lv_label_get_text(lbl);
+		// If connected to a network (contains "Connected: ")
+		if (strstr(txt, "Connected: ") != NULL) {
+	        xSemaphoreGive(xWifiDisconnectSemaphore);
+	    }
+	    // Already disconnected
+	    else {
+			// Hide Wi-Fi menu
+			lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// Show scan menu
+			lv_obj_remove_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// Reset static
+			do_once = false;
+			
+			ui_menu->page = WIFI_SCAN_PAGE;
+		}
 	}
 	// Send over Wi-Fi
 	else if (ui_btns->right_btn == 1 && wifi_menu->index == 1) {
