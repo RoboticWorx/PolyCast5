@@ -15,6 +15,8 @@
 
 #define TAG "WIFI_TASK"
 
+extern bool wifi_connected;
+
 static wifi_scan_t wifi_scan[WIFI_MAX_NETWORKS];
 static wifi_login_t selected_network;
 
@@ -40,11 +42,10 @@ static void wifi_task(void *param)
 	
 	wifi_funcs_wifi_event_init();
 	
-	/*wifi_config_t current;
-	ESP_ERROR_CHECK(esp_wifi_get_config(ESP_IF_WIFI_STA, &current));
-	ESP_LOGI(TAG, "At boot config SSID='%s', pass='%s'", current.sta.ssid, current.sta.password);*/
+	
     
 	while (1) {
+		// Start a Wi-Fi scan
 		if (xSemaphoreTake(xWifiStartScanSemaphore, 0) == pdTRUE) {
 			ESP_ERROR_CHECK(esp_wifi_start());
 			
@@ -53,10 +54,12 @@ static void wifi_task(void *param)
 			wifi_funcs_radio_stop();
 		}
 		
+		// Disconnect from Wi-Fi
 		if (xSemaphoreTake(xWifiDisconnectSemaphore, 0) == pdTRUE) {			
 			wifi_funcs_radio_stop();
 		}
 		
+		// Specific network to connect selected
 		if (xQueueReceive(xWifiSelectedNetworkQueue, &selected_network, 0) == pdTRUE) {
 			#ifdef POLYCAST5_DEBUG
 				ESP_LOGI(TAG, "xWifiSelectedNetworkQueue received: ssid='%s', pass='%s'", selected_network.ssid, selected_network.password);
@@ -71,6 +74,11 @@ static void wifi_task(void *param)
 			ESP_ERROR_CHECK(wifi_funcs_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password));
 						
 			ESP_ERROR_CHECK(wifi_funcs_connect());
+		}
+		
+		// Wi-Fi is actively connected
+		if (wifi_connected) {
+			wifi_funcs_get_current_date_time();
 		}
     
 		vTaskDelay(pdMS_TO_TICKS(10));

@@ -1115,7 +1115,7 @@ void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_
 		lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
 		lv_label_set_text(lbl, "Connect to network");
 	}
-		
+	
 	
 	// Up button pressed
 	if (ui_btns->up_btn == 1) {

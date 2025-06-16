@@ -1,6 +1,8 @@
 #ifndef WIFI_FUNCS_H
 #define WIFI_FUNCS_H
 
+#include <stdbool.h>
+
 #include "esp_err.h"
 
 #define WIFI_MAX_NETWORKS 20
@@ -17,7 +19,8 @@ typedef struct {
     char ssid[33];
     uint8_t bssid[6];
     char password[33];
-    bool locked;
+    bool locked; // If network requires a password
+    bool prev; // If connecting to the last known network
 } wifi_login_t;
 
 //extern wifi_scan_t wifi_scan[WIFI_MAX_NETWORKS];
@@ -51,6 +54,8 @@ esp_err_t wifi_funcs_radio_start(const char *ssid, const uint8_t* bssid, const c
 
 void wifi_funcs_wifi_event_init(void);
 esp_err_t wifi_funcs_radio_stop(void);
+void wifi_funcs_get_current_date_time(void);
+wifi_login_t wifi_funcs_get_prev(void);
 
 
 #endif // WIFI_FUNCS_H

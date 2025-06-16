@@ -165,12 +165,12 @@ void lcd_wifi_create_scan_list(wifi_scan_menu_t *menu)
 	
 	// Create list
     menu->main_list = lv_list_create(ACTIVE_SCR);
-    lv_obj_set_size(menu->main_list, 210, 68);
+    lv_obj_set_size(menu->main_list, 210, 106); // h: 68
     
     // Format
     lv_obj_set_scrollbar_mode(menu->main_list, LV_SCROLLBAR_MODE_OFF); // Never draw bars
     lv_obj_set_style_bg_color(menu->main_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_align(menu->main_list, LV_ALIGN_CENTER, 0, 17);
+    lv_obj_align(menu->main_list, LV_ALIGN_CENTER, 0, 0); // y: 17
     lv_obj_set_style_border_width(menu->main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_scrollbar_mode(menu->main_list, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_scroll_dir(menu->main_list, LV_DIR_VER);
@@ -219,8 +219,8 @@ void lcd_wifi_create_scan_list(wifi_scan_menu_t *menu)
 		menu->index = menu->size - 1;
 	}
 	
-	if (menu->size > 1) {
-		menu->index = 1;
+	if (menu->size > 0) {
+		menu->index = 0;
 	}
 	
 	// Hide for now
@@ -254,24 +254,48 @@ static void lcd_wifi_update_scan_menu(wifi_scan_menu_t *menu)
 void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
 {	
 	static lv_obj_t *lbl_wait;
+	static lv_obj_t *lbl_option;
 	static bool locked[WIFI_MAX_NETWORKS];
 	static bool initialized = false;
 	static bool scanned = false;
+	static bool scanning = false;
 	
 	static uint8_t bssids[WIFI_MAX_NETWORKS][6];
 	
 	// Do once
-    if (!initialized) {        
-        // Wait label
-        lbl_wait = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_wait, "Scanning for networks...\nPlease wait...", user_secondary_color,
-					 &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 20);
-					 
-		lv_timer_handler();
-					 
-		// Start scan
-		xSemaphoreGive(xWifiStartScanSemaphore);
-					 
+    if (!initialized) {        				 
+		// Option label
+        lbl_option = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_option, "or press down to scan", user_secondary_color,
+					 &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -10);
+					 		
+		/* Add prev button */
+        char buf[16];
+        snprintf(buf, sizeof(buf), "Connect to last");
+        
+        // Create button
+        wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size] = lv_list_add_btn(wifi_menu->scan_menu.main_list, NULL, buf);
+        lv_obj_set_size(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size], 200, 30);
+
+        // Style selected
+        lv_obj_add_style(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size], &wifi_menu->scan_menu.sel_style, 0);
+
+        // Create and format text label
+        lv_obj_t *lbl = lv_obj_get_child(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size], 0);
+        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+        
+        // Format buttons as container
+	    wifi_menu->scan_menu.cont = lv_obj_get_parent(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size]);
+	    lv_obj_set_flex_flow(wifi_menu->scan_menu.cont, LV_FLEX_FLOW_COLUMN);
+	    lv_obj_set_flex_align(wifi_menu->scan_menu.cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+	    lv_obj_set_style_pad_gap(wifi_menu->scan_menu.cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT); // Set button spacing
+	    
+	    wifi_menu->scan_menu.size++; // One larger
+	    
+		lv_timer_handler(); // Show
+					 					 
 		initialized = true;
     }
 
@@ -286,6 +310,8 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 	    // Once networks have been received: delete help text
 	    if (!scanned) {
 			lv_obj_delete(lbl_wait);
+			lbl_wait = NULL;
+			scanning = false;
 			scanned = true;
 		}
 		
@@ -316,12 +342,6 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
         lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
         
-        // Format buttons as container
-	    wifi_menu->scan_menu.cont = lv_obj_get_parent(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size]);
-	    lv_obj_set_flex_flow(wifi_menu->scan_menu.cont, LV_FLEX_FLOW_COLUMN);
-	    lv_obj_set_flex_align(wifi_menu->scan_menu.cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-	    lv_obj_set_style_pad_gap(wifi_menu->scan_menu.cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT); // Set button spacing
-        
         // Size one bigger now
         wifi_menu->scan_menu.size++;
     }
@@ -331,13 +351,37 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		wifi_menu->scan_menu.index--;
 		lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
 	}
+	// Scan requested
+	else if (!scanned && ui_btns->down_btn == 1) {
+		if (lbl_option) { // Delete if exists
+			lv_obj_delete(lbl_option);
+			lbl_option = NULL;
+		}
+		
+		if (!scanning) {
+			// Wait label
+		    lbl_wait = lv_label_create(ACTIVE_SCR);
+			lcd_format_label(lbl_wait, "Scanning for networks...\nPlease wait...", user_secondary_color,
+						 &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 20);
+							 
+			// Start scan
+			xSemaphoreGive(xWifiStartScanSemaphore);
+			
+			scanning = true;
+		}
+	}
 	// Scroll down
 	else if (scanned && ui_btns->down_btn == 1) {
 		wifi_menu->scan_menu.index++;
 		lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
 	}
 	// Back
-	else if (scanned && ui_btns->left_btn == 1) {
+	else if ((!scanning || scanned) && ui_btns->left_btn == 1) {
+		if (lbl_option) { // Delete if exists
+			lv_obj_delete(lbl_option);
+			lbl_option = NULL;
+		}
+		
 		// Reset
 		initialized = false;
 		scanned = false;
@@ -361,8 +405,47 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		// Switch pages
 		ui_menu->page = WIFI_PAGE;
 	}
+	// If connecting to last known
+	else if (ui_btns->right_btn == 1 && wifi_menu->scan_menu.index == 0 && !scanning) {
+		if (lbl_option) { // Delete if exists
+			lv_obj_delete(lbl_option);
+			lbl_option = NULL;
+		}
+		
+		selected_network = wifi_funcs_get_prev(); // Loads boot state saved network info
+		selected_network.prev = true; // Connecting to previous
+		
+		if (xQueueSend(xWifiSelectedNetworkQueue, &selected_network, portMAX_DELAY) != pdPASS) {
+		    ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue previous_network");
+		}
+		
+		// Reset
+		initialized = false;
+		scanned = false;
+		for(int i = 0; i < wifi_menu->scan_menu.size; i++) {
+			locked[i] = false;
+			memset(bssids[i], 0, sizeof(bssids[i]));
+		}
+		wifi_menu->scan_menu.size = 0;
+		wifi_menu->scan_menu.index = 0;
+		lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
+			
+		// Clear children
+		lv_obj_clean(wifi_menu->scan_menu.main_list);
+			
+		// Hide scan menu
+		lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+			
+		// Show Wi-Fi menu
+		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = WIFI_PAGE;
+	}
 	// Network selected
 	else if (scanned && ui_btns->right_btn == 1) {
+		selected_network.prev = false; // Connecting to new
+		
 		// Copy over SSID
 		lv_obj_t *btn = wifi_menu->scan_menu.btns[wifi_menu->scan_menu.index];
 	    lv_obj_t *lbl = lv_obj_get_child(btn, 0);
