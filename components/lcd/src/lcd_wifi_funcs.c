@@ -1,11 +1,13 @@
-#include "core/lv_obj.h"
-#include "misc/lv_area.h"
-#include "misc/lv_color.h"
 #include "polycast5_macros.h"
 
 #include "core/lv_obj_pos.h"
 #include "core/lv_obj_tree.h"
+#include "core/lv_obj.h"
 
+#include "misc/lv_area.h"
+#include "misc/lv_color.h"
+
+#include "widgets/chart/lv_chart_private.h"
 #include "widgets/label/lv_label.h"
 
 #include "nvs.h"
@@ -765,6 +767,49 @@ void lcd_wifi_get_password(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t
     }
 }
 
+// Colors bar more green or red based on value
+static void chart_draw_cb(lv_event_t * e)
+{
+	// Get task and descriptor
+    lv_draw_task_t *task = lv_event_get_draw_task(e);
+    lv_draw_dsc_base_t *base = (lv_draw_dsc_base_t *)lv_draw_task_get_draw_dsc(task);
+    
+    // Filter to only the bars
+    if (base->part != LV_PART_ITEMS) {
+		return;
+	}
+
+	// Get the fill descriptor
+    lv_draw_fill_dsc_t *fill = lv_draw_task_get_fill_dsc(task);
+    
+    // Ensure valid
+    if (!fill) {
+		return;
+	}
+
+	// Fetch series data and compute the index
+    lv_obj_t *chart = lv_event_get_target_obj(e);
+    lv_chart_series_t *ser = lv_event_get_user_data(e);
+    int32_t *y_array = lv_chart_get_y_array(chart, ser);
+
+    uint32_t pc = lv_chart_get_point_count(chart);
+    uint32_t idx = base->id2; // Column being painted
+    uint32_t logical = (ser->start_point + idx) % pc; // Real slot
+    int32_t v = y_array[logical]; // SNR 0-50
+    if (v > 50) { // Cap
+		v = 50;
+	}
+
+	// Skip uninitialized points
+    if (v == LV_CHART_POINT_NONE) {
+		return;
+	}
+
+	// Compute red-green mix ratio
+    uint8_t mix = (uint8_t)((uint32_t)v * 255 / 50); // 0=red, 50=green
+    fill->color = lv_color_mix(lv_palette_main(LV_PALETTE_GREEN), lv_palette_main(LV_PALETTE_RED), mix);
+}
+
 void lcd_wifi_beacon_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
 {
 	#define SCROLL_STEP 53  // Pixels per button-press
@@ -777,6 +822,7 @@ void lcd_wifi_beacon_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t 
     static lv_obj_t *lbl_snr;
     static lv_obj_t *lbl_scroll;
     static lv_obj_t *lbl_info;
+    static lv_obj_t *lbl_data;
 
     if(!init) {
         // Create a scrollable container
@@ -797,7 +843,7 @@ void lcd_wifi_beacon_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t 
 		lv_obj_set_style_bg_color(chart, lv_color_black(), LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_chart_set_type(chart, LV_CHART_TYPE_BAR);
         lv_chart_set_point_count(chart, 40);
-        lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, 0, 60);
+        lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, 0, 50);
         lv_chart_set_update_mode(chart, LV_CHART_UPDATE_MODE_SHIFT);
         
         // Bar
@@ -807,7 +853,13 @@ void lcd_wifi_beacon_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t 
         lv_obj_set_style_pad_column(chart, 2, LV_PART_MAIN);
         lv_obj_set_style_bg_color(chart, lv_palette_main(LV_PALETTE_GREEN), LV_PART_ITEMS);
         
-        // Text above
+        // Callback to change bar color based on value
+		// Tell the chart to generate draw-task events
+		lv_obj_add_flag(chart, LV_OBJ_FLAG_SEND_DRAW_TASK_EVENTS);
+		// Register your callback on DRAW_TASK_ADDED
+		lv_obj_add_event_cb(chart, chart_draw_cb, LV_EVENT_DRAW_TASK_ADDED, series);
+        
+        // Small text
         lbl_rssi = lv_label_create(cont);
         lcd_format_label(lbl_rssi, "RSSI: ", user_secondary_color,
 						 &lv_font_montserrat_16, LV_ALIGN_TOP_LEFT, 0, -10);
@@ -819,8 +871,12 @@ void lcd_wifi_beacon_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t 
 		lbl_scroll = lv_label_create(cont);
         lcd_format_label(lbl_scroll, "SCROLL", user_secondary_color,
 						 &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, 15);
+						 
+		lbl_data = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_data, "DATA " LV_SYMBOL_RIGHT, user_secondary_color,
+						 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_RIGHT, -3, 0);
 
-        // Text below
+        // Main info
         lbl_info = lv_label_create(cont);
         lcd_format_label(lbl_info, "", user_secondary_color,
 						 &lv_font_montserrat_16, LV_ALIGN_BOTTOM_LEFT, 0, 265);
@@ -857,11 +913,11 @@ void lcd_wifi_beacon_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t 
 	    int len = snprintf(txt_buf, sizeof(txt_buf),
 	        "SSID:\n - %.16s...\n"
 	        "Channel:\n - %u\n"
-	        "Freq:\n - %d MHz or %.3f GHz\n"
+	        "Freq:\n - %d MHz / %.3f GHz\n"
 	        "Security:\n - %s\n"
 	        "Compatibility Code:\n - 0x%04X\n"
 	        "Beacon Interval:\n - %u ms\n"
-	        "Time since reboot:\n - %" PRIu64 "m or %" PRIu64 " days",
+	        "Time since reboot:\n - %" PRIu64 "m / %" PRIu64 " days",
 	        beacon.ssid,
 	        beacon.channel,
 	        beacon.freq,
@@ -893,10 +949,11 @@ void lcd_wifi_beacon_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t 
     else if (ui_btns->left_btn) {
         // Delete obj
         lv_obj_delete(cont); // Also deletes children
+        lv_obj_delete(lbl_data); // Not child of cont
         
         // Reset statics
         init = false;
-	    cont = chart = lbl_rssi = lbl_snr = lbl_scroll = lbl_info = NULL;
+	    cont = chart = lbl_rssi = lbl_snr = lbl_scroll = lbl_info = lbl_data = NULL;
 	    series = NULL;
 	    
 	    // Turn off Wi-Fi
