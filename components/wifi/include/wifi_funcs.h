@@ -23,6 +23,27 @@ typedef struct {
     bool prev; // If connecting to the last known network
 } wifi_login_t;
 
+typedef struct {
+	uint8_t type;
+    uint8_t channel;
+    int mask;
+    uint8_t target_bssid[6];
+} wifi_sniff_t;
+
+typedef struct {
+	char ssid[33];
+    uint8_t channel;
+    int freq;
+    int rssi;
+    int snr;
+    bool rsn;
+    bool wpa;
+    uint16_t cap_info;
+    uint16_t interval;
+    uint64_t timestamp;
+} wifi_beacon_t;
+//SSID: %s | Channel: %d (%d MHz) | RSSI: %d dBm | SNR: %d dB | Encryption: %s | TS=%llu days | intvl=%u ms | cap=0x%04x
+
 //extern wifi_scan_t wifi_scan[WIFI_MAX_NETWORKS];
 
 /**
@@ -56,6 +77,7 @@ void wifi_funcs_wifi_event_init(void);
 esp_err_t wifi_funcs_radio_stop(void);
 void wifi_funcs_get_current_date_time(void);
 wifi_login_t wifi_funcs_get_prev(void);
+void wifi_funcs_init_promiscuous(wifi_sniff_t *network);
 
 
 #endif // WIFI_FUNCS_H

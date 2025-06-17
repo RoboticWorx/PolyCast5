@@ -64,6 +64,7 @@ static bool scrolling_menu = false;
 static bool scrolling_up = false;	
 
 extern wifi_login_t selected_network;
+extern bool monitoring_packets;
 
 typedef struct {
     lv_obj_t *top;    // the label that sits at the top line
@@ -1163,9 +1164,16 @@ void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_
 	else if (ui_btns->right_btn == 1 && wifi_menu->index == 2) {
 		// Hide Wi-Fi menu
 		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
+			
+		// Show scan menu
+		lv_obj_remove_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+			
 		// Reset static
 		do_once = false;
+		
+		monitoring_packets = true;
+			
+		ui_menu->page = WIFI_SCAN_PAGE;
 	}
 	// Sync with PolyPlug
 	else if (ui_btns->right_btn == 1 && wifi_menu->index == 3) {

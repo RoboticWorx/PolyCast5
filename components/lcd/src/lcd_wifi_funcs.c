@@ -1,4 +1,6 @@
 #include "core/lv_obj.h"
+#include "misc/lv_area.h"
+#include "misc/lv_color.h"
 #include "polycast5_macros.h"
 
 #include "core/lv_obj_pos.h"
@@ -27,6 +29,8 @@ wifi_menu_t wifi_menu = {
 };
 
 wifi_login_t selected_network = {0};
+
+bool monitoring_packets = false;
 
 static const char* TAG = "LCD_WIFI_FUNCS";
 
@@ -261,41 +265,60 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 	static bool scanning = false;
 	
 	static uint8_t bssids[WIFI_MAX_NETWORKS][6];
+	static uint8_t channels[WIFI_MAX_NETWORKS];
 	
 	// Do once
-    if (!initialized) {        				 
-		// Option label
-        lbl_option = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_option, "or press down to scan", user_secondary_color,
-					 &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -10);
+    if (!initialized) {        	
+		if (!monitoring_packets) {			 
+			// Option label
+	        lbl_option = lv_label_create(ACTIVE_SCR);
+			lcd_format_label(lbl_option, "or press down to scan", user_secondary_color,
+						 &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -10);
 					 		
-		/* Add prev button */
-        char buf[16];
-        snprintf(buf, sizeof(buf), "Connect to last");
-        
-        // Create button
-        wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size] = lv_list_add_btn(wifi_menu->scan_menu.main_list, NULL, buf);
-        lv_obj_set_size(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size], 200, 30);
-
-        // Style selected
-        lv_obj_add_style(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size], &wifi_menu->scan_menu.sel_style, 0);
-
-        // Create and format text label
-        lv_obj_t *lbl = lv_obj_get_child(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size], 0);
-        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
-        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
-        
-        // Format buttons as container
-	    wifi_menu->scan_menu.cont = lv_obj_get_parent(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size]);
-	    lv_obj_set_flex_flow(wifi_menu->scan_menu.cont, LV_FLEX_FLOW_COLUMN);
-	    lv_obj_set_flex_align(wifi_menu->scan_menu.cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-	    lv_obj_set_style_pad_gap(wifi_menu->scan_menu.cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT); // Set button spacing
+		
+			/* Add prev button */
+	        char buf[16];
+	        snprintf(buf, sizeof(buf), "Connect to last");
+	        
+	        // Create button
+	        wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size] = lv_list_add_btn(wifi_menu->scan_menu.main_list, NULL, buf);
+	        lv_obj_set_size(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size], 200, 30);
+	
+	        // Style selected
+	        lv_obj_add_style(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size], &wifi_menu->scan_menu.sel_style, 0);
+	
+	        // Create and format text label
+	        lv_obj_t *lbl = lv_obj_get_child(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size], 0);
+	        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+	        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+	        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+	        
+	        // Format buttons as container
+		    wifi_menu->scan_menu.cont = lv_obj_get_parent(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size]);
+		    lv_obj_set_flex_flow(wifi_menu->scan_menu.cont, LV_FLEX_FLOW_COLUMN);
+		    lv_obj_set_flex_align(wifi_menu->scan_menu.cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+		    lv_obj_set_style_pad_gap(wifi_menu->scan_menu.cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT); // Set button spacing
+		    
+		    wifi_menu->scan_menu.size++; // One larger
+		    
+		    lv_timer_handler(); // Show
+		}
+		else {
+			// Disconnect if connected
+			xSemaphoreGive(xWifiDisconnectSemaphore);
+			
+			lbl_wait = lv_label_create(ACTIVE_SCR);
+			lcd_format_label(lbl_wait, "Scanning for networks...\nPlease wait, then select\na network to monitor.", user_secondary_color,
+						 &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
+						 						 
+			lv_timer_handler(); // Show
+							 
+			// Start scan
+			xSemaphoreGive(xWifiStartScanSemaphore);
+			
+			scanning = true;
+		}
 	    
-	    wifi_menu->scan_menu.size++; // One larger
-	    
-		lv_timer_handler(); // Show
-					 					 
 		initialized = true;
     }
 
@@ -319,6 +342,8 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		locked[wifi_menu->scan_menu.size] = (result.auth != 0) ? true : false; 
 		// Copy BSSID
 		memcpy(bssids[wifi_menu->scan_menu.size], result.bssid, sizeof(result.bssid));
+		// Copy channel
+		channels[wifi_menu->scan_menu.size] = result.channel;
 		
 		// Format SSID
         char buf[33];
@@ -342,6 +367,12 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
         lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
         
+        // Format buttons as container
+		wifi_menu->scan_menu.cont = lv_obj_get_parent(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size]);
+		lv_obj_set_flex_flow(wifi_menu->scan_menu.cont, LV_FLEX_FLOW_COLUMN);
+		lv_obj_set_flex_align(wifi_menu->scan_menu.cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+		lv_obj_set_style_pad_gap(wifi_menu->scan_menu.cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT); // Set button spacing
+        
         // Size one bigger now
         wifi_menu->scan_menu.size++;
     }
@@ -351,8 +382,8 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		wifi_menu->scan_menu.index--;
 		lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
 	}
-	// Scan requested
-	else if (!scanned && ui_btns->down_btn == 1) {
+	// Scan requested - not monitoring
+	else if (!scanned && ui_btns->down_btn == 1 && !monitoring_packets) {
 		if (lbl_option) { // Delete if exists
 			lv_obj_delete(lbl_option);
 			lbl_option = NULL;
@@ -383,11 +414,13 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		}
 		
 		// Reset
+		monitoring_packets = false;
 		initialized = false;
 		scanned = false;
-		for(int i = 0; i < WIFI_MAX_NETWORKS; i++) {
+		for(int i = 0; i < wifi_menu->scan_menu.size; i++) {
 			locked[i] = false;
 			memset(bssids[i], 0, sizeof(bssids[i]));
+			channels[i] = 0;
 		}
 		wifi_menu->scan_menu.size = 0;
 		wifi_menu->scan_menu.index = 0;
@@ -406,7 +439,7 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		ui_menu->page = WIFI_PAGE;
 	}
 	// If connecting to last known
-	else if (ui_btns->right_btn == 1 && wifi_menu->scan_menu.index == 0 && !scanning) {
+	else if (ui_btns->right_btn == 1 && wifi_menu->scan_menu.index == 0 && !scanning && !monitoring_packets) {
 		if (lbl_option) { // Delete if exists
 			lv_obj_delete(lbl_option);
 			lbl_option = NULL;
@@ -420,11 +453,13 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		}
 		
 		// Reset
+		monitoring_packets = false;
 		initialized = false;
 		scanned = false;
 		for(int i = 0; i < wifi_menu->scan_menu.size; i++) {
 			locked[i] = false;
 			memset(bssids[i], 0, sizeof(bssids[i]));
+			channels[i] = 0;
 		}
 		wifi_menu->scan_menu.size = 0;
 		wifi_menu->scan_menu.index = 0;
@@ -444,69 +479,113 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 	}
 	// Network selected
 	else if (scanned && ui_btns->right_btn == 1) {
-		selected_network.prev = false; // Connecting to new
-		
-		// Copy over SSID
-		lv_obj_t *btn = wifi_menu->scan_menu.btns[wifi_menu->scan_menu.index];
-	    lv_obj_t *lbl = lv_obj_get_child(btn, 0);
-	    const char *ssid = lv_label_get_text(lbl);
-	    strlcpy((char*)selected_network.ssid, ssid, sizeof(selected_network.ssid));
-	    
-	    // Copy BSSID
-	    memcpy(selected_network.bssid, bssids[wifi_menu->scan_menu.index], sizeof(bssids[wifi_menu->scan_menu.index]));
-		
-		// If network requires password
-	    if (locked[wifi_menu->scan_menu.index]) {
-			// Reset
-			initialized = false;
-			scanned = false;
-			for(int i = 0; i < wifi_menu->scan_menu.size; i++) {
-			    locked[i] = false;
-			    memset(bssids[i], 0, sizeof(bssids[i]));
-			}
-			wifi_menu->scan_menu.size = 0;
-			wifi_menu->scan_menu.index = 0;
-			lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
+		// Connecting to usual network
+		if (!monitoring_packets) {
+			selected_network.prev = false; // Connecting to new
 			
-			// Clear children
-			lv_obj_clean(wifi_menu->scan_menu.main_list);
-			
-			// Hide scan menu
-			lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
-			
-			// Switch pages
-			ui_menu->page = WIFI_PASSWORD_PAGE;
-		}
-		// Else open network: go ahead and send
-		else {
-			selected_network.locked = false; // Doesn't require password
-			
-	    	if (xQueueSend(xWifiSelectedNetworkQueue, &selected_network, portMAX_DELAY) != pdPASS) {
-		        ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue SSID");
-		    }
+			// Copy over SSID
+			lv_obj_t *btn = wifi_menu->scan_menu.btns[wifi_menu->scan_menu.index];
+		    lv_obj_t *lbl = lv_obj_get_child(btn, 0);
+		    const char *ssid = lv_label_get_text(lbl);
+		    strlcpy((char*)selected_network.ssid, ssid, sizeof(selected_network.ssid));
 		    
-		    // Reset
+		    // Copy BSSID
+		    memcpy(selected_network.bssid, bssids[wifi_menu->scan_menu.index], sizeof(bssids[wifi_menu->scan_menu.index]));
+			
+			// If network requires password
+		    if (locked[wifi_menu->scan_menu.index]) {
+				// Reset
+				monitoring_packets = false;
+				initialized = false;
+				scanned = false;
+				for(int i = 0; i < wifi_menu->scan_menu.size; i++) {
+				    locked[i] = false;
+				    memset(bssids[i], 0, sizeof(bssids[i]));
+				    channels[i] = 0;
+				}
+				wifi_menu->scan_menu.size = 0;
+				wifi_menu->scan_menu.index = 0;
+				lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
+				
+				// Clear children
+				lv_obj_clean(wifi_menu->scan_menu.main_list);
+				
+				// Hide scan menu
+				lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+				
+				// Switch pages
+				ui_menu->page = WIFI_PASSWORD_PAGE;
+			}
+			// Else open network: go ahead and send
+			else {
+				selected_network.locked = false; // Doesn't require password
+				
+		    	if (xQueueSend(xWifiSelectedNetworkQueue, &selected_network, portMAX_DELAY) != pdPASS) {
+			        ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue SSID");
+			    }
+			    
+			    // Reset
+				monitoring_packets = false;
+				initialized = false;
+				scanned = false;
+				for(int i = 0; i < wifi_menu->scan_menu.size; i++) {
+					locked[i] = false;
+					memset(bssids[i], 0, sizeof(bssids[i]));
+					channels[i] = 0;
+				}
+				wifi_menu->scan_menu.size = 0;
+				wifi_menu->scan_menu.index = 0;
+				lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
+				
+				// Clear children
+				lv_obj_clean(wifi_menu->scan_menu.main_list);
+				
+				// Hide scan menu
+				lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+				
+				// Show Wi-Fi menu
+				lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+				
+				// Switch pages
+				ui_menu->page = WIFI_PAGE;
+			}
+		}
+		// Monitoring packets
+		else {
+			wifi_sniff_t sniff_network;
+			// Copy in data
+			// Copy channel
+			sniff_network.channel = channels[wifi_menu->scan_menu.index];
+			// Copy BSSID
+			memcpy(sniff_network.target_bssid, bssids[wifi_menu->scan_menu.index], sizeof(bssids[wifi_menu->scan_menu.index]));
+			// Set mask
+			sniff_network.mask = 1; // 1 = WIFI_PROMIS_FILTER_MASK_MGMT
+				
+		    if (xQueueSend(xWifiSniffQueue, &sniff_network, portMAX_DELAY) != pdPASS) {
+			    ESP_LOGE(TAG, "Failed: xWifiSniffQueue");
+			}
+			    
+			// Reset
+			monitoring_packets = false;
 			initialized = false;
 			scanned = false;
 			for(int i = 0; i < wifi_menu->scan_menu.size; i++) {
 				locked[i] = false;
 				memset(bssids[i], 0, sizeof(bssids[i]));
+				channels[i] = 0;
 			}
 			wifi_menu->scan_menu.size = 0;
 			wifi_menu->scan_menu.index = 0;
 			lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
-			
+				
 			// Clear children
 			lv_obj_clean(wifi_menu->scan_menu.main_list);
-			
+				
 			// Hide scan menu
 			lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
-			
-			// Show Wi-Fi menu
-			lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-			
+				
 			// Switch pages
-			ui_menu->page = WIFI_PAGE;
+			ui_menu->page = WIFI_BEACON_PAGE;
 		}
 	}
 }
@@ -686,7 +765,148 @@ void lcd_wifi_get_password(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t
     }
 }
 
+void lcd_wifi_beacon_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
+{
+	#define SCROLL_STEP 53  // Pixels per button-press
+	
+    static bool init = false;
+    static lv_obj_t *cont;
+    static lv_obj_t *chart;
+    static lv_chart_series_t *series;
+    static lv_obj_t *lbl_rssi;
+    static lv_obj_t *lbl_snr;
+    static lv_obj_t *lbl_scroll;
+    static lv_obj_t *lbl_info;
 
+    if(!init) {
+        // Create a scrollable container
+        cont = lv_obj_create(ACTIVE_SCR);
+        // Format
+        lv_obj_align(cont, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(cont, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_size(cont, 210, 106);
+        lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+        lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_ON);
 
+        // Chart at the top
+        chart = lv_chart_create(cont);
+        // Format
+        lv_obj_set_size(chart, 186, 60);
+        lv_obj_align(chart, LV_ALIGN_CENTER, 0, 0);
+		lv_obj_set_style_bg_color(chart, lv_color_black(), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_chart_set_type(chart, LV_CHART_TYPE_BAR);
+        lv_chart_set_point_count(chart, 40);
+        lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, 0, 60);
+        lv_chart_set_update_mode(chart, LV_CHART_UPDATE_MODE_SHIFT);
+        
+        // Bar
+        series = lv_chart_add_series(chart, lv_palette_main(LV_PALETTE_GREEN), LV_CHART_AXIS_PRIMARY_Y);
+        // Styling
+        lv_obj_set_style_width(chart, 8, LV_PART_INDICATOR);
+        lv_obj_set_style_pad_column(chart, 2, LV_PART_MAIN);
+        lv_obj_set_style_bg_color(chart, lv_palette_main(LV_PALETTE_GREEN), LV_PART_ITEMS);
+        
+        // Text above
+        lbl_rssi = lv_label_create(cont);
+        lcd_format_label(lbl_rssi, "RSSI: ", user_secondary_color,
+						 &lv_font_montserrat_16, LV_ALIGN_TOP_LEFT, 0, -10);
+						 
+		lbl_snr = lv_label_create(cont);
+        lcd_format_label(lbl_snr, "SNR: ", user_secondary_color,
+						 &lv_font_montserrat_16, LV_ALIGN_TOP_RIGHT, -5, -10);
+						 
+		lbl_scroll = lv_label_create(cont);
+        lcd_format_label(lbl_scroll, "SCROLL", user_secondary_color,
+						 &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, 15);
 
+        // Text below
+        lbl_info = lv_label_create(cont);
+        lcd_format_label(lbl_info, "", user_secondary_color,
+						 &lv_font_montserrat_16, LV_ALIGN_BOTTOM_LEFT, 0, 265);
+        lv_label_set_long_mode(lbl_info, LV_LABEL_LONG_WRAP);
+        lv_label_set_text(lbl_info, "Configuring...");
+
+        init = true;
+    }
+
+    // On each new beacon
+    wifi_beacon_t beacon;
+    if(xQueueReceive(xWifiSnrQueue, &beacon, 0) == pdTRUE) {
+		//ESP_LOGI(TAG, "RX REC %d", current_snr);
+        lv_chart_set_next_value(chart, series, beacon.snr);
+        lv_chart_refresh(chart);
+        
+        // Update SNR text
+        char snr_buf[10];
+        snprintf(snr_buf, sizeof(snr_buf), "SNR: %d", beacon.snr);
+        lv_label_set_text(lbl_snr, snr_buf);
+        
+        // Update RSSI text
+        char rssi_buf[11];
+        snprintf(rssi_buf, sizeof(rssi_buf), "RSSI: %d", beacon.rssi);
+        lv_label_set_text(lbl_rssi, rssi_buf);
+        
+        // Update other text
+        char txt_buf[256];
+        const char *sec = (beacon.rsn && beacon.wpa) ? "WPA/RSN" : (beacon.rsn) ? "RSN" : (beacon.wpa) ? "WPA" : "Open";
+        // beacon.timestamp is in seconds
+        uint64_t timestamp_mins = beacon.timestamp / 60; 
+        uint64_t timestamp_days = beacon.timestamp / (24 * 60 * 60); 
+        
+	    int len = snprintf(txt_buf, sizeof(txt_buf),
+	        "SSID:\n - %.16s...\n"
+	        "Channel:\n - %u\n"
+	        "Freq:\n - %d MHz or %.3f GHz\n"
+	        "Security:\n - %s\n"
+	        "Compatibility Code:\n - 0x%04X\n"
+	        "Beacon Interval:\n - %u ms\n"
+	        "Time since reboot:\n - %" PRIu64 "m or %" PRIu64 " days",
+	        beacon.ssid,
+	        beacon.channel,
+	        beacon.freq,
+	        beacon.freq / 1000.0f,
+	        sec,
+	        beacon.cap_info,
+	        beacon.interval,
+	        timestamp_mins, // Minutes
+	        timestamp_days // Days
+	    );
+	    // Check for truncation
+	    if(len < 0 || (size_t)len >= sizeof(txt_buf)) {
+	        ESP_LOGE(TAG, "Label truncation: lcd_wifi_beacon_page");
+	    }
+	    else {
+			lv_label_set_text(lbl_info, txt_buf);
+		}
+    }
+    
+    // Scroll down
+    if (ui_btns->down_btn) {
+        lv_obj_scroll_by(cont, 0, -SCROLL_STEP, true);
+    }
+    // Scroll up
+    else if (ui_btns->up_btn) {
+        lv_obj_scroll_by(cont, 0, SCROLL_STEP, true);
+    }
+    // Back
+    else if (ui_btns->left_btn) {
+        // Delete obj
+        lv_obj_delete(cont); // Also deletes children
+        
+        // Reset statics
+        init = false;
+	    cont = chart = lbl_rssi = lbl_snr = lbl_scroll = lbl_info = NULL;
+	    series = NULL;
+	    
+	    // Turn off Wi-Fi
+	    xSemaphoreGive(xWifiDisconnectSemaphore);
+		
+		// Show Wi-Fi menu
+		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = WIFI_PAGE;
+    }
+}
 

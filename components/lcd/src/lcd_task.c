@@ -215,6 +215,9 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == WIFI_PASSWORD_PAGE) {
 				lcd_wifi_get_password(&ui_menu, &wifi_menu, &ui_btns);
 			}
+			else if (ui_menu.page == WIFI_BEACON_PAGE) {
+				lcd_wifi_beacon_page(&ui_menu, &wifi_menu, &ui_btns);
+			}
 		}
 						
 		// Sleep condition

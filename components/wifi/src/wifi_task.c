@@ -19,9 +19,12 @@ extern bool wifi_connected;
 
 static wifi_scan_t wifi_scan[WIFI_MAX_NETWORKS];
 static wifi_login_t selected_network;
+static wifi_sniff_t sniff_network;
 
 QueueHandle_t xWifiScanQueue;
 QueueHandle_t xWifiSelectedNetworkQueue;
+QueueHandle_t xWifiSniffQueue;
+QueueHandle_t xWifiSnrQueue;
 
 SemaphoreHandle_t xWifiStartScanSemaphore;
 SemaphoreHandle_t xWifiNetworkConnectedSemaphore;
@@ -39,6 +42,8 @@ static void wifi_task(void *param)
 	
 	xWifiScanQueue = xQueueCreate(WIFI_MAX_NETWORKS, sizeof(wifi_scan_t));
 	xWifiSelectedNetworkQueue = xQueueCreate(1, sizeof(wifi_login_t));
+	xWifiSniffQueue = xQueueCreate(1, sizeof(wifi_sniff_t));
+	xWifiSnrQueue = xQueueCreate(1, sizeof(wifi_beacon_t));
 	
 	wifi_funcs_wifi_event_init();
 	
@@ -79,6 +84,17 @@ static void wifi_task(void *param)
 		// Wi-Fi is actively connected
 		if (wifi_connected) {
 			wifi_funcs_get_current_date_time();
+		}
+		
+		if (xQueueReceive(xWifiSniffQueue, &sniff_network, 0) == pdTRUE) {
+			#ifdef POLYCAST5_DEBUG
+				ESP_LOGI(TAG, "xWifiSniffQueue received: mask='%d', channel='%u'", sniff_network.mask, sniff_network.channel);
+				ESP_LOGI(TAG, "xWifiSniffQueue received: bssid='%02x:%02x:%02x:%02x:%02x:%02x'",
+				    sniff_network.target_bssid[0], sniff_network.target_bssid[1], sniff_network.target_bssid[2],
+				    sniff_network.target_bssid[3], sniff_network.target_bssid[4], sniff_network.target_bssid[5]);
+			#endif
+			
+			wifi_funcs_init_promiscuous(&sniff_network);
 		}
     
 		vTaskDelay(pdMS_TO_TICKS(10));

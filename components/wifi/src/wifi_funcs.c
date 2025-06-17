@@ -17,12 +17,19 @@
 
 #define TAG "WIFI_FUNCS"
 
-#define WIFI_CONNECTED_BIT    (1 << 0)
+#define WIFI_CONNECTED_BIT (1 << 0)
 #define WIFI_DISCONNECTED_BIT (1 << 1)
 
-bool wifi_connected = false;
+/* Helpers to pull type/subtype from the 802.11 frame control */
+#define FC_TYPE(fc)    (((fc) & 0x0C) >> 2)
+#define FC_SUBTYPE(fc) (((fc) & 0xF0) >> 4)
+#define TYPE_MGMT      0x00
+#define SUBTYPE_BEACON 0x08
 
+static uint8_t target_bssid[6] = { 0x60, 0x55, 0xF9, 0xFC, 0xDE, 0xA8 };
 static EventGroupHandle_t wifi_event_group;
+
+bool wifi_connected = false;
 
 esp_err_t wifi_funcs_scan(wifi_scan_t *wifi_scan)
 {
@@ -321,4 +328,199 @@ wifi_login_t wifi_funcs_get_prev(void)
 	return prev;
 }
 
+static void wifi_sniffer_cb(void* buf, wifi_promiscuous_pkt_type_t type)
+{
+	static volatile uint32_t frames_seen = 0;
+	frames_seen++;
+	
+	#ifdef POLYCAST5_DEBUG
+		if (frames_seen % 100 == 0) { // Every 100 frames
+		    ESP_LOGI(TAG, "sniffer: %u frames so far\r\n", frames_seen);
+		}
+	#endif
+
+	// Make sure only management frames
+    if (type != WIFI_PKT_MGMT) {
+        return;
+    }
+    wifi_promiscuous_pkt_t *pkt = (wifi_promiscuous_pkt_t*)buf;
+    
+    // Points to the raw 802.11 frame bytes
+    uint8_t *frame = pkt->payload;
+    
+    // frame_ctrl == first two bytes
+    uint16_t frame_ctrl = (frame[1] << 8) | frame[0];
+    
+    // bits [3:2] give Type (00=Mgmt, 01=Control, 10=Data)
+	// bits [7:4] give Subtype (1000=Beacon)
+	// Check if management beacon frame
+    if (FC_TYPE(frame_ctrl) != TYPE_MGMT || FC_SUBTYPE(frame_ctrl) != SUBTYPE_BEACON) {
+        return;
+    }
+    
+    // Addresses: bytes 4–9 = SA, 10–15 = DA, 16–21 = BSSID (for beacon)
+    uint8_t *bssid = &frame[16];
+    
+    // Filter for target BSSID
+    if (memcmp(bssid, target_bssid, 6) != 0) {
+        return;
+    }
+
+    // After the 24-byte MAC header comes:
+    // 8 bytes timestamp | 2 bytes interval | 2 bytes capability info
+    uint8_t *fixed = frame + 24;
+    uint64_t timestamp;
+    uint16_t interval, cap_info;
+    memcpy(&timestamp, fixed + 0, sizeof(timestamp));
+    memcpy(&interval, fixed + 8, sizeof(interval));
+    memcpy(&cap_info, fixed + 10, sizeof(cap_info));
+    
+    // Convert timestamp from µs to days (time since last reboot)
+    uint64_t timestamp_seconds = timestamp / 1000000; 
+    uint64_t timestamp_days = timestamp_seconds / (24 * 60 * 60); 
+    
+    uint8_t *ie = fixed + 12; // Information element (IE) starts 8 + 2 + 2 from 24
+	int rem = pkt->rx_ctrl.sig_len - (ie - frame); // Remaining length of packet
+	
+	int channel = pkt->rx_ctrl.channel; // Works on both 2.4GHz and 5GHz
+	bool has_rsn = false, has_wpa = false; // Flags to see if they exist
+	char ssid[33] = {0}; // SSID buffer
+	
+	// Walk through bytes
+	while (rem >= 2) {
+	    uint8_t id = ie[0], len = ie[1]; // Tag ID and packet length
+	    
+	    // Make sure tag valid
+	    if (len + 2 > rem) {
+			break;
+		}
+		
+	    uint8_t *data = ie + 2; // Data pointer
+	
+	    switch (id) {
+	        case 0: // SSID
+	        	if (len < sizeof(ssid)) {
+					memcpy(ssid, data, len);
+				}
+				break;
+				
+	        case 3: // DS Parameter Set (2.4 GHz channel)
+	        	if (channel == 0) {
+					channel = data[0];
+				}
+				break;
+				
+	        case 48: // RSN (WPA2/WPA3) IE
+	        	has_rsn = true;
+				break;
+				
+	        case 221: // Catch-all for vendor-specific IEs
+	            if (len >= 4 && data[0] == 0x00 && data[1] == 0x50 && data[2] == 0xF2 && data[3] == 0x01) {
+					has_wpa = true;
+				}
+	            break;
+	    }
+	    
+	    // Iterate pointer and remainder is less
+	    ie += len + 2;
+	    rem -= len + 2;
+	}
+	
+	// Get frequency
+	int freq_mhz = 0;
+	if (channel >= 1  && channel <= 14) {
+		freq_mhz = 2412 + 5 * (channel - 1);
+	}
+	else if (channel >= 36 && channel <= 165) {
+		freq_mhz = 5000 + (5 * channel);
+	}
+	
+	// Get SNR
+	int snr_db = pkt->rx_ctrl.rssi - pkt->rx_ctrl.noise_floor;
+	
+	#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "SSID: %s | Channel: %d (%d MHz) | RSSI: %d dBm | SNR: %d dB | Encryption: %s | TS=%llu days | intvl=%u ms | cap=0x%04x",
+		    ssid, channel, freq_mhz, pkt->rx_ctrl.rssi, snr_db,
+		    has_rsn ? "WPA2/3" : has_wpa ? "WPA" : (cap_info & 0x10) ? "WEP" : "Open",
+		    timestamp_days, interval, cap_info);
+	#endif
+	
+	// Populate and send
+	wifi_beacon_t beacon;
+	strlcpy((char*)beacon.ssid, ssid, sizeof(beacon.ssid));
+	beacon.channel = channel;
+	beacon.freq = freq_mhz;
+	beacon.rssi = pkt->rx_ctrl.rssi;
+	beacon.snr = snr_db;
+	beacon.rsn = has_rsn;
+	beacon.wpa = has_wpa;
+	beacon.cap_info = cap_info;
+	beacon.interval = interval;
+	beacon.timestamp = timestamp_seconds;
+	xQueueSend(xWifiSnrQueue, &beacon, 0);
+    
+    /*
+    Capability Information (cap_info): A 16-bit bitmask of the AP’s capabilities, defined by IEEE 802.11
+    Example: cap=0x1431 -> binary 0001 0100 0011 0001
+    
+    | Bit | Name                | Value  | Set? | Meaning                                 |
+	| --- | ------------------- | ------ | ---- | --------------------------------------- |
+	| 0   | ESS                 | 1      | 1    | Infrastructure network (not IBSS).      |
+	| 1   | IBSS                | 2      | 0    | Ad hoc mode (not set).                  |
+	| 2   | CF‐Pollable         | 4      | 0    | Contention‐free polling (not set).      |
+	| 3   | CF‐PollRequest      | 8      | 0    | Contention‐free request (not set).      |
+	| 4   | Privacy             | 0x10   | 1    | WEP/WPA/WPA2 encryption supported.      |
+	| 5   | Short Preamble      | 0x20   | 1    | Supports “short” preamble (faster RX).  |
+	| 6   | PBCC                | 0x40   | 0    | Packet Binary Convolutional Code (no).  |
+	| 7   | Channel Agility     | 0x80   | 0    | Dynamic channel switching (no).         |
+	| 8   | Spectrum Management | 0x100  | 0    | 5 GHz regulatory features (no).         |
+	| 9   | QoS AP              | 0x200  | 0    | Quality‐of‐Service AP (no).             |
+	| 10  | Short Slot Time     | 0x400  | 1    | 9 µs slot instead of 20 µs.             |
+	| 11  | APSD                | 0x800  | 0    | Automatic Power‐Save Delivery (no).     |
+	| 12  | Radio Measurement   | 0x1000 | 1    | 802.11k measurement (survey) supported. |
+	| 13  | DSSS‐OFDM           | 0x2000 | 0    | Mixed‐mode DSSS/OFDM (no).              |
+	| 14  | Delayed Block Ack   | 0x4000 | 0    | (802.11e feature) (no).                 |
+	| 15  | Immediate Block Ack | 0x8000 | 0    | (802.11e feature) (no).                 |
+	
+	So 0x1431 tells you your AP is:
+		- ESS (infrastructure AP, not ad-hoc)
+		- Privacy (it’s encrypting traffic)
+		- Short Preamble (can use faster preamble)
+		- Short Slot Time (9 µs slots for faster contention)
+		- Radio Measurement (it supports 802.11k measurement features)
+    */
+}
+
+void wifi_funcs_init_promiscuous(wifi_sniff_t *network)
+{
+	// Start up the radio
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_start());
+    
+    // Fix the channel to the target AP
+    ESP_ERROR_CHECK(esp_wifi_set_channel(network->channel, WIFI_SECOND_CHAN_NONE));
+    
+    // Only management frames
+	wifi_promiscuous_filter_t filter = {
+		// 1 = WIFI_PROMIS_FILTER_MASK_MGMT
+        .filter_mask = (network->mask == 1) ? WIFI_PROMIS_FILTER_MASK_MGMT : WIFI_PROMIS_FILTER_MASK_DATA
+    };
+    
+    // Copy passed bssid into global
+    memcpy(target_bssid, network->target_bssid, 6);
+    
+    // Filter for matching packets
+    ESP_ERROR_CHECK(esp_wifi_set_promiscuous_filter(&filter));
+
+    // Register callback and enable promiscuous mode
+    ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_cb));
+    ESP_ERROR_CHECK(esp_wifi_set_promiscuous(true));
+
+	#ifdef POLYCAST5_DEBUG
+	    ESP_LOGI(TAG, "Sniffer initialized; filtering beacon frames from %02x:%02x:%02x:%02x:%02x:%02x",
+	         network->target_bssid[0], network->target_bssid[1],
+	         network->target_bssid[2], network->target_bssid[3],
+	         network->target_bssid[4], network->target_bssid[5]);
+    #endif
+}
 
