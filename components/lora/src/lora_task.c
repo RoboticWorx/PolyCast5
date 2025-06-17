@@ -269,6 +269,7 @@ static void lora_event_handler_task(void *pvParameters) {
 			if (irq_flags & SX126X_IRQ_TIMEOUT) {
 				ESP_LOGW(TAG, "RX timeout occurred");
 				sx126x_clear_irq_status(NULL, SX126X_IRQ_TIMEOUT);
+				sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
 			}
 
 			if (irq_flags & SX126X_IRQ_HEADER_ERROR) {

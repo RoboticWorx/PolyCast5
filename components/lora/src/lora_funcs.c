@@ -36,20 +36,19 @@ void lora_generate_random_key(void)
 
 void lora_set_rx_mode(void) // Call once to set RX mode and receive on EXTI8
 {
+	#define RTC_FREQ_HZ 32768U
+	#define MS_TO_RTC_STEP(ms) ((uint32_t)(((uint64_t)(ms) * RTC_FREQ_HZ) / 1000U))
 
 	while (gpio_get_level(SX126X_BUSY_PIN) == 1) {
 		vTaskDelay(pdMS_TO_TICKS(1)); // Poll for SX1262 to be ready
 	}
 
-	// gpio_set_level(SX126X_DIO2_PIN, 1);
-
-	// Enter continuous RX mode
-	sx126x_status_t status = sx126x_set_rx(
-		NULL,
-		SX126X_RX_SINGLE_MODE); // sx126x_set_rx_with_timeout_in_rtc_step(NULL,
-								// SX126X_RX_SINGLE_MODE);
+	// Enter RX mode
+	// Use timeout in case receipt is never received
+	uint32_t timeout_steps = MS_TO_RTC_STEP(2000);
+    sx126x_status_t status = sx126x_set_rx_with_timeout_in_rtc_step(NULL, timeout_steps);
 	if (status != SX126X_STATUS_OK) {
-		printf("Failed to enter continuous RX mode\n");
+		ESP_LOGE(TAG, "Failed to enter continuous RX mode\n");
 		return;
 	}
 }
@@ -62,14 +61,14 @@ void lora_tx(uint8_t tx_data[], uint8_t data_len) {
 
 	sx126x_status_t status = sx126x_write_buffer(NULL, 0, tx_data, data_len);
 	if (status != SX126X_STATUS_OK) {
-		printf("Failed to write to buffer\n");
+		ESP_LOGE(TAG, "Failed to write to buffer\n");
 	}
 
 	// Start transmission
 	status = sx126x_set_tx(NULL, SX126X_MAX_TIMEOUT_IN_MS);
 
 	if (status != SX126X_STATUS_OK) {
-		printf("Failed to start transmission\n");
+		ESP_LOGE(TAG, "Failed to start transmission\n");
 	}
 }
 
@@ -77,13 +76,13 @@ void lora_process_received_message(uint8_t *message, size_t message_len) {
 	// Verify that the message length is at least 16 bytes (for IV) + 16 bytes
 	// (minimum ciphertext)
 	if (message_len < 32) {
-		printf("Received message too short!\n");
+		ESP_LOGE(TAG, "Received message too short!\n");
 		return;
 	}
 
 	// The expected message length is 80 bytes (16 IV + 64 cyphertext)
 	if (message_len != CYPHERTEXT_LENGTH + 16) {
-		printf("Unexpected message length: %u bytes\n", (unsigned)message_len);
+		ESP_LOGE(TAG, "Unexpected message length: %u bytes\n", (unsigned)message_len);
 		return;
 	}
 
@@ -139,11 +138,11 @@ void lora_encrypt_and_transmit(uint8_t plaintext[]) {
 	uint8_t iv[IV_LENGTH];				// To hold IV
 	generate_random_iv(iv, sizeof(iv)); // Generate random IV into iv[16]
 
-	/*printf("Generated IV: ");
+	/*ESP_LOGE(TAG, "Generated IV: ");
 	for (int i = 0; i < 16; i++) {
-		printf("%02X ", iv[i]);
+		ESP_LOGE(TAG, "%02X ", iv[i]);
 	}
-	printf("\n");*/
+	ESP_LOGE(TAG, "\n");*/
 
 	struct AES_ctx ctx;
 	AES_init_ctx_iv(&ctx, encryption_key,
@@ -156,18 +155,12 @@ void lora_encrypt_and_transmit(uint8_t plaintext[]) {
 	memcpy(message + IV_LENGTH, buffer,
 		   CYPHERTEXT_LENGTH); // Next are the cyphertext
 
-	/*printf("Message to send (hex): ");
+	/*ESP_LOGE(TAG, "Message to send (hex): ");
 	for (int i = 0; i < (int)sizeof(message); i++)
 	{
-		printf("%02X ", message[i]);
+		ESP_LOGE(TAG, "%02X ", message[i]);
 	}
-	printf("\n");*/
-
-	// osStatus_t status = osMessageQueuePut(lora_hex_queue_tx, message, 0, 0);
-	// if (status != osOK)
-	//{
-	//	printf("Failed to send data to lora_hex_queue_tx\n");
-	// }
+	ESP_LOGE(TAG, "\n");*/
 
 	lora_tx(message, sizeof(message)); // Send the data
 }
