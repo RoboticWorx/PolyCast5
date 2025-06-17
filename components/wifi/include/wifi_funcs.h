@@ -7,6 +7,8 @@
 
 #define WIFI_MAX_NETWORKS 20
 
+#define MAX_MAC_CLIENTS 100
+
 typedef struct {
     uint8_t ssid[33];
     uint8_t bssid[6];
@@ -32,7 +34,7 @@ typedef struct {
 
 typedef struct {
 	char ssid[33];
-    uint8_t channel;
+    int channel;
     int freq;
     int rssi;
     int snr;
@@ -42,7 +44,19 @@ typedef struct {
     uint16_t interval;
     uint64_t timestamp;
 } wifi_beacon_t;
-//SSID: %s | Channel: %d (%d MHz) | RSSI: %d dBm | SNR: %d dB | Encryption: %s | TS=%llu days | intvl=%u ms | cap=0x%04x
+
+typedef struct {
+    uint8_t mac[6];
+    int8_t  rssi;
+    uint32_t last_seen; // In ticks
+} wifi_data_clients_t;
+
+typedef struct {
+    wifi_data_clients_t clients[MAX_MAC_CLIENTS];
+    uint32_t client_count;
+    uint32_t rate;
+    uint32_t channel;
+} wifi_data_t;
 
 //extern wifi_scan_t wifi_scan[WIFI_MAX_NETWORKS];
 

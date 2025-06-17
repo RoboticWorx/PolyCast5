@@ -63,11 +63,12 @@ static void lora_task(void *pvParameters) {
 		ESP_LOGE(TAG, "Failed to create xReceiveEncKeyQueue queue");
 		vTaskDelete(NULL);
 	}
-
+	
 	// Create the LoRa event handler task
-	xTaskCreate(lora_event_handler_task, "lora_event_handler", 4096, NULL, 6,
-				NULL);
-
+	if (xTaskCreate(lora_event_handler_task, "lora_event_handler", 1024 * 3, NULL, tskIDLE_PRIORITY + 3, NULL) != pdPASS) {
+	    ESP_LOGE(TAG, "Failed to start lora_event_handler_task");
+	}
+	
 	sx126x_mod_params_lora_t lora_mod_params = {
 		.sf = SX126X_LORA_SF7, // Spreading factor (higher value sends further
 							   // but takes more time)

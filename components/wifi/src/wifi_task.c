@@ -24,7 +24,8 @@ static wifi_sniff_t sniff_network;
 QueueHandle_t xWifiScanQueue;
 QueueHandle_t xWifiSelectedNetworkQueue;
 QueueHandle_t xWifiSniffQueue;
-QueueHandle_t xWifiSnrQueue;
+QueueHandle_t xWifiBeaconQueue;
+QueueHandle_t xWifiDataQueue;
 
 SemaphoreHandle_t xWifiStartScanSemaphore;
 SemaphoreHandle_t xWifiNetworkConnectedSemaphore;
@@ -43,7 +44,8 @@ static void wifi_task(void *param)
 	xWifiScanQueue = xQueueCreate(WIFI_MAX_NETWORKS, sizeof(wifi_scan_t));
 	xWifiSelectedNetworkQueue = xQueueCreate(1, sizeof(wifi_login_t));
 	xWifiSniffQueue = xQueueCreate(1, sizeof(wifi_sniff_t));
-	xWifiSnrQueue = xQueueCreate(1, sizeof(wifi_beacon_t));
+	xWifiBeaconQueue = xQueueCreate(1, sizeof(wifi_beacon_t));
+	xWifiDataQueue = xQueueCreate(1, sizeof(wifi_data_t));
 	
 	wifi_funcs_wifi_event_init();
 	

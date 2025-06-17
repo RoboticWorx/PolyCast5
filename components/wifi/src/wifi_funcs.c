@@ -23,11 +23,15 @@
 /* Helpers to pull type/subtype from the 802.11 frame control */
 #define FC_TYPE(fc)    (((fc) & 0x0C) >> 2)
 #define FC_SUBTYPE(fc) (((fc) & 0xF0) >> 4)
-#define TYPE_MGMT      0x00
+#define TYPE_MGMT 0x00
 #define SUBTYPE_BEACON 0x08
+
+
 
 static uint8_t target_bssid[6] = { 0x60, 0x55, 0xF9, 0xFC, 0xDE, 0xA8 };
 static EventGroupHandle_t wifi_event_group;
+
+static wifi_data_t wifi_data;
 
 bool wifi_connected = false;
 
@@ -306,12 +310,14 @@ esp_err_t wifi_funcs_radio_stop(void)
     if (esp_wifi_stop() == ESP_OK) {
 		xSemaphoreGive(xWifiNetworkDisconnectedSemaphore);
 		wifi_connected = false;
+		memset(&wifi_data, 0, sizeof(wifi_data)); // Zero out wifi_data if initialized
 		return ESP_OK;
 	}
     
     ESP_LOGE(TAG, "wifi_funcs_radio_stop not ESP_OK");
     
     wifi_connected = false;
+    memset(&wifi_data, 0, sizeof(wifi_data)); // Zero out wifi_data if initialized
     
     return ESP_FAIL;
 }
@@ -328,7 +334,7 @@ wifi_login_t wifi_funcs_get_prev(void)
 	return prev;
 }
 
-static void wifi_sniffer_cb(void* buf, wifi_promiscuous_pkt_type_t type)
+static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 {
 	static volatile uint32_t frames_seen = 0;
 	frames_seen++;
@@ -457,7 +463,7 @@ static void wifi_sniffer_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 	beacon.cap_info = cap_info;
 	beacon.interval = interval;
 	beacon.timestamp = timestamp_seconds;
-	xQueueSend(xWifiSnrQueue, &beacon, 0);
+	xQueueSend(xWifiBeaconQueue, &beacon, 0);
     
     /*
     Capability Information (cap_info): A 16-bit bitmask of the AP’s capabilities, defined by IEEE 802.11
@@ -491,6 +497,91 @@ static void wifi_sniffer_cb(void* buf, wifi_promiscuous_pkt_type_t type)
     */
 }
 
+static void record_client(const uint8_t *mac, int8_t rssi) {
+    uint32_t now = xTaskGetTickCount();
+    
+    // Check if exists
+    for (int i = 0; i < wifi_data.client_count; i++) {
+        if (memcmp(wifi_data.clients[i].mac, mac, 6) == 0) { // If it does, update the rssi and time then exit
+            wifi_data.clients[i].rssi = rssi;
+            wifi_data.clients[i].last_seen = now;
+            
+            return;
+        }
+    }
+    // Else add new
+    if (wifi_data.client_count < MAX_MAC_CLIENTS) {
+        memcpy(wifi_data.clients[wifi_data.client_count].mac, mac, 6);
+        
+        wifi_data.clients[wifi_data.client_count].rssi = rssi;
+        wifi_data.clients[wifi_data.client_count].last_seen = now;
+        wifi_data.client_count++;
+        
+        #ifdef POLYCAST5_DEBUG
+	        ESP_LOGI(TAG, "New MAC found: %02x:%02x:%02x:%02x:%02x:%02x",
+	                 mac[0], mac[1], mac[2],
+	                 mac[3], mac[4], mac[5]);
+        #endif
+    }
+}
+
+static void wifi_sniffer_data_cb(void* buf, wifi_promiscuous_pkt_type_t type)
+{
+	// Make sure a data packet
+    if (type != WIFI_PKT_DATA) {
+		return;
+	}
+
+    wifi_promiscuous_pkt_t *pkt = (wifi_promiscuous_pkt_t*)buf;
+    uint8_t *frame = pkt->payload;
+    // Get frame type
+    uint16_t fc = (frame[1] << 8) | frame[0];
+
+    // Double check: only true 802.11 data
+    if ((fc & 0x0C) != 0x08) {
+		return; // Bits [3:2] == 10
+	}
+
+    bool toDS = fc & 0x0100;
+    bool fromDS = fc & 0x0200;
+    const uint8_t *sa = NULL; // Source MAC pointer
+
+    // Address layout depends on ToDS/FromDS:
+    // [0] Frame Ctrl (2)
+    // [2] Duration (2)
+    // [4] Addr1
+    // [10] Addr2
+    // [16] Addr3
+    // [24] Addr4 (only when both ToDS & FromDS)
+
+	// Find MAC
+    if(!toDS && !fromDS) {
+        // STA to STA
+        sa = &frame[10]; // Addr2
+    }
+    else if(!toDS && fromDS) {
+        // From DS: AP -> STA
+        sa = &frame[16]; // Addr3 is transmitter (the AP’s MAC)
+    }
+    else if(toDS && !fromDS) {
+        // To DS: STA -> AP
+        sa = &frame[10]; // Addr2 is station’s MAC
+    }
+    else {
+        // WDS: mesh or 4-addr; Addr4 is original source
+        sa = &frame[24];
+    }
+
+    int8_t rssi = pkt->rx_ctrl.rssi;
+    
+    // Check uniqueness
+    record_client(sa, rssi);
+
+    wifi_data.rate = pkt->rx_ctrl.rate;
+	wifi_data.channel = pkt->rx_ctrl.channel;
+	xQueueSend(xWifiDataQueue, &wifi_data, 0);
+}
+
 void wifi_funcs_init_promiscuous(wifi_sniff_t *network)
 {
 	// Start up the radio
@@ -513,7 +604,12 @@ void wifi_funcs_init_promiscuous(wifi_sniff_t *network)
     ESP_ERROR_CHECK(esp_wifi_set_promiscuous_filter(&filter));
 
     // Register callback and enable promiscuous mode
-    ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_cb));
+    if (network->mask == 1) {
+		ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_beacon_cb));
+	}
+	else {
+		ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_data_cb));
+	}
     ESP_ERROR_CHECK(esp_wifi_set_promiscuous(true));
 
 	#ifdef POLYCAST5_DEBUG

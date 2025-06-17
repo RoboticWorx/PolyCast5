@@ -46,6 +46,7 @@
 #define WIFI_SCAN_PAGE 18
 #define WIFI_PASSWORD_PAGE 19
 #define WIFI_BEACON_PAGE 20
+#define WIFI_DATA_PAGE 21
 
 extern volatile bool lcd_clear_pending_inputs;
 

@@ -36,6 +36,8 @@ bool monitoring_packets = false;
 
 static const char* TAG = "LCD_WIFI_FUNCS";
 
+static wifi_sniff_t sniff_network;
+
 // Character vars for user input
 static char name_buf[MAX_PASSWORD_LEN + 1] = {0};
 static const char* char_rows[NUM_CHAR_ROWS] = {
@@ -554,7 +556,6 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		}
 		// Monitoring packets
 		else {
-			wifi_sniff_t sniff_network;
 			// Copy in data
 			// Copy channel
 			sniff_network.channel = channels[wifi_menu->scan_menu.index];
@@ -564,7 +565,7 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 			sniff_network.mask = 1; // 1 = WIFI_PROMIS_FILTER_MASK_MGMT
 				
 		    if (xQueueSend(xWifiSniffQueue, &sniff_network, portMAX_DELAY) != pdPASS) {
-			    ESP_LOGE(TAG, "Failed: xWifiSniffQueue");
+			    ESP_LOGE(TAG, "Failed: xWifiSniffQueue beacon");
 			}
 			    
 			// Reset
@@ -888,7 +889,7 @@ void lcd_wifi_beacon_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t 
 
     // On each new beacon
     wifi_beacon_t beacon;
-    if(xQueueReceive(xWifiSnrQueue, &beacon, 0) == pdTRUE) {
+    if(xQueueReceive(xWifiBeaconQueue, &beacon, 0) == pdTRUE) {
 		//ESP_LOGI(TAG, "RX REC %d", current_snr);
         lv_chart_set_next_value(chart, series, beacon.snr);
         lv_chart_refresh(chart);
@@ -912,7 +913,7 @@ void lcd_wifi_beacon_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t 
         
 	    int len = snprintf(txt_buf, sizeof(txt_buf),
 	        "SSID:\n - %.16s...\n"
-	        "Channel:\n - %u\n"
+	        "Channel:\n - %d\n"
 	        "Freq:\n - %d MHz / %.3f GHz\n"
 	        "Security:\n - %s\n"
 	        "Compatibility Code:\n - 0x%04X\n"
@@ -929,7 +930,7 @@ void lcd_wifi_beacon_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t 
 	        timestamp_days // Days
 	    );
 	    // Check for truncation
-	    if(len < 0 || (size_t)len >= sizeof(txt_buf)) {
+	    if (len < 0 || (size_t)len >= sizeof(txt_buf)) {
 	        ESP_LOGE(TAG, "Label truncation: lcd_wifi_beacon_page");
 	    }
 	    else {
@@ -965,5 +966,187 @@ void lcd_wifi_beacon_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t 
 		// Switch pages
 		ui_menu->page = WIFI_PAGE;
     }
+    // Switch to data frames
+    else if (ui_btns->right_btn) {
+        // Delete obj
+        lv_obj_delete(cont); // Also deletes children
+        lv_obj_delete(lbl_data); // Not child of cont
+        
+        // Reset statics
+        init = false;
+	    cont = chart = lbl_rssi = lbl_snr = lbl_scroll = lbl_info = lbl_data = NULL;
+	    series = NULL;
+	    
+	    // Turn off Wi-Fi
+	    xSemaphoreGive(xWifiDisconnectSemaphore);
+	    
+	    // Switch mask
+		sniff_network.mask = 0; // 1 = WIFI_PROMIS_FILTER_MASK_MGMT
+		
+		// Restart
+		if (xQueueSend(xWifiSniffQueue, &sniff_network, portMAX_DELAY) != pdPASS) {
+			ESP_LOGE(TAG, "Failed: xWifiSniffQueue data");
+		}
+		
+		// Switch pages
+		ui_menu->page = WIFI_DATA_PAGE;
+    }
 }
+
+static int cmp_rssi(const void *a,const void *b)
+{
+    const wifi_data_clients_t *A = a, *B = b;
+    return B->rssi - A->rssi;          // descending (-30 dBm above -70 dBm)
+}
+
+void lcd_wifi_data_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
+{
+	#define MAX_BARS 40
+	#define SCROLL_STEP 53 // Pixels per button-press
+
+	// Statics
+    static bool init = false;
+    static lv_obj_t *cont, *chart, *lbl_info, *lbl_clients, *lbl_scroll, *lbl_beacon;
+    static lv_chart_series_t *series;
+
+    // Do once
+    if(!init) {
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		// Create container
+        cont = lv_obj_create(ACTIVE_SCR);
+        // Format
+        lv_obj_align(cont, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(cont, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_size(cont, 210, 106);
+        lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+        lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_ON);
+        
+        // Chart at the top
+        chart = lv_chart_create(cont);
+        // Format
+        lv_obj_set_size(chart, 186, 60);
+        lv_obj_align(chart, LV_ALIGN_CENTER, 0, 0);
+		lv_obj_set_style_bg_color(chart, lv_color_black(), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_chart_set_type(chart, LV_CHART_TYPE_BAR);
+        lv_chart_set_point_count(chart, MAX_BARS);
+        lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, -100, 0);
+        lv_chart_set_update_mode(chart, LV_CHART_UPDATE_MODE_SHIFT);
+        
+        // Bar
+        series = lv_chart_add_series(chart, lv_palette_main(LV_PALETTE_GREEN), LV_CHART_AXIS_PRIMARY_Y);
+        // Styling
+        lv_obj_set_style_width(chart, 8, LV_PART_ITEMS);
+        lv_obj_set_style_pad_column(chart, 2, LV_PART_MAIN);
+        lv_obj_set_style_bg_color(chart, lv_palette_main(LV_PALETTE_GREEN), LV_PART_ITEMS);
+        
+        // Top text
+        lbl_clients = lv_label_create(cont);
+        lcd_format_label(lbl_clients, "", user_secondary_color,
+						 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, -10);
+		
+		// Helper texts
+		lbl_scroll = lv_label_create(cont);
+        lcd_format_label(lbl_scroll, "SCROLL", user_secondary_color,
+						 &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, 15);
+						 
+		lbl_beacon = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_beacon, LV_SYMBOL_LEFT " BEACON", user_secondary_color,
+						 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_LEFT, 3, 0);
+
+        // MACs text
+        lbl_info = lv_label_create(cont);
+        lv_obj_set_style_text_color(lbl_info, user_secondary_color, 0);
+        lv_obj_set_style_text_font(lbl_info, &lv_font_montserrat_14, 0);
+        lv_label_set_text(lbl_info, "Waiting for MACs...");
+        lv_label_set_long_mode(lbl_info, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(lbl_info, 190);
+        lv_obj_align_to(lbl_info, chart, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 25);
+
+        init = true;
+    }
+
+    // When new data received
+    wifi_data_t wifi_data;
+    if(xQueueReceive(xWifiDataQueue, &wifi_data, 0) == pdTRUE) {
+		// Update top
+		char top_buf[64];
+		snprintf(top_buf, sizeof(top_buf), "%" PRIu32 " users on Ch%" PRIu32 "@%" PRIu32 "Mbps\n", wifi_data.client_count, wifi_data.channel, wifi_data.rate);
+		lv_label_set_text(lbl_clients, top_buf);
+		
+        // Sort by RSSI
+        qsort(wifi_data.clients, wifi_data.client_count, sizeof(wifi_data.clients[0]), cmp_rssi);
+
+        // Rebuild chart
+        uint32_t bars = MIN(wifi_data.client_count, MAX_BARS); // Cap at MAX_BARS
+        
+        // Resize the chart’s internal point buffer so you never draw empty slots
+        lv_chart_set_point_count(chart, bars);
+        
+        // Get the raw Y-array pointer for your series.
+        int32_t *ya = lv_chart_get_y_array(chart, series);
+        
+        // Copy each client’s latest RSSI into that array in sorted order
+        for (uint32_t i = 0; i < bars; i++) {
+			ya[i] = wifi_data.clients[i].rssi;
+		}
+
+		// Redraw
+        lv_chart_refresh(chart);
+
+        // Rebuild info text
+        char buf[512];
+        size_t off = 0;
+        
+        off += snprintf(buf, sizeof(buf), "Unique users (MACs):\n");
+
+        for (uint32_t i = 0; i < wifi_data.client_count && off < sizeof(buf); i++) {
+            const uint8_t *m = wifi_data.clients[i].mac;
+            off += snprintf(buf + off, sizeof(buf) - off, "%02X:%02X:%02X:%02X:%02X:%02X @%3d\n",
+                            m[0],m[1],m[2],m[3],m[4],m[5],
+                            wifi_data.clients[i].rssi);
+        }
+        lv_label_set_text(lbl_info, buf);
+    }
+
+    // Scroll down
+    if (ui_btns->down_btn) {
+		lv_obj_scroll_by(cont, 0, -SCROLL_STEP, true);
+	}
+	// Scroll up
+    else if (ui_btns->up_btn) {
+		lv_obj_scroll_by(cont, 0,  SCROLL_STEP, true);
+	}
+	// Back to beacon
+    else if (ui_btns->left_btn) {
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		 
+        // Delete obj
+        lv_obj_delete(cont); // Also deletes children
+        lv_obj_delete(lbl_beacon); // Parent is ACTIVE_SCR
+        
+        // Reset statics
+        init = false;
+	    cont = chart = lbl_info = lbl_clients = lbl_scroll = lbl_beacon = NULL;
+	    series = NULL;
+	    
+	    // Turn off Wi-Fi
+	    xSemaphoreGive(xWifiDisconnectSemaphore);
+	    
+	    // Switch mask
+		sniff_network.mask = 1; // 1 = WIFI_PROMIS_FILTER_MASK_MGMT
+				
+		// Restart
+		if (xQueueSend(xWifiSniffQueue, &sniff_network, portMAX_DELAY) != pdPASS) {
+			ESP_LOGE(TAG, "Failed: xWifiSniffQueue back to beacon");
+		}
+		
+		// Switch pages
+		ui_menu->page = WIFI_BEACON_PAGE;
+    }
+}
+
+
+
 
