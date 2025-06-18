@@ -27,6 +27,11 @@ extern SemaphoreHandle_t xLeftButtonSemaphore; // Left btn pressed
 extern SemaphoreHandle_t xBackButtonSemaphore; // Back btn pressed
 extern SemaphoreHandle_t xSelectButtonSemaphore; // Select btn pressed
 
+extern SemaphoreHandle_t xLedBlueSemaphore;
+extern SemaphoreHandle_t xLedRedSemaphore;
+extern SemaphoreHandle_t xLedGreenSemaphore;
+extern SemaphoreHandle_t xLedOffSemaphore;
+
 
 
 /**

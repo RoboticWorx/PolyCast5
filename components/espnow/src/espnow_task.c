@@ -42,26 +42,32 @@ QueueHandle_t xEspSendCmdQueue;
 static void espnow_task(void *param)
 {
 	xEspCmdRxStatusSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xEspCmdRxStatusSemaphore);
 	xEspCmdTxSuccessSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xEspCmdTxSuccessSemaphore);
 	xEspCmdTxFailedSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xEspCmdTxFailedSemaphore);
 	
     xEspSendEncKeyQueueNVS = xQueueCreate(1, ENC_KEY_LEN);
 	if (xEspSendEncKeyQueueNVS == NULL) {
 		ESP_LOGE(TAG, "Failed to create xEspSendEncKeyQueueNVS");
 		vTaskDelete(NULL);
 	}
+	configASSERT(xEspSendEncKeyQueueNVS);
 	
 	xEspSendEncKeyQueue = xQueueCreate(1, ENC_KEY_LEN);
 	if (xEspSendEncKeyQueue == NULL) {
 		ESP_LOGE(TAG, "Failed to create xEspSendEncKeyQueue");
 		vTaskDelete(NULL);
 	}
+	configASSERT(xEspSendEncKeyQueue);
 	
 	xEspSendCmdQueue = xQueueCreate(1, sizeof(espnow_cmd_t));
 	if (xEspSendCmdQueue == NULL) {
 		ESP_LOGE(TAG, "Failed to create xEspSendCmdQueue");
 		vTaskDelete(NULL);
 	}
+	configASSERT(xEspSendCmdQueue);
     
 	while (1) {
 

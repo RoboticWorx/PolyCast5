@@ -48,7 +48,6 @@ typedef struct {
 typedef struct {
     uint8_t mac[6];
     int8_t  rssi;
-    uint32_t last_seen; // In ticks
 } wifi_data_clients_t;
 
 typedef struct {

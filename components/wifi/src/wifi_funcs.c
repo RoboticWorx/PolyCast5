@@ -12,7 +12,7 @@
 
 #include "wifi_funcs.h"
 #include "wifi_task.h"
-
+#include "gpio_task.h"
 #include "espnow_funcs.h"
 
 #define TAG "WIFI_FUNCS"
@@ -307,19 +307,19 @@ esp_err_t wifi_funcs_radio_stop(void)
 	esp_wifi_disconnect(); // Disconnect if connected
 	
 	// Stop Wi-Fi
-    if (esp_wifi_stop() == ESP_OK) {
+	esp_err_t err = esp_wifi_stop();
+    if (err == ESP_OK) {
 		xSemaphoreGive(xWifiNetworkDisconnectedSemaphore);
-		wifi_connected = false;
-		memset(&wifi_data, 0, sizeof(wifi_data)); // Zero out wifi_data if initialized
-		return ESP_OK;
 	}
-    
-    ESP_LOGE(TAG, "wifi_funcs_radio_stop not ESP_OK");
+	else {
+		ESP_LOGE(TAG, "wifi_funcs_radio_stop not ESP_OK");
+	}    
     
     wifi_connected = false;
     memset(&wifi_data, 0, sizeof(wifi_data)); // Zero out wifi_data if initialized
+    //xSemaphoreGive(xLedOffSemaphore);
     
-    return ESP_FAIL;
+    return err;
 }
 
 wifi_login_t wifi_funcs_get_prev(void)
@@ -463,7 +463,9 @@ static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 	beacon.cap_info = cap_info;
 	beacon.interval = interval;
 	beacon.timestamp = timestamp_seconds;
-	xQueueSend(xWifiBeaconQueue, &beacon, 0);
+	if (xQueueSend(xWifiBeaconQueue, &beacon, 0) != pdTRUE) {
+		//ESP_LOGE(TAG, "xWifiBeaconQueue send failed");
+	}
     
     /*
     Capability Information (cap_info): A 16-bit bitmask of the AP’s capabilities, defined by IEEE 802.11
@@ -498,13 +500,11 @@ static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 }
 
 static void record_client(const uint8_t *mac, int8_t rssi) {
-    uint32_t now = xTaskGetTickCount();
     
     // Check if exists
     for (int i = 0; i < wifi_data.client_count; i++) {
-        if (memcmp(wifi_data.clients[i].mac, mac, 6) == 0) { // If it does, update the rssi and time then exit
+        if (memcmp(wifi_data.clients[i].mac, mac, 6) == 0) { // If it does, update the rssi then exit
             wifi_data.clients[i].rssi = rssi;
-            wifi_data.clients[i].last_seen = now;
             
             return;
         }
@@ -514,7 +514,6 @@ static void record_client(const uint8_t *mac, int8_t rssi) {
         memcpy(wifi_data.clients[wifi_data.client_count].mac, mac, 6);
         
         wifi_data.clients[wifi_data.client_count].rssi = rssi;
-        wifi_data.clients[wifi_data.client_count].last_seen = now;
         wifi_data.client_count++;
         
         #ifdef POLYCAST5_DEBUG
@@ -579,7 +578,10 @@ static void wifi_sniffer_data_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 
     wifi_data.rate = pkt->rx_ctrl.rate;
 	wifi_data.channel = pkt->rx_ctrl.channel;
-	xQueueSend(xWifiDataQueue, &wifi_data, 0);
+	wifi_data_t *p = &wifi_data;
+	if (xQueueSend(xWifiDataQueue, &p, 0) != pdTRUE) {
+		//ESP_LOGE(TAG, "xWifiDataQueue send failed");
+	}
 }
 
 void wifi_funcs_init_promiscuous(wifi_sniff_t *network)

@@ -12,6 +12,7 @@
 #include "wifi_task.h"
 #include "espnow_task.h"
 #include "espnow_funcs.h"
+#include "gpio_task.h"
 
 #define TAG "WIFI_TASK"
 
@@ -36,16 +37,28 @@ SemaphoreHandle_t xWifiConnectingSemaphore;
 static void wifi_task(void *param)
 {
 	xWifiStartScanSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xWifiStartScanSemaphore);
 	xWifiNetworkConnectedSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xWifiNetworkConnectedSemaphore);
 	xWifiNetworkDisconnectedSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xWifiNetworkDisconnectedSemaphore);
 	xWifiDisconnectSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xWifiDisconnectSemaphore);
 	xWifiConnectingSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xWifiConnectingSemaphore);
 	
 	xWifiScanQueue = xQueueCreate(WIFI_MAX_NETWORKS, sizeof(wifi_scan_t));
+	configASSERT(xWifiScanQueue);
 	xWifiSelectedNetworkQueue = xQueueCreate(1, sizeof(wifi_login_t));
+	configASSERT(xWifiSelectedNetworkQueue);
 	xWifiSniffQueue = xQueueCreate(1, sizeof(wifi_sniff_t));
+	configASSERT(xWifiSniffQueue);
 	xWifiBeaconQueue = xQueueCreate(1, sizeof(wifi_beacon_t));
-	xWifiDataQueue = xQueueCreate(1, sizeof(wifi_data_t));
+	configASSERT(xWifiBeaconQueue);
+	xWifiDataQueue = xQueueCreate(1, sizeof(wifi_data_t*));
+	configASSERT(xWifiDataQueue);
+	
+	
 	
 	wifi_funcs_wifi_event_init();
 	
@@ -55,6 +68,7 @@ static void wifi_task(void *param)
 		// Start a Wi-Fi scan
 		if (xSemaphoreTake(xWifiStartScanSemaphore, 0) == pdTRUE) {
 			ESP_ERROR_CHECK(esp_wifi_start());
+			//xSemaphoreGive(xLedBlueSemaphore);
 			
 			wifi_funcs_scan(wifi_scan);
 			

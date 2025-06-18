@@ -22,17 +22,37 @@ SemaphoreHandle_t xLeftButtonSemaphore;
 SemaphoreHandle_t xBackButtonSemaphore;
 SemaphoreHandle_t xSelectButtonSemaphore;
 
+SemaphoreHandle_t xLedBlueSemaphore;
+SemaphoreHandle_t xLedRedSemaphore;
+SemaphoreHandle_t xLedGreenSemaphore;
+SemaphoreHandle_t xLedOffSemaphore;
+
 static const char *TAG = "GPIO_TASK";
 
 static void gpio_task(void *arg)
 {
 	
 	xUpButtonSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xUpButtonSemaphore);
     xDownButtonSemaphore = xSemaphoreCreateBinary();
+    configASSERT(xDownButtonSemaphore);
     xRightButtonSemaphore = xSemaphoreCreateBinary();
+    configASSERT(xRightButtonSemaphore);
     xLeftButtonSemaphore = xSemaphoreCreateBinary();
+    configASSERT(xLeftButtonSemaphore);
     xBackButtonSemaphore = xSemaphoreCreateBinary();
+    configASSERT(xBackButtonSemaphore);
     xSelectButtonSemaphore = xSemaphoreCreateBinary();
+    configASSERT(xSelectButtonSemaphore);
+    
+    xLedBlueSemaphore = xSemaphoreCreateBinary();
+    configASSERT(xLedBlueSemaphore);
+    xLedRedSemaphore = xSemaphoreCreateBinary();
+    configASSERT(xLedRedSemaphore);
+    xLedGreenSemaphore = xSemaphoreCreateBinary();
+    configASSERT(xLedGreenSemaphore);
+    xLedOffSemaphore = xSemaphoreCreateBinary();
+    configASSERT(xLedOffSemaphore);
 
 	gpio_write_output(0, 0); // Red LED
 	gpio_write_output(1, 0); // Green LED
@@ -50,7 +70,7 @@ static void gpio_task(void *arg)
         #endif
 		
 		// If a button is pressed
-	    if (xSemaphoreTake(xGpioEventSemaphore, portMAX_DELAY)) {		
+	    if (xSemaphoreTake(xGpioEventSemaphore, 0) == pdTRUE) {		
 	        vTaskDelay(pdMS_TO_TICKS(50)); // Ignore bounce window
 
 			if (gpio_read_input(USER_BUTTON_UP) == 0) {
@@ -91,14 +111,29 @@ static void gpio_task(void *arg)
 		        #endif
 			}
 		}
+			
+		if (xSemaphoreTake(xLedBlueSemaphore, 0) == pdTRUE) {	
+			gpio_write_output(2, 1); // Blue LED
+		}
+		if (xSemaphoreTake(xLedRedSemaphore, 0) == pdTRUE) {	
+			gpio_write_output(0, 1); // Red LED
+		}
+		if (xSemaphoreTake(xLedGreenSemaphore, 0) == pdTRUE) {	
+			gpio_write_output(1, 1); // Green LED
+		}
+		if (xSemaphoreTake(xLedOffSemaphore, 0) == pdTRUE) {	
+			gpio_write_output(0, 0); // Red LED
+			gpio_write_output(1, 0); // Green LED
+			gpio_write_output(2, 0); // Blue LED
+		}
 	    
-	    //vTaskDelay(pdMS_TO_TICKS(20));
+	    vTaskDelay(pdMS_TO_TICKS(20));
 	}
 }
 
 void gpio_task_create(void)
 {
-	if (xTaskCreate(gpio_task, "gpio_task", 1024, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
+	if (xTaskCreate(gpio_task, "gpio_task", 1024 * 2, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
 	    ESP_LOGE(TAG, "Failed to start gpio_task");
 	}
 }

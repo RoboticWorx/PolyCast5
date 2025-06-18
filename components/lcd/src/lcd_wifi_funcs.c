@@ -769,7 +769,7 @@ void lcd_wifi_get_password(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t
 }
 
 // Colors bar more green or red based on value
-static void chart_draw_cb(lv_event_t * e)
+static void beacon_chart_draw_cb(lv_event_t * e)
 {
 	// Get task and descriptor
     lv_draw_task_t *task = lv_event_get_draw_task(e);
@@ -858,7 +858,7 @@ void lcd_wifi_beacon_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t 
 		// Tell the chart to generate draw-task events
 		lv_obj_add_flag(chart, LV_OBJ_FLAG_SEND_DRAW_TASK_EVENTS);
 		// Register your callback on DRAW_TASK_ADDED
-		lv_obj_add_event_cb(chart, chart_draw_cb, LV_EVENT_DRAW_TASK_ADDED, series);
+		lv_obj_add_event_cb(chart, beacon_chart_draw_cb, LV_EVENT_DRAW_TASK_ADDED, series);
         
         // Small text
         lbl_rssi = lv_label_create(cont);
@@ -993,10 +993,66 @@ void lcd_wifi_beacon_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t 
     }
 }
 
-static int cmp_rssi(const void *a,const void *b)
+// Colors bar more green or red based on value
+static void data_chart_draw_cb(lv_event_t * e)
+{
+	// Get task and descriptor
+    lv_draw_task_t *task = lv_event_get_draw_task(e);
+    lv_draw_dsc_base_t *base = (lv_draw_dsc_base_t *)lv_draw_task_get_draw_dsc(task);
+    
+    // Filter to only the bars
+    if (base->part != LV_PART_ITEMS) {
+		return;
+	}
+
+	// Get the fill descriptor
+    lv_draw_fill_dsc_t *fill = lv_draw_task_get_fill_dsc(task);
+    
+    // Ensure valid
+    if (!fill) {
+		return;
+	}
+
+	// Fetch series data and compute the index
+    lv_obj_t *chart = lv_event_get_target_obj(e);
+    lv_chart_series_t *ser = lv_event_get_user_data(e);
+    int32_t *y_array = lv_chart_get_y_array(chart, ser);
+
+    uint32_t pc = lv_chart_get_point_count(chart);
+    uint32_t idx = base->id2; // Column being painted
+    uint32_t logical = (ser->start_point + idx) % pc; // Real slot
+    
+	int32_t  rssi_db = y_array[logical];       // e.g. –40
+
+    if(rssi_db == LV_CHART_POINT_NONE) {
+		return;
+	}
+
+    // Given your chart range is MIN=-100, MAX=0:
+	const int32_t MIN_DB = -100;
+	const int32_t MAX_DB = -40;
+	const uint32_t RANGE = (uint32_t)(MAX_DB - MIN_DB);
+	
+	// rssi_db is something between MIN_DB...MAX_DB
+	// Shift into 0..RANGE
+	uint32_t strength = (uint32_t)(rssi_db - MIN_DB); // e.g. –40->60, –100->0, 0->100
+	
+	// Cap at max
+	if (strength > RANGE) {
+		strength = RANGE;
+	}
+	
+	// Compute mix 0...255
+	uint8_t mix = (uint8_t)((strength * 255u) / RANGE);
+	
+	// Create color
+	fill->color = lv_color_mix(lv_palette_main(LV_PALETTE_GREEN), lv_palette_main(LV_PALETTE_RED), mix);
+}
+
+static int cmp_rssi(const void *a, const void *b)
 {
     const wifi_data_clients_t *A = a, *B = b;
-    return B->rssi - A->rssi;          // descending (-30 dBm above -70 dBm)
+    return B->rssi - A->rssi; // Descending (-30 dBm above -70 dBm)
 }
 
 void lcd_wifi_data_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
@@ -1031,7 +1087,7 @@ void lcd_wifi_data_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		lv_obj_set_style_bg_color(chart, lv_color_black(), LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_chart_set_type(chart, LV_CHART_TYPE_BAR);
         lv_chart_set_point_count(chart, MAX_BARS);
-        lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, -100, 0);
+        lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, -100, -30);
         lv_chart_set_update_mode(chart, LV_CHART_UPDATE_MODE_SHIFT);
         
         // Bar
@@ -1040,6 +1096,12 @@ void lcd_wifi_data_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
         lv_obj_set_style_width(chart, 8, LV_PART_ITEMS);
         lv_obj_set_style_pad_column(chart, 2, LV_PART_MAIN);
         lv_obj_set_style_bg_color(chart, lv_palette_main(LV_PALETTE_GREEN), LV_PART_ITEMS);
+        
+        // Callback to change bar color based on value
+		// Tell the chart to generate draw-task events
+		lv_obj_add_flag(chart, LV_OBJ_FLAG_SEND_DRAW_TASK_EVENTS);
+		// Register your callback on DRAW_TASK_ADDED
+		lv_obj_add_event_cb(chart, data_chart_draw_cb, LV_EVENT_DRAW_TASK_ADDED, series);
         
         // Top text
         lbl_clients = lv_label_create(cont);
@@ -1068,18 +1130,18 @@ void lcd_wifi_data_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
     }
 
     // When new data received
-    wifi_data_t wifi_data;
+    wifi_data_t *wifi_data;
     if(xQueueReceive(xWifiDataQueue, &wifi_data, 0) == pdTRUE) {
 		// Update top
 		char top_buf[64];
-		snprintf(top_buf, sizeof(top_buf), "%" PRIu32 " users on Ch%" PRIu32 "@%" PRIu32 "Mbps\n", wifi_data.client_count, wifi_data.channel, wifi_data.rate);
+		snprintf(top_buf, sizeof(top_buf), "%" PRIu32 " users on Ch%" PRIu32 "@%" PRIu32 "Mbps\n", wifi_data->client_count, wifi_data->channel, wifi_data->rate);
 		lv_label_set_text(lbl_clients, top_buf);
 		
         // Sort by RSSI
-        qsort(wifi_data.clients, wifi_data.client_count, sizeof(wifi_data.clients[0]), cmp_rssi);
+        qsort(wifi_data->clients, wifi_data->client_count, sizeof(wifi_data->clients[0]), cmp_rssi);
 
         // Rebuild chart
-        uint32_t bars = MIN(wifi_data.client_count, MAX_BARS); // Cap at MAX_BARS
+        uint32_t bars = MIN(wifi_data->client_count, MAX_BARS); // Cap at MAX_BARS
         
         // Resize the chart’s internal point buffer so you never draw empty slots
         lv_chart_set_point_count(chart, bars);
@@ -1089,7 +1151,7 @@ void lcd_wifi_data_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
         
         // Copy each client’s latest RSSI into that array in sorted order
         for (uint32_t i = 0; i < bars; i++) {
-			ya[i] = wifi_data.clients[i].rssi;
+			ya[i] = wifi_data->clients[i].rssi;
 		}
 
 		// Redraw
@@ -1101,11 +1163,11 @@ void lcd_wifi_data_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
         
         off += snprintf(buf, sizeof(buf), "Unique users (MACs):\n");
 
-        for (uint32_t i = 0; i < wifi_data.client_count && off < sizeof(buf); i++) {
-            const uint8_t *m = wifi_data.clients[i].mac;
+        for (uint32_t i = 0; i < wifi_data->client_count && off < sizeof(buf); i++) {
+            const uint8_t *m = wifi_data->clients[i].mac;
             off += snprintf(buf + off, sizeof(buf) - off, "%02X:%02X:%02X:%02X:%02X:%02X @%3d\n",
                             m[0],m[1],m[2],m[3],m[4],m[5],
-                            wifi_data.clients[i].rssi);
+                            wifi_data->clients[i].rssi);
         }
         lv_label_set_text(lbl_info, buf);
     }

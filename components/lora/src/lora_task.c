@@ -43,26 +43,26 @@ static void lora_task(void *pvParameters) {
 	xLoraEventSemaphore = xSemaphoreCreateBinary();
 	if (xLoraEventSemaphore == NULL) {
 		ESP_LOGE(TAG, "Failed to create xLoraEventSemaphore semaphore");
-		vTaskDelete(NULL);
 	}
+	configASSERT(xLoraEventSemaphore);
 	
 	xLoraGenerateEncKeySemaphore = xSemaphoreCreateBinary();
 	if (xLoraGenerateEncKeySemaphore == NULL) {
 		ESP_LOGE(TAG, "Failed to create xLoraGenerateEncKeySemaphore semaphore");
-		vTaskDelete(NULL);
 	}
+	configASSERT(xLoraGenerateEncKeySemaphore);
 	
 	xLoraReceiptValidSemaphore = xSemaphoreCreateBinary();
 	if (xLoraReceiptValidSemaphore == NULL) {
 		ESP_LOGE(TAG, "Failed to create xReceiveEncKeyQueue semaphore");
-		vTaskDelete(NULL);
 	}
+	configASSERT(xLoraReceiptValidSemaphore);
 	
 	xLoraSendEncQueue = xQueueCreate(1, sizeof(lora_cmd_t));
 	if (xLoraSendEncQueue == NULL) {
 		ESP_LOGE(TAG, "Failed to create xReceiveEncKeyQueue queue");
-		vTaskDelete(NULL);
 	}
+	configASSERT(xLoraSendEncQueue);
 	
 	// Create the LoRa event handler task
 	if (xTaskCreate(lora_event_handler_task, "lora_event_handler", 1024 * 3, NULL, tskIDLE_PRIORITY + 3, NULL) != pdPASS) {
