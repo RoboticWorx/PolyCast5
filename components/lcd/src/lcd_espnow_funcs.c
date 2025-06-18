@@ -460,6 +460,48 @@ void lcd_espnow_get_rx_mac(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_bt
 		// Go back
 		ui_menu->page = ESPNOW_PAGE;
     }
+    // Go home
+    else if (ui_btns->home_btn) {
+        // Clean all
+		for (int i = 0; i < 12; i++) {
+			lv_obj_del(lbl_sel_digit[i]);
+			lbl_sel_digit[i] = NULL;
+		}
+
+		lv_obj_del(lbl_enter_mac);
+		lv_obj_del(lbl_how_to);
+		lv_obj_del(container);
+
+		lbl_enter_mac = NULL;
+		lbl_how_to = NULL;
+		container = NULL;
+		
+		// Reset selected digit
+		digit_index = 0;
+		
+		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+    }
+    // Power off
+    else if (ui_btns->pwr_btn) {
+        // Clean all
+		for (int i = 0; i < 12; i++) {
+			lv_obj_del(lbl_sel_digit[i]);
+			lbl_sel_digit[i] = NULL;
+		}
+
+		lv_obj_del(lbl_enter_mac);
+		lv_obj_del(lbl_how_to);
+		lv_obj_del(container);
+
+		lbl_enter_mac = NULL;
+		lbl_how_to = NULL;
+		container = NULL;
+		
+		// Reset selected digit
+		digit_index = 0;
+		
+		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+    }
     // Move selection right
     else if (ui_btns->right_btn && digit_index < 11) {
         // De-style old digit
@@ -671,7 +713,7 @@ void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
         update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
     }
     // Can back out if at start
-    else if (ui_btns->left_btn && cur_pos == 0) { // && espnow_menu_overwrite
+    else if (ui_btns->left_btn && cur_pos == 0) {
 		// Delete labels since no longer used
         lv_obj_delete(lbl_user_in);
         lv_obj_delete(lbl_dirs);
@@ -694,6 +736,46 @@ void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
 		// Switch pages
  		ui_menu->page = ESPNOW_PAGE;
 		return;
+    }
+ 	// Go home
+    else if (ui_btns->home_btn) {
+		// Delete labels since no longer used
+        lv_obj_delete(lbl_user_in);
+        lv_obj_delete(lbl_dirs);
+        lv_obj_delete(lbl_chars);
+        
+        // Reset statics for next time
+        lbl_user_in = NULL;
+	    lbl_dirs = NULL;
+	    cur_pos = 0;
+	    cur_char = '_';
+	    memset(name_buf, 0, sizeof name_buf);
+	    
+	    espnow_menu_overwrite = false;
+	    
+	    memset(espnow_menu->lmk[espnow_menu->size], 0, LMK_LEN); // Zero out enc entry
+	    
+	    lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+    }
+    // Power off
+    else if (ui_btns->pwr_btn) {
+		// Delete labels since no longer used
+        lv_obj_delete(lbl_user_in);
+        lv_obj_delete(lbl_dirs);
+        lv_obj_delete(lbl_chars);
+        
+        // Reset statics for next time
+        lbl_user_in = NULL;
+	    lbl_dirs = NULL;
+	    cur_pos = 0;
+	    cur_char = '_';
+	    memset(name_buf, 0, sizeof name_buf);
+	    
+	    espnow_menu_overwrite = false;
+	    
+	    memset(espnow_menu->lmk[espnow_menu->size], 0, LMK_LEN); // Zero out enc entry
+	    
+	    lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
     }
     // If left and not at start
     else if (ui_btns->left_btn && cur_pos != 0) {
@@ -1110,6 +1192,30 @@ void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, 
 		// Go back
 		ui_menu->page = ESPNOW_PAGE;
 	}
+	// Power off
+	else if (ui_btns->pwr_btn == 1) {
+		// Reset receipts
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT);
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, RX_TXT);
+		
+		// Back to default
+		espnow_menu->espnow_submenu.cmd_to_send = 1;
+		char buf[BUF_SIZE];
+		snprintf(buf, sizeof(buf), "%u", espnow_menu->espnow_submenu.cmd_to_send);
+		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_cmd, buf);
+		
+		// Hide everything
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_tx, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_rx, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_cmd, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send_box, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_send, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.lbl_edit, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(espnow_menu->espnow_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+	}
 	// Increment command
 	else if (ui_btns->up_btn == 1) {
 		// Reset receipts
@@ -1147,7 +1253,7 @@ void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, 
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_cmd, buf);
 	}
 	// Edit
-	else if (ui_btns->back_btn == 1) {
+	else if (ui_btns->home_btn == 1) {
 		// Reset receipts
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT);
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, RX_TXT);

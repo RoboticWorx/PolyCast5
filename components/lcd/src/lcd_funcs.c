@@ -254,6 +254,7 @@ void lcd_device_sleep(void)
 	}
 
 	xQueueReset(xPowerButtonSemaphore); // Clear xPowerButtonSemaphore
+	go_to_sleep = false; // Clear sleep flag
 }
 
 void lcd_init_driver(void)
@@ -782,6 +783,8 @@ void lcd_home_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
 	else if (ui_btns->right_btn == 1) {
 		stop_animations();
 		
+		unhide_selection_widgets(ui_menu);
+		
 		// Show selection labels
 		lv_obj_remove_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
@@ -862,8 +865,9 @@ void lcd_clear_user_in()
 	ui_btns.down_btn = 0;
 	ui_btns.left_btn = 0;
 	ui_btns.right_btn = 0;
-	ui_btns.back_btn = 0;
 	ui_btns.select_btn = 0;
+	ui_btns.home_btn = 0;
+	ui_btns.pwr_btn = 0;
 }
 
 void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns) 
@@ -890,12 +894,38 @@ void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
 		lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-		
-		xQueueReset(xPowerButtonSemaphore); // Clear xPowerButtonSemaphore
-		
+				
 		start_animation();
 
 		ui_menu->page = HOME_PAGE;
+	}
+	// Go home
+	else if (ui_btns->home_btn == 1) {
+		// Hide selection labels
+		lv_obj_add_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->lbl_mid, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->lbl_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+				
+		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+	}
+	// Power off
+	else if (ui_btns->pwr_btn == 1) {
+		// Hide selection labels
+		lv_obj_add_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->lbl_mid, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->lbl_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
 	}
 
 	if (scrolling_menu) {
@@ -910,6 +940,30 @@ void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
 			lcd_scroll_anim(ui_menu, next_top, scrolling_up, SCROLL_SPEED);
 		}
 		scrolling_menu = false;
+	}
+}
+
+void lcd_funcs_transition_back(bool home, ui_menu_t *ui_menu)
+{
+	lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+	
+	if (home) { // Transition to home
+		start_animation();
+
+		ui_menu->page = HOME_PAGE;
+	}
+	else { // Transition to sleep
+		gpio_set_level(ST7789_LEDK_PIN, 0); // BL low so user doesn't see redraw
+	
+		start_animation();
+
+		ui_menu->page = HOME_PAGE;
+			
+		lv_timer_handler();
+		go_to_sleep = true;
 	}
 }
 
@@ -941,6 +995,20 @@ void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_
 		unhide_selection_widgets(ui_menu);
 		
 		ui_menu->page = SELECTION_PAGE;
+	}
+	// Home selected
+	else if (ui_btns->home_btn == 1) {
+		// Hide IR menu
+		lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+	}
+	// Power off selected
+	else if (ui_btns->pwr_btn == 1) {
+		// Hide IR menu
+		lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
 	}
 	// Down button pressed
 	else if (ui_btns->right_btn == 1) {
@@ -992,6 +1060,9 @@ void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_
 		// Hide LoRa menu
 		lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
+		// Reset static
+		do_once = false;
+		
 		// Show submenu
 		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 		
@@ -1000,7 +1071,6 @@ void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_
 	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {
-		
 		// Hide LoRa menu
 		lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -1011,6 +1081,24 @@ void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_
 		do_once = false;
 		
 		ui_menu->page = SELECTION_PAGE;
+	}
+	else if (ui_btns->home_btn == 1) {
+		// Hide LoRa menu
+		lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+	}
+	else if (ui_btns->pwr_btn == 1) {
+		// Hide LoRa menu
+		lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
 	}
 }
 
@@ -1044,8 +1132,10 @@ void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui
 		// Hide ESP-NOW menu
 		lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
+		// Reset static
+		do_once = false;
+		
 		ui_menu->page = ESPNOW_RX_MAC_PAGE;
-
 	}
 	// Specific selected
 	else if (ui_btns->right_btn == 1) {
@@ -1062,6 +1152,9 @@ void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui
 		lv_obj_remove_flag(espnow_menu->espnow_submenu.arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(espnow_menu->espnow_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
+		// Reset static
+		do_once = false;
+		
 		// Hide up and down arrows
 		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
@@ -1072,7 +1165,6 @@ void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui
 	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {
-		
 		// Hide ESP-NOW menu
 		lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -1084,6 +1176,26 @@ void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui
 		
 		// Switch pages
 		ui_menu->page = SELECTION_PAGE;
+	}
+	// Home selected
+	else if (ui_btns->home_btn == 1) {
+		// Hide ESP-NOW menu
+		lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+	}
+	// Power off selected
+	else if (ui_btns->pwr_btn == 1) {
+		// Hide ESP-NOW menu
+		lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
 	}
 }
 
@@ -1196,5 +1308,25 @@ void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_
 		
 		// Switch pages
 		ui_menu->page = SELECTION_PAGE;
+	}
+	// Home selected
+	else if (ui_btns->home_btn == 1) {
+		// Hide Wi-Fi menu
+		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+	}
+	// Power off selected
+	else if (ui_btns->pwr_btn == 1) {
+		// Hide Wi-Fi menu
+		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
 	}
 }

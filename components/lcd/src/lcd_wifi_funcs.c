@@ -442,6 +442,62 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		// Switch pages
 		ui_menu->page = WIFI_PAGE;
 	}
+	// Go home
+	else if ((!scanning || scanned) && ui_btns->home_btn == 1) {
+		if (lbl_option) { // Delete if exists
+			lv_obj_delete(lbl_option);
+			lbl_option = NULL;
+		}
+		
+		// Reset
+		monitoring_packets = false;
+		initialized = false;
+		scanned = false;
+		for(int i = 0; i < wifi_menu->scan_menu.size; i++) {
+			locked[i] = false;
+			memset(bssids[i], 0, sizeof(bssids[i]));
+			channels[i] = 0;
+		}
+		wifi_menu->scan_menu.size = 0;
+		wifi_menu->scan_menu.index = 0;
+		lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
+		
+		// Clear children
+		lv_obj_clean(wifi_menu->scan_menu.main_list);
+		
+		// Hide scan menu
+		lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+	}
+	// Power off
+	else if ((!scanning || scanned) && ui_btns->pwr_btn == 1) {
+		if (lbl_option) { // Delete if exists
+			lv_obj_delete(lbl_option);
+			lbl_option = NULL;
+		}
+		
+		// Reset
+		monitoring_packets = false;
+		initialized = false;
+		scanned = false;
+		for(int i = 0; i < wifi_menu->scan_menu.size; i++) {
+			locked[i] = false;
+			memset(bssids[i], 0, sizeof(bssids[i]));
+			channels[i] = 0;
+		}
+		wifi_menu->scan_menu.size = 0;
+		wifi_menu->scan_menu.index = 0;
+		lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
+		
+		// Clear children
+		lv_obj_clean(wifi_menu->scan_menu.main_list);
+		
+		// Hide scan menu
+		lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+	}
 	// If connecting to last known
 	else if (ui_btns->right_btn == 1 && wifi_menu->scan_menu.index == 0 && !scanning && !monitoring_packets) {
 		if (lbl_option) { // Delete if exists
@@ -640,7 +696,7 @@ void lcd_wifi_get_password(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t
     }
 
     // Switch rows (ex A->a)
-    if (ui_btns->back_btn) {
+    if (ui_btns->home_btn) {
 		 // Increment with wrap
         row_idx = (row_idx + 1) % NUM_CHAR_ROWS;
         
@@ -705,6 +761,19 @@ void lcd_wifi_get_password(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t
         ui_menu->page = WIFI_PAGE;
         
         return;
+    }
+    // Power off
+    else if (ui_btns->pwr_btn) {
+		// Delete objects
+        lv_obj_del(lbl_user_in);
+        lv_obj_del(lbl_dirs);
+        
+        // Reset statics
+        lbl_user_in = lbl_dirs = NULL;
+        cur_pos = row_idx = char_idx = 0;
+        initialized = false;
+
+        lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
     }
     // Backspace
     else if (ui_btns->left_btn) {
@@ -966,6 +1035,38 @@ void lcd_wifi_beacon_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t 
 		// Switch pages
 		ui_menu->page = WIFI_PAGE;
     }
+    // Go home
+    else if (ui_btns->home_btn) {
+        // Delete obj
+        lv_obj_delete(cont); // Also deletes children
+        lv_obj_delete(lbl_data); // Not child of cont
+        
+        // Reset statics
+        init = false;
+	    cont = chart = lbl_rssi = lbl_snr = lbl_scroll = lbl_info = lbl_data = NULL;
+	    series = NULL;
+	    
+	    // Turn off Wi-Fi
+	    xSemaphoreGive(xWifiDisconnectSemaphore);
+		
+		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+    }
+    // Power off
+    else if (ui_btns->pwr_btn) {
+        // Delete obj
+        lv_obj_delete(cont); // Also deletes children
+        lv_obj_delete(lbl_data); // Not child of cont
+        
+        // Reset statics
+        init = false;
+	    cont = chart = lbl_rssi = lbl_snr = lbl_scroll = lbl_info = lbl_data = NULL;
+	    series = NULL;
+	    
+	    // Turn off Wi-Fi
+	    xSemaphoreGive(xWifiDisconnectSemaphore);
+		
+		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+    }
     // Switch to data frames
     else if (ui_btns->right_btn) {
         // Delete obj
@@ -1206,6 +1307,42 @@ void lcd_wifi_data_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		
 		// Switch pages
 		ui_menu->page = WIFI_BEACON_PAGE;
+    }
+    // Go home
+    else if (ui_btns->home_btn) {
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		 
+        // Delete obj
+        lv_obj_delete(cont); // Also deletes children
+        lv_obj_delete(lbl_beacon); // Parent is ACTIVE_SCR
+        
+        // Reset statics
+        init = false;
+	    cont = chart = lbl_info = lbl_clients = lbl_scroll = lbl_beacon = NULL;
+	    series = NULL;
+	    
+	    // Turn off Wi-Fi
+	    xSemaphoreGive(xWifiDisconnectSemaphore);
+	    
+	    lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+    }
+    // Power off
+    else if (ui_btns->pwr_btn) {
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		 
+        // Delete obj
+        lv_obj_delete(cont); // Also deletes children
+        lv_obj_delete(lbl_beacon); // Parent is ACTIVE_SCR
+        
+        // Reset statics
+        init = false;
+	    cont = chart = lbl_info = lbl_clients = lbl_scroll = lbl_beacon = NULL;
+	    series = NULL;
+	    
+	    // Turn off Wi-Fi
+	    xSemaphoreGive(xWifiDisconnectSemaphore);
+	    
+	    lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
     }
 }
 

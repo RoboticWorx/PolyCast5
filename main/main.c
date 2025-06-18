@@ -106,10 +106,12 @@ void app_main(void) {
 	configASSERT(xSPIBusMutex); // Ensure success
 	
 	xGpioEventSemaphore = xSemaphoreCreateBinary(); // ISR semaphores
+	configASSERT(xGpioEventSemaphore);
 	xPowerButtonSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xPowerButtonSemaphore);
+	
     if (gpio_init() != ESP_OK) {
-        ESP_LOGE(TAG, "gpio_init failed, stopping task");
-        vTaskDelete(NULL);
+        ESP_LOGE(TAG, "gpio_init failed");
         return;
     }
 	

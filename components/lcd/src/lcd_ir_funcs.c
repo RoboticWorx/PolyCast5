@@ -145,6 +145,38 @@ void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_b
         ui_menu->page = INFRARED_PAGE;
         return;
     }
+    // Go home
+    else if (ui_btns->home_btn) {
+        // Reset for next time
+        lv_obj_delete(lbl_title);
+		lv_obj_delete(lbl_name);
+		lv_obj_delete(lbl_back);
+		lv_obj_delete(lbl_edit);
+		lv_obj_delete(lbl_select);
+        lbl_title = NULL;
+        lbl_name = NULL;
+        lbl_back = NULL;
+        lbl_edit = NULL;
+        lbl_select = NULL;
+        
+        lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+    }
+    // Power off
+    else if (ui_btns->pwr_btn) {
+        // Reset for next time
+        lv_obj_delete(lbl_title);
+		lv_obj_delete(lbl_name);
+		lv_obj_delete(lbl_back);
+		lv_obj_delete(lbl_edit);
+		lv_obj_delete(lbl_select);
+        lbl_title = NULL;
+        lbl_name = NULL;
+        lbl_back = NULL;
+        lbl_edit = NULL;
+        lbl_select = NULL;
+        
+        lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+    }
 	// Iterate up
     else if (ui_btns->up_btn) {
 		if (edit_idx == 0) {
@@ -352,6 +384,42 @@ void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t
 	    
  		ui_menu->page = INFRARED_REMOTE_EDIT_PAGE;
 		return;
+    }
+    // If go home and overwriting
+    else if (ui_btns->home_btn && ir_menu_overwrite) {
+		// Delete labels since no longer used
+        lv_obj_delete(lbl_user_in);
+        lv_obj_delete(lbl_dirs);
+        lv_obj_delete(lbl_chars);
+        
+        // Reset statics for next time
+        lbl_user_in = NULL;
+	    lbl_dirs  = NULL;
+	    cur_pos  = 0;
+	    cur_char = '_';
+	    memset(name_buf, 0, sizeof name_buf);
+	    
+	    ir_menu_overwrite = false;
+	    
+ 		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+    }
+    // If power off and overwriting
+    else if (ui_btns->pwr_btn && ir_menu_overwrite) {
+		// Delete labels since no longer used
+        lv_obj_delete(lbl_user_in);
+        lv_obj_delete(lbl_dirs);
+        lv_obj_delete(lbl_chars);
+        
+        // Reset statics for next time
+        lbl_user_in = NULL;
+	    lbl_dirs  = NULL;
+	    cur_pos  = 0;
+	    cur_char = '_';
+	    memset(name_buf, 0, sizeof name_buf);
+	    
+	    ir_menu_overwrite = false;
+	    
+ 		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
     }
     // If left and not at start
     else if (ui_btns->left_btn) {

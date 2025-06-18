@@ -31,11 +31,13 @@ ui_btns_t ui_btns = {
     .down_btn = 0,
     .right_btn = 0,
     .left_btn = 0,
-    .back_btn = 0,
     .select_btn = 0,
+    .home_btn = 0,
+    .pwr_btn = 0,
 };
 
 volatile bool lcd_clear_pending_inputs = false;
+volatile bool go_to_sleep = false;
 
 lv_color_t user_primary_color = LV_COLOR_MAKE(0x00, 0x00, 0x8B); 
 lv_color_t user_secondary_color = LV_COLOR_MAKE(0xFF, 0xFF, 0xFF);
@@ -139,14 +141,6 @@ static void lcd_task(void *pvParameters)
 			else {
 				ui_btns.left_btn = 0;
 			}
-			if (xSemaphoreTake(xBackButtonSemaphore, 0)) {
-				ui_btns.back_btn = 1;
-				
-				sleep_timer_last = xTaskGetTickCount();
-			}
-			else {
-				ui_btns.back_btn = 0;
-			}
 			if (xSemaphoreTake(xSelectButtonSemaphore, 0)) {
 				ui_btns.select_btn = 1;
 				
@@ -155,12 +149,31 @@ static void lcd_task(void *pvParameters)
 			else {
 				ui_btns.select_btn = 0;
 			}
+			if (xSemaphoreTake(xHomeButtonSemaphore, 0)) {
+				ui_btns.home_btn = 1;
+				
+				sleep_timer_last = xTaskGetTickCount();
+			}
+			else {
+				ui_btns.home_btn = 0;
+			}
+			if (xSemaphoreTake(xPowerButtonSemaphore, 0)) {
+				ui_btns.pwr_btn = 1;
+				
+				go_to_sleep = true;
+			}
+			else {
+				ui_btns.pwr_btn = 0;
+				
+				go_to_sleep = false;
+			}
+			
 			// If in loop screen and extra buttons were pressed -> clear them
 			if (lcd_clear_pending_inputs) {
 				lcd_clear_user_in(); // Clear any pending inputs
 				lcd_clear_pending_inputs = false;
 			}
-
+			
 			
 			if (ui_menu.page == HOME_PAGE) {
 				// Show cool two frame animation and allow user to change animation scrolling up/down				
@@ -222,9 +235,9 @@ static void lcd_task(void *pvParameters)
 				lcd_wifi_data_page(&ui_menu, &wifi_menu, &ui_btns);
 			}
 		}
-						
+		
 		// Sleep condition
-		if ((ui_menu.page == HOME_PAGE) && ((xTaskGetTickCount() - sleep_timer_last >= sleep_timer_interval) || (xSemaphoreTake(xPowerButtonSemaphore, 0) == pdTRUE))) {
+		if ((ui_menu.page == HOME_PAGE) && ((xTaskGetTickCount() - sleep_timer_last >= sleep_timer_interval) || go_to_sleep)) {
 			lcd_device_sleep();
 			
 			sleep_timer_last = xTaskGetTickCount();

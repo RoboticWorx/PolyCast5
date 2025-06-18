@@ -49,6 +49,7 @@
 #define WIFI_DATA_PAGE 21
 
 extern volatile bool lcd_clear_pending_inputs;
+extern volatile bool go_to_sleep;
 
 typedef struct ui_menu_t {
     const char **options; // your array of strings
@@ -70,8 +71,9 @@ typedef struct ui_btns_t {
     bool down_btn;
     bool right_btn;
     bool left_btn;
-    bool back_btn;
     bool select_btn;
+    bool home_btn;
+    bool pwr_btn;
 } ui_btns_t;
 
 extern ui_btns_t ui_btns;
@@ -100,6 +102,14 @@ void lcd_init_selection_labels(ui_menu_t *ui_menu);
  * @brief Clears all NVS for namespace
  */
 void lcd_ns_nvs_clear(const char* ns);
+
+/**
+ * @brief Switch page to home, redraw, then set sleep flag
+ *
+ * @param [in] home Go home or sleep
+ * @param [in] ui_menu UI menu structure
+ */
+void lcd_funcs_transition_back(bool home, ui_menu_t *ui_menu);
 
 /**
  * @brief Format labels

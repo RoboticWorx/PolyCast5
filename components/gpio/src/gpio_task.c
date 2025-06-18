@@ -19,7 +19,7 @@ SemaphoreHandle_t xUpButtonSemaphore;
 SemaphoreHandle_t xDownButtonSemaphore;
 SemaphoreHandle_t xRightButtonSemaphore;
 SemaphoreHandle_t xLeftButtonSemaphore;
-SemaphoreHandle_t xBackButtonSemaphore;
+SemaphoreHandle_t xHomeButtonSemaphore;
 SemaphoreHandle_t xSelectButtonSemaphore;
 
 SemaphoreHandle_t xLedBlueSemaphore;
@@ -40,8 +40,8 @@ static void gpio_task(void *arg)
     configASSERT(xRightButtonSemaphore);
     xLeftButtonSemaphore = xSemaphoreCreateBinary();
     configASSERT(xLeftButtonSemaphore);
-    xBackButtonSemaphore = xSemaphoreCreateBinary();
-    configASSERT(xBackButtonSemaphore);
+    xHomeButtonSemaphore = xSemaphoreCreateBinary();
+    configASSERT(xHomeButtonSemaphore);
     xSelectButtonSemaphore = xSemaphoreCreateBinary();
     configASSERT(xSelectButtonSemaphore);
     
@@ -97,10 +97,10 @@ static void gpio_task(void *arg)
 		        	ESP_LOGI(TAG, "xLeftButtonSemaphore given");
 		        #endif
 			}
-			else if (gpio_read_input(USER_BUTTON_BACK) == 0) {
-				xSemaphoreGive(xBackButtonSemaphore); // THIS IS PWR ON NEW HW
+			else if (gpio_read_input(USER_BUTTON_HOME) == 0) {
+				xSemaphoreGive(xHomeButtonSemaphore); // THIS IS PWR ON NEW HW
 				#ifdef POLYCAST5_DEBUG_GPIO
-		        	ESP_LOGI(TAG, "xBackButtonSemaphore given");
+		        	ESP_LOGI(TAG, "xHomeButtonSemaphore given");
 		        #endif
 				
 			}
