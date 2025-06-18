@@ -759,8 +759,6 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
 	// Wait until signal received and saved	
 	while (1) {
 		
-		lv_timer_handler();
-		
         if (xSemaphoreTake(xInfraredSignalSavedSemaphore, 0) == pdTRUE) {
 			lv_obj_delete(img_save_remote); // Delete img
 			
@@ -805,9 +803,10 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
             
             break;
         }
+        
+        vTaskDelay(pdMS_TO_TICKS(20));
+		lv_timer_handler();
     }
-	
-	vTaskDelay(pdMS_TO_TICKS(20));
 }
 
 esp_err_t lcd_ir_menu_nvs_save(const ir_menu_t *menu, const char* ns, const char* count, const char* fmt)
