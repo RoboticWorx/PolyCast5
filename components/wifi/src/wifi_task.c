@@ -1,5 +1,7 @@
 #include "polycast5_macros.h"
 
+#include <string.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
@@ -90,11 +92,21 @@ static void wifi_task(void *param)
 			#endif
 			
 			xQueueReset(xWifiNetworkDisconnectedSemaphore); // Reset previous gives
-			xSemaphoreGive(xWifiConnectingSemaphore); // Tell LCD we're trying
 			
-			ESP_ERROR_CHECK(wifi_funcs_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password));
-						
-			ESP_ERROR_CHECK(wifi_funcs_connect());
+			if (selected_network.prev && strlen(selected_network.ssid) == 0) {
+				#ifdef POLYCAST5_DEBUG
+				    ESP_LOGW(TAG, "No previous network to connect to");
+			    #endif
+			    
+			    xSemaphoreGive(xWifiNetworkDisconnectedSemaphore);
+			}
+			else {
+				xSemaphoreGive(xWifiConnectingSemaphore); // Tell LCD we're trying
+			
+				ESP_ERROR_CHECK(wifi_funcs_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password));
+							
+				ESP_ERROR_CHECK(wifi_funcs_connect());
+			}
 		}
 		
 		// Wi-Fi is actively connected
