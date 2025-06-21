@@ -13,6 +13,14 @@
 #include "lora_task.h"
 #include "lora_funcs.h"
 
+#define MAX_RETRIES 2
+
+extern uint32_t expected_rx_id;
+extern bool waiting_for_ack;
+
+static volatile bool need_to_retry = false;
+static uint8_t retry_count = 0;
+
 static lora_cmd_t lora_cmd;
 
 static const char *TAG = "LORA_TASK";
@@ -70,11 +78,10 @@ static void lora_task(void *pvParameters) {
 	}
 	
 	sx126x_mod_params_lora_t lora_mod_params = {
-		.sf = SX126X_LORA_SF7, // Spreading factor (higher value sends further
-							   // but takes more time)
+		.sf = SX126X_LORA_SF7, // Spreading factor (higher value sends further but takes more time)
 		.bw = SX126X_LORA_BW_125, // Bandwidth
 		.cr = SX126X_LORA_CR_4_5, // Error correction
-		.ldro = 0,				  // 1 if SF > 10
+		.ldro = 0, // 1 if SF > 10
 	};
 
 	sx126x_pkt_params_lora_t lora_pkt_params = {
@@ -88,9 +95,9 @@ static void lora_task(void *pvParameters) {
 	// Define the PA configuration parameters
 	sx126x_pa_cfg_params_t pa_config = {
 		.pa_duty_cycle = 0x04, // Duty cycle setting
-		.hp_max = 0x07,		   // Maximum output power
-		.device_sel = 0x00,	   // Select SX1262-specific PA configuration
-		.pa_lut = 0x01		   // Default LUT (Look-Up Table)
+		.hp_max = 0x07, // Maximum output power
+		.device_sel = 0x00, // Select SX1262-specific PA configuration
+		.pa_lut = 0x01 // Default LUT (Look-Up Table)
 	};
 
 	sx126x_hal_reset(NULL);
@@ -200,13 +207,37 @@ static void lora_task(void *pvParameters) {
 			lora_generate_random_key();
 		}
 		
-		// Request to send
-		// Save received encryption key
-		if (xQueueReceive(xLoraSendEncQueue, &lora_cmd, 0) == pdPASS) {
+		// If retrying from no receipt
+		if (need_to_retry) {
+			#ifdef POLYCAST5_DEBUG
+	        	ESP_LOGI(TAG, "RETRYING: %s", payload);
+	        #endif
+	        
+			// Encrypt and send the same payload again
+			lora_encrypt_and_transmit((uint8_t *)payload);
+			
+			need_to_retry = false;
+		}
+		// Else if new command
+		else if (!waiting_for_ack && uxQueueMessagesWaiting(xLoraSendEncQueue) > 0) {
+			xQueuePeek(xLoraSendEncQueue, &lora_cmd, 0);
+			
 			memcpy(encryption_key, lora_cmd.key, ENC_KEY_LEN);
 			
+			// Create unique message ID
+			uint32_t msg_id = lora_create_msg_id();
+			expected_rx_id = msg_id;
+				
+			retry_count = 0; // Reset count
+			waiting_for_ack = true; // Need to wait for acknowledgement before sending again
+			
+			// If no instructions, just put a "0"
+			if (strlen(lora_cmd.instr) == 0) {
+				strcpy(lora_cmd.instr, "0");
+			}
+			
 			// Format command into string
-			snprintf(payload, sizeof(payload), "PolyCast_Command_Value: %d %s", lora_cmd.index, lora_cmd.instr);
+			snprintf(payload, sizeof(payload), "PolyCast_Command_Value:%" PRIu32 ":%d:%s", expected_rx_id, lora_cmd.index, lora_cmd.instr);
 			
 			#ifdef POLYCAST5_DEBUG
 	        	ESP_LOGI(TAG, "SENDING: %s", payload);
@@ -216,7 +247,7 @@ static void lora_task(void *pvParameters) {
 			lora_encrypt_and_transmit((uint8_t *)payload);
 		}
 
-		vTaskDelay(pdMS_TO_TICKS(500));
+		vTaskDelay(pdMS_TO_TICKS(10));
 	}
 }
 
@@ -268,9 +299,26 @@ static void lora_event_handler_task(void *pvParameters) {
 			}
 
 			if (irq_flags & SX126X_IRQ_TIMEOUT) {
-				ESP_LOGW(TAG, "RX timeout occurred");
+				#ifdef POLYCAST5_DEBUG
+					ESP_LOGW(TAG, "RX timeout occurred");
+				#endif
+				
 				sx126x_clear_irq_status(NULL, SX126X_IRQ_TIMEOUT);
 				sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
+				
+				// Never got receipt, need to try again with same everything
+				if (retry_count < MAX_RETRIES) { // Cap at MAX_RETRIES
+					need_to_retry = true;
+					retry_count++;
+				}
+				else {
+					xQueueReset(xLoraSendEncQueue); // Clear pending commands
+					waiting_for_ack = false;
+					
+					#ifdef POLYCAST5_DEBUG
+						ESP_LOGW(TAG, "Hit max LoRa retires");
+					#endif
+				}
 			}
 
 			if (irq_flags & SX126X_IRQ_HEADER_ERROR) {

@@ -11,6 +11,7 @@
 extern uint8_t encryption_key[ENC_KEY_LEN];
 
 void lora_generate_random_key(void);
+uint32_t lora_create_msg_id(void);
 
 void lora_set_rx_mode(void);
 void lora_process_received_message(uint8_t *message, size_t message_len);

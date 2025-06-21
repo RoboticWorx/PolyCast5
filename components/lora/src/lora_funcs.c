@@ -13,12 +13,24 @@
 
 static const char *TAG = "LORA_FUNCS";
 
+uint32_t expected_rx_id = 0;
 uint8_t encryption_key[ENC_KEY_LEN] = {0};
+
+bool waiting_for_ack = false;
 
 static void generate_random_iv(uint8_t *iv, size_t length) {
 	for (size_t i = 0; i < length; i++) {
 		iv[i] = (uint8_t)(esp_random() % (255 + 1)); // Generate number 0 - 255
 	}
+}
+
+uint32_t lora_create_msg_id(void)
+{
+    uint32_t id;
+    do {
+        id = esp_random();
+    } while(id == 0);
+    return id;
 }
 
 void lora_generate_random_key(void)
@@ -105,22 +117,31 @@ void lora_process_received_message(uint8_t *message, size_t message_len) {
 	AES_CBC_decrypt_buffer(&ctx, ciphertext, sizeof(ciphertext));
 
 	ciphertext[sizeof(ciphertext) - 1] = '\0'; // Ensure null termination
-
+	
 	// "cyphertext" is now decrypted
 	#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Decrypted text: %s\n", ciphertext);
     #endif
+    
+    uint32_t received_rx_id;
 	
-	const char expected[] = "PolyCast_Command_Value_Received";
-
 	// If received valid receipt
-	if (strcmp((char*)ciphertext, expected) == 0) {
-		#ifdef POLYCAST5_DEBUG
-        	ESP_LOGI(TAG, "Decrypted text exactly matches expected string");
-        #endif
-	    
-	    // Signal LCD to show check
-	    xSemaphoreGive(xLoraReceiptValidSemaphore);
+	if (sscanf((char*)ciphertext, "PolyCast_Command_Value_Received:%" SCNu32, &received_rx_id) == 1) {
+		if (received_rx_id == expected_rx_id) {
+            #ifdef POLYCAST5_DEBUG
+            	ESP_LOGI(TAG, "ACK matches id=%" PRIu32, received_rx_id);
+            #endif
+            
+            xQueueReset(xLoraSendEncQueue); // Clear pending commands
+            waiting_for_ack = false;
+            
+            xSemaphoreGive(xLoraReceiptValidSemaphore);
+        }
+        else {
+            #ifdef POLYCAST5_DEBUG
+	            ESP_LOGW(TAG, "ACK ID wrong (got=%" PRIu32 ", want=%" PRIu32 ")", received_rx_id, expected_rx_id);
+            #endif
+        }
 	} 
 	else {
 		#ifdef POLYCAST5_DEBUG
