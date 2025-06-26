@@ -17,7 +17,7 @@
 #include "wifi_task.h"
 #include "wifi_funcs.h"
 
-#include "lcd_funcs.h"
+#include "lcd_utils.h"
 #include "lcd_task.h"
 
 #define MAX_PASSWORD_LEN 32
@@ -499,7 +499,7 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
 	}
 	// If connecting to last known
-	else if (ui_btns->right_btn == 1 && wifi_menu->scan_menu.index == 0 && !scanning && !monitoring_packets) {
+	else if (ui_btns->select_btn == 1 && wifi_menu->scan_menu.index == 0 && !scanning && !monitoring_packets) {
 		if (lbl_option) { // Delete if exists
 			lv_obj_delete(lbl_option);
 			lbl_option = NULL;
@@ -538,7 +538,7 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		ui_menu->page = WIFI_PAGE;
 	}
 	// Network selected
-	else if (scanned && ui_btns->right_btn == 1) {
+	else if (scanned && ui_btns->select_btn == 1) {
 		// Connecting to usual network
 		if (!monitoring_packets) {
 			selected_network.prev = false; // Connecting to new

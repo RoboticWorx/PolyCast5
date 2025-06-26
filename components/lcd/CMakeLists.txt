@@ -7,7 +7,7 @@ idf_component_register(
         "src/lcd_lora_funcs.c"
         "src/lcd_espnow_funcs.c"
         "src/lcd_wifi_funcs.c"
-        "src/lcd_funcs.c"
+        "src/lcd_utils.c"
         "src/lcd_task.c"
         "src/st7789.c"
         

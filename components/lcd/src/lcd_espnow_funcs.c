@@ -11,7 +11,7 @@
 #include "esp_mac.h"
 #include "esp_random.h"
 
-#include "lcd_funcs.h"
+#include "lcd_utils.h"
 #include "lcd_task.h"
 
 #include "lcd_lora_funcs.h"

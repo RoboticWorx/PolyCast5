@@ -15,7 +15,7 @@
 
 #include "st7789.h"
 
-#include "lcd_funcs.h"
+#include "lcd_utils.h"
 #include "lcd_task.h"
 #include "wifi_funcs.h"
 #include "wifi_task.h"
@@ -462,113 +462,6 @@ void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32
     lv_anim_start(&a2);
 }
 
-static void infrared_swipe_done_cb(lv_timer_t * t) {
-	ui_menu_t *menu = (ui_menu_t *)lv_timer_get_user_data(t);
-	
-    lv_timer_del(t); // Only once
-    
-    // Update IR
-    lcd_ir_update_menu(&ir_menu);
-    menu->page = INFRARED_PAGE;
-}
-
-void lcd_selection_btn_pressed(ui_menu_t *menu)
-{
-    const char *option = lv_label_get_text(menu->lbl_mid);
-
-	if (strcmp(option, "Infrared") == 0) {
-		lcd_swipe_anim(menu, 1, SWIPE_SPEED);
-		
-		// Non-blocking delay
-		lv_timer_t * timer = lv_timer_create(infrared_swipe_done_cb, 250, menu);
-		lv_timer_set_repeat_count(timer, 1);  // One-shot timer
-	}
-	else if (strcmp(option, "Bluetooth") == 0) {
-		lcd_swipe_anim(menu, 1, SWIPE_SPEED);
-		menu->page = BLUETOOTH_PAGE;
-	}
-	else if (strcmp(option, "PolyPlug") == 0) {
-		lcd_swipe_anim(menu, 1, SWIPE_SPEED);
-		menu->page = LORA_PAGE;
-	}
-	else if (strcmp(option, "ESP32") == 0) {
-		lcd_swipe_anim(menu, 1, SWIPE_SPEED);
-		menu->page = ESPNOW_PAGE;
-	}
-	else if (strcmp(option, "Tools") == 0) {
-		lcd_swipe_anim(menu, 1, SWIPE_SPEED);
-		menu->page = SETTINGS_PAGE;
-	}
-	else if (strcmp(option, "Settings") == 0) {
-		lcd_swipe_anim(menu, 1, SWIPE_SPEED);
-		menu->page = TOOLS_PAGE;
-	}
-	else if (strcmp(option, "Wi-Fi") == 0) {
-		lcd_swipe_anim(menu, 1, SWIPE_SPEED);
-		menu->page = WIFI_PAGE;
-	}
-	else {
-		#ifdef POLYCAST5_DEBUG
-			ESP_LOGW(TAG, "Invalid menu option selected");
-		#endif
-	}
-}
-
-static void swipe_ready_cb(lv_anim_t * a)
-{
-	scroll_ctx_t * ctx = (scroll_ctx_t *)a->user_data;
-    lv_obj_add_flag(ctx->bot, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(ctx->mid, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(ctx->top, LV_OBJ_FLAG_HIDDEN);
-    
-    free(ctx);
-}
-
-void lcd_swipe_anim(ui_menu_t *menu, bool swipe_left, uint32_t speed_px_s)
-{
-	lv_obj_remove_flag(ACTIVE_SCR, LV_OBJ_FLAG_SCROLLABLE); // Disable scroll-bar
-	
-	// Get center button
-    lv_obj_t * btn_mid = lv_obj_get_parent(menu->lbl_mid);
-
-    // Animation objects
-    lv_obj_t * objs[3] = {
-      menu->lbl_top,
-      btn_mid,
-      menu->lbl_bot
-    };
-
-    // Compute start/end
-    lv_coord_t start_x = 0;
-    lv_coord_t end_x = swipe_left ? -240 : 240;
-    uint32_t dist = LV_ABS(end_x - start_x);
-    uint32_t dur = (dist * 1000U) / speed_px_s;
-
-    // For callback
-    scroll_ctx_t *ctx = malloc(sizeof(*ctx));
-    *ctx = (scroll_ctx_t){ .top = menu->lbl_top,
-                           .mid = btn_mid,
-                           .bot = menu->lbl_bot };
-
-	// Loop through objects and animate each
-    for (int i = 0; i < 3; i++) {
-        lv_anim_t a;
-        lv_anim_init(&a);
-        lv_anim_set_var(&a, objs[i]);
-        lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_x);
-        lv_anim_set_values(&a, start_x, end_x);
-        lv_anim_set_time(&a, dur);
-        lv_anim_set_path_cb(&a, lv_anim_path_linear);
-        if (i == 2) { // Only needed for one
-            lv_anim_set_ready_cb(&a, swipe_ready_cb);
-            lv_anim_set_user_data(&a, ctx);
-        } else {
-            lv_anim_set_user_data(&a, ctx);
-        }
-        lv_anim_start(&a);
-    }
-}
-
 static void unhide_selection_widgets(ui_menu_t *m)
 {
     // Show center button and it's label
@@ -780,7 +673,7 @@ void lcd_home_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
 	else if (ui_btns->down_btn == 1) {
 		transition_animation(false);
 	}
-	else if (ui_btns->right_btn == 1) {
+	else if (ui_btns->select_btn == 1) {
 		stop_animations();
 		
 		unhide_selection_widgets(ui_menu);
@@ -798,6 +691,9 @@ void lcd_home_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
 		ui_menu->page = SELECTION_PAGE;
 	}
 	else if (ui_btns->left_btn == 1) {
+		
+	}
+	else if (ui_btns->right_btn == 1) {
 		
 	}
 }
@@ -870,7 +766,53 @@ void lcd_clear_user_in()
 	ui_btns.pwr_btn = 0;
 }
 
-void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns) 
+static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu, wifi_menu_t* wifi_menu)
+{
+	// Hide selection labels
+	lv_obj_add_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->lbl_mid, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->lbl_bot, LV_OBJ_FLAG_HIDDEN);
+		
+    const char *option = lv_label_get_text(ui_menu->lbl_mid);
+    
+   	if (strcmp(option, "Infrared") == 0) {	
+		// Show IR list
+		lv_obj_remove_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);	
+		ui_menu->page = INFRARED_PAGE;
+	}
+	else if (strcmp(option, "Bluetooth") == 0) {
+		ui_menu->page = BLUETOOTH_PAGE;
+	}
+	else if (strcmp(option, "PolyPlug") == 0) {
+		// Show LoRa list
+		lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);	
+		ui_menu->page = LORA_PAGE;
+	}
+	else if (strcmp(option, "ESP32") == 0) {
+		// Show ESP-NOW list
+		lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		ui_menu->page = ESPNOW_PAGE;
+	}
+	else if (strcmp(option, "Tools") == 0) {
+		ui_menu->page = SETTINGS_PAGE;
+	}
+	else if (strcmp(option, "Settings") == 0) {
+		ui_menu->page = TOOLS_PAGE;
+	}
+	else if (strcmp(option, "Wi-Fi") == 0) {
+		// Show Wi-Fi list
+		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		ui_menu->page = WIFI_PAGE;
+	}
+	else {
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGW(TAG, "Invalid menu option selected");
+		#endif
+	}
+}
+
+void lcd_selection_page_selected(ui_menu_t *ui_menu, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu, wifi_menu_t* wifi_menu, ui_btns_t *ui_btns) 
 {
 	if (ui_btns->up_btn == 1) {
 		scrolling_menu = true;
@@ -880,8 +822,8 @@ void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
 		scrolling_menu = true;
 		scrolling_up = true;
 	}
-	else if (ui_btns->right_btn == 1) {
-		lcd_selection_btn_pressed(ui_menu);
+	else if (ui_btns->select_btn == 1) {
+		lcd_selection_btn_pressed(ui_menu, ir_menu, lora_menu, espnow_menu, wifi_menu);
 	}
 	// Go back
 	else if (ui_btns->left_btn == 1) {
@@ -968,28 +910,39 @@ void lcd_funcs_transition_back(bool home, ui_menu_t *ui_menu)
 }
 
 void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns) 
-{
-	// Show IR list
-	lv_obj_remove_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+{	
+	static bool initalized = false;
 	
+	if (!initalized) {
+		// Show IR list
+		lv_obj_remove_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);	
+		
+		initalized = true;
+	}
 	// New remote selected
-	if (ui_btns->up_btn == 1 && ir_menu->index == 1) {
+	if (ui_btns->select_btn == 1 && ir_menu->index == 1) {
 		lcd_ir_save_new_signal(ui_menu, ir_menu);
+		
+		initalized = false;
 	}
 	// Edit remote selected
-	else if (ui_btns->up_btn == 1 && ir_menu->index == 2) {
+	else if (ui_btns->select_btn == 1 && ir_menu->index == 2) {
 		lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN); // Hide IR menu
+		
+		initalized = false; // Reset bool
 		
 		ui_menu->page = INFRARED_REMOTE_EDIT_PAGE;
 	}
 	// Selected specific remote
-	else if (ui_btns->up_btn == 1 && ir_menu->index != 0) {
+	else if (ui_btns->select_btn == 1 && ir_menu->index != 0) {
 		xQueueSend(xInfraredSignalToTxQueue, &ir_menu->index, 0);
 	}
 	// Back selected
 	else if (ui_btns->down_btn == 1) {
 		// Hide IR menu
 		lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		initalized = false; // Reset bool
 		
 		// Show selection labels
 		unhide_selection_widgets(ui_menu);
@@ -1001,12 +954,16 @@ void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_
 		// Hide IR menu
 		lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
+		initalized = false; // Reset bool
+		
 		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
 	}
 	// Power off selected
 	else if (ui_btns->pwr_btn == 1) {
 		// Hide IR menu
 		lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		initalized = false; // Reset bool
 		
 		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
 	}
@@ -1048,7 +1005,7 @@ void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_
 		lcd_lora_update_menu(lora_menu);
 	}
 	// Add PolyPlug selected
-	else if (ui_btns->right_btn == 1 && lora_menu->index == 0) {
+	else if (ui_btns->select_btn == 1 && lora_menu->index == 0) {
 		// Hide LoRa menu
 		lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -1056,7 +1013,7 @@ void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_
 	
 	}
 	// PolyPlug selected
-	else if (ui_btns->right_btn == 1) {
+	else if (ui_btns->select_btn == 1) {
 		// Hide LoRa menu
 		lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -1128,7 +1085,7 @@ void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui
 		lcd_espnow_update_menu(espnow_menu);
 	}
 	// Add ESP32 selected
-	else if (ui_btns->right_btn == 1 && espnow_menu->index == 0) {
+	else if (ui_btns->select_btn == 1 && espnow_menu->index == 0) {
 		// Hide ESP-NOW menu
 		lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -1138,7 +1095,7 @@ void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui
 		ui_menu->page = ESPNOW_RX_MAC_PAGE;
 	}
 	// Specific selected
-	else if (ui_btns->right_btn == 1) {
+	else if (ui_btns->select_btn == 1) {
 		// Hide ESP-NOW menu
 		lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -1243,7 +1200,7 @@ void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_
 		lcd_wifi_update_menu(wifi_menu);
 	}
 	// Connect to network
-	else if (ui_btns->right_btn == 1 && wifi_menu->index == 0) {
+	else if (ui_btns->select_btn == 1 && wifi_menu->index == 0) {
 		lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
 		const char *txt = lv_label_get_text(lbl);
 		// If connected to a network (contains "Connected: ")
@@ -1265,7 +1222,7 @@ void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_
 		}
 	}
 	// Send over Wi-Fi
-	else if (ui_btns->right_btn == 1 && wifi_menu->index == 1) {
+	else if (ui_btns->select_btn == 1 && wifi_menu->index == 1) {
 		// Hide Wi-Fi menu
 		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -1273,7 +1230,7 @@ void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_
 		do_once = false;
 	}
 	// Monitor packets
-	else if (ui_btns->right_btn == 1 && wifi_menu->index == 2) {
+	else if (ui_btns->select_btn == 1 && wifi_menu->index == 2) {
 		// Hide Wi-Fi menu
 		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 			
@@ -1288,7 +1245,7 @@ void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_
 		ui_menu->page = WIFI_SCAN_PAGE;
 	}
 	// Sync with PolyPlug
-	else if (ui_btns->right_btn == 1 && wifi_menu->index == 3) {
+	else if (ui_btns->select_btn == 1 && wifi_menu->index == 3) {
 		// Hide Wi-Fi menu
 		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		

@@ -7,7 +7,7 @@
 
 #include "TCA9535.h"
 
-#include "lcd_funcs.h"
+#include "lcd_utils.h"
 #include "gpio_funcs.h"
 #include "gpio_task.h"
 
@@ -51,7 +51,8 @@ esp_err_t gpio_init(void)
 	gpio_config_t io_conf_out = {
 	    .pin_bit_mask = (1ULL << ST7789_LEDK_PIN) |
 	        			(1ULL << ST7789_DC_PIN)   |
-	      				(1ULL << ST7789_RST_PIN),
+	        			(1ULL << ST7789_RST_PIN),  //|
+	      				//(1ULL << HAPTIC_PIN),
 	    .mode = GPIO_MODE_OUTPUT,
 	    .pull_up_en = GPIO_PULLUP_DISABLE,
 	    .pull_down_en = GPIO_PULLDOWN_DISABLE,

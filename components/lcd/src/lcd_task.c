@@ -5,7 +5,7 @@
 
 #include "lcd_task.h"
 #include "gpio_task.h"
-#include "lcd_funcs.h"
+#include "lcd_utils.h"
 
 static const char *TAG = "LCD_TASK";
 
@@ -180,7 +180,17 @@ static void lcd_task(void *pvParameters)
 				lcd_home_page_selected(&ui_menu, &ui_btns);
 			} 
 			else if (ui_menu.page == SELECTION_PAGE) {
-				lcd_selection_page_selected(&ui_menu, &ui_btns);
+				lcd_selection_page_selected(&ui_menu, &ir_menu, &lora_menu, &espnow_menu, &wifi_menu, &ui_btns);
+			}
+			// IR remotes page
+			else if (ui_menu.page == INFRARED_PAGE) {
+				lcd_infrared_page_selected(&ui_menu, &ir_menu, &ui_btns);
+			}
+			else if (ui_menu.page == INFRARED_REMOTE_NAME_PAGE) {
+				lcd_ir_create_custom_name(&ui_menu, &ir_menu, &ui_btns);
+			}
+			else if (ui_menu.page == INFRARED_REMOTE_EDIT_PAGE) {
+				lcd_ir_edit_remotes(&ui_menu, &ir_menu, &ui_btns);
 			}
 			// LoRa page (PolyPlugs)
 			else if (ui_menu.page == LORA_PAGE) {
@@ -207,16 +217,6 @@ static void lcd_task(void *pvParameters)
 			}
 			else if (ui_menu.page == ESPNOW_OPTION_PAGE) {
 				lcd_espnow_option_selected(&ui_menu, &espnow_menu, &ui_btns);
-			}
-			// IR remotes page
-			else if (ui_menu.page == INFRARED_PAGE) {
-				lcd_infrared_page_selected(&ui_menu, &ir_menu, &ui_btns);
-			}
-			else if (ui_menu.page == INFRARED_REMOTE_NAME_PAGE) {
-				lcd_ir_create_custom_name(&ui_menu, &ir_menu, &ui_btns);
-			}
-			else if (ui_menu.page == INFRARED_REMOTE_EDIT_PAGE) {
-				lcd_ir_edit_remotes(&ui_menu, &ir_menu, &ui_btns);
 			}
 			// Wi-Fi page
 			else if (ui_menu.page == WIFI_PAGE) {

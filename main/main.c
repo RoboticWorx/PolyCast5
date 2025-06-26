@@ -17,7 +17,7 @@
 #include "lora_task.h"
 #include "lora_funcs.h"
 
-#include "lcd_funcs.h"
+#include "lcd_utils.h"
 #include "lcd_task.h"
 
 #include "infrared_task.h"

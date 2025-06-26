@@ -16,7 +16,7 @@
 #include "lcd_lora_funcs.h"
 #include "lora_task.h"
 
-#include "lcd_funcs.h"
+#include "lcd_utils.h"
 #include "lcd_task.h"
 
 #include "espnow_task.h"
@@ -649,7 +649,6 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 
 void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns) 
 {
-	
 	// If received a valid receipt from the receiver
 	if (xSemaphoreTake(xLoraReceiptValidSemaphore, 0) == pdTRUE) {
 		// Show check in top left corner
@@ -715,13 +714,18 @@ void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_bt
 		lcd_lora_update_submenu(lora_menu);
 	}
 	// Scroll up
-	else if (ui_btns->up_btn == 1 && lora_menu->submenu.index > 2) {
+	else if (ui_btns->up_btn == 1) {
 		// Update selection
-		lora_menu->submenu.index -= 3;
+		if (lora_menu->submenu.index > 2) {
+			lora_menu->submenu.index -= 3;
+		}
+		else if (lora_menu->submenu.index < 3) {
+			lora_menu->submenu.index += 3;
+		}
 		lcd_lora_update_submenu(lora_menu);
 	}
 	// Send selected
-	else if (ui_btns->up_btn == 1 && lora_menu->submenu.index == 0) {
+	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 0) {
 		lora_cmd.index = lora_menu->submenu.index;
 		memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
 		xQueueSend(xLoraSendEncQueue, &lora_cmd, 0);
@@ -734,7 +738,7 @@ void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_bt
 		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
 	}
 	// Delete selected
-	else if (ui_btns->down_btn == 1 && lora_menu->submenu.index == 5) {
+	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 5) {
 		
 		// Get user entry to remove
 	    int del_idx = lora_menu->index;     
@@ -790,13 +794,18 @@ void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_bt
     	ui_menu->page = LORA_PAGE;
 	}
 	// Scroll down
-	else if (ui_btns->down_btn == 1 && lora_menu->submenu.index < 3) {
+	else if (ui_btns->down_btn == 1) {
 		// Update selection
-		lora_menu->submenu.index += 3;
+		if (lora_menu->submenu.index < 3) {
+			lora_menu->submenu.index += 3;
+		}
+		else if (lora_menu->submenu.index > 2) {
+			lora_menu->submenu.index -= 3;
+		}
 		lcd_lora_update_submenu(lora_menu);
 	}
 	// Select other
-	else if (ui_btns->up_btn == 1 || ui_btns->down_btn == 1) {
+	else if (ui_btns->select_btn == 1) {
 		// Hide and reset receipt label
 		lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
 		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
@@ -816,15 +825,11 @@ void lcd_lora_subpage_option_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu
 		lcd_lora_subpage_loop_selected(ui_menu, lora_menu, ui_btns);
 	}
 	// Away was selected
-	else if (lora_menu->submenu.index == 3) {
-		// Hide left arrow
-	    lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-	    
+	else if (lora_menu->submenu.index == 3) {	    
 		lcd_lora_subpage_away_selected(ui_menu, lora_menu, ui_btns);
 	}
 	// Edit was selected
 	else if (lora_menu->submenu.index == 4) {
-		
 		// Don’t allow renaming the first index
 	    if (lora_menu->index == 0) {
 	        return;
@@ -869,7 +874,7 @@ void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 				 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, -15, 20); // +y = down, +x = right
 				 
 		lbl_subpage_ins = lv_label_create(ACTIVE_SCR);		 
-		lcd_format_label(lbl_subpage_ins, "- Right/left to adjust time.\n- Up twice to confirm.\n- Down to exit.", user_secondary_color,
+		lcd_format_label(lbl_subpage_ins, "- Right/left to adjust time.\n- Press select to confirm.\n- Down to exit.", user_secondary_color,
 				 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, -15);
 		
 		lbl_selected_icon = lv_label_create(ACTIVE_SCR);		 
@@ -891,11 +896,17 @@ void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 	}	
 	
 	// Move up
-	if (ui_btns->up_btn == 1 && selected_index == 1) {
-		// Move pointer up
-		lv_obj_set_y(lbl_selected_icon, 22);
-			
-		selected_index = 0;
+	if (ui_btns->up_btn == 1) {
+		if (selected_index == 1) {
+			// Move pointer up
+			lv_obj_set_y(lbl_selected_icon, 22);
+			selected_index = 0;
+		}
+		else if (selected_index == 0) {
+			// Move pointer up
+			lv_obj_set_y(lbl_selected_icon, Y_SEL_POS);
+			selected_index = 1;
+		}
 	}
 	// Move down
 	else if (ui_btns->down_btn == 1 && selected_index == 0) {
@@ -905,7 +916,7 @@ void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 		selected_index = 1;
 	}
 	// Shift time of selected right
-	else if(ui_btns->right_btn == 1) {
+	else if (ui_btns->right_btn == 1) {
 		// Changing top time
 		if (selected_index == 0) {
 			on_idx = (on_idx  + 1) % TIME_OPT_COUNT;
@@ -922,7 +933,7 @@ void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 		}
 	}
 	// Shift time of selected left
-	else if(ui_btns->left_btn == 1) {
+	else if (ui_btns->left_btn == 1) {
 		// Changing top time
 		if (selected_index == 0) {
 			on_idx = (on_idx - 1 + TIME_OPT_COUNT) % TIME_OPT_COUNT;
@@ -939,7 +950,7 @@ void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 		}
 	}
 	// Confirm
-	else if (ui_btns->up_btn == 1 && selected_index == 0) {				 
+	else if (ui_btns->select_btn == 1) {				 
 		// Reset objects
 		lv_obj_delete(lbl_subpage_times);
 		lv_obj_delete(lbl_selected_icon);
@@ -981,7 +992,7 @@ void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 	else if (ui_btns->down_btn == 1) {
 		// Show LoRa submenu cont
 		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
-			
+		
 		// Reset objects
 		lv_obj_delete(lbl_subpage_times);
 		lv_obj_delete(lbl_selected_icon);
@@ -1084,7 +1095,7 @@ void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 	}
 	
 	// Back selected
-	if (ui_btns->up_btn == 1 && away_menu->index == 0) {
+	if (ui_btns->left_btn == 1) {
 		// Delete away_menu lv_obj
 		lv_obj_del(away_menu->main_list);
 		
@@ -1101,9 +1112,6 @@ void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 		
 		// Show LoRa submenu cont
 		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
-		
-		// Put back left menu arrow
-		lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 		
 		ui_menu->page = LORA_SUBPAGE;
 	}
@@ -1156,7 +1164,7 @@ void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 		lcd_lora_update_menu(away_menu);
 	}
 	// Specific option selected
-	else if (ui_btns->right_btn == 1 && away_menu->index != 0) {
+	else if (ui_btns->select_btn == 1 && away_menu->index != 0) {
 		// Hide away_menu
 		lv_obj_add_flag(away_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -1190,9 +1198,6 @@ void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 
 		// Show LoRa submenu cont
 		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
-
-		// Put back left menu arrow
-		lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 
 		ui_menu->page = LORA_SUBPAGE;
 	}

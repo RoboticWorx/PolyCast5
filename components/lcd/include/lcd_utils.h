@@ -173,13 +173,6 @@ void lcd_swipe_anim(ui_menu_t *menu, bool swipe_left, uint32_t speed_px_s);
 void lcd_format_center_button(lv_obj_t *btn_mid, lv_color_t user_primary_color, lv_color_t user_secondary_color);
 
 /**
- * @brief Determine which page was selected by the user in the wireless selection page
- *
- * @param [in] ui_menu UI menu structure
- */
-void lcd_selection_btn_pressed(ui_menu_t *ui_menu);
-
-/**
  * @brief Initialize images to be used in animation
  */
 void lcd_init_images();
@@ -203,7 +196,7 @@ void lcd_home_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns);
  * @param [in] ui_menu UI menu structure
  * @param [in] ui_btns UI input structure
  */
-void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns);
+void lcd_selection_page_selected(ui_menu_t *ui_menu, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu, wifi_menu_t* wifi_menu, ui_btns_t *ui_btns);
 
 /**
  * @brief Executes on infrared page

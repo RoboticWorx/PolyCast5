@@ -10,7 +10,7 @@
 #include "esp_log.h"
 
 #include "lcd_ir_funcs.h"
-#include "lcd_funcs.h"
+#include "lcd_utils.h"
 #include "lcd_task.h"
 #include "infrared_task.h"
 #include "gpio_task.h"

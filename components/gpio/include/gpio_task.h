@@ -12,6 +12,8 @@
 #define USER_BUTTON_SELECT 5
 #define USER_BUTTON_POWER 1
 
+#define HAPTIC_PIN 15 // 15 is NC: placeholder
+
 // ISR semaphores
 extern SemaphoreHandle_t xPowerButtonSemaphore; // Select btn pressed
 extern SemaphoreHandle_t xGpioEventSemaphore; // A btn was pressed

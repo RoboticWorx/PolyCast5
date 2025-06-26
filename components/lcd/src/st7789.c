@@ -10,7 +10,7 @@
 #include "esp_log.h"
 
 #include "st7789.h"
-#include "lcd_funcs.h"
+#include "lcd_utils.h"
 
 #define TAG "ST7789"
 #define	_DEBUG_ 0
