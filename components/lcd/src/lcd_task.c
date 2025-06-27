@@ -234,6 +234,9 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == WIFI_DATA_PAGE) {
 				lcd_wifi_data_page(&ui_menu, &wifi_menu, &ui_btns);
 			}
+			else if (ui_menu.page == WIFI_SYNC_PAGE) {
+				lcd_wifi_sync_page(&ui_menu, &wifi_menu, &ui_btns);
+			}
 		}
 		
 		// Sleep condition

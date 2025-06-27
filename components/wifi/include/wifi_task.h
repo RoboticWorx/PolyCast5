@@ -14,6 +14,7 @@ extern SemaphoreHandle_t xWifiNetworkConnectedSemaphore;
 extern SemaphoreHandle_t xWifiNetworkDisconnectedSemaphore;
 extern SemaphoreHandle_t xWifiDisconnectSemaphore;
 extern SemaphoreHandle_t xWifiConnectingSemaphore;
+extern SemaphoreHandle_t xWifiReconnectSemaphore;
 
 /**
  * @brief Create the Wi-Fi task

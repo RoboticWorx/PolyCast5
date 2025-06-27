@@ -15,10 +15,13 @@
 #include "lcd_espnow_funcs.h"
 #include "espnow_funcs.h"
 #include "espnow_task.h"
+#include "wifi_funcs.h"
+#include "wifi_task.h"
 
 #define TAG "ESPNOW_TASK"
 
-espnow_cmd_t espnow_cmd;
+static espnow_cmd_t espnow_cmd;
+static espnow_mqtt_t espnow_mqtt;
 
 static const uint8_t UNIVERSAL_MAC[ESP_NOW_ETH_ALEN] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
@@ -31,6 +34,7 @@ SemaphoreHandle_t xEspCmdTxFailedSemaphore;
 QueueHandle_t xEspSendEncKeyQueueNVS;
 QueueHandle_t xEspSendEncKeyQueue;
 QueueHandle_t xEspSendCmdQueue;
+QueueHandle_t xEspSendMqttQueue;
 
 /*
 	SPI RAM Config:
@@ -51,23 +55,26 @@ static void espnow_task(void *param)
     xEspSendEncKeyQueueNVS = xQueueCreate(1, ENC_KEY_LEN);
 	if (xEspSendEncKeyQueueNVS == NULL) {
 		ESP_LOGE(TAG, "Failed to create xEspSendEncKeyQueueNVS");
-		vTaskDelete(NULL);
 	}
 	configASSERT(xEspSendEncKeyQueueNVS);
 	
 	xEspSendEncKeyQueue = xQueueCreate(1, ENC_KEY_LEN);
 	if (xEspSendEncKeyQueue == NULL) {
 		ESP_LOGE(TAG, "Failed to create xEspSendEncKeyQueue");
-		vTaskDelete(NULL);
 	}
 	configASSERT(xEspSendEncKeyQueue);
 	
 	xEspSendCmdQueue = xQueueCreate(1, sizeof(espnow_cmd_t));
 	if (xEspSendCmdQueue == NULL) {
 		ESP_LOGE(TAG, "Failed to create xEspSendCmdQueue");
-		vTaskDelete(NULL);
 	}
 	configASSERT(xEspSendCmdQueue);
+	
+	xEspSendMqttQueue = xQueueCreate(1, sizeof(espnow_mqtt_t));
+	if (xEspSendMqttQueue == NULL) {
+		ESP_LOGE(TAG, "Failed to create xEspSendMqttQueue");
+	}
+	configASSERT(xEspSendMqttQueue);
     
 	while (1) {
 
@@ -78,7 +85,6 @@ static void espnow_task(void *param)
 		    ESP_ERROR_CHECK(espnow_funcs_espnow_init(UNIVERSAL_MAC, WIFI_CHANNEL, false, NULL));
 		    
 		    // Send the data
-		    //char* msg = "Hello from polycast!";
 		    espnow_funcs_espnow_send_data(UNIVERSAL_MAC, received_enc_key, ENC_KEY_LEN);
 			
 			// Stop radio and de-initialize ESP-NOW
@@ -87,6 +93,45 @@ static void espnow_task(void *param)
 		    
 		    // Send the data to LCD task to save to NVS under given option
 		    xQueueSend(xEspSendEncKeyQueueNVS, received_enc_key, portMAX_DELAY);
+		}
+		
+		// Sharing MAC address as unique token for MQTT commands
+		if (xQueueReceive(xEspSendMqttQueue, &espnow_mqtt, 0) == pdPASS) {
+			wifi_funcs_radio_stop();
+			
+			// Start radio and initialize ESP-NOW
+			ESP_ERROR_CHECK(espnow_funcs_wifi_radio_start(WIFI_CHANNEL));
+		    ESP_ERROR_CHECK(espnow_funcs_espnow_init(UNIVERSAL_MAC, WIFI_CHANNEL, false, NULL));
+		    
+		    // Combine the info into a single string
+		    char payload[111];
+		    int len = snprintf(
+			    payload, sizeof(payload),
+			    "%s:%s:%02X%02X%02X%02X%02X%02X",
+			    espnow_mqtt.ssid,
+			    espnow_mqtt.password,
+			    espnow_mqtt.mac_to_send[0],
+			    espnow_mqtt.mac_to_send[1],
+			    espnow_mqtt.mac_to_send[2],
+			    espnow_mqtt.mac_to_send[3],
+			    espnow_mqtt.mac_to_send[4],
+			    espnow_mqtt.mac_to_send[5]
+			);
+			
+			#ifdef POLYCAST5_DEBUG
+		    	ESP_LOG_BUFFER_HEX("Sending MQTT MAC", espnow_mqtt.mac_to_send, ESPNOW_MAC_SIZE);
+		    	ESP_LOGI(TAG, "Sending MQTT: %s", payload);
+		    #endif
+		    
+		    // Send the data
+		    espnow_funcs_espnow_send_data(UNIVERSAL_MAC, (uint8_t*)payload, len);
+			
+			// Stop radio and de-initialize ESP-NOW
+		    ESP_ERROR_CHECK(espnow_funcs_espnow_deinit());
+		    ESP_ERROR_CHECK(espnow_funcs_wifi_radio_stop());
+		    
+		    // Reconnect to previous network
+		    xSemaphoreGive(xWifiReconnectSemaphore);
 		}
 		
 		// Sending ESP32 -> ESP32 command via ESP-NOW

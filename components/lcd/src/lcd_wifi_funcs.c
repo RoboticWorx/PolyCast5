@@ -1,9 +1,11 @@
 #include "polycast5_macros.h"
 
+#include "freertos/idf_additions.h"
+#include "portmacro.h"
+
 #include "core/lv_obj_pos.h"
 #include "core/lv_obj_tree.h"
 #include "core/lv_obj.h"
-
 #include "misc/lv_area.h"
 #include "misc/lv_color.h"
 
@@ -11,12 +13,13 @@
 #include "widgets/label/lv_label.h"
 
 #include "nvs.h"
+#include "esp_mac.h"
 #include "esp_log.h"
 
 #include "lcd_wifi_funcs.h"
 #include "wifi_task.h"
 #include "wifi_funcs.h"
-
+#include "espnow_task.h"
 #include "lcd_utils.h"
 #include "lcd_task.h"
 
@@ -421,7 +424,7 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		monitoring_packets = false;
 		initialized = false;
 		scanned = false;
-		for(int i = 0; i < wifi_menu->scan_menu.size; i++) {
+		for (int i = 0; i < wifi_menu->scan_menu.size; i++) {
 			locked[i] = false;
 			memset(bssids[i], 0, sizeof(bssids[i]));
 			channels[i] = 0;
@@ -453,7 +456,7 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		monitoring_packets = false;
 		initialized = false;
 		scanned = false;
-		for(int i = 0; i < wifi_menu->scan_menu.size; i++) {
+		for (int i = 0; i < wifi_menu->scan_menu.size; i++) {
 			locked[i] = false;
 			memset(bssids[i], 0, sizeof(bssids[i]));
 			channels[i] = 0;
@@ -481,7 +484,7 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		monitoring_packets = false;
 		initialized = false;
 		scanned = false;
-		for(int i = 0; i < wifi_menu->scan_menu.size; i++) {
+		for (int i = 0; i < wifi_menu->scan_menu.size; i++) {
 			locked[i] = false;
 			memset(bssids[i], 0, sizeof(bssids[i]));
 			channels[i] = 0;
@@ -516,7 +519,7 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		monitoring_packets = false;
 		initialized = false;
 		scanned = false;
-		for(int i = 0; i < wifi_menu->scan_menu.size; i++) {
+		for (int i = 0; i < wifi_menu->scan_menu.size; i++) {
 			locked[i] = false;
 			memset(bssids[i], 0, sizeof(bssids[i]));
 			channels[i] = 0;
@@ -558,7 +561,7 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 				monitoring_packets = false;
 				initialized = false;
 				scanned = false;
-				for(int i = 0; i < wifi_menu->scan_menu.size; i++) {
+				for (int i = 0; i < wifi_menu->scan_menu.size; i++) {
 				    locked[i] = false;
 				    memset(bssids[i], 0, sizeof(bssids[i]));
 				    channels[i] = 0;
@@ -588,7 +591,7 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 				monitoring_packets = false;
 				initialized = false;
 				scanned = false;
-				for(int i = 0; i < wifi_menu->scan_menu.size; i++) {
+				for (int i = 0; i < wifi_menu->scan_menu.size; i++) {
 					locked[i] = false;
 					memset(bssids[i], 0, sizeof(bssids[i]));
 					channels[i] = 0;
@@ -628,7 +631,7 @@ void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 			monitoring_packets = false;
 			initialized = false;
 			scanned = false;
-			for(int i = 0; i < wifi_menu->scan_menu.size; i++) {
+			for (int i = 0; i < wifi_menu->scan_menu.size; i++) {
 				locked[i] = false;
 				memset(bssids[i], 0, sizeof(bssids[i]));
 				channels[i] = 0;
@@ -1346,6 +1349,117 @@ void lcd_wifi_data_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
     }
 }
 
-
+void lcd_wifi_sync_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
+{
+	static bool init = false;
+	
+	static lv_obj_t *lbl_ins;
+	
+	if (!init) {
+		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		lbl_ins = lv_label_create(ACTIVE_SCR);
+		
+        lcd_format_label(lbl_ins, "1. Bring near desired PolyPlug.\n2. Press the top right button\non the PolyPlug.\n3. Confirm LED is showing\ngreen on the PolyPlug.\n4. On this device, hit the\nright arrow to confirm.", user_secondary_color,
+                         &lv_font_montserrat_14, LV_ALIGN_CENTER, 6, 6);
+		
+		init = true;
+	}
+	
+	// Send via ESP-NOW
+	if (ui_btns->right_btn == 1) {
+		// Get device MAC
+		uint8_t my_mac[6];
+		esp_read_mac(my_mac, ESP_MAC_WIFI_STA);
+		
+		// Copy info
+		espnow_mqtt_t sync_info;
+		memcpy(sync_info.mac_to_send, my_mac, sizeof(sync_info.mac_to_send));
+		strlcpy(sync_info.password, selected_network.password, sizeof(sync_info.password));
+		strlcpy(sync_info.ssid, selected_network.ssid, sizeof(sync_info.ssid));
+	
+		// Transmit via ESP-NOW
+		xQueueSend(xEspSendMqttQueue, &sync_info, portMAX_DELAY);
+		
+		
+		// Show confirmation
+		lcd_format_label(lbl_ins, "Syncing...", user_secondary_color,
+					 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+			
+		lv_timer_handler();
+		vTaskDelay(pdMS_TO_TICKS(500));
+			
+		lcd_clear_pending_inputs = true;
+		
+		
+		// Exit
+		// Put back arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Delete label
+		lv_obj_delete(lbl_ins);
+		
+		// Reset statics
+		init = false;
+		lbl_ins = NULL;
+		
+		// Show Wi-Fi menu
+		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Go back
+		ui_menu->page = WIFI_PAGE;
+	}
+	// Back
+	else if (ui_btns->left_btn == 1) {
+		// Put back arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Delete label
+		lv_obj_delete(lbl_ins);
+		
+		// Reset statics
+		init = false;
+		lbl_ins = NULL;
+		
+		// Show Wi-Fi menu
+		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Go back
+		ui_menu->page = WIFI_PAGE;
+	}
+	// Go home
+    else if (ui_btns->home_btn) {
+		// Put back arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Delete label
+		lv_obj_delete(lbl_ins);
+		
+		// Reset statics
+		init = false;
+		lbl_ins = NULL;
+	    
+	    lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+    }
+    // Power off
+    else if (ui_btns->pwr_btn) {
+		// Put back arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Delete label
+		lv_obj_delete(lbl_ins);
+		
+		// Reset statics
+		init = false;
+		lbl_ins = NULL;
+	    
+	    lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+    }
+}
 
 

@@ -35,6 +35,7 @@ SemaphoreHandle_t xWifiNetworkConnectedSemaphore;
 SemaphoreHandle_t xWifiNetworkDisconnectedSemaphore;
 SemaphoreHandle_t xWifiDisconnectSemaphore;
 SemaphoreHandle_t xWifiConnectingSemaphore;
+SemaphoreHandle_t xWifiReconnectSemaphore;
 
 static void wifi_task(void *param)
 {
@@ -48,6 +49,8 @@ static void wifi_task(void *param)
 	configASSERT(xWifiDisconnectSemaphore);
 	xWifiConnectingSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xWifiConnectingSemaphore);
+	xWifiReconnectSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xWifiReconnectSemaphore);
 	
 	xWifiScanQueue = xQueueCreate(WIFI_MAX_NETWORKS, sizeof(wifi_scan_t));
 	configASSERT(xWifiScanQueue);
@@ -99,16 +102,27 @@ static void wifi_task(void *param)
 			}
 			else {
 				xSemaphoreGive(xWifiConnectingSemaphore); // Tell LCD we're trying
-			
+				
 				ESP_ERROR_CHECK(wifi_funcs_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password));
-							
+				
 				ESP_ERROR_CHECK(wifi_funcs_connect());
 			}
 		}
 		
+		// Reconnect to last known network
+		if (xSemaphoreTake(xWifiReconnectSemaphore, 0) == pdTRUE) {
+			xQueueReset(xWifiNetworkDisconnectedSemaphore); // Reset previous gives
+			
+			xSemaphoreGive(xWifiConnectingSemaphore); // Tell LCD we're trying
+			
+			ESP_ERROR_CHECK(wifi_funcs_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password));
+							
+			ESP_ERROR_CHECK(wifi_funcs_connect());
+		}
+		
 		// Wi-Fi is actively connected
 		if (wifi_connected) {
-			wifi_funcs_get_current_date_time();
+			//wifi_funcs_get_current_date_time();
 		}
 		
 		if (xQueueReceive(xWifiSniffQueue, &sniff_network, 0) == pdTRUE) {

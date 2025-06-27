@@ -13,6 +13,13 @@ typedef struct {
     uint8_t lmk[LMK_LEN]; // Local master key (if enc)
 } espnow_cmd_t;
 
+typedef struct {
+    uint8_t mac_to_send[ESPNOW_MAC_SIZE];
+    char ssid[33];
+    char password[65];
+    uint8_t cmd_to_send;
+} espnow_mqtt_t;
+
 extern SemaphoreHandle_t xEspCmdRxStatusSemaphore;
 extern SemaphoreHandle_t xEspCmdTxSuccessSemaphore;
 extern SemaphoreHandle_t xEspCmdTxFailedSemaphore;
@@ -20,6 +27,7 @@ extern SemaphoreHandle_t xEspCmdTxFailedSemaphore;
 extern QueueHandle_t xEspSendEncKeyQueueNVS;
 extern QueueHandle_t xEspSendEncKeyQueue;
 extern QueueHandle_t xEspSendCmdQueue;
+extern QueueHandle_t xEspSendMqttQueue;
 
 /**
  * @brief Create the ESP-NOW task

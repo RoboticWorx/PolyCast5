@@ -262,7 +262,7 @@ static bool wait_for_connection(TickType_t timeout)
 {
     // Wait for either bit
     EventBits_t bits = xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_BIT | WIFI_DISCONNECTED_BIT, pdTRUE,
-     			pdFALSE, timeout);
+    			pdFALSE, timeout);
 
 	// Got IP
     if (bits & WIFI_CONNECTED_BIT) {

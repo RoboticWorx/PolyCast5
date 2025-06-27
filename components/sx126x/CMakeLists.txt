@@ -10,8 +10,8 @@ idf_component_register(
     	"include"
     
     REQUIRES
-    	driver freertos
+    	common
     
     PRIV_REQUIRES
-    	gpio lora lcd
+    	lora gpio lcd
 )

@@ -10,7 +10,7 @@ idf_component_register(
     	"include"
     
     REQUIRES
-    	driver freertos nvs_flash common
+    	common
     
     PRIV_REQUIRES
     	gpio lcd

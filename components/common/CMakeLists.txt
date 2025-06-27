@@ -8,8 +8,8 @@ idf_component_register(
     	"include"
     
     REQUIRES
-    	driver freertos 
+    	driver freertos nvs_flash
     
     PRIV_REQUIRES
-    	espnow gpio infrared lcd lora lvgl sx126x
+    	espnow infrared lora lvgl sx126x gpio lcd
 )

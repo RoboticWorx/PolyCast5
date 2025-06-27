@@ -1,3 +1,4 @@
+#include "misc/lv_timer.h"
 #include "polycast5_macros.h"
 
 #include <stdlib.h>
@@ -1159,7 +1160,8 @@ void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui
 void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
 {
 	// Statics
-	static bool do_once = false;
+	static bool do_once, connected = false;
+	static lv_obj_t *lbl_conf;
 	
 	// Only execute once
 	if (!do_once) {
@@ -1180,12 +1182,15 @@ void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_
 		
 		lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
 		lv_label_set_text(lbl, buf);
+		
+		connected = true;
 	}
 	if (xSemaphoreTake(xWifiNetworkDisconnectedSemaphore, 0) == pdTRUE) {
 		lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
 		lv_label_set_text(lbl, "Connect to network");
+		
+		connected = false;
 	}
-	
 	
 	// Up button pressed
 	if (ui_btns->up_btn == 1) {
@@ -1201,10 +1206,8 @@ void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_
 	}
 	// Connect to network
 	else if (ui_btns->select_btn == 1 && wifi_menu->index == 0) {
-		lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
-		const char *txt = lv_label_get_text(lbl);
-		// If connected to a network (contains "Connected: ")
-		if (strstr(txt, "Connected: ") != NULL) {
+		// If connected to a network
+		if (connected) {
 	        xSemaphoreGive(xWifiDisconnectSemaphore);
 	    }
 	    // Already disconnected
@@ -1248,9 +1251,30 @@ void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_
 	else if (ui_btns->select_btn == 1 && wifi_menu->index == 3) {
 		// Hide Wi-Fi menu
 		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Reset static
-		do_once = false;
+				
+		if (connected) {
+			// Reset static
+			do_once = false;
+			
+			ui_menu->page = WIFI_SYNC_PAGE;
+		}
+		else {
+			lbl_conf = lv_label_create(ACTIVE_SCR);
+			
+			lcd_format_label(lbl_conf, "Please connect\n  to Wi-Fi first!", user_secondary_color,
+						 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+			
+			lv_timer_handler();
+			vTaskDelay(pdMS_TO_TICKS(1000));
+			
+			lv_obj_del(lbl_conf);
+			lbl_conf = NULL;
+			
+			lcd_clear_pending_inputs = true;
+	        
+	        // Show Wi-Fi menu
+			lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		}
 	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {

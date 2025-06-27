@@ -292,7 +292,7 @@ void lcd_lora_create_enc_key(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
 	lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
 	lv_obj_t *lbl_key_ins = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(lbl_key_ins, "1. Bring near desired PolyPlug.\n2. Press the top right button\non PolyPlug.\n3. Confirm LED is showing\ngreen on PolyPlug.\n4. On this device, hit the\nright arrow to confirm.", user_secondary_color,
+	lcd_format_label(lbl_key_ins, "1. Bring near desired PolyPlug.\n2. Press the top right button\non the PolyPlug.\n3. Confirm LED is showing\ngreen on the PolyPlug.\n4. On this device, hit the\nright arrow to confirm.", user_secondary_color,
                          &lv_font_montserrat_14, LV_ALIGN_CENTER, 6, 6);
                     
     while (1) {

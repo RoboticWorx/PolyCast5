@@ -10,8 +10,8 @@ idf_component_register(
     	"include"
     
     REQUIRES
-    	driver freertos common
+    	common
     
     PRIV_REQUIRES
-    	gpio lcd esp_wifi esp_netif espnow mqtt
+    	esp_wifi esp_netif espnow mqtt gpio lcd
 )
