@@ -40,7 +40,7 @@
  * - LV_STDLIB_RTTHREAD:    RT-Thread implementation
  * - LV_STDLIB_CUSTOM:      Implement the functions externally
  */
-#define LV_USE_STDLIB_MALLOC    LV_STDLIB_BUILTIN
+#define LV_USE_STDLIB_MALLOC    LV_STDLIB_CUSTOM
 #define LV_USE_STDLIB_STRING    LV_STDLIB_BUILTIN
 #define LV_USE_STDLIB_SPRINTF   LV_STDLIB_BUILTIN
 
@@ -51,21 +51,22 @@
 #define LV_LIMITS_INCLUDE       <limits.h>
 #define LV_STDARG_INCLUDE       <stdarg.h>
 
-#if LV_USE_STDLIB_MALLOC == LV_STDLIB_BUILTIN
-    /*Size of the memory available for `lv_malloc()` in bytes (>= 2kB)*/
-    #define LV_MEM_SIZE (120 * 1024U)          /*[bytes]*/
-
-    /*Size of the memory expand for `lv_malloc()` in bytes*/
-    #define LV_MEM_POOL_EXPAND_SIZE 0
-
-    /*Set an address for the memory pool instead of allocating it as a normal array. Can be in external SRAM too.*/
-    #define LV_MEM_ADR 0     /*0: unused*/
-    /*Instead of an address give a memory allocator that will be called to get a memory pool for LVGL. E.g. my_malloc*/
-    #if LV_MEM_ADR == 0
-        #undef LV_MEM_POOL_INCLUDE
-        #undef LV_MEM_POOL_ALLOC
-    #endif
-#endif  /*LV_USE_STDLIB_MALLOC == LV_STDLIB_BUILTIN*/
+// Custom settings to draw from PSRAM
+#define LV_MEM_CUSTOM            1
+#define LV_MEM_CUSTOM_INCLUDE    "esp_heap_caps.h"
+#define LV_MEM_CUSTOM_ALLOC(sz)  heap_caps_malloc((sz), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)
+#define LV_MEM_CUSTOM_REALLOC(p, sz) \
+	                             heap_caps_realloc((p), (sz), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)
+#define LV_MEM_CUSTOM_FREE(p)    heap_caps_free(p)
+	
+/* Disable all of the old builtin‐pool macros so no TLSF code ever gets pulled in */
+#undef  LV_MEM_SIZE
+#define LV_MEM_SIZE             0
+#undef  LV_MEM_POOL_EXPAND_SIZE
+#define LV_MEM_POOL_EXPAND_SIZE 0
+#undef  LV_MEM_ADR
+#define LV_MEM_ADR              0
+// End custom settings to draw from PSRAM
 
 /*====================
    HAL SETTINGS

@@ -32,6 +32,7 @@
 #include "espnow_funcs.h"
 
 #include "wifi_task.h"
+#include "wifi_funcs.h"
 
 // Logging tag
 static const char *TAG = "MAIN";
@@ -80,7 +81,7 @@ void app_main(void) {
     ESP_ERROR_CHECK(espnow_funcs_wifi_driver_init());
     // Turn off radio to save power
     ESP_ERROR_CHECK(espnow_funcs_wifi_radio_stop());
-
+    
 	// Isolate and configure sleep wake up
 	//ESP_ERROR_CHECK(rtc_gpio_isolate(USER_BUTTON_POWER));
 	//ESP_ERROR_CHECK(rtc_gpio_set_direction(USER_BUTTON_POWER, RTC_GPIO_MODE_INPUT_ONLY));
@@ -135,6 +136,17 @@ void app_main(void) {
 	espnow_task_create();
 	wifi_task_create();
 	//ble_hid_task_start_up();
+	
+	#ifdef POLYCAST5_DEBUG_RAM
+		// Log again after allocating some things
+	    // Prints how much of that is free for malloc()
+	    free_ext = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+	    ESP_LOGI("AFTER PSRAM", "Free PSRAM heap = %u KB", free_ext / 1024);
+	
+	    // Also show internal
+	    free_int = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+	    ESP_LOGI("AFTER PSRAM", "Free internal heap = %u KB", free_int / 1024);
+    #endif
 
 	#ifdef POLYCAST5_DEBUG
 		ESP_LOGI(TAG, "Main initialized and tasks created");

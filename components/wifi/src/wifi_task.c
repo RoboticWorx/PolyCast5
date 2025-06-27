@@ -60,11 +60,8 @@ static void wifi_task(void *param)
 	xWifiDataQueue = xQueueCreate(1, sizeof(wifi_data_t*));
 	configASSERT(xWifiDataQueue);
 	
-	
-	
 	wifi_funcs_wifi_event_init();
-	
-	
+	wifi_funcs_mqtt_client_init();
     
 	while (1) {
 		// Start a Wi-Fi scan

@@ -1,12 +1,10 @@
+# Collect every .c under src/ (recursively)
+file(GLOB_RECURSE SRCS
+     RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
+     "src/*.c")
 
 idf_component_register(
-
-    SRCS
-        "src/lr_fhss_mac.c"
-        "src/sx126x_driver_version.c"
-        "src/sx126x_hal.c"
-        "src/sx126x_lr_fhss.c"
-        "src/sx126x.c"
+    SRCS ${SRCS}
         
     INCLUDE_DIRS 
     	"include"

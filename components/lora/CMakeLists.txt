@@ -1,10 +1,10 @@
+# Collect every .c under src/ (recursively)
+file(GLOB_RECURSE SRCS
+     RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
+     "src/*.c")
 
 idf_component_register(
-
-    SRCS
-    	"src/aes.c"
-        "src/lora_funcs.c"
-        "src/lora_task.c"
+    SRCS ${SRCS}
                 
     INCLUDE_DIRS 
     	"include"

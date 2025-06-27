@@ -11,6 +11,8 @@
 #include "../misc/lv_log.h"
 #include "../core/lv_global.h"
 
+#include "lvgl_psram_heap.h"
+
 #if LV_USE_OS == LV_OS_PTHREAD
     #include <pthread.h>
 #endif

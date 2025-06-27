@@ -1,9 +1,10 @@
+# Collect every .c under src/ (recursively)
+file(GLOB_RECURSE SRCS
+     RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
+     "src/*.c")
 
 idf_component_register(
-
-    SRCS
-        "src/infrared_funcs.c"
-        "src/infrared_task.c"
+    SRCS ${SRCS}
                 
     INCLUDE_DIRS 
     	"include"

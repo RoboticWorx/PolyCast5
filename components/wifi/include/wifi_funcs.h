@@ -87,6 +87,8 @@ esp_err_t wifi_funcs_connect(void);
 esp_err_t wifi_funcs_radio_start(const char *ssid, const uint8_t* bssid, const char *password);
 
 void wifi_funcs_wifi_event_init(void);
+void wifi_funcs_mqtt_client_init(void);
+
 esp_err_t wifi_funcs_radio_stop(void);
 void wifi_funcs_get_current_date_time(void);
 wifi_login_t wifi_funcs_get_prev(void);

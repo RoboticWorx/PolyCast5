@@ -4,6 +4,7 @@
 #include <time.h>
 #include <sys/time.h>
 
+#include "mqtt_client.h"
 #include "esp_log.h"
 #include "esp_wifi.h"
 #include "esp_netif.h"
@@ -27,6 +28,7 @@
 #define SUBTYPE_BEACON 0x08
 
 
+static esp_mqtt_client_handle_t mqtt_client;
 
 static uint8_t target_bssid[6] = { 0x60, 0x55, 0xF9, 0xFC, 0xDE, 0xA8 };
 static EventGroupHandle_t wifi_event_group;
@@ -203,9 +205,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
         xSemaphoreGive(xWifiNetworkConnectedSemaphore); // Notify LCD we connected
 
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
-        
-		wifi_funcs_get_current_date_time();
-		
+        		
 		wifi_connected = true;
     }
 }
@@ -219,6 +219,43 @@ void wifi_funcs_wifi_event_init(void)
     			 
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, wifi_event_handler,
     			 NULL, NULL));
+}
+
+static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
+{
+    esp_mqtt_event_handle_t event = event_data;
+    switch (event->event_id) {
+        case MQTT_EVENT_CONNECTED:
+            ESP_LOGI(TAG, "Connected, publishing...");
+            esp_mqtt_client_publish(mqtt_client,
+                                    "devices/esp32c5/cmd",
+                                    "TURN_ON",
+                                    0,    // message length (0 = strlen)
+                                    1,    // QoS
+                                    0);   // retain
+            break;
+        case MQTT_EVENT_DISCONNECTED:
+            ESP_LOGI(TAG, "Disconnected");
+            break;
+        default:
+            break;
+    }
+}
+
+void wifi_funcs_mqtt_client_init(void)
+{
+	esp_mqtt_client_config_t cfg = {
+	    .broker = {
+	        .address = {
+	            .uri = "mqtt://test.mosquitto.org"
+	        }
+	    },
+	    .session = {
+	        .keepalive = 60
+	    }
+	};
+    mqtt_client = esp_mqtt_client_init(&cfg);
+    esp_mqtt_client_register_event(mqtt_client, MQTT_EVENT_ANY, mqtt_event_handler, NULL);
 }
 
 static bool wait_for_connection(TickType_t timeout)
@@ -252,6 +289,7 @@ esp_err_t wifi_funcs_connect(void)
 		#ifdef POLYCAST5_DEBUG
     		ESP_LOGI(TAG, "Wi-Fi connected and got IP!");
     	#endif
+    	esp_mqtt_client_start(mqtt_client); // Start mqtt client
 	}
 	else {
 	    ESP_LOGE(TAG, "Failed to connect");
@@ -304,6 +342,7 @@ esp_err_t wifi_funcs_radio_start(const char *ssid, const uint8_t* bssid, const c
 
 esp_err_t wifi_funcs_radio_stop(void)
 {
+	esp_mqtt_client_stop(mqtt_client); // Stop possible client
 	esp_wifi_disconnect(); // Disconnect if connected
 	
 	// Stop Wi-Fi
