@@ -10,7 +10,10 @@
 static const char *TAG = "LCD_TASK";
 
 static const TickType_t btn_timer_interval = pdMS_TO_TICKS(200);
-static const TickType_t sleep_timer_interval = pdMS_TO_TICKS(POLYCAST5_DEFAULT_SLEEP_TIME_MS);
+
+#ifdef POLYCAST5_EN_SLEEP_TIMER
+	static const TickType_t sleep_timer_interval = pdMS_TO_TICKS(POLYCAST5_DEFAULT_SLEEP_TIME_MS);
+#endif
 
 ui_menu_t ui_menu = {
     .options = (const char *[]) {"Bluetooth","PolyPlug","ESP32","Infrared","Tools", "Settings","Wi-Fi"},
@@ -240,11 +243,19 @@ static void lcd_task(void *pvParameters)
 		}
 		
 		// Sleep condition
-		if ((ui_menu.page == HOME_PAGE) && ((xTaskGetTickCount() - sleep_timer_last >= sleep_timer_interval) || go_to_sleep)) {
-			lcd_device_sleep();
-			
-			sleep_timer_last = xTaskGetTickCount();
-		}
+		#ifdef POLYCAST5_EN_SLEEP_TIMER
+			if ((ui_menu.page == HOME_PAGE) && ((xTaskGetTickCount() - sleep_timer_last >= sleep_timer_interval) || go_to_sleep)) {
+				lcd_device_sleep();
+				
+				sleep_timer_last = xTaskGetTickCount();
+			}
+		#else
+			if ((ui_menu.page == HOME_PAGE) && go_to_sleep) {
+				lcd_device_sleep();
+				
+				sleep_timer_last = xTaskGetTickCount();
+			}
+		#endif
 
 		lv_timer_handler();
 		vTaskDelay(pdMS_TO_TICKS(10));

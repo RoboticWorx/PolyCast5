@@ -62,7 +62,11 @@ static void gpio_task(void *arg)
 	gpio_write_output(5, 0); // NA
 	gpio_write_output(6, 0); // NA
 	gpio_write_output(7, 0); // NA
-		
+	
+	#ifdef POLYCAST5_CYCLE_RGB_ON_BOOT
+		gpio_cycle_rgb();
+	#endif
+	
 	while (1) 
 	{
 		#ifdef POLYCAST5_DEBUG_GPIO

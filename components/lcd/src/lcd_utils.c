@@ -1,3 +1,4 @@
+#include "freertos/projdefs.h"
 #include "misc/lv_timer.h"
 #include "polycast5_macros.h"
 
@@ -219,6 +220,7 @@ static void lcd_panel_wake(void)
 
 void lcd_device_sleep(void)
 {
+	xQueueReset(xWifiCanSleepSemaphore);
 	xSemaphoreGive(xWifiDisconnectSemaphore); // Disconnect from Wi-Fi if connected
 	
 	lcd_panel_sleep(); // Put ST7789 to sleep
@@ -229,8 +231,9 @@ void lcd_device_sleep(void)
 		vTaskDelay(pdMS_TO_TICKS(10));
 		lv_timer_handler();
 	}
-
-	// gpio_reset_pin(USER_BUTTON_POWER);
+	
+	// Wait for Wi-Fi to shut off if on
+	xSemaphoreTake(xWifiCanSleepSemaphore, pdMS_TO_TICKS(1000));
 
 	xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
 
@@ -244,9 +247,6 @@ void lcd_device_sleep(void)
 
 	lcd_panel_wake(); // Wake up ST7789
 	gpio_set_level(ST7789_LEDK_PIN, 1); // BL high
-	
-	// rtc_gpio_deinit(USER_BUTTON_POWER);
-	//   then re-apply your gpio_config(…) for the digital input
 
 	// Handle case where waking from timer: don't auto sleep
 	while (gpio_get_level(USER_BUTTON_POWER) != 1) {
@@ -1261,7 +1261,7 @@ void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_
 		else {
 			lbl_conf = lv_label_create(ACTIVE_SCR);
 			
-			lcd_format_label(lbl_conf, "Please connect\n  to Wi-Fi first!", user_secondary_color,
+			lcd_format_label(lbl_conf, "Please connect to\n  a network first!", user_secondary_color,
 						 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
 			
 			lv_timer_handler();

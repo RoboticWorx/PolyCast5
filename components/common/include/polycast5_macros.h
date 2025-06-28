@@ -11,6 +11,10 @@
 //#define POLYCAST5_ESPNOW_DUMP_NVS 1 // Show ESP-NOW NVS state on boot
 //#define POLYCAST5_IR_NVS_CLEAR 1 // Clear all IR namespaces 
 
+//#define POLYCAST5_CYCLE_RGB_ON_BOOT 1 // Cycle through the RGB LED to make sure it is working
+
+//#define POLYCAST5_EN_SLEEP_TIMER 1 // Enable sleep timer
+
 #define POLYCAST5_DEFAULT_SLEEP_TIME_MS (30 * 1000) // 30 sec
 
 

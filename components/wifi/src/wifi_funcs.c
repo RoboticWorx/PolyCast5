@@ -351,12 +351,12 @@ esp_err_t wifi_funcs_radio_stop(void)
 		xSemaphoreGive(xWifiNetworkDisconnectedSemaphore);
 	}
 	else {
-		ESP_LOGE(TAG, "wifi_funcs_radio_stop not ESP_OK");
-	}    
+		ESP_LOGE(TAG, "wifi_funcs_radio_stop: %s", err);
+	}
     
+    xSemaphoreGive(xWifiCanSleepSemaphore);
     wifi_connected = false;
     memset(&wifi_data, 0, sizeof(wifi_data)); // Zero out wifi_data if initialized
-    //xSemaphoreGive(xLedOffSemaphore);
     
     return err;
 }

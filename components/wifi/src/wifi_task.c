@@ -36,6 +36,7 @@ SemaphoreHandle_t xWifiNetworkDisconnectedSemaphore;
 SemaphoreHandle_t xWifiDisconnectSemaphore;
 SemaphoreHandle_t xWifiConnectingSemaphore;
 SemaphoreHandle_t xWifiReconnectSemaphore;
+SemaphoreHandle_t xWifiCanSleepSemaphore;
 
 static void wifi_task(void *param)
 {
@@ -51,6 +52,8 @@ static void wifi_task(void *param)
 	configASSERT(xWifiConnectingSemaphore);
 	xWifiReconnectSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xWifiReconnectSemaphore);
+	xWifiCanSleepSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xWifiCanSleepSemaphore);
 	
 	xWifiScanQueue = xQueueCreate(WIFI_MAX_NETWORKS, sizeof(wifi_scan_t));
 	configASSERT(xWifiScanQueue);
@@ -70,7 +73,6 @@ static void wifi_task(void *param)
 		// Start a Wi-Fi scan
 		if (xSemaphoreTake(xWifiStartScanSemaphore, 0) == pdTRUE) {
 			ESP_ERROR_CHECK(esp_wifi_start());
-			//xSemaphoreGive(xLedBlueSemaphore);
 			
 			wifi_funcs_scan(wifi_scan);
 			

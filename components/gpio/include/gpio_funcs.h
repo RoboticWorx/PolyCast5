@@ -38,4 +38,11 @@ int gpio_read_input(uint8_t pin);
  */
 esp_err_t gpio_write_output(uint8_t pin, bool level);
 
+#ifdef POLYCAST5_CYCLE_RGB_ON_BOOT
+	/** 
+	 * @brief Cycle through the RGB LED to make sure it is working
+	 */
+	void gpio_cycle_rgb(void);
+#endif
+
 #endif // GPIO_FUNCS_H
