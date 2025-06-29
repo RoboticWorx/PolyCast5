@@ -97,22 +97,20 @@ static void espnow_task(void *param)
 		    ESP_ERROR_CHECK(espnow_funcs_espnow_init(UNIVERSAL_MAC, WIFI_CHANNEL, false, NULL));
 		    
 		    // Combine the info into a single string
-		    char payload[111];
+		    char payload[134];
 		    int len = snprintf(
 			    payload, sizeof(payload),
-			    "%s:%s:%02X%02X%02X%02X%02X%02X",
+			    "%s:%s:%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",
 			    espnow_mqtt.ssid,
 			    espnow_mqtt.password,
-			    espnow_mqtt.mac_to_send[0],
-			    espnow_mqtt.mac_to_send[1],
-			    espnow_mqtt.mac_to_send[2],
-			    espnow_mqtt.mac_to_send[3],
-			    espnow_mqtt.mac_to_send[4],
-			    espnow_mqtt.mac_to_send[5]
+			    espnow_mqtt.key[0], espnow_mqtt.key[1], espnow_mqtt.key[2], espnow_mqtt.key[3],
+			    espnow_mqtt.key[4], espnow_mqtt.key[5], espnow_mqtt.key[6], espnow_mqtt.key[7],
+			    espnow_mqtt.key[8], espnow_mqtt.key[9], espnow_mqtt.key[10], espnow_mqtt.key[11],
+			    espnow_mqtt.key[12], espnow_mqtt.key[13], espnow_mqtt.key[14], espnow_mqtt.key[15]
 			);
 			
 			#ifdef POLYCAST5_DEBUG
-		    	ESP_LOG_BUFFER_HEX("Sending MQTT MAC", espnow_mqtt.mac_to_send, ESPNOW_MAC_SIZE);
+		    	ESP_LOG_BUFFER_HEX("Sending MQTT KEY", espnow_mqtt.key, 16);
 		    	ESP_LOGI(TAG, "Sending MQTT: %s", payload);
 		    #endif
 		    

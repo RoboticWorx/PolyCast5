@@ -57,7 +57,10 @@ typedef struct {
     uint32_t channel;
 } wifi_data_t;
 
-//extern wifi_scan_t wifi_scan[WIFI_MAX_NETWORKS];
+typedef struct {
+    uint8_t key[16];
+    char payload[4];
+} wifi_mqtt_t;
 
 /**
  * @brief Scan and print available networks

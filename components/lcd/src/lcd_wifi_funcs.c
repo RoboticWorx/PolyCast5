@@ -15,6 +15,7 @@
 #include "nvs.h"
 #include "esp_mac.h"
 #include "esp_log.h"
+#include "esp_random.h"
 
 #include "lcd_wifi_funcs.h"
 #include "wifi_task.h"
@@ -40,6 +41,8 @@ bool monitoring_packets = false;
 static const char* TAG = "LCD_WIFI_FUNCS";
 
 static wifi_sniff_t sniff_network;
+
+static uint8_t mqtt_key[16];
 
 // Character vars for user input
 static char name_buf[MAX_PASSWORD_LEN + 1] = {0};
@@ -1366,12 +1369,11 @@ void lcd_wifi_sync_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 	// Send via ESP-NOW
 	if (ui_btns->right_btn == 1) {
 		// Get device MAC
-		uint8_t my_mac[6];
-		esp_read_mac(my_mac, ESP_MAC_WIFI_STA);
+		esp_fill_random(mqtt_key, sizeof(mqtt_key));
 		
 		// Copy info
 		espnow_mqtt_t sync_info;
-		memcpy(sync_info.mac_to_send, my_mac, sizeof(sync_info.mac_to_send));
+		memcpy(sync_info.key, mqtt_key, sizeof(sync_info.key));
 		strlcpy(sync_info.password, selected_network.password, sizeof(sync_info.password));
 		strlcpy(sync_info.ssid, selected_network.ssid, sizeof(sync_info.ssid));
 	
@@ -1475,11 +1477,14 @@ void lcd_wifi_send_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 	
 	// Send via MQTT
 	if (ui_btns->right_btn == 1) {
-		char buf[BUF_SIZE];
-		snprintf(buf, sizeof(buf), "%u", wifi_menu->wifi_submenu.cmd_to_send);
+		wifi_mqtt_t wifi_mqtt;
+		
+		snprintf(wifi_mqtt.payload, sizeof(wifi_mqtt.payload), "%u", wifi_menu->wifi_submenu.cmd_to_send);
+		memcpy(wifi_mqtt.key, mqtt_key, sizeof(mqtt_key));
+		// NEED TO SAVE TO FLASH UNDER SPECIFIC ENTRY
 		
 		// Send
-		xQueueSend(xWifiMqttCmdQueue, buf, portMAX_DELAY);
+		xQueueSend(xWifiMqttCmdQueue, &wifi_mqtt, portMAX_DELAY);
 	}
 	// Command up
 	if (ui_btns->up_btn == 1) {

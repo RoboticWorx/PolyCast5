@@ -2,6 +2,7 @@
 #define ESPNOW_TASK_H
 
 #include "freertos/idf_additions.h"
+
 #include "lcd_espnow_funcs.h"
 
 #define WIFI_CHANNEL 1
@@ -14,7 +15,7 @@ typedef struct {
 } espnow_cmd_t;
 
 typedef struct {
-    uint8_t mac_to_send[ESPNOW_MAC_SIZE];
+    uint8_t key[16];
     char ssid[33];
     char password[65];
     uint8_t cmd_to_send;

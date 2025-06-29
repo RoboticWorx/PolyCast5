@@ -25,7 +25,7 @@ static wifi_scan_t wifi_scan[WIFI_MAX_NETWORKS];
 static wifi_login_t selected_network;
 static wifi_sniff_t sniff_network;
 
-static char mqtt_payload[64]; // Change 64 to something else
+static wifi_mqtt_t wifi_mqtt;
 
 QueueHandle_t xWifiScanQueue;
 QueueHandle_t xWifiSelectedNetworkQueue;
@@ -69,18 +69,12 @@ static void wifi_task(void *param)
 	configASSERT(xWifiBeaconQueue);
 	xWifiDataQueue = xQueueCreate(1, sizeof(wifi_data_t*));
 	configASSERT(xWifiDataQueue);
-	xWifiMqttCmdQueue = xQueueCreate(1, sizeof(mqtt_payload));
+	xWifiMqttCmdQueue = xQueueCreate(1, sizeof(wifi_mqtt_t));
 	configASSERT(xWifiMqttCmdQueue);
 	
 	uint8_t my_mac[6];
 	esp_read_mac(my_mac, ESP_MAC_WIFI_STA);
-	
-	// Build a topic string: "polycast5/XX:XX:XX:XX:XX:XX/cmd"
-	char mqtt_topic[32];
-	snprintf(mqtt_topic, sizeof(mqtt_topic), "polycast5/%02X%02X%02X%02X%02X%02X/cmd",
-	         my_mac[0], my_mac[1], my_mac[2],
-	         my_mac[3], my_mac[4], my_mac[5]);
-	
+		
 	wifi_funcs_wifi_event_init();
 	wifi_funcs_mqtt_client_init();
 	
@@ -143,8 +137,20 @@ static void wifi_task(void *param)
 		}
 		
 		// Send data over MQTT
-		if (xQueueReceive(xWifiMqttCmdQueue, mqtt_payload, 0) == pdTRUE) {
-			wifi_funcs_mqtt_client_publish(mqtt_payload, mqtt_topic);
+		if (xQueueReceive(xWifiMqttCmdQueue, &wifi_mqtt, 0) == pdTRUE) {
+			// Build the topic string
+		    char topic[128];
+		    int len = snprintf(
+			    topic, sizeof(topic),
+			    "polycast5/%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X/cmd",
+			    wifi_mqtt.key[0], wifi_mqtt.key[1], wifi_mqtt.key[2], wifi_mqtt.key[3],
+			    wifi_mqtt.key[4], wifi_mqtt.key[5], wifi_mqtt.key[6], wifi_mqtt.key[7],
+			    wifi_mqtt.key[8], wifi_mqtt.key[9], wifi_mqtt.key[10], wifi_mqtt.key[11],
+			    wifi_mqtt.key[12], wifi_mqtt.key[13], wifi_mqtt.key[14], wifi_mqtt.key[15]
+			);
+			strlcpy(topic, topic, len + 1);
+	         
+			wifi_funcs_mqtt_client_publish(wifi_mqtt.payload, topic);
 		}
 		
 		// Received channel to sniff
