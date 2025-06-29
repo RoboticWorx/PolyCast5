@@ -27,9 +27,11 @@
 #define MAX_PASSWORD_LEN 32
 #define NUM_CHAR_ROWS 4
 
+#define WIFI_MENU_START_SIZE 3
+
 wifi_menu_t wifi_menu = {
-    .options = {"Connect to network", "Send over Wi-Fi", "Monitor packets", "Sync with PolyPlug"},
-    .size = 4,
+    .options = {"Connect to network", "Monitor packets", "Sync with PolyPlug"},
+    .size = WIFI_MENU_START_SIZE,
     .index = 0,
     .cont = NULL,
 };
@@ -43,6 +45,9 @@ static const char* TAG = "LCD_WIFI_FUNCS";
 static wifi_sniff_t sniff_network;
 
 static uint8_t mqtt_key[16];
+static bool wifi_menu_overwrite = false;
+
+static char mqtt_name_buf[MAX_PASSWORD_LEN + 1] = {0};
 
 // Character vars for user input
 static char name_buf[MAX_PASSWORD_LEN + 1] = {0};
@@ -1379,18 +1384,7 @@ void lcd_wifi_sync_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 	
 		// Transmit via ESP-NOW
 		xQueueSend(xEspSendMqttQueue, &sync_info, portMAX_DELAY);
-		
-		
-		// Show confirmation
-		lcd_format_label(lbl_ins, "Syncing...", user_secondary_color,
-					 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
-			
-		lv_timer_handler();
-		vTaskDelay(pdMS_TO_TICKS(500));
-			
-		lcd_clear_pending_inputs = true;
-		
-		
+				
 		// Exit
 		// Put back arrows
 		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
@@ -1403,11 +1397,8 @@ void lcd_wifi_sync_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		init = false;
 		lbl_ins = NULL;
 		
-		// Show Wi-Fi menu
-		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Go back
-		ui_menu->page = WIFI_PAGE;
+		// Go to name page
+		ui_menu->page = WIFI_NAME_PAGE;
 	}
 	// Back
 	else if (ui_btns->left_btn == 1) {
@@ -1460,6 +1451,285 @@ void lcd_wifi_sync_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
     }
 }
 
+static void update_name_label_lcd(lv_obj_t *lbl_display, char cur_char, int cur_pos)
+{
+    char display[MAX_CUSTOM_NAME_LEN + 2]; // Buffer
+    
+    int len = cur_pos + 1; // Current length of name
+    
+    // Cap
+    if (len > MAX_CUSTOM_NAME_LEN + 1) {
+		len = MAX_CUSTOM_NAME_LEN + 1;
+	}
+	
+	// Copy name into display buffer
+    if (cur_pos > 0) {
+		memcpy(display, mqtt_name_buf, cur_pos);
+	}
+	
+	// Get current
+    display[cur_pos] = cur_char;
+    display[len] = '\0';
+    
+    // Set text and re-center
+    lv_label_set_text(lbl_display, display);
+    lv_obj_align(lbl_display, LV_ALIGN_CENTER, 0, 30);
+}
+
+void lcd_wifi_create_custom_name(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
+{
+	static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
+	
+    // Declare statics
+    static int cur_pos = 0; // User position
+    static char cur_char = '_';
+    static lv_obj_t *lbl_dirs = NULL;
+    static lv_obj_t *lbl_chars = NULL;
+    static lv_obj_t *lbl_user_in = NULL;
+    
+    // Create initial label
+    if (!lbl_user_in) {
+		
+		// If renaming, autofill what was there previously
+        if (wifi_menu_overwrite) {
+            // Copy the old name into buffer
+            strncpy(mqtt_name_buf, wifi_menu->options[wifi_menu->index], MAX_CUSTOM_NAME_LEN);
+
+            // Place cursor at the end
+            cur_pos = strlen(mqtt_name_buf);
+            
+            // Start with '_'
+            cur_char = '_';
+        }
+        else { // Else blank slate
+            memset(mqtt_name_buf, 0, sizeof mqtt_name_buf);
+            cur_pos = 0;
+            cur_char = '_';
+        }
+		
+        lbl_user_in = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_user_in, "", user_secondary_color,
+                         &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
+                         
+        lbl_dirs = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_dirs, "Enter PolyPlug name\nwith arrow buttons:", user_secondary_color,
+                         &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, -30);
+                         
+        if (wifi_menu_overwrite)
+        	lv_label_set_text(lbl_dirs, "Enter new PolyPlug name\n   with arrow buttons:");
+        
+        lbl_chars = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_chars, "(Up to 12 characters)", user_secondary_color,
+                         &lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0);
+                         
+        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+    }
+
+    // Take user input
+    // If up, iterate up
+    if (ui_btns->up_btn) {
+		// Wrap
+        if (cur_char == '_') {
+			cur_char = 'A';
+		}
+        else if (cur_char == 'Z') {
+			cur_char = '_';
+		}
+		// Else iterate 1 char
+        else {
+			cur_char = (char)(cur_char + 1);
+		}
+		
+		// Save to array
+        mqtt_name_buf[cur_pos] = cur_char;
+        
+        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+    }
+    // If down, iterate down
+    else if (ui_btns->down_btn) {
+		// Wrap
+        if (cur_char == '_') {
+			cur_char = 'Z';
+		}
+        else if (cur_char == 'A') {
+			cur_char = '_';
+		}
+		// Else iterate down 1 char
+        else {
+			cur_char = (char)(cur_char - 1);
+		}
+		
+		// Save to array
+        mqtt_name_buf[cur_pos] = cur_char;
+        
+        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+    }
+    // Can back out if at start and overwriting
+    else if (ui_btns->left_btn && cur_pos == 0 && wifi_menu_overwrite) {
+		// Delete labels since no longer used
+        lv_obj_delete(lbl_user_in);
+        lv_obj_delete(lbl_dirs);
+        lv_obj_delete(lbl_chars);
+        
+        // Reset statics for next time
+        lbl_user_in = NULL;
+	    lbl_dirs = NULL;
+	    cur_pos = 0;
+	    cur_char = '_';
+	    memset(mqtt_name_buf, 0, sizeof mqtt_name_buf);
+	    
+	    wifi_menu_overwrite = false;
+	    	    
+	    // Show Wi-Fi list
+		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+ 		ui_menu->page = WIFI_PAGE;
+		return;
+    }
+ 	// Go home
+    else if (ui_btns->home_btn && wifi_menu_overwrite) {
+		// Delete labels since no longer used
+        lv_obj_delete(lbl_user_in);
+        lv_obj_delete(lbl_dirs);
+        lv_obj_delete(lbl_chars);
+        
+        // Reset statics for next time
+        lbl_user_in = NULL;
+	    lbl_dirs = NULL;
+	    cur_pos = 0;
+	    cur_char = '_';
+	    memset(mqtt_name_buf, 0, sizeof mqtt_name_buf);
+	    
+	    wifi_menu_overwrite = false;
+	    
+	    lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+    }
+    // Power off
+    else if (ui_btns->pwr_btn && wifi_menu_overwrite) {
+		// Delete labels since no longer used
+        lv_obj_delete(lbl_user_in);
+        lv_obj_delete(lbl_dirs);
+        lv_obj_delete(lbl_chars);
+        
+        // Reset statics for next time
+        lbl_user_in = NULL;
+	    lbl_dirs = NULL;
+	    cur_pos = 0;
+	    cur_char = '_';
+	    memset(mqtt_name_buf, 0, sizeof mqtt_name_buf);
+	    
+	    wifi_menu_overwrite = false;
+	    
+	    lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+    }
+    // If left and not at start
+    else if (ui_btns->left_btn && cur_pos != 0) {
+        // Clear the current slot
+	    mqtt_name_buf[cur_pos] = '\0';
+	
+	    // De-increment left
+	    if (cur_pos > 0) {
+	        cur_pos--;
+	    }
+	
+	    // Reload cur_char from the new slot
+	    cur_char = mqtt_name_buf[cur_pos] ? mqtt_name_buf[cur_pos] : '_';
+	    
+	    update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+    }
+    // If right
+    else if (ui_btns->right_btn) {
+		// Handle case where up/down wasn't pressed
+        mqtt_name_buf[cur_pos] = cur_char;
+        
+        // If not yet at end
+        if (cur_pos < MAX_CUSTOM_NAME_LEN - 1) {
+            cur_pos++;
+            cur_char = '_';
+        }
+        
+        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+    }
+    // If save button pressed
+    else if (ui_btns->select_btn) {
+		// Save final
+        mqtt_name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
+        memcpy(saved_name, mqtt_name_buf, MAX_CUSTOM_NAME_LEN + 1);
+        #ifdef POLYCAST5_DEBUG
+		    ESP_LOGI(TAG, "%s", saved_name);
+		#endif
+        
+        // Delete labels since no longer used
+        lv_obj_delete(lbl_user_in);
+        lv_obj_delete(lbl_dirs);
+        lv_obj_delete(lbl_chars);
+        
+        // Reset statics for next time
+        lbl_user_in = NULL;
+	    lbl_dirs = NULL;
+	    cur_pos = 0;
+	    cur_char = '_';
+	    memset(mqtt_name_buf, 0, sizeof mqtt_name_buf);
+
+		// Update options
+		// If overwriting an existing as a rename
+		if (wifi_menu_overwrite) {
+			// wifi_menu->index is edit_idx
+			// Release old string then reallocate
+			free(wifi_menu->options[wifi_menu->index]);
+			wifi_menu->options[wifi_menu->index] = strdup(saved_name);
+
+			// Persist to NVS
+			lcd_wifi_menu_nvs_save(wifi_menu);
+
+			// Update the button’s label in-place
+			lv_obj_t *btn = wifi_menu->btns[wifi_menu->index];
+			lv_obj_t *child_lbl = lv_obj_get_child(btn, 0);
+			lv_label_set_text(child_lbl, wifi_menu->options[wifi_menu->index]);
+
+			// Reset flag
+			wifi_menu_overwrite = false;
+			
+			// Redraw menu
+			lv_obj_add_flag(wifi_menu->cont, LV_OBJ_FLAG_HIDDEN); // Hide
+		}
+		// Else adding a whole new Wi-Fi plug
+		else {
+			// Size one bigger
+			wifi_menu->size++;
+		
+			// Save to options, then to NVS
+			char *name_copy = strdup(saved_name);
+			wifi_menu->options[wifi_menu->size - 1] = name_copy;
+			lcd_wifi_menu_nvs_save(wifi_menu);
+	        
+	        // Create new button for new option
+			wifi_menu->btns[wifi_menu->size - 1] = lv_list_add_btn(wifi_menu->main_list, NULL, wifi_menu->options[wifi_menu->size - 1]);
+			lv_obj_set_size(wifi_menu->btns[wifi_menu->size - 1], 200, 30);
+			lv_obj_add_style(wifi_menu->btns[wifi_menu->size - 1], &wifi_menu->btn_style, 0);
+			
+			// Create and format text label
+			lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[wifi_menu->size - 1], 0);
+			lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+			lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+			lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
+			
+			// Save topic key to NVS
+			// wifi_menu->size - (WIFI_MENU_START_SIZE + 1) offsets index by WIFI_MENU_START_SIZE to start saving at index 0
+			memcpy(wifi_menu->topic_keys[wifi_menu->size - (WIFI_MENU_START_SIZE + 1)], mqtt_key, sizeof(wifi_menu->topic_keys[wifi_menu->size - (WIFI_MENU_START_SIZE + 1)]));
+	        lcd_wifi_topic_keys_nvs_save(wifi_menu);
+		}
+		
+		// Show Wi-Fi list
+		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch to Wi-Fi page
+		ui_menu->page = WIFI_PAGE;
+        return;
+    }
+}
+
 static void hide_wifi_send_page(wifi_menu_t *wifi_menu)
 {
 	// Hide everything
@@ -1479,9 +1749,11 @@ void lcd_wifi_send_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 	if (ui_btns->right_btn == 1) {
 		wifi_mqtt_t wifi_mqtt;
 		
+		// Format payload
 		snprintf(wifi_mqtt.payload, sizeof(wifi_mqtt.payload), "%u", wifi_menu->wifi_submenu.cmd_to_send);
-		memcpy(wifi_mqtt.key, mqtt_key, sizeof(mqtt_key));
-		// NEED TO SAVE TO FLASH UNDER SPECIFIC ENTRY
+		
+		// Get topic key for given entry (topic_keys is 0-based)
+		memcpy(wifi_mqtt.key, wifi_menu->topic_keys[wifi_menu->index - WIFI_MENU_START_SIZE], sizeof(wifi_menu->topic_keys[wifi_menu->index - WIFI_MENU_START_SIZE]));
 		
 		// Send
 		xQueueSend(xWifiMqttCmdQueue, &wifi_mqtt, portMAX_DELAY);
@@ -1632,3 +1904,325 @@ void lcd_wifi_setup_send_page(wifi_menu_t *wifi_menu)
 	// Hide everything for now
 	hide_wifi_send_page(wifi_menu);
 }
+
+esp_err_t lcd_wifi_menu_nvs_save(const wifi_menu_t *menu)
+{
+    nvs_handle_t h;
+
+    // Open NVS
+    esp_err_t err = nvs_open(WIFI_MENU_NS, NVS_READWRITE, &h);
+    if (err != ESP_OK)
+    	return err;
+	
+	// Number of user options is size - start_size
+    uint8_t user_cnt = menu->size - WIFI_MENU_START_SIZE;
+    
+    // Save user_cnt
+    err = nvs_set_u8(h, WIFI_MENU_KEY_COUNT, user_cnt);
+    
+    // If error, exit
+    if (err != ESP_OK)
+    	goto out;
+
+	// Loop through all and number them: 00, 01, etc.
+    for (uint8_t i = 0; i < user_cnt; i++) {
+		// Format key
+        char key[16];
+        snprintf(key, sizeof(key), WIFI_MENU_KEY_FMT, i);
+        
+        // Store the menu option string at each key starting at index WIFI_MENU_START_SIZE
+        err = nvs_set_str(h, key, menu->options[i + WIFI_MENU_START_SIZE]);
+        
+        // Exit if error
+        if (err != ESP_OK)
+        	goto out;
+    }
+    
+    // Flush pending writes to flash
+    err = nvs_commit(h);
+
+	// Close NVS
+	out: nvs_close(h);
+	
+    return err;
+}
+
+esp_err_t lcd_wifi_menu_nvs_load(wifi_menu_t *menu)
+{
+    nvs_handle_t h;
+        
+    // Open NVS
+    esp_err_t err = nvs_open(WIFI_MENU_NS, NVS_READONLY, &h);
+    if (err != ESP_OK)
+    	return err;
+
+	// Get number of saved items
+    uint8_t user_cnt = 0;
+    err = nvs_get_u8(h, WIFI_MENU_KEY_COUNT, &user_cnt);
+    if (err != ESP_OK) {
+		nvs_close(h);
+		return err;
+	}
+
+    menu->size = WIFI_MENU_START_SIZE; // Don't change first 3 options
+    menu->index = 0;
+
+	// Loop through all keys
+    for (uint8_t i = 0; i < user_cnt; i++) {
+		// Format key
+        char key[16];
+        snprintf(key, sizeof(key), WIFI_MENU_KEY_FMT, i);
+        size_t len = 0;
+        
+        // Extract the size of the string
+        if (nvs_get_str(h, key, NULL, &len) != ESP_OK) {
+        	break;
+        }
+
+		// Ensure enough memory is available
+        char *buf = malloc(len);
+        if (!buf)
+        	break;
+        
+        // Extract the string
+        if (nvs_get_str(h, key, buf, &len) != ESP_OK) {
+			free(buf);
+			break;
+		}
+
+		// Update menu struct
+		if (menu->size >= MAX_WIFI_OPTIONS) {
+		    free(buf);
+		    break;
+		}
+        menu->options[menu->size++] = buf;
+    }
+    
+    // Close NVS
+    nvs_close(h);
+    
+    return ESP_OK;
+}
+
+esp_err_t lcd_wifi_topic_keys_nvs_save(const wifi_menu_t *menu)
+{
+    nvs_handle_t h;
+    
+    // Open NVS
+    esp_err_t err = nvs_open(WIFI_TOPIC_NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) {
+		return err;
+	}
+
+    // Save number of topic keys: size - start_size
+    uint8_t count = menu->size - WIFI_MENU_START_SIZE;
+    err = nvs_set_u8(h, WIFI_TOPIC_KEY_COUNT, count);
+    if (err != ESP_OK) {
+        nvs_close(h);
+        return err;
+    }
+
+    // For every user entry, add the key or erase
+    for (int i = 0; i < MAX_WIFI_OPTIONS; i++) {
+		// Format key
+        char key[16];
+        snprintf(key, sizeof(key), WIFI_TOPIC_KEY_FMT, i);
+	
+		// If in range
+        if (i < count) {
+			// Save index to NVS
+            err = nvs_set_blob(h, key, menu->topic_keys[i], sizeof(menu->topic_keys[i]));
+        }
+         // Not in range: erase
+        else {
+            err = nvs_erase_key(h, key);
+            if (err == ESP_ERR_NVS_NOT_FOUND) {
+				err = ESP_OK;
+			}
+        }
+	
+		// Close NVS on error
+        if (err != ESP_OK) {
+            nvs_close(h);
+            return err;
+        }
+    }
+
+    // Commit changes
+    err = nvs_commit(h);
+    
+    // Close NVS
+    nvs_close(h);
+    
+    return err;
+}
+
+esp_err_t lcd_wifi_topic_keys_nvs_load(wifi_menu_t *menu)
+{
+    nvs_handle_t h;
+    
+    // Open NVS
+    esp_err_t err = nvs_open(WIFI_TOPIC_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+		return err;
+	}
+
+    // Get number of topic keys saved
+    uint8_t count = 0;
+    err = nvs_get_u8(h, WIFI_TOPIC_KEY_COUNT, &count);
+    
+    // Nothing saved: close
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        nvs_close(h);
+        return ESP_ERR_NVS_NOT_FOUND;
+    }
+    // Error: close
+    if (err != ESP_OK) {
+        nvs_close(h);
+        return err;
+    }
+
+    // Zero out everything first
+    memset(menu->topic_keys, 0, sizeof(menu->topic_keys));
+
+    // Pull out each topic key
+    for (uint8_t i = 0; i < count; i++) {
+		// Format key
+        char key[16];
+        snprintf(key, sizeof(key), WIFI_TOPIC_KEY_FMT, i);
+        
+        size_t len = sizeof(menu->topic_keys[i]);
+		
+		// Get the topic key and save to index
+        err = nvs_get_blob(h, key, menu->topic_keys[i], &len);
+        
+        if (err == ESP_ERR_NVS_NOT_FOUND) {
+            // Hole: leave it zeroed
+            continue;
+        }
+        if (err != ESP_OK || len != sizeof(menu->topic_keys[i])) {
+			// Error: close
+            nvs_close(h);
+            return ESP_ERR_INVALID_STATE;
+        }
+    }
+	
+	// Close NVS
+    nvs_close(h);
+
+    // Restore menu bookkeeping
+    menu->size = count + WIFI_MENU_START_SIZE;
+    menu->index = 0;
+
+    return ESP_OK;
+}
+
+#ifdef POLYCAST5_WIFI_DUMP_NVS
+	void lcd_wifi_dump_menu_nvs(void)
+	{
+	    // Open NVS
+	    nvs_handle_t h;
+	    esp_err_t err = nvs_open(WIFI_MENU_NS, NVS_READONLY, &h);
+	    if (err != ESP_OK) {
+	        ESP_LOGI(TAG, "WIFI_MENU_NS open err %s", esp_err_to_name(err));
+	        return;
+	    }
+	
+	    // Get user entries
+	    uint8_t user_cnt = 0;
+	    err = nvs_get_u8(h, WIFI_MENU_KEY_COUNT, &user_cnt);
+	    if (err == ESP_OK) {
+	        ESP_LOGI(TAG, "Saved menu entry count = %u", user_cnt);
+	    }
+	    else {
+	        ESP_LOGW(TAG, "No count key or err=%s", esp_err_to_name(err));
+	    }
+	
+	    // For every entry
+	    for (int i = 0; i < user_cnt; i++) {
+	        char key[16];
+	        snprintf(key, sizeof(key), WIFI_MENU_KEY_FMT, i);
+	
+	        // First find out how long the string is
+	        size_t len = 0;
+	        err = nvs_get_str(h, key, NULL, &len);
+	        if (err == ESP_OK && len > 0) {
+	            // Allocate a buffer and read it back
+	            char *buf = malloc(len);
+	            if (buf) {
+	                if (nvs_get_str(h, key, buf, &len) == ESP_OK) {
+	                    ESP_LOGI(TAG, "slot %02d: '%s'", i, buf);
+	                }
+	                else {
+	                    ESP_LOGI(TAG, "slot %02d: <read err %s>", i, esp_err_to_name(err));
+	                }
+	                free(buf);
+	            }
+	            else {
+	                ESP_LOGI(TAG, "slot %02d: <malloc failed>", i);
+	            }
+	        }
+	        else if (err == ESP_ERR_NVS_NOT_FOUND) {
+	            ESP_LOGI(TAG, "slot %02d: <empty>", i);
+	        }
+	        else {
+	            ESP_LOGI(TAG, "slot %02d: err=%s", i, esp_err_to_name(err));
+	        }
+	    }
+	
+	    // Close NVS
+	    nvs_close(h);
+	}
+
+
+	void lcd_wifi_dump_wifi_topic_nvs(void)
+	{
+	    // Open NVS
+	    nvs_handle_t h;
+	    esp_err_t err = nvs_open(WIFI_TOPIC_NS, NVS_READONLY, &h);
+	    if (err != ESP_OK) {
+	        ESP_LOGI(TAG, "WIFI_TOPIC_NS open err %s", esp_err_to_name(err));
+	        return;
+	    }
+	
+	    // Get the saved count
+	    uint8_t count = 0;
+	    err = nvs_get_u8(h, WIFI_TOPIC_KEY_COUNT, &count);
+	    if (err == ESP_OK) {
+		    ESP_LOGI(TAG, "Saved topic_key count = %u\n", count);
+	    }
+	    else {
+		    ESP_LOGW(TAG, "No count key or err=%s\n", esp_err_to_name(err));
+	    }
+	
+	    // Loop every possible slot
+	    for (int i = 0; i < MAX_WIFI_OPTIONS; i++) {
+			// Format key
+	        char key[16];
+	        snprintf(key, sizeof(key), WIFI_TOPIC_KEY_FMT, i);
+	
+	        size_t len = sizeof(((wifi_menu_t *)0)->topic_keys[0]);
+	        uint8_t buf[len];
+	        
+	        // Get entry
+	        err = nvs_get_blob(h, key, buf, &len);
+	        if (err == ESP_OK && len == sizeof(buf)) {
+		        ESP_LOGI(TAG, "slot %02d: ", i);
+	            
+	            for (int b = 0; b < len; b++) {
+	                ESP_LOGI(TAG, "%02X", buf[b]);
+	            }
+	        }
+	        else if (err == ESP_ERR_NVS_NOT_FOUND) {
+	             ESP_LOGI(TAG, "slot %02d: <empty>\n", i);
+	        }
+	        else {
+	             ESP_LOGI(TAG, "slot %02d: err=%s\n", i, esp_err_to_name(err));
+	        }
+	    }
+	
+	    // Close NVS
+	    nvs_close(h);
+	}
+#endif
+

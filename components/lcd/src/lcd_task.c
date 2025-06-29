@@ -73,6 +73,11 @@ static void lcd_task(void *pvParameters)
 		lcd_ns_nvs_clear(A_IR_REMOTE_NS);
 	#endif
 	
+	#ifdef POLYCAST5_WIFI_NVS_CLEAR
+		lcd_ns_nvs_clear(WIFI_MENU_NS);
+		lcd_ns_nvs_clear(WIFI_TOPIC_NS);
+	#endif
+	
 	
 	// Create common items
 	lcd_init_selection_labels(&ui_menu);
@@ -87,6 +92,9 @@ static void lcd_task(void *pvParameters)
 	lcd_espnow_menu_nvs_load(&espnow_menu);
 	lcd_espnow_lmk_nvs_load(&espnow_menu);
 	lcd_espnow_rx_mac_nvs_load(&espnow_menu);
+	
+	lcd_wifi_menu_nvs_load(&wifi_menu);
+	lcd_wifi_topic_keys_nvs_load(&wifi_menu);
 	
 		
 	// Create common pages
@@ -107,13 +115,17 @@ static void lcd_task(void *pvParameters)
 		lcd_espnow_dump_nvs();
 	#endif
 	
+	#ifdef POLYCAST5_WIFI_DUMP_NVS
+		lcd_wifi_dump_menu_nvs();
+		lcd_wifi_dump_wifi_topic_nvs();
+	#endif
 	
 	while (1)
 	{
 		if (xTaskGetTickCount() - btn_timer_last >= btn_timer_interval) {
 			btn_timer_last = xTaskGetTickCount();
 			
-			if (xSemaphoreTake(xUpButtonSemaphore, 0)) {
+			if (xUpButtonSemaphore && xSemaphoreTake(xUpButtonSemaphore, 0) == pdTRUE) {
 				ui_btns.up_btn = 1;
 				
 				sleep_timer_last = xTaskGetTickCount(); // Reset sleep timer
@@ -121,7 +133,7 @@ static void lcd_task(void *pvParameters)
 			else {
 				ui_btns.up_btn = 0;
 			}
-			if (xSemaphoreTake(xDownButtonSemaphore, 0)) {
+			if (xDownButtonSemaphore && xSemaphoreTake(xDownButtonSemaphore, 0) == pdTRUE) {
 				ui_btns.down_btn = 1;
 				
 				sleep_timer_last = xTaskGetTickCount();
@@ -129,7 +141,7 @@ static void lcd_task(void *pvParameters)
 			else {
 				ui_btns.down_btn = 0;
 			}
-			if (xSemaphoreTake(xRightButtonSemaphore, 0)) {
+			if (xRightButtonSemaphore && xSemaphoreTake(xRightButtonSemaphore, 0) == pdTRUE) {
 				ui_btns.right_btn = 1;
 				
 				sleep_timer_last = xTaskGetTickCount();
@@ -137,7 +149,7 @@ static void lcd_task(void *pvParameters)
 			else {
 				ui_btns.right_btn = 0;
 			}
-			if (xSemaphoreTake(xLeftButtonSemaphore, 0)) {
+			if (xLeftButtonSemaphore && xSemaphoreTake(xLeftButtonSemaphore, 0) == pdTRUE) {
 				ui_btns.left_btn = 1;
 				
 				sleep_timer_last = xTaskGetTickCount();
@@ -145,7 +157,7 @@ static void lcd_task(void *pvParameters)
 			else {
 				ui_btns.left_btn = 0;
 			}
-			if (xSemaphoreTake(xSelectButtonSemaphore, 0)) {
+			if (xSelectButtonSemaphore && xSemaphoreTake(xSelectButtonSemaphore, 0) == pdTRUE) {
 				ui_btns.select_btn = 1;
 				
 				sleep_timer_last = xTaskGetTickCount();
@@ -153,7 +165,7 @@ static void lcd_task(void *pvParameters)
 			else {
 				ui_btns.select_btn = 0;
 			}
-			if (xSemaphoreTake(xHomeButtonSemaphore, 0)) {
+			if (xHomeButtonSemaphore && xSemaphoreTake(xHomeButtonSemaphore, 0) == pdTRUE) {
 				ui_btns.home_btn = 1;
 				
 				sleep_timer_last = xTaskGetTickCount();
@@ -161,7 +173,7 @@ static void lcd_task(void *pvParameters)
 			else {
 				ui_btns.home_btn = 0;
 			}
-			if (xSemaphoreTake(xPowerButtonSemaphore, 0)) {
+			if (xPowerButtonSemaphore && xSemaphoreTake(xPowerButtonSemaphore, 0) == pdTRUE) {
 				ui_btns.pwr_btn = 1;
 				
 				go_to_sleep = true;
@@ -243,6 +255,9 @@ static void lcd_task(void *pvParameters)
 			}
 			else if (ui_menu.page == WIFI_SEND_PAGE) {
 				lcd_wifi_send_page(&ui_menu, &wifi_menu, &ui_btns);
+			}
+			else if (ui_menu.page == WIFI_NAME_PAGE) {
+				lcd_wifi_create_custom_name(&ui_menu, &wifi_menu, &ui_btns);
 			}
 		}
 		

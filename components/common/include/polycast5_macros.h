@@ -9,7 +9,10 @@
 //#define POLYCAST5_BUILD_FULL_ANIMS 1 // Build all animation frames
 
 //#define POLYCAST5_ESPNOW_DUMP_NVS 1 // Show ESP-NOW NVS state on boot
+#define POLYCAST5_WIFI_DUMP_NVS 1 // Show Wi-Fi NVS state on boot
+
 //#define POLYCAST5_IR_NVS_CLEAR 1 // Clear all IR namespaces 
+//#define POLYCAST5_WIFI_NVS_CLEAR 1 // Clear all Wi-Fi namespaces
 
 //#define POLYCAST5_CYCLE_RGB_ON_BOOT 1 // Cycle through the RGB LED to make sure it is working
 

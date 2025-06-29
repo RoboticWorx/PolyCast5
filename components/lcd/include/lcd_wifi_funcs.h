@@ -5,16 +5,17 @@
 
 #include "esp_err.h"
 
-#define MAX_WIFI_OPTIONS 4
+#define MAX_WIFI_OPTIONS 20
 #define MAX_WIFI_SUBOPTIONS 20
+#define TOPIC_KEY_LEN 16
 
-#define LORA_OPTIONS_NS "lo_op_ns" // NVS namespace
-#define LORA_OPTIONS_KEY_COUNT "lo_op_ke" // u8: number of option
-#define LORA_OPTIONS_KEY_FMT "lo_op%02d" // lo_op00, lo_op01 …
+#define WIFI_MENU_NS "wf_mn_ns" // NVS namespace
+#define WIFI_MENU_KEY_COUNT "wf_mn_ke" // u8: number of saved topic keys
+#define WIFI_MENU_KEY_FMT "wf_mn%02d" // Blob key format
 
-#define LORA_ENC_NS "lo_en_ns" // NVS namespace
-#define LORA_ENC_KEY_COUNT "lo_en_ke" // u8: number of user remotes
-#define LORA_ENC_KEY_FMT "lo_en%02d" // lo_en00, lo_en01 …
+#define WIFI_TOPIC_NS "wf_tp_ns"
+#define WIFI_TOPIC_KEY_COUNT "wf_tp_ke"
+#define WIFI_TOPIC_KEY_FMT "wf_tp%02d"
 
 // Forward-declare structs (from lcd_funcs.h)
 typedef struct ui_btns_t ui_btns_t;
@@ -43,6 +44,7 @@ typedef struct {
 typedef struct {
     char* options[MAX_WIFI_OPTIONS];
     lv_obj_t *btns[MAX_WIFI_OPTIONS];
+    uint8_t topic_keys[MAX_WIFI_OPTIONS][TOPIC_KEY_LEN];
     int size;
     int index;
     lv_obj_t *main_list;
@@ -91,5 +93,17 @@ void lcd_wifi_data_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 void lcd_wifi_sync_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns);
 void lcd_wifi_send_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns);
 void lcd_wifi_setup_send_page(wifi_menu_t *wifi_menu);
+
+esp_err_t lcd_wifi_menu_nvs_load(wifi_menu_t *menu);
+esp_err_t lcd_wifi_menu_nvs_save(const wifi_menu_t *menu);
+esp_err_t lcd_wifi_topic_keys_nvs_load(wifi_menu_t *menu);
+esp_err_t lcd_wifi_topic_keys_nvs_save(const wifi_menu_t *menu);
+
+void lcd_wifi_create_custom_name(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns);
+
+#ifdef POLYCAST5_WIFI_DUMP_NVS
+	void lcd_wifi_dump_menu_nvs(void);
+	void lcd_wifi_dump_wifi_topic_nvs(void);
+#endif
 
 #endif // LCD_WIFI_FUNCS_H
