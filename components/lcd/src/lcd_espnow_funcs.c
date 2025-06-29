@@ -844,9 +844,6 @@ void lcd_espnow_create_custom_name(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
 
 			// Reset flag
 			espnow_menu_overwrite = false;
-			
-			// Redraw menu
-			lv_obj_add_flag(espnow_menu->cont, LV_OBJ_FLAG_HIDDEN); // Hide
 		}
 		// Else adding a whole new ESP32
 		else {

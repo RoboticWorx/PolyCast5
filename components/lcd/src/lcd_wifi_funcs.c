@@ -1239,7 +1239,7 @@ void lcd_wifi_data_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 
     // When new data received
     wifi_data_t *wifi_data;
-    if(xQueueReceive(xWifiDataQueue, &wifi_data, 0) == pdTRUE) {
+    if (xQueueReceive(xWifiDataQueue, &wifi_data, 0) == pdTRUE) {
 		// Update top
 		char top_buf[64];
 		snprintf(top_buf, sizeof(top_buf), "%" PRIu32 " users on Ch%" PRIu32 "@%" PRIu32 "Mbps\n", wifi_data->client_count, wifi_data->channel, wifi_data->rate);
@@ -1512,11 +1512,11 @@ void lcd_wifi_create_custom_name(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_
                          &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
                          
         lbl_dirs = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_dirs, "Enter PolyPlug name\nwith arrow buttons:", user_secondary_color,
+		lcd_format_label(lbl_dirs, "Enter PolyPlug name\n  with arrow buttons:", user_secondary_color,
                          &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, -30);
                          
         if (wifi_menu_overwrite)
-        	lv_label_set_text(lbl_dirs, "Enter new PolyPlug name\n   with arrow buttons:");
+        	lv_label_set_text(lbl_dirs, "Enter new plug name\n  with arrow buttons:");
         
         lbl_chars = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_chars, "(Up to 12 characters)", user_secondary_color,
@@ -1690,15 +1690,12 @@ void lcd_wifi_create_custom_name(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_
 
 			// Reset flag
 			wifi_menu_overwrite = false;
-			
-			// Redraw menu
-			lv_obj_add_flag(wifi_menu->cont, LV_OBJ_FLAG_HIDDEN); // Hide
 		}
 		// Else adding a whole new Wi-Fi plug
 		else {
 			// Size one bigger
 			wifi_menu->size++;
-		
+			
 			// Save to options, then to NVS
 			char *name_copy = strdup(saved_name);
 			wifi_menu->options[wifi_menu->size - 1] = name_copy;
@@ -1737,8 +1734,157 @@ static void hide_wifi_send_page(wifi_menu_t *wifi_menu)
 	lv_obj_add_flag(wifi_menu->wifi_submenu.lbl_send_cmd, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(wifi_menu->wifi_submenu.lbl_send_box, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(wifi_menu->wifi_submenu.lbl_send, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(wifi_menu->wifi_submenu.lbl_edit, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(wifi_menu->wifi_submenu.arrow_top, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(wifi_menu->wifi_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void prompt_name_or_del(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
+{
+	lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+	
+	// Create and format ins labels
+	lv_obj_t *lbl_ins = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_ins, LV_SYMBOL_SETTINGS, user_secondary_color,
+    			 &lv_font_montserrat_30, LV_ALIGN_CENTER, 0, 0);
+    			 
+	lv_obj_t *lbl_exit = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_exit, "BACK", user_secondary_color,
+    			 &lv_font_montserrat_18, LV_ALIGN_LEFT_MID, 16, -1);
+    			 
+    lv_obj_t *lbl_name = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_name, "RENAME", user_secondary_color,
+    			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 13);
+    			 
+    lv_obj_t *lbl_del = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_del, "DELETE", user_secondary_color,
+    			 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
+                    
+    while (1) {
+		lv_timer_handler();
+		
+		// User hit cancel
+        if (xSemaphoreTake(xLeftButtonSemaphore, 0) == pdTRUE) {
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            
+            lv_obj_del(lbl_exit);
+            lv_obj_del(lbl_name);
+            lv_obj_del(lbl_del);
+            lv_obj_del(lbl_ins);
+			
+			// Hide up and down arrows
+			lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+				
+			lcd_clear_pending_inputs = true; // Clear any false inputs
+			
+			// Show wifi send page
+			lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_send_ins, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_send_cmd, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_send_box, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_send, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_edit, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(wifi_menu->wifi_submenu.arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(wifi_menu->wifi_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
+			
+			// Switch pages
+			ui_menu->page = WIFI_SEND_PAGE;
+            
+            // Go back
+            return;
+        }
+        // Rename
+        else if (xSemaphoreTake(xUpButtonSemaphore, 0) == pdTRUE) {
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            
+            lv_obj_del(lbl_exit);
+            lv_obj_del(lbl_name);
+            lv_obj_del(lbl_del);
+            lv_obj_del(lbl_ins);
+			
+			lcd_clear_pending_inputs = true; // Clear any false inputs
+			
+			wifi_menu_overwrite = true; // Set overwrite flag
+			
+			// Prompt to enter name
+            ui_menu->page = WIFI_NAME_PAGE;
+            
+            // Go back
+            return;
+        }
+        // Delete
+        else if (xSemaphoreTake(xDownButtonSemaphore, 0) == pdTRUE) {
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            
+            lv_obj_del(lbl_exit);
+            lv_obj_del(lbl_name);
+            lv_obj_del(lbl_del);
+            lv_obj_del(lbl_ins);
+            
+            lcd_clear_pending_inputs = true; // Clear any false inputs
+            
+            
+            // Delete the entry
+            // Delete entry is wifi_menu->index
+            uint8_t del_idx = wifi_menu->index;
+            
+            // Ensure valid entry to delete
+		    if (del_idx < WIFI_MENU_START_SIZE || del_idx >= wifi_menu->size) {
+		        return;
+		    }
+		    
+		    // Get the corresponding topic index
+		    uint8_t topic_slot = del_idx - WIFI_MENU_START_SIZE;
+		
+		    // Shift all keys after topic_slot down one
+		    for (uint8_t i = topic_slot; (i + 1) < (wifi_menu->size - WIFI_MENU_START_SIZE); i++) {
+		        memcpy(wifi_menu->topic_keys[i], wifi_menu->topic_keys[i + 1], TOPIC_KEY_LEN);
+		    }
+		    
+		    // Zero out the now dangling slot
+		    memset(wifi_menu->topic_keys[wifi_menu->size - WIFI_MENU_START_SIZE - 1], 0, TOPIC_KEY_LEN);
+		
+		    // Also free the deleted option and associated button
+		    free(wifi_menu->options[del_idx]);
+		    lv_obj_del(wifi_menu->btns[del_idx]);
+		    
+		    // Shift all the remaining options and buttons down one
+		    for (uint8_t i = del_idx; (i + 1) < wifi_menu->size; i++) {
+		        wifi_menu->options[i] = wifi_menu->options[i + 1];
+		        wifi_menu->btns[i] = wifi_menu->btns[i + 1];
+		    }
+		    
+		    // Null out dangling indexs
+			wifi_menu->options[wifi_menu->size] = NULL;
+			wifi_menu->btns[wifi_menu->size] = NULL;
+		
+		    // Shrink the menu
+		    wifi_menu->size--;
+		    
+		    // Persist both to NVS (single-save helpers will erase the old tail)
+		    lcd_wifi_menu_nvs_save(wifi_menu);
+		    lcd_wifi_topic_keys_nvs_save(wifi_menu);
+		    
+		    // Adjust if was last
+		    if (wifi_menu->index >= wifi_menu->size) {
+		        wifi_menu->index = wifi_menu->size - 1;
+		    }
+
+		    // Refresh the list UI
+		    lcd_wifi_update_menu(wifi_menu);
+		    
+		    // Show Wi-Fi menu
+			lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+            
+            // Switch pages
+			ui_menu->page = WIFI_PAGE;
+            
+            // Go back
+            return;
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
 }
 
 void lcd_wifi_send_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
@@ -1785,6 +1931,24 @@ void lcd_wifi_send_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		snprintf(buf, sizeof(buf), "%u", wifi_menu->wifi_submenu.cmd_to_send);
 		lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_cmd, buf);
 	}
+	// Edit
+	else if (ui_btns->home_btn == 1) {
+		// Hide current page
+		hide_wifi_send_page(wifi_menu);
+		
+		// Reset default value
+		wifi_menu->wifi_submenu.cmd_to_send = 1;
+		// Update
+		char buf[BUF_SIZE];
+		snprintf(buf, sizeof(buf), "%u", wifi_menu->wifi_submenu.cmd_to_send);
+		lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_cmd, buf);
+		
+		// Show top and bot arrows
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		
+		prompt_name_or_del(ui_menu, wifi_menu);
+	}
 	// Back
 	else if (ui_btns->left_btn == 1) {
 		// Hide current page
@@ -1807,24 +1971,6 @@ void lcd_wifi_send_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		// Go back
 		ui_menu->page = WIFI_PAGE;
 	}
-	// Go home
-    else if (ui_btns->home_btn) {
-		// Hide current page
-		hide_wifi_send_page(wifi_menu);
-		
-		// Reset default value
-		wifi_menu->wifi_submenu.cmd_to_send = 1;
-		// Update
-		char buf[BUF_SIZE];
-		snprintf(buf, sizeof(buf), "%u", wifi_menu->wifi_submenu.cmd_to_send);
-		lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_cmd, buf);
-		
-		// Show top and bot arrows
-		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-	    
-	    lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-    }
     // Power off
     else if (ui_btns->pwr_btn) {
 		// Hide current page
@@ -1848,13 +1994,13 @@ void lcd_wifi_send_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 
 void lcd_wifi_setup_send_page(wifi_menu_t *wifi_menu)
 {
-	#define X_POS -30
+	#define X_POS -38
 	wifi_menu->wifi_submenu.cmd_to_send = 1; // Set default
 	
 	// Create labels
 	wifi_menu->wifi_submenu.lbl_send_ins = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(wifi_menu->wifi_submenu.lbl_send_ins, "  0 = OFF    1 = ON\nOTHER = CUSTOM", user_secondary_color,
-					 &lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS + 4, 48);
+	lcd_format_label(wifi_menu->wifi_submenu.lbl_send_ins, "0 = OFF     1 = ON\nREST = CUSTOM", user_secondary_color,
+					 &lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS - 10, 48);
 
 	wifi_menu->wifi_submenu.lbl_send_cmd = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(wifi_menu->wifi_submenu.lbl_send_cmd, "1", user_secondary_color,
@@ -1867,6 +2013,10 @@ void lcd_wifi_setup_send_page(wifi_menu_t *wifi_menu)
 	wifi_menu->wifi_submenu.lbl_send = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(wifi_menu->wifi_submenu.lbl_send, "SEND", user_secondary_color,
 					 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
+	
+	wifi_menu->wifi_submenu.lbl_edit = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(wifi_menu->wifi_submenu.lbl_edit, LV_SYMBOL_PREV " EDIT", user_secondary_color,
+					 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_RIGHT, -5, -4);
 					 
 	wifi_menu->wifi_submenu.arrow_top = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(wifi_menu->wifi_submenu.arrow_top, LV_SYMBOL_UP, user_secondary_color,
@@ -1901,6 +2051,24 @@ void lcd_wifi_setup_send_page(wifi_menu_t *wifi_menu)
 		
 	lv_obj_add_style(wifi_menu->wifi_submenu.lbl_send_box, &style_cmd, 0);
 	
+	// Create a style for the edit box
+	static lv_style_t style_edit;
+	lv_style_init(&style_edit);
+
+	lv_style_set_radius(&style_edit, 8);
+	lv_style_set_bg_color(&style_edit, user_primary_color);
+	lv_style_set_border_width(&style_edit, 2);
+	lv_style_set_border_color(&style_edit, user_secondary_color);
+	lv_style_set_border_side(&style_edit, LV_BORDER_SIDE_FULL);
+	lv_style_set_text_color(&style_edit, user_secondary_color);
+	
+	lv_style_set_pad_left(&style_edit, 10);
+	lv_style_set_pad_right(&style_edit, 10);
+	lv_style_set_pad_top(&style_edit, 6);
+	lv_style_set_pad_bottom(&style_edit, 6);
+	
+	lv_obj_add_style(wifi_menu->wifi_submenu.lbl_edit, &style_edit, 0);
+	
 	// Hide everything for now
 	hide_wifi_send_page(wifi_menu);
 }
@@ -1925,13 +2093,23 @@ esp_err_t lcd_wifi_menu_nvs_save(const wifi_menu_t *menu)
     	goto out;
 
 	// Loop through all and number them: 00, 01, etc.
-    for (uint8_t i = 0; i < user_cnt; i++) {
+    for (uint8_t i = 0; i < user_cnt + 1; i++) {
 		// Format key
         char key[16];
         snprintf(key, sizeof(key), WIFI_MENU_KEY_FMT, i);
         
-        // Store the menu option string at each key starting at index WIFI_MENU_START_SIZE
-        err = nvs_set_str(h, key, menu->options[i + WIFI_MENU_START_SIZE]);
+        // If in range
+        if (i < user_cnt) {
+			// Store the menu option string at each key starting at index WIFI_MENU_START_SIZE
+        	err = nvs_set_str(h, key, menu->options[i + WIFI_MENU_START_SIZE]);
+        }
+         // Not in range: erase
+        else {
+            err = nvs_erase_key(h, key);
+            if (err == ESP_ERR_NVS_NOT_FOUND) {
+				err = ESP_OK;
+			}
+        }
         
         // Exit if error
         if (err != ESP_OK)
@@ -2023,7 +2201,7 @@ esp_err_t lcd_wifi_topic_keys_nvs_save(const wifi_menu_t *menu)
     }
 
     // For every user entry, add the key or erase
-    for (int i = 0; i < MAX_WIFI_OPTIONS; i++) {
+    for (int i = 0; i < count + 1; i++) {
 		// Format key
         char key[16];
         snprintf(key, sizeof(key), WIFI_TOPIC_KEY_FMT, i);
