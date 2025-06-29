@@ -226,17 +226,23 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     esp_mqtt_event_handle_t event = event_data;
     switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
-            ESP_LOGI(TAG, "Connected, publishing...");
-            esp_mqtt_client_publish(mqtt_client,
-                                    "devices/esp32c5/cmd",
-                                    "TURN_ON",
-                                    0,    // message length (0 = strlen)
-                                    1,    // QoS
-                                    0);   // retain
+        	#ifdef POLYCAST5_DEBUG
+            	ESP_LOGI(TAG, "Connected to MQTT");
+            #endif
             break;
+            
         case MQTT_EVENT_DISCONNECTED:
-            ESP_LOGI(TAG, "Disconnected");
+        	#ifdef POLYCAST5_DEBUG
+            	ESP_LOGI(TAG, "Disconnected from MQTT");
+            #endif
             break;
+            
+        case MQTT_EVENT_PUBLISHED:
+            ESP_LOGI(TAG, "Broker ACKed message ID %d on topic %.*s",
+                     event->msg_id,
+                     event->topic_len, event->topic);
+            break;
+            
         default:
             break;
     }
@@ -256,6 +262,21 @@ void wifi_funcs_mqtt_client_init(void)
 	};
     mqtt_client = esp_mqtt_client_init(&cfg);
     esp_mqtt_client_register_event(mqtt_client, MQTT_EVENT_ANY, mqtt_event_handler, NULL);
+}
+
+void wifi_funcs_mqtt_client_publish(char *payload, char *topic)
+{	
+	int msg_id = esp_mqtt_client_publish(mqtt_client, topic, payload, 0, 1, 0);
+	
+	if (msg_id != -1) {
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "MQTT send success: %d", msg_id);
+			ESP_LOGI(TAG, "Sent '%s' to topic '%s'", payload, topic);
+		#endif
+	}
+	else {
+		ESP_LOGE(TAG, "MQTT send FAILED: %d", msg_id);
+	}
 }
 
 static bool wait_for_connection(TickType_t timeout)
@@ -351,7 +372,7 @@ esp_err_t wifi_funcs_radio_stop(void)
 		xSemaphoreGive(xWifiNetworkDisconnectedSemaphore);
 	}
 	else {
-		ESP_LOGE(TAG, "wifi_funcs_radio_stop: %s", err);
+		ESP_LOGE(TAG, "wifi_funcs_radio_stop: %d", err);
 	}
     
     xSemaphoreGive(xWifiCanSleepSemaphore);
@@ -367,8 +388,8 @@ wifi_login_t wifi_funcs_get_prev(void)
 	ESP_ERROR_CHECK(esp_wifi_get_config(ESP_IF_WIFI_STA, &current));
 	
 	wifi_login_t prev;
-	strlcpy(prev.ssid, (char*)current.sta.ssid, sizeof(current.sta.ssid));
-	strlcpy(prev.password, (char*)current.sta.password, sizeof(current.sta.password));
+	strlcpy(prev.ssid, (char *)current.sta.ssid, sizeof(current.sta.ssid));
+	strlcpy(prev.password, (char *)current.sta.password, sizeof(current.sta.password));
 	
 	return prev;
 }

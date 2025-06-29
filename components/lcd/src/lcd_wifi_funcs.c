@@ -108,10 +108,6 @@ void lcd_wifi_setup_page(wifi_menu_t *menu)
 		menu->index = menu->size - 1;
 	}
 	
-	if (menu->size > 1) {
-		menu->index = 1;
-	}
-	
 	// Create button for each option
     for (int i = 0; i < menu->size; i++) {
 
@@ -1462,4 +1458,172 @@ void lcd_wifi_sync_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
     }
 }
 
+static void hide_wifi_send_page(wifi_menu_t *wifi_menu)
+{
+	// Hide everything
+	lv_obj_add_flag(wifi_menu->wifi_submenu.lbl_send_ins, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(wifi_menu->wifi_submenu.lbl_send_cmd, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(wifi_menu->wifi_submenu.lbl_send_box, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(wifi_menu->wifi_submenu.lbl_send, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(wifi_menu->wifi_submenu.arrow_top, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(wifi_menu->wifi_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
+}
 
+void lcd_wifi_send_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
+{
+	#define BUF_SIZE 4
+	
+	// Send via MQTT
+	if (ui_btns->right_btn == 1) {
+		char buf[BUF_SIZE];
+		snprintf(buf, sizeof(buf), "%u", wifi_menu->wifi_submenu.cmd_to_send);
+		
+		// Send
+		xQueueSend(xWifiMqttCmdQueue, buf, portMAX_DELAY);
+	}
+	// Command up
+	if (ui_btns->up_btn == 1) {
+		wifi_menu->wifi_submenu.cmd_to_send++;
+		
+		// Format and display new value
+		char buf[BUF_SIZE];
+		snprintf(buf, sizeof(buf), "%u", wifi_menu->wifi_submenu.cmd_to_send);
+		lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_cmd, buf);
+	}
+	// Command down
+	if (ui_btns->down_btn == 1) {
+		wifi_menu->wifi_submenu.cmd_to_send--;
+		
+		// Format and display new value
+		char buf[BUF_SIZE];
+		snprintf(buf, sizeof(buf), "%u", wifi_menu->wifi_submenu.cmd_to_send);
+		lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_cmd, buf);
+	}
+	// Command += 3
+	if (ui_btns->select_btn == 1) {
+		wifi_menu->wifi_submenu.cmd_to_send += 3;
+		
+		// Format and display new value
+		char buf[BUF_SIZE];
+		snprintf(buf, sizeof(buf), "%u", wifi_menu->wifi_submenu.cmd_to_send);
+		lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_cmd, buf);
+	}
+	// Back
+	else if (ui_btns->left_btn == 1) {
+		// Hide current page
+		hide_wifi_send_page(wifi_menu);
+		
+		// Reset default value
+		wifi_menu->wifi_submenu.cmd_to_send = 1;
+		// Update
+		char buf[BUF_SIZE];
+		snprintf(buf, sizeof(buf), "%u", wifi_menu->wifi_submenu.cmd_to_send);
+		lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_cmd, buf);
+		
+		// Show top and bot arrows
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show Wi-Fi menu
+		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Go back
+		ui_menu->page = WIFI_PAGE;
+	}
+	// Go home
+    else if (ui_btns->home_btn) {
+		// Hide current page
+		hide_wifi_send_page(wifi_menu);
+		
+		// Reset default value
+		wifi_menu->wifi_submenu.cmd_to_send = 1;
+		// Update
+		char buf[BUF_SIZE];
+		snprintf(buf, sizeof(buf), "%u", wifi_menu->wifi_submenu.cmd_to_send);
+		lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_cmd, buf);
+		
+		// Show top and bot arrows
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+	    
+	    lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+    }
+    // Power off
+    else if (ui_btns->pwr_btn) {
+		// Hide current page
+		hide_wifi_send_page(wifi_menu);
+		
+		// Reset default value
+		wifi_menu->wifi_submenu.cmd_to_send = 1;
+		// Update
+		char buf[BUF_SIZE];
+		snprintf(buf, sizeof(buf), "%u", wifi_menu->wifi_submenu.cmd_to_send);
+		lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_cmd, buf);
+		
+		// Show top and bot arrows
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		
+	    lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+    }
+}
+
+
+void lcd_wifi_setup_send_page(wifi_menu_t *wifi_menu)
+{
+	#define X_POS -30
+	wifi_menu->wifi_submenu.cmd_to_send = 1; // Set default
+	
+	// Create labels
+	wifi_menu->wifi_submenu.lbl_send_ins = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(wifi_menu->wifi_submenu.lbl_send_ins, "  0 = OFF    1 = ON\nOTHER = CUSTOM", user_secondary_color,
+					 &lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS + 4, 48);
+
+	wifi_menu->wifi_submenu.lbl_send_cmd = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(wifi_menu->wifi_submenu.lbl_send_cmd, "1", user_secondary_color,
+					 &lv_font_montserrat_30, LV_ALIGN_CENTER, X_POS, -20);
+
+	wifi_menu->wifi_submenu.lbl_send_box = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(wifi_menu->wifi_submenu.lbl_send_box, "", user_secondary_color,
+					 &lv_font_montserrat_24, LV_ALIGN_CENTER, X_POS, -20);
+					 
+	wifi_menu->wifi_submenu.lbl_send = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(wifi_menu->wifi_submenu.lbl_send, "SEND", user_secondary_color,
+					 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
+					 
+	wifi_menu->wifi_submenu.arrow_top = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(wifi_menu->wifi_submenu.arrow_top, LV_SYMBOL_UP, user_secondary_color,
+					 &lv_font_montserrat_14, LV_ALIGN_CENTER, X_POS, -50);
+					 
+	wifi_menu->wifi_submenu.arrow_bot = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(wifi_menu->wifi_submenu.arrow_bot, LV_SYMBOL_DOWN, user_secondary_color,
+					 &lv_font_montserrat_14, LV_ALIGN_CENTER, X_POS, 10);
+
+	// Create a style for the send cmd box
+	static lv_style_t style_cmd;
+	lv_style_init(&style_cmd);
+
+	lv_style_set_radius(&style_cmd, 8);
+	lv_style_set_bg_color(&style_cmd, user_primary_color);
+	lv_style_set_border_width(&style_cmd, 2);
+	lv_style_set_border_color(&style_cmd, user_secondary_color);
+	lv_style_set_border_side(&style_cmd, LV_BORDER_SIDE_FULL);
+	lv_style_set_text_color(&style_cmd, user_secondary_color);
+	
+	lv_color_t darker_user_primary_color = lv_color_darken(user_primary_color, 100); // % darker 
+	lv_style_set_shadow_spread(&style_cmd, 3);
+	lv_style_set_shadow_width(&style_cmd, 6);
+	lv_style_set_shadow_offset_x(&style_cmd, 3);
+	lv_style_set_shadow_offset_y(&style_cmd, 3);
+	lv_style_set_shadow_color(&style_cmd, darker_user_primary_color);
+	    
+	lv_style_set_pad_left(&style_cmd, 55);
+	lv_style_set_pad_right(&style_cmd, 55);
+	lv_style_set_pad_top(&style_cmd, 25);
+	lv_style_set_pad_bottom(&style_cmd, 25);
+		
+	lv_obj_add_style(wifi_menu->wifi_submenu.lbl_send_box, &style_cmd, 0);
+	
+	// Hide everything for now
+	hide_wifi_send_page(wifi_menu);
+}

@@ -8,6 +8,7 @@ extern QueueHandle_t xWifiSelectedNetworkQueue;
 extern QueueHandle_t xWifiSniffQueue;
 extern QueueHandle_t xWifiBeaconQueue;
 extern QueueHandle_t xWifiDataQueue;
+extern QueueHandle_t xWifiMqttCmdQueue;
 
 extern SemaphoreHandle_t xWifiStartScanSemaphore;
 extern SemaphoreHandle_t xWifiNetworkConnectedSemaphore;

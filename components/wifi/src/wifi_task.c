@@ -7,6 +7,7 @@
 #include "freertos/projdefs.h"
 #include "freertos/task.h"
 
+#include "esp_mac.h"
 #include "esp_log.h"
 #include "esp_wifi.h"
 
@@ -24,11 +25,14 @@ static wifi_scan_t wifi_scan[WIFI_MAX_NETWORKS];
 static wifi_login_t selected_network;
 static wifi_sniff_t sniff_network;
 
+static char mqtt_payload[64]; // Change 64 to something else
+
 QueueHandle_t xWifiScanQueue;
 QueueHandle_t xWifiSelectedNetworkQueue;
 QueueHandle_t xWifiSniffQueue;
 QueueHandle_t xWifiBeaconQueue;
 QueueHandle_t xWifiDataQueue;
+QueueHandle_t xWifiMqttCmdQueue;
 
 SemaphoreHandle_t xWifiStartScanSemaphore;
 SemaphoreHandle_t xWifiNetworkConnectedSemaphore;
@@ -65,10 +69,21 @@ static void wifi_task(void *param)
 	configASSERT(xWifiBeaconQueue);
 	xWifiDataQueue = xQueueCreate(1, sizeof(wifi_data_t*));
 	configASSERT(xWifiDataQueue);
+	xWifiMqttCmdQueue = xQueueCreate(1, sizeof(mqtt_payload));
+	configASSERT(xWifiMqttCmdQueue);
+	
+	uint8_t my_mac[6];
+	esp_read_mac(my_mac, ESP_MAC_WIFI_STA);
+	
+	// Build a topic string: "polycast5/XX:XX:XX:XX:XX:XX/cmd"
+	char mqtt_topic[32];
+	snprintf(mqtt_topic, sizeof(mqtt_topic), "polycast5/%02X%02X%02X%02X%02X%02X/cmd",
+	         my_mac[0], my_mac[1], my_mac[2],
+	         my_mac[3], my_mac[4], my_mac[5]);
 	
 	wifi_funcs_wifi_event_init();
 	wifi_funcs_mqtt_client_init();
-    
+	
 	while (1) {
 		// Start a Wi-Fi scan
 		if (xSemaphoreTake(xWifiStartScanSemaphore, 0) == pdTRUE) {
@@ -127,6 +142,12 @@ static void wifi_task(void *param)
 			//wifi_funcs_get_current_date_time();
 		}
 		
+		// Send data over MQTT
+		if (xQueueReceive(xWifiMqttCmdQueue, mqtt_payload, 0) == pdTRUE) {
+			wifi_funcs_mqtt_client_publish(mqtt_payload, mqtt_topic);
+		}
+		
+		// Received channel to sniff
 		if (xQueueReceive(xWifiSniffQueue, &sniff_network, 0) == pdTRUE) {
 			#ifdef POLYCAST5_DEBUG
 				ESP_LOGI(TAG, "xWifiSniffQueue received: mask='%d', channel='%u'", sniff_network.mask, sniff_network.channel);

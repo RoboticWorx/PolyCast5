@@ -48,6 +48,7 @@
 #define WIFI_BEACON_PAGE 20
 #define WIFI_DATA_PAGE 21
 #define WIFI_SYNC_PAGE 22
+#define WIFI_SEND_PAGE 23
 
 extern volatile bool lcd_clear_pending_inputs;
 extern volatile bool go_to_sleep;

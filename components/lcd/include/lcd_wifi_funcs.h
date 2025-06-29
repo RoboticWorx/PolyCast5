@@ -31,13 +31,13 @@ typedef struct {
 } wifi_scan_menu_t;
 
 typedef struct {
-    char *options[MAX_WIFI_SUBOPTIONS];
-    lv_obj_t *btns[MAX_WIFI_SUBOPTIONS];
-    int size;
-    int index;
-    lv_obj_t *cont;
-	lv_style_t btn_style;
-	lv_style_t sel_style;
+    lv_obj_t *lbl_send_ins;
+	lv_obj_t *lbl_send_cmd;
+	lv_obj_t *lbl_send_box;
+	lv_obj_t *lbl_send;
+	lv_obj_t *arrow_top;
+	lv_obj_t *arrow_bot;
+	uint8_t cmd_to_send;
 } wifi_submenu_t;
 
 typedef struct {
@@ -49,7 +49,7 @@ typedef struct {
 	lv_style_t btn_style;
 	lv_style_t sel_style;
 	lv_obj_t *cont;
-	wifi_submenu_t submenu;
+	wifi_submenu_t wifi_submenu;
 	wifi_scan_menu_t scan_menu;
 } wifi_menu_t;
 
@@ -89,6 +89,7 @@ void lcd_wifi_get_password(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t
 void lcd_wifi_beacon_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns);
 void lcd_wifi_data_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns);
 void lcd_wifi_sync_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns);
-
+void lcd_wifi_send_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns);
+void lcd_wifi_setup_send_page(wifi_menu_t *wifi_menu);
 
 #endif // LCD_WIFI_FUNCS_H

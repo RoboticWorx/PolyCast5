@@ -59,7 +59,7 @@ static void lcd_task(void *pvParameters)
 	// Create images
 	lcd_init_images();
     
-    TickType_t btn_timer_last = xTaskGetTickCount();	
+    TickType_t btn_timer_last = xTaskGetTickCount();
 	TickType_t sleep_timer_last = xTaskGetTickCount();
 	
 	
@@ -99,6 +99,7 @@ static void lcd_task(void *pvParameters)
 	lcd_espnow_setup_send_page(&espnow_menu);
 	
 	lcd_wifi_setup_page(&wifi_menu);
+	lcd_wifi_setup_send_page(&wifi_menu);
 	lcd_wifi_create_scan_list(&wifi_menu.scan_menu);
 	
 	
@@ -239,6 +240,9 @@ static void lcd_task(void *pvParameters)
 			}
 			else if (ui_menu.page == WIFI_SYNC_PAGE) {
 				lcd_wifi_sync_page(&ui_menu, &wifi_menu, &ui_btns);
+			}
+			else if (ui_menu.page == WIFI_SEND_PAGE) {
+				lcd_wifi_send_page(&ui_menu, &wifi_menu, &ui_btns);
 			}
 		}
 		

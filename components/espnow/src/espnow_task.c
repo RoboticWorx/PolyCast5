@@ -36,13 +36,6 @@ QueueHandle_t xEspSendEncKeyQueue;
 QueueHandle_t xEspSendCmdQueue;
 QueueHandle_t xEspSendMqttQueue;
 
-/*
-	SPI RAM Config:
-	- Try to allocate Wi-Fi firstly
-	- Allow .bss
-	- Allow .noinit
-*/
-
 static void espnow_task(void *param)
 {
 	xEspCmdRxStatusSemaphore = xSemaphoreCreateBinary();
