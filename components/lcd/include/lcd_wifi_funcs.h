@@ -37,6 +37,7 @@ typedef struct {
 	lv_obj_t *lbl_send_box;
 	lv_obj_t *lbl_send;
 	lv_obj_t *lbl_edit;
+	lv_obj_t *lbl_receipt;
 	lv_obj_t *arrow_top;
 	lv_obj_t *arrow_bot;
 	uint8_t cmd_to_send;

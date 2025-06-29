@@ -1735,6 +1735,7 @@ static void hide_wifi_send_page(wifi_menu_t *wifi_menu)
 	lv_obj_add_flag(wifi_menu->wifi_submenu.lbl_send_box, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(wifi_menu->wifi_submenu.lbl_send, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(wifi_menu->wifi_submenu.lbl_edit, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(wifi_menu->wifi_submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(wifi_menu->wifi_submenu.arrow_top, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(wifi_menu->wifi_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
 }
@@ -1891,8 +1892,27 @@ void lcd_wifi_send_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 {
 	#define BUF_SIZE 4
 	
+	static bool three_dots = false;
+	
+	// If got receipt back from MQTT receiver
+	if (xSemaphoreTake(xWifiMqttSuccessSemaphore, 0) == pdTRUE) {
+		lv_label_set_text(wifi_menu->wifi_submenu.lbl_receipt, LV_SYMBOL_OK);
+		lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
+	}
+	
 	// Send via MQTT
 	if (ui_btns->right_btn == 1) {
+		// Show dots to imply message is sending (change each time ...<->..)
+		if (!three_dots) {
+			lv_label_set_text(wifi_menu->wifi_submenu.lbl_receipt, "...");
+			three_dots = !three_dots;
+		}
+		else {
+			lv_label_set_text(wifi_menu->wifi_submenu.lbl_receipt, "..");
+			three_dots = !three_dots;
+		}
+		lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
+		
 		wifi_mqtt_t wifi_mqtt;
 		
 		// Format payload
@@ -1906,6 +1926,9 @@ void lcd_wifi_send_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 	}
 	// Command up
 	if (ui_btns->up_btn == 1) {
+		// Hide receipt check
+		lv_obj_add_flag(wifi_menu->wifi_submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
+		
 		wifi_menu->wifi_submenu.cmd_to_send++;
 		
 		// Format and display new value
@@ -1915,6 +1938,9 @@ void lcd_wifi_send_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 	}
 	// Command down
 	if (ui_btns->down_btn == 1) {
+		// Hide receipt check
+		lv_obj_add_flag(wifi_menu->wifi_submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
+		
 		wifi_menu->wifi_submenu.cmd_to_send--;
 		
 		// Format and display new value
@@ -1924,6 +1950,9 @@ void lcd_wifi_send_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 	}
 	// Command += 3
 	if (ui_btns->select_btn == 1) {
+		// Hide receipt check
+		lv_obj_add_flag(wifi_menu->wifi_submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
+		
 		wifi_menu->wifi_submenu.cmd_to_send += 3;
 		
 		// Format and display new value
@@ -2025,6 +2054,10 @@ void lcd_wifi_setup_send_page(wifi_menu_t *wifi_menu)
 	wifi_menu->wifi_submenu.arrow_bot = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(wifi_menu->wifi_submenu.arrow_bot, LV_SYMBOL_DOWN, user_secondary_color,
 					 &lv_font_montserrat_14, LV_ALIGN_CENTER, X_POS, 10);
+					 
+	wifi_menu->wifi_submenu.lbl_receipt = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(wifi_menu->wifi_submenu.lbl_receipt, LV_SYMBOL_OK, user_secondary_color,
+					 &lv_font_montserrat_30, LV_ALIGN_TOP_RIGHT, -32, 21);
 
 	// Create a style for the send cmd box
 	static lv_style_t style_cmd;

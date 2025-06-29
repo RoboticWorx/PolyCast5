@@ -41,6 +41,7 @@ SemaphoreHandle_t xWifiDisconnectSemaphore;
 SemaphoreHandle_t xWifiConnectingSemaphore;
 SemaphoreHandle_t xWifiReconnectSemaphore;
 SemaphoreHandle_t xWifiCanSleepSemaphore;
+SemaphoreHandle_t xWifiMqttSuccessSemaphore;
 
 static void wifi_task(void *param)
 {
@@ -58,6 +59,8 @@ static void wifi_task(void *param)
 	configASSERT(xWifiReconnectSemaphore);
 	xWifiCanSleepSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xWifiCanSleepSemaphore);
+	xWifiMqttSuccessSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xWifiMqttSuccessSemaphore);
 	
 	xWifiScanQueue = xQueueCreate(WIFI_MAX_NETWORKS, sizeof(wifi_scan_t));
 	configASSERT(xWifiScanQueue);
@@ -150,7 +153,7 @@ static void wifi_task(void *param)
 			);
 			strlcpy(topic, topic, len + 1);
 	         
-			wifi_funcs_mqtt_client_publish(wifi_mqtt.payload, topic);
+			wifi_funcs_mqtt_client_publish(wifi_mqtt.payload, wifi_mqtt.key);
 		}
 		
 		// Received channel to sniff

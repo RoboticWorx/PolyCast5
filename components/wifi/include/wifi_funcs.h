@@ -97,6 +97,6 @@ void wifi_funcs_get_current_date_time(void);
 wifi_login_t wifi_funcs_get_prev(void);
 void wifi_funcs_init_promiscuous(wifi_sniff_t *network);
 
-void wifi_funcs_mqtt_client_publish(char *payload, char *topic);
+void wifi_funcs_mqtt_client_publish(char *payload, const uint8_t key[16]);
 
 #endif // WIFI_FUNCS_H
