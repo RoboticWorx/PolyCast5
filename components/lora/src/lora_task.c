@@ -227,7 +227,7 @@ static void lora_task(void *pvParameters) {
 			// Create unique message ID
 			uint32_t msg_id = lora_create_msg_id();
 			expected_rx_id = msg_id;
-				
+			
 			retry_count = 0; // Reset count
 			waiting_for_ack = true; // Need to wait for acknowledgement before sending again
 			
@@ -322,13 +322,49 @@ static void lora_event_handler_task(void *pvParameters) {
 			}
 
 			if (irq_flags & SX126X_IRQ_HEADER_ERROR) {
-				ESP_LOGE(TAG, "Header error in received packet");
+				#ifdef POLYCAST5_DEBUG
+					ESP_LOGE(TAG, "Header error in received packet");
+				#endif
+				
 				sx126x_clear_irq_status(NULL, SX126X_IRQ_HEADER_ERROR);
+				sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
+				
+				// Never got receipt, need to try again with same everything
+				if (retry_count < MAX_RETRIES) { // Cap at MAX_RETRIES
+					need_to_retry = true;
+					retry_count++;
+				}
+				else {
+					xQueueReset(xLoraSendEncQueue); // Clear pending commands
+					waiting_for_ack = false;
+					
+					#ifdef POLYCAST5_DEBUG
+						ESP_LOGW(TAG, "Hit max LoRa retires");
+					#endif
+				}
 			}
 
 			if (irq_flags & SX126X_IRQ_CRC_ERROR) {
-				ESP_LOGE(TAG, "CRC error in received packet");
+				#ifdef POLYCAST5_DEBUG
+					ESP_LOGE(TAG, "CRC error in received packet");
+				#endif
+				
 				sx126x_clear_irq_status(NULL, SX126X_IRQ_CRC_ERROR);
+				sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
+				
+				// Never got receipt, need to try again with same everything
+				if (retry_count < MAX_RETRIES) { // Cap at MAX_RETRIES
+					need_to_retry = true;
+					retry_count++;
+				}
+				else {
+					xQueueReset(xLoraSendEncQueue); // Clear pending commands
+					waiting_for_ack = false;
+					
+					#ifdef POLYCAST5_DEBUG
+						ESP_LOGW(TAG, "Hit max LoRa retires");
+					#endif
+				}
 			}
 		}
 	}
