@@ -8,8 +8,6 @@
 #include "lcd_espnow_funcs.h"
 #include "lcd_wifi_funcs.h"
 
-#include "gpio_task.h"
-
 #define SPI_MISO_PIN 2 // MISO for SX126x
 #define SPI_MOSI_PIN 7 // SPI2 MOSI
 #define SPI_SCLK_PIN 6 // SPI2 SCLK
@@ -50,6 +48,11 @@
 #define WIFI_SYNC_PAGE 22
 #define WIFI_SEND_PAGE 23
 #define WIFI_NAME_PAGE 24
+
+#define ACTIVE_SCR (lv_scr_act())
+
+extern lv_color_t user_primary_color;
+extern lv_color_t user_secondary_color;
 
 extern volatile bool lcd_clear_pending_inputs;
 extern volatile bool go_to_sleep;

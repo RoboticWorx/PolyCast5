@@ -1,5 +1,3 @@
-#include "freertos/projdefs.h"
-#include "misc/lv_timer.h"
 #include "polycast5_macros.h"
 
 #include <stdlib.h>
@@ -7,22 +5,25 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/projdefs.h"
+#include "portmacro.h"
+
+#include "misc/lv_timer.h"
 
 #include "nvs.h"
-
 #include "esp_sleep.h"
 #include "driver/gpio.h"
 #include "esp_timer.h"
 #include "esp_log.h"
 
-#include "portmacro.h"
 #include "st7789.h"
 
 #include "lcd_utils.h"
-#include "lcd_task.h"
 #include "wifi_funcs.h"
 #include "wifi_task.h"
 #include "infrared_funcs.h"
+#include "gpio_funcs.h"
+#include "gpio_task.h"
 
 #include "anim_city.h"
 #include "anim_black_hole.h"

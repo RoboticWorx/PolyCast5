@@ -5,6 +5,16 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define USER_BUTTON_LEFT 1
+#define USER_BUTTON_UP 0
+#define USER_BUTTON_RIGHT 2
+#define USER_BUTTON_HOME 3
+#define USER_BUTTON_DOWN 4
+#define USER_BUTTON_SELECT 5
+#define USER_BUTTON_POWER 1
+
+#define HAPTIC_PIN 15 // 15 is NC: placeholder
+
 /** 
  * @brief Initialise NVS flash
  */

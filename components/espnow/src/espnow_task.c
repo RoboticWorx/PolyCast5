@@ -11,7 +11,7 @@
 #include "esp_log_buffer.h"
 #include "portmacro.h"
 
-#include "lora_task.h"
+#include "lora_funcs.h"
 #include "lcd_espnow_funcs.h"
 #include "espnow_funcs.h"
 #include "espnow_task.h"

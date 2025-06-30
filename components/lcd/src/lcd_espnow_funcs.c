@@ -12,12 +12,11 @@
 #include "esp_random.h"
 
 #include "lcd_utils.h"
-#include "lcd_task.h"
-
 #include "lcd_lora_funcs.h"
 #include "lcd_espnow_funcs.h"
-
 #include "espnow_task.h"
+#include "espnow_funcs.h"
+#include "gpio_task.h"
 
 #include "qr_esp_rx_example.h"
 #include "qr_esp_enc_rx_example.h"

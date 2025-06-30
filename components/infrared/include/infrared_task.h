@@ -1,10 +1,7 @@
 #ifndef INFRARED_TASK_H
 #define INFRARED_TASK_H
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-
-#include "hal/rmt_types.h"
+#include "freertos/idf_additions.h"
 
 extern SemaphoreHandle_t xInfraredRxEventSemaphore;
 extern SemaphoreHandle_t xInfraredStartRxSemaphore;

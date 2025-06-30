@@ -5,6 +5,7 @@
 #include "esp_log.h"
 #include "esp_random.h"
 
+#include "sx126x.h"
 #include "sx126x_hal.h"
 
 #include "lora_funcs.h"

@@ -1,8 +1,26 @@
 #ifndef ESPNOW_FUNCS_H
 #define ESPNOW_FUNCS_H
 
+#define WIFI_CHANNEL 1
+
 #include "esp_err.h"
 #include "esp_now.h"
+
+#include "lcd_espnow_funcs.h"
+
+typedef struct {
+    uint8_t mac_selected[ESPNOW_MAC_SIZE];
+    uint8_t cmd_to_send;
+    bool enc; // If encryption was enabled
+    uint8_t lmk[LMK_LEN]; // Local master key (if enc)
+} espnow_cmd_t;
+
+typedef struct {
+    uint8_t key[16];
+    char ssid[33];
+    char password[65];
+    uint8_t cmd_to_send;
+} espnow_mqtt_t;
 
 /**
  * @brief Initialize the Wi-Fi driver and allocate Wi-Fi buffers

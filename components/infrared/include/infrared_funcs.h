@@ -5,7 +5,6 @@
 #include "driver/rmt_tx.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
-#include "esp_log.h"
 #include <stddef.h>
 
 #include "infrared_task.h"

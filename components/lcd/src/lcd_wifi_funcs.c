@@ -13,7 +13,6 @@
 #include "widgets/label/lv_label.h"
 
 #include "nvs.h"
-#include "esp_mac.h"
 #include "esp_log.h"
 #include "esp_random.h"
 
@@ -21,8 +20,9 @@
 #include "wifi_task.h"
 #include "wifi_funcs.h"
 #include "espnow_task.h"
+#include "espnow_funcs.h"
+#include "gpio_task.h"
 #include "lcd_utils.h"
-#include "lcd_task.h"
 
 #define MAX_PASSWORD_LEN 32
 #define NUM_CHAR_ROWS 4

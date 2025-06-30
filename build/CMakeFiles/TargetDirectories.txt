@@ -908,3 +908,9 @@ C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/main/CMakeFiles/li
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/main/CMakeFiles/install.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/main/CMakeFiles/install/local.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/main/CMakeFiles/install/strip.dir
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/tools/CMakeFiles/edit_cache.dir
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/tools/CMakeFiles/rebuild_cache.dir
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/tools/CMakeFiles/list_install_components.dir
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/tools/CMakeFiles/install.dir
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/tools/CMakeFiles/install/local.dir
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/tools/CMakeFiles/install/strip.dir
