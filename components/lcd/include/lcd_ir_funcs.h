@@ -18,7 +18,7 @@
 //#define B_REMOTE_KEY_COUNT "b_ir_rem_count"
 //#define B_REMOTE_KEY_FMT "b_r%02d"
 
-// Forward-declare structs (from lcd_funcs.h)
+// Forward-declare structs (from lcd_utils.h)
 typedef struct ui_btns_t ui_btns_t;
 typedef struct ui_menu_t ui_menu_t;
 

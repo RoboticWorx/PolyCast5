@@ -1373,7 +1373,8 @@ void lcd_wifi_sync_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 	
 	// Send via ESP-NOW
 	if (ui_btns->right_btn == 1) {
-		// Get device MAC
+		// Create unique ID
+		// TRNG already since Wi-Fi is active
 		esp_fill_random(mqtt_key, sizeof(mqtt_key));
 		
 		// Copy info

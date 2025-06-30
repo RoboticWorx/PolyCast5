@@ -23,7 +23,7 @@
 
 #define MAX_ESPNOW_OPTIONS 20
 
-// Forward-declare structs (from lcd_funcs.h)
+// Forward-declare structs (from lcd_utils.h)
 typedef struct ui_btns_t ui_btns_t;
 typedef struct ui_menu_t ui_menu_t;
 

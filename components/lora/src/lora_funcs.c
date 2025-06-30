@@ -4,6 +4,7 @@
 
 #include "esp_log.h"
 #include "esp_random.h"
+#include "bootloader_random.h"
 
 #include "sx126x.h"
 #include "sx126x_hal.h"
@@ -19,24 +20,31 @@ uint8_t encryption_key[ENC_KEY_LEN] = {0};
 
 bool waiting_for_ack = false;
 
-static void generate_random_iv(uint8_t *iv, size_t length) {
+static void generate_random_iv(uint8_t *iv, size_t length)
+{
+	bootloader_random_enable();
 	for (size_t i = 0; i < length; i++) {
 		iv[i] = (uint8_t)(esp_random() % (255 + 1)); // Generate number 0 - 255
 	}
+	bootloader_random_disable();
 }
 
 uint32_t lora_create_msg_id(void)
 {
+	bootloader_random_enable();
     uint32_t id;
     do {
         id = esp_random();
     } while(id == 0);
+    bootloader_random_disable();
     return id;
 }
 
 void lora_generate_random_key(void)
 {
+	bootloader_random_enable();
 	esp_fill_random(encryption_key, sizeof(encryption_key));
+	bootloader_random_disable();
 	
 	#ifdef POLYCAST5_DEBUG
         ESP_LOG_BUFFER_HEX("LORA KEY GENERATED", encryption_key, sizeof(encryption_key));

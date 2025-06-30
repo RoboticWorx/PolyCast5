@@ -8,6 +8,9 @@ list(APPEND SRCS
     "media/qr/src/qr_esp_enc_rx_example.c"
         
     "media/other/src/img_ir_save_new_remote.c"
+    
+    "media/other/src/img_coin_heads.c"
+    "media/other/src/img_coin_tails.c"
         
     "media/city/src/anim_city_1.c"
     "media/city/src/anim_city_2.c"
@@ -104,7 +107,7 @@ idf_component_register(
     	"media/other/include"
     
     REQUIRES
-    	common lvgl sx126x infrared espnow lora wifi sx126x gpio tools
+    	common lvgl sx126x infrared espnow lora wifi sx126x gpio tools bootloader_support
     
     PRIV_REQUIRES
 )

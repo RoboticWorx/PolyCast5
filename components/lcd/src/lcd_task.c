@@ -110,6 +110,8 @@ static void lcd_task(void *pvParameters)
 	lcd_wifi_setup_send_page(&wifi_menu);
 	lcd_wifi_create_scan_list(&wifi_menu.scan_menu);
 	
+	lcd_tools_setup_page(&tools_menu);
+	
 	
 	#ifdef POLYCAST5_ESPNOW_DUMP_NVS
 		lcd_espnow_dump_nvs();
@@ -195,7 +197,7 @@ static void lcd_task(void *pvParameters)
 				lcd_home_page_selected(&ui_menu, &ui_btns);
 			} 
 			else if (ui_menu.page == SELECTION_PAGE) {
-				lcd_selection_page_selected(&ui_menu, &ir_menu, &lora_menu, &espnow_menu, &wifi_menu, &ui_btns);
+				lcd_selection_page_selected(&ui_menu, &ui_btns, &ir_menu, &lora_menu, &espnow_menu, &wifi_menu, &tools_menu);
 			}
 			// IR remotes page
 			else if (ui_menu.page == INFRARED_PAGE) {
@@ -257,6 +259,13 @@ static void lcd_task(void *pvParameters)
 			}
 			else if (ui_menu.page == WIFI_NAME_PAGE) {
 				lcd_wifi_create_custom_name(&ui_menu, &wifi_menu, &ui_btns);
+			}
+			// Tools page
+			else if (ui_menu.page == TOOLS_PAGE) {
+				lcd_tools_page_selected(&ui_btns, &ui_menu, &tools_menu);
+			}
+			else if (ui_menu.page == TOOLS_COIN_PAGE) {
+				lcd_tools_coin_page(&ui_btns, &ui_menu, &tools_menu);
 			}
 		}
 		

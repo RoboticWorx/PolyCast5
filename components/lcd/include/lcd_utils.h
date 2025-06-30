@@ -7,6 +7,7 @@
 #include "lcd_lora_funcs.h"
 #include "lcd_espnow_funcs.h"
 #include "lcd_wifi_funcs.h"
+#include "lcd_tools_funcs.h"
 
 #include "gpio_funcs.h"
 
@@ -42,6 +43,8 @@
 #define WIFI_SYNC_PAGE 22
 #define WIFI_SEND_PAGE 23
 #define WIFI_NAME_PAGE 24
+
+#define TOOLS_COIN_PAGE 25
 
 #define ACTIVE_SCR (lv_scr_act())
 
@@ -195,8 +198,13 @@ void lcd_home_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns);
  *
  * @param [in] ui_menu UI menu structure
  * @param [in] ui_btns UI input structure
+ * @param [in] ir_menu IR menu structure
+ * @param [in] lora_menu LoRa menu structure
+ * @param [in] espnow_menu ESP-NOW menu structure
+ * @param [in] wifi_menu Wi-Fi menu structure
+ * @param [in] tools_menu Tools menu structure
  */
-void lcd_selection_page_selected(ui_menu_t *ui_menu, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu, wifi_menu_t* wifi_menu, ui_btns_t *ui_btns);
+void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu, wifi_menu_t* wifi_menu, tools_menu_t* tools_menu);
 
 /**
  * @brief Executes on infrared page
@@ -211,7 +219,7 @@ void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_
  * @brief Executes on LoRa page
  *
  * @param [in] ui_menu UI menu structure
- * @param [in] lora_meun LoRa menu structure
+ * @param [in] lora_menu LoRa menu structure
  * @param [in] ui_btns UI input structure
  */
 void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
@@ -233,6 +241,15 @@ void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui
  * @param [in] ui_btns UI input structure
  */
 void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns);
+
+/**
+ * @brief Executes on tools page
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] tools_menu Tools menu structure
+ */
+void lcd_tools_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu);
 
 
 #endif /* LCD_FUNCS_H */

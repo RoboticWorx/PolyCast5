@@ -15,7 +15,7 @@
 #define LORA_ENC_KEY_COUNT "lo_en_ke" // u8: number of user remotes
 #define LORA_ENC_KEY_FMT "lo_en%02d" // lo_en00, lo_en01 …
 
-// Forward-declare structs (from lcd_funcs.h)
+// Forward-declare structs (from lcd_utils.h)
 typedef struct ui_btns_t ui_btns_t;
 typedef struct ui_menu_t ui_menu_t;
 
