@@ -1,23 +1,15 @@
 #include "nvs_flash.h"
 
 #include "driver/i2c.h"
-
-#include "esp_sleep.h"
 #include "esp_log.h"
 
-#include "TCA9535.h"
+#include "tca9535.h"
 
 #include "lcd_utils.h"
 #include "gpio_funcs.h"
 #include "gpio_task.h"
 
 static const char *TAG = "GPIO_FUNCS";
-
-static void IRAM_ATTR tca9535_int_isr(void *arg) {
-    BaseType_t woken = pdFALSE;
-    xSemaphoreGiveFromISR(xGpioEventSemaphore, &woken);
-    portYIELD_FROM_ISR(woken);
-}
 
 static void IRAM_ATTR power_int_isr(void *arg) {
     BaseType_t woken = pdFALSE;
@@ -72,8 +64,7 @@ esp_err_t gpio_init(void)
 	
 	// Configure inputs
 	gpio_config_t io_conf_int = {
-	    .pin_bit_mask = (1ULL << TCA9535_INT_GPIO) |
-	    				(1ULL << USER_BUTTON_POWER),
+	    .pin_bit_mask = (1ULL << USER_BUTTON_POWER),
 	    .mode = GPIO_MODE_INPUT,
 	    .intr_type = GPIO_INTR_NEGEDGE,
 	    .pull_up_en = GPIO_PULLUP_DISABLE,
@@ -83,7 +74,7 @@ esp_err_t gpio_init(void)
 
 	// ISR service
 	gpio_install_isr_service(0);
-	gpio_isr_handler_add(TCA9535_INT_GPIO, tca9535_int_isr, NULL);
+	//gpio_isr_handler_add(TCA9535_INT_GPIO, tca9535_int_isr, NULL);
 	gpio_isr_handler_add(USER_BUTTON_POWER, power_int_isr, NULL);
 	
 

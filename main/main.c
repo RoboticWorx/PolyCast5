@@ -16,23 +16,16 @@
 
 #include "lora_task.h"
 #include "lora_funcs.h"
-
 #include "lcd_utils.h"
 #include "lcd_task.h"
-
 #include "infrared_task.h"
-
 //#include "bluetooth_task.h"
 //#include "bluetooth_funcs.h"
-
 #include "gpio_task.h"
 #include "gpio_funcs.h"
-
 #include "espnow_task.h"
 #include "espnow_funcs.h"
-
 #include "wifi_task.h"
-#include "wifi_funcs.h"
 
 // Logging tag
 static const char *TAG = "MAIN";
@@ -106,8 +99,6 @@ void app_main(void) {
 	xSPIBusMutex = xSemaphoreCreateMutex();
 	configASSERT(xSPIBusMutex); // Ensure success
 	
-	xGpioEventSemaphore = xSemaphoreCreateBinary(); // ISR semaphores
-	configASSERT(xGpioEventSemaphore);
 	xPowerButtonSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xPowerButtonSemaphore);
 	

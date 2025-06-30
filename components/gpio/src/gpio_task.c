@@ -10,9 +10,12 @@
 #include "gpio_task.h"
 #include "gpio_funcs.h"
 
+#define POLL_MS 20
+#define REPEAT_START_MS 400
+#define REPEAT_NEXT_MS 100
+
 SemaphoreHandle_t xSPIBusMutex;
 
-SemaphoreHandle_t xGpioEventSemaphore;
 SemaphoreHandle_t xPowerButtonSemaphore;
 
 SemaphoreHandle_t xUpButtonSemaphore;
@@ -29,9 +32,40 @@ SemaphoreHandle_t xLedOffSemaphore;
 
 static const char *TAG = "GPIO_TASK";
 
+typedef struct {
+    uint8_t pin; // Expander pin number
+    uint16_t ticks; // Ticks until next event
+    bool prev; // Last sampled state (1 = released, 0 = pressed)
+} btn_state_t;
+
+// Buttons and states: same order as buttonSemaphores
+static btn_state_t buttons[6] = {
+    {USER_BUTTON_UP,     0, 1},
+    {USER_BUTTON_DOWN,   0, 1},
+    {USER_BUTTON_RIGHT,  0, 1},
+    {USER_BUTTON_LEFT,   0, 1},
+    {USER_BUTTON_HOME,   0, 1},
+    {USER_BUTTON_SELECT, 0, 1},
+};
+
+static SemaphoreHandle_t *buttonSemaphores[] = {
+    &xUpButtonSemaphore,
+    &xDownButtonSemaphore,
+    &xRightButtonSemaphore,
+    &xLeftButtonSemaphore,
+    &xHomeButtonSemaphore,
+    &xSelectButtonSemaphore,
+};
+
+// Helper to “give” the right semaphore based on index
+static inline void give_button_sem(size_t i)
+{
+    // Dereference the pointer and give it
+    xSemaphoreGive(*buttonSemaphores[i]);
+}
+
 static void gpio_task(void *arg)
 {
-	
 	xUpButtonSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xUpButtonSemaphore);
     xDownButtonSemaphore = xSemaphoreCreateBinary();
@@ -72,66 +106,52 @@ static void gpio_task(void *arg)
 		#ifdef POLYCAST5_DEBUG_GPIO
         	//ESP_LOGI(TAG, "GPIO_UP: %d GPIO_DOWN: %d GPIO_RIGHT: %d", gpio_read_input(USER_BUTTON_UP), gpio_read_input(USER_BUTTON_DOWN), gpio_read_input(USER_BUTTON_RIGHT));
         #endif
-		
-		// If a button is pressed
-	    if (xSemaphoreTake(xGpioEventSemaphore, 0) == pdTRUE) {		
-	        vTaskDelay(pdMS_TO_TICKS(50)); // Ignore bounce window
-
-			if (gpio_read_input(USER_BUTTON_UP) == 0) {
-				xSemaphoreGive(xUpButtonSemaphore);
-				#ifdef POLYCAST5_DEBUG_GPIO
-		        	ESP_LOGI(TAG, "xUpButtonSemaphore given");
-		        #endif
-			}
-			else if (gpio_read_input(USER_BUTTON_DOWN) == 0) {
-				xSemaphoreGive(xDownButtonSemaphore);
-				#ifdef POLYCAST5_DEBUG_GPIO
-		        	ESP_LOGI(TAG, "xDownButtonSemaphore given");
-		        #endif
-			}
-			else if (gpio_read_input(USER_BUTTON_RIGHT) == 0) {
-				xSemaphoreGive(xRightButtonSemaphore);
-				#ifdef POLYCAST5_DEBUG_GPIO
-		        	ESP_LOGI(TAG, "xRightButtonSemaphore given");
-		        #endif
-			}
-			else if (gpio_read_input(USER_BUTTON_LEFT) == 0) {
-				xSemaphoreGive(xLeftButtonSemaphore);
-				#ifdef POLYCAST5_DEBUG_GPIO
-		        	ESP_LOGI(TAG, "xLeftButtonSemaphore given");
-		        #endif
-			}
-			else if (gpio_read_input(USER_BUTTON_HOME) == 0) {
-				xSemaphoreGive(xHomeButtonSemaphore); // THIS IS PWR ON NEW HW
-				#ifdef POLYCAST5_DEBUG_GPIO
-		        	ESP_LOGI(TAG, "xHomeButtonSemaphore given");
-		        #endif
-				
-			}
-			else if (gpio_read_input(USER_BUTTON_SELECT) == 0) {
-				xSemaphoreGive(xSelectButtonSemaphore);
-				#ifdef POLYCAST5_DEBUG_GPIO
-		        	ESP_LOGI(TAG, "xSelectButtonSemaphore given");
-		        #endif
-			}
+	
+	    // Press + auto-repeat state machine
+	    for (size_t i = 0; i < 6; i++) {
+	        btn_state_t *b = &buttons[i]; // Get the button
+	        bool level = gpio_read_input(b->pin); // Read its state: 0 = pressed, 1 = released
+	
+			// Button pressed
+	        if (level == 0) {
+	            if (b->prev == 1) { // New press
+	                give_button_sem(i); // Signal the press
+	                b->ticks = REPEAT_START_MS / POLL_MS;
+	            }
+	            else if (b->ticks == 0) { // Time to auto-repeat
+	                give_button_sem(i); // Repeat the press
+	                b->ticks = REPEAT_NEXT_MS / POLL_MS;
+	            }
+	            else { // Waiting for next repeat
+	                b->ticks--; // Tick down
+	            }
+	        }
+	        else { // Button released
+	            // Reset for next press
+	            b->ticks = 0;
+	        }
+	        
+	        // Set previous
+	        b->prev = level;
+	    }
+	
+	    // RGB LED handling
+	    if (xSemaphoreTake(xLedBlueSemaphore, 0) == pdTRUE) {
+			gpio_write_output(2, 1);
 		}
-			
-		if (xSemaphoreTake(xLedBlueSemaphore, 0) == pdTRUE) {	
-			gpio_write_output(2, 1); // Blue LED
+	    if (xSemaphoreTake(xLedRedSemaphore, 0) == pdTRUE) {
+			gpio_write_output(0, 1);
 		}
-		if (xSemaphoreTake(xLedRedSemaphore, 0) == pdTRUE) {	
-			gpio_write_output(0, 1); // Red LED
+	    if (xSemaphoreTake(xLedGreenSemaphore, 0) == pdTRUE) {
+			gpio_write_output(1, 1);
 		}
-		if (xSemaphoreTake(xLedGreenSemaphore, 0) == pdTRUE) {	
-			gpio_write_output(1, 1); // Green LED
-		}
-		if (xSemaphoreTake(xLedOffSemaphore, 0) == pdTRUE) {	
-			gpio_write_output(0, 0); // Red LED
-			gpio_write_output(1, 0); // Green LED
-			gpio_write_output(2, 0); // Blue LED
-		}
-	    
-	    vTaskDelay(pdMS_TO_TICKS(20));
+	    if (xSemaphoreTake(xLedOffSemaphore, 0) == pdTRUE) {
+	        gpio_write_output(0, 0);
+	        gpio_write_output(1, 0);
+	        gpio_write_output(2, 0);
+	    }
+	
+	    vTaskDelay(pdMS_TO_TICKS(POLL_MS));
 	}
 }
 

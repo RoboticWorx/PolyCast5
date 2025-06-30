@@ -6,7 +6,6 @@
 
 // ISR semaphores
 extern SemaphoreHandle_t xPowerButtonSemaphore; // Select btn pressed
-extern SemaphoreHandle_t xGpioEventSemaphore; // A btn was pressed
 
 // Mutex
 extern SemaphoreHandle_t xSPIBusMutex;
@@ -23,8 +22,6 @@ extern SemaphoreHandle_t xLedBlueSemaphore;
 extern SemaphoreHandle_t xLedRedSemaphore;
 extern SemaphoreHandle_t xLedGreenSemaphore;
 extern SemaphoreHandle_t xLedOffSemaphore;
-
-
 
 /**
  * @brief  Create the GPIO expander task.
