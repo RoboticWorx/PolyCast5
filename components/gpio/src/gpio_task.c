@@ -10,6 +10,8 @@
 #include "gpio_task.h"
 #include "gpio_funcs.h"
 
+#define TAG "GPIO_TASK"
+
 #define POLL_MS 20
 #define REPEAT_START_MS 400
 #define REPEAT_NEXT_MS 100
@@ -29,8 +31,6 @@ SemaphoreHandle_t xLedBlueSemaphore;
 SemaphoreHandle_t xLedRedSemaphore;
 SemaphoreHandle_t xLedGreenSemaphore;
 SemaphoreHandle_t xLedOffSemaphore;
-
-static const char *TAG = "GPIO_TASK";
 
 typedef struct {
     uint8_t pin; // Expander pin number

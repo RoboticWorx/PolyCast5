@@ -13,5 +13,5 @@ idf_component_register(
     	common
     
     PRIV_REQUIRES
-    	esp_wifi esp_netif espnow mqtt gpio lcd
+    	esp_wifi esp_netif espnow mqtt gpio
 )

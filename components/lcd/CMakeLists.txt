@@ -104,8 +104,7 @@ idf_component_register(
     	"media/other/include"
     
     REQUIRES
-    	common lvgl
+    	common lvgl sx126x infrared espnow lora wifi sx126x gpio tools
     
     PRIV_REQUIRES
-    	sx126x infrared espnow lora wifi sx126x gpio
 )

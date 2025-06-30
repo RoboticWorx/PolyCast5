@@ -13,5 +13,5 @@ idf_component_register(
     	common esp_wifi
     
     PRIV_REQUIRES
-    	esp_netif lora wifi gpio lcd
+    	esp_netif lora wifi gpio
 )

@@ -1,12 +1,13 @@
 #ifndef ESPNOW_FUNCS_H
 #define ESPNOW_FUNCS_H
 
-#define WIFI_CHANNEL 1
-
 #include "esp_err.h"
 #include "esp_now.h"
 
-#include "lcd_espnow_funcs.h"
+#define WIFI_CHANNEL 1
+
+#define ESPNOW_MAC_SIZE 6
+#define LMK_LEN 16
 
 typedef struct {
     uint8_t mac_selected[ESPNOW_MAC_SIZE];

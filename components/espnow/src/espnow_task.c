@@ -12,7 +12,6 @@
 #include "portmacro.h"
 
 #include "lora_funcs.h"
-#include "lcd_espnow_funcs.h"
 #include "espnow_funcs.h"
 #include "espnow_task.h"
 #include "wifi_funcs.h"

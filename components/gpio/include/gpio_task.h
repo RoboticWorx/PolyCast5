@@ -1,8 +1,7 @@
 #ifndef GPIO_TASK_H
 #define GPIO_TASK_H
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
+#include "freertos/idf_additions.h"
 
 // ISR semaphores
 extern SemaphoreHandle_t xPowerButtonSemaphore; // Select btn pressed

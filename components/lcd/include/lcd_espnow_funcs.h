@@ -7,6 +7,8 @@
 
 #include "lvgl.h"
 
+#include "espnow_funcs.h"
+
 #define ESPNOW_RX_MAC_NS "es_rxm_ns" // NVS namespace
 #define ESPNOW_RX_MAC_KEY_COUNT "es_rxm_ke" // u8: number of option
 #define ESPNOW_RX_MAC_KEY_FMT "es_rxm%d"
@@ -20,9 +22,6 @@
 #define ESPNOW_LMK_KEY_FMT "es_lm%02d"
 
 #define MAX_ESPNOW_OPTIONS 20
-
-#define ESPNOW_MAC_SIZE 6
-#define LMK_LEN 16
 
 // Forward-declare structs (from lcd_funcs.h)
 typedef struct ui_btns_t ui_btns_t;

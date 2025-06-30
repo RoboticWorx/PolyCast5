@@ -190,7 +190,6 @@ static void lcd_task(void *pvParameters)
 				lcd_clear_pending_inputs = false;
 			}
 			
-			
 			if (ui_menu.page == HOME_PAGE) {
 				// Show cool two frame animation and allow user to change animation scrolling up/down				
 				lcd_home_page_selected(&ui_menu, &ui_btns);

@@ -11,5 +11,5 @@ idf_component_register(
     	driver freertos nvs_flash
     
     PRIV_REQUIRES
-    	espnow infrared lora lvgl sx126x gpio lcd
+    	
 )
