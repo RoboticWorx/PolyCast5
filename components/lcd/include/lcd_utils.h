@@ -45,6 +45,7 @@
 #define WIFI_NAME_PAGE 24
 
 #define TOOLS_COIN_PAGE 25
+#define TOOLS_DOCS_PAGE 26
 
 #define ACTIVE_SCR (lv_scr_act())
 

@@ -4,6 +4,7 @@
 #include "core/lv_obj_pos.h"
 #include "core/lv_obj.h"
 #include "misc/lv_area.h"
+#include "widgets/label/lv_label.h"
 
 #include "esp_log.h"
 #include "esp_err.h"
@@ -14,6 +15,8 @@
 
 #include "img_coin_heads.h"
 #include "img_coin_tails.h"
+#include "qr_pc5_com.h"
+#include "qr_pc5_docs.h"
 
 tools_menu_t tools_menu = {
     .options = {"Coin flipper", "Dice roller", "Number generator", "Read the docs"},
@@ -265,6 +268,112 @@ void lcd_tools_coin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		lbl_result = NULL;
 		coin_heads = NULL;
 		coin_tails = NULL;
+		
+		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+	}
+}
+
+void lcd_tools_docs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
+{
+	#define MAX_QRS 2
+	#define QR_COM_TXT "Homepage:"
+	#define QR_DOCS_TXT "How to docs:"
+	
+	// Statics
+	static bool do_once = false;
+	static uint8_t qr_idx = 0;
+	
+	static lv_obj_t *lbl_ins;
+	static lv_obj_t *qr_active;
+	
+	// Only execute once
+	if (!do_once) {
+		qr_idx = 0;
+		
+		lbl_ins = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_ins, QR_COM_TXT, user_secondary_color,
+        			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 7);
+        
+        // Create QR
+		qr_active = lv_img_create(ACTIVE_SCR);
+	    lv_img_set_src(qr_active, &qr_pc5_com);
+	    lv_obj_align(qr_active, LV_ALIGN_CENTER, 0, 13);
+		
+		do_once = true;
+	}
+	
+	// Go right a QR
+	if (ui_btns->right_btn == 1) {	
+		// Increment with wrap
+		qr_idx = (qr_idx + 1) % MAX_QRS;
+		
+		if (qr_idx == 0) {
+			lv_label_set_text(lbl_ins, QR_COM_TXT);
+			lv_img_set_src(qr_active, &qr_pc5_com);
+		}
+		else if (qr_idx == 1) {
+			lv_label_set_text(lbl_ins, QR_DOCS_TXT);
+			lv_img_set_src(qr_active, &qr_pc5_docs);
+		}
+	}
+	// Go left a QR
+	else if (ui_btns->left_btn == 1 && qr_idx != 0) {	
+		// De-increment with wrap
+		qr_idx = (qr_idx + MAX_QRS - 1) % MAX_QRS;
+		
+		if (qr_idx == 0) {
+			lv_label_set_text(lbl_ins, QR_COM_TXT);
+			lv_img_set_src(qr_active, &qr_pc5_com);
+		}
+		else if (qr_idx == 1) {
+			lv_label_set_text(lbl_ins, QR_DOCS_TXT);
+			lv_img_set_src(qr_active, &qr_pc5_docs);
+		}
+	}
+	// Back selected
+	else if (ui_btns->left_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(qr_active);
+		
+		// Reset statics
+		do_once = false;
+		lbl_ins = NULL;
+		qr_active = NULL;
+		
+		// Show tools list
+		lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show up/down arrow
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = TOOLS_PAGE;
+	}
+	// Home selected
+	else if (ui_btns->home_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(qr_active);
+		
+		// Reset statics
+		do_once = false;
+		lbl_ins = NULL;
+		qr_active = NULL;
+		
+		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+	}
+	// Power off selected
+	else if (ui_btns->pwr_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(qr_active);
+		
+		// Reset statics
+		do_once = false;
+		lbl_ins = NULL;
+		qr_active = NULL;
 		
 		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
 	}

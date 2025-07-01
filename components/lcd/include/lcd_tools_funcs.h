@@ -46,7 +46,14 @@ void lcd_tools_update_menu(tools_menu_t *tools_menu);
  */
 void lcd_tools_coin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu);
 
-
+/**
+ * @brief Runs tools read the docs page
+ *
+ * @param [in] ui_btns User input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] tools_menu Tools menu structure
+ */
+void lcd_tools_docs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu);
 
 
 #endif // LCD_TOOLS_FUNCS_H
