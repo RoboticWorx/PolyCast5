@@ -42,6 +42,8 @@ SemaphoreHandle_t xWifiConnectingSemaphore;
 SemaphoreHandle_t xWifiReconnectSemaphore;
 SemaphoreHandle_t xWifiCanSleepSemaphore;
 SemaphoreHandle_t xWifiMqttSuccessSemaphore;
+SemaphoreHandle_t xWifiMqttConnectedSemaphore;
+SemaphoreHandle_t xWifiMqttDisconnectedSemaphore;
 
 static void wifi_task(void *param)
 {
@@ -61,6 +63,10 @@ static void wifi_task(void *param)
 	configASSERT(xWifiCanSleepSemaphore);
 	xWifiMqttSuccessSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xWifiMqttSuccessSemaphore);
+	xWifiMqttConnectedSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xWifiMqttConnectedSemaphore);
+	xWifiMqttDisconnectedSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xWifiMqttDisconnectedSemaphore);
 	
 	xWifiScanQueue = xQueueCreate(WIFI_MAX_NETWORKS, sizeof(wifi_scan_t));
 	configASSERT(xWifiScanQueue);

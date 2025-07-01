@@ -29,6 +29,11 @@
 
 #define WIFI_MENU_START_SIZE 3
 
+#define MQTT_READY_TXT "0 = OFF     1 = ON\nREST = CUSTOM"
+#define MQTT_SENDING_TXT "Sending via\nMQTT broker..." 
+#define MQTT_CONNECTING_TXT "Please wait...\nConnecting..."
+
+
 wifi_menu_t wifi_menu = {
     .options = {"Connect to network", "Monitor packets", "Sync with PolyPlug"},
     .size = WIFI_MENU_START_SIZE,
@@ -1893,13 +1898,27 @@ void lcd_wifi_send_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 {
 	#define BUF_SIZE 4
 	
+	// Define statics
 	static bool three_dots = false;
+	static bool mqtt_connected = false;
 	
+	// Update labels on status
+	if (xSemaphoreTake(xWifiMqttDisconnectedSemaphore, 0) == pdTRUE) {
+		lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_ins, MQTT_CONNECTING_TXT);
+		mqtt_connected = false;
+	}
+	else if (xSemaphoreTake(xWifiMqttConnectedSemaphore, 0) == pdTRUE) {
+		lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_ins, MQTT_READY_TXT);
+		mqtt_connected = true;
+	}
 	// If got receipt back from MQTT receiver
-	if (xSemaphoreTake(xWifiMqttSuccessSemaphore, 0) == pdTRUE) {
+	else if (xSemaphoreTake(xWifiMqttSuccessSemaphore, 0) == pdTRUE) {
 		lv_label_set_text(wifi_menu->wifi_submenu.lbl_receipt, LV_SYMBOL_OK);
 		lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
+		
+		lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_ins, MQTT_READY_TXT);
 	}
+	
 	
 	// Send via MQTT
 	if (ui_btns->right_btn == 1) {
@@ -1913,6 +1932,10 @@ void lcd_wifi_send_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 			three_dots = !three_dots;
 		}
 		lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
+		
+		if (mqtt_connected) {
+			lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_ins, MQTT_SENDING_TXT);
+		}
 		
 		wifi_mqtt_t wifi_mqtt;
 		
@@ -2029,7 +2052,7 @@ void lcd_wifi_setup_send_page(wifi_menu_t *wifi_menu)
 	
 	// Create labels
 	wifi_menu->wifi_submenu.lbl_send_ins = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(wifi_menu->wifi_submenu.lbl_send_ins, "0 = OFF     1 = ON\nREST = CUSTOM", user_secondary_color,
+	lcd_format_label(wifi_menu->wifi_submenu.lbl_send_ins, MQTT_CONNECTING_TXT, user_secondary_color,
 					 &lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS - 10, 48);
 
 	wifi_menu->wifi_submenu.lbl_send_cmd = lv_label_create(ACTIVE_SCR);

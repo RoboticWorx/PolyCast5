@@ -194,6 +194,8 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
         #endif
         
         wifi_funcs_radio_stop();
+        
+        xSemaphoreGive(xWifiMqttDisconnectedSemaphore); // Notify LCD we disconnected
 
         xEventGroupSetBits(wifi_event_group, WIFI_DISCONNECTED_BIT);
     }
@@ -233,6 +235,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             	ESP_LOGI(TAG, "Connected to MQTT");
             #endif
             
+            xSemaphoreGive(xWifiMqttConnectedSemaphore); // Notify LCD we connected
+            
             // Subscribe to any polycast5/.../ack
             esp_mqtt_client_subscribe(event->client, "polycast5/+/ack", 0);
             break;
@@ -241,6 +245,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         	#ifdef POLYCAST5_DEBUG
             	ESP_LOGW(TAG, "Disconnected from MQTT");
             #endif
+            
+            xSemaphoreGive(xWifiMqttDisconnectedSemaphore); // Notify LCD we disconnected
             break;
             
         case MQTT_EVENT_PUBLISHED:
