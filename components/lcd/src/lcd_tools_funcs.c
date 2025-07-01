@@ -16,7 +16,7 @@
 #include "img_coin_tails.h"
 
 tools_menu_t tools_menu = {
-    .options = {"Coin flipper", "Dice roller", "Number generator", "Unit converter"},
+    .options = {"Coin flipper", "Dice roller", "Number generator", "Read the docs"},
     .size = 4,
     .index = 0,
     .cont = NULL,
