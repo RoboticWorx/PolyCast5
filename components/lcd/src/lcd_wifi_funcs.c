@@ -1935,18 +1935,18 @@ void lcd_wifi_send_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
 		
 		if (mqtt_connected) {
 			lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_ins, MQTT_SENDING_TXT);
+			
+			wifi_mqtt_t wifi_mqtt;
+			
+			// Format payload
+			snprintf(wifi_mqtt.payload, sizeof(wifi_mqtt.payload), "%u", wifi_menu->wifi_submenu.cmd_to_send);
+			
+			// Get topic key for given entry (topic_keys is 0-based)
+			memcpy(wifi_mqtt.key, wifi_menu->topic_keys[wifi_menu->index - WIFI_MENU_START_SIZE], sizeof(wifi_menu->topic_keys[wifi_menu->index - WIFI_MENU_START_SIZE]));
+			
+			// Send
+			xQueueSend(xWifiMqttCmdQueue, &wifi_mqtt, portMAX_DELAY);
 		}
-		
-		wifi_mqtt_t wifi_mqtt;
-		
-		// Format payload
-		snprintf(wifi_mqtt.payload, sizeof(wifi_mqtt.payload), "%u", wifi_menu->wifi_submenu.cmd_to_send);
-		
-		// Get topic key for given entry (topic_keys is 0-based)
-		memcpy(wifi_mqtt.key, wifi_menu->topic_keys[wifi_menu->index - WIFI_MENU_START_SIZE], sizeof(wifi_menu->topic_keys[wifi_menu->index - WIFI_MENU_START_SIZE]));
-		
-		// Send
-		xQueueSend(xWifiMqttCmdQueue, &wifi_mqtt, portMAX_DELAY);
 	}
 	// Command up
 	if (ui_btns->up_btn == 1) {
