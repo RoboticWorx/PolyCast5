@@ -270,6 +270,9 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == TOOLS_DOCS_PAGE) {
 				lcd_tools_docs_page(&ui_btns, &ui_menu, &tools_menu);
 			}
+			else if (ui_menu.page == TOOLS_DICE_PAGE) {
+				lcd_tools_dice_page(&ui_btns, &ui_menu, &tools_menu);
+			}
 		}
 		
 		// Sleep condition

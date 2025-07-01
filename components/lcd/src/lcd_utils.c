@@ -1394,6 +1394,17 @@ void lcd_tools_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
 		// Switch pages
 		ui_menu->page = TOOLS_COIN_PAGE;
 	}
+	// Dice roller selected
+	else if (ui_btns->select_btn == 1 && tools_menu->index == 1) {
+		// Hide tools menu
+		lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		// Switch pages
+		ui_menu->page = TOOLS_DICE_PAGE;
+	}
 	// Read the docs selected
 	else if (ui_btns->select_btn == 1 && tools_menu->index == 3) {
 		// Hide tools menu

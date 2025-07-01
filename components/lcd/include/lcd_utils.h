@@ -46,6 +46,7 @@
 
 #define TOOLS_COIN_PAGE 25
 #define TOOLS_DOCS_PAGE 26
+#define TOOLS_DICE_PAGE 27
 
 #define ACTIVE_SCR (lv_scr_act())
 
