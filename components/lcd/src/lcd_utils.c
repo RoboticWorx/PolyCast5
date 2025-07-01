@@ -1012,6 +1012,8 @@ void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_
 	}
 	// Add PolyPlug selected
 	else if (ui_btns->select_btn == 1 && lora_menu->index == 0) {
+		xSemaphoreGive(xWifiDisconnectSemaphore); // Disconnect from Wi-Fi if connected
+		
 		// Hide LoRa menu
 		lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -1102,6 +1104,8 @@ void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui
 	}
 	// Specific selected
 	else if (ui_btns->select_btn == 1) {
+		xSemaphoreGive(xWifiDisconnectSemaphore); // Disconnect from Wi-Fi if connected
+		
 		// Hide ESP-NOW menu
 		lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -1123,8 +1127,6 @@ void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui
 		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
 		ui_menu->page = ESPNOW_OPTION_PAGE;
-		
-		xSemaphoreGive(xWifiDisconnectSemaphore); // Disconnect from Wi-Fi if connected
 	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {

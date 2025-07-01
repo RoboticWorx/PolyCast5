@@ -37,6 +37,7 @@ static EventGroupHandle_t wifi_event_group;
 
 static wifi_data_t wifi_data;
 static char mqtt_active_ack_topic[80] = {0};
+static bool mqtt_connected = false;
 
 bool wifi_connected = false;
 
@@ -235,10 +236,12 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             	ESP_LOGI(TAG, "Connected to MQTT");
             #endif
             
-            xSemaphoreGive(xWifiMqttConnectedSemaphore); // Notify LCD we connected
-            
             // Subscribe to any polycast5/.../ack
             esp_mqtt_client_subscribe(event->client, "polycast5/+/ack", 0);
+            
+            xSemaphoreGive(xWifiMqttConnectedSemaphore); // Notify LCD we connected
+            
+            mqtt_connected = true;
             break;
             
         case MQTT_EVENT_DISCONNECTED:
@@ -253,6 +256,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         	#ifdef POLYCAST5_DEBUG
 	            ESP_LOGI(TAG, "Broker ACKed message ID %d on topic %.*s", event->msg_id, event->topic_len, event->topic);
             #endif
+            
+            mqtt_connected = false;
             break;
             
         case MQTT_EVENT_DATA:
@@ -425,7 +430,11 @@ esp_err_t wifi_funcs_radio_start(const char *ssid, const uint8_t* bssid, const c
 
 esp_err_t wifi_funcs_radio_stop(void)
 {
-	esp_mqtt_client_stop(mqtt_client); // Stop possible client
+	// Stop client if started
+	if (mqtt_connected) {
+        esp_mqtt_client_disconnect(mqtt_client);
+    }
+	
 	esp_wifi_disconnect(); // Disconnect if connected
 	
 	// Stop Wi-Fi
