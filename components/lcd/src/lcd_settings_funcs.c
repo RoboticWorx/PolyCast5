@@ -2,6 +2,7 @@
 #include "freertos/projdefs.h"
 
 #include "nvs.h"
+#include "esp_system.h"
 #include "esp_log.h"
 #include "esp_err.h"
 
@@ -9,6 +10,7 @@
 #include "core/lv_obj_pos.h"
 #include "core/lv_obj.h"
 #include "misc/lv_area.h"
+#include "nvs_flash.h"
 #include "widgets/label/lv_label.h"
 
 #include "lcd_utils.h"
@@ -21,8 +23,8 @@
 #define COLOR_OPTION_COUNT 5
 
 settings_menu_t settings_menu = {
-    .options = {"Set unlock pin", "Change colors"},
-    .size = 2,
+    .options = {"Set unlock pin", "Change colors", "Adjust sleep timer", "Adjust haptics", "Reboot", "Factory reset"},
+    .size = 6,
     .index = 0,
     .cont = NULL,
 };
@@ -439,11 +441,9 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 		// Show settings list
 		lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
-		// Show top and bottom arrows
+		// Show arrows
 		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-		
-		// Show right
 		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Switch pages
@@ -473,6 +473,93 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 		
 		// Reset statics
 		lbl_ins = lbl_arr = old_color_box = new_color_box = NULL;
+		do_once = false;
+		
+		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+	}
+}
+
+void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
+{
+	// Statics
+	static bool do_once = false;
+	
+	static lv_obj_t *lbl_ins;
+	static lv_obj_t *lbl_note;
+	
+	// Only execute once
+	if (!do_once) {
+		lbl_ins = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_ins, "Press select to factory reset.", user_secondary_color,
+        			 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 18);
+        			 
+        lbl_note = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_note, "NOTE: This will erase\n        all user data!", user_secondary_color,
+        			 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+
+		do_once = true;
+	}
+	
+	if (ui_btns->select_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_note);
+		
+		// Reset statics
+		lbl_ins = lbl_note = NULL;
+		do_once = false;
+		
+		// Confirmation text
+		lv_obj_t *lbl_rst = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_rst, "Resetting...", user_secondary_color,
+				 &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 0);
+		lv_timer_handler();
+		vTaskDelay(pdMS_TO_TICKS(1000));
+		
+		ESP_ERROR_CHECK(nvs_flash_erase()); // Factory reset
+		esp_restart();
+	}
+	// Back selected
+	else if (ui_btns->left_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_note);
+		
+		// Reset statics
+		lbl_ins = lbl_note = NULL;
+		do_once = false;
+		
+		// Show settings list
+		lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = SETTINGS_PAGE;
+	}
+	// Home selected
+	else if (ui_btns->home_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_note);
+		
+		// Reset statics
+		lbl_ins = lbl_note = NULL;
+		do_once = false;
+		
+		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+	}
+	// Power off selected
+	else if (ui_btns->pwr_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_note);
+		
+		// Reset statics
+		lbl_ins = lbl_note = NULL;
 		do_once = false;
 		
 		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep

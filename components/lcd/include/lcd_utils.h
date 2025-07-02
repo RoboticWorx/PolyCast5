@@ -51,6 +51,7 @@
 
 #define SETTINGS_COLORS_PAGE 28
 #define SETTINGS_COLORS_SEL_PAGE 29
+#define SETTINGS_FACTORY_RST_PAGE 30
 
 #define ACTIVE_SCR (lv_scr_act())
 

@@ -285,6 +285,9 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == SETTINGS_COLORS_SEL_PAGE) {
 				lcd_settings_colors_sel_page(&ui_btns, &ui_menu, &settings_menu);
 			}
+			else if (ui_menu.page == SETTINGS_FACTORY_RST_PAGE) {
+				lcd_settings_factory_rst_page(&ui_btns, &ui_menu, &settings_menu);
+			}
 		}
 		
 		// Sleep condition

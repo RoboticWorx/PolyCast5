@@ -56,6 +56,15 @@ void lcd_settings_colors_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_m
 void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
 
 /**
+ * @brief Executes factory reset page
+ *
+ * @param [in] ui_btns User input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] settings_menu Settings menu structure
+ */
+void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
+
+/**
  * @brief Saves the current primary and secondary colors to NVS
  *
  * @param [in] new_color_idx Selected color index
