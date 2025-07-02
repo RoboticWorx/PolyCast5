@@ -32,8 +32,6 @@ tools_menu_t tools_menu = {
     .cont = NULL,
 };
 
-// unit converter dbm <-> mW, ft <-> cm, dbm <-> mW, dbm <-> mW, 
-
 void lcd_tools_setup_page(tools_menu_t *menu)
 {
 	// Create list
@@ -454,7 +452,7 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
         // Create a style for dice boxes
         lv_style_reset(&style_dice); // Reset
 		lv_style_init(&style_dice); // Init
-	
+		
 		lv_style_set_radius(&style_dice, 8);
 		lv_style_set_bg_color(&style_dice, user_primary_color);
 		lv_style_set_border_width(&style_dice, 2);

@@ -8,6 +8,7 @@
 #include "lcd_espnow_funcs.h"
 #include "lcd_wifi_funcs.h"
 #include "lcd_tools_funcs.h"
+#include "lcd_settings_funcs.h"
 
 #include "gpio_funcs.h"
 
@@ -205,8 +206,9 @@ void lcd_home_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns);
  * @param [in] espnow_menu ESP-NOW menu structure
  * @param [in] wifi_menu Wi-Fi menu structure
  * @param [in] tools_menu Tools menu structure
+  @param [in] settings_menu Settings menu structure
  */
-void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu, wifi_menu_t* wifi_menu, tools_menu_t* tools_menu);
+void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu, wifi_menu_t* wifi_menu, tools_menu_t* tools_menu, settings_menu_t* settings_menu);
 
 /**
  * @brief Executes on infrared page
@@ -252,6 +254,15 @@ void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_
  * @param [in] tools_menu Tools menu structure
  */
 void lcd_tools_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu);
+
+/**
+ * @brief Executes on settings page
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] settings_menu Settings menu structure
+ */
+void lcd_settings_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
 
 
 #endif /* LCD_FUNCS_H */

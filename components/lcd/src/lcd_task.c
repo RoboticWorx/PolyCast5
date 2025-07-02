@@ -112,6 +112,8 @@ static void lcd_task(void *pvParameters)
 	
 	lcd_tools_setup_page(&tools_menu);
 	
+	lcd_settings_setup_page(&settings_menu);
+	
 	
 	#ifdef POLYCAST5_ESPNOW_DUMP_NVS
 		lcd_espnow_dump_nvs();
@@ -197,7 +199,7 @@ static void lcd_task(void *pvParameters)
 				lcd_home_page_selected(&ui_menu, &ui_btns);
 			} 
 			else if (ui_menu.page == SELECTION_PAGE) {
-				lcd_selection_page_selected(&ui_menu, &ui_btns, &ir_menu, &lora_menu, &espnow_menu, &wifi_menu, &tools_menu);
+				lcd_selection_page_selected(&ui_menu, &ui_btns, &ir_menu, &lora_menu, &espnow_menu, &wifi_menu, &tools_menu, &settings_menu);
 			}
 			// IR remotes page
 			else if (ui_menu.page == INFRARED_PAGE) {
@@ -272,6 +274,10 @@ static void lcd_task(void *pvParameters)
 			}
 			else if (ui_menu.page == TOOLS_DICE_PAGE) {
 				lcd_tools_dice_page(&ui_btns, &ui_menu, &tools_menu);
+			}
+			// Settings page
+			else if (ui_menu.page == SETTINGS_PAGE) {
+				lcd_settings_page_selected(&ui_btns, &ui_menu, &settings_menu);
 			}
 		}
 		
