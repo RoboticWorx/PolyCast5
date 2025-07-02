@@ -47,7 +47,7 @@ lv_color_t user_secondary_color = LV_COLOR_MAKE(0xFF, 0xFF, 0xFF);
 
 static void lcd_task(void *pvParameters)
 {
-	user_primary_color = lv_color_hex(0x00008B);
+	lcd_settings_color_nvs_load(); // Load user colors from NVS
 	
 	// No scrollbar
 	lv_obj_set_scrollbar_mode(ACTIVE_SCR, LV_SCROLLBAR_MODE_OFF);
@@ -278,6 +278,12 @@ static void lcd_task(void *pvParameters)
 			// Settings page
 			else if (ui_menu.page == SETTINGS_PAGE) {
 				lcd_settings_page_selected(&ui_btns, &ui_menu, &settings_menu);
+			}
+			else if (ui_menu.page == SETTINGS_COLORS_PAGE) {
+				lcd_settings_colors_page(&ui_btns, &ui_menu, &settings_menu);
+			}
+			else if (ui_menu.page == SETTINGS_COLORS_SEL_PAGE) {
+				lcd_settings_colors_sel_page(&ui_btns, &ui_menu, &settings_menu);
 			}
 		}
 		

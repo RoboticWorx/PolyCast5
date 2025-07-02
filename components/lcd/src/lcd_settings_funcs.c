@@ -1,16 +1,24 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
 
+#include "nvs.h"
+#include "esp_log.h"
+#include "esp_err.h"
+
 #include "font/lv_symbol_def.h"
 #include "core/lv_obj_pos.h"
 #include "core/lv_obj.h"
 #include "misc/lv_area.h"
 #include "widgets/label/lv_label.h"
 
-#include "esp_log.h"
-#include "esp_err.h"
-
 #include "lcd_utils.h"
+#include "lcd_settings_funcs.h"
+
+#define SETTINGS_COLOR_NS "se_co_ns" // NVS namespace
+#define SETTINGS_COLOR_PRIM_KEY "se_pr_ke"
+#define SETTINGS_COLOR_SEC_KEY "se_se_ke"
+
+#define COLOR_OPTION_COUNT 5
 
 settings_menu_t settings_menu = {
     .options = {"Set unlock pin", "Change colors"},
@@ -18,6 +26,23 @@ settings_menu_t settings_menu = {
     .index = 0,
     .cont = NULL,
 };
+
+static const lv_color_t primary_color_options[COLOR_OPTION_COUNT] = {
+    LV_COLOR_MAKE(0x8B, 0x00, 0x00),
+    LV_COLOR_MAKE(0x00, 0x8B, 0x00),
+    LV_COLOR_MAKE(0x00, 0x00, 0x8B),
+    LV_COLOR_MAKE(0x00, 0x00, 0x00),
+    LV_COLOR_MAKE(0xFF, 0xFF, 0xFF),
+};
+static const lv_color_t secondary_color_options[COLOR_OPTION_COUNT] = {
+	LV_COLOR_MAKE(0x00, 0x00, 0x00),
+    LV_COLOR_MAKE(0xFF, 0xFF, 0xFF),
+    LV_COLOR_MAKE(0x8B, 0x00, 0x00),
+	LV_COLOR_MAKE(0x00, 0x8B, 0x00),
+	LV_COLOR_MAKE(0x00, 0x00, 0x8B),
+};
+
+static bool primary_color_selected = true;
 
 void lcd_settings_setup_page(settings_menu_t *menu)
 {
@@ -134,3 +159,368 @@ void lcd_settings_update_menu(settings_menu_t *menu)
     // Enable scrolling if list gets too long
     lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
 }
+
+void lcd_settings_colors_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
+{
+	#define X_COL_POS 53
+	
+	// Statics
+	static bool do_once = false;
+	
+	static lv_obj_t *lbl_ins;
+	static lv_obj_t *lbl_primary;
+	static lv_obj_t *lbl_secondary;
+	static lv_obj_t *lbl_selected;
+	static lv_obj_t *primary_color_box;
+	static lv_obj_t *secondary_color_box;
+	
+	// Only execute once
+	if (!do_once) {	
+		primary_color_selected = true;
+			
+		lbl_ins = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_ins, "Select a color to change:", user_secondary_color,
+        			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
+
+        // Border color for contrast			 
+        lv_color_t darker_user_primary_color = lv_color_darken(user_primary_color, 100); // % darker 
+        			 
+        // Create color boxes to show the change
+	    primary_color_box = lv_obj_create(ACTIVE_SCR);
+	    lv_obj_set_size(primary_color_box,  100,  80);
+	    lv_obj_align(primary_color_box, LV_ALIGN_CENTER, -X_COL_POS,  10);
+	    lv_obj_set_style_bg_color(primary_color_box, user_primary_color, LV_PART_MAIN);
+	    lv_obj_set_style_bg_opa(primary_color_box, LV_OPA_COVER, LV_PART_MAIN);
+	    lv_obj_set_style_border_width(primary_color_box, 3, LV_PART_MAIN);
+	    lv_obj_set_style_border_color(primary_color_box, darker_user_primary_color, LV_PART_MAIN);
+	    
+	    secondary_color_box = lv_obj_create(ACTIVE_SCR);
+	    lv_obj_set_size(secondary_color_box,  100,  80);
+	    lv_obj_align(secondary_color_box, LV_ALIGN_CENTER, X_COL_POS,  10);
+	    lv_obj_set_style_bg_color(secondary_color_box, user_secondary_color, LV_PART_MAIN);
+	    lv_obj_set_style_bg_opa(secondary_color_box, LV_OPA_COVER, LV_PART_MAIN);
+	    lv_obj_set_style_border_width(secondary_color_box, 3, LV_PART_MAIN);
+	    lv_obj_set_style_border_color(secondary_color_box, darker_user_primary_color, LV_PART_MAIN);
+	    
+	    // Text labels
+	    lbl_primary = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_primary, "Primary", user_secondary_color,
+        			 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, -X_COL_POS, 43);
+        			 
+        lbl_secondary = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_secondary, "Secondary", user_primary_color,
+        			 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, X_COL_POS, 43);
+        			 
+        lbl_selected = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_selected, LV_SYMBOL_CLOSE, user_secondary_color,
+        			 &lv_font_montserrat_30, LV_ALIGN_CENTER, -X_COL_POS, 18);
+		
+		do_once = true;
+	}
+	
+	// Select a color
+	if (ui_btns->select_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_primary);
+		lv_obj_delete(lbl_secondary);
+		lv_obj_delete(lbl_selected);
+		lv_obj_delete(primary_color_box);
+		lv_obj_delete(secondary_color_box);
+		
+		// Reset statics
+		lbl_ins = primary_color_box = secondary_color_box = lbl_primary = lbl_secondary = lbl_selected = NULL;
+		do_once = false;
+		
+		// Show top and bottom arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Hide right
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = SETTINGS_COLORS_SEL_PAGE;
+	}
+	// Switch selected right
+	else if (ui_btns->right_btn == 1) {	
+		// Move selected from primary to secondary
+		if (primary_color_selected) {
+			lv_obj_set_x(lbl_selected, X_COL_POS);
+			lv_obj_set_style_text_color(lbl_selected, user_primary_color, 0);
+		}
+		else { // Secondary to primary
+			lv_obj_set_x(lbl_selected, -X_COL_POS);
+			lv_obj_set_style_text_color(lbl_selected, user_secondary_color, 0);
+		}
+		primary_color_selected = !primary_color_selected;
+	}
+	// Switch selected left
+	else if (ui_btns->left_btn == 1 && !primary_color_selected) {	
+		lv_obj_set_x(lbl_selected, -X_COL_POS);
+		lv_obj_set_style_text_color(lbl_selected, user_secondary_color, 0);
+		primary_color_selected = !primary_color_selected;
+	}
+	// Back selected
+	else if (ui_btns->left_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_primary);
+		lv_obj_delete(lbl_secondary);
+		lv_obj_delete(lbl_selected);
+		lv_obj_delete(primary_color_box);
+		lv_obj_delete(secondary_color_box);
+		
+		// Reset statics
+		lbl_ins = primary_color_box = secondary_color_box = lbl_primary = lbl_secondary = lbl_selected = NULL;
+		do_once = false;
+		
+		// Show settings list
+		lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show top and bottom arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = SETTINGS_PAGE;
+	}
+	// Home selected
+	else if (ui_btns->home_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_primary);
+		lv_obj_delete(lbl_secondary);
+		lv_obj_delete(primary_color_box);
+		lv_obj_delete(secondary_color_box);
+		
+		// Reset statics
+		lbl_ins = primary_color_box = secondary_color_box = lbl_primary = lbl_secondary = NULL;
+		do_once = false;
+		
+		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+	}
+	// Power off selected
+	else if (ui_btns->pwr_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_primary);
+		lv_obj_delete(lbl_secondary);
+		lv_obj_delete(primary_color_box);
+		lv_obj_delete(secondary_color_box);
+		
+		// Reset statics
+		lbl_ins = primary_color_box = secondary_color_box = lbl_primary = lbl_secondary = NULL;
+		do_once = false;
+		
+		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+	}
+}
+
+void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
+{
+	#define X_SEL_POS 62
+	
+	// Statics
+	static bool do_once = false;
+	static uint8_t new_color_idx = 0;
+	
+	static lv_obj_t *lbl_ins;
+	static lv_obj_t *lbl_arr;
+	static lv_obj_t *old_color_box;
+	static lv_obj_t *new_color_box;
+	
+	// Only execute once
+	if (!do_once) {
+		new_color_idx = 0;
+			    
+		lbl_ins = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_ins, "Use up/down to adjust.", user_secondary_color,
+        			 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 18);
+        			 
+		lbl_arr = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_arr, LV_SYMBOL_MINUS LV_SYMBOL_RIGHT, user_secondary_color,
+        			 &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 10);
+        
+        // Border color for contrast			 
+        lv_color_t darker_user_primary_color = lv_color_darken(user_primary_color, 100); // % darker 
+        
+        // Create color boxes to show the change
+	    old_color_box = lv_obj_create(ACTIVE_SCR);
+	    lv_obj_set_size(old_color_box,  60,  60);
+	    lv_obj_align(old_color_box, LV_ALIGN_CENTER, -X_SEL_POS,  10);
+	    lv_obj_set_style_bg_opa(old_color_box, LV_OPA_COVER, LV_PART_MAIN);
+	    lv_obj_set_style_border_width(old_color_box, 3, LV_PART_MAIN);
+	    
+		if (primary_color_selected) {
+			lv_obj_set_style_bg_color(old_color_box, user_primary_color, LV_PART_MAIN);
+	    	lv_obj_set_style_border_color(old_color_box, darker_user_primary_color, LV_PART_MAIN);
+		}
+		else {
+			lv_obj_set_style_bg_color(old_color_box, user_secondary_color, LV_PART_MAIN);
+	    	lv_obj_set_style_border_color(old_color_box, darker_user_primary_color, LV_PART_MAIN);
+		}
+
+        // New color
+	    new_color_box = lv_obj_create(ACTIVE_SCR);
+	    lv_obj_set_size(new_color_box,  60,  60);
+	    lv_obj_align(new_color_box, LV_ALIGN_CENTER, X_SEL_POS,  10);
+	    lv_obj_set_style_bg_color(new_color_box, user_secondary_color, LV_PART_MAIN);
+	    lv_obj_set_style_bg_opa(new_color_box, LV_OPA_COVER, LV_PART_MAIN);
+	    lv_obj_set_style_border_width(new_color_box, 3, LV_PART_MAIN);
+	    lv_obj_set_style_border_color(new_color_box, user_secondary_color, LV_PART_MAIN);
+	    
+        lv_color_t c = primary_color_selected ? primary_color_options[new_color_idx] : secondary_color_options[new_color_idx];
+        lv_obj_set_style_bg_color(new_color_box, c, LV_PART_MAIN);
+        lv_obj_set_style_border_color(new_color_box, c, LV_PART_MAIN);
+
+		do_once = true;
+	}
+	
+	// Increment new color up
+	if (ui_btns->up_btn == 1) {
+		// Increment with wrap
+		new_color_idx = (new_color_idx + 1) % COLOR_OPTION_COUNT;
+		
+		// Assign to index of selected
+        lv_color_t c = primary_color_selected ? primary_color_options[new_color_idx] : secondary_color_options[new_color_idx];
+        // Show
+        lv_obj_set_style_bg_color(new_color_box, c, LV_PART_MAIN);
+        lv_obj_set_style_border_color(new_color_box, c, LV_PART_MAIN);
+	}
+	// Decrement new color down
+	else if (ui_btns->down_btn == 1) {
+		// Decrement with wrap
+		new_color_idx = (new_color_idx + 1) % COLOR_OPTION_COUNT;
+		
+		// Assign to index of selected
+        lv_color_t c = primary_color_selected ? primary_color_options[new_color_idx] : secondary_color_options[new_color_idx];
+        // Show
+        lv_obj_set_style_bg_color(new_color_box, c, LV_PART_MAIN);
+        lv_obj_set_style_border_color(new_color_box, c, LV_PART_MAIN);
+	}
+	// Confirm new color
+	else if (ui_btns->select_btn == 1) {
+		lv_color_t c = primary_color_selected ? primary_color_options[new_color_idx] : secondary_color_options[new_color_idx];
+		if (primary_color_selected) {
+			user_primary_color = c;
+		}
+		else {
+			user_secondary_color = c;
+		}
+		lcd_settings_color_nvs_save(new_color_idx, primary_color_selected);
+		
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_arr);
+		lv_obj_delete(old_color_box);
+		lv_obj_delete(new_color_box);
+		
+		// Confirmation text
+		lv_obj_t *lbl_rst = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_rst, "Reloading with\nnew color...", user_secondary_color,
+				 &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
+		lv_timer_handler();
+		vTaskDelay(pdMS_TO_TICKS(1500));
+		esp_restart();
+	}
+	// Back selected
+	else if (ui_btns->left_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_arr);
+		lv_obj_delete(old_color_box);
+		lv_obj_delete(new_color_box);
+		
+		// Reset statics
+		lbl_ins = lbl_arr = old_color_box = new_color_box = NULL;
+		do_once = false;
+		
+		// Show settings list
+		lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show top and bottom arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show right
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = SETTINGS_PAGE;
+	}
+	// Home selected
+	else if (ui_btns->home_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_arr);
+		lv_obj_delete(old_color_box);
+		lv_obj_delete(new_color_box);
+		
+		// Reset statics
+		lbl_ins = lbl_arr = old_color_box = new_color_box = NULL;
+		do_once = false;
+		
+		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+	}
+	// Power off selected
+	else if (ui_btns->pwr_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_arr);
+		lv_obj_delete(old_color_box);
+		lv_obj_delete(new_color_box);
+		
+		// Reset statics
+		lbl_ins = lbl_arr = old_color_box = new_color_box = NULL;
+		do_once = false;
+		
+		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+	}
+}
+
+void lcd_settings_color_nvs_save(int new_color_idx, bool is_primary)
+{
+    esp_err_t err;
+    nvs_handle_t handle;
+
+    // Open NVS
+    err = nvs_open(SETTINGS_COLOR_NS, NVS_READWRITE, &handle);
+    ESP_ERROR_CHECK(err);
+
+    // Pick a key for primary vs secondary
+    const char *key = is_primary ? SETTINGS_COLOR_PRIM_KEY : SETTINGS_COLOR_SEC_KEY;
+
+    // Store the index
+    err = nvs_set_i32(handle, key, new_color_idx);
+    ESP_ERROR_CHECK(err);
+
+    //Commit & close
+    err = nvs_commit(handle);
+    ESP_ERROR_CHECK(err);
+    nvs_close(handle);
+}
+
+void lcd_settings_color_nvs_load(void)
+{
+    esp_err_t err;
+    nvs_handle_t handle;
+
+	// Open NVS
+    err = nvs_open(SETTINGS_COLOR_NS, NVS_READONLY, &handle);
+    if(err == ESP_OK) {
+        int32_t idx;
+        // Get primary color
+        if(nvs_get_i32(handle, SETTINGS_COLOR_PRIM_KEY, &idx) == ESP_OK) {
+            user_primary_color = primary_color_options[idx];
+        }
+        
+        // Get secondary color
+        if(nvs_get_i32(handle, SETTINGS_COLOR_SEC_KEY, &idx) == ESP_OK) {
+            user_secondary_color = secondary_color_options[idx];
+        }
+        nvs_close(handle);
+    }
+}
+
+

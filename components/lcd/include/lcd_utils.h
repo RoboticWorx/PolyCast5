@@ -49,6 +49,9 @@
 #define TOOLS_DOCS_PAGE 26
 #define TOOLS_DICE_PAGE 27
 
+#define SETTINGS_COLORS_PAGE 28
+#define SETTINGS_COLORS_SEL_PAGE 29
+
 #define ACTIVE_SCR (lv_scr_act())
 
 extern lv_color_t user_primary_color;

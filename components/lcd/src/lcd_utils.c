@@ -1483,6 +1483,21 @@ void lcd_settings_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings
 		settings_menu->index++;
 		lcd_settings_update_menu(settings_menu);
 	}
+	// Change colors selected
+	else if (ui_btns->select_btn == 1 && settings_menu->index == 1) {
+		// Hide settings menu
+		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		// Hide top and bottom arrows
+		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = SETTINGS_COLORS_PAGE;
+	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {
 		// Hide settings menu
