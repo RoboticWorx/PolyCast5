@@ -91,7 +91,7 @@ static void gpio_task(void *arg)
 	gpio_write_output(0, 0); // Red LED
 	gpio_write_output(1, 0); // Green LED
 	gpio_write_output(2, 0); // Blue LED
-	gpio_write_output(3, 1); // 3V enable
+	gpio_write_output(3, 0); // 3V enable
 	gpio_write_output(4, 0); // NA
 	gpio_write_output(5, 0); // NA
 	gpio_write_output(6, 0); // NA

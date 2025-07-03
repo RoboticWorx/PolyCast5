@@ -274,11 +274,11 @@ void lcd_init_driver(void)
 
     // Hardware 270° rotation (90° CCW)
     spi_master_write_command(&tft, 0x36); // MADCTL
-    spi_master_write_data_byte(&tft, 0xA0); // MY=1, MV=1: 0xA0 for 270deg, 0xC0 for 180deg, 0x60 for 90deg
+    spi_master_write_data_byte(&tft, 0x60); // MY=1, MV=1: 0xA0 for 270deg, 0xC0 for 180deg, 0x60 for 90deg
 
     // Restore portrait offsets
     tft._offsetx = 40;
-    tft._offsety = 52; // 52 if 270 
+    tft._offsety = 53; // 52 if 270 | 53 if 90
 }
 
 static void lv_tick_cb(void *arg)

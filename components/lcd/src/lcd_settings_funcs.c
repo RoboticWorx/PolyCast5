@@ -494,7 +494,7 @@ void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
         			 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 18);
         			 
         lbl_note = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_note, "NOTE: This will erase\n        all user data!", user_secondary_color,
+		lcd_format_label(lbl_note, "NOTE: This will erase\n       all user data!", user_secondary_color,
         			 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
 
 		do_once = true;

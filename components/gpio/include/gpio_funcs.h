@@ -8,20 +8,20 @@
 #define SPI_MISO_PIN 2 // MISO for SX126x
 #define SPI_MOSI_PIN 7 // SPI2 MOSI
 #define SPI_SCLK_PIN 6 // SPI2 SCLK
-#define ST7789_CS_PIN 11 // CS
-#define ST7789_DC_PIN 25 // D/C
-#define ST7789_RST_PIN 26 // RESET
-#define ST7789_LEDK_PIN 10 // Backlight
+#define ST7789_CS_PIN 1 // CS
+#define ST7789_DC_PIN 8 // D/C
+#define ST7789_RST_PIN 9 // RESET
+#define ST7789_LEDK_PIN 3 // Backlight
 
-#define USER_BUTTON_LEFT 1
-#define USER_BUTTON_UP 0
-#define USER_BUTTON_RIGHT 2
-#define USER_BUTTON_HOME 3
-#define USER_BUTTON_DOWN 4
-#define USER_BUTTON_SELECT 5
-#define USER_BUTTON_POWER 1
+#define USER_BUTTON_LEFT 3
+#define USER_BUTTON_UP 1
+#define USER_BUTTON_RIGHT 5
+#define USER_BUTTON_HOME 2
+#define USER_BUTTON_DOWN 6
+#define USER_BUTTON_SELECT 4
+#define USER_BUTTON_POWER 0
 
-#define HAPTIC_PIN 15 // 15 is NC: placeholder
+#define HAPTIC_PIN 10
 
 /** 
  * @brief Initialise NVS flash
@@ -56,11 +56,9 @@ int gpio_read_input(uint8_t pin);
  */
 esp_err_t gpio_write_output(uint8_t pin, bool level);
 
-#ifdef POLYCAST5_CYCLE_RGB_ON_BOOT
-	/** 
-	 * @brief Cycle through the RGB LED to make sure it is working
-	 */
-	void gpio_cycle_rgb(void);
-#endif
+/** 
+ * @brief Cycle through the RGB LED to make sure it is working
+ */
+void gpio_cycle_rgb(void);
 
 #endif // GPIO_FUNCS_H

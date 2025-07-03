@@ -8,14 +8,6 @@
 #include "gpio_funcs.h"
 #include "gpio_task.h"
 
-#define SPI_MISO_PIN 2 // MISO for SX126x
-#define SPI_MOSI_PIN 7 // SPI2 MOSI
-#define SPI_SCLK_PIN 6 // SPI2 SCLK
-#define ST7789_CS_PIN 11 // CS
-#define ST7789_DC_PIN 25 // D/C
-#define ST7789_RST_PIN 26 // RESET
-#define ST7789_LEDK_PIN 10 // Backlight
-
 static const char *TAG = "GPIO_FUNCS";
 
 static void IRAM_ATTR power_int_isr(void *arg) {
@@ -109,29 +101,29 @@ esp_err_t gpio_init(void)
 	return ret;
 }
 
-#ifdef POLYCAST5_CYCLE_RGB_ON_BOOT
-	void gpio_cycle_rgb(void)
-	{
-		gpio_write_output(0, 1); // Red LED
-		gpio_write_output(1, 0); // Green LED
-		gpio_write_output(2, 0); // Blue LED
-		vTaskDelay(pdMS_TO_TICKS(333));
+
+void gpio_cycle_rgb(void)
+{
+	gpio_write_output(0, 1); // Red LED
+	gpio_write_output(1, 0); // Green LED
+	gpio_write_output(2, 0); // Blue LED
+	vTaskDelay(pdMS_TO_TICKS(333));
 		
-		gpio_write_output(0, 0);
-		gpio_write_output(1, 1);
-		gpio_write_output(2, 0);
-		vTaskDelay(pdMS_TO_TICKS(333));
+	gpio_write_output(0, 0);
+	gpio_write_output(1, 1);
+	gpio_write_output(2, 0);
+	vTaskDelay(pdMS_TO_TICKS(333));
 		
-		gpio_write_output(0, 0);
-		gpio_write_output(1, 0);
-		gpio_write_output(2, 1);
-		vTaskDelay(pdMS_TO_TICKS(333));
+	gpio_write_output(0, 0);
+	gpio_write_output(1, 0);
+	gpio_write_output(2, 1);
+	vTaskDelay(pdMS_TO_TICKS(333));
 		
-		gpio_write_output(0, 0);
-		gpio_write_output(1, 0);
-		gpio_write_output(2, 0);
-	}
-#endif
+	gpio_write_output(0, 0);
+	gpio_write_output(1, 0);
+	gpio_write_output(2, 0);
+}
+
 
 int gpio_read_input(uint8_t pin)
 {

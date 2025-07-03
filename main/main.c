@@ -108,7 +108,7 @@ void app_main(void) {
         return;
     }
 	
-	gpio_set_level(ST7789_LEDK_PIN, 1); // LCD BL high on start
+	gpio_set_level(ST7789_LEDK_PIN, 0); // LCD BL high on start
 	
 	// Initialize the SX126x HAL with the SPI handle
 	sx126x_hal_init(spi_sx126x);
