@@ -19,6 +19,8 @@
 #define ADC_CH ADC_CHANNEL_4
 #define NUM_ADC_SAMPLES 32768
 
+static TimerHandle_t haptic_timer;
+
 static adc_oneshot_unit_handle_t adc1_handle = NULL;
 static adc_cali_handle_t cali_handle = NULL;
 
@@ -55,6 +57,11 @@ void gpio_init_nvs(void)
         ESP_LOGI(TAG, "NVS initialized");
     #endif
     
+}
+
+static void IRAM_ATTR haptic_off_cb(TimerHandle_t xTimer)
+{
+    gpio_set_level(HAPTIC_PIN, 0);
 }
 
 esp_err_t gpio_init(void)
@@ -96,10 +103,17 @@ esp_err_t gpio_init(void)
 	};
 	gpio_config(&io_conf_int);*/
 
+
 	// ISR service
 	gpio_install_isr_service(0);
 	//gpio_isr_handler_add(TCA9535_INT_GPIO, tca9535_int_isr, NULL);	
-		
+	
+	
+	// Create a timer for the haptic motor
+    haptic_timer = xTimerCreate("haptic_off", pdMS_TO_TICKS(10), pdFALSE, NULL, haptic_off_cb);
+    configASSERT(haptic_timer);
+	
+	
 	esp_err_t ret = TCA9535Init();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "TCA9535Init failed: %s", esp_err_to_name(ret));
@@ -276,9 +290,13 @@ uint8_t gpio_volts_to_soc(float voltage)
 
 void gpio_spin_haptic(uint32_t ms)
 {
-	gpio_set_level(HAPTIC_PIN, 1);
-	vTaskDelay(pdMS_TO_TICKS(ms));
-	gpio_set_level(HAPTIC_PIN, 0);
+    gpio_set_level(HAPTIC_PIN, 1); // Haptic ON
+    
+    // Re-arm the timer with the new period
+    xTimerChangePeriod(haptic_timer, pdMS_TO_TICKS(ms), 0);
+    xTimerStart(haptic_timer, 0);
+    
+    // Haptic OFF when timer expires
 }
 
 void gpio_cycle_rgb(void)

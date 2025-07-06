@@ -89,7 +89,7 @@ float gpio_get_battery_voltage(void);
 uint8_t gpio_volts_to_soc(float voltage);
 
 /** 
- * @brief Quickly spin haptic motor for button feedback
+ * @brief Spins the haptic motor for a given duration
  *
  * @param [in] ms Time on in milliseconds
  */
