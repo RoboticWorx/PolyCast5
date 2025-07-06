@@ -17,6 +17,7 @@
 #define REPEAT_NEXT_MS 100
 
 SemaphoreHandle_t xSPIBusMutex;
+SemaphoreHandle_t xI2CBusMutex;
 
 SemaphoreHandle_t xPowerButtonSemaphore;
 
@@ -134,6 +135,15 @@ static void gpio_task(void *arg)
 	        // Set previous
 	        b->prev = level;
 	    }
+	    
+	    if (gpio_read_input(USER_BUTTON_POWER) == 0) {
+			xSemaphoreGive(xPowerButtonSemaphore);
+		}
+	    
+	    // Reset hotkey
+	    if (gpio_read_input(USER_BUTTON_HOME) == 0 && gpio_read_input(USER_BUTTON_RIGHT) == 0) {
+			esp_restart();
+		}
 	
 	    // RGB LED handling
 	    if (xSemaphoreTake(xLedBlueSemaphore, 0) == pdTRUE) {
@@ -150,7 +160,7 @@ static void gpio_task(void *arg)
 	        gpio_write_output(1, 0);
 	        gpio_write_output(2, 0);
 	    }
-	
+		
 	    vTaskDelay(pdMS_TO_TICKS(POLL_MS));
 	}
 }

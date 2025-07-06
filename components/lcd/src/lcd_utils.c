@@ -17,6 +17,7 @@
 #include "esp_log.h"
 
 #include "st7789.h"
+#include "tca9535.h"
 
 #include "lcd_utils.h"
 #include "wifi_funcs.h"
@@ -209,14 +210,14 @@ static void lcd_panel_wake(void)
     spi_master_write_command(&tft, 0x3A); // COLMOD
     spi_master_write_data_byte(&tft, 0x55); // 0x55 = 16-bit
 
-    // Hardware 270° rotation (90° CCW)
+    // Hardware rotation
     spi_master_write_command(&tft, 0x36); // MADCTL
-    spi_master_write_data_byte(&tft, 0xA0); // MY=1, MV=1: 0xA0 for 270deg, 0xC0 for 180deg, 0x60 for 90deg
+    spi_master_write_data_byte(&tft, 0x60); // MY=1, MV=1: 0xA0 for 270deg, 0xC0 for 180deg, 0x60 for 90deg
     
     spi_master_write_command(&tft, 0x21); // INVON  ()
     
     spi_master_write_command(&tft,0x29); // DISPON
-    
+        
     xSemaphoreGive(xSPIBusMutex); // Release SPI bus
 }
 
@@ -226,10 +227,10 @@ void lcd_device_sleep(void)
 	xSemaphoreGive(xWifiDisconnectSemaphore); // Disconnect from Wi-Fi if connected
 	
 	lcd_panel_sleep(); // Put ST7789 to sleep
-	gpio_set_level(ST7789_LEDK_PIN, 0); // BL low
+	gpio_set_level(ST7789_LEDK_PIN, 1); // BL low
 	
-	// Handle case where btn is putting device to sleep: don't auto wake
-	while (gpio_get_level(USER_BUTTON_POWER) != 1) {
+	// Don't auto wake
+	while (gpio_read_input(USER_BUTTON_POWER) != 1) {
 		vTaskDelay(pdMS_TO_TICKS(10));
 		lv_timer_handler();
 	}
@@ -238,6 +239,7 @@ void lcd_device_sleep(void)
 	xSemaphoreTake(xWifiCanSleepSemaphore, pdMS_TO_TICKS(1000));
 
 	xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
+	xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
 
 	#ifdef POLYCAST5_DEBUG
 		ESP_LOGI(TAG, "Entering light sleep");
@@ -246,18 +248,20 @@ void lcd_device_sleep(void)
 	ESP_ERROR_CHECK(esp_light_sleep_start());
 
 	xSemaphoreGive(xSPIBusMutex); // Release SPI bus
+	xSemaphoreGive(xI2CBusMutex); // Release I2C bus
 
 	lcd_panel_wake(); // Wake up ST7789
-	gpio_set_level(ST7789_LEDK_PIN, 1); // BL high
+	gpio_set_level(ST7789_LEDK_PIN, 0); // BL high
 
-	// Handle case where waking from timer: don't auto sleep
-	while (gpio_get_level(USER_BUTTON_POWER) != 1) {
+	// Don't auto sleep
+	while (gpio_read_input(USER_BUTTON_POWER) != 1) {
 		vTaskDelay(pdMS_TO_TICKS(10));
 		lv_timer_handler();
 	}
 
 	xQueueReset(xPowerButtonSemaphore); // Clear xPowerButtonSemaphore
 	go_to_sleep = false; // Clear sleep flag
+	lcd_clear_pending_inputs = true; // Clear if action button pressed to wake
 }
 
 void lcd_init_driver(void)
@@ -269,10 +273,10 @@ void lcd_init_driver(void)
     spi_master_init(&tft, SPI_MOSI_PIN, SPI_SCLK_PIN, ST7789_CS_PIN, ST7789_DC_PIN, ST7789_RST_PIN, ST7789_LEDK_PIN);
     spi_clock_speed(40 * 1000 * 1000);  // 40 MHz
 
-    // ST7789 panel init (nopnop2002 driver)
+    // ST7789 panel init
     lcdInit(&tft, HOR_RES, VER_RES, 0, 0);
 
-    // Hardware 270° rotation (90° CCW)
+    // Hardware rotation
     spi_master_write_command(&tft, 0x36); // MADCTL
     spi_master_write_data_byte(&tft, 0x60); // MY=1, MV=1: 0xA0 for 270deg, 0xC0 for 180deg, 0x60 for 90deg
 

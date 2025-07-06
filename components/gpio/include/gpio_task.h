@@ -8,6 +8,7 @@ extern SemaphoreHandle_t xPowerButtonSemaphore; // Select btn pressed
 
 // Mutex
 extern SemaphoreHandle_t xSPIBusMutex;
+extern SemaphoreHandle_t xI2CBusMutex;
 
 // Regular
 extern SemaphoreHandle_t xUpButtonSemaphore; // Up btn pressed

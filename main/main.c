@@ -13,6 +13,7 @@
 #include "esp_psram.h" // POLYCAST5_DEBUG_RAM
 
 #include "sx126x_hal.h"
+#include "tca9535.h"
 
 #include "lora_task.h"
 #include "lora_funcs.h"
@@ -85,7 +86,7 @@ void app_main(void) {
 	#ifdef POLYCAST5_DEBUG
 		//ESP_ERROR_CHECKesp_sleep_pd_config(ESP_PD_DOMAIN_MAX, ESP_PD_OPTION_ON));
 	#endif
-	ESP_ERROR_CHECK(esp_sleep_enable_ext1_wakeup(1ULL << USER_BUTTON_POWER, ESP_EXT1_WAKEUP_ANY_LOW));
+	ESP_ERROR_CHECK(esp_sleep_enable_ext1_wakeup(1ULL << TCA9535_INT_GPIO, ESP_EXT1_WAKEUP_ANY_LOW));
 
 	// Reference so sleep code is pulled in now
     if (false) {
@@ -99,6 +100,8 @@ void app_main(void) {
 	
 	xSPIBusMutex = xSemaphoreCreateMutex();
 	configASSERT(xSPIBusMutex); // Ensure success
+	xI2CBusMutex = xSemaphoreCreateMutex();
+	configASSERT(xI2CBusMutex);
 	
 	xPowerButtonSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xPowerButtonSemaphore);

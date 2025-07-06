@@ -10,12 +10,6 @@
 
 static const char *TAG = "GPIO_FUNCS";
 
-static void IRAM_ATTR power_int_isr(void *arg) {
-    BaseType_t woken = pdFALSE;
-    xSemaphoreGiveFromISR(xPowerButtonSemaphore, &woken);
-    portYIELD_FROM_ISR(woken);
-}
-
 void gpio_init_nvs(void)
 {
 	// Initialize flash
@@ -61,21 +55,19 @@ esp_err_t gpio_init(void)
 	};
 	gpio_config(&io_conf_in);*/
 	
-	// Configure inputs
-	gpio_config_t io_conf_int = {
+	// Configure interrupts
+	/*gpio_config_t io_conf_int = {
 	    .pin_bit_mask = (1ULL << USER_BUTTON_POWER),
 	    .mode = GPIO_MODE_INPUT,
 	    .intr_type = GPIO_INTR_NEGEDGE,
 	    .pull_up_en = GPIO_PULLUP_DISABLE,
 	    .pull_down_en = GPIO_PULLDOWN_DISABLE,
 	};
-	gpio_config(&io_conf_int);
+	gpio_config(&io_conf_int);*/
 
 	// ISR service
-	gpio_install_isr_service(0);
-	//gpio_isr_handler_add(TCA9535_INT_GPIO, tca9535_int_isr, NULL);
-	gpio_isr_handler_add(USER_BUTTON_POWER, power_int_isr, NULL);
-	
+	//gpio_install_isr_service(0);
+	//gpio_isr_handler_add(TCA9535_INT_GPIO, tca9535_int_isr, NULL);	
 
 	esp_err_t ret = TCA9535Init();
     if (ret != ESP_OK) {
@@ -131,7 +123,11 @@ int gpio_read_input(uint8_t pin)
         ESP_LOGE(TAG, "Invalid input pin %d", pin);
         return -1;
     }
+    
+    xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
     uint8_t inputs = TCA9535ReadSingleRegister(TCA9535_INPUT_REG0);
+    xSemaphoreGive(xI2CBusMutex); // Release I2C bus
+    
     return (inputs >> pin) & 0x1;
 }
 
@@ -141,11 +137,20 @@ esp_err_t gpio_write_output(uint8_t pin, bool level)
         ESP_LOGE(TAG, "Invalid output pin %d", pin);
         return ESP_ERR_INVALID_ARG;
     }
+    
+    xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
     uint8_t out = TCA9535ReadSingleRegister(TCA9535_OUTPUT_REG1);
+    xSemaphoreGive(xI2CBusMutex); // Release I2C bus
+    
     if (level) {
         out |=  (1 << pin);
     } else {
         out &= ~(1 << pin);
     }
-    return TCA9535WriteSingleRegister(TCA9535_OUTPUT_REG1, out);
+    
+    xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
+    esp_err_t err = TCA9535WriteSingleRegister(TCA9535_OUTPUT_REG1, out);
+    xSemaphoreGive(xI2CBusMutex); // Release I2C bus
+    
+    return err;
 }
