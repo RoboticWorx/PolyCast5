@@ -6,6 +6,7 @@
 #include "lcd_task.h"
 #include "gpio_task.h"
 #include "lcd_utils.h"
+#include "widgets/label/lv_label.h"
 
 static const char *TAG = "LCD_TASK";
 
@@ -62,6 +63,7 @@ static void lcd_task(void *pvParameters)
     TickType_t btn_timer_last = xTaskGetTickCount();
 	TickType_t sleep_timer_last = xTaskGetTickCount();
 	
+	uint8_t battery_percentage;
 	
 	//nvs_flash_erase(); // Factory reset
 
@@ -304,6 +306,11 @@ static void lcd_task(void *pvParameters)
 				sleep_timer_last = xTaskGetTickCount();
 			}
 		#endif
+		
+		// Update battery text
+		if (xAdcBatReadingQueue && xQueueReceive(xAdcBatReadingQueue, &battery_percentage, 0) == pdTRUE) {
+			lcd_update_battery(&ui_menu, battery_percentage);
+		}
 
 		lv_timer_handler();
 		vTaskDelay(pdMS_TO_TICKS(10));

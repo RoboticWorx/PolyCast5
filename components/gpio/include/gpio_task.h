@@ -3,14 +3,13 @@
 
 #include "freertos/idf_additions.h"
 
-// ISR semaphores
-extern SemaphoreHandle_t xPowerButtonSemaphore; // Select btn pressed
-
 // Mutex
 extern SemaphoreHandle_t xSPIBusMutex;
 extern SemaphoreHandle_t xI2CBusMutex;
 
 // Regular
+extern SemaphoreHandle_t xPowerButtonSemaphore;
+
 extern SemaphoreHandle_t xUpButtonSemaphore; // Up btn pressed
 extern SemaphoreHandle_t xDownButtonSemaphore; // Down btn pressed
 extern SemaphoreHandle_t xRightButtonSemaphore; // Right btn pressed
@@ -22,6 +21,9 @@ extern SemaphoreHandle_t xLedBlueSemaphore;
 extern SemaphoreHandle_t xLedRedSemaphore;
 extern SemaphoreHandle_t xLedGreenSemaphore;
 extern SemaphoreHandle_t xLedOffSemaphore;
+
+// Queues
+extern QueueHandle_t xAdcBatReadingQueue;
 
 /**
  * @brief  Create the GPIO expander task.

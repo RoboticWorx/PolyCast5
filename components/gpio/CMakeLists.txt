@@ -13,5 +13,5 @@ idf_component_register(
     	common 
     
     PRIV_REQUIRES
-    	
+    	esp_adc efuse
 )

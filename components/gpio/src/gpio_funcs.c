@@ -1,14 +1,40 @@
+#include "polycast5_macros.h"
+
 #include "nvs_flash.h"
 
 #include "driver/i2c.h"
 #include "esp_log.h"
+#include "esp_adc/adc_oneshot.h"
+#include "esp_adc/adc_cali.h"
+#include "esp_adc/adc_cali_scheme.h"
 
 #include "tca9535.h"
 
 #include "gpio_funcs.h"
 #include "gpio_task.h"
 
-static const char *TAG = "GPIO_FUNCS";
+#define TAG "GPIO_FUNCS"
+
+#define ADC_CH ADC_CHANNEL_4
+#define NUM_ADC_SAMPLES 32768
+
+static adc_oneshot_unit_handle_t adc1_handle = NULL;
+static adc_cali_handle_t cali_handle = NULL;
+
+typedef struct {
+    float volt;
+    uint8_t soc; // State-of-charge (percentage)
+} soc_point_t;
+
+// LiPo voltage and corresponding discharge state based on typical LiPo voltage discharge curve
+static const soc_point_t soc_table[] = { // {V, %}
+    {4.20, 100}, {4.15, 95},  {4.11, 90},  {4.08, 85},  {4.02, 80},
+    {3.98, 75},  {3.95, 70},  {3.91, 65},  {3.87, 60},  {3.85, 55},
+   {3.84, 50}, {3.82, 45}, {3.80, 40}, {3.79, 35}, {3.77, 30},
+   {3.75, 25}, {3.73, 20}, {3.69, 15}, {3.61, 10} ,{3.50, 5},
+   {3.27, 0},
+};
+static const int TABLE_LEN = sizeof(soc_table) / sizeof(soc_table[0]);
 
 void gpio_init_nvs(void)
 {
@@ -68,7 +94,7 @@ esp_err_t gpio_init(void)
 	// ISR service
 	gpio_install_isr_service(0);
 	//gpio_isr_handler_add(TCA9535_INT_GPIO, tca9535_int_isr, NULL);	
-
+	
 	esp_err_t ret = TCA9535Init();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "TCA9535Init failed: %s", esp_err_to_name(ret));
@@ -92,30 +118,6 @@ esp_err_t gpio_init(void)
 	
 	return ret;
 }
-
-
-void gpio_cycle_rgb(void)
-{
-	gpio_write_output(0, 1); // Red LED
-	gpio_write_output(1, 0); // Green LED
-	gpio_write_output(2, 0); // Blue LED
-	vTaskDelay(pdMS_TO_TICKS(333));
-		
-	gpio_write_output(0, 0);
-	gpio_write_output(1, 1);
-	gpio_write_output(2, 0);
-	vTaskDelay(pdMS_TO_TICKS(333));
-		
-	gpio_write_output(0, 0);
-	gpio_write_output(1, 0);
-	gpio_write_output(2, 1);
-	vTaskDelay(pdMS_TO_TICKS(333));
-		
-	gpio_write_output(0, 0);
-	gpio_write_output(1, 0);
-	gpio_write_output(2, 0);
-}
-
 
 int gpio_read_input(uint8_t pin)
 {
@@ -153,4 +155,138 @@ esp_err_t gpio_write_output(uint8_t pin, bool level)
     xSemaphoreGive(xI2CBusMutex); // Release I2C bus
     
     return err;
+}
+
+void gpio_init_battery_adc(void)
+{
+	// Init one-shot ADC
+    adc_oneshot_unit_init_cfg_t unit_cfg = {
+        .unit_id = ADC_UNIT_1,
+        .ulp_mode = ADC_ULP_MODE_DISABLE,
+    };
+    ESP_ERROR_CHECK(adc_oneshot_new_unit(&unit_cfg, &adc1_handle));
+
+	// Configure ADC channel
+    adc_oneshot_chan_cfg_t chan_cfg = {
+        .bitwidth = ADC_BITWIDTH_12,
+        .atten     = ADC_ATTEN_DB_12,
+    };
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CH, &chan_cfg));
+
+	#ifdef POLYCAST5_DEBUG
+    	ESP_LOGI(TAG, "ADC initialized");
+    #endif
+    
+    // Configure curve fitting
+    adc_cali_curve_fitting_config_t cfg = {
+	    .unit_id   = ADC_UNIT_1,
+	    .atten     = ADC_ATTEN_DB_12,
+	    .bitwidth  = ADC_BITWIDTH_12,
+	};
+	ESP_ERROR_CHECK(adc_cali_create_scheme_curve_fitting(&cfg, &cali_handle));
+}
+
+void gpio_deinit_battery_adc(void)
+{
+	// Deinit cali_handle
+	if (cali_handle) {
+	    ESP_ERROR_CHECK(adc_cali_delete_scheme_curve_fitting(cali_handle));
+	    cali_handle = NULL;
+	}
+	
+	// Deinit adc1_handle
+	if (adc1_handle) {
+	    ESP_ERROR_CHECK(adc_oneshot_del_unit(adc1_handle));
+	    adc1_handle = NULL;
+	}
+}
+
+float gpio_get_battery_voltage(void)
+{	
+	uint32_t sum = 0;
+	
+	// Average readings
+	for (int i = 0; i < NUM_ADC_SAMPLES; i++) {
+	    int raw;
+	    ESP_ERROR_CHECK(adc_oneshot_read(adc1_handle, ADC_CH, &raw));
+	    sum += raw;
+	    esp_rom_delay_us(5);
+	}
+	int avg_raw = sum / NUM_ADC_SAMPLES;
+	
+	// Get pin mV
+	int pin_mv;
+	ESP_ERROR_CHECK(adc_cali_raw_to_voltage(cali_handle, avg_raw, &pin_mv));
+	
+	float Vadc = pin_mv / 1000.0f; // Convert to volts
+	
+    //return Vadc;
+    
+    // Undo divider + op amp: Vbat = (Vadc + off) / gain
+    const float R42 = 10000, R43 = 27400;
+    const float R44 = 10000, R45 = 27400;
+    const float R40 =  2200, R41 = 22000;
+    const float Vref = 3.3f * (R41 / (R40+R41));
+    const float gain = (1.0f + R45 / R44) * (R43 / (R42+R43));
+    const float off  = (R45 / R44) * Vref;
+
+    return (Vadc + off)/gain;
+}
+
+uint8_t gpio_volts_to_soc(float voltage)
+{
+	// Clamp at max
+    if (voltage >= soc_table[0].volt) {
+    	return 100;
+    }
+    
+    // Clamp at min
+    if (voltage <= soc_table[TABLE_LEN - 1].volt) {
+		return 0;
+	}
+
+    // Search for where the voltage lives between on soc_table
+    for (int i = 0; i < TABLE_LEN - 1; i++) {
+		// Neighboring high and low voltage
+        float v_hi = soc_table[i].volt;
+        float v_lo = soc_table[i + 1].volt;
+        
+        // If 'voltage' lives between them
+        if (voltage >= v_lo && voltage <= v_hi) {
+			// Get neighboring SoC
+            uint8_t soc_hi = soc_table[i].soc;
+            uint8_t soc_lo = soc_table[i + 1].soc;
+            
+            // Linearly interpolate the value (map)
+            float soc_f = (voltage - v_lo) * (soc_hi - soc_lo) / (v_hi - v_lo) + soc_lo;
+            
+            // Round to nearest % and return
+            return (uint8_t)(soc_f + 0.5f);
+        }
+    }
+
+    // Fallback
+    return 0;
+}
+
+void gpio_cycle_rgb(void)
+{
+	gpio_write_output(0, 1); // Red LED
+	gpio_write_output(1, 0); // Green LED
+	gpio_write_output(2, 0); // Blue LED
+	vTaskDelay(pdMS_TO_TICKS(333));
+		
+	gpio_write_output(0, 0);
+	gpio_write_output(1, 1);
+	gpio_write_output(2, 0);
+	vTaskDelay(pdMS_TO_TICKS(333));
+		
+	gpio_write_output(0, 0);
+	gpio_write_output(1, 0);
+	gpio_write_output(2, 1);
+	vTaskDelay(pdMS_TO_TICKS(333));
+		
+	gpio_write_output(0, 0);
+	gpio_write_output(1, 0);
+	gpio_write_output(2, 0);
 }

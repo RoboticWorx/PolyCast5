@@ -231,7 +231,7 @@ void lcd_device_sleep(void)
 	
 	// Don't auto wake
 	while (gpio_read_input(USER_BUTTON_POWER) != 1) {
-		vTaskDelay(pdMS_TO_TICKS(10));
+		vTaskDelay(pdMS_TO_TICKS(25));
 		lv_timer_handler();
 	}
 	
@@ -255,7 +255,7 @@ void lcd_device_sleep(void)
 
 	// Don't auto sleep
 	while (gpio_read_input(USER_BUTTON_POWER) != 1) {
-		vTaskDelay(pdMS_TO_TICKS(10));
+		vTaskDelay(pdMS_TO_TICKS(25));
 		lv_timer_handler();
 	}
 
@@ -743,12 +743,12 @@ void lcd_init_selection_labels(ui_menu_t *ui_menu)
 					 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
 
 	// Battery icon
-	lv_obj_t *battery_icon_text = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(battery_icon_text, "100", user_secondary_color,
+	ui_menu->lbl_battery_txt = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(ui_menu->lbl_battery_txt, "...", user_secondary_color,
 					 &lv_font_montserrat_14, LV_ALIGN_TOP_RIGHT, -28, 0);
 
-	lv_obj_t *battery_icon = lv_label_create(ACTIVE_SCR); // 3, 2, 1, EMPTY
-	lcd_format_label(battery_icon, LV_SYMBOL_BATTERY_FULL, user_secondary_color,
+	ui_menu->lbl_battery_icon = lv_label_create(ACTIVE_SCR); // 3, 2, 1, EMPTY
+	lcd_format_label(ui_menu->lbl_battery_icon, LV_SYMBOL_BATTERY_FULL, user_secondary_color,
 					 &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
 					 
 	// Hide all for now
@@ -771,6 +771,30 @@ void lcd_clear_user_in()
 	ui_btns.select_btn = 0;
 	ui_btns.home_btn = 0;
 	ui_btns.pwr_btn = 0;
+}
+
+void lcd_update_battery(ui_menu_t *ui_menu, uint8_t battery_percentage)
+{
+	char buf[4]; // 3 + 1 max
+	snprintf(buf, sizeof(buf), "%u", battery_percentage);
+	lv_label_set_text(ui_menu->lbl_battery_txt, buf);
+	
+	// Update icon based on battery level
+	if (battery_percentage >= 80) { // 80-100
+		lv_label_set_text(ui_menu->lbl_battery_icon, LV_SYMBOL_BATTERY_FULL);
+	}
+	else if (battery_percentage >= 60) { // 60-79
+		lv_label_set_text(ui_menu->lbl_battery_icon, LV_SYMBOL_BATTERY_3);
+	}
+	else if (battery_percentage >= 40) { // 40-59
+		lv_label_set_text(ui_menu->lbl_battery_icon, LV_SYMBOL_BATTERY_2);
+	}
+	else if (battery_percentage >= 20) { // 20-39
+		lv_label_set_text(ui_menu->lbl_battery_icon, LV_SYMBOL_BATTERY_1);
+	}
+	else { // 0-19
+		lv_label_set_text(ui_menu->lbl_battery_icon, LV_SYMBOL_BATTERY_EMPTY);
+	}
 }
 
 static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu, wifi_menu_t* wifi_menu, tools_menu_t* tools_menu, settings_menu_t* settings_menu)

@@ -1,10 +1,10 @@
-#include "freertos/projdefs.h"
 #include "polycast5_macros.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-
+#include "freertos/projdefs.h"
 #include "portmacro.h"
+
 #include "esp_log.h"
 
 #include "gpio_task.h"
@@ -32,6 +32,8 @@ SemaphoreHandle_t xLedBlueSemaphore;
 SemaphoreHandle_t xLedRedSemaphore;
 SemaphoreHandle_t xLedGreenSemaphore;
 SemaphoreHandle_t xLedOffSemaphore;
+
+QueueHandle_t xAdcBatReadingQueue;
 
 typedef struct {
     uint8_t pin; // Expander pin number
@@ -65,6 +67,56 @@ static inline void give_button_sem(size_t i)
     xSemaphoreGive(*buttonSemaphores[i]);
 }
 
+static const TickType_t adc_timer_interval = pdMS_TO_TICKS(10000);
+
+static void adc_task(void *arg)
+{
+	// Get battery charge on start
+    gpio_init_battery_adc();
+	float v = gpio_get_battery_voltage();
+	#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Startup voltage: %f", v);
+	#endif
+	gpio_deinit_battery_adc();
+	
+	uint8_t percentage = gpio_volts_to_soc(v);
+	#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Startup percentage: %%%u", percentage);
+	#endif
+	
+	// Send startup value to LCD
+	if (xQueueSend(xAdcBatReadingQueue, &percentage, portMAX_DELAY) != pdPASS) {
+		ESP_LOGE(TAG, "Failed to send xAdcBatReadingQueue: %%%u", percentage);
+	}
+	
+	TickType_t adc_timer_last = xTaskGetTickCount();
+	    
+    while (1) {
+		// Update battery status every adc_timer_interval
+		if (xTaskGetTickCount() - adc_timer_last >= adc_timer_interval) {
+			adc_timer_last = xTaskGetTickCount();
+			
+			gpio_init_battery_adc();
+			float v = gpio_get_battery_voltage();
+			gpio_deinit_battery_adc();
+			
+			uint8_t percentage = gpio_volts_to_soc(v);
+			
+			#ifdef POLYCAST5_DEBUG
+				ESP_LOGI(TAG, "Battery voltage: %f", v);
+				ESP_LOGI(TAG, "Battery percentage: %%%u", percentage);
+			#endif
+			
+			// Send value to LCD
+			if (xQueueSend(xAdcBatReadingQueue, &percentage, portMAX_DELAY) != pdPASS) {
+				ESP_LOGE(TAG, "Failed to send xAdcBatReadingQueue: %%%u", percentage);
+			}
+		}
+		
+		vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+
 static void gpio_task(void *arg)
 {
 	xUpButtonSemaphore = xSemaphoreCreateBinary();
@@ -88,7 +140,10 @@ static void gpio_task(void *arg)
     configASSERT(xLedGreenSemaphore);
     xLedOffSemaphore = xSemaphoreCreateBinary();
     configASSERT(xLedOffSemaphore);
-
+    
+    xAdcBatReadingQueue = xQueueCreate(1, sizeof(uint8_t));
+	configASSERT(xAdcBatReadingQueue);
+    
 	gpio_write_output(0, 0); // Red LED
 	gpio_write_output(1, 0); // Green LED
 	gpio_write_output(2, 0); // Blue LED
@@ -101,6 +156,10 @@ static void gpio_task(void *arg)
 	#ifdef POLYCAST5_CYCLE_RGB_ON_BOOT
 		gpio_cycle_rgb();
 	#endif
+	
+	if (xTaskCreate(adc_task, "adc_task", 1024 * 2, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
+	    ESP_LOGE(TAG, "Failed to start adc_task");
+	}
 	
 	while (1) 
 	{
@@ -161,7 +220,7 @@ static void gpio_task(void *arg)
 	        gpio_write_output(1, 0);
 	        gpio_write_output(2, 0);
 	    }
-		
+	    
 	    vTaskDelay(pdMS_TO_TICKS(POLL_MS));
 	}
 }

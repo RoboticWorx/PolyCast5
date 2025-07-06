@@ -22,6 +22,7 @@
 #define USER_BUTTON_POWER 0
 
 #define HAPTIC_PIN 10
+#define ADC_PIN 5
 
 /** 
  * @brief Initialise NVS flash
@@ -60,5 +61,31 @@ esp_err_t gpio_write_output(uint8_t pin, bool level);
  * @brief Cycle through the RGB LED to make sure it is working
  */
 void gpio_cycle_rgb(void);
+
+/** 
+ * @brief Initalize battery ADC
+ */
+void gpio_init_battery_adc(void);
+
+/** 
+ * @brief De-initalize battery ADC to save power
+ */
+void gpio_deinit_battery_adc(void);
+
+/** 
+ * @brief Get the raw battery voltage with software averaging
+ *
+ * @return The value in volts
+ */
+float gpio_get_battery_voltage(void);
+
+/** 
+ * @brief Convert the raw voltage to a state-of-charge percentage 0-100 based on a typical LiPo discharge curve
+ *
+ * @param [in] voltage The voltage value to convert
+ *
+ * @return The value in percent
+ */
+uint8_t gpio_volts_to_soc(float voltage);
 
 #endif // GPIO_FUNCS_H
