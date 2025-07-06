@@ -11,7 +11,7 @@
 #define ST7789_CS_PIN 1 // CS
 #define ST7789_DC_PIN 8 // D/C
 #define ST7789_RST_PIN 9 // RESET
-#define ST7789_LEDK_PIN 3 // Backlight
+#define ST7789_LEDA_PIN 3 // Backlight
 
 #define USER_BUTTON_LEFT 3
 #define USER_BUTTON_UP 1
@@ -87,5 +87,12 @@ float gpio_get_battery_voltage(void);
  * @return The value in percent
  */
 uint8_t gpio_volts_to_soc(float voltage);
+
+/** 
+ * @brief Quickly spin haptic motor for button feedback
+ *
+ * @param [in] ms Time on in milliseconds
+ */
+void gpio_spin_haptic(uint32_t ms);
 
 #endif // GPIO_FUNCS_H

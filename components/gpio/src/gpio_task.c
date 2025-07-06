@@ -67,7 +67,8 @@ static inline void give_button_sem(size_t i)
     xSemaphoreGive(*buttonSemaphores[i]);
 }
 
-static const TickType_t adc_timer_interval = pdMS_TO_TICKS(10000);
+static const TickType_t adc_timer_interval = pdMS_TO_TICKS(20000); // 20s
+static uint32_t haptic_ms = 15;
 
 static void adc_task(void *arg)
 {
@@ -81,7 +82,7 @@ static void adc_task(void *arg)
 	
 	uint8_t percentage = gpio_volts_to_soc(v);
 	#ifdef POLYCAST5_DEBUG
-		ESP_LOGI(TAG, "Startup percentage: %%%u", percentage);
+		ESP_LOGI(TAG, "Startup percentage: %u%%", percentage);
 	#endif
 	
 	// Send startup value to LCD
@@ -104,12 +105,12 @@ static void adc_task(void *arg)
 			
 			#ifdef POLYCAST5_DEBUG
 				ESP_LOGI(TAG, "Battery voltage: %f", v);
-				ESP_LOGI(TAG, "Battery percentage: %%%u", percentage);
+				ESP_LOGI(TAG, "Battery percentage: %u%%", percentage);
 			#endif
 			
 			// Send value to LCD
 			if (xQueueSend(xAdcBatReadingQueue, &percentage, portMAX_DELAY) != pdPASS) {
-				ESP_LOGE(TAG, "Failed to send xAdcBatReadingQueue: %%%u", percentage);
+				ESP_LOGE(TAG, "Failed to send xAdcBatReadingQueue: %u%%", percentage);
 			}
 		}
 		
@@ -144,14 +145,14 @@ static void gpio_task(void *arg)
     xAdcBatReadingQueue = xQueueCreate(1, sizeof(uint8_t));
 	configASSERT(xAdcBatReadingQueue);
     
-	gpio_write_output(0, 0); // Red LED
-	gpio_write_output(1, 0); // Green LED
-	gpio_write_output(2, 0); // Blue LED
-	gpio_write_output(3, 0); // 3V enable
-	gpio_write_output(4, 0); // NA
-	gpio_write_output(5, 0); // NA
-	gpio_write_output(6, 0); // NA
-	gpio_write_output(7, 0); // NA
+	gpio_write_output(0, 1); // Red LED
+	gpio_write_output(1, 1); // Green LED
+	gpio_write_output(2, 1); // Blue LED
+	gpio_write_output(3, 0); // NC
+	gpio_write_output(4, 0); // NC
+	gpio_write_output(5, 0); // NC
+	gpio_write_output(6, 0); // NC
+	gpio_write_output(7, 0); // NC
 	
 	#ifdef POLYCAST5_CYCLE_RGB_ON_BOOT
 		gpio_cycle_rgb();
@@ -177,6 +178,8 @@ static void gpio_task(void *arg)
 	            if (b->prev == 1) { // New press
 	                give_button_sem(i); // Signal the press
 	                b->ticks = REPEAT_START_MS / POLL_MS;
+	                
+	                gpio_spin_haptic(haptic_ms);
 	            }
 	            else if (b->ticks == 0) { // Time to auto-repeat
 	                give_button_sem(i); // Repeat the press

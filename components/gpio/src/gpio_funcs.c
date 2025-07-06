@@ -1,3 +1,4 @@
+#include "freertos/projdefs.h"
 #include "polycast5_macros.h"
 
 #include "nvs_flash.h"
@@ -60,16 +61,20 @@ esp_err_t gpio_init(void)
 {
 	// Configure outputs
 	gpio_config_t io_conf_out = {
-	    .pin_bit_mask = (1ULL << ST7789_LEDK_PIN) |
+	    .pin_bit_mask = (1ULL << ST7789_LEDA_PIN) |
 	        			(1ULL << ST7789_DC_PIN)   |
-	        			(1ULL << ST7789_RST_PIN),  //|
-	      				//(1ULL << HAPTIC_PIN),
+	        			(1ULL << ST7789_RST_PIN)  |
+	      				(1ULL << HAPTIC_PIN),
 	    .mode = GPIO_MODE_OUTPUT,
 	    .pull_up_en = GPIO_PULLUP_DISABLE,
 	    .pull_down_en = GPIO_PULLDOWN_DISABLE,
 	    .intr_type = GPIO_INTR_DISABLE
 	};
 	gpio_config(&io_conf_out);
+	
+	// Default states
+	gpio_set_level(ST7789_LEDA_PIN, 0); // LCD BL high on start
+	gpio_set_level(HAPTIC_PIN, 0); // Hapic motor low on start
 	
 	// Configure inputs
 	/*gpio_config_t io_conf_in = {
@@ -94,7 +99,7 @@ esp_err_t gpio_init(void)
 	// ISR service
 	gpio_install_isr_service(0);
 	//gpio_isr_handler_add(TCA9535_INT_GPIO, tca9535_int_isr, NULL);	
-	
+		
 	esp_err_t ret = TCA9535Init();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "TCA9535Init failed: %s", esp_err_to_name(ret));
@@ -267,6 +272,13 @@ uint8_t gpio_volts_to_soc(float voltage)
 
     // Fallback
     return 0;
+}
+
+void gpio_spin_haptic(uint32_t ms)
+{
+	gpio_set_level(HAPTIC_PIN, 1);
+	vTaskDelay(pdMS_TO_TICKS(ms));
+	gpio_set_level(HAPTIC_PIN, 0);
 }
 
 void gpio_cycle_rgb(void)

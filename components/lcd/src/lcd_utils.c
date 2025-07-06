@@ -227,7 +227,7 @@ void lcd_device_sleep(void)
 	xSemaphoreGive(xWifiDisconnectSemaphore); // Disconnect from Wi-Fi if connected
 	
 	lcd_panel_sleep(); // Put ST7789 to sleep
-	gpio_set_level(ST7789_LEDK_PIN, 1); // BL low
+	gpio_set_level(ST7789_LEDA_PIN, 1); // BL low
 	
 	// Don't auto wake
 	while (gpio_read_input(USER_BUTTON_POWER) != 1) {
@@ -251,7 +251,7 @@ void lcd_device_sleep(void)
 	xSemaphoreGive(xI2CBusMutex); // Release I2C bus
 
 	lcd_panel_wake(); // Wake up ST7789
-	gpio_set_level(ST7789_LEDK_PIN, 0); // BL high
+	gpio_set_level(ST7789_LEDA_PIN, 0); // BL high
 
 	// Don't auto sleep
 	while (gpio_read_input(USER_BUTTON_POWER) != 1) {
@@ -270,7 +270,7 @@ void lcd_init_driver(void)
     vTaskDelay(pdMS_TO_TICKS(50));
 
     // SPI bus + device init
-    spi_master_init(&tft, SPI_MOSI_PIN, SPI_SCLK_PIN, ST7789_CS_PIN, ST7789_DC_PIN, ST7789_RST_PIN, ST7789_LEDK_PIN);
+    spi_master_init(&tft, SPI_MOSI_PIN, SPI_SCLK_PIN, ST7789_CS_PIN, ST7789_DC_PIN, ST7789_RST_PIN, ST7789_LEDA_PIN);
     spi_clock_speed(40 * 1000 * 1000);  // 40 MHz
 
     // ST7789 panel init
@@ -934,7 +934,7 @@ void lcd_funcs_transition_back(bool home, ui_menu_t *ui_menu)
 		ui_menu->page = HOME_PAGE;
 	}
 	else { // Transition to sleep
-		gpio_set_level(ST7789_LEDK_PIN, 0); // BL low so user doesn't see redraw
+		gpio_set_level(ST7789_LEDA_PIN, 0); // BL low so user doesn't see redraw
 	
 		start_animation();
 
