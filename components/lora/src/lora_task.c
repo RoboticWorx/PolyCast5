@@ -197,7 +197,6 @@ static void lora_task(void *pvParameters) {
 	};
 	gpio_config(&io_conf);
 
-	//gpio_install_isr_service(0);
 	gpio_isr_handler_add(SX126X_DIO1_PIN, dio1_isr_handler, NULL);
 
 	char payload[CYPHERTEXT_LENGTH] = {0}; // Hold data to send

@@ -136,6 +136,7 @@ static void gpio_task(void *arg)
 	        b->prev = level;
 	    }
 	    
+	    // Go to sleep requested
 	    if (gpio_read_input(USER_BUTTON_POWER) == 0) {
 			xSemaphoreGive(xPowerButtonSemaphore);
 		}

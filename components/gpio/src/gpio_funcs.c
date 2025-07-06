@@ -66,7 +66,7 @@ esp_err_t gpio_init(void)
 	gpio_config(&io_conf_int);*/
 
 	// ISR service
-	//gpio_install_isr_service(0);
+	gpio_install_isr_service(0);
 	//gpio_isr_handler_add(TCA9535_INT_GPIO, tca9535_int_isr, NULL);	
 
 	esp_err_t ret = TCA9535Init();
