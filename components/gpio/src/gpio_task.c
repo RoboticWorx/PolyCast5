@@ -20,6 +20,7 @@ SemaphoreHandle_t xSPIBusMutex;
 SemaphoreHandle_t xI2CBusMutex;
 
 SemaphoreHandle_t xPowerButtonSemaphore;
+SemaphoreHandle_t xStartAdcBatSemaphore;
 
 SemaphoreHandle_t xUpButtonSemaphore;
 SemaphoreHandle_t xDownButtonSemaphore;
@@ -68,10 +69,12 @@ static inline void give_button_sem(size_t i)
 }
 
 static const TickType_t adc_timer_interval = pdMS_TO_TICKS(20000); // 20s
-static uint32_t haptic_ms = 15;
+static uint32_t haptic_ms = 20;
 
 static void adc_task(void *arg)
 {
+	static uint8_t last_percentage = 100;
+	
 	// Get battery charge on start
     gpio_init_battery_adc();
 	float v = gpio_get_battery_voltage();
@@ -85,6 +88,8 @@ static void adc_task(void *arg)
 		ESP_LOGI(TAG, "Startup percentage: %u%%", percentage);
 	#endif
 	
+	last_percentage = percentage;
+	
 	// Send startup value to LCD
 	if (xQueueSend(xAdcBatReadingQueue, &percentage, portMAX_DELAY) != pdPASS) {
 		ESP_LOGE(TAG, "Failed to send xAdcBatReadingQueue: %%%u", percentage);
@@ -94,7 +99,7 @@ static void adc_task(void *arg)
 	    
     while (1) {
 		// Update battery status every adc_timer_interval
-		if (xTaskGetTickCount() - adc_timer_last >= adc_timer_interval) {
+		if ((xTaskGetTickCount() - adc_timer_last >= adc_timer_interval) || (xSemaphoreTake(xStartAdcBatSemaphore, 0) == pdTRUE)) {
 			adc_timer_last = xTaskGetTickCount();
 			
 			gpio_init_battery_adc();
@@ -108,13 +113,25 @@ static void adc_task(void *arg)
 				ESP_LOGI(TAG, "Battery percentage: %u%%", percentage);
 			#endif
 			
+			// If fluctuating by one, ignore
+			if (percentage == last_percentage + 1) {
+				percentage = last_percentage;
+			}
+			else {
+				last_percentage = percentage;
+			}
+			
+			#ifdef POLYCAST5_DEBUG
+				ESP_LOGI(TAG, "NEW battery percentage: %u%%", percentage);
+			#endif
+			
 			// Send value to LCD
 			if (xQueueSend(xAdcBatReadingQueue, &percentage, portMAX_DELAY) != pdPASS) {
 				ESP_LOGE(TAG, "Failed to send xAdcBatReadingQueue: %u%%", percentage);
 			}
 		}
 		
-		vTaskDelay(pdMS_TO_TICKS(100));
+		vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
@@ -141,6 +158,9 @@ static void gpio_task(void *arg)
     configASSERT(xLedGreenSemaphore);
     xLedOffSemaphore = xSemaphoreCreateBinary();
     configASSERT(xLedOffSemaphore);
+    
+    xStartAdcBatSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xStartAdcBatSemaphore);
     
     xAdcBatReadingQueue = xQueueCreate(1, sizeof(uint8_t));
 	configASSERT(xAdcBatReadingQueue);
@@ -179,7 +199,10 @@ static void gpio_task(void *arg)
 	                give_button_sem(i); // Signal the press
 	                b->ticks = REPEAT_START_MS / POLL_MS;
 	                
-	                gpio_spin_haptic(haptic_ms);
+	                // If select button
+	                if (i == 5) {
+						gpio_spin_haptic(haptic_ms);
+					}
 	            }
 	            else if (b->ticks == 0) { // Time to auto-repeat
 	                give_button_sem(i); // Repeat the press

@@ -252,6 +252,8 @@ void lcd_device_sleep(void)
 
 	lcd_panel_wake(); // Wake up ST7789
 	gpio_set_level(ST7789_LEDA_PIN, 0); // BL high
+	
+	xSemaphoreGive(xStartAdcBatSemaphore); // Start new battery ADC reading
 
 	// Don't auto sleep
 	while (gpio_read_input(USER_BUTTON_POWER) != 1) {
@@ -259,7 +261,8 @@ void lcd_device_sleep(void)
 		lv_timer_handler();
 	}
 
-	xQueueReset(xPowerButtonSemaphore); // Clear xPowerButtonSemaphore
+	xQueueReset(xPowerButtonSemaphore); // Clear xPowerButtonSemaphore	
+	
 	go_to_sleep = false; // Clear sleep flag
 	lcd_clear_pending_inputs = true; // Clear if action button pressed to wake
 }

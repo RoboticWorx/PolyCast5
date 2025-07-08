@@ -17,7 +17,7 @@
 #define TAG "GPIO_FUNCS"
 
 #define ADC_CH ADC_CHANNEL_4
-#define NUM_ADC_SAMPLES 32768
+#define NUM_ADC_SAMPLES 16384
 
 static TimerHandle_t haptic_timer;
 

@@ -9,6 +9,7 @@ extern SemaphoreHandle_t xI2CBusMutex;
 
 // Regular
 extern SemaphoreHandle_t xPowerButtonSemaphore;
+extern SemaphoreHandle_t xStartAdcBatSemaphore;
 
 extern SemaphoreHandle_t xUpButtonSemaphore; // Up btn pressed
 extern SemaphoreHandle_t xDownButtonSemaphore; // Down btn pressed

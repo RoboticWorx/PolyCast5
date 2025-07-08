@@ -182,6 +182,9 @@ static void lcd_task(void *pvParameters)
 			if (xPowerButtonSemaphore && xSemaphoreTake(xPowerButtonSemaphore, 0) == pdTRUE) {
 				ui_btns.pwr_btn = 1;
 				
+				lv_label_set_text(ui_menu.lbl_battery_txt, "..."); // Start with dots until battery updated
+				lv_timer_handler();
+				
 				go_to_sleep = true;
 			}
 			else {
