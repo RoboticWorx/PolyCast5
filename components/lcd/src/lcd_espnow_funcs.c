@@ -1153,11 +1153,14 @@ void lcd_espnow_option_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, 
         // enc = true if no LMK
         espnow_cmd.enc = memcmp(espnow_menu->lmk[espnow_menu->index], (uint8_t[LMK_LEN]){0}, LMK_LEN) != 0;
         // If enc, copy LMK
-		if (espnow_cmd.enc)
+		if (espnow_cmd.enc) {
 			memcpy(espnow_cmd.lmk, espnow_menu->lmk[espnow_menu->index], LMK_LEN);
+		}
 
         // Send it to ESP-NOW task
         xQueueSend(xEspSendCmdQueue, &espnow_cmd, portMAX_DELAY);
+        
+        lcd_clear_pending_inputs = true; // Would sometimes get "ghost" up press
 	}
 	// Exit
 	else if (ui_btns->left_btn == 1) {
