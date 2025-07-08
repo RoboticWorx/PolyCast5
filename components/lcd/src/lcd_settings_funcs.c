@@ -23,7 +23,7 @@
 #define COLOR_OPTION_COUNT 5
 
 settings_menu_t settings_menu = {
-    .options = {"Set unlock pin", "Change colors", "Adjust sleep timer", "Adjust haptics", "Reboot", "Factory reset"},
+    .options = {"Set unlock pin", "Change colors", "Adjust haptics", "Adjust sleep timer", "Reboot", "Factory reset"},
     .size = 6,
     .index = 0,
     .cont = NULL,

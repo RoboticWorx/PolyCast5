@@ -391,10 +391,11 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 	#define BUF_SIZE 4
 	#define NUM_IMGS 6
 	#define ANIM_DELAY 30
+	#define DICE_SCROLL_DIS 40
 	
 	// Statics
 	static bool do_once = false;
-	static bool dice_sel = true;
+	static uint8_t user_idx = 0;
 	static uint8_t dice = 1;
 	static uint8_t sides = 6;
 	
@@ -407,11 +408,16 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 	static lv_obj_t *lbl_result;
 	static lv_obj_t *img_dice;
 	
+	static lv_obj_t *cont_roll_log;
+	static lv_obj_t *lbl_roll_log;
+	static char roll_log_buf[2048];
+	
 	static lv_style_t style_dice;
 	
 	// Only execute once
 	if (!do_once) {
-		dice_sel = true;
+		user_idx = 0;
+		roll_log_buf[0] = 0; // Write null terminator into first element
 		
 		// Create dice img
 		img_dice = lv_img_create(ACTIVE_SCR);
@@ -447,7 +453,7 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
         			 
         lbl_result = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_result, "", user_secondary_color,
-        			 &lv_font_montserrat_22, LV_ALIGN_BOTTOM_LEFT, 5, -14);		 
+        			 &lv_font_montserrat_22, LV_ALIGN_BOTTOM_LEFT, 15, -14);		 
         
         // Create a style for dice boxes
         lv_style_reset(&style_dice); // Reset
@@ -468,6 +474,29 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		lv_obj_add_style(lbl_sides, &style_dice, 0);
 		lv_obj_add_style(lbl_dice, &style_dice, 0);
 		
+		// Create a scrollable log container for each roll result
+	    cont_roll_log = lv_obj_create(ACTIVE_SCR);
+	    lv_obj_set_size(cont_roll_log, 210, 106);
+	    lv_obj_set_style_bg_color(cont_roll_log, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+	    lv_obj_align(cont_roll_log, LV_ALIGN_CENTER, 0, 0);
+	    // Format
+	    lv_obj_set_scroll_dir(cont_roll_log, LV_DIR_VER);
+	    lv_obj_set_scrollbar_mode(cont_roll_log, LV_SCROLLBAR_MODE_AUTO);
+	    lv_obj_set_style_pad_top(cont_roll_log, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_pad_bottom(cont_roll_log, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_pad_left(cont_roll_log, 15, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_pad_right(cont_roll_log, 15, LV_PART_MAIN | LV_STATE_DEFAULT);
+	
+	    // Create the history log
+	    lbl_roll_log = lv_label_create(cont_roll_log);
+		lv_obj_set_style_text_font(lbl_roll_log, &lv_font_montserrat_16, 0);
+		lv_obj_set_style_text_color(lbl_roll_log, user_secondary_color, 0); 
+	    lv_label_set_long_mode(lbl_roll_log, LV_LABEL_LONG_WRAP);
+	    lv_obj_set_width(lbl_roll_log, 180);
+	    lv_label_set_text(lbl_roll_log, roll_log_buf);
+	    
+	    lv_obj_add_flag(cont_roll_log, LV_OBJ_FLAG_HIDDEN); // Hide history cont
+		
 		do_once = true;
 	}
 	
@@ -477,7 +506,7 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		bootloader_random_disable();
 		
 		// Animate
-		for (int i = 0; i < (20 + zero_to_five); i++) {
+		for (int i = 0; i < (15 + zero_to_five); i++) {
 			if (i % NUM_IMGS == 0) {
 				lv_img_set_src(img_dice, &img_dice_1);
 			}
@@ -501,12 +530,24 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 			vTaskDelay(pdMS_TO_TICKS(ANIM_DELAY));
 		}
 		
+		roll_log_buf[0] = 0; // Clear log
+		
 		uint16_t total = 0;
 		bootloader_random_enable();
 		for (int i = 0; i < dice; i++) {
 			uint8_t roll = (esp_random() % sides) + 1; // 0 to (sides - 1) -> 1 to sides
 			
 			total += roll;
+			
+			// Combine roll results for log
+			char tmp[12];
+			if (i == dice - 1) { // Last one
+				snprintf(tmp, sizeof(tmp), "%u = %u", roll, total);
+			}
+			else {
+				snprintf(tmp, sizeof(tmp), "%u + ", roll);
+			}
+	        strlcat(roll_log_buf, tmp, sizeof(roll_log_buf));
 		}
 		bootloader_random_disable();
 		
@@ -515,29 +556,44 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		snprintf(buf, sizeof(buf), "= %" PRIu16, total);
 		lv_label_set_text(lbl_result, buf);
 		
+		// Set log text
+		lv_label_set_text(lbl_roll_log, roll_log_buf);
+		
 		lcd_clear_pending_inputs = true; // In case button pressed while looping
 	}
 	// Go right
 	else if (ui_btns->right_btn == 1) {	
 		// If on dice, move to sides
-		if (dice_sel) {
+		if (user_idx == 0) {
 			lv_obj_set_x(lbl_pointer, X_POS);
+			user_idx = 1;
 		}
-		else {
+		else if (user_idx == 1) { // Sides to log
+			lv_obj_remove_flag(cont_roll_log, LV_OBJ_FLAG_HIDDEN);
+			user_idx = 2;
+		}
+		else { // user_idx == 2: Log to dice
+			lv_obj_add_flag(cont_roll_log, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_set_x(lbl_pointer, X_POS - 65);
+			user_idx = 0;
 		}
-		
-		dice_sel = !dice_sel;
 	}
 	// Move left
-	else if (ui_btns->left_btn == 1 && !dice_sel) {	
-		lv_obj_set_x(lbl_pointer, X_POS - 65);
-		
-		dice_sel = !dice_sel;
+	else if (ui_btns->left_btn == 1 && user_idx != 0) {	
+		// If on cont, move to sides
+		if (user_idx == 2) {
+			lv_obj_add_flag(cont_roll_log, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_set_x(lbl_pointer, X_POS);
+			user_idx = 1;
+		}
+		else { // Sides to dice
+			lv_obj_set_x(lbl_pointer, X_POS - 65);
+			user_idx = 0;
+		}
 	}
 	else if (ui_btns->up_btn == 1) {
 		// If on dice
-		if (dice_sel) {
+		if (user_idx == 0) {
 			dice++;
 			
 			// Can't be 0
@@ -550,7 +606,7 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 			snprintf(buf, sizeof(buf), "%u", dice);
 			lv_label_set_text(lbl_num_dice, buf);
 		}
-		else { // If on sides
+		else if (user_idx == 1) { // If on sides
 			sides++;
 			
 			// Can't be 0
@@ -563,10 +619,13 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 			snprintf(buf, sizeof(buf), "%u", sides);
 			lv_label_set_text(lbl_num_sides, buf);
 		}
+		else { // Log
+			lv_obj_scroll_by(cont_roll_log, 0, DICE_SCROLL_DIS, LV_ANIM_ON);
+		}
 	}
 	else if (ui_btns->down_btn == 1) {
 		// If on dice
-		if (dice_sel) {
+		if (user_idx == 0) {
 			dice--;
 			
 			// Can't be 0
@@ -579,7 +638,7 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 			snprintf(buf, sizeof(buf), "%u", dice);
 			lv_label_set_text(lbl_num_dice, buf);
 		}
-		else { // If on sides
+		else if (user_idx == 1) { // If on sides
 			sides--;
 			
 			// Can't be 0
@@ -591,6 +650,9 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 			char buf[BUF_SIZE];
 			snprintf(buf, sizeof(buf), "%u", sides);
 			lv_label_set_text(lbl_num_sides, buf);
+		}
+		else { // Log
+			lv_obj_scroll_by(cont_roll_log, 0, -DICE_SCROLL_DIS, LV_ANIM_ON);
 		}
 	}
 	// Back selected
@@ -604,13 +666,15 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		lv_obj_delete(lbl_pointer);
 		lv_obj_delete(img_dice);
 		lv_obj_delete(lbl_result);
+		lv_obj_delete(lbl_roll_log);
+		lv_obj_delete(cont_roll_log);
 		
 		// Remove styles
 		lv_obj_remove_style_all(lbl_sides);
 		lv_obj_remove_style_all(lbl_dice);
 		
 		// Reset statics
-		lbl_ins = lbl_dice = lbl_sides = lbl_num_dice = lbl_num_sides = lbl_pointer = img_dice = lbl_result = NULL;
+		lbl_ins = lbl_dice = lbl_sides = lbl_num_dice = lbl_num_sides = lbl_pointer = img_dice = lbl_result = lbl_roll_log = cont_roll_log = NULL;
 		do_once = false;
 		
 		// Show tools list
@@ -630,13 +694,15 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		lv_obj_delete(lbl_pointer);
 		lv_obj_delete(img_dice);
 		lv_obj_delete(lbl_result);
+		lv_obj_delete(lbl_roll_log);
+		lv_obj_delete(cont_roll_log);
 		
 		// Remove styles
 		lv_obj_remove_style_all(lbl_sides);
 		lv_obj_remove_style_all(lbl_dice);
 		
 		// Reset statics
-		lbl_ins = lbl_dice = lbl_sides = lbl_num_dice = lbl_num_sides = lbl_pointer = img_dice = lbl_result = NULL;
+		lbl_ins = lbl_dice = lbl_sides = lbl_num_dice = lbl_num_sides = lbl_pointer = img_dice = lbl_result = lbl_roll_log = cont_roll_log = NULL;
 		do_once = false;
 		
 		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
@@ -652,13 +718,15 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		lv_obj_delete(lbl_pointer);
 		lv_obj_delete(img_dice);
 		lv_obj_delete(lbl_result);
+		lv_obj_delete(lbl_roll_log);
+		lv_obj_delete(cont_roll_log);
 		
 		// Remove styles
 		lv_obj_remove_style_all(lbl_sides);
 		lv_obj_remove_style_all(lbl_dice);
 		
 		// Reset statics
-		lbl_ins = lbl_dice = lbl_sides = lbl_num_dice = lbl_num_sides = lbl_pointer = img_dice = lbl_result = NULL;
+		lbl_ins = lbl_dice = lbl_sides = lbl_num_dice = lbl_num_sides = lbl_pointer = img_dice = lbl_result = lbl_roll_log = cont_roll_log = NULL;
 		do_once = false;
 		
 		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
