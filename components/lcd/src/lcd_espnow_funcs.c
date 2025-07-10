@@ -10,7 +10,6 @@
 #include "esp_err.h"
 #include "esp_mac.h"
 #include "esp_random.h"
-#include "bootloader_random.h"
 
 #include "lcd_utils.h"
 #include "lcd_lora_funcs.h"
@@ -174,9 +173,9 @@ static bool display_mac_and_lmk(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 	// Generate ESP-NOW LMK
 	#define OUT_BUF_LEN (16*2 + 15 /*colons*/ + 1 /*newline*/ + 16 /*"Generated key:"*/ + 1 /*'\0'*/)
 	uint8_t lmk[LMK_LEN];
-	bootloader_random_enable();
+	
 	esp_fill_random(lmk, LMK_LEN);
-	bootloader_random_disable();
+	
 	char lmk_str[OUT_BUF_LEN];
 	char *p = lmk_str;
 	int written = snprintf(p, OUT_BUF_LEN, "Generated key:\n");

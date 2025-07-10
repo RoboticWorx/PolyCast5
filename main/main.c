@@ -11,6 +11,7 @@
 #include "esp_log.h"
 #include "esp_sleep.h"
 #include "esp_psram.h" // POLYCAST5_DEBUG_RAM
+#include "esp_random.h"
 
 #include "sx126x_hal.h"
 #include "tca9535.h"
@@ -120,6 +121,10 @@ void app_main(void) {
 	sx126x.hal_wakeup = sx126x_hal_wakeup;
 	sx126x.hal_write = sx126x_hal_write;
 	sx126x.hal_read = sx126x_hal_read;
+	
+	// Seed random number generation XORWOW PRNG core: TRNG at boot
+	uint8_t seed[32];
+    esp_fill_random(seed, sizeof(seed));
 
 	// Create tasks
 	gpio_task_create();

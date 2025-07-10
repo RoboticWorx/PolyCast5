@@ -5,6 +5,7 @@
 #include "freertos/projdefs.h"
 #include "portmacro.h"
 
+#include "hal/adc_hal.h"
 #include "esp_log.h"
 
 #include "gpio_task.h"
@@ -74,7 +75,7 @@ static uint32_t haptic_ms = 20;
 static void adc_task(void *arg)
 {
 	static uint8_t last_percentage = 100;
-	
+		
 	// Get battery charge on start
     gpio_init_battery_adc();
 	float v = gpio_get_battery_voltage();
@@ -82,7 +83,7 @@ static void adc_task(void *arg)
 		ESP_LOGI(TAG, "Startup voltage: %f", v);
 	#endif
 	gpio_deinit_battery_adc();
-	
+		
 	uint8_t percentage = gpio_volts_to_soc(v);
 	#ifdef POLYCAST5_DEBUG
 		ESP_LOGI(TAG, "Startup percentage: %u%%", percentage);
@@ -101,11 +102,11 @@ static void adc_task(void *arg)
 		// Update battery status every adc_timer_interval
 		if ((xTaskGetTickCount() - adc_timer_last >= adc_timer_interval) || (xSemaphoreTake(xStartAdcBatSemaphore, 0) == pdTRUE)) {
 			adc_timer_last = xTaskGetTickCount();
-			
+				
 			gpio_init_battery_adc();
 			float v = gpio_get_battery_voltage();
 			gpio_deinit_battery_adc();
-			
+						
 			uint8_t percentage = gpio_volts_to_soc(v);
 			
 			#ifdef POLYCAST5_DEBUG
@@ -165,9 +166,9 @@ static void gpio_task(void *arg)
     xAdcBatReadingQueue = xQueueCreate(1, sizeof(uint8_t));
 	configASSERT(xAdcBatReadingQueue);
     
-	gpio_write_output(0, 1); // Red LED
-	gpio_write_output(1, 1); // Green LED
-	gpio_write_output(2, 1); // Blue LED
+	gpio_write_output(0, 0); // Red LED
+	gpio_write_output(1, 0); // Green LED
+	gpio_write_output(2, 0); // Blue LED
 	gpio_write_output(3, 0); // NC
 	gpio_write_output(4, 0); // NC
 	gpio_write_output(5, 0); // NC

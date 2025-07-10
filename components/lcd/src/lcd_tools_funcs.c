@@ -10,9 +10,9 @@
 #include "esp_log.h"
 #include "esp_err.h"
 #include "esp_random.h"
-#include "bootloader_random.h"
 
 #include "lcd_utils.h"
+#include "gpio_task.h"
 
 #include "img_coin_heads.h"
 #include "img_coin_tails.h"
@@ -188,9 +188,7 @@ void lcd_tools_coin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 	if (ui_btns->select_btn == 1) {
 		lv_label_set_text(lbl_result, "Flipping...");
 		
-		bootloader_random_enable();
 		uint32_t one_or_zero = esp_random() % 2;
-		bootloader_random_disable();
 		
 		// Animate
 		for (int i = 0; i < (NUM_FLIPS + one_or_zero); i++) {
@@ -501,9 +499,7 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 	}
 	
 	if (ui_btns->select_btn == 1) {
-		bootloader_random_enable();
 		uint32_t zero_to_five = esp_random() % NUM_IMGS; // Random end frame
-		bootloader_random_disable();
 		
 		// Animate
 		for (int i = 0; i < (15 + zero_to_five); i++) {
@@ -533,7 +529,7 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		roll_log_buf[0] = 0; // Clear log
 		
 		uint16_t total = 0;
-		bootloader_random_enable();
+		
 		for (int i = 0; i < dice; i++) {
 			uint8_t roll = (esp_random() % sides) + 1; // 0 to (sides - 1) -> 1 to sides
 			
@@ -549,7 +545,6 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 			}
 	        strlcat(roll_log_buf, tmp, sizeof(roll_log_buf));
 		}
-		bootloader_random_disable();
 		
 		// Format and display new value
 		char buf[8];

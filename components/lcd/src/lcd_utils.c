@@ -254,7 +254,7 @@ void lcd_device_sleep(void)
 	gpio_set_level(ST7789_LEDA_PIN, 0); // BL high
 	
 	xSemaphoreGive(xStartAdcBatSemaphore); // Start new battery ADC reading
-
+	
 	// Don't auto sleep
 	while (gpio_read_input(USER_BUTTON_POWER) != 1) {
 		vTaskDelay(pdMS_TO_TICKS(25));

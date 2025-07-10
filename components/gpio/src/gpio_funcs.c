@@ -85,11 +85,11 @@ esp_err_t gpio_init(void)
 	
 	// Configure inputs
 	/*gpio_config_t io_conf_in = {
-	    .pin_bit_mask = (1ULL << USER_BUTTON_POWER),
+	    .pin_bit_mask = (1ULL << ADC_PIN),
 	    .mode = GPIO_MODE_INPUT,
 	    .intr_type = GPIO_INTR_DISABLE,
 	    .pull_up_en = GPIO_PULLUP_DISABLE,
-	    .pull_down_en = GPIO_PULLDOWN_DISABLE,
+	    .pull_down_en = GPIO_PULLDOWN_ENABLE,
 	};
 	gpio_config(&io_conf_in);*/
 	
@@ -221,7 +221,7 @@ void gpio_deinit_battery_adc(void)
 }
 
 float gpio_get_battery_voltage(void)
-{	
+{
 	uint32_t sum = 0;
 	
 	// Average readings
@@ -232,6 +232,10 @@ float gpio_get_battery_voltage(void)
 	    esp_rom_delay_us(5);
 	}
 	int avg_raw = sum / NUM_ADC_SAMPLES;
+	
+	#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Raw battery reading: %d", avg_raw);
+	#endif
 	
 	// Get pin mV
 	int pin_mv;
@@ -245,7 +249,7 @@ float gpio_get_battery_voltage(void)
     const float R42 = 10000, R43 = 27400;
     const float R44 = 10000, R45 = 27400;
     const float R40 =  2200, R41 = 22000;
-    const float Vref = 3.3f * (R41 / (R40+R41));
+    const float Vref = 3.3f * (R41 / (R40 + R41));
     const float gain = (1.0f + R45 / R44) * (R43 / (R42+R43));
     const float off  = (R45 / R44) * Vref;
 
