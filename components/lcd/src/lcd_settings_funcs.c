@@ -20,7 +20,7 @@
 #define SETTINGS_COLOR_PRIM_KEY "se_pr_ke"
 #define SETTINGS_COLOR_SEC_KEY "se_se_ke"
 
-#define COLOR_OPTION_COUNT 5
+#define COLOR_OPTION_COUNT 22
 
 settings_menu_t settings_menu = {
     .options = {"Set unlock pin", "Change colors", "Adjust haptics", "Adjust sleep timer", "Reboot", "Factory reset"},
@@ -30,18 +30,61 @@ settings_menu_t settings_menu = {
 };
 
 static const lv_color_t primary_color_options[COLOR_OPTION_COUNT] = {
-    LV_COLOR_MAKE(0x8B, 0x00, 0x00),
-    LV_COLOR_MAKE(0x00, 0x8B, 0x00),
-    LV_COLOR_MAKE(0x00, 0x00, 0x8B),
-    LV_COLOR_MAKE(0x00, 0x00, 0x00),
-    LV_COLOR_MAKE(0xFF, 0xFF, 0xFF),
+	LV_COLOR_MAKE(0x00, 0x00, 0x00), // Black
+	LV_COLOR_MAKE(0xFF, 0xFF, 0xFF), // White
+   
+	// Warm to cool sweep
+	LV_COLOR_MAKE(0x8B, 0x00, 0x00), // Dark Red
+	LV_COLOR_MAKE(0x79, 0x55, 0x48), // Brown
+    LV_COLOR_MAKE(0xFF, 0x57, 0x22), // Deep Orange 500
+    LV_COLOR_MAKE(0xFF, 0x98, 0x00), // Orange 500
+    LV_COLOR_MAKE(0xFF, 0xC1, 0x07), // Amber 500
+    LV_COLOR_MAKE(0xFF, 0xD7, 0x00), // Gold
+    LV_COLOR_MAKE(0xFF, 0xEB, 0x3B), // Yellow 500
+    LV_COLOR_MAKE(0xE9, 0x1E, 0x63), // Pink 500
+
+	LV_COLOR_MAKE(0xCD, 0xDC, 0x39), // Lime 500
+	LV_COLOR_MAKE(0x4C, 0xAF, 0x50), // Green 500
+	LV_COLOR_MAKE(0x00, 0x8B, 0x00), // 8B Green
+	LV_COLOR_MAKE(0x00, 0x64, 0x00), // Dark Green
+	LV_COLOR_MAKE(0x00, 0x96, 0x88), // Teal 500
+
+	LV_COLOR_MAKE(0x03, 0xA9, 0xF4), // Light Blue 500
+	LV_COLOR_MAKE(0x46, 0x82, 0xB4), // Steel Blue
+	LV_COLOR_MAKE(0x00, 0x00, 0x8B), // Dark Blue
+	LV_COLOR_MAKE(0x3F, 0x51, 0xB5), // Indigo 500
+	LV_COLOR_MAKE(0x9C, 0x27, 0xB0), // Purple 500
+	LV_COLOR_MAKE(0xA0, 0x20, 0xF0), // Pure Purple
+	LV_COLOR_MAKE(0x30, 0x19, 0x34), // Dark Purple
 };
+
 static const lv_color_t secondary_color_options[COLOR_OPTION_COUNT] = {
-	LV_COLOR_MAKE(0x00, 0x00, 0x00),
-    LV_COLOR_MAKE(0xFF, 0xFF, 0xFF),
-    LV_COLOR_MAKE(0x8B, 0x00, 0x00),
-	LV_COLOR_MAKE(0x00, 0x8B, 0x00),
-	LV_COLOR_MAKE(0x00, 0x00, 0x8B),
+	LV_COLOR_MAKE(0x00, 0x00, 0x00), // Black
+	LV_COLOR_MAKE(0xFF, 0xFF, 0xFF), // White
+   
+	// Warm to cool sweep
+	LV_COLOR_MAKE(0x8B, 0x00, 0x00), // Dark Red
+	LV_COLOR_MAKE(0x79, 0x55, 0x48), // Brown
+    LV_COLOR_MAKE(0xFF, 0x57, 0x22), // Deep Orange 500
+    LV_COLOR_MAKE(0xFF, 0x98, 0x00), // Orange 500
+    LV_COLOR_MAKE(0xFF, 0xC1, 0x07), // Amber 500
+    LV_COLOR_MAKE(0xFF, 0xD7, 0x00), // Gold
+	LV_COLOR_MAKE(0xFF, 0xEB, 0x3B), // Yellow 500
+	LV_COLOR_MAKE(0xE9, 0x1E, 0x63), // Pink 500
+
+	LV_COLOR_MAKE(0xCD, 0xDC, 0x39), // Lime 500
+	LV_COLOR_MAKE(0x4C, 0xAF, 0x50), // Green 500
+	LV_COLOR_MAKE(0x00, 0x8B, 0x00), // 8B Green
+	LV_COLOR_MAKE(0x00, 0x64, 0x00), // Dark Green
+	LV_COLOR_MAKE(0x00, 0x96, 0x88), // Teal 500
+
+	LV_COLOR_MAKE(0x03, 0xA9, 0xF4), // Light Blue 500
+	LV_COLOR_MAKE(0x46, 0x82, 0xB4), // Steel Blue
+	LV_COLOR_MAKE(0x00, 0x00, 0x8B), // Dark Blue
+	LV_COLOR_MAKE(0x3F, 0x51, 0xB5), // Indigo 500
+	LV_COLOR_MAKE(0x9C, 0x27, 0xB0), // Purple 500
+	LV_COLOR_MAKE(0xA0, 0x20, 0xF0), // Pure Purple
+	LV_COLOR_MAKE(0x30, 0x19, 0x34), // Dark Purple
 };
 
 static bool primary_color_selected = true;
@@ -354,6 +397,7 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 	    lv_obj_set_style_bg_opa(old_color_box, LV_OPA_COVER, LV_PART_MAIN);
 	    lv_obj_set_style_border_width(old_color_box, 3, LV_PART_MAIN);
 	    
+	    // Set 'old' box to what was selected
 		if (primary_color_selected) {
 			lv_obj_set_style_bg_color(old_color_box, user_primary_color, LV_PART_MAIN);
 	    	lv_obj_set_style_border_color(old_color_box, darker_user_primary_color, LV_PART_MAIN);
@@ -372,7 +416,14 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 	    lv_obj_set_style_border_width(new_color_box, 3, LV_PART_MAIN);
 	    lv_obj_set_style_border_color(new_color_box, user_secondary_color, LV_PART_MAIN);
 	    
-        lv_color_t c = primary_color_selected ? primary_color_options[new_color_idx] : secondary_color_options[new_color_idx];
+	    const lv_color_t *opts = primary_color_selected ? primary_color_options : secondary_color_options;
+        lv_color_t c = opts[new_color_idx];
+        
+        // Skip if forbidden color (current or secondary)
+        while(lv_color_eq(c, user_primary_color) || lv_color_eq(c, user_secondary_color)) {
+	        new_color_idx = (new_color_idx + 1) % COLOR_OPTION_COUNT;
+	        c = opts[new_color_idx];
+	    }
         lv_obj_set_style_bg_color(new_color_box, c, LV_PART_MAIN);
         lv_obj_set_style_border_color(new_color_box, c, LV_PART_MAIN);
 
@@ -381,22 +432,42 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 	
 	// Increment new color up
 	if (ui_btns->up_btn == 1) {
+		// Pick which palette to use
+	    const lv_color_t *opts = primary_color_selected ? primary_color_options : secondary_color_options;
+                                
 		// Increment with wrap
 		new_color_idx = (new_color_idx + 1) % COLOR_OPTION_COUNT;
 		
 		// Assign to index of selected
-        lv_color_t c = primary_color_selected ? primary_color_options[new_color_idx] : secondary_color_options[new_color_idx];
+        lv_color_t c = opts[new_color_idx];
+        
+        // Skip if forbidden color (current or secondary)
+	    while(lv_color_eq(c, user_primary_color) || lv_color_eq(c, user_secondary_color)) {
+	        new_color_idx = (new_color_idx + 1) % COLOR_OPTION_COUNT;
+	        c = opts[new_color_idx];
+	    }
+        
         // Show
         lv_obj_set_style_bg_color(new_color_box, c, LV_PART_MAIN);
         lv_obj_set_style_border_color(new_color_box, c, LV_PART_MAIN);
 	}
 	// Decrement new color down
 	else if (ui_btns->down_btn == 1) {
+		// Pick which palette to use
+	    const lv_color_t *opts = primary_color_selected ? primary_color_options : secondary_color_options;
+                                
 		// Decrement with wrap
-		new_color_idx = (new_color_idx + 1) % COLOR_OPTION_COUNT;
+		new_color_idx = (new_color_idx + COLOR_OPTION_COUNT - 1) % COLOR_OPTION_COUNT;
 		
 		// Assign to index of selected
-        lv_color_t c = primary_color_selected ? primary_color_options[new_color_idx] : secondary_color_options[new_color_idx];
+        lv_color_t c = opts[new_color_idx];
+        
+        // Skip if forbidden color (current or secondary)
+	    while(lv_color_eq(c, user_primary_color) || lv_color_eq(c, user_secondary_color)) {
+	        new_color_idx = (new_color_idx + COLOR_OPTION_COUNT - 1) % COLOR_OPTION_COUNT;
+	        c = opts[new_color_idx];
+	    }
+        
         // Show
         lv_obj_set_style_bg_color(new_color_box, c, LV_PART_MAIN);
         lv_obj_set_style_border_color(new_color_box, c, LV_PART_MAIN);
@@ -410,6 +481,8 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 		else {
 			user_secondary_color = c;
 		}
+		
+		// Save to NVS to load at boot
 		lcd_settings_color_nvs_save(new_color_idx, primary_color_selected);
 		
 		// Delete objects

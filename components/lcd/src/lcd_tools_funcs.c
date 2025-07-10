@@ -12,7 +12,6 @@
 #include "esp_random.h"
 
 #include "lcd_utils.h"
-#include "gpio_task.h"
 
 #include "img_coin_heads.h"
 #include "img_coin_tails.h"
