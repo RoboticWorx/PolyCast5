@@ -290,7 +290,7 @@ void lcd_settings_colors_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_m
 		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
 		// Hide right
-		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Switch pages
 		ui_menu->page = SETTINGS_COLORS_SEL_PAGE;
@@ -335,11 +335,14 @@ void lcd_settings_colors_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_m
 		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
+		// Hide right
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		// Switch pages
 		ui_menu->page = SETTINGS_PAGE;
 	}
-	// Home selected
-	else if (ui_btns->home_btn == 1) {
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Delete objects
 		lv_obj_delete(lbl_ins);
 		lv_obj_delete(lbl_primary);
@@ -351,22 +354,7 @@ void lcd_settings_colors_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_m
 		lbl_ins = primary_color_box = secondary_color_box = lbl_primary = lbl_secondary = NULL;
 		do_once = false;
 		
-		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-	}
-	// Power off selected
-	else if (ui_btns->pwr_btn == 1) {
-		// Delete objects
-		lv_obj_delete(lbl_ins);
-		lv_obj_delete(lbl_primary);
-		lv_obj_delete(lbl_secondary);
-		lv_obj_delete(primary_color_box);
-		lv_obj_delete(secondary_color_box);
-		
-		// Reset statics
-		lbl_ins = primary_color_box = secondary_color_box = lbl_primary = lbl_secondary = NULL;
-		do_once = false;
-		
-		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 
@@ -499,6 +487,12 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 		lv_obj_delete(old_color_box);
 		lv_obj_delete(new_color_box);
 		
+		// Hide arrows
+		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		// Confirmation text
 		lv_obj_t *lbl_rst = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_rst, "Reloading with\nnew color...", user_secondary_color,
@@ -525,13 +519,12 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 		// Show arrows
 		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Switch pages
 		ui_menu->page = SETTINGS_PAGE;
 	}
-	// Home selected
-	else if (ui_btns->home_btn == 1) {
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Delete objects
 		lv_obj_delete(lbl_ins);
 		lv_obj_delete(lbl_arr);
@@ -542,21 +535,7 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 		lbl_ins = lbl_arr = old_color_box = new_color_box = NULL;
 		do_once = false;
 		
-		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-	}
-	// Power off selected
-	else if (ui_btns->pwr_btn == 1) {
-		// Delete objects
-		lv_obj_delete(lbl_ins);
-		lv_obj_delete(lbl_arr);
-		lv_obj_delete(old_color_box);
-		lv_obj_delete(new_color_box);
-		
-		// Reset statics
-		lbl_ins = lbl_arr = old_color_box = new_color_box = NULL;
-		do_once = false;
-		
-		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 
@@ -616,13 +595,12 @@ void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
 		// Show arrows
 		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Switch pages
 		ui_menu->page = SETTINGS_PAGE;
 	}
-	// Home selected
-	else if (ui_btns->home_btn == 1) {
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Delete objects
 		lv_obj_delete(lbl_ins);
 		lv_obj_delete(lbl_note);
@@ -631,19 +609,7 @@ void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
 		lbl_ins = lbl_note = NULL;
 		do_once = false;
 		
-		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-	}
-	// Power off selected
-	else if (ui_btns->pwr_btn == 1) {
-		// Delete objects
-		lv_obj_delete(lbl_ins);
-		lv_obj_delete(lbl_note);
-		
-		// Reset statics
-		lbl_ins = lbl_note = NULL;
-		do_once = false;
-		
-		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 

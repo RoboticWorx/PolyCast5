@@ -487,7 +487,6 @@ static void unhide_selection_widgets(ui_menu_t *m)
     lv_obj_remove_flag(m->arrow_top, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(m->arrow_bot, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(m->arrow_left, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_remove_flag(m->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
     // Reset X-coord so they are back on-screen
     lv_obj_set_x(m->lbl_top, 0);
@@ -695,7 +694,6 @@ void lcd_home_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
 		lv_obj_remove_flag(ui_menu->lbl_bot, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
 		ui_menu->page = SELECTION_PAGE;
@@ -811,6 +809,9 @@ static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t* ir_menu, lo
     const char *option = lv_label_get_text(ui_menu->lbl_mid);
     
    	if (strcmp(option, "Infrared") == 0) {	
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		// Show IR list
 		lv_obj_remove_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);	
 		ui_menu->page = INFRARED_PAGE;
@@ -886,10 +887,6 @@ void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns, ir_menu
 		lv_obj_add_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->lbl_mid, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->lbl_bot, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 				
 		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
 	}
@@ -900,10 +897,6 @@ void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns, ir_menu
 		lv_obj_add_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->lbl_mid, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->lbl_bot, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
 		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
 	}
@@ -984,28 +977,22 @@ void lcd_infrared_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_
 		
 		initalized = false; // Reset bool
 		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		// Show selection labels
 		unhide_selection_widgets(ui_menu);
 		
 		ui_menu->page = SELECTION_PAGE;
 	}
-	// Home selected
-	else if (ui_btns->home_btn == 1) {
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Hide IR menu
 		lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
 		initalized = false; // Reset bool
 		
-		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-	}
-	// Power off selected
-	else if (ui_btns->pwr_btn == 1) {
-		// Hide IR menu
-		lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		initalized = false; // Reset bool
-		
-		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 	// Down button pressed
 	else if (ui_btns->right_btn == 1) {
@@ -1062,9 +1049,12 @@ void lcd_lora_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t 
 		// Reset static
 		do_once = false;
 		
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		// Show submenu
 		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
-		
+
 		ui_menu->page = LORA_SUBPAGE;
 	
 	}
@@ -1134,6 +1124,9 @@ void lcd_espnow_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_men
 		// Reset static
 		do_once = false;
 		
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		ui_menu->page = ESPNOW_RX_MAC_PAGE;
 	}
 	// Specific selected
@@ -1159,6 +1152,9 @@ void lcd_espnow_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_men
 		// Hide up and down arrows
 		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		ui_menu->page = ESPNOW_OPTION_PAGE;
 	}
@@ -1289,6 +1285,9 @@ void lcd_wifi_page_selected(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 			// Reset static
 			do_once = false;
 			
+			// Show right arrow
+			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+			
 			ui_menu->page = WIFI_SYNC_PAGE;
 		}
 		else {
@@ -1322,7 +1321,7 @@ void lcd_wifi_page_selected(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 			lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 			
-			// Show wifi send page
+			// Show Wi-Fi send page
 			lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_send_ins, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_send_cmd, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_send_box, LV_OBJ_FLAG_HIDDEN);
@@ -1330,6 +1329,9 @@ void lcd_wifi_page_selected(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 			lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_edit, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_remove_flag(wifi_menu->wifi_submenu.arrow_top, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_remove_flag(wifi_menu->wifi_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
+			
+			// Show right arrow
+			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 			
 			ui_menu->page = WIFI_SEND_PAGE;
 		}
@@ -1365,25 +1367,15 @@ void lcd_wifi_page_selected(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 		// Switch pages
 		ui_menu->page = SELECTION_PAGE;
 	}
-	// Home selected
-	else if (ui_btns->home_btn == 1) {
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Hide Wi-Fi menu
 		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
 		// Reset static
 		do_once = false;
 		
-		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-	}
-	// Power off selected
-	else if (ui_btns->pwr_btn == 1) {
-		// Hide Wi-Fi menu
-		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Reset static
-		do_once = false;
-		
-		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 
@@ -1436,6 +1428,9 @@ void lcd_tools_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
 		// Reset static
 		do_once = false;
 		
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		// Switch pages
 		ui_menu->page = TOOLS_DICE_PAGE;
 	}
@@ -1450,6 +1445,9 @@ void lcd_tools_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
 		// Hide up/down arrow
 		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Switch pages
 		ui_menu->page = TOOLS_DOCS_PAGE;
@@ -1468,25 +1466,15 @@ void lcd_tools_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
 		// Switch pages
 		ui_menu->page = SELECTION_PAGE;
 	}
-	// Home selected
-	else if (ui_btns->home_btn == 1) {
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Hide tools menu
 		lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
 		// Reset static
 		do_once = false;
 		
-		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-	}
-	// Power off selected
-	else if (ui_btns->pwr_btn == 1) {
-		// Hide tools menu
-		lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Reset static
-		do_once = false;
-		
-		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 
@@ -1526,6 +1514,9 @@ void lcd_settings_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings
 		// Hide top and bottom arrows
 		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Switch pages
 		ui_menu->page = SETTINGS_COLORS_PAGE;

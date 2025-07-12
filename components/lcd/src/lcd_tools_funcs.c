@@ -234,13 +234,12 @@ void lcd_tools_coin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		// Show arrows
 		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Switch pages
 		ui_menu->page = TOOLS_PAGE;
 	}
-	// Home selected
-	else if (ui_btns->home_btn == 1) {
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Delete objects
 		lv_obj_delete(lbl_ins);
 		lv_obj_delete(lbl_result);
@@ -254,24 +253,7 @@ void lcd_tools_coin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		coin_heads = NULL;
 		coin_tails = NULL;
 		
-		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-	}
-	// Power off selected
-	else if (ui_btns->pwr_btn == 1) {
-		// Delete objects
-		lv_obj_delete(lbl_ins);
-		lv_obj_delete(lbl_result);
-		lv_obj_delete(coin_heads);
-		lv_obj_delete(coin_tails);
-		
-		// Reset statics
-		do_once = false;
-		lbl_ins = NULL;
-		lbl_result = NULL;
-		coin_heads = NULL;
-		coin_tails = NULL;
-		
-		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 
@@ -350,11 +332,14 @@ void lcd_tools_docs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		// Switch pages
 		ui_menu->page = TOOLS_PAGE;
 	}
-	// Home selected
-	else if (ui_btns->home_btn == 1) {
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Delete objects
 		lv_obj_delete(lbl_ins);
 		lv_obj_delete(qr_active);
@@ -364,20 +349,7 @@ void lcd_tools_docs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		lbl_ins = NULL;
 		qr_active = NULL;
 		
-		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-	}
-	// Power off selected
-	else if (ui_btns->pwr_btn == 1) {
-		// Delete objects
-		lv_obj_delete(lbl_ins);
-		lv_obj_delete(qr_active);
-		
-		// Reset statics
-		do_once = false;
-		lbl_ins = NULL;
-		qr_active = NULL;
-		
-		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 
@@ -671,14 +643,17 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		lbl_ins = lbl_dice = lbl_sides = lbl_num_dice = lbl_num_sides = lbl_pointer = img_dice = lbl_result = lbl_roll_log = cont_roll_log = NULL;
 		do_once = false;
 		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		// Show tools list
 		lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
 		// Switch pages
 		ui_menu->page = TOOLS_PAGE;
 	}
-	// Home selected
-	else if (ui_btns->home_btn == 1) {
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Delete objects
 		lv_obj_delete(lbl_ins);
 		lv_obj_delete(lbl_dice);
@@ -699,31 +674,7 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		lbl_ins = lbl_dice = lbl_sides = lbl_num_dice = lbl_num_sides = lbl_pointer = img_dice = lbl_result = lbl_roll_log = cont_roll_log = NULL;
 		do_once = false;
 		
-		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-	}
-	// Power off selected
-	else if (ui_btns->pwr_btn == 1) {
-		// Delete objects
-		lv_obj_delete(lbl_ins);
-		lv_obj_delete(lbl_dice);
-		lv_obj_delete(lbl_sides);
-		lv_obj_delete(lbl_num_dice);
-		lv_obj_delete(lbl_num_sides);
-		lv_obj_delete(lbl_pointer);
-		lv_obj_delete(img_dice);
-		lv_obj_delete(lbl_result);
-		lv_obj_delete(lbl_roll_log);
-		lv_obj_delete(cont_roll_log);
-		
-		// Remove styles
-		lv_obj_remove_style_all(lbl_sides);
-		lv_obj_remove_style_all(lbl_dice);
-		
-		// Reset statics
-		lbl_ins = lbl_dice = lbl_sides = lbl_num_dice = lbl_num_sides = lbl_pointer = img_dice = lbl_result = lbl_roll_log = cont_roll_log = NULL;
-		do_once = false;
-		
-		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 

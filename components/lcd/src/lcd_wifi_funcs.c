@@ -654,6 +654,9 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 				
 			// Hide scan menu
 			lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// Show right arrow
+			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 				
 			// Switch pages
 			ui_menu->page = WIFI_BEACON_PAGE;
@@ -1040,6 +1043,9 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
 	    
 	    // Turn off Wi-Fi
 	    xSemaphoreGive(xWifiDisconnectSemaphore);
+	    
+	    // Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Show Wi-Fi menu
 		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -1047,8 +1053,8 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
 		// Switch pages
 		ui_menu->page = WIFI_PAGE;
     }
-    // Go home
-    else if (ui_btns->home_btn) {
+    // Go home or power off
+    else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
         // Delete obj
         lv_obj_delete(cont); // Also deletes children
         lv_obj_delete(lbl_data); // Not child of cont
@@ -1061,23 +1067,7 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
 	    // Turn off Wi-Fi
 	    xSemaphoreGive(xWifiDisconnectSemaphore);
 		
-		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-    }
-    // Power off
-    else if (ui_btns->pwr_btn) {
-        // Delete obj
-        lv_obj_delete(cont); // Also deletes children
-        lv_obj_delete(lbl_data); // Not child of cont
-        
-        // Reset statics
-        init = false;
-	    cont = chart = lbl_rssi = lbl_snr = lbl_scroll = lbl_info = lbl_data = NULL;
-	    series = NULL;
-	    
-	    // Turn off Wi-Fi
-	    xSemaphoreGive(xWifiDisconnectSemaphore);
-		
-		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
     // Switch to data frames
     else if (ui_btns->right_btn) {
@@ -1100,6 +1090,9 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
 		if (xQueueSend(xWifiSniffQueue, &sniff_network, portMAX_DELAY) != pdPASS) {
 			ESP_LOGE(TAG, "Failed: xWifiSniffQueue data");
 		}
+		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Switch pages
 		ui_menu->page = WIFI_DATA_PAGE;
@@ -1317,6 +1310,9 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 			ESP_LOGE(TAG, "Failed: xWifiSniffQueue back to beacon");
 		}
 		
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		// Switch pages
 		ui_menu->page = WIFI_BEACON_PAGE;
     }
@@ -1419,14 +1415,17 @@ void lcd_wifi_sync_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		init = false;
 		lbl_ins = NULL;
 		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		// Show Wi-Fi menu
 		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
 		// Go back
 		ui_menu->page = WIFI_PAGE;
 	}
-	// Go home
-    else if (ui_btns->home_btn) {
+	// Go home or power off
+    else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Put back arrows
 		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
@@ -1437,23 +1436,11 @@ void lcd_wifi_sync_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		// Reset statics
 		init = false;
 		lbl_ins = NULL;
-	    
-	    lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-    }
-    // Power off
-    else if (ui_btns->pwr_btn) {
-		// Put back arrows
-		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
-		// Delete label
-		lv_obj_delete(lbl_ins);
-		
-		// Reset statics
-		init = false;
-		lbl_ins = NULL;
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 	    
-	    lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+	    lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -1585,6 +1572,9 @@ void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_m
 	    memset(mqtt_name_buf, 0, sizeof mqtt_name_buf);
 	    
 	    wifi_menu_overwrite = false;
+	    
+	    // Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 	    	    
 	    // Show Wi-Fi list
 		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -1593,8 +1583,8 @@ void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_m
  		ui_menu->page = WIFI_PAGE;
 		return;
     }
- 	// Go home
-    else if (ui_btns->home_btn && wifi_menu_overwrite) {
+ 	// Go home or power off selected and overwrite
+    else if ((ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) && wifi_menu_overwrite) {
 		// Delete labels since no longer used
         lv_obj_delete(lbl_user_in);
         lv_obj_delete(lbl_dirs);
@@ -1609,25 +1599,10 @@ void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_m
 	    
 	    wifi_menu_overwrite = false;
 	    
-	    lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-    }
-    // Power off
-    else if (ui_btns->pwr_btn && wifi_menu_overwrite) {
-		// Delete labels since no longer used
-        lv_obj_delete(lbl_user_in);
-        lv_obj_delete(lbl_dirs);
-        lv_obj_delete(lbl_chars);
-        
-        // Reset statics for next time
-        lbl_user_in = NULL;
-	    lbl_dirs = NULL;
-	    cur_pos = 0;
-	    cur_char = '_';
-	    memset(mqtt_name_buf, 0, sizeof mqtt_name_buf);
+	    // Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 	    
-	    wifi_menu_overwrite = false;
-	    
-	    lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+	    lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
     // If left and not at start
     else if (ui_btns->left_btn && cur_pos != 0) {
@@ -1723,6 +1698,9 @@ void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_m
 			memcpy(wifi_menu->topic_keys[wifi_menu->size - (WIFI_MENU_START_SIZE + 1)], mqtt_key, sizeof(wifi_menu->topic_keys[wifi_menu->size - (WIFI_MENU_START_SIZE + 1)]));
 	        lcd_wifi_topic_keys_nvs_save(wifi_menu);
 		}
+		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Show Wi-Fi list
 		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -1880,6 +1858,9 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 		    // Refresh the list UI
 		    lcd_wifi_update_menu(wifi_menu);
 		    
+		    // Hide right arrow
+			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		    
 		    // Show Wi-Fi menu
 			lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
             
@@ -1918,7 +1899,6 @@ void lcd_wifi_send_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		
 		lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_ins, MQTT_READY_TXT);
 	}
-	
 	
 	// Send via MQTT
 	if (ui_btns->right_btn == 1) {
@@ -2013,6 +1993,9 @@ void lcd_wifi_send_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		char buf[BUF_SIZE];
 		snprintf(buf, sizeof(buf), "%u", wifi_menu->wifi_submenu.cmd_to_send);
 		lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_cmd, buf);
+		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Show top and bot arrows
 		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);

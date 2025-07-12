@@ -267,6 +267,9 @@ static bool prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
             lv_obj_del(lbl_enc_yes);
             lv_obj_del(lbl_enc_no);
             
+            // Hide right arrow
+			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            
             // Show ESP-NOW menu
 			lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 			
@@ -455,14 +458,17 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 		// Reset selected digit
 		digit_index = 0;
 		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		// Show ESP-NOW list
 		lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-
+		
 		// Go back
 		ui_menu->page = ESPNOW_PAGE;
     }
-    // Go home
-    else if (ui_btns->home_btn) {
+    // Go home or power off
+    else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
         // Clean all
 		for (int i = 0; i < 12; i++) {
 			lv_obj_del(lbl_sel_digit[i]);
@@ -480,28 +486,7 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 		// Reset selected digit
 		digit_index = 0;
 		
-		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-    }
-    // Power off
-    else if (ui_btns->pwr_btn) {
-        // Clean all
-		for (int i = 0; i < 12; i++) {
-			lv_obj_del(lbl_sel_digit[i]);
-			lbl_sel_digit[i] = NULL;
-		}
-
-		lv_obj_del(lbl_enter_mac);
-		lv_obj_del(lbl_how_to);
-		lv_obj_del(container);
-
-		lbl_enter_mac = NULL;
-		lbl_how_to = NULL;
-		container = NULL;
-		
-		// Reset selected digit
-		digit_index = 0;
-		
-		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
     // Move selection right
     else if (ui_btns->right_btn && digit_index < 11) {
@@ -738,8 +723,8 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
  		ui_menu->page = ESPNOW_PAGE;
 		return;
     }
- 	// Go home
-    else if (ui_btns->home_btn) {
+ 	// Go home or power off
+    else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Delete labels since no longer used
         lv_obj_delete(lbl_user_in);
         lv_obj_delete(lbl_dirs);
@@ -756,27 +741,7 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 	    
 	    memset(espnow_menu->lmk[espnow_menu->size], 0, LMK_LEN); // Zero out enc entry
 	    
-	    lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-    }
-    // Power off
-    else if (ui_btns->pwr_btn) {
-		// Delete labels since no longer used
-        lv_obj_delete(lbl_user_in);
-        lv_obj_delete(lbl_dirs);
-        lv_obj_delete(lbl_chars);
-        
-        // Reset statics for next time
-        lbl_user_in = NULL;
-	    lbl_dirs = NULL;
-	    cur_pos = 0;
-	    cur_char = '_';
-	    memset(name_buf, 0, sizeof name_buf);
-	    
-	    espnow_menu_overwrite = false;
-	    
-	    memset(espnow_menu->lmk[espnow_menu->size], 0, LMK_LEN); // Zero out enc entry
-	    
-	    lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+	    lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
     // If left and not at start
     else if (ui_btns->left_btn && cur_pos != 0) {
@@ -881,6 +846,9 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 				prompt_upload_qr(ui_menu, false); // Show regular example QR
 			}
 		}
+		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Show ESP-NOW list
 		lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -1112,6 +1080,9 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 			
 		    // Refresh the list UI
 		    lcd_espnow_update_menu(espnow_menu);
+		    
+		    // Hide right arrow
+			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
             
             // Switch pages
 			ui_menu->page = ESPNOW_PAGE;
@@ -1183,9 +1154,15 @@ void lcd_espnow_option_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_m
 		lv_obj_add_flag(espnow_menu->espnow_submenu.arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(espnow_menu->espnow_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		// Show up and down arrows
 		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Show ESP-NOW list
 		lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);

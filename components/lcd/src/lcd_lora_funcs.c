@@ -1,3 +1,4 @@
+#include "core/lv_obj.h"
 #include "misc/lv_area.h"
 #include "polycast5_macros.h"
 
@@ -479,8 +480,8 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
  		ui_menu->page = LORA_SUBPAGE;
 		return;
     }
-    // Go home if ranaming
-    else if (ui_btns->home_btn && lora_menu_overwrite) {
+    // Go home or power off if ranaming
+    else if ((ui_btns->home_btn || ui_btns->pwr_btn) && lora_menu_overwrite) {
 		// Delete labels since no longer used
         lv_obj_delete(lbl_user_in);
         lv_obj_delete(lbl_dirs);
@@ -502,31 +503,7 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		// Hide
 		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 	    
- 		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-    }
-    else if (ui_btns->pwr_btn && lora_menu_overwrite) {
-		// Delete labels since no longer used
-        lv_obj_delete(lbl_user_in);
-        lv_obj_delete(lbl_dirs);
-        lv_obj_delete(lbl_chars);
-        
-        // Reset statics for next time
-        lbl_user_in = NULL;
-	    lbl_dirs = NULL;
-	    cur_pos = 0;
-	    cur_char = '_';
-	    memset(name_buf, 0, sizeof name_buf);
-	    
-	    lora_menu_overwrite = false; // Switch back
-		
-		// Reset submenu to first index
-		lora_menu->submenu.index = 0;
-		lcd_lora_update_submenu(lora_menu);
-	    
- 		// Hide
-		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
-	    
- 		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+ 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
     // If left and not at start
     else if (ui_btns->left_btn && cur_pos != 0) {
@@ -653,7 +630,7 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 }
 
 void lcd_lora_subpage_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu) 
-{
+{	
 	// If received a valid receipt from the receiver
 	if (xSemaphoreTake(xLoraReceiptValidSemaphore, 0) == pdTRUE) {
 		// Show check in top left corner
@@ -676,14 +653,17 @@ void lcd_lora_subpage_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu
 		lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
 		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
 		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		// Show LoRa list
 		lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
 		// Go back
 		ui_menu->page = LORA_PAGE;
 	}
-	// Go home
-	else if (ui_btns->home_btn == 1) {
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Reset selection
 		lora_menu->submenu.index = 0;
 		lcd_lora_update_submenu(lora_menu);
@@ -695,22 +675,10 @@ void lcd_lora_subpage_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu
 		lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
 		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
 		
-		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-	}
-	// Pwr off
-	else if (ui_btns->pwr_btn == 1) {
-		// Reset selection
-		lora_menu->submenu.index = 0;
-		lcd_lora_update_submenu(lora_menu);
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
-		// Hide cont
-		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
-		
-		// Hide and reset receipt label
-		lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
-		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
-		
-		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 	// Scroll left
 	else if (ui_btns->left_btn == 1) {
@@ -830,6 +798,9 @@ void lcd_lora_subpage_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu
 		// Hide submenu
 		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		// Go to subpage options page
 		ui_menu->page = LORA_AWAY_SUBPAGE;
 	}
@@ -855,7 +826,7 @@ void lcd_lora_subpage_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu
 		// Go to subpage options page
 		ui_menu->page = LORA_PLAN_SUBPAGE;
 	}
-	// Plan selected
+	// Edit selected
 	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 4) {
 		// Hide and reset receipt label
 		lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
@@ -1047,8 +1018,8 @@ void lcd_lora_subpage_loop_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora
 		// Go back
 		ui_menu->page = LORA_SUBPAGE;
 	}
-	// Go home
-	else if (ui_btns->home_btn == 1) {			
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {			
 		// Reset objects
 		lv_obj_delete(lbl_subpage_times);
 		lv_obj_delete(lbl_selected_icon);
@@ -1066,28 +1037,7 @@ void lcd_lora_subpage_loop_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora
 		on_idx = 0;
 		off_idx = 0;
 			
-		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-	}
-	// Sleep
-	else if (ui_btns->pwr_btn == 1) {			
-		// Reset objects
-		lv_obj_delete(lbl_subpage_times);
-		lv_obj_delete(lbl_selected_icon);
-		lv_obj_delete(lbl_subpage_ins);
-		lv_obj_delete(lbl_top_time);
-		lv_obj_delete(lbl_bot_time);
-		lbl_subpage_times = NULL;
-		lbl_selected_icon = NULL;
-		lbl_subpage_ins = NULL;
-		lbl_top_time = NULL;
-		lbl_bot_time = NULL;
-		
-		// Refresh statics 
-		selected_index = 1;
-		on_idx = 0;
-		off_idx = 0;
-			
-		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 
@@ -1415,13 +1365,16 @@ void lcd_lora_subpage_away_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora
 		do_once = false;
 		away_menu = NULL;
 		
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		// Show LoRa submenu cont
 		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 		
 		ui_menu->page = LORA_SUBPAGE;
 	}
-	// Home selected
-	else if (ui_btns->home_btn == 1) {
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Delete away_menu lv_obj
 		lv_obj_del(away_menu->main_list);
 		
@@ -1436,25 +1389,10 @@ void lcd_lora_subpage_away_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora
 		do_once = false;
 		away_menu = NULL;
 		
-		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-	}
-	// Power off selected
-	else if (ui_btns->pwr_btn == 1) {
-		// Delete away_menu lv_obj
-		lv_obj_del(away_menu->main_list);
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
-		// Free the styles
-		lv_style_reset(&away_menu->btn_style);
-		lv_style_reset(&away_menu->sel_style);
-		
-		// Free what was allocated
-		free(away_menu);
-		
-		// Reset statics
-		do_once = false;
-		away_menu = NULL;
-		
-		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 	// Scroll up pressed
 	else if (ui_btns->up_btn == 1) {
