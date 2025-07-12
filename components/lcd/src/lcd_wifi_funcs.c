@@ -271,7 +271,7 @@ static void lcd_wifi_update_scan_menu(wifi_scan_menu_t *menu)
     lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
 }
 
-void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
+void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {	
 	static lv_obj_t *lbl_wait;
 	static lv_obj_t *lbl_option;
@@ -675,7 +675,7 @@ static void update_password_label_lcd(lv_obj_t *lbl_display, char cur_char, int 
     lv_obj_align(lbl_display, LV_ALIGN_CENTER, 0, 30);
 }
 
-void lcd_wifi_get_password(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t  *ui_btns)
+void lcd_wifi_get_password(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {
 	// Statics
     static lv_obj_t *lbl_dirs, *lbl_user_in;
@@ -892,7 +892,7 @@ static void beacon_chart_draw_cb(lv_event_t * e)
     fill->color = lv_color_mix(lv_palette_main(LV_PALETTE_GREEN), lv_palette_main(LV_PALETTE_RED), mix);
 }
 
-void lcd_wifi_beacon_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
+void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {
 	#define SCROLL_STEP 53  // Pixels per button-press
 	
@@ -1168,7 +1168,7 @@ static int cmp_rssi(const void *a, const void *b)
     return B->rssi - A->rssi; // Descending (-30 dBm above -70 dBm)
 }
 
-void lcd_wifi_data_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
+void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {
 	#define MAX_BARS 40
 	#define SCROLL_STEP 53 // Pixels per button-press
@@ -1358,7 +1358,7 @@ void lcd_wifi_data_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *u
     }
 }
 
-void lcd_wifi_sync_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
+void lcd_wifi_sync_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {
 	static bool init = false;
 	
@@ -1482,7 +1482,7 @@ static void update_name_label_lcd(lv_obj_t *lbl_display, char cur_char, int cur_
     lv_obj_align(lbl_display, LV_ALIGN_CENTER, 0, 30);
 }
 
-void lcd_wifi_create_custom_name(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
+void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {
 	static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
 	
@@ -1894,7 +1894,7 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
     }
 }
 
-void lcd_wifi_send_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
+void lcd_wifi_send_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {
 	#define BUF_SIZE 4
 	

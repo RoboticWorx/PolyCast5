@@ -949,7 +949,7 @@ void lcd_funcs_transition_back(bool home, ui_menu_t *ui_menu)
 	}
 }
 
-void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns) 
+void lcd_infrared_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_menu) 
 {	
 	static bool initalized = false;
 	
@@ -1021,7 +1021,7 @@ void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_
 	}
 }
 
-void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns) 
+void lcd_lora_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu) 
 {
 	// Only execute once
 	static bool do_once = false;
@@ -1101,7 +1101,7 @@ void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_
 	}
 }
 
-void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns)
+void lcd_espnow_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 {
 	// Statics
 	static bool do_once = false;
@@ -1198,7 +1198,7 @@ void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui
 	}
 }
 
-void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns)
+void lcd_wifi_page_selected(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {
 	// Statics
 	static bool do_once, connected = false;

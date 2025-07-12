@@ -237,7 +237,7 @@ void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns, ir_menu
  * @param [in] ir_menu Infrared menu structure
  * @param [in] ui_btns UI input structure
  */
-void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns); 
+void lcd_infrared_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_menu ); 
 
 /**
  * @brief Executes on LoRa page
@@ -246,7 +246,7 @@ void lcd_infrared_page_selected(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_
  * @param [in] lora_menu LoRa menu structure
  * @param [in] ui_btns UI input structure
  */
-void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
+void lcd_lora_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu);
 
 /**
  * @brief Executes on ESP-NOW page
@@ -255,7 +255,7 @@ void lcd_lora_page_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_
  * @param [in] espnow_menu LoRa menu structure
  * @param [in] ui_btns UI input structure
  */
-void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui_btns_t *ui_btns);
+void lcd_espnow_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espnow_menu);
 
 /**
  * @brief Executes on Wi-Fi page
@@ -264,7 +264,7 @@ void lcd_espnow_page_selected(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu, ui
  * @param [in] wifi_menu Wi-Fi menu structure
  * @param [in] ui_btns UI input structure
  */
-void lcd_wifi_page_selected(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns);
+void lcd_wifi_page_selected(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
 
 /**
  * @brief Executes on tools page

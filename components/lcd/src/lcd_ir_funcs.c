@@ -34,7 +34,7 @@ static uint8_t ir_index_overwrite = 0;
 static int edit_idx = 0;
 
 
-void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns)
+void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_menu)
 {
 	#define REMOTE_TXT "Remote selected:"
 	#define SIG_TXT "Signal selected:"
@@ -253,7 +253,7 @@ static void update_name_label_lcd(lv_obj_t *lbl_display, char cur_char, int cur_
     lv_obj_align(lbl_display, LV_ALIGN_CENTER, 0, 30);
 }
 
-void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns)
+void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_menu)
 {
     // Declare statics
     static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};

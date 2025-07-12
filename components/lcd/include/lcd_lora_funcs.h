@@ -106,20 +106,20 @@ void lcd_lora_update_submenu(lora_menu_t *lora_menu);
 /**
  * @brief Executes when user selects "AWAY" from LoRa subpage
  *
+ * @param [in] ui_btns UI input structure
  * @param [in] ui_menu UI menu structure
  * @param [in] lora_menu LoRa menu structure
- * @param [in] ui_btns UI input structure
  */
-void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
+void lcd_lora_subpage_away_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu);
 
 /**
  * @brief Executes when user selects "LOOP" from LoRa subpage
  *
+ * @param [in] ui_btns UI input structure
  * @param [in] ui_menu UI menu structure
  * @param [in] lora_menu LoRa menu structure
- * @param [in] ui_btns UI input structure
  */
-void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
+void lcd_lora_subpage_loop_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu);
 
 /**
  * @brief Executes when user selects "PLAN" from LoRa subpage
@@ -132,6 +132,13 @@ void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 void lcd_lora_subpage_plan_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu);
 
 /**
+ * @brief Updates plan menu based on user selection
+ *
+ * @param [in] lora_plan_menu LoRa plan menu structure
+ */
+void lcd_lora_update_plan_menu(lora_plan_menu_t *lora_plan_menu);
+
+/**
  * @brief Prompts user on how to pair a PolyPlug then sends a Semaphore to generate a random enc key to share
  *
  * @param [in] ui_menu UI menu structure
@@ -142,16 +149,18 @@ void lcd_lora_create_enc_key(ui_menu_t *ui_menu, lora_menu_t *lora_menu);
 /**
  * @brief Takes user input to create a name for/rename a designated PolyPlug
  *
+ * @param [in] ui_btns UI input structure
  * @param [in] ui_menu UI menu structure
  * @param [in] lora_menu LoRa menu structure
- * @param [in] ui_btns UI input structure
  */
-void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
+void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu);
 
 /**
  * @brief Saves new LoRa menu option and name to NVS
  *
  * @param [in] lora_menu LoRa menu structure
+ *
+ * @returns ESP error status
  */
 esp_err_t lcd_lora_menu_nvs_save(const lora_menu_t *lora_menu);
 
@@ -159,6 +168,8 @@ esp_err_t lcd_lora_menu_nvs_save(const lora_menu_t *lora_menu);
  * @brief Saves new LoRa enc key to NVS
  *
  * @param [in] lora_menu ESP-NOW menu structure
+ *
+ * @returns ESP error status
  */
 esp_err_t lcd_lora_key_nvs_save(const lora_menu_t *lora_menu);
 
@@ -166,6 +177,8 @@ esp_err_t lcd_lora_key_nvs_save(const lora_menu_t *lora_menu);
  * @brief Loads all LoRa menu options and names from NVS
  *
  * @param [in] lora_menu ESP-NOW menu structure
+ *
+ * @returns ESP error status
  */
 esp_err_t lcd_lora_menu_nvs_load(lora_menu_t *lora_menu);
 
@@ -173,6 +186,8 @@ esp_err_t lcd_lora_menu_nvs_load(lora_menu_t *lora_menu);
  * @brief Loads all LoRa enc keys from NVS
  *
  * @param [in] lora_menu ESP-NOW menu structure
+ *
+ * @returns ESP error status
  */
 esp_err_t lcd_lora_key_nvs_load(lora_menu_t *lora_menu);
 
@@ -180,6 +195,8 @@ esp_err_t lcd_lora_key_nvs_load(lora_menu_t *lora_menu);
  * @brief Deletes a given enc key from NVS
  *
  * @param [in] lora_menu ESP-NOW menu structure
+ *
+ * @returns ESP error status
  */
 esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx);
 
@@ -187,6 +204,8 @@ esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx);
  * @brief Deletes a given menu option from NVS
  *
  * @param [in] lora_menu ESP-NOW menu structure
+ *
+ * @returns ESP error status
  */
 esp_err_t lcd_lora_menu_nvs_delete(uint8_t del_idx);
 

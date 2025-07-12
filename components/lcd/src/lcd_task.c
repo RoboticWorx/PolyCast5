@@ -209,70 +209,70 @@ static void lcd_task(void *pvParameters)
 			}
 			// IR remotes page
 			else if (ui_menu.page == INFRARED_PAGE) {
-				lcd_infrared_page_selected(&ui_menu, &ir_menu, &ui_btns);
+				lcd_infrared_page_selected(&ui_btns, &ui_menu, &ir_menu);
 			}
 			else if (ui_menu.page == INFRARED_REMOTE_NAME_PAGE) {
-				lcd_ir_create_custom_name(&ui_menu, &ir_menu, &ui_btns);
+				lcd_ir_create_custom_name(&ui_btns, &ui_menu, &ir_menu);
 			}
 			else if (ui_menu.page == INFRARED_REMOTE_EDIT_PAGE) {
-				lcd_ir_edit_remotes(&ui_menu, &ir_menu, &ui_btns);
+				lcd_ir_edit_remotes(&ui_btns, &ui_menu, &ir_menu);
 			}
 			// LoRa page (PolyPlugs)
 			else if (ui_menu.page == LORA_PAGE) {
-				lcd_lora_page_selected(&ui_menu, &lora_menu, &ui_btns);
+				lcd_lora_page_selected(&ui_btns, &ui_menu, &lora_menu);
 			}
 			else if (ui_menu.page == LORA_NAME_PAGE) {
-				lcd_lora_create_custom_name(&ui_menu, &lora_menu, &ui_btns);
+				lcd_lora_create_custom_name(&ui_btns, &ui_menu, &lora_menu);
 			}
 			else if (ui_menu.page == LORA_SUBPAGE) {
 				lcd_lora_subpage_selected(&ui_btns, &ui_menu, &lora_menu, &lora_plan_menu);
 			}
 			else if (ui_menu.page == LORA_LOOP_SUBPAGE) {
-				lcd_lora_subpage_loop_selected(&ui_menu, &lora_menu, &ui_btns);
+				lcd_lora_subpage_loop_selected(&ui_btns, &ui_menu, &lora_menu);
 			}
 			else if (ui_menu.page == LORA_AWAY_SUBPAGE) {
-				lcd_lora_subpage_away_selected(&ui_menu, &lora_menu, &ui_btns);
+				lcd_lora_subpage_away_selected(&ui_btns, &ui_menu, &lora_menu);
 			}
 			else if (ui_menu.page == LORA_PLAN_SUBPAGE) {
 				lcd_lora_subpage_plan_selected(&ui_btns, &ui_menu, &lora_menu, &lora_plan_menu);
 			}
 			// ESP-NOW page
 			else if (ui_menu.page == ESPNOW_PAGE) {
-				lcd_espnow_page_selected(&ui_menu, &espnow_menu, &ui_btns);
+				lcd_espnow_page_selected(&ui_btns, &ui_menu, &espnow_menu);
 			}
 			else if (ui_menu.page == ESPNOW_RX_MAC_PAGE) {
-				lcd_espnow_get_rx_mac(&ui_menu, &espnow_menu, &ui_btns);
+				lcd_espnow_get_rx_mac(&ui_btns, &ui_menu, &espnow_menu);
 			}
 			else if (ui_menu.page == ESPNOW_NAME_PAGE) {
-				lcd_espnow_create_custom_name(&ui_menu, &espnow_menu, &ui_btns);
+				lcd_espnow_create_custom_name(&ui_btns, &ui_menu, &espnow_menu);
 			}
 			else if (ui_menu.page == ESPNOW_OPTION_PAGE) {
-				lcd_espnow_option_selected(&ui_menu, &espnow_menu, &ui_btns);
+				lcd_espnow_option_selected(&ui_btns, &ui_menu, &espnow_menu);
 			}
 			// Wi-Fi page
 			else if (ui_menu.page == WIFI_PAGE) {
-				lcd_wifi_page_selected(&ui_menu, &wifi_menu, &ui_btns);
+				lcd_wifi_page_selected(&ui_btns, &ui_menu, &wifi_menu);
 			}
 			else if (ui_menu.page == WIFI_SCAN_PAGE) {
-				lcd_wifi_scan_page(&ui_menu, &wifi_menu, &ui_btns);
+				lcd_wifi_scan_page(&ui_btns, &ui_menu, &wifi_menu);
 			}
 			else if (ui_menu.page == WIFI_PASSWORD_PAGE) {
-				lcd_wifi_get_password(&ui_menu, &wifi_menu, &ui_btns);
+				lcd_wifi_get_password(&ui_btns, &ui_menu, &wifi_menu);
 			}
 			else if (ui_menu.page == WIFI_BEACON_PAGE) {
-				lcd_wifi_beacon_page(&ui_menu, &wifi_menu, &ui_btns);
+				lcd_wifi_beacon_page(&ui_btns, &ui_menu, &wifi_menu);
 			}
 			else if (ui_menu.page == WIFI_DATA_PAGE) {
-				lcd_wifi_data_page(&ui_menu, &wifi_menu, &ui_btns);
+				lcd_wifi_data_page(&ui_btns, &ui_menu, &wifi_menu);
 			}
 			else if (ui_menu.page == WIFI_SYNC_PAGE) {
-				lcd_wifi_sync_page(&ui_menu, &wifi_menu, &ui_btns);
+				lcd_wifi_sync_page(&ui_btns, &ui_menu, &wifi_menu);
 			}
 			else if (ui_menu.page == WIFI_SEND_PAGE) {
-				lcd_wifi_send_page(&ui_menu, &wifi_menu, &ui_btns);
+				lcd_wifi_send_page(&ui_btns, &ui_menu, &wifi_menu);
 			}
 			else if (ui_menu.page == WIFI_NAME_PAGE) {
-				lcd_wifi_create_custom_name(&ui_menu, &wifi_menu, &ui_btns);
+				lcd_wifi_create_custom_name(&ui_btns, &ui_menu, &wifi_menu);
 			}
 			// Tools page
 			else if (ui_menu.page == TOOLS_PAGE) {

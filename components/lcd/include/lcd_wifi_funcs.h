@@ -67,6 +67,13 @@ extern wifi_menu_t wifi_menu;
 void lcd_wifi_setup_page(wifi_menu_t *wifi_menu);
 
 /**
+ * @brief Creates the Wi-Fi send page for quick user access
+ *
+ * @param [in] wifi_menu Wi-Fi menu structure
+ */
+void lcd_wifi_setup_send_page(wifi_menu_t *wifi_menu);
+
+/**
  * @brief Creates the Wi-Fi scan page then hides it for quick access
  *
  * @param [in] wifi_scan_menu Wi-Fi scan menu structure
@@ -83,25 +90,101 @@ void lcd_wifi_update_menu(wifi_menu_t *wifi_menu);
 /**
  * @brief Executes when WIFI_SCAN_PAGE selected
  *
+ * @param [in] ui_btns UI input structure
  * @param [in] ui_menu UI menu structure
  * @param [in] wifi_menu Wi-Fi menu structure
- * @param [in] ui_btns Btn menu structure
  */
-void lcd_wifi_scan_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns);
+void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
 
-void lcd_wifi_get_password(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns);
-void lcd_wifi_beacon_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns);
-void lcd_wifi_data_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns);
-void lcd_wifi_sync_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns);
-void lcd_wifi_send_page(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns);
-void lcd_wifi_setup_send_page(wifi_menu_t *wifi_menu);
+/**
+ * @brief Gets network password via user input
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] wifi_menu Wi-Fi menu structure
+ */
+void lcd_wifi_get_password(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
 
+/**
+ * @brief Executes Wi-Fi beacon page
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] wifi_menu Wi-Fi menu structure
+ */
+void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
+
+/**
+ * @brief Executes Wi-Fi data page
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] wifi_menu Wi-Fi menu structure
+ */
+void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
+
+/**
+ * @brief Prompts user confirmation before sync
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] wifi_menu Wi-Fi menu structure
+ */
+void lcd_wifi_sync_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
+
+/**
+ * @brief Executes Wi-Fi send page to send data via MQTT
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] wifi_menu Wi-Fi menu structure
+ */
+void lcd_wifi_send_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
+
+/**
+ * @brief Gets user input to name a Wi-Fi PolyPlug
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] wifi_menu Wi-Fi menu structure
+ */
+void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
+
+/**
+ * @brief Loads Wi-Fi menu items from NVS
+ *
+ * @param [in] wifi_menu Wi-Fi menu structure
+ *
+ * @returns ESP error status
+ */
 esp_err_t lcd_wifi_menu_nvs_load(wifi_menu_t *menu);
-esp_err_t lcd_wifi_menu_nvs_save(const wifi_menu_t *menu);
-esp_err_t lcd_wifi_topic_keys_nvs_load(wifi_menu_t *menu);
-esp_err_t lcd_wifi_topic_keys_nvs_save(const wifi_menu_t *menu);
 
-void lcd_wifi_create_custom_name(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu, ui_btns_t *ui_btns);
+/**
+ * @brief Saves Wi-Fi menu items to NVS
+ *
+ * @param [in] wifi_menu Wi-Fi menu structure
+ *
+ * @returns ESP error status
+ */
+esp_err_t lcd_wifi_menu_nvs_save(const wifi_menu_t *menu);
+
+/**
+ * @brief Loads Wi-Fi topic keys from NVS
+ *
+ * @param [in] wifi_menu Wi-Fi menu structure
+ *
+ * @returns ESP error status
+ */
+esp_err_t lcd_wifi_topic_keys_nvs_load(wifi_menu_t *menu);
+
+/**
+ * @brief Saves Wi-Fi topic keys to NVS
+ *
+ * @param [in] wifi_menu Wi-Fi menu structure
+ *
+ * @returns ESP error status
+ */
+esp_err_t lcd_wifi_topic_keys_nvs_save(const wifi_menu_t *menu);
 
 #ifdef POLYCAST5_WIFI_DUMP_NVS
 	void lcd_wifi_dump_menu_nvs(void);

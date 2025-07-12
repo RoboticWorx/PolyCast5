@@ -44,7 +44,38 @@ extern ir_menu_t ir_menu;
  * @param [in] ir_menu IR menu structure
  * @param [in] ui_btns UI buttons structure
  */
-void lcd_ir_edit_remotes(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns);
+void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_menu );
+
+/**
+ * @brief Create custom name for IR remote/signal and save to options in NVS
+ *
+ * @param [in] ui_btns UI buttons structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] ir_menu Infrared menu structure
+ */
+void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_menu);
+
+/**
+ * @brief Create initial structures to display IR data
+ *
+ * @param [in] ir_menu Infrared menu structure
+ */
+void lcd_ir_setup_page(ir_menu_t *ir_menu);
+
+/**
+ * @brief Update IR structures to display
+ *
+ * @param [in] ir_menu Infrared menu structure
+ */
+void lcd_ir_update_menu(ir_menu_t *ir_menu);
+
+/**
+ * @brief Select IR option to execute
+ *
+ * @param [in] ui_menu UI menu structure
+ * @param [in] ir_menu Infrared menu structure
+ */
+void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *ir_menu);
 
 /**
  * @brief Removes a given index from NVS
@@ -82,36 +113,5 @@ esp_err_t lcd_ir_menu_nvs_load(ir_menu_t *ir_menu, const char* ns, const char* c
  * @returns ESP error status
  */
 esp_err_t lcd_ir_menu_nvs_save(const ir_menu_t *ir_menu, const char* ns, const char* count, const char* fmt);
-
-/**
- * @brief Create custom name for IR remote/signal and save to options in NVS
- *
- * @param [in] ui_menu UI menu structure
- * @param [in] ir_menu Infrared menu structure
- * @param [in] ui_btns UI buttons structure
- */
-void lcd_ir_create_custom_name(ui_menu_t *ui_menu, ir_menu_t *ir_menu, ui_btns_t *ui_btns);
-
-/**
- * @brief Create initial structures to display IR data
- *
- * @param [in] ir_menu Infrared menu structure
- */
-void lcd_ir_setup_page(ir_menu_t *ir_menu);
-
-/**
- * @brief Update IR structures to display
- *
- * @param [in] ir_menu Infrared menu structure
- */
-void lcd_ir_update_menu(ir_menu_t *ir_menu);
-
-/**
- * @brief Select IR option to execute
- *
- * @param [in] ui_menu UI menu structure
- * @param [in] ir_menu Infrared menu structure
- */
-void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *ir_menu);
 
 #endif // LCD_IR_FUNCS_H
