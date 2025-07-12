@@ -1,3 +1,4 @@
+#include "misc/lv_area.h"
 #include "polycast5_macros.h"
 
 #include "core/lv_obj_pos.h"
@@ -30,6 +31,8 @@ lora_menu_t lora_menu = {
     .index = 0,
     .cont = NULL,
 };
+
+lora_plan_menu_t lora_plan_menu = {0};
 
 static lora_cmd_t lora_cmd = {
     .key = {0},
@@ -610,7 +613,7 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
 				// Allocate a fresh buffer for this entry
 		        uint8_t *slot = malloc(ENC_KEY_LEN);
 		        if (!slot) {
-		            ESP_LOGE(TAG, "Out of memory allocating key");
+		            ESP_LOGE(TAG, "Out of memory allocating ENC_KEY_LEN key");
 		            return;
 		        }
 		        memcpy(slot, received_enc_key_nvs, ENC_KEY_LEN);
@@ -647,7 +650,7 @@ void lcd_lora_create_custom_name(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_
     }
 }
 
-void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns) 
+void lcd_lora_subpage_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu) 
 {
 	// If received a valid receipt from the receiver
 	if (xSemaphoreTake(xLoraReceiptValidSemaphore, 0) == pdTRUE) {
@@ -804,8 +807,8 @@ void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_bt
 		}
 		lcd_lora_update_submenu(lora_menu);
 	}
-	// Select other
-	else if (ui_btns->select_btn == 1) {
+	// Loop selected
+	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 1) {
 		// Hide and reset receipt label
 		lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
 		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
@@ -814,22 +817,67 @@ void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_bt
 		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 		
 		// Go to subpage options page
-		ui_menu->page = LORA_OPTIONS_SUBPAGE;
+		ui_menu->page = LORA_LOOP_SUBPAGE;
 	}
-}
+	// Away selected
+	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 3) {
+		// Hide and reset receipt label
+		lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
+		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
+		
+		// Hide submenu
+		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+		
+		// Go to subpage options page
+		ui_menu->page = LORA_AWAY_SUBPAGE;
+	}
+	// Plan selected
+	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 2) {
+		// Hide and reset receipt label
+		lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
+		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
+		
+		// Hide submenu
+		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reveal the container and label
+		lv_obj_remove_flag(lora_plan_menu->plan_cont, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(lora_plan_menu->lbl_days_ins, LV_OBJ_FLAG_HIDDEN);
+		
+		// Default index 0
+		lora_plan_menu->plan_index = 0;
+		
+		/* Update container */
+		// Wrap index
+		if (lora_plan_menu->plan_index >= LORA_PLAN_SUBMENU_COUNT) {
+			lora_plan_menu->plan_index = 0;
+		}
+		else if (lora_plan_menu->plan_index < 0) {
+			lora_plan_menu->plan_index = LORA_PLAN_SUBMENU_COUNT - 1;
+		}
 
-void lcd_lora_subpage_option_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns)
-{	
-	// Loop was selected
-	if (lora_menu->submenu.index == 1) {
-		lcd_lora_subpage_loop_selected(ui_menu, lora_menu, ui_btns);
+	    // Reset every button to unselected
+	    for (int i = 0; i < LORA_PLAN_SUBMENU_COUNT; i++) {
+	        lv_obj_remove_style(lora_plan_menu->plan_btns[i], &lora_plan_menu->plan_sel_style, 0);
+	        lv_obj_add_style(lora_plan_menu->plan_btns[i], &lora_plan_menu->plan_btn_style, 0);
+	    }
+
+	    // Highlight only the current index
+	    lv_obj_remove_style(lora_plan_menu->plan_btns[lora_plan_menu->plan_index], &lora_plan_menu->plan_btn_style, 0);
+	    lv_obj_add_style(lora_plan_menu->plan_btns[lora_plan_menu->plan_index], &lora_plan_menu->plan_sel_style, 0);
+		
+		// Go to subpage options page
+		ui_menu->page = LORA_PLAN_SUBPAGE;
 	}
-	// Away was selected
-	else if (lora_menu->submenu.index == 3) {	    
-		lcd_lora_subpage_away_selected(ui_menu, lora_menu, ui_btns);
-	}
-	// Edit was selected
-	else if (lora_menu->submenu.index == 4) {
+	// Plan selected
+	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 4) {
+		// Hide and reset receipt label
+		lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
+		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
+		
+		// Hide submenu
+		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+		
 		// Don’t allow renaming the first index
 	    if (lora_menu->index == 0) {
 	        return;
@@ -1054,6 +1102,314 @@ void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
 		off_idx = 0;
 			
 		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+	}
+}
+
+void lcd_lora_setup_plan_page(ui_menu_t *ui_menu, lora_plan_menu_t *lora_plan_menu)
+{
+    static const char *options[LORA_PLAN_SUBMENU_COUNT] = {
+        LV_SYMBOL_CLOSE "\nMON",
+        LV_SYMBOL_CLOSE "\nTUE",
+        LV_SYMBOL_CLOSE "\nWED",
+        LV_SYMBOL_CLOSE "\nTHU",
+        LV_SYMBOL_CLOSE "\nFRI",
+        LV_SYMBOL_CLOSE "\nSAT",
+        LV_SYMBOL_CLOSE "\nSUN",
+        LV_SYMBOL_TRASH "\nREM",
+    };
+
+    // Assign options
+    for (int i = 0; i < LORA_PLAN_SUBMENU_COUNT; i++) {
+        lora_plan_menu->plan_options[i] = options[i];
+    }
+
+    // Create instruction label
+    lora_plan_menu->lbl_days_ins = lv_label_create(ACTIVE_SCR);
+    lcd_format_label(lora_plan_menu->lbl_days_ins, "Select day(s)", user_secondary_color,
+                 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 10);
+    
+    /* Initialize plan submenu */
+    // Create container
+    lora_plan_menu->plan_cont = lv_obj_create(ACTIVE_SCR);
+    
+    // Format
+    lv_obj_set_size(lora_plan_menu->plan_cont, 230, 92);
+    lv_obj_align(lora_plan_menu->plan_cont, LV_ALIGN_CENTER, 0, 7);
+    lv_obj_set_style_bg_color(lora_plan_menu->plan_cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(lora_plan_menu->plan_cont, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_scrollbar_mode(lora_plan_menu->plan_cont, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_scroll_dir(lora_plan_menu->plan_cont, LV_DIR_VER);
+    
+    // Set flow
+    lv_obj_set_flex_flow(lora_plan_menu->plan_cont, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(lora_plan_menu->plan_cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    // Set padding
+    lv_obj_set_style_pad_gap(lora_plan_menu->plan_cont, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    // Prepare styles 
+    // Normal button style
+    lv_style_init(&lora_plan_menu->plan_btn_style);
+    lv_style_set_radius(&lora_plan_menu->plan_btn_style, 8);
+    lv_style_set_bg_color(&lora_plan_menu->plan_btn_style, user_primary_color);
+    lv_style_set_border_width(&lora_plan_menu->plan_btn_style, 2);
+    lv_style_set_border_color(&lora_plan_menu->plan_btn_style, user_secondary_color);
+    lv_style_set_border_side(&lora_plan_menu->plan_btn_style, LV_BORDER_SIDE_FULL);
+    lv_style_set_text_font(&lora_plan_menu->plan_btn_style, &lv_font_montserrat_14);
+    lv_style_set_text_color(&lora_plan_menu->plan_btn_style, user_secondary_color);
+    lv_style_set_text_align(&lora_plan_menu->plan_btn_style, LV_TEXT_ALIGN_CENTER);
+
+    // Selected button style
+    lv_style_init(&lora_plan_menu->plan_sel_style);
+    lv_style_set_radius(&lora_plan_menu->plan_sel_style, 8);
+    lv_style_set_bg_color(&lora_plan_menu->plan_sel_style, user_secondary_color);
+    lv_style_set_border_width(&lora_plan_menu->plan_sel_style, 2);
+    lv_style_set_border_color(&lora_plan_menu->plan_sel_style, user_secondary_color);
+    lv_style_set_border_side(&lora_plan_menu->plan_sel_style, LV_BORDER_SIDE_FULL);
+    lv_style_set_text_font(&lora_plan_menu->plan_sel_style, &lv_font_montserrat_14);
+    lv_style_set_text_color(&lora_plan_menu->plan_sel_style, user_primary_color);
+    lv_style_set_text_align(&lora_plan_menu->plan_sel_style, LV_TEXT_ALIGN_CENTER);
+
+    // Create button per option
+    for (int i = 0; i < LORA_PLAN_SUBMENU_COUNT; i++) {
+        lora_plan_menu->plan_btns[i] = lv_btn_create(lora_plan_menu->plan_cont);
+        lv_obj_set_size(lora_plan_menu->plan_btns[i], 48, 43);
+        
+        // Add style
+        if (i == lora_plan_menu->plan_index) {
+            lv_obj_add_style(lora_plan_menu->plan_btns[i], &lora_plan_menu->plan_btn_style, 0);
+        }
+        else {
+            lv_obj_add_style(lora_plan_menu->plan_btns[i], &lora_plan_menu->plan_sel_style, 0);
+        }
+    
+        // Create child label
+        lv_obj_t *lbl = lv_label_create(lora_plan_menu->plan_btns[i]);
+        lv_label_set_text(lbl, lora_plan_menu->plan_options[i]);
+        
+        // Format
+        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
+    }
+    
+    // Put arrows after container
+    lv_obj_move_foreground(ui_menu->arrow_top);
+    lv_obj_move_foreground(ui_menu->arrow_bot);
+    lv_obj_move_foreground(ui_menu->arrow_left);
+    lv_obj_move_foreground(ui_menu->arrow_right);
+    
+    /* Update container */
+    // Wrap index
+    if (lora_plan_menu->plan_index >= LORA_PLAN_SUBMENU_COUNT) {
+        lora_plan_menu->plan_index = 0;
+    }
+    else if (lora_plan_menu->plan_index < 0) {
+        lora_plan_menu->plan_index = LORA_PLAN_SUBMENU_COUNT - 1;
+    }
+
+    // Reset every button to unselected
+    for (int i = 0; i < LORA_PLAN_SUBMENU_COUNT; i++) {
+        lv_obj_remove_style(lora_plan_menu->plan_btns[i], &lora_plan_menu->plan_sel_style, 0);
+        lv_obj_add_style(lora_plan_menu->plan_btns[i], &lora_plan_menu->plan_btn_style, 0);
+    }
+
+    // Highlight only the current index
+    lv_obj_remove_style(lora_plan_menu->plan_btns[lora_plan_menu->plan_index], &lora_plan_menu->plan_btn_style, 0);
+    lv_obj_add_style(lora_plan_menu->plan_btns[lora_plan_menu->plan_index], &lora_plan_menu->plan_sel_style, 0);
+    
+    // Hide the container and label
+    lv_obj_add_flag(lora_plan_menu->plan_cont, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(lora_plan_menu->lbl_days_ins, LV_OBJ_FLAG_HIDDEN);
+}
+
+void lcd_lora_subpage_plan_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu)
+{
+	#define PLAN_COLUMNS 4 // 4x2 grid to fit 8 buttons
+	
+	// Statics for toggling
+	static const char *days[7] = {"MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"};
+	static bool days_selected[7] = {false};
+	
+	if (ui_btns->right_btn == 1) {
+		// Update selection right
+		lora_plan_menu->plan_index = (lora_plan_menu->plan_index + 1) % LORA_PLAN_SUBMENU_COUNT;
+		
+		/* Update container */
+		// Wrap index
+		if (lora_plan_menu->plan_index >= LORA_PLAN_SUBMENU_COUNT) {
+			lora_plan_menu->plan_index = 0;
+		}
+		else if (lora_plan_menu->plan_index < 0) {
+			lora_plan_menu->plan_index = LORA_PLAN_SUBMENU_COUNT - 1;
+		}
+
+	    // Reset every button to unselected
+	    for (int i = 0; i < LORA_PLAN_SUBMENU_COUNT; i++) {
+	        lv_obj_remove_style(lora_plan_menu->plan_btns[i], &lora_plan_menu->plan_sel_style, 0);
+	        lv_obj_add_style(lora_plan_menu->plan_btns[i], &lora_plan_menu->plan_btn_style, 0);
+	    }
+
+	    // Highlight only the current index
+	    lv_obj_remove_style(lora_plan_menu->plan_btns[lora_plan_menu->plan_index], &lora_plan_menu->plan_btn_style, 0);
+	    lv_obj_add_style(lora_plan_menu->plan_btns[lora_plan_menu->plan_index], &lora_plan_menu->plan_sel_style, 0);
+	}
+	else if (ui_btns->left_btn == 1 && lora_plan_menu->plan_index == 0) {
+		// Reset all labels and days
+		for (int i = 0; i < 7; i++) {
+			days_selected[i] = false;
+			lv_obj_t *lbl = lv_obj_get_child(lora_plan_menu->plan_btns[i], 0);
+			char buf[20];
+			snprintf(buf, sizeof(buf), "%s\n%s", LV_SYMBOL_CLOSE, days[i]);
+			lv_label_set_text(lbl, buf);
+		}
+		
+		// Hide plan items
+		lv_obj_add_flag(lora_plan_menu->plan_cont, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(lora_plan_menu->lbl_days_ins, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show LoRa submenu
+		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = LORA_SUBPAGE;
+	}
+	else if (ui_btns->left_btn == 1) {
+		// Update selection left
+		lora_plan_menu->plan_index = (lora_plan_menu->plan_index - 1 + LORA_PLAN_SUBMENU_COUNT) % LORA_PLAN_SUBMENU_COUNT;
+		
+		/* Update container */
+		// Wrap index
+		if (lora_plan_menu->plan_index >= LORA_PLAN_SUBMENU_COUNT) {
+			lora_plan_menu->plan_index = 0;
+		}
+		else if (lora_plan_menu->plan_index < 0) {
+			lora_plan_menu->plan_index = LORA_PLAN_SUBMENU_COUNT - 1;
+		}
+
+	    // Reset every button to unselected
+	    for (int i = 0; i < LORA_PLAN_SUBMENU_COUNT; i++) {
+	        lv_obj_remove_style(lora_plan_menu->plan_btns[i], &lora_plan_menu->plan_sel_style, 0);
+	        lv_obj_add_style(lora_plan_menu->plan_btns[i], &lora_plan_menu->plan_btn_style, 0);
+	    }
+
+	    // Highlight only the current index
+	    lv_obj_remove_style(lora_plan_menu->plan_btns[lora_plan_menu->plan_index], &lora_plan_menu->plan_btn_style, 0);
+	    lv_obj_add_style(lora_plan_menu->plan_btns[lora_plan_menu->plan_index], &lora_plan_menu->plan_sel_style, 0);
+	}
+	else if (ui_btns->up_btn == 1) {
+		// Update selection up (for 4 columns: if > 3 subtract 4, else add 4)
+		if (lora_plan_menu->plan_index > (PLAN_COLUMNS - 1)) {
+			lora_plan_menu->plan_index -= PLAN_COLUMNS;
+		}
+		else {
+			lora_plan_menu->plan_index += PLAN_COLUMNS;
+		}
+		
+		// Wrap if needed
+		if (lora_plan_menu->plan_index >= LORA_PLAN_SUBMENU_COUNT) {
+			lora_plan_menu->plan_index -= LORA_PLAN_SUBMENU_COUNT;
+		}
+		
+		/* Update container */
+		// Wrap index
+		if (lora_plan_menu->plan_index >= LORA_PLAN_SUBMENU_COUNT) {
+			lora_plan_menu->plan_index = 0;
+		}
+		else if (lora_plan_menu->plan_index < 0) {
+			lora_plan_menu->plan_index = LORA_PLAN_SUBMENU_COUNT - 1;
+		}
+
+	    // Reset every button to unselected
+	    for (int i = 0; i < LORA_PLAN_SUBMENU_COUNT; i++) {
+	        lv_obj_remove_style(lora_plan_menu->plan_btns[i], &lora_plan_menu->plan_sel_style, 0);
+	        lv_obj_add_style(lora_plan_menu->plan_btns[i], &lora_plan_menu->plan_btn_style, 0);
+	    }
+
+	    // Highlight only the current index
+	    lv_obj_remove_style(lora_plan_menu->plan_btns[lora_plan_menu->plan_index], &lora_plan_menu->plan_btn_style, 0);
+	    lv_obj_add_style(lora_plan_menu->plan_btns[lora_plan_menu->plan_index], &lora_plan_menu->plan_sel_style, 0);
+	}
+	else if (ui_btns->down_btn == 1) {
+		// Update selection down (for 4 columns: if < 4 add 4, else subtract 4)
+		if (lora_plan_menu->plan_index < PLAN_COLUMNS) {
+			lora_plan_menu->plan_index += PLAN_COLUMNS;
+		}
+		else {
+			lora_plan_menu->plan_index -= PLAN_COLUMNS;
+		}
+		
+		// Wrap if needed
+		if (lora_plan_menu->plan_index < 0) {
+			lora_plan_menu->plan_index += LORA_PLAN_SUBMENU_COUNT;
+		}
+		
+		/* Update container */
+		// Wrap index
+		if (lora_plan_menu->plan_index >= LORA_PLAN_SUBMENU_COUNT) {
+			lora_plan_menu->plan_index = 0;
+		}
+		else if (lora_plan_menu->plan_index < 0) {
+			lora_plan_menu->plan_index = LORA_PLAN_SUBMENU_COUNT - 1;
+		}
+
+	    // Reset every button to unselected
+	    for (int i = 0; i < LORA_PLAN_SUBMENU_COUNT; i++) {
+	        lv_obj_remove_style(lora_plan_menu->plan_btns[i], &lora_plan_menu->plan_sel_style, 0);
+	        lv_obj_add_style(lora_plan_menu->plan_btns[i], &lora_plan_menu->plan_btn_style, 0);
+	    }
+
+	    // Highlight only the current index
+	    lv_obj_remove_style(lora_plan_menu->plan_btns[lora_plan_menu->plan_index], &lora_plan_menu->plan_btn_style, 0);
+	    lv_obj_add_style(lora_plan_menu->plan_btns[lora_plan_menu->plan_index], &lora_plan_menu->plan_sel_style, 0);
+    }
+	else if (ui_btns->select_btn == 1) {
+		// If a day, toggle it and update symbol
+		if (lora_plan_menu->plan_index < 7) {
+			days_selected[lora_plan_menu->plan_index] = !days_selected[lora_plan_menu->plan_index];
+			lv_obj_t *lbl = lv_obj_get_child(lora_plan_menu->plan_btns[lora_plan_menu->plan_index], 0);
+			char buf[20];
+			snprintf(buf, sizeof(buf), "%s\n%s", days_selected[lora_plan_menu->plan_index] ? LV_SYMBOL_OK : LV_SYMBOL_CLOSE, days[lora_plan_menu->plan_index]);
+			lv_label_set_text(lbl, buf);
+		}
+		// Else "REM" selected (remove)
+		else {
+			// Reset all labels and days
+			for (int i = 0; i < 7; i++) {
+				days_selected[i] = false;
+				lv_obj_t *lbl = lv_obj_get_child(lora_plan_menu->plan_btns[i], 0);
+				char buf[20];
+				snprintf(buf, sizeof(buf), "%s\n%s", LV_SYMBOL_CLOSE, days[i]);
+				lv_label_set_text(lbl, buf);
+			}
+			
+			// Hide and go back
+			lv_obj_add_flag(lora_plan_menu->plan_cont, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_add_flag(lora_plan_menu->lbl_days_ins, LV_OBJ_FLAG_HIDDEN);
+			
+			// Show LoRa submenu
+			lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+
+			// Switch pages
+			ui_menu->page = LORA_SUBPAGE;
+		}
+	}
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Reset all labels and days
+		for (int i = 0; i < 7; i++) {
+			days_selected[i] = false;
+			lv_obj_t *lbl = lv_obj_get_child(lora_plan_menu->plan_btns[i], 0);
+			char buf[20];
+			snprintf(buf, sizeof(buf), "%s\n%s", LV_SYMBOL_CLOSE, days[i]);
+			lv_label_set_text(lbl, buf);
+		}
+			
+		// Hide plan items
+		lv_obj_add_flag(lora_plan_menu->plan_cont, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(lora_plan_menu->lbl_days_ins, LV_OBJ_FLAG_HIDDEN);
+		
+		// Go home or power off
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);
 	}
 }
 

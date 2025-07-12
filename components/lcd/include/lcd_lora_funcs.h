@@ -6,6 +6,7 @@
 #include "esp_err.h"
 
 #define MAX_LORA_OPTIONS 20
+#define LORA_PLAN_SUBMENU_COUNT 8
 
 #define LORA_OPTIONS_NS "lo_op_ns" // NVS namespace
 #define LORA_OPTIONS_KEY_COUNT "lo_op_ke" // u8: number of option
@@ -42,8 +43,19 @@ typedef struct {
 	lv_obj_t *cont;
 	lora_submenu_t submenu;
 } lora_menu_t;
+	
+typedef struct {
+    lv_obj_t *plan_cont;
+    lv_obj_t *plan_btns[LORA_PLAN_SUBMENU_COUNT];
+    lv_obj_t *lbl_days_ins;
+    lv_style_t plan_btn_style;
+    lv_style_t plan_sel_style;
+    const char *plan_options[LORA_PLAN_SUBMENU_COUNT];
+    int plan_index;
+} lora_plan_menu_t;
 
 extern lora_menu_t lora_menu; 
+extern lora_plan_menu_t lora_plan_menu; 
 
 /**
  * @brief Creates the central LoRa page then hides it for quick access
@@ -60,13 +72,22 @@ void lcd_lora_setup_page(lora_menu_t *lora_menu);
 void lcd_lora_setup_subpage(lora_menu_t *lora_menu);
 
 /**
- * @brief Executes when navigating the LoRa subpage to display LoRa options in a container
+ * @brief Creates the LoRa plan subpage then hides it for quick access
  *
  * @param [in] ui_menu UI menu structure
- * @param [in] lora_menu LoRa menu structure
- * @param [in] ui_btns UI input structure
+ * @param [in] lora_plan_menu LoRa plan menu structure
  */
-void lcd_lora_subpage_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
+void lcd_lora_setup_plan_page(ui_menu_t *ui_menu, lora_plan_menu_t *lora_plan_menu);
+
+/**
+ * @brief Executes when navigating the LoRa subpage to display LoRa options in a container
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] lora_menu LoRa menu structure
+ * @param [in] lora_plan_menu LoRa plan menu structure
+ */
+void lcd_lora_subpage_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu);
 
 /**
  * @brief Updates the LoRa menu labels based on user menu input
@@ -81,15 +102,6 @@ void lcd_lora_update_menu(lora_menu_t *lora_menu);
  * @param [in] lora_menu LoRa menu structure
  */
 void lcd_lora_update_submenu(lora_menu_t *lora_menu);
-
-/**
- * @brief Executes when a specific LoRa subpage option is selected by the user
- *
- * @param [in] ui_menu UI menu structure
- * @param [in] lora_menu LoRa menu structure
- * @param [in] ui_btns UI input structure
- */
-void lcd_lora_subpage_option_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
 
 /**
  * @brief Executes when user selects "AWAY" from LoRa subpage
@@ -108,6 +120,16 @@ void lcd_lora_subpage_away_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, 
  * @param [in] ui_btns UI input structure
  */
 void lcd_lora_subpage_loop_selected(ui_menu_t *ui_menu, lora_menu_t *lora_menu, ui_btns_t *ui_btns);
+
+/**
+ * @brief Executes when user selects "PLAN" from LoRa subpage
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] lora_menu LoRa menu structure
+ * @param [in] lora_plan_menu LoRa plan menu structure
+ */
+void lcd_lora_subpage_plan_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu);
 
 /**
  * @brief Prompts user on how to pair a PolyPlug then sends a Semaphore to generate a random enc key to share

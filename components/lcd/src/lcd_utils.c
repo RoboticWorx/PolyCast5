@@ -942,8 +942,9 @@ void lcd_funcs_transition_back(bool home, ui_menu_t *ui_menu)
 		start_animation();
 
 		ui_menu->page = HOME_PAGE;
+		
+		lv_refr_now(disp); // Force redraw of homescreen before sleeping
 			
-		lv_timer_handler();
 		go_to_sleep = true;
 	}
 }

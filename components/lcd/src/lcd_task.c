@@ -104,6 +104,7 @@ static void lcd_task(void *pvParameters)
 	
 	lcd_lora_setup_page(&lora_menu);
 	lcd_lora_setup_subpage(&lora_menu);
+	lcd_lora_setup_plan_page(&ui_menu, &lora_plan_menu);
 	
 	lcd_espnow_setup_page(&espnow_menu);
 	lcd_espnow_setup_send_page(&espnow_menu);
@@ -224,10 +225,16 @@ static void lcd_task(void *pvParameters)
 				lcd_lora_create_custom_name(&ui_menu, &lora_menu, &ui_btns);
 			}
 			else if (ui_menu.page == LORA_SUBPAGE) {
-				lcd_lora_subpage_selected(&ui_menu, &lora_menu, &ui_btns);
+				lcd_lora_subpage_selected(&ui_btns, &ui_menu, &lora_menu, &lora_plan_menu);
 			}
-			else if (ui_menu.page == LORA_OPTIONS_SUBPAGE) {
-				lcd_lora_subpage_option_selected(&ui_menu, &lora_menu, &ui_btns);
+			else if (ui_menu.page == LORA_LOOP_SUBPAGE) {
+				lcd_lora_subpage_loop_selected(&ui_menu, &lora_menu, &ui_btns);
+			}
+			else if (ui_menu.page == LORA_AWAY_SUBPAGE) {
+				lcd_lora_subpage_away_selected(&ui_menu, &lora_menu, &ui_btns);
+			}
+			else if (ui_menu.page == LORA_PLAN_SUBPAGE) {
+				lcd_lora_subpage_plan_selected(&ui_btns, &ui_menu, &lora_menu, &lora_plan_menu);
 			}
 			// ESP-NOW page
 			else if (ui_menu.page == ESPNOW_PAGE) {
