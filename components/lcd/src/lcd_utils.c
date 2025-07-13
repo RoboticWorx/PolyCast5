@@ -55,7 +55,7 @@
 #else
 	#define CITY_FRAME_CNT 5
 	#define BLACK_HOLE_FRAME_CNT 5
-	#define MATRIX_RAIN_FRAME_CNT 30
+	#define MATRIX_RAIN_FRAME_CNT 42
 #endif
 
 // Cycle order
@@ -126,12 +126,15 @@ typedef struct {
 	};
 	
 	static const lv_img_dsc_t *matrix_rain_frames[MATRIX_RAIN_FRAME_CNT] = {
-			&anim_matrix_rain_1,  &anim_matrix_rain_2,  &anim_matrix_rain_3,  &anim_matrix_rain_4,  &anim_matrix_rain_5,
-			&anim_matrix_rain_6,  &anim_matrix_rain_7,  &anim_matrix_rain_8,  &anim_matrix_rain_9,  &anim_matrix_rain_10,
+			&anim_matrix_rain_1,  &anim_matrix_rain_2,  &anim_matrix_rain_3,  &anim_matrix_rain_4,	&anim_matrix_rain_5,
+			&anim_matrix_rain_6,  &anim_matrix_rain_7,  &anim_matrix_rain_8,  &anim_matrix_rain_9,	&anim_matrix_rain_10,
 			&anim_matrix_rain_11, &anim_matrix_rain_12, &anim_matrix_rain_13, &anim_matrix_rain_14, &anim_matrix_rain_15,
 			&anim_matrix_rain_16, &anim_matrix_rain_17, &anim_matrix_rain_18, &anim_matrix_rain_19, &anim_matrix_rain_20,
 			&anim_matrix_rain_21, &anim_matrix_rain_22, &anim_matrix_rain_23, &anim_matrix_rain_24, &anim_matrix_rain_25,
-			&anim_matrix_rain_26, &anim_matrix_rain_27, &anim_matrix_rain_28, &anim_matrix_rain_29, &anim_matrix_rain_30
+			&anim_matrix_rain_26, &anim_matrix_rain_27, &anim_matrix_rain_28, &anim_matrix_rain_29, &anim_matrix_rain_30,
+			&anim_matrix_rain_31, &anim_matrix_rain_32, &anim_matrix_rain_33, &anim_matrix_rain_34, &anim_matrix_rain_35,
+			&anim_matrix_rain_36, &anim_matrix_rain_37, &anim_matrix_rain_38, &anim_matrix_rain_39, &anim_matrix_rain_40,
+			&anim_matrix_rain_41, &anim_matrix_rain_42
 	};
 #else
 	static const lv_img_dsc_t *city_frames[CITY_FRAME_CNT] = {
@@ -145,12 +148,15 @@ typedef struct {
 	};
 	
 	static const lv_img_dsc_t *matrix_rain_frames[MATRIX_RAIN_FRAME_CNT] = {
-			&anim_matrix_rain_1,  &anim_matrix_rain_2,  &anim_matrix_rain_3,  &anim_matrix_rain_4,  &anim_matrix_rain_5,
-			&anim_matrix_rain_6,  &anim_matrix_rain_7,  &anim_matrix_rain_8,  &anim_matrix_rain_9,  &anim_matrix_rain_10,
+			&anim_matrix_rain_1,  &anim_matrix_rain_2,  &anim_matrix_rain_3,  &anim_matrix_rain_4,	&anim_matrix_rain_5,
+			&anim_matrix_rain_6,  &anim_matrix_rain_7,  &anim_matrix_rain_8,  &anim_matrix_rain_9,	&anim_matrix_rain_10,
 			&anim_matrix_rain_11, &anim_matrix_rain_12, &anim_matrix_rain_13, &anim_matrix_rain_14, &anim_matrix_rain_15,
 			&anim_matrix_rain_16, &anim_matrix_rain_17, &anim_matrix_rain_18, &anim_matrix_rain_19, &anim_matrix_rain_20,
 			&anim_matrix_rain_21, &anim_matrix_rain_22, &anim_matrix_rain_23, &anim_matrix_rain_24, &anim_matrix_rain_25,
-			&anim_matrix_rain_26, &anim_matrix_rain_27, &anim_matrix_rain_28, &anim_matrix_rain_29, &anim_matrix_rain_30
+			&anim_matrix_rain_26, &anim_matrix_rain_27, &anim_matrix_rain_28, &anim_matrix_rain_29, &anim_matrix_rain_30,
+			&anim_matrix_rain_31, &anim_matrix_rain_32, &anim_matrix_rain_33, &anim_matrix_rain_34, &anim_matrix_rain_35,
+			&anim_matrix_rain_36, &anim_matrix_rain_37, &anim_matrix_rain_38, &anim_matrix_rain_39, &anim_matrix_rain_40,
+			&anim_matrix_rain_41, &anim_matrix_rain_42
 	};
 #endif
 
