@@ -28,6 +28,7 @@
 
 #include "anim_city.h"
 #include "anim_black_hole.h"
+#include "anim_matrix_rain.h"
 
 #define DRAW_LINES   20
 #define FLUSH_CHUNK  2
@@ -41,20 +42,26 @@
 
 
 /* Animation macros */
+#define NUM_ANIMS 3
+
 #define CITY_FRAME_PERIOD 120 // 160
 #define BLACK_HOLE_FRAME_PERIOD 120
+#define MATRIX_RAIN_FRAME_PERIOD 100
 
 #ifdef POLYCAST5_BUILD_FULL_ANIMS
 	#define CITY_FRAME_CNT 60
 	#define BLACK_HOLE_FRAME_CNT 18
+	#define MATRIX_RAIN_FRAME_CNT 30
 #else
 	#define CITY_FRAME_CNT 5
 	#define BLACK_HOLE_FRAME_CNT 5
+	#define MATRIX_RAIN_FRAME_CNT 30
 #endif
 
 // Cycle order
 #define CITY 0
 #define BLACK_HOLE 1
+#define MATRIX_RAIN 2
 
 static uint8_t anim_active = 0; // Default determined in lcd_anim_nvs_load
 
@@ -117,6 +124,15 @@ typedef struct {
 			&anim_black_hole_13, &anim_black_hole_14, &anim_black_hole_15,
 			&anim_black_hole_16, &anim_black_hole_17, &anim_black_hole_18
 	};
+	
+	static const lv_img_dsc_t *matrix_rain_frames[MATRIX_RAIN_FRAME_CNT] = {
+			&anim_matrix_rain_1,  &anim_matrix_rain_2,  &anim_matrix_rain_3,  &anim_matrix_rain_4,  &anim_matrix_rain_5,
+			&anim_matrix_rain_6,  &anim_matrix_rain_7,  &anim_matrix_rain_8,  &anim_matrix_rain_9,  &anim_matrix_rain_10,
+			&anim_matrix_rain_11, &anim_matrix_rain_12, &anim_matrix_rain_13, &anim_matrix_rain_14, &anim_matrix_rain_15,
+			&anim_matrix_rain_16, &anim_matrix_rain_17, &anim_matrix_rain_18, &anim_matrix_rain_19, &anim_matrix_rain_20,
+			&anim_matrix_rain_21, &anim_matrix_rain_22, &anim_matrix_rain_23, &anim_matrix_rain_24, &anim_matrix_rain_25,
+			&anim_matrix_rain_26, &anim_matrix_rain_27, &anim_matrix_rain_28, &anim_matrix_rain_29, &anim_matrix_rain_30
+	};
 #else
 	static const lv_img_dsc_t *city_frames[CITY_FRAME_CNT] = {
 			&anim_city_1, &anim_city_2, &anim_city_3,
@@ -126,6 +142,15 @@ typedef struct {
 	static const lv_img_dsc_t *black_hole_frames[BLACK_HOLE_FRAME_CNT] = {
 			&anim_black_hole_1,	 &anim_black_hole_2,  &anim_black_hole_3,
 			&anim_black_hole_4,	 &anim_black_hole_5
+	};
+	
+	static const lv_img_dsc_t *matrix_rain_frames[MATRIX_RAIN_FRAME_CNT] = {
+			&anim_matrix_rain_1,  &anim_matrix_rain_2,  &anim_matrix_rain_3,  &anim_matrix_rain_4,  &anim_matrix_rain_5,
+			&anim_matrix_rain_6,  &anim_matrix_rain_7,  &anim_matrix_rain_8,  &anim_matrix_rain_9,  &anim_matrix_rain_10,
+			&anim_matrix_rain_11, &anim_matrix_rain_12, &anim_matrix_rain_13, &anim_matrix_rain_14, &anim_matrix_rain_15,
+			&anim_matrix_rain_16, &anim_matrix_rain_17, &anim_matrix_rain_18, &anim_matrix_rain_19, &anim_matrix_rain_20,
+			&anim_matrix_rain_21, &anim_matrix_rain_22, &anim_matrix_rain_23, &anim_matrix_rain_24, &anim_matrix_rain_25,
+			&anim_matrix_rain_26, &anim_matrix_rain_27, &anim_matrix_rain_28, &anim_matrix_rain_29, &anim_matrix_rain_30
 	};
 #endif
 
@@ -143,6 +168,16 @@ static anim_t city_anim = {
 static anim_t black_hole_anim = {
     .frames = black_hole_frames,
     .frame_cnt = BLACK_HOLE_FRAME_CNT,
+    .pingpong = false,
+    .forward = true,
+    .cur = 0,
+    .img = NULL,
+    .timer = NULL
+};
+
+static anim_t matrix_rain_anim = {
+    .frames = matrix_rain_frames,
+    .frame_cnt = MATRIX_RAIN_FRAME_CNT,
     .pingpong = false,
     .forward = true,
     .cur = 0,
@@ -630,34 +665,53 @@ void lcd_init_images()
 		lv_obj_add_flag(black_hole_anim.img, LV_OBJ_FLAG_HIDDEN);
 		lv_timer_pause(black_hole_anim.timer);
 	}
+	
+	/* Matrix rain */
+    // Create image
+    matrix_rain_anim.img = lv_img_create(ACTIVE_SCR);
+    lv_img_set_src(matrix_rain_anim.img, matrix_rain_anim.frames[0]);
+    lv_obj_center(matrix_rain_anim.img);
+    
+    // Create timer
+    matrix_rain_anim.timer = lv_timer_create(anim_timer_cb, MATRIX_RAIN_FRAME_PERIOD, &matrix_rain_anim);
+    
+    // Check if set
+    if(anim_active != MATRIX_RAIN) {
+		lv_obj_add_flag(matrix_rain_anim.img, LV_OBJ_FLAG_HIDDEN);
+		lv_timer_pause(matrix_rain_anim.timer);
+	}
 }
 
 static void start_animation(void)
 {
     // Start the active
-    if(anim_active == CITY) {
+    if (anim_active == CITY) {
         lv_obj_remove_flag(city_anim.img, LV_OBJ_FLAG_HIDDEN);
         lv_timer_resume(city_anim.timer);
     }
-    else {
+    else if (anim_active == BLACK_HOLE) {
         lv_obj_remove_flag(black_hole_anim.img,  LV_OBJ_FLAG_HIDDEN);
         lv_timer_resume(black_hole_anim.timer);
     }
+    else if (anim_active == MATRIX_RAIN){
+		lv_obj_remove_flag(matrix_rain_anim.img,  LV_OBJ_FLAG_HIDDEN);
+        lv_timer_resume(matrix_rain_anim.timer);
+	}
 }
 
 static void stop_animations(void)
 {
     lv_timer_pause(city_anim.timer);
     lv_timer_pause(black_hole_anim.timer);
+    lv_timer_pause(matrix_rain_anim.timer);
 
     lv_obj_add_flag(city_anim.img, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(black_hole_anim.img, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(matrix_rain_anim.img, LV_OBJ_FLAG_HIDDEN);
 }
 
 static void transition_animation(bool dir)
-{
-	#define NUM_ANIMS 2
-	
+{	
 	stop_animations();
 	
 	if (dir) {
@@ -1035,11 +1089,13 @@ void lcd_lora_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t 
 	else if (ui_btns->select_btn == 1 && lora_menu->index == 0) {
 		xSemaphoreGive(xWifiDisconnectSemaphore); // Disconnect from Wi-Fi if connected
 		
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		// Hide LoRa menu
 		lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
 		lcd_lora_create_enc_key(ui_menu, lora_menu);
-	
 	}
 	// PolyPlug selected
 	else if (ui_btns->select_btn == 1) {

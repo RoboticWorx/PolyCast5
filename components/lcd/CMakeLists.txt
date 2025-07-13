@@ -3,6 +3,7 @@ file(GLOB_RECURSE SRCS
 	"src/*.c"
 	"media/city/src/*.c"
 	"media/black_hole/src/*.c"
+	"media/matrix_rain/src/*.c"
 	"media/other/src/*.c"
 	"media/qr/src/*.c"
 )
@@ -15,6 +16,7 @@ idf_component_register(
     	"media/qr/include"
     	"media/city/include"
     	"media/black_hole/include"
+    	"media/matrix_rain/include"
     	"media/other/include"
     
     REQUIRES
