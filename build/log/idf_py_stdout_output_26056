@@ -1,0 +1,381 @@
+Command: ninja flash
+[1/10] Performing build step for 'bootloader'
+[1/1] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\build\bootloader\esp-idf\esptool_py && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-master/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x2000 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/bootloader.bin"
+Bootloader binary size 0x5510 bytes. 0xaf0 bytes (11%) free.
+[2/10] No install step for 'bootloader'
+[3/10] Completed 'bootloader'
+[4/10] Building C object esp-idf/lcd/CMakeFiles/__idf_lcd.dir/src/lcd_utils.c.obj
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:107:17: warning: excess elements in array initializer
+  107 |                 &anim_city_11, &anim_city_12, &anim_city_13, &anim_city_14, &anim_city_15,
+      |                 ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:107:17: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:107:32: warning: excess elements in array initializer
+  107 |                 &anim_city_11, &anim_city_12, &anim_city_13, &anim_city_14, &anim_city_15,
+      |                                ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:107:32: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:107:47: warning: excess elements in array initializer
+  107 |                 &anim_city_11, &anim_city_12, &anim_city_13, &anim_city_14, &anim_city_15,
+      |                                               ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:107:47: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:107:62: warning: excess elements in array initializer
+  107 |                 &anim_city_11, &anim_city_12, &anim_city_13, &anim_city_14, &anim_city_15,
+      |                                                              ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:107:62: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:107:77: warning: excess elements in array initializer
+  107 |                 &anim_city_11, &anim_city_12, &anim_city_13, &anim_city_14, &anim_city_15,
+      |                                                                             ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:107:77: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:108:17: warning: excess elements in array initializer
+  108 |                 &anim_city_16, &anim_city_17, &anim_city_18, &anim_city_19, &anim_city_20,
+      |                 ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:108:17: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:108:32: warning: excess elements in array initializer
+  108 |                 &anim_city_16, &anim_city_17, &anim_city_18, &anim_city_19, &anim_city_20,
+      |                                ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:108:32: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:108:47: warning: excess elements in array initializer
+  108 |                 &anim_city_16, &anim_city_17, &anim_city_18, &anim_city_19, &anim_city_20,
+      |                                               ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:108:47: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:108:62: warning: excess elements in array initializer
+  108 |                 &anim_city_16, &anim_city_17, &anim_city_18, &anim_city_19, &anim_city_20,
+      |                                                              ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:108:62: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:108:77: warning: excess elements in array initializer
+  108 |                 &anim_city_16, &anim_city_17, &anim_city_18, &anim_city_19, &anim_city_20,
+      |                                                                             ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:108:77: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:17: warning: excess elements in array initializer
+  109 |                 &anim_city_21, &anim_city_22, &anim_city_23, &anim_city_24, &anim_city_25,
+      |                 ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:17: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:32: warning: excess elements in array initializer
+  109 |                 &anim_city_21, &anim_city_22, &anim_city_23, &anim_city_24, &anim_city_25,
+      |                                ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:32: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:47: warning: excess elements in array initializer
+  109 |                 &anim_city_21, &anim_city_22, &anim_city_23, &anim_city_24, &anim_city_25,
+      |                                               ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:47: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:62: warning: excess elements in array initializer
+  109 |                 &anim_city_21, &anim_city_22, &anim_city_23, &anim_city_24, &anim_city_25,
+      |                                                              ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:62: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:77: warning: excess elements in array initializer
+  109 |                 &anim_city_21, &anim_city_22, &anim_city_23, &anim_city_24, &anim_city_25,
+      |                                                                             ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:77: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:17: warning: excess elements in array initializer
+  110 |                 &anim_city_26, &anim_city_27, &anim_city_28, &anim_city_29, &anim_city_30,
+      |                 ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:17: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:32: warning: excess elements in array initializer
+  110 |                 &anim_city_26, &anim_city_27, &anim_city_28, &anim_city_29, &anim_city_30,
+      |                                ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:32: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:47: warning: excess elements in array initializer
+  110 |                 &anim_city_26, &anim_city_27, &anim_city_28, &anim_city_29, &anim_city_30,
+      |                                               ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:47: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:62: warning: excess elements in array initializer
+  110 |                 &anim_city_26, &anim_city_27, &anim_city_28, &anim_city_29, &anim_city_30,
+      |                                                              ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:62: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:77: warning: excess elements in array initializer
+  110 |                 &anim_city_26, &anim_city_27, &anim_city_28, &anim_city_29, &anim_city_30,
+      |                                                                             ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:77: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:17: warning: excess elements in array initializer
+  111 |                 &anim_city_31, &anim_city_32, &anim_city_33, &anim_city_34, &anim_city_35,
+      |                 ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:17: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:32: warning: excess elements in array initializer
+  111 |                 &anim_city_31, &anim_city_32, &anim_city_33, &anim_city_34, &anim_city_35,
+      |                                ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:32: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:47: warning: excess elements in array initializer
+  111 |                 &anim_city_31, &anim_city_32, &anim_city_33, &anim_city_34, &anim_city_35,
+      |                                               ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:47: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:62: warning: excess elements in array initializer
+  111 |                 &anim_city_31, &anim_city_32, &anim_city_33, &anim_city_34, &anim_city_35,
+      |                                                              ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:62: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:77: warning: excess elements in array initializer
+  111 |                 &anim_city_31, &anim_city_32, &anim_city_33, &anim_city_34, &anim_city_35,
+      |                                                                             ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:77: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:17: warning: excess elements in array initializer
+  112 |                 &anim_city_36, &anim_city_37, &anim_city_38, &anim_city_39, &anim_city_40,
+      |                 ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:17: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:32: warning: excess elements in array initializer
+  112 |                 &anim_city_36, &anim_city_37, &anim_city_38, &anim_city_39, &anim_city_40,
+      |                                ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:32: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:47: warning: excess elements in array initializer
+  112 |                 &anim_city_36, &anim_city_37, &anim_city_38, &anim_city_39, &anim_city_40,
+      |                                               ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:47: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:62: warning: excess elements in array initializer
+  112 |                 &anim_city_36, &anim_city_37, &anim_city_38, &anim_city_39, &anim_city_40,
+      |                                                              ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:62: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:77: warning: excess elements in array initializer
+  112 |                 &anim_city_36, &anim_city_37, &anim_city_38, &anim_city_39, &anim_city_40,
+      |                                                                             ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:77: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:17: warning: excess elements in array initializer
+  113 |                 &anim_city_41, &anim_city_42, &anim_city_43, &anim_city_44, &anim_city_45,
+      |                 ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:17: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:32: warning: excess elements in array initializer
+  113 |                 &anim_city_41, &anim_city_42, &anim_city_43, &anim_city_44, &anim_city_45,
+      |                                ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:32: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:47: warning: excess elements in array initializer
+  113 |                 &anim_city_41, &anim_city_42, &anim_city_43, &anim_city_44, &anim_city_45,
+      |                                               ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:47: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:62: warning: excess elements in array initializer
+  113 |                 &anim_city_41, &anim_city_42, &anim_city_43, &anim_city_44, &anim_city_45,
+      |                                                              ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:62: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:77: warning: excess elements in array initializer
+  113 |                 &anim_city_41, &anim_city_42, &anim_city_43, &anim_city_44, &anim_city_45,
+      |                                                                             ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:77: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:17: warning: excess elements in array initializer
+  114 |                 &anim_city_46, &anim_city_47, &anim_city_48, &anim_city_49, &anim_city_50,
+      |                 ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:17: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:32: warning: excess elements in array initializer
+  114 |                 &anim_city_46, &anim_city_47, &anim_city_48, &anim_city_49, &anim_city_50,
+      |                                ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:32: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:47: warning: excess elements in array initializer
+  114 |                 &anim_city_46, &anim_city_47, &anim_city_48, &anim_city_49, &anim_city_50,
+      |                                               ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:47: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:62: warning: excess elements in array initializer
+  114 |                 &anim_city_46, &anim_city_47, &anim_city_48, &anim_city_49, &anim_city_50,
+      |                                                              ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:62: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:77: warning: excess elements in array initializer
+  114 |                 &anim_city_46, &anim_city_47, &anim_city_48, &anim_city_49, &anim_city_50,
+      |                                                                             ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:77: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:17: warning: excess elements in array initializer
+  115 |                 &anim_city_51, &anim_city_52, &anim_city_53, &anim_city_54, &anim_city_55,
+      |                 ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:17: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:32: warning: excess elements in array initializer
+  115 |                 &anim_city_51, &anim_city_52, &anim_city_53, &anim_city_54, &anim_city_55,
+      |                                ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:32: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:47: warning: excess elements in array initializer
+  115 |                 &anim_city_51, &anim_city_52, &anim_city_53, &anim_city_54, &anim_city_55,
+      |                                               ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:47: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:62: warning: excess elements in array initializer
+  115 |                 &anim_city_51, &anim_city_52, &anim_city_53, &anim_city_54, &anim_city_55,
+      |                                                              ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:62: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:77: warning: excess elements in array initializer
+  115 |                 &anim_city_51, &anim_city_52, &anim_city_53, &anim_city_54, &anim_city_55,
+      |                                                                             ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:77: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:17: warning: excess elements in array initializer
+  116 |                 &anim_city_56, &anim_city_57, &anim_city_58, &anim_city_59, &anim_city_60,
+      |                 ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:17: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:32: warning: excess elements in array initializer
+  116 |                 &anim_city_56, &anim_city_57, &anim_city_58, &anim_city_59, &anim_city_60,
+      |                                ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:32: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:47: warning: excess elements in array initializer
+  116 |                 &anim_city_56, &anim_city_57, &anim_city_58, &anim_city_59, &anim_city_60,
+      |                                               ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:47: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:62: warning: excess elements in array initializer
+  116 |                 &anim_city_56, &anim_city_57, &anim_city_58, &anim_city_59, &anim_city_60,
+      |                                                              ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:62: note: (near initialization for 'city_frames')
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:77: warning: excess elements in array initializer
+  116 |                 &anim_city_56, &anim_city_57, &anim_city_58, &anim_city_59, &anim_city_60,
+      |                                                                             ^
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:77: note: (near initialization for 'city_frames')
+[5/10] Linking C static library esp-idf\lcd\liblcd.a
+[6/10] Generating ld/sections.ld
+[7/10] Linking CXX executable app-template.elf
+[8/10] Generating binary image from built executable
+esptool.py v4.9.dev6
+Creating esp32c5 image...
+Merged 2 ELF sections
+Successfully created esp32c5 image.
+Generated C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/app-template.bin
+[9/10] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\build\esp-idf\esptool_py && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-master/components/partition_table/check_sizes.py --offset 0x8000 partition --type app C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/partition_table/partition-table.bin C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/app-template.bin"
+app-template.bin binary size 0x615af0 bytes. Smallest app partition is 0x700000 bytes. 0xea510 bytes (13%) free.
+[9/10] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Espressif\frameworks\esp-idf-master\components\esptool_py && C:\Espressif\tools\cmake\3.30.2\bin\cmake.exe -D IDF_PATH=C:/Espressif/frameworks/esp-idf-master -D SERIAL_TOOL=C:/Espressif/python_env/idf5.5_py3.11_env/Scripts/python.exe;;C:/Espressif/frameworks/esp-idf-master/components/esptool_py/esptool/esptool.py;--chip;esp32c5 -D SERIAL_TOOL_ARGS=--before=default_reset;--after=hard_reset;write_flash;@flash_args -D WORKING_DIRECTORY=C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build -P C:/Espressif/frameworks/esp-idf-master/components/esptool_py/run_serial_tool.cmake"
+esptool.py --chip esp32c5 -p COM10 -b 460800 --before=default_reset --after=hard_reset write_flash --flash_mode dio --flash_freq 80m --flash_size 8MB 0x2000 bootloader/bootloader.bin 0x10000 app-template.bin 0x8000 partition_table/partition-table.bin
+esptool.py v4.9.dev6
+Serial port COM10
+Connecting...
+Chip is ESP32-C5 (revision v0.1)
+Features: WiFi 6, BT 5, IEEE802.15.4
+Crystal is 48MHz
+USB mode: USB-Serial/JTAG
+MAC: 60:55:f9:ff:fe:fc:e0:64
+BASE MAC: 60:55:f9:fc:e0:64
+MAC_EXT: ff:fe
+Uploading stub...
+Running stub...
+Stub running...
+Changing baud rate to 460800
+Changed.
+Configuring flash size...
+Flash will be erased from 0x00002000 to 0x00007fff...
+Flash will be erased from 0x00010000 to 0x00625fff...
+Flash will be erased from 0x00008000 to 0x00008fff...
+Compressed 21776 bytes to 13301...
+Writing at 0x00002000... (100 %)
+Wrote 21776 bytes (13301 compressed) at 0x00002000 in 0.2 seconds (effective 818.3 kbit/s)...
+Hash of data verified.
+Compressed 6380272 bytes to 2087094...
+Writing at 0x00010000... (0 %)
+Writing at 0x0001bdca... (1 %)
+Writing at 0x00029340... (2 %)
+Writing at 0x00037d8a... (3 %)
+Writing at 0x000479f4... (3 %)
+Writing at 0x0005778a... (4 %)
+Writing at 0x00067311... (5 %)
+Writing at 0x00076fb5... (6 %)
+Writing at 0x00086cf7... (7 %)
+Writing at 0x00096a23... (7 %)
+Writing at 0x000a6946... (8 %)
+Writing at 0x000b675e... (9 %)
+Writing at 0x000c6686... (10 %)
+Writing at 0x000d66e4... (10 %)
+Writing at 0x000e62ac... (11 %)
+Writing at 0x000f60e8... (12 %)
+Writing at 0x00105cda... (13 %)
+Writing at 0x001159d0... (14 %)
+Writing at 0x001254e0... (14 %)
+Writing at 0x001351a6... (15 %)
+Writing at 0x00144cd2... (16 %)
+Writing at 0x00159dfc... (17 %)
+Writing at 0x00170d3a... (17 %)
+Writing at 0x001851c2... (18 %)
+Writing at 0x0019bcc5... (19 %)
+Writing at 0x001b13be... (20 %)
+Writing at 0x001c5704... (21 %)
+Writing at 0x001dc8a4... (21 %)
+Writing at 0x001ec7fa... (22 %)
+Writing at 0x001fd3c4... (23 %)
+Writing at 0x0020c8aa... (24 %)
+Writing at 0x0021b10f... (25 %)
+Writing at 0x00229f03... (25 %)
+Writing at 0x00238a66... (26 %)
+Writing at 0x0024747c... (27 %)
+Writing at 0x00255d82... (28 %)
+Writing at 0x002643fc... (28 %)
+Writing at 0x00271a60... (29 %)
+Writing at 0x0027f91b... (30 %)
+Writing at 0x0028d82c... (31 %)
+Writing at 0x0029b7b9... (32 %)
+Writing at 0x002ab022... (32 %)
+Writing at 0x002b7870... (33 %)
+Writing at 0x002c44da... (34 %)
+Writing at 0x002d0e74... (35 %)
+Writing at 0x002dcddb... (35 %)
+Writing at 0x002e99cf... (36 %)
+Writing at 0x002f62c4... (37 %)
+Writing at 0x00302bb1... (38 %)
+Writing at 0x0030f05a... (39 %)
+Writing at 0x0031be28... (39 %)
+Writing at 0x003290ca... (40 %)
+Writing at 0x00336092... (41 %)
+Writing at 0x0034255c... (42 %)
+Writing at 0x003525e5... (42 %)
+Writing at 0x0035f963... (43 %)
+Writing at 0x0036d0aa... (44 %)
+Writing at 0x0037a9a7... (45 %)
+Writing at 0x0038844d... (46 %)
+Writing at 0x00396124... (46 %)
+Writing at 0x003a469d... (47 %)
+Writing at 0x003b352a... (48 %)
+Writing at 0x003c23f4... (49 %)
+Writing at 0x003d190c... (50 %)
+Writing at 0x003e1109... (50 %)
+Writing at 0x003f09c4... (51 %)
+Writing at 0x00400fc2... (52 %)
+Writing at 0x0041165f... (53 %)
+Writing at 0x00421a6e... (53 %)
+Writing at 0x004325f9... (54 %)
+Writing at 0x0044236b... (55 %)
+Writing at 0x00451d1e... (56 %)
+Writing at 0x00461656... (57 %)
+Writing at 0x00470eeb... (57 %)
+Writing at 0x00480417... (58 %)
+Writing at 0x0048bc24... (59 %)
+Writing at 0x004a1e6a... (60 %)
+Writing at 0x004bb0df... (60 %)
+Writing at 0x004c31e0... (61 %)
+Writing at 0x004cb820... (62 %)
+Writing at 0x004d4a8f... (63 %)
+Writing at 0x004ded94... (64 %)
+Writing at 0x004e972f... (64 %)
+Writing at 0x004f33e1... (65 %)
+Writing at 0x004f98ee... (66 %)
+Writing at 0x0050013c... (67 %)
+Writing at 0x00506efb... (67 %)
+Writing at 0x0050e809... (68 %)
+Writing at 0x00516394... (69 %)
+Writing at 0x0051e92b... (70 %)
+Writing at 0x00525826... (71 %)
+Writing at 0x0052b8bf... (71 %)
+Writing at 0x00532a7e... (72 %)
+Writing at 0x0053910b... (73 %)
+Writing at 0x0053f436... (74 %)
+Writing at 0x005454b4... (75 %)
+Writing at 0x0054b3f7... (75 %)
+Writing at 0x0055418c... (76 %)
+Writing at 0x0055bbaa... (77 %)
+Writing at 0x00563f24... (78 %)
+Writing at 0x0056b21a... (78 %)
+Writing at 0x00572123... (79 %)
+Writing at 0x00579072... (80 %)
+Writing at 0x00580248... (81 %)
+Writing at 0x00586cde... (82 %)
+Writing at 0x0058e228... (82 %)
+Writing at 0x00594bcd... (83 %)
+Writing at 0x0059b328... (84 %)
+Writing at 0x005a22e5... (85 %)
+Writing at 0x005a8748... (85 %)
+Writing at 0x005aefe3... (86 %)
+Writing at 0x005b5cde... (87 %)
+Writing at 0x005bb894... (88 %)
+Writing at 0x005c18e3... (89 %)
+Writing at 0x005c77ac... (89 %)
+Writing at 0x005cda24... (90 %)
+Writing at 0x005d4166... (91 %)
+Writing at 0x005da1fe... (92 %)
+Writing at 0x005e0177... (92 %)
+Writing at 0x005e6455... (93 %)
+Writing at 0x005ecb64... (94 %)
+Writing at 0x005f2e06... (95 %)
+Writing at 0x005f908d... (96 %)
+Writing at 0x005ff506... (96 %)
+Writing at 0x00605a27... (97 %)
+Writing at 0x0060cf6a... (98 %)
+Writing at 0x00613b6f... (99 %)
+Writing at 0x00619b46... (100 %)
+Wrote 6380272 bytes (2087094 compressed) at 0x00010000 in 24.0 seconds (effective 2124.4 kbit/s)...
+Hash of data verified.
+Compressed 3072 bytes to 105...
+Writing at 0x00008000... (100 %)
+Wrote 3072 bytes (105 compressed) at 0x00008000 in 0.0 seconds (effective 818.1 kbit/s)...
+Hash of data verified.
+
+Leaving...
+Hard resetting via RTS pin...
