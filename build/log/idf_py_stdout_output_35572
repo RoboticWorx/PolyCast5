@@ -1,11 +1,11 @@
 Command: ninja flash
 [1/6] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\build\esp-idf\esptool_py && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-master/components/partition_table/check_sizes.py --offset 0x8000 partition --type app C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/partition_table/partition-table.bin C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/PolyCast5.bin"
 PolyCast5.bin binary size 0x191070 bytes. Smallest app partition is 0x200000 bytes. 0x6ef90 bytes (22%) free.
-[2/6] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\build && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-master/components/spiffs/spiffsgen.py 0x580000 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/assets C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/assets.bin --page-size=256 --obj-name-len=64 --meta-len=4 --use-magic --use-magic-len"
-[3/6] Performing build step for 'bootloader'
+[2/6] Performing build step for 'bootloader'
 [1/1] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\build\bootloader\esp-idf\esptool_py && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-master/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x2000 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/bootloader.bin"
 Bootloader binary size 0x5510 bytes. 0xaf0 bytes (11%) free.
-[4/6] No install step for 'bootloader'
+[3/6] No install step for 'bootloader'
+[4/6] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\build && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-master/components/spiffs/spiffsgen.py 0x580000 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/assets C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/assets.bin --page-size=256 --obj-name-len=64 --meta-len=4 --use-magic --use-magic-len"
 [5/6] Completed 'bootloader'
 [5/6] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Espressif\frameworks\esp-idf-master\components\esptool_py && C:\Espressif\tools\cmake\3.30.2\bin\cmake.exe -D IDF_PATH=C:/Espressif/frameworks/esp-idf-master -D SERIAL_TOOL=C:/Espressif/python_env/idf5.5_py3.11_env/Scripts/python.exe;;C:/Espressif/frameworks/esp-idf-master/components/esptool_py/esptool/esptool.py;--chip;esp32c5 -D SERIAL_TOOL_ARGS=--before=default_reset;--after=hard_reset;write_flash;@flash_args -D WORKING_DIRECTORY=C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build -P C:/Espressif/frameworks/esp-idf-master/components/esptool_py/run_serial_tool.cmake"
 esptool.py --chip esp32c5 -p COM10 -b 460800 --before=default_reset --after=hard_reset write_flash --flash_mode dio --flash_freq 80m --flash_size 8MB 0x2000 bootloader/bootloader.bin 0x10000 PolyCast5.bin 0x8000 partition_table/partition-table.bin 0x210000 assets.bin
@@ -31,22 +31,22 @@ Flash will be erased from 0x00008000 to 0x00008fff...
 Flash will be erased from 0x00210000 to 0x0078ffff...
 Compressed 21776 bytes to 13301...
 Writing at 0x00002000... (100 %)
-Wrote 21776 bytes (13301 compressed) at 0x00002000 in 0.2 seconds (effective 806.9 kbit/s)...
+Wrote 21776 bytes (13301 compressed) at 0x00002000 in 0.2 seconds (effective 813.5 kbit/s)...
 Hash of data verified.
-Compressed 1642608 bytes to 886109...
+Compressed 1642608 bytes to 886108...
 Writing at 0x00010000... (1 %)
-Writing at 0x0001c79d... (3 %)
+Writing at 0x0001c78d... (3 %)
 Writing at 0x00029b37... (5 %)
 Writing at 0x00031d7f... (7 %)
 Writing at 0x00039e84... (9 %)
-Writing at 0x00042b95... (10 %)
+Writing at 0x00042b94... (10 %)
 Writing at 0x0004c405... (12 %)
 Writing at 0x000575f7... (14 %)
-Writing at 0x0005fe40... (16 %)
-Writing at 0x00069b87... (18 %)
-Writing at 0x0006ff8f... (20 %)
+Writing at 0x0005fe3c... (16 %)
+Writing at 0x00069b86... (18 %)
+Writing at 0x0006ff8d... (20 %)
 Writing at 0x00076d16... (21 %)
-Writing at 0x0007e887... (23 %)
+Writing at 0x0007e883... (23 %)
 Writing at 0x000863de... (25 %)
 Writing at 0x0008ebd2... (27 %)
 Writing at 0x000950be... (29 %)
@@ -59,8 +59,8 @@ Writing at 0x000bbdd4... (40 %)
 Writing at 0x000c1cb6... (41 %)
 Writing at 0x000caa19... (43 %)
 Writing at 0x000d23e2... (45 %)
-Writing at 0x000da656... (47 %)
-Writing at 0x000e1a77... (49 %)
+Writing at 0x000da655... (47 %)
+Writing at 0x000e1a74... (49 %)
 Writing at 0x000e88a3... (50 %)
 Writing at 0x000ef9ae... (52 %)
 Writing at 0x000f6b56... (54 %)
@@ -79,21 +79,21 @@ Writing at 0x0014425a... (76 %)
 Writing at 0x0014a9cc... (78 %)
 Writing at 0x00150cb6... (80 %)
 Writing at 0x00156ab4... (81 %)
-Writing at 0x0015c9f1... (83 %)
-Writing at 0x001634e6... (85 %)
+Writing at 0x0015c9f2... (83 %)
+Writing at 0x001634e7... (85 %)
 Writing at 0x00169773... (87 %)
 Writing at 0x0016fa40... (89 %)
-Writing at 0x00175ec2... (90 %)
+Writing at 0x00175eca... (90 %)
 Writing at 0x0017c41e... (92 %)
 Writing at 0x001837dd... (94 %)
 Writing at 0x0018a476... (96 %)
-Writing at 0x001909fd... (98 %)
-Writing at 0x001a04e7... (100 %)
-Wrote 1642608 bytes (886109 compressed) at 0x00010000 in 6.7 seconds (effective 1965.2 kbit/s)...
+Writing at 0x001909fc... (98 %)
+Writing at 0x001a04dd... (100 %)
+Wrote 1642608 bytes (886108 compressed) at 0x00010000 in 6.7 seconds (effective 1969.0 kbit/s)...
 Hash of data verified.
 Compressed 3072 bytes to 119...
 Writing at 0x00008000... (100 %)
-Wrote 3072 bytes (119 compressed) at 0x00008000 in 0.0 seconds (effective 812.5 kbit/s)...
+Wrote 3072 bytes (119 compressed) at 0x00008000 in 0.0 seconds (effective 816.6 kbit/s)...
 Hash of data verified.
 Compressed 5767168 bytes to 1317464...
 Writing at 0x00210000... (1 %)
@@ -177,7 +177,7 @@ Writing at 0x006cffc0... (96 %)
 Writing at 0x006de3e3... (97 %)
 Writing at 0x006eb325... (98 %)
 Writing at 0x00702a36... (100 %)
-Wrote 5767168 bytes (1317464 compressed) at 0x00210000 in 20.8 seconds (effective 2215.7 kbit/s)...
+Wrote 5767168 bytes (1317464 compressed) at 0x00210000 in 20.8 seconds (effective 2217.3 kbit/s)...
 Hash of data verified.
 
 Leaving...
