@@ -6,4 +6,4 @@ set confirm off
 set confirm on
 
 # Load application symbols
-file C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/app-template.elf
+file C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/PolyCast5.elf

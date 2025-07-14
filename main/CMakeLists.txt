@@ -1,6 +1,7 @@
 # See the build system documentation in IDF programming guide
 # for more information about component CMakeLists.txt files.
 
+# Register components
 file(GLOB_RECURSE SRCS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.c")
 
 idf_component_register(
@@ -27,4 +28,5 @@ idf_component_register(
         console
         esp_driver_uart
         esp_psram
+        spiffs
 )

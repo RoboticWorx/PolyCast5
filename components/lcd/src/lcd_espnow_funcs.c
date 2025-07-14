@@ -11,15 +11,13 @@
 #include "esp_mac.h"
 #include "esp_random.h"
 
+#include "lcd_asset_macros.h"
 #include "lcd_utils.h"
 #include "lcd_lora_funcs.h"
 #include "lcd_espnow_funcs.h"
 #include "espnow_task.h"
 
 #include "gpio_task.h"
-
-#include "qr_esp_rx_example.h"
-#include "qr_esp_enc_rx_example.h"
 
 #define RX_MAC_IN_SEL_COLOR lv_palette_main(LV_PALETTE_RED)
 #define TX_TXT "Transmit: "
@@ -553,10 +551,10 @@ static void prompt_upload_qr(ui_menu_t *ui_menu, bool encrypting)
     // Create QR code (100x100px)
     lv_obj_t *qr_code = lv_img_create(ACTIVE_SCR);
     if (encrypting) {
-		lv_img_set_src(qr_code, &qr_esp_enc_rx_example);
+		lv_img_set_src(qr_code, QR_ESP_ENC_RX_EX);
 	}
 	else {
-		lv_img_set_src(qr_code, &qr_esp_rx_example);
+		lv_img_set_src(qr_code, QR_ESP_RX_EX);
 	}
     lv_obj_align(qr_code, LV_ALIGN_CENTER, 0, 12);
                     

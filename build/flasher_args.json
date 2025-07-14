@@ -9,12 +9,14 @@
     },
     "flash_files" : {
         "0x2000" : "bootloader/bootloader.bin",
-        "0x10000" : "app-template.bin",
-        "0x8000" : "partition_table/partition-table.bin"
+        "0x10000" : "PolyCast5.bin",
+        "0x8000" : "partition_table/partition-table.bin",
+        "0x210000" : "assets.bin"
     },
     "bootloader" : { "offset" : "0x2000", "file" : "bootloader/bootloader.bin", "encrypted" : "false" },
-    "app" : { "offset" : "0x10000", "file" : "app-template.bin", "encrypted" : "false" },
+    "app" : { "offset" : "0x10000", "file" : "PolyCast5.bin", "encrypted" : "false" },
     "partition-table" : { "offset" : "0x8000", "file" : "partition_table/partition-table.bin", "encrypted" : "false" },
+    "assets" : { "offset" : "0x210000", "file" : "assets.bin", "encrypted" : "false" },
     "extra_esptool_args" : {
         "after"  : "hard_reset",
         "before" : "default_reset",

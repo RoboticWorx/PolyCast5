@@ -11,18 +11,8 @@
 #include "esp_err.h"
 #include "esp_random.h"
 
+#include "lcd_asset_macros.h"
 #include "lcd_utils.h"
-
-#include "img_coin_heads.h"
-#include "img_coin_tails.h"
-#include "img_dice_1.h"
-#include "img_dice_2.h"
-#include "img_dice_3.h"
-#include "img_dice_4.h"
-#include "img_dice_5.h"
-#include "img_dice_6.h"
-#include "qr_pc5_com.h"
-#include "qr_pc5_docs.h"
 
 tools_menu_t tools_menu = {
     .options = {"Coin flipper", "Dice roller", "Number generator", "Read the docs"},
@@ -172,11 +162,11 @@ void lcd_tools_coin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
         
         // Create coin images
 		coin_heads = lv_img_create(ACTIVE_SCR);
-	    lv_img_set_src(coin_heads, &img_coin_heads);
+	    lv_img_set_src(coin_heads, IMG_COIN_HEADS);
 	    lv_obj_align(coin_heads, LV_ALIGN_CENTER, -40, 16);
 	    
 	    coin_tails = lv_img_create(ACTIVE_SCR);
-	    lv_img_set_src(coin_tails, &img_coin_tails);
+	    lv_img_set_src(coin_tails, IMG_COIN_TAILS);
 	    lv_obj_align(coin_tails, LV_ALIGN_CENTER, -40, 16);
 	    lv_obj_add_flag(coin_tails, LV_OBJ_FLAG_HIDDEN); // Hide for now
 		
@@ -280,7 +270,7 @@ void lcd_tools_docs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
         
         // Create QR
 		qr_active = lv_img_create(ACTIVE_SCR);
-	    lv_img_set_src(qr_active, &qr_pc5_com);
+	    lv_img_set_src(qr_active, QR_PC5_COM);
 	    lv_obj_align(qr_active, LV_ALIGN_CENTER, 0, 13);
 		
 		do_once = true;
@@ -293,11 +283,11 @@ void lcd_tools_docs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		
 		if (qr_idx == 0) {
 			lv_label_set_text(lbl_ins, QR_COM_TXT);
-			lv_img_set_src(qr_active, &qr_pc5_com);
+			lv_img_set_src(qr_active, QR_PC5_COM);
 		}
 		else if (qr_idx == 1) {
 			lv_label_set_text(lbl_ins, QR_DOCS_TXT);
-			lv_img_set_src(qr_active, &qr_pc5_docs);
+			lv_img_set_src(qr_active, QR_PC5_DOCS);
 		}
 	}
 	// Go left a QR
@@ -307,11 +297,11 @@ void lcd_tools_docs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		
 		if (qr_idx == 0) {
 			lv_label_set_text(lbl_ins, QR_COM_TXT);
-			lv_img_set_src(qr_active, &qr_pc5_com);
+			lv_img_set_src(qr_active, QR_PC5_COM);
 		}
 		else if (qr_idx == 1) {
 			lv_label_set_text(lbl_ins, QR_DOCS_TXT);
-			lv_img_set_src(qr_active, &qr_pc5_docs);
+			lv_img_set_src(qr_active, QR_PC5_DOCS);
 		}
 	}
 	// Back selected
@@ -390,7 +380,7 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		
 		// Create dice img
 		img_dice = lv_img_create(ACTIVE_SCR);
-	    lv_img_set_src(img_dice, &img_dice_2);
+	    lv_img_set_src(img_dice, IMG_DICE_2);
 	    lv_obj_align(img_dice, LV_ALIGN_CENTER, -65, 0);
 		
 		lbl_ins = lv_label_create(ACTIVE_SCR);
@@ -475,22 +465,22 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		// Animate
 		for (int i = 0; i < (15 + zero_to_five); i++) {
 			if (i % NUM_IMGS == 0) {
-				lv_img_set_src(img_dice, &img_dice_1);
+				lv_img_set_src(img_dice, IMG_DICE_1);
 			}
 			else if (i % NUM_IMGS == 1) {
-				lv_img_set_src(img_dice, &img_dice_2);
+				lv_img_set_src(img_dice, IMG_DICE_2);
 			}
 			else if (i % NUM_IMGS == 2) {
-				lv_img_set_src(img_dice, &img_dice_3);
+				lv_img_set_src(img_dice, IMG_DICE_3);
 			}
 			else if (i % NUM_IMGS == 3) {
-				lv_img_set_src(img_dice, &img_dice_4);
+				lv_img_set_src(img_dice, IMG_DICE_4);
 			}
 			else if (i % NUM_IMGS == 4) {
-				lv_img_set_src(img_dice, &img_dice_5);
+				lv_img_set_src(img_dice, IMG_DICE_5);
 			}
 			else if (i % NUM_IMGS == 5) {
-				lv_img_set_src(img_dice, &img_dice_6);
+				lv_img_set_src(img_dice, IMG_DICE_6);
 			}
 			
 			lv_timer_handler();

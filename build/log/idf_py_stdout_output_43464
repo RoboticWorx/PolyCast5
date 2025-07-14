@@ -1,0 +1,576 @@
+Command: ninja flash
+[1/18] Linking C static library esp-idf\gpio\libgpio.a
+[2/18] Performing build step for 'bootloader'
+[1/1] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\build\bootloader\esp-idf\esptool_py && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-master/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x2000 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/bootloader/bootloader.bin"
+Bootloader binary size 0x5510 bytes. 0xaf0 bytes (11%) free.
+[3/18] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\build && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-master/components/spiffs/spiffsgen.py 0x580000 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/assets C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/assets.bin --page-size=256 --obj-name-len=64 --meta-len=4 --use-magic --use-magic-len"
+FAILED: CMakeFiles/spiffs_assets_bin C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/CMakeFiles/spiffs_assets_bin 
+C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\build && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-master/components/spiffs/spiffsgen.py 0x580000 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/assets C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/assets.bin --page-size=256 --obj-name-len=64 --meta-len=4 --use-magic --use-magic-len"
+Traceback (most recent call last):
+  File "C:\Espressif\frameworks\esp-idf-master\components\spiffs\spiffsgen.py", line 431, in create_file
+    block.update_obj(contents_chunk)
+  File "C:\Espressif\frameworks\esp-idf-master\components\spiffs\spiffsgen.py", line 346, in update_obj
+    raise SpiffsFullError()
+SpiffsFullError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Espressif\frameworks\esp-idf-master\components\spiffs\spiffsgen.py", line 435, in create_file
+    raise SpiffsFullError
+SpiffsFullError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Espressif\frameworks\esp-idf-master\components\spiffs\spiffsgen.py", line 590, in <module>
+    main()
+  File "C:\Espressif\frameworks\esp-idf-master\components\spiffs\spiffsgen.py", line 582, in main
+    spiffs.create_file('/' + os.path.relpath(full_path, args.base_dir).replace('\\', '/'), full_path)
+  File "C:\Espressif\frameworks\esp-idf-master\components\spiffs\spiffsgen.py", line 446, in create_file
+    block = self._create_block()
+            ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Espressif\frameworks\esp-idf-master\components\spiffs\spiffsgen.py", line 395, in _create_block
+    raise SpiffsFullError('the image size has been exceeded')
+SpiffsFullError: the image size has been exceeded
+[4/18] Linking C static library esp-idf\lora\liblora.a
+[5/18] No install step for 'bootloader'
+[6/18] Linking C static library esp-idf\infrared\libinfrared.a
+[7/18] Linking C static library esp-idf\tools\libtools.a
+[8/18] Building C object esp-idf/lcd/CMakeFiles/__idf_lcd.dir/src/lcd_utils.c.obj
+FAILED: esp-idf/lcd/CMakeFiles/__idf_lcd.dir/src/lcd_utils.c.obj 
+C:\Espressif\tools\riscv32-esp-elf\esp-14.2.0_20241119\riscv32-esp-elf\bin\riscv32-esp-elf-gcc.exe -DESP_PLATFORM -DIDF_VER=\"v5.5-dev-2715-ga45d713b03\" -DLV_CONF_INCLUDE_SIMPLE -DSOC_MMU_PAGE_SIZE=CONFIG_MMU_PAGE_SIZE -DSOC_XTAL_FREQ_MHZ=CONFIG_XTAL_FREQ -D_GLIBCXX_HAVE_POSIX_SEMAPHORE -D_GLIBCXX_USE_POSIX_SEMAPHORE -D_GNU_SOURCE -D_POSIX_READER_WRITER_LOCKS -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/config -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include -IC:/Espressif/frameworks/esp-idf-master/components/newlib/platform_include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/config/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/config/include/freertos -IC:/Espressif/frameworks/esp-idf-master/components/freertos/config/riscv/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/FreeRTOS-Kernel/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/FreeRTOS-Kernel/portable/riscv/include -IC:/Espressif/frameworks/esp-idf-master/components/freertos/FreeRTOS-Kernel/portable/riscv/include/freertos -IC:/Espressif/frameworks/esp-idf-master/components/freertos/esp_additions/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/soc -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/include/soc/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/dma/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/ldo/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/debug_probe/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/mspi_timing_tuning/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/power_supply/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/. -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_hw_support/port/esp32c5/private_include -IC:/Espressif/frameworks/esp-idf-master/components/heap/include -IC:/Espressif/frameworks/esp-idf-master/components/heap/tlsf -IC:/Espressif/frameworks/esp-idf-master/components/log/include -IC:/Espressif/frameworks/esp-idf-master/components/soc/include -IC:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/register -IC:/Espressif/frameworks/esp-idf-master/components/hal/platform_port/include -IC:/Espressif/frameworks/esp-idf-master/components/hal/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/hal/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/include/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5 -IC:/Espressif/frameworks/esp-idf-master/components/esp_common/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/port/soc -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/port/include/riscv -IC:/Espressif/frameworks/esp-idf-master/components/esp_system/port/include/private -IC:/Espressif/frameworks/esp-idf-master/components/riscv/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/include/apps -IC:/Espressif/frameworks/esp-idf-master/components/lwip/include/apps/sntp -IC:/Espressif/frameworks/esp-idf-master/components/lwip/lwip/src/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/freertos/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/esp32xx/include -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/esp32xx/include/arch -IC:/Espressif/frameworks/esp-idf-master/components/lwip/port/esp32xx/include/sys -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/common/include -IC:/Espressif/frameworks/esp-idf-master/components/driver/deprecated -IC:/Espressif/frameworks/esp-idf-master/components/driver/i2c/include -IC:/Espressif/frameworks/esp-idf-master/components/driver/touch_sensor/include -IC:/Espressif/frameworks/esp-idf-master/components/driver/twai/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_pm/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_ringbuf/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_pcnt/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_gptimer/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_spi/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_mcpwm/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_ana_cmpr/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_i2s/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdmmc/include -IC:/Espressif/frameworks/esp-idf-master/components/sdmmc/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdspi/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdio/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_dac/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_tsens/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdm/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_i2c/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_uart/include -IC:/Espressif/frameworks/esp-idf-master/components/vfs/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_ledc/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_parlio/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_driver_usb_serial_jtag/include -IC:/Espressif/frameworks/esp-idf-master/components/nvs_flash/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_partition/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl/src -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl/examples -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl/demos -IC:/Espressif/frameworks/esp-idf-master/components/esp_timer/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/sx126x/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/infrared/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/espnow/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_wifi/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_wifi/include/local -IC:/Espressif/frameworks/esp-idf-master/components/esp_wifi/wifi_apps/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_wifi/wifi_apps/nan_app/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_event/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_phy/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_phy/esp32c5/include -IC:/Espressif/frameworks/esp-idf-master/components/esp_netif/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lora/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/wifi/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio/include -IC:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/tools/include -IC:/Espressif/frameworks/esp-idf-master/components/bootloader_support/include -IC:/Espressif/frameworks/esp-idf-master/components/bootloader_support/bootloader_flash/include -IC:/Espressif/frameworks/esp-idf-master/components/spiffs/include -march=rv32imac_zicsr_zifencei  -fdiagnostics-color=always -ffunction-sections -fdata-sections -Wall -Werror=all -Wno-error=unused-function -Wno-error=unused-variable -Wno-error=unused-but-set-variable -Wno-error=deprecated-declarations -Wextra -Wno-error=extra -Wno-unused-parameter -Wno-sign-compare -Wno-enum-conversion -gdwarf-4 -ggdb -nostartfiles -Og -fno-shrink-wrap -fmacro-prefix-map=C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5=. -fmacro-prefix-map=C:/Espressif/frameworks/esp-idf-master=/IDF -fstrict-volatile-bitfields -fno-jump-tables -fno-tree-switch-conversion -std=gnu17 -Wno-old-style-declaration -MD -MT esp-idf/lcd/CMakeFiles/__idf_lcd.dir/src/lcd_utils.c.obj -MF esp-idf\lcd\CMakeFiles\__idf_lcd.dir\src\lcd_utils.c.obj.d -o esp-idf/lcd/CMakeFiles/__idf_lcd.dir/src/lcd_utils.c.obj -c C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c
+In file included from C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:25:
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:27:22: warning: excess elements in array initializer
+   27 | #define ANIM_CITY_21 "A:/anim/city/anim_city_21.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:17: note: in expansion of macro 'ANIM_CITY_21'
+  109 |                 ANIM_CITY_21, ANIM_CITY_22, ANIM_CITY_23, ANIM_CITY_24, ANIM_CITY_25,
+      |                 ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:27:22: note: (near initialization for 'city_paths')
+   27 | #define ANIM_CITY_21 "A:/anim/city/anim_city_21.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:17: note: in expansion of macro 'ANIM_CITY_21'
+  109 |                 ANIM_CITY_21, ANIM_CITY_22, ANIM_CITY_23, ANIM_CITY_24, ANIM_CITY_25,
+      |                 ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:28:22: warning: excess elements in array initializer
+   28 | #define ANIM_CITY_22 "A:/anim/city/anim_city_22.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:31: note: in expansion of macro 'ANIM_CITY_22'
+  109 |                 ANIM_CITY_21, ANIM_CITY_22, ANIM_CITY_23, ANIM_CITY_24, ANIM_CITY_25,
+      |                               ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:28:22: note: (near initialization for 'city_paths')
+   28 | #define ANIM_CITY_22 "A:/anim/city/anim_city_22.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:31: note: in expansion of macro 'ANIM_CITY_22'
+  109 |                 ANIM_CITY_21, ANIM_CITY_22, ANIM_CITY_23, ANIM_CITY_24, ANIM_CITY_25,
+      |                               ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:29:22: warning: excess elements in array initializer
+   29 | #define ANIM_CITY_23 "A:/anim/city/anim_city_23.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:45: note: in expansion of macro 'ANIM_CITY_23'
+  109 |                 ANIM_CITY_21, ANIM_CITY_22, ANIM_CITY_23, ANIM_CITY_24, ANIM_CITY_25,
+      |                                             ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:29:22: note: (near initialization for 'city_paths')
+   29 | #define ANIM_CITY_23 "A:/anim/city/anim_city_23.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:45: note: in expansion of macro 'ANIM_CITY_23'
+  109 |                 ANIM_CITY_21, ANIM_CITY_22, ANIM_CITY_23, ANIM_CITY_24, ANIM_CITY_25,
+      |                                             ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:30:22: warning: excess elements in array initializer
+   30 | #define ANIM_CITY_24 "A:/anim/city/anim_city_24.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:59: note: in expansion of macro 'ANIM_CITY_24'
+  109 |                 ANIM_CITY_21, ANIM_CITY_22, ANIM_CITY_23, ANIM_CITY_24, ANIM_CITY_25,
+      |                                                           ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:30:22: note: (near initialization for 'city_paths')
+   30 | #define ANIM_CITY_24 "A:/anim/city/anim_city_24.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:59: note: in expansion of macro 'ANIM_CITY_24'
+  109 |                 ANIM_CITY_21, ANIM_CITY_22, ANIM_CITY_23, ANIM_CITY_24, ANIM_CITY_25,
+      |                                                           ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:31:22: warning: excess elements in array initializer
+   31 | #define ANIM_CITY_25 "A:/anim/city/anim_city_25.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:73: note: in expansion of macro 'ANIM_CITY_25'
+  109 |                 ANIM_CITY_21, ANIM_CITY_22, ANIM_CITY_23, ANIM_CITY_24, ANIM_CITY_25,
+      |                                                                         ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:31:22: note: (near initialization for 'city_paths')
+   31 | #define ANIM_CITY_25 "A:/anim/city/anim_city_25.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:109:73: note: in expansion of macro 'ANIM_CITY_25'
+  109 |                 ANIM_CITY_21, ANIM_CITY_22, ANIM_CITY_23, ANIM_CITY_24, ANIM_CITY_25,
+      |                                                                         ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:32:22: warning: excess elements in array initializer
+   32 | #define ANIM_CITY_26 "A:/anim/city/anim_city_26.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:17: note: in expansion of macro 'ANIM_CITY_26'
+  110 |                 ANIM_CITY_26, ANIM_CITY_27, ANIM_CITY_28, ANIM_CITY_29, ANIM_CITY_30,
+      |                 ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:32:22: note: (near initialization for 'city_paths')
+   32 | #define ANIM_CITY_26 "A:/anim/city/anim_city_26.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:17: note: in expansion of macro 'ANIM_CITY_26'
+  110 |                 ANIM_CITY_26, ANIM_CITY_27, ANIM_CITY_28, ANIM_CITY_29, ANIM_CITY_30,
+      |                 ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:33:22: warning: excess elements in array initializer
+   33 | #define ANIM_CITY_27 "A:/anim/city/anim_city_27.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:31: note: in expansion of macro 'ANIM_CITY_27'
+  110 |                 ANIM_CITY_26, ANIM_CITY_27, ANIM_CITY_28, ANIM_CITY_29, ANIM_CITY_30,
+      |                               ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:33:22: note: (near initialization for 'city_paths')
+   33 | #define ANIM_CITY_27 "A:/anim/city/anim_city_27.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:31: note: in expansion of macro 'ANIM_CITY_27'
+  110 |                 ANIM_CITY_26, ANIM_CITY_27, ANIM_CITY_28, ANIM_CITY_29, ANIM_CITY_30,
+      |                               ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:34:22: warning: excess elements in array initializer
+   34 | #define ANIM_CITY_28 "A:/anim/city/anim_city_28.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:45: note: in expansion of macro 'ANIM_CITY_28'
+  110 |                 ANIM_CITY_26, ANIM_CITY_27, ANIM_CITY_28, ANIM_CITY_29, ANIM_CITY_30,
+      |                                             ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:34:22: note: (near initialization for 'city_paths')
+   34 | #define ANIM_CITY_28 "A:/anim/city/anim_city_28.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:45: note: in expansion of macro 'ANIM_CITY_28'
+  110 |                 ANIM_CITY_26, ANIM_CITY_27, ANIM_CITY_28, ANIM_CITY_29, ANIM_CITY_30,
+      |                                             ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:35:22: warning: excess elements in array initializer
+   35 | #define ANIM_CITY_29 "A:/anim/city/anim_city_29.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:59: note: in expansion of macro 'ANIM_CITY_29'
+  110 |                 ANIM_CITY_26, ANIM_CITY_27, ANIM_CITY_28, ANIM_CITY_29, ANIM_CITY_30,
+      |                                                           ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:35:22: note: (near initialization for 'city_paths')
+   35 | #define ANIM_CITY_29 "A:/anim/city/anim_city_29.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:59: note: in expansion of macro 'ANIM_CITY_29'
+  110 |                 ANIM_CITY_26, ANIM_CITY_27, ANIM_CITY_28, ANIM_CITY_29, ANIM_CITY_30,
+      |                                                           ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:36:22: warning: excess elements in array initializer
+   36 | #define ANIM_CITY_30 "A:/anim/city/anim_city_30.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:73: note: in expansion of macro 'ANIM_CITY_30'
+  110 |                 ANIM_CITY_26, ANIM_CITY_27, ANIM_CITY_28, ANIM_CITY_29, ANIM_CITY_30,
+      |                                                                         ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:36:22: note: (near initialization for 'city_paths')
+   36 | #define ANIM_CITY_30 "A:/anim/city/anim_city_30.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:110:73: note: in expansion of macro 'ANIM_CITY_30'
+  110 |                 ANIM_CITY_26, ANIM_CITY_27, ANIM_CITY_28, ANIM_CITY_29, ANIM_CITY_30,
+      |                                                                         ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:37:22: warning: excess elements in array initializer
+   37 | #define ANIM_CITY_31 "A:/anim/city/anim_city_31.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:17: note: in expansion of macro 'ANIM_CITY_31'
+  111 |                 ANIM_CITY_31, ANIM_CITY_32, ANIM_CITY_33, ANIM_CITY_34, ANIM_CITY_35,
+      |                 ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:37:22: note: (near initialization for 'city_paths')
+   37 | #define ANIM_CITY_31 "A:/anim/city/anim_city_31.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:17: note: in expansion of macro 'ANIM_CITY_31'
+  111 |                 ANIM_CITY_31, ANIM_CITY_32, ANIM_CITY_33, ANIM_CITY_34, ANIM_CITY_35,
+      |                 ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:38:22: warning: excess elements in array initializer
+   38 | #define ANIM_CITY_32 "A:/anim/city/anim_city_32.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:31: note: in expansion of macro 'ANIM_CITY_32'
+  111 |                 ANIM_CITY_31, ANIM_CITY_32, ANIM_CITY_33, ANIM_CITY_34, ANIM_CITY_35,
+      |                               ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:38:22: note: (near initialization for 'city_paths')
+   38 | #define ANIM_CITY_32 "A:/anim/city/anim_city_32.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:31: note: in expansion of macro 'ANIM_CITY_32'
+  111 |                 ANIM_CITY_31, ANIM_CITY_32, ANIM_CITY_33, ANIM_CITY_34, ANIM_CITY_35,
+      |                               ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:39:22: warning: excess elements in array initializer
+   39 | #define ANIM_CITY_33 "A:/anim/city/anim_city_33.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:45: note: in expansion of macro 'ANIM_CITY_33'
+  111 |                 ANIM_CITY_31, ANIM_CITY_32, ANIM_CITY_33, ANIM_CITY_34, ANIM_CITY_35,
+      |                                             ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:39:22: note: (near initialization for 'city_paths')
+   39 | #define ANIM_CITY_33 "A:/anim/city/anim_city_33.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:45: note: in expansion of macro 'ANIM_CITY_33'
+  111 |                 ANIM_CITY_31, ANIM_CITY_32, ANIM_CITY_33, ANIM_CITY_34, ANIM_CITY_35,
+      |                                             ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:40:22: warning: excess elements in array initializer
+   40 | #define ANIM_CITY_34 "A:/anim/city/anim_city_34.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:59: note: in expansion of macro 'ANIM_CITY_34'
+  111 |                 ANIM_CITY_31, ANIM_CITY_32, ANIM_CITY_33, ANIM_CITY_34, ANIM_CITY_35,
+      |                                                           ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:40:22: note: (near initialization for 'city_paths')
+   40 | #define ANIM_CITY_34 "A:/anim/city/anim_city_34.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:59: note: in expansion of macro 'ANIM_CITY_34'
+  111 |                 ANIM_CITY_31, ANIM_CITY_32, ANIM_CITY_33, ANIM_CITY_34, ANIM_CITY_35,
+      |                                                           ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:41:22: warning: excess elements in array initializer
+   41 | #define ANIM_CITY_35 "A:/anim/city/anim_city_35.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:73: note: in expansion of macro 'ANIM_CITY_35'
+  111 |                 ANIM_CITY_31, ANIM_CITY_32, ANIM_CITY_33, ANIM_CITY_34, ANIM_CITY_35,
+      |                                                                         ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:41:22: note: (near initialization for 'city_paths')
+   41 | #define ANIM_CITY_35 "A:/anim/city/anim_city_35.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:111:73: note: in expansion of macro 'ANIM_CITY_35'
+  111 |                 ANIM_CITY_31, ANIM_CITY_32, ANIM_CITY_33, ANIM_CITY_34, ANIM_CITY_35,
+      |                                                                         ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:42:22: warning: excess elements in array initializer
+   42 | #define ANIM_CITY_36 "A:/anim/city/anim_city_36.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:17: note: in expansion of macro 'ANIM_CITY_36'
+  112 |                 ANIM_CITY_36, ANIM_CITY_37, ANIM_CITY_38, ANIM_CITY_39, ANIM_CITY_40,
+      |                 ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:42:22: note: (near initialization for 'city_paths')
+   42 | #define ANIM_CITY_36 "A:/anim/city/anim_city_36.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:17: note: in expansion of macro 'ANIM_CITY_36'
+  112 |                 ANIM_CITY_36, ANIM_CITY_37, ANIM_CITY_38, ANIM_CITY_39, ANIM_CITY_40,
+      |                 ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:43:22: warning: excess elements in array initializer
+   43 | #define ANIM_CITY_37 "A:/anim/city/anim_city_37.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:31: note: in expansion of macro 'ANIM_CITY_37'
+  112 |                 ANIM_CITY_36, ANIM_CITY_37, ANIM_CITY_38, ANIM_CITY_39, ANIM_CITY_40,
+      |                               ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:43:22: note: (near initialization for 'city_paths')
+   43 | #define ANIM_CITY_37 "A:/anim/city/anim_city_37.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:31: note: in expansion of macro 'ANIM_CITY_37'
+  112 |                 ANIM_CITY_36, ANIM_CITY_37, ANIM_CITY_38, ANIM_CITY_39, ANIM_CITY_40,
+      |                               ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:44:22: warning: excess elements in array initializer
+   44 | #define ANIM_CITY_38 "A:/anim/city/anim_city_38.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:45: note: in expansion of macro 'ANIM_CITY_38'
+  112 |                 ANIM_CITY_36, ANIM_CITY_37, ANIM_CITY_38, ANIM_CITY_39, ANIM_CITY_40,
+      |                                             ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:44:22: note: (near initialization for 'city_paths')
+   44 | #define ANIM_CITY_38 "A:/anim/city/anim_city_38.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:45: note: in expansion of macro 'ANIM_CITY_38'
+  112 |                 ANIM_CITY_36, ANIM_CITY_37, ANIM_CITY_38, ANIM_CITY_39, ANIM_CITY_40,
+      |                                             ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:45:22: warning: excess elements in array initializer
+   45 | #define ANIM_CITY_39 "A:/anim/city/anim_city_39.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:59: note: in expansion of macro 'ANIM_CITY_39'
+  112 |                 ANIM_CITY_36, ANIM_CITY_37, ANIM_CITY_38, ANIM_CITY_39, ANIM_CITY_40,
+      |                                                           ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:45:22: note: (near initialization for 'city_paths')
+   45 | #define ANIM_CITY_39 "A:/anim/city/anim_city_39.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:59: note: in expansion of macro 'ANIM_CITY_39'
+  112 |                 ANIM_CITY_36, ANIM_CITY_37, ANIM_CITY_38, ANIM_CITY_39, ANIM_CITY_40,
+      |                                                           ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:46:22: warning: excess elements in array initializer
+   46 | #define ANIM_CITY_40 "A:/anim/city/anim_city_40.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:73: note: in expansion of macro 'ANIM_CITY_40'
+  112 |                 ANIM_CITY_36, ANIM_CITY_37, ANIM_CITY_38, ANIM_CITY_39, ANIM_CITY_40,
+      |                                                                         ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:46:22: note: (near initialization for 'city_paths')
+   46 | #define ANIM_CITY_40 "A:/anim/city/anim_city_40.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:112:73: note: in expansion of macro 'ANIM_CITY_40'
+  112 |                 ANIM_CITY_36, ANIM_CITY_37, ANIM_CITY_38, ANIM_CITY_39, ANIM_CITY_40,
+      |                                                                         ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:47:22: warning: excess elements in array initializer
+   47 | #define ANIM_CITY_41 "A:/anim/city/anim_city_41.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:17: note: in expansion of macro 'ANIM_CITY_41'
+  113 |                 ANIM_CITY_41, ANIM_CITY_42, ANIM_CITY_43, ANIM_CITY_44, ANIM_CITY_45,
+      |                 ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:47:22: note: (near initialization for 'city_paths')
+   47 | #define ANIM_CITY_41 "A:/anim/city/anim_city_41.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:17: note: in expansion of macro 'ANIM_CITY_41'
+  113 |                 ANIM_CITY_41, ANIM_CITY_42, ANIM_CITY_43, ANIM_CITY_44, ANIM_CITY_45,
+      |                 ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:48:22: warning: excess elements in array initializer
+   48 | #define ANIM_CITY_42 "A:/anim/city/anim_city_42.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:31: note: in expansion of macro 'ANIM_CITY_42'
+  113 |                 ANIM_CITY_41, ANIM_CITY_42, ANIM_CITY_43, ANIM_CITY_44, ANIM_CITY_45,
+      |                               ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:48:22: note: (near initialization for 'city_paths')
+   48 | #define ANIM_CITY_42 "A:/anim/city/anim_city_42.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:31: note: in expansion of macro 'ANIM_CITY_42'
+  113 |                 ANIM_CITY_41, ANIM_CITY_42, ANIM_CITY_43, ANIM_CITY_44, ANIM_CITY_45,
+      |                               ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:49:22: warning: excess elements in array initializer
+   49 | #define ANIM_CITY_43 "A:/anim/city/anim_city_43.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:45: note: in expansion of macro 'ANIM_CITY_43'
+  113 |                 ANIM_CITY_41, ANIM_CITY_42, ANIM_CITY_43, ANIM_CITY_44, ANIM_CITY_45,
+      |                                             ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:49:22: note: (near initialization for 'city_paths')
+   49 | #define ANIM_CITY_43 "A:/anim/city/anim_city_43.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:45: note: in expansion of macro 'ANIM_CITY_43'
+  113 |                 ANIM_CITY_41, ANIM_CITY_42, ANIM_CITY_43, ANIM_CITY_44, ANIM_CITY_45,
+      |                                             ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:50:22: warning: excess elements in array initializer
+   50 | #define ANIM_CITY_44 "A:/anim/city/anim_city_44.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:59: note: in expansion of macro 'ANIM_CITY_44'
+  113 |                 ANIM_CITY_41, ANIM_CITY_42, ANIM_CITY_43, ANIM_CITY_44, ANIM_CITY_45,
+      |                                                           ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:50:22: note: (near initialization for 'city_paths')
+   50 | #define ANIM_CITY_44 "A:/anim/city/anim_city_44.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:59: note: in expansion of macro 'ANIM_CITY_44'
+  113 |                 ANIM_CITY_41, ANIM_CITY_42, ANIM_CITY_43, ANIM_CITY_44, ANIM_CITY_45,
+      |                                                           ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:51:22: warning: excess elements in array initializer
+   51 | #define ANIM_CITY_45 "A:/anim/city/anim_city_45.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:73: note: in expansion of macro 'ANIM_CITY_45'
+  113 |                 ANIM_CITY_41, ANIM_CITY_42, ANIM_CITY_43, ANIM_CITY_44, ANIM_CITY_45,
+      |                                                                         ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:51:22: note: (near initialization for 'city_paths')
+   51 | #define ANIM_CITY_45 "A:/anim/city/anim_city_45.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:113:73: note: in expansion of macro 'ANIM_CITY_45'
+  113 |                 ANIM_CITY_41, ANIM_CITY_42, ANIM_CITY_43, ANIM_CITY_44, ANIM_CITY_45,
+      |                                                                         ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:52:22: warning: excess elements in array initializer
+   52 | #define ANIM_CITY_46 "A:/anim/city/anim_city_46.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:17: note: in expansion of macro 'ANIM_CITY_46'
+  114 |                 ANIM_CITY_46, ANIM_CITY_47, ANIM_CITY_48, ANIM_CITY_49, ANIM_CITY_50,
+      |                 ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:52:22: note: (near initialization for 'city_paths')
+   52 | #define ANIM_CITY_46 "A:/anim/city/anim_city_46.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:17: note: in expansion of macro 'ANIM_CITY_46'
+  114 |                 ANIM_CITY_46, ANIM_CITY_47, ANIM_CITY_48, ANIM_CITY_49, ANIM_CITY_50,
+      |                 ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:53:22: warning: excess elements in array initializer
+   53 | #define ANIM_CITY_47 "A:/anim/city/anim_city_47.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:31: note: in expansion of macro 'ANIM_CITY_47'
+  114 |                 ANIM_CITY_46, ANIM_CITY_47, ANIM_CITY_48, ANIM_CITY_49, ANIM_CITY_50,
+      |                               ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:53:22: note: (near initialization for 'city_paths')
+   53 | #define ANIM_CITY_47 "A:/anim/city/anim_city_47.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:31: note: in expansion of macro 'ANIM_CITY_47'
+  114 |                 ANIM_CITY_46, ANIM_CITY_47, ANIM_CITY_48, ANIM_CITY_49, ANIM_CITY_50,
+      |                               ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:54:22: warning: excess elements in array initializer
+   54 | #define ANIM_CITY_48 "A:/anim/city/anim_city_48.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:45: note: in expansion of macro 'ANIM_CITY_48'
+  114 |                 ANIM_CITY_46, ANIM_CITY_47, ANIM_CITY_48, ANIM_CITY_49, ANIM_CITY_50,
+      |                                             ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:54:22: note: (near initialization for 'city_paths')
+   54 | #define ANIM_CITY_48 "A:/anim/city/anim_city_48.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:45: note: in expansion of macro 'ANIM_CITY_48'
+  114 |                 ANIM_CITY_46, ANIM_CITY_47, ANIM_CITY_48, ANIM_CITY_49, ANIM_CITY_50,
+      |                                             ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:55:22: warning: excess elements in array initializer
+   55 | #define ANIM_CITY_49 "A:/anim/city/anim_city_49.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:59: note: in expansion of macro 'ANIM_CITY_49'
+  114 |                 ANIM_CITY_46, ANIM_CITY_47, ANIM_CITY_48, ANIM_CITY_49, ANIM_CITY_50,
+      |                                                           ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:55:22: note: (near initialization for 'city_paths')
+   55 | #define ANIM_CITY_49 "A:/anim/city/anim_city_49.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:59: note: in expansion of macro 'ANIM_CITY_49'
+  114 |                 ANIM_CITY_46, ANIM_CITY_47, ANIM_CITY_48, ANIM_CITY_49, ANIM_CITY_50,
+      |                                                           ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:56:22: warning: excess elements in array initializer
+   56 | #define ANIM_CITY_50 "A:/anim/city/anim_city_50.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:73: note: in expansion of macro 'ANIM_CITY_50'
+  114 |                 ANIM_CITY_46, ANIM_CITY_47, ANIM_CITY_48, ANIM_CITY_49, ANIM_CITY_50,
+      |                                                                         ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:56:22: note: (near initialization for 'city_paths')
+   56 | #define ANIM_CITY_50 "A:/anim/city/anim_city_50.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:114:73: note: in expansion of macro 'ANIM_CITY_50'
+  114 |                 ANIM_CITY_46, ANIM_CITY_47, ANIM_CITY_48, ANIM_CITY_49, ANIM_CITY_50,
+      |                                                                         ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:57:22: warning: excess elements in array initializer
+   57 | #define ANIM_CITY_51 "A:/anim/city/anim_city_51.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:17: note: in expansion of macro 'ANIM_CITY_51'
+  115 |                 ANIM_CITY_51, ANIM_CITY_52, ANIM_CITY_53, ANIM_CITY_54, ANIM_CITY_55,
+      |                 ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:57:22: note: (near initialization for 'city_paths')
+   57 | #define ANIM_CITY_51 "A:/anim/city/anim_city_51.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:17: note: in expansion of macro 'ANIM_CITY_51'
+  115 |                 ANIM_CITY_51, ANIM_CITY_52, ANIM_CITY_53, ANIM_CITY_54, ANIM_CITY_55,
+      |                 ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:58:22: warning: excess elements in array initializer
+   58 | #define ANIM_CITY_52 "A:/anim/city/anim_city_52.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:31: note: in expansion of macro 'ANIM_CITY_52'
+  115 |                 ANIM_CITY_51, ANIM_CITY_52, ANIM_CITY_53, ANIM_CITY_54, ANIM_CITY_55,
+      |                               ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:58:22: note: (near initialization for 'city_paths')
+   58 | #define ANIM_CITY_52 "A:/anim/city/anim_city_52.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:31: note: in expansion of macro 'ANIM_CITY_52'
+  115 |                 ANIM_CITY_51, ANIM_CITY_52, ANIM_CITY_53, ANIM_CITY_54, ANIM_CITY_55,
+      |                               ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:59:22: warning: excess elements in array initializer
+   59 | #define ANIM_CITY_53 "A:/anim/city/anim_city_53.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:45: note: in expansion of macro 'ANIM_CITY_53'
+  115 |                 ANIM_CITY_51, ANIM_CITY_52, ANIM_CITY_53, ANIM_CITY_54, ANIM_CITY_55,
+      |                                             ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:59:22: note: (near initialization for 'city_paths')
+   59 | #define ANIM_CITY_53 "A:/anim/city/anim_city_53.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:45: note: in expansion of macro 'ANIM_CITY_53'
+  115 |                 ANIM_CITY_51, ANIM_CITY_52, ANIM_CITY_53, ANIM_CITY_54, ANIM_CITY_55,
+      |                                             ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:60:22: warning: excess elements in array initializer
+   60 | #define ANIM_CITY_54 "A:/anim/city/anim_city_54.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:59: note: in expansion of macro 'ANIM_CITY_54'
+  115 |                 ANIM_CITY_51, ANIM_CITY_52, ANIM_CITY_53, ANIM_CITY_54, ANIM_CITY_55,
+      |                                                           ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:60:22: note: (near initialization for 'city_paths')
+   60 | #define ANIM_CITY_54 "A:/anim/city/anim_city_54.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:59: note: in expansion of macro 'ANIM_CITY_54'
+  115 |                 ANIM_CITY_51, ANIM_CITY_52, ANIM_CITY_53, ANIM_CITY_54, ANIM_CITY_55,
+      |                                                           ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:61:22: warning: excess elements in array initializer
+   61 | #define ANIM_CITY_55 "A:/anim/city/anim_city_55.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:73: note: in expansion of macro 'ANIM_CITY_55'
+  115 |                 ANIM_CITY_51, ANIM_CITY_52, ANIM_CITY_53, ANIM_CITY_54, ANIM_CITY_55,
+      |                                                                         ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:61:22: note: (near initialization for 'city_paths')
+   61 | #define ANIM_CITY_55 "A:/anim/city/anim_city_55.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:115:73: note: in expansion of macro 'ANIM_CITY_55'
+  115 |                 ANIM_CITY_51, ANIM_CITY_52, ANIM_CITY_53, ANIM_CITY_54, ANIM_CITY_55,
+      |                                                                         ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:62:22: warning: excess elements in array initializer
+   62 | #define ANIM_CITY_56 "A:/anim/city/anim_city_56.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:17: note: in expansion of macro 'ANIM_CITY_56'
+  116 |                 ANIM_CITY_56, ANIM_CITY_57, ANIM_CITY_58, ANIM_CITY_59, ANIM_CITY_60,
+      |                 ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:62:22: note: (near initialization for 'city_paths')
+   62 | #define ANIM_CITY_56 "A:/anim/city/anim_city_56.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:17: note: in expansion of macro 'ANIM_CITY_56'
+  116 |                 ANIM_CITY_56, ANIM_CITY_57, ANIM_CITY_58, ANIM_CITY_59, ANIM_CITY_60,
+      |                 ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:63:22: warning: excess elements in array initializer
+   63 | #define ANIM_CITY_57 "A:/anim/city/anim_city_57.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:31: note: in expansion of macro 'ANIM_CITY_57'
+  116 |                 ANIM_CITY_56, ANIM_CITY_57, ANIM_CITY_58, ANIM_CITY_59, ANIM_CITY_60,
+      |                               ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:63:22: note: (near initialization for 'city_paths')
+   63 | #define ANIM_CITY_57 "A:/anim/city/anim_city_57.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:31: note: in expansion of macro 'ANIM_CITY_57'
+  116 |                 ANIM_CITY_56, ANIM_CITY_57, ANIM_CITY_58, ANIM_CITY_59, ANIM_CITY_60,
+      |                               ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:64:22: warning: excess elements in array initializer
+   64 | #define ANIM_CITY_58 "A:/anim/city/anim_city_58.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:45: note: in expansion of macro 'ANIM_CITY_58'
+  116 |                 ANIM_CITY_56, ANIM_CITY_57, ANIM_CITY_58, ANIM_CITY_59, ANIM_CITY_60,
+      |                                             ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:64:22: note: (near initialization for 'city_paths')
+   64 | #define ANIM_CITY_58 "A:/anim/city/anim_city_58.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:45: note: in expansion of macro 'ANIM_CITY_58'
+  116 |                 ANIM_CITY_56, ANIM_CITY_57, ANIM_CITY_58, ANIM_CITY_59, ANIM_CITY_60,
+      |                                             ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:65:22: warning: excess elements in array initializer
+   65 | #define ANIM_CITY_59 "A:/anim/city/anim_city_59.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:59: note: in expansion of macro 'ANIM_CITY_59'
+  116 |                 ANIM_CITY_56, ANIM_CITY_57, ANIM_CITY_58, ANIM_CITY_59, ANIM_CITY_60,
+      |                                                           ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:65:22: note: (near initialization for 'city_paths')
+   65 | #define ANIM_CITY_59 "A:/anim/city/anim_city_59.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:59: note: in expansion of macro 'ANIM_CITY_59'
+  116 |                 ANIM_CITY_56, ANIM_CITY_57, ANIM_CITY_58, ANIM_CITY_59, ANIM_CITY_60,
+      |                                                           ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:66:22: warning: excess elements in array initializer
+   66 | #define ANIM_CITY_60 "A:/anim/city/anim_city_60.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:73: note: in expansion of macro 'ANIM_CITY_60'
+  116 |                 ANIM_CITY_56, ANIM_CITY_57, ANIM_CITY_58, ANIM_CITY_59, ANIM_CITY_60,
+      |                                                                         ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/include/lcd_asset_macros.h:66:22: note: (near initialization for 'city_paths')
+   66 | #define ANIM_CITY_60 "A:/anim/city/anim_city_60.bin"
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:116:73: note: in expansion of macro 'ANIM_CITY_60'
+  116 |                 ANIM_CITY_56, ANIM_CITY_57, ANIM_CITY_58, ANIM_CITY_59, ANIM_CITY_60,
+      |                                                                         ^~~~~~~~~~~~
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:121:63: error: 'ANIM_BLACK_HOLE_6' undeclared here (not in a function); did you mean 'ANIM_BLACK_HOLE_1'?
+  121 |                         ANIM_BLACK_HOLE_4, ANIM_BLACK_HOLE_5, ANIM_BLACK_HOLE_6,
+      |                                                               ^~~~~~~~~~~~~~~~~
+      |                                                               ANIM_BLACK_HOLE_1
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:122:25: error: 'ANIM_BLACK_HOLE_7' undeclared here (not in a function); did you mean 'ANIM_BLACK_HOLE_1'?
+  122 |                         ANIM_BLACK_HOLE_7, ANIM_BLACK_HOLE_8, ANIM_BLACK_HOLE_9,
+      |                         ^~~~~~~~~~~~~~~~~
+      |                         ANIM_BLACK_HOLE_1
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:122:44: error: 'ANIM_BLACK_HOLE_8' undeclared here (not in a function); did you mean 'ANIM_BLACK_HOLE_1'?
+  122 |                         ANIM_BLACK_HOLE_7, ANIM_BLACK_HOLE_8, ANIM_BLACK_HOLE_9,
+      |                                            ^~~~~~~~~~~~~~~~~
+      |                                            ANIM_BLACK_HOLE_1
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:122:63: error: 'ANIM_BLACK_HOLE_9' undeclared here (not in a function); did you mean 'ANIM_BLACK_HOLE_1'?
+  122 |                         ANIM_BLACK_HOLE_7, ANIM_BLACK_HOLE_8, ANIM_BLACK_HOLE_9,
+      |                                                               ^~~~~~~~~~~~~~~~~
+      |                                                               ANIM_BLACK_HOLE_1
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:123:25: error: 'ANIM_BLACK_HOLE_10' undeclared here (not in a function); did you mean 'ANIM_BLACK_HOLE_1'?
+  123 |                         ANIM_BLACK_HOLE_10, ANIM_BLACK_HOLE_11, ANIM_BLACK_HOLE_12,
+      |                         ^~~~~~~~~~~~~~~~~~
+      |                         ANIM_BLACK_HOLE_1
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:123:45: error: 'ANIM_BLACK_HOLE_11' undeclared here (not in a function); did you mean 'ANIM_BLACK_HOLE_1'?
+  123 |                         ANIM_BLACK_HOLE_10, ANIM_BLACK_HOLE_11, ANIM_BLACK_HOLE_12,
+      |                                             ^~~~~~~~~~~~~~~~~~
+      |                                             ANIM_BLACK_HOLE_1
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:123:65: error: 'ANIM_BLACK_HOLE_12' undeclared here (not in a function); did you mean 'ANIM_BLACK_HOLE_1'?
+  123 |                         ANIM_BLACK_HOLE_10, ANIM_BLACK_HOLE_11, ANIM_BLACK_HOLE_12,
+      |                                                                 ^~~~~~~~~~~~~~~~~~
+      |                                                                 ANIM_BLACK_HOLE_1
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:124:25: error: 'ANIM_BLACK_HOLE_13' undeclared here (not in a function); did you mean 'ANIM_BLACK_HOLE_1'?
+  124 |                         ANIM_BLACK_HOLE_13, ANIM_BLACK_HOLE_14, ANIM_BLACK_HOLE_15,
+      |                         ^~~~~~~~~~~~~~~~~~
+      |                         ANIM_BLACK_HOLE_1
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:124:45: error: 'ANIM_BLACK_HOLE_14' undeclared here (not in a function); did you mean 'ANIM_BLACK_HOLE_1'?
+  124 |                         ANIM_BLACK_HOLE_13, ANIM_BLACK_HOLE_14, ANIM_BLACK_HOLE_15,
+      |                                             ^~~~~~~~~~~~~~~~~~
+      |                                             ANIM_BLACK_HOLE_1
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:124:65: error: 'ANIM_BLACK_HOLE_15' undeclared here (not in a function); did you mean 'ANIM_BLACK_HOLE_1'?
+  124 |                         ANIM_BLACK_HOLE_13, ANIM_BLACK_HOLE_14, ANIM_BLACK_HOLE_15,
+      |                                                                 ^~~~~~~~~~~~~~~~~~
+      |                                                                 ANIM_BLACK_HOLE_1
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:125:25: error: 'ANIM_BLACK_HOLE_16' undeclared here (not in a function); did you mean 'ANIM_BLACK_HOLE_1'?
+  125 |                         ANIM_BLACK_HOLE_16, ANIM_BLACK_HOLE_17, ANIM_BLACK_HOLE_18
+      |                         ^~~~~~~~~~~~~~~~~~
+      |                         ANIM_BLACK_HOLE_1
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:125:45: error: 'ANIM_BLACK_HOLE_17' undeclared here (not in a function); did you mean 'ANIM_BLACK_HOLE_1'?
+  125 |                         ANIM_BLACK_HOLE_16, ANIM_BLACK_HOLE_17, ANIM_BLACK_HOLE_18
+      |                                             ^~~~~~~~~~~~~~~~~~
+      |                                             ANIM_BLACK_HOLE_1
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/src/lcd_utils.c:125:65: error: 'ANIM_BLACK_HOLE_18' undeclared here (not in a function); did you mean 'ANIM_BLACK_HOLE_1'?
+  125 |                         ANIM_BLACK_HOLE_16, ANIM_BLACK_HOLE_17, ANIM_BLACK_HOLE_18
+      |                                                                 ^~~~~~~~~~~~~~~~~~
+      |                                                                 ANIM_BLACK_HOLE_1
+ninja: build stopped: subcommand failed.

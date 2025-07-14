@@ -3,8 +3,9 @@ cmake_minimum_required(VERSION 3.16)
 
 if("${CONFIG}" STREQUAL "" OR "${CONFIG}" STREQUAL "")
   file(REMOVE_RECURSE
-  "app-template.bin"
-  "app-template.map"
+  "PolyCast5.bin"
+  "PolyCast5.map"
+  "assets.bin"
   "bootloader\\bootloader.bin"
   "bootloader\\bootloader.elf"
   "bootloader\\bootloader.map"

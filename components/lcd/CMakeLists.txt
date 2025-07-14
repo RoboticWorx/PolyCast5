@@ -1,26 +1,16 @@
+# Collect every .c under src/ (recursively)
 file(GLOB_RECURSE SRCS
-	RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
-	"src/*.c"
-	"media/city/src/*.c"
-	"media/black_hole/src/*.c"
-	"media/matrix_rain/src/*.c"
-	"media/other/src/*.c"
-	"media/qr/src/*.c"
-)
+     RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
+     "src/*.c")
 
 idf_component_register(
     SRCS ${SRCS}
         
     INCLUDE_DIRS 
     	"include"
-    	"media/qr/include"
-    	"media/city/include"
-    	"media/black_hole/include"
-    	"media/matrix_rain/include"
-    	"media/other/include"
     
     REQUIRES
-    	common lvgl sx126x infrared espnow lora wifi gpio tools bootloader_support
+    	common lvgl sx126x infrared espnow lora wifi gpio tools bootloader_support spiffs
     
     PRIV_REQUIRES
 )

@@ -160,7 +160,7 @@ CMAKE_INSTALL_MANDIR:PATH=
 CMAKE_INSTALL_OLDINCLUDEDIR:PATH=/usr/include
 
 //Install path prefix, prepended onto install directories.
-CMAKE_INSTALL_PREFIX:PATH=C:/Program Files (x86)/app-template
+CMAKE_INSTALL_PREFIX:PATH=C:/Program Files (x86)/PolyCast5
 
 //Run-time variable data (LOCALSTATEDIR/run)
 CMAKE_INSTALL_RUNSTATEDIR:PATH=
@@ -216,7 +216,7 @@ CMAKE_PROJECT_DESCRIPTION:STATIC=
 CMAKE_PROJECT_HOMEPAGE_URL:STATIC=
 
 //Value Computed by CMake
-CMAKE_PROJECT_NAME:STATIC=app-template
+CMAKE_PROJECT_NAME:STATIC=PolyCast5
 
 //Value Computed by CMake
 CMAKE_PROJECT_VERSION:STATIC=3.6.2
@@ -358,6 +358,15 @@ PYTHON:UNINITIALIZED=C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.ex
 //No help, variable specified on the command line.
 PYTHON_DEPS_CHECKED:UNINITIALIZED=1
 
+//Value Computed by CMake
+PolyCast5_BINARY_DIR:STATIC=C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build
+
+//Value Computed by CMake
+PolyCast5_IS_TOP_LEVEL:STATIC=ON
+
+//Value Computed by CMake
+PolyCast5_SOURCE_DIR:STATIC=C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5
+
 //Allow unsafe builds. These builds ARE NOT SECURE.
 UNSAFE_BUILD:BOOL=OFF
 
@@ -366,15 +375,6 @@ USE_SHARED_MBEDTLS_LIBRARY:BOOL=OFF
 
 //Build Mbed TLS static library.
 USE_STATIC_MBEDTLS_LIBRARY:BOOL=ON
-
-//Value Computed by CMake
-app-template_BINARY_DIR:STATIC=C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build
-
-//Value Computed by CMake
-app-template_IS_TOP_LEVEL:STATIC=ON
-
-//Value Computed by CMake
-app-template_SOURCE_DIR:STATIC=C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5
 
 //Value Computed by CMake
 esp-idf_BINARY_DIR:STATIC=C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf
@@ -602,7 +602,7 @@ FIND_PACKAGE_MESSAGE_DETAILS_Threads:INTERNAL=[TRUE][v()]
 //ADVANCED property for variable: GIT_EXECUTABLE
 GIT_EXECUTABLE-ADVANCED:INTERNAL=1
 //CMAKE_INSTALL_PREFIX during last run
-_GNUInstallDirs_LAST_CMAKE_INSTALL_PREFIX:INTERNAL=C:/Program Files (x86)/app-template
+_GNUInstallDirs_LAST_CMAKE_INSTALL_PREFIX:INTERNAL=C:/Program Files (x86)/PolyCast5
 //Compiler reason failure
 _Python3_Compiler_REASON_FAILURE:INTERNAL=
 //Development reason failure

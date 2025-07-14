@@ -1,2 +1,0 @@
-Command: ninja flash
-ninja: error: 'C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd/media/matrix_rain/src/anim_matrix_rain_43.c', needed by 'esp-idf/lcd/CMakeFiles/__idf_lcd.dir/media/matrix_rain/src/anim_matrix_rain_43.c.obj', missing and no known rule to make it

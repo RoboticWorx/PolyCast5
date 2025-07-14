@@ -10,12 +10,15 @@ C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/CMakeFiles/monitor.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/CMakeFiles/flash.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/CMakeFiles/encrypted-flash.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/CMakeFiles/_project_elf_src.dir
-C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/CMakeFiles/app-template.elf.dir
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/CMakeFiles/PolyCast5.elf.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/CMakeFiles/size.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/CMakeFiles/size-files.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/CMakeFiles/size-components.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/CMakeFiles/uf2.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/CMakeFiles/uf2-app.dir
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/CMakeFiles/spiffs_assets_bin.dir
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/CMakeFiles/assets-flash.dir
+C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/CMakeFiles/encrypted-assets-flash.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/CMakeFiles/edit_cache.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/CMakeFiles/rebuild_cache.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/CMakeFiles/list_install_components.dir

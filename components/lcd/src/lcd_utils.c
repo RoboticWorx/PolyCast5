@@ -8,27 +8,27 @@
 #include "freertos/projdefs.h"
 #include "portmacro.h"
 
-#include "misc/lv_timer.h"
-
 #include "nvs.h"
 #include "esp_sleep.h"
 #include "driver/gpio.h"
 #include "esp_timer.h"
 #include "esp_log.h"
+#include "esp_spiffs.h"
 
 #include "st7789.h"
 #include "tca9535.h"
 
+#include "draw/lv_image_decoder_private.h"
+#include "draw/lv_image_decoder.h"
+#include "misc/lv_timer.h"
+
+#include "lcd_asset_macros.h"
 #include "lcd_utils.h"
 #include "wifi_funcs.h"
 #include "wifi_task.h"
 #include "infrared_funcs.h"
 #include "gpio_funcs.h"
 #include "gpio_task.h"
-
-#include "anim_city.h"
-#include "anim_black_hole.h"
-#include "anim_matrix_rain.h"
 
 #define DRAW_LINES   20
 #define FLUSH_CHUNK  2
@@ -90,7 +90,7 @@ typedef struct {
 /* Animation */
 typedef struct {
     lv_obj_t *img; // Single lv_img
-    const lv_img_dsc_t **frames; // Pointer to the file‐scope array
+    const char **frames; // Pointer to file‐path strings
     uint8_t frame_cnt; // Num frames
     bool pingpong; // False = wrap
     bool forward; // Current direction in pingpong
@@ -100,90 +100,90 @@ typedef struct {
 
 // Define animation frames
 #ifdef POLYCAST5_BUILD_FULL_ANIMS
-	static const lv_img_dsc_t *city_frames[CITY_FRAME_CNT] = { // 64.84KB each
+	const char *city_paths[CITY_FRAME_CNT] = { // 64.84KB each
 		// 64.84KB each
-		&anim_city_1,  &anim_city_2,  &anim_city_3,	 &anim_city_4,	&anim_city_5,
-		&anim_city_6,  &anim_city_7,  &anim_city_8,	 &anim_city_9,	&anim_city_10,
-		&anim_city_11, &anim_city_12, &anim_city_13, &anim_city_14, &anim_city_15,
-		&anim_city_16, &anim_city_17, &anim_city_18, &anim_city_19, &anim_city_20,
-		&anim_city_21, &anim_city_22, &anim_city_23, &anim_city_24, &anim_city_25,
-		&anim_city_26, &anim_city_27, &anim_city_28, &anim_city_29, &anim_city_30,
-		&anim_city_31, &anim_city_32, &anim_city_33, &anim_city_34, &anim_city_35,
-		&anim_city_36, &anim_city_37, &anim_city_38, &anim_city_39, &anim_city_40,
-		&anim_city_41, &anim_city_42, &anim_city_43, &anim_city_44, &anim_city_45,
-		&anim_city_46, &anim_city_47, &anim_city_48, &anim_city_49, &anim_city_50,
-		&anim_city_51, &anim_city_52, &anim_city_53, &anim_city_54, &anim_city_55,
-		&anim_city_56, &anim_city_57, &anim_city_58, &anim_city_59, &anim_city_60,
+		ANIM_CITY_1, ANIM_CITY_2, ANIM_CITY_3,	ANIM_CITY_4, ANIM_CITY_5,
+		ANIM_CITY_6, ANIM_CITY_7, ANIM_CITY_8,	ANIM_CITY_9, ANIM_CITY_10,
+		/*ANIM_CITY_11, ANIM_CITY_12, ANIM_CITY_13, ANIM_CITY_14, ANIM_CITY_15,
+		ANIM_CITY_16, ANIM_CITY_17, ANIM_CITY_18, ANIM_CITY_19, ANIM_CITY_20,
+		ANIM_CITY_21, ANIM_CITY_22, ANIM_CITY_23, ANIM_CITY_24, ANIM_CITY_25,
+		ANIM_CITY_26, ANIM_CITY_27, ANIM_CITY_28, ANIM_CITY_29, ANIM_CITY_30,
+		ANIM_CITY_31, ANIM_CITY_32, ANIM_CITY_33, ANIM_CITY_34, ANIM_CITY_35,
+		ANIM_CITY_36, ANIM_CITY_37, ANIM_CITY_38, ANIM_CITY_39, ANIM_CITY_40,
+		ANIM_CITY_41, ANIM_CITY_42, ANIM_CITY_43, ANIM_CITY_44, ANIM_CITY_45,
+		ANIM_CITY_46, ANIM_CITY_47, ANIM_CITY_48, ANIM_CITY_49, ANIM_CITY_50,
+		ANIM_CITY_51, ANIM_CITY_52, ANIM_CITY_53, ANIM_CITY_54, ANIM_CITY_55,
+		ANIM_CITY_56, ANIM_CITY_57, ANIM_CITY_58, ANIM_CITY_59, ANIM_CITY_60,*/
 	};
 	
-	static const lv_img_dsc_t *black_hole_frames[BLACK_HOLE_FRAME_CNT] = {
-			&anim_black_hole_1,	 &anim_black_hole_2,  &anim_black_hole_3,
-			&anim_black_hole_4,	 &anim_black_hole_5,  &anim_black_hole_6,
-			&anim_black_hole_7,	 &anim_black_hole_8,  &anim_black_hole_9,
-			&anim_black_hole_10, &anim_black_hole_11, &anim_black_hole_12,
-			&anim_black_hole_13, &anim_black_hole_14, &anim_black_hole_15,
-			&anim_black_hole_16, &anim_black_hole_17, &anim_black_hole_18
+	const char *black_hole_paths[BLACK_HOLE_FRAME_CNT] = {
+			ANIM_BLACK_HOLE_1, ANIM_BLACK_HOLE_2, ANIM_BLACK_HOLE_3,
+			ANIM_BLACK_HOLE_4, ANIM_BLACK_HOLE_5, ANIM_BLACK_HOLE_6,
+			ANIM_BLACK_HOLE_7, ANIM_BLACK_HOLE_8, ANIM_BLACK_HOLE_9,
+			ANIM_BLACK_HOLE_10, ANIM_BLACK_HOLE_11, ANIM_BLACK_HOLE_12,
+			ANIM_BLACK_HOLE_13, ANIM_BLACK_HOLE_14, ANIM_BLACK_HOLE_15,
+			ANIM_BLACK_HOLE_16, ANIM_BLACK_HOLE_17, ANIM_BLACK_HOLE_18
 	};
 	
-	static const lv_img_dsc_t *matrix_rain_frames[MATRIX_RAIN_FRAME_CNT] = {
-			&anim_matrix_rain_1,  &anim_matrix_rain_2,  &anim_matrix_rain_3,  &anim_matrix_rain_4,	&anim_matrix_rain_5,
-			&anim_matrix_rain_6,  &anim_matrix_rain_7,  &anim_matrix_rain_8,  &anim_matrix_rain_9,	&anim_matrix_rain_10,
-			&anim_matrix_rain_11, &anim_matrix_rain_12, &anim_matrix_rain_13, &anim_matrix_rain_14, &anim_matrix_rain_15,
-			&anim_matrix_rain_16, &anim_matrix_rain_17, &anim_matrix_rain_18, &anim_matrix_rain_19, &anim_matrix_rain_20,
-			&anim_matrix_rain_21, &anim_matrix_rain_22, &anim_matrix_rain_23, &anim_matrix_rain_24, &anim_matrix_rain_25,
-			&anim_matrix_rain_26, &anim_matrix_rain_27, &anim_matrix_rain_28, &anim_matrix_rain_29, &anim_matrix_rain_30,
-			&anim_matrix_rain_31, &anim_matrix_rain_32, &anim_matrix_rain_33, &anim_matrix_rain_34, &anim_matrix_rain_35,
-			&anim_matrix_rain_36, &anim_matrix_rain_37, &anim_matrix_rain_38, &anim_matrix_rain_39, &anim_matrix_rain_40,
-			&anim_matrix_rain_41, &anim_matrix_rain_42
+	const char *matrix_rain_paths[MATRIX_RAIN_FRAME_CNT] = {
+			ANIM_MATRIX_RAIN_1, ANIM_MATRIX_RAIN_2, ANIM_MATRIX_RAIN_3, ANIM_MATRIX_RAIN_4,	ANIM_MATRIX_RAIN_5,
+			ANIM_MATRIX_RAIN_6, ANIM_MATRIX_RAIN_7, ANIM_MATRIX_RAIN_8, ANIM_MATRIX_RAIN_9,	ANIM_MATRIX_RAIN_10,
+			ANIM_MATRIX_RAIN_11, ANIM_MATRIX_RAIN_12, ANIM_MATRIX_RAIN_13, ANIM_MATRIX_RAIN_14, ANIM_MATRIX_RAIN_15,
+			ANIM_MATRIX_RAIN_16, ANIM_MATRIX_RAIN_17, ANIM_MATRIX_RAIN_18, ANIM_MATRIX_RAIN_19, ANIM_MATRIX_RAIN_20,
+			ANIM_MATRIX_RAIN_21, ANIM_MATRIX_RAIN_22, ANIM_MATRIX_RAIN_23, ANIM_MATRIX_RAIN_24, ANIM_MATRIX_RAIN_25,
+			ANIM_MATRIX_RAIN_26, ANIM_MATRIX_RAIN_27, ANIM_MATRIX_RAIN_28, ANIM_MATRIX_RAIN_29, ANIM_MATRIX_RAIN_30,
+			ANIM_MATRIX_RAIN_31, ANIM_MATRIX_RAIN_32, ANIM_MATRIX_RAIN_33, ANIM_MATRIX_RAIN_34, ANIM_MATRIX_RAIN_35,
+			ANIM_MATRIX_RAIN_36, ANIM_MATRIX_RAIN_37, ANIM_MATRIX_RAIN_38, ANIM_MATRIX_RAIN_39, ANIM_MATRIX_RAIN_40,
+			ANIM_MATRIX_RAIN_41, ANIM_MATRIX_RAIN_42
 	};
 #else
-	static const lv_img_dsc_t *city_frames[CITY_FRAME_CNT] = {
-			&anim_city_1, &anim_city_2, &anim_city_3,
-			&anim_city_4, &anim_city_5
+	const char *city_paths[CITY_FRAME_CNT] = {
+			ANIM_CITY_1, ANIM_CITY_2, ANIM_CITY_3,
+			ANIM_CITY_4, ANIM_CITY_5
 	};
 	
-	static const lv_img_dsc_t *black_hole_frames[BLACK_HOLE_FRAME_CNT] = {
-			&anim_black_hole_1,	 &anim_black_hole_2,  &anim_black_hole_3,
-			&anim_black_hole_4,	 &anim_black_hole_5
+	const char *black_hole_paths[BLACK_HOLE_FRAME_CNT] = {
+			ANIM_BLACK_HOLE_1, ANIM_BLACK_HOLE_2, ANIM_BLACK_HOLE_3,
+			ANIM_BLACK_HOLE_4, ANIM_BLACK_HOLE_5
 	};
 	
-	static const lv_img_dsc_t *matrix_rain_frames[MATRIX_RAIN_FRAME_CNT] = {
-			&anim_matrix_rain_1,  &anim_matrix_rain_2,  &anim_matrix_rain_3,
-			&anim_matrix_rain_4,	&anim_matrix_rain_5
+	const char *matrix_rain_paths[MATRIX_RAIN_FRAME_CNT] = {
+			ANIM_MATRIX_RAIN_1, ANIM_MATRIX_RAIN_2, ANIM_MATRIX_RAIN_3,
+			ANIM_MATRIX_RAIN_4, ANIM_MATRIX_RAIN_5
 	};
 #endif
 
 // Animation structs
 static anim_t city_anim = {
-    .frames = city_frames,
+    .frames = city_paths,
     .frame_cnt = CITY_FRAME_CNT,
     .pingpong = false,
     .forward = true,
-    .cur = 0,
+    .cur = CITY_FRAME_CNT - 1,
     .img = NULL,
     .timer = NULL
 };
 
 static anim_t black_hole_anim = {
-    .frames = black_hole_frames,
+    .frames = black_hole_paths,
     .frame_cnt = BLACK_HOLE_FRAME_CNT,
     .pingpong = false,
     .forward = true,
-    .cur = 0,
+    .cur = BLACK_HOLE_FRAME_CNT - 1,
     .img = NULL,
     .timer = NULL
 };
 
 static anim_t matrix_rain_anim = {
-    .frames = matrix_rain_frames,
+    .frames = matrix_rain_paths,
     .frame_cnt = MATRIX_RAIN_FRAME_CNT,
     .pingpong = false,
     .forward = true,
-    .cur = 0,
+    .cur = MATRIX_RAIN_FRAME_CNT - 1,
     .img = NULL,
     .timer = NULL
 };
-	
+
 
 static void st7789_flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_map)
 {
@@ -328,10 +328,41 @@ static void lv_tick_cb(void *arg)
     lv_tick_inc(1);
 }
 
+static void warm_anim(const char **paths, int cnt) {
+    lv_image_decoder_dsc_t dsc;
+    for(int i = 0; i < cnt; i++) {
+        if(lv_image_decoder_open(&dsc, paths[i], NULL) == LV_RESULT_OK) {
+            lv_image_decoder_close(&dsc);
+        }
+    }
+}
+
 void lcd_lvgl_init(void)
 {
+	// Mount SPIFFS so that "/assets/…" works
+    esp_vfs_spiffs_conf_t cfg = {
+        .base_path = "/assets",
+        .partition_label = "assets",
+        .max_files = (CITY_FRAME_CNT + BLACK_HOLE_FRAME_CNT + MATRIX_RAIN_FRAME_CNT) * 6, // Plenty of PSRAM available for now
+        .format_if_mount_failed = false
+    };
+    esp_err_t ret = esp_vfs_spiffs_register(&cfg);
+    if (ret != ESP_OK) {
+        ESP_LOGE("LCD", "SPIFFS mount failed: %d", ret);
+        return;
+    } 
+    else {
+        ESP_LOGI("LCD", "SPIFFS mounted successfully");
+    }
+    
     // LVGL library init
     lv_init();
+    
+    // Initialize LVGL's POSIX file system driver (binds to VFS/SPIFFS)
+    lv_fs_posix_init();
+    
+     // Reserve slots in the decoded-image cache
+    lv_image_cache_init((CITY_FRAME_CNT + BLACK_HOLE_FRAME_CNT + MATRIX_RAIN_FRAME_CNT) * 2);
 
     // Draw‐buffer: HOR_RES × DRAW_LINES lines
     // Allocate space for 20 lines of 240 px each (≈9.6 kB), DMA-capable in DRAM
@@ -355,6 +386,11 @@ void lcd_lvgl_init(void)
     esp_timer_handle_t tick_timer;
     esp_timer_create(&tick_args, &tick_timer);
     esp_timer_start_periodic(tick_timer, 1000);
+    
+    // Pre-load animations for quick access if needed (but longer boot time)
+	warm_anim(city_paths, CITY_FRAME_CNT);
+	warm_anim(black_hole_paths, BLACK_HOLE_FRAME_CNT);
+	warm_anim(matrix_rain_paths, MATRIX_RAIN_FRAME_CNT);
 }
 
 void lcd_ns_nvs_clear(const char* ns)
@@ -700,6 +736,7 @@ static void start_animation(void)
 
 static void stop_animations(void)
 {
+	// Halt all animations
     lv_timer_pause(city_anim.timer);
     lv_timer_pause(black_hole_anim.timer);
     lv_timer_pause(matrix_rain_anim.timer);
