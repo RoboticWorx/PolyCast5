@@ -1,13 +1,16 @@
-# Collect every .c under src/ (recursively)
+# Collect every .c (recursively)
 file(GLOB_RECURSE SRCS
-     RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
-     "src/*.c")
+	RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
+	"src/*.c"
+	"media/src/*.c"
+)
 
 idf_component_register(
     SRCS ${SRCS}
         
     INCLUDE_DIRS 
     	"include"
+    	"media/include"
     
     REQUIRES
     	common lvgl sx126x infrared espnow lora wifi gpio tools bootloader_support spiffs

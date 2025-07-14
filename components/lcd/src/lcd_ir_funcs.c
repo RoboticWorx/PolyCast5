@@ -3,10 +3,13 @@
 
 #include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
-#include "misc/lv_area.h"
 
 #include "nvs.h"
 #include "esp_log.h"
+
+#include "misc/lv_area.h"
+#include "widgets/label/lv_label.h"
+#include "widgets/list/lv_list.h"
 
 #include "lcd_asset_macros.h"
 #include "lcd_ir_funcs.h"
@@ -14,8 +17,7 @@
 #include "infrared_task.h"
 #include "gpio_task.h"
 
-#include "widgets/label/lv_label.h"
-#include "widgets/list/lv_list.h"
+#include "img_save_new_remote.h"
 
 ir_menu_t ir_menu = {
     .options = {"REMOTE", "Add New", "Edit"},
@@ -749,7 +751,7 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *menu)
 				 
 	// Create present signal img
     lv_obj_t *img_save_remote = lv_img_create(ACTIVE_SCR);
-    lv_img_set_src(img_save_remote, IMG_IR_SAVE_NEW);
+    lv_img_set_src(img_save_remote, &img_save_new_remote);
     lv_obj_align(img_save_remote, LV_ALIGN_CENTER, 0, 25);
     
 	lv_timer_handler();

@@ -2,17 +2,21 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
 
-#include "core/lv_obj_pos.h"
-#include "core/lv_obj.h"
-#include "misc/lv_area.h"
-#include "widgets/label/lv_label.h"
-
 #include "esp_log.h"
 #include "esp_err.h"
 #include "esp_random.h"
 
+#include "core/lv_obj_pos.h"
+#include "core/lv_obj.h"
+#include "misc/lv_area.h"
+#include "misc/lv_timer.h"
+#include "widgets/label/lv_label.h"
+
 #include "lcd_asset_macros.h"
 #include "lcd_utils.h"
+
+#include "img_coin_heads.h"
+#include "img_coin_tails.h"
 
 tools_menu_t tools_menu = {
     .options = {"Coin flipper", "Dice roller", "Number generator", "Read the docs"},
@@ -160,13 +164,13 @@ void lcd_tools_coin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		lcd_format_label(lbl_result, "Ready", user_secondary_color,
         			 &lv_font_montserrat_18, LV_ALIGN_CENTER, 62, 16);
         
-        // Create coin images
+        // Create coin image
 		coin_heads = lv_img_create(ACTIVE_SCR);
-	    lv_img_set_src(coin_heads, IMG_COIN_HEADS);
+	    lv_img_set_src(coin_heads, &img_coin_heads);
 	    lv_obj_align(coin_heads, LV_ALIGN_CENTER, -40, 16);
 	    
 	    coin_tails = lv_img_create(ACTIVE_SCR);
-	    lv_img_set_src(coin_tails, IMG_COIN_TAILS);
+	    lv_img_set_src(coin_tails, &img_coin_tails);
 	    lv_obj_align(coin_tails, LV_ALIGN_CENTER, -40, 16);
 	    lv_obj_add_flag(coin_tails, LV_OBJ_FLAG_HIDDEN); // Hide for now
 		
@@ -455,7 +459,7 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 	    lv_label_set_text(lbl_roll_log, roll_log_buf);
 	    
 	    lv_obj_add_flag(cont_roll_log, LV_OBJ_FLAG_HIDDEN); // Hide history cont
-		
+	    	    		
 		do_once = true;
 	}
 	

@@ -859,8 +859,8 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 
 void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu)
 {
-	#define TIME_OPT_COUNT (sizeof(time_opts)/sizeof(time_opts[0]))
-	#define Y_SEL_POS 43
+	#define LOOP_TIME_OPT_COUNT (sizeof(time_opts)/sizeof(time_opts[0]))
+	#define LOOP_Y_SEL_POS 43
 	
 	// Create statics
 	static lv_obj_t *lbl_subpage_times = NULL;
@@ -893,7 +893,7 @@ void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		
 		lbl_selected_icon = lv_label_create(ACTIVE_SCR);		 
 		lcd_format_label(lbl_selected_icon, LV_SYMBOL_PLAY, user_secondary_color,
-			 &lv_font_montserrat_12, LV_ALIGN_TOP_MID, -75, Y_SEL_POS);
+			 &lv_font_montserrat_12, LV_ALIGN_TOP_MID, -75, LOOP_Y_SEL_POS);
 			 
 		lbl_top_time = lv_label_create(ACTIVE_SCR);		 
 		lcd_format_label(lbl_top_time, "", user_secondary_color,
@@ -901,13 +901,13 @@ void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 			 
 		lbl_bot_time = lv_label_create(ACTIVE_SCR);		 
 		lcd_format_label(lbl_bot_time, "", user_secondary_color, 
-			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 55, Y_SEL_POS - 2);
+			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 55, LOOP_Y_SEL_POS - 2);
 		
 		char buf[4];
 		snprintf(buf, sizeof(buf), "%s", time_opts[0]);
 		lv_label_set_text(lbl_top_time, buf);
 		lv_label_set_text(lbl_bot_time, buf);
-	}	
+	}
 	
 	// Move up
 	if (ui_btns->up_btn == 1) {
@@ -918,14 +918,14 @@ void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		}
 		else if (selected_index == 0) {
 			// Move pointer up
-			lv_obj_set_y(lbl_selected_icon, Y_SEL_POS);
+			lv_obj_set_y(lbl_selected_icon, LOOP_Y_SEL_POS);
 			selected_index = 1;
 		}
 	}
 	// Move down
 	else if (ui_btns->down_btn == 1 && selected_index == 0) {
 		// Move pointer down
-		lv_obj_set_y(lbl_selected_icon, Y_SEL_POS);
+		lv_obj_set_y(lbl_selected_icon, LOOP_Y_SEL_POS);
 			
 		selected_index = 1;
 	}
@@ -933,14 +933,14 @@ void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 	else if (ui_btns->right_btn == 1) {
 		// Changing top time
 		if (selected_index == 0) {
-			on_idx = (on_idx  + 1) % TIME_OPT_COUNT;
+			on_idx = (on_idx  + 1) % LOOP_TIME_OPT_COUNT;
 			char buf[4];
 			snprintf(buf, sizeof(buf), "%s", time_opts[on_idx]);
 			lv_label_set_text(lbl_top_time, buf);
 		}
 		// Changing bot time
 		else {
-			off_idx = (off_idx + 1) % TIME_OPT_COUNT;
+			off_idx = (off_idx + 1) % LOOP_TIME_OPT_COUNT;
 			char buf[4];
 			snprintf(buf, sizeof(buf), "%s", time_opts[off_idx]);
 			lv_label_set_text(lbl_bot_time, buf);
@@ -950,14 +950,14 @@ void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 	else if (ui_btns->left_btn == 1) {
 		// Changing top time
 		if (selected_index == 0) {
-			on_idx = (on_idx - 1 + TIME_OPT_COUNT) % TIME_OPT_COUNT;
+			on_idx = (on_idx - 1 + LOOP_TIME_OPT_COUNT) % LOOP_TIME_OPT_COUNT;
 			char buf[4];
 			snprintf(buf, sizeof(buf), "%s", time_opts[on_idx]);
 			lv_label_set_text(lbl_top_time, buf);
 		}
 		// Changing bot time
 		else {
-			off_idx = (off_idx - 1 + TIME_OPT_COUNT) % TIME_OPT_COUNT;
+			off_idx = (off_idx - 1 + LOOP_TIME_OPT_COUNT) % LOOP_TIME_OPT_COUNT;
 			char buf[4];
 			snprintf(buf, sizeof(buf), "%s", time_opts[off_idx]);
 			lv_label_set_text(lbl_bot_time, buf);
@@ -1171,12 +1171,19 @@ void lcd_lora_plan_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 			lv_label_set_text(lbl, buf);
 		}
 		
+		lora_plan_menu->plan_index = 0;
+		
 		// Reset text
 		lv_label_set_text(lora_plan_menu->lbl_days_ins, LORA_PLAN_SEL_INS);
 		
 		// Hide plan items
 		lv_obj_add_flag(lora_plan_menu->plan_cont, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(lora_plan_menu->lbl_days_ins, LV_OBJ_FLAG_HIDDEN);
+		
+		// Hide arrows
+		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Switch pages
 		ui_menu->page = LORA_PLAN_CONFIRM_SUBPAGE;
@@ -1322,7 +1329,39 @@ void lcd_lora_plan_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 
 void lcd_lora_plan_confirm_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu)
 {
+	static bool init = false;
+	static lv_obj_t *lbl_ins = NULL;
 	
+	if (!init) {
+		lbl_ins = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_ins, "Please make sure the\ntargeted PolyPlug is\nconnected to Wi-Fi\nbefore proceeding! If\nnot, please do so in the\nWi-Fi menu via 'sync'.", user_secondary_color,
+	    		&lv_font_montserrat_14, LV_ALIGN_CENTER, 0, -15);
+	    
+	    init = true;
+	}
+    
+	// Back
+    if (ui_btns->left_btn == 1) {
+		// Reset objects
+		lv_obj_del(lbl_ins);
+		
+		// Reset statics
+		init = false;
+		
+		// Show arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        
+        // Reveal the plan container and label
+		lv_obj_remove_flag(lora_plan_menu->plan_cont, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(lora_plan_menu->lbl_days_ins, LV_OBJ_FLAG_HIDDEN);
+		
+		lcd_lora_update_plan_menu(lora_plan_menu); // Refresh
+		
+		// Go back
+		ui_menu->page = LORA_PLAN_SUBPAGE;
+	}
 }
 
 void lcd_lora_update_plan_menu(lora_plan_menu_t *lora_plan_menu)

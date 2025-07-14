@@ -135,13 +135,6 @@
 
 /* IMAGES START */
 
-// Infrared
-#define IMG_IR_SAVE_NEW "A:/img/img_ir_save_new_remote.bin"
-
-// Tools coins
-#define IMG_COIN_HEADS "A:/img/img_coin_heads.bin"
-#define IMG_COIN_TAILS "A:/img/img_coin_tails.bin"
-
 // Tools dice
 #define IMG_DICE_1 "A:/img/img_dice_1.bin"
 #define IMG_DICE_2 "A:/img/img_dice_2.bin"

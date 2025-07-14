@@ -30,8 +30,8 @@
 #include "gpio_funcs.h"
 #include "gpio_task.h"
 
-#define DRAW_LINES   20
-#define FLUSH_CHUNK  2
+#define DRAW_LINES 20
+#define FLUSH_CHUNK 2
 
 #define SWIPE_SPEED 1200
 #define SCROLL_SPEED 400
@@ -308,10 +308,17 @@ static void lv_tick_cb(void *arg)
     lv_tick_inc(1);
 }
 
+static void warm_img(const char *path) {
+    lv_image_decoder_dsc_t dsc;
+    if (lv_image_decoder_open(&dsc, path, NULL) == LV_RESULT_OK) {
+        lv_image_decoder_close(&dsc);
+    }
+}
+
 static void warm_anim(const char **paths, int cnt) {
     lv_image_decoder_dsc_t dsc;
-    for(int i = 0; i < cnt; i++) {
-        if(lv_image_decoder_open(&dsc, paths[i], NULL) == LV_RESULT_OK) {
+    for (int i = 0; i < cnt; i++) {
+        if (lv_image_decoder_open(&dsc, paths[i], NULL) == LV_RESULT_OK) {
             lv_image_decoder_close(&dsc);
         }
     }
@@ -342,7 +349,7 @@ void lcd_lvgl_init(void)
     lv_fs_posix_init();
     
      // Reserve slots in the decoded-image cache
-    lv_image_cache_init((CITY_FRAME_CNT + BLACK_HOLE_FRAME_CNT + MATRIX_RAIN_FRAME_CNT) * 2);
+    lv_image_cache_init((CITY_FRAME_CNT + BLACK_HOLE_FRAME_CNT + MATRIX_RAIN_FRAME_CNT) * 3);
 
     // Draw‐buffer: HOR_RES x DRAW_LINES lines
     // Allocate space for 20 lines of 240 px each (≈9.6 kB), DMA-capable in DRAM
@@ -371,6 +378,20 @@ void lcd_lvgl_init(void)
 	warm_anim(city_paths, CITY_FRAME_CNT);
 	warm_anim(black_hole_paths, BLACK_HOLE_FRAME_CNT);
 	warm_anim(matrix_rain_paths, MATRIX_RAIN_FRAME_CNT);
+	
+	// Pre-load images too
+	warm_img(IMG_DICE_1);
+	warm_img(IMG_DICE_2);
+	warm_img(IMG_DICE_3);
+	warm_img(IMG_DICE_4);
+	warm_img(IMG_DICE_5);
+	warm_img(IMG_DICE_6);
+	
+	// And QRs
+	warm_img(QR_ESP_ENC_RX_EX);
+	warm_img(QR_ESP_RX_EX);
+	warm_img(QR_PC5_COM);
+	warm_img(QR_PC5_DOCS);
 }
 
 void lcd_ns_nvs_clear(const char* ns)
