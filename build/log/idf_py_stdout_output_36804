@@ -1,0 +1,127 @@
+Command: ninja app-flash
+[0/1] Re-running CMake...
+-- Component directory C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/bluetooth does not contain a CMakeLists.txt file. No component will be added
+-- Minimal build - OFF
+-- ccache will be used for faster recompilation
+-- Building ESP-IDF components for target esp32c5
+NOTICE: Using component placed at C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\components\lvgl for dependency "lvgl/lvgl", specified in C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\main\idf_component.yml
+NOTICE: Processing 1 dependencies:
+NOTICE: [1/1] idf (5.5.0)
+-- Project sdkconfig file C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/sdkconfig
+-- Adding linker script C:/Espressif/frameworks/esp-idf-master/components/riscv/ld/rom.api.ld
+-- App "PolyCast5" version: 61003be5-dirty
+-- Adding linker script C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_system/ld/memory.ld
+-- Adding linker script C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_system/ld/sections.ld.in
+-- Adding linker script C:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/ld/esp32c5.rom.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/ld/esp32c5.rom.api.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/ld/esp32c5.rom.rvfp.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/ld/esp32c5.rom.wdt.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/ld/esp32c5.rom.systimer.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/ld/esp32c5.rom.version.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/ld/esp32c5.rom.phy.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/ld/esp32c5.rom.coexist.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/ld/esp32c5.rom.net80211.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/ld/esp32c5.rom.pp.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/ld/esp32c5.rom.libc.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/ld/esp32c5.rom.newlib.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/ld/esp32c5.rom.newlib-normal.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-master/components/esp_rom/esp32c5/ld/esp32c5.rom.heap.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-master/components/soc/esp32c5/ld/esp32c5.peripherals.ld
+-- Components: app_trace app_update bootloader bootloader_support bt cmock common console cxx driver efuse esp-tls esp_adc esp_app_format esp_bootloader_format esp_coex esp_common esp_driver_ana_cmpr esp_driver_bitscrambler esp_driver_cam esp_driver_dac esp_driver_gpio esp_driver_gptimer esp_driver_i2c esp_driver_i2s esp_driver_isp esp_driver_jpeg esp_driver_ledc esp_driver_mcpwm esp_driver_parlio esp_driver_pcnt esp_driver_ppa esp_driver_rmt esp_driver_sdio esp_driver_sdm esp_driver_sdmmc esp_driver_sdspi esp_driver_spi esp_driver_touch_sens esp_driver_tsens esp_driver_uart esp_driver_usb_serial_jtag esp_eth esp_event esp_gdbstub esp_hid esp_http_client esp_http_server esp_https_ota esp_https_server esp_hw_support esp_lcd esp_local_ctrl esp_mm esp_netif esp_netif_stack esp_partition esp_phy esp_pm esp_psram esp_ringbuf esp_rom esp_security esp_system esp_timer esp_vfs_console esp_wifi espcoredump espnow esptool_py fatfs freertos gpio hal heap http_parser idf_test ieee802154 infrared json lcd log lora lvgl lwip main mbedtls mqtt newlib nvs_flash nvs_sec_provider openthread partition_table protobuf-c protocomm pthread riscv rt sdmmc soc spi_flash spiffs sx126x tcp_transport tools ulp unity usb vfs wear_levelling wifi wifi_provisioning wpa_supplicant
+-- Component paths: C:/Espressif/frameworks/esp-idf-master/components/app_trace C:/Espressif/frameworks/esp-idf-master/components/app_update C:/Espressif/frameworks/esp-idf-master/components/bootloader C:/Espressif/frameworks/esp-idf-master/components/bootloader_support C:/Espressif/frameworks/esp-idf-master/components/bt C:/Espressif/frameworks/esp-idf-master/components/cmock C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/common C:/Espressif/frameworks/esp-idf-master/components/console C:/Espressif/frameworks/esp-idf-master/components/cxx C:/Espressif/frameworks/esp-idf-master/components/driver C:/Espressif/frameworks/esp-idf-master/components/efuse C:/Espressif/frameworks/esp-idf-master/components/esp-tls C:/Espressif/frameworks/esp-idf-master/components/esp_adc C:/Espressif/frameworks/esp-idf-master/components/esp_app_format C:/Espressif/frameworks/esp-idf-master/components/esp_bootloader_format C:/Espressif/frameworks/esp-idf-master/components/esp_coex C:/Espressif/frameworks/esp-idf-master/components/esp_common C:/Espressif/frameworks/esp-idf-master/components/esp_driver_ana_cmpr C:/Espressif/frameworks/esp-idf-master/components/esp_driver_bitscrambler C:/Espressif/frameworks/esp-idf-master/components/esp_driver_cam C:/Espressif/frameworks/esp-idf-master/components/esp_driver_dac C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gpio C:/Espressif/frameworks/esp-idf-master/components/esp_driver_gptimer C:/Espressif/frameworks/esp-idf-master/components/esp_driver_i2c C:/Espressif/frameworks/esp-idf-master/components/esp_driver_i2s C:/Espressif/frameworks/esp-idf-master/components/esp_driver_isp C:/Espressif/frameworks/esp-idf-master/components/esp_driver_jpeg C:/Espressif/frameworks/esp-idf-master/components/esp_driver_ledc C:/Espressif/frameworks/esp-idf-master/components/esp_driver_mcpwm C:/Espressif/frameworks/esp-idf-master/components/esp_driver_parlio C:/Espressif/frameworks/esp-idf-master/components/esp_driver_pcnt C:/Espressif/frameworks/esp-idf-master/components/esp_driver_ppa C:/Espressif/frameworks/esp-idf-master/components/esp_driver_rmt C:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdio C:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdm C:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdmmc C:/Espressif/frameworks/esp-idf-master/components/esp_driver_sdspi C:/Espressif/frameworks/esp-idf-master/components/esp_driver_spi C:/Espressif/frameworks/esp-idf-master/components/esp_driver_touch_sens C:/Espressif/frameworks/esp-idf-master/components/esp_driver_tsens C:/Espressif/frameworks/esp-idf-master/components/esp_driver_uart C:/Espressif/frameworks/esp-idf-master/components/esp_driver_usb_serial_jtag C:/Espressif/frameworks/esp-idf-master/components/esp_eth C:/Espressif/frameworks/esp-idf-master/components/esp_event C:/Espressif/frameworks/esp-idf-master/components/esp_gdbstub C:/Espressif/frameworks/esp-idf-master/components/esp_hid C:/Espressif/frameworks/esp-idf-master/components/esp_http_client C:/Espressif/frameworks/esp-idf-master/components/esp_http_server C:/Espressif/frameworks/esp-idf-master/components/esp_https_ota C:/Espressif/frameworks/esp-idf-master/components/esp_https_server C:/Espressif/frameworks/esp-idf-master/components/esp_hw_support C:/Espressif/frameworks/esp-idf-master/components/esp_lcd C:/Espressif/frameworks/esp-idf-master/components/esp_local_ctrl C:/Espressif/frameworks/esp-idf-master/components/esp_mm C:/Espressif/frameworks/esp-idf-master/components/esp_netif C:/Espressif/frameworks/esp-idf-master/components/esp_netif_stack C:/Espressif/frameworks/esp-idf-master/components/esp_partition C:/Espressif/frameworks/esp-idf-master/components/esp_phy C:/Espressif/frameworks/esp-idf-master/components/esp_pm C:/Espressif/frameworks/esp-idf-master/components/esp_psram C:/Espressif/frameworks/esp-idf-master/components/esp_ringbuf C:/Espressif/frameworks/esp-idf-master/components/esp_rom C:/Espressif/frameworks/esp-idf-master/components/esp_security C:/Espressif/frameworks/esp-idf-master/components/esp_system C:/Espressif/frameworks/esp-idf-master/components/esp_timer C:/Espressif/frameworks/esp-idf-master/components/esp_vfs_console C:/Espressif/frameworks/esp-idf-master/components/esp_wifi C:/Espressif/frameworks/esp-idf-master/components/espcoredump C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/espnow C:/Espressif/frameworks/esp-idf-master/components/esptool_py C:/Espressif/frameworks/esp-idf-master/components/fatfs C:/Espressif/frameworks/esp-idf-master/components/freertos C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/gpio C:/Espressif/frameworks/esp-idf-master/components/hal C:/Espressif/frameworks/esp-idf-master/components/heap C:/Espressif/frameworks/esp-idf-master/components/http_parser C:/Espressif/frameworks/esp-idf-master/components/idf_test C:/Espressif/frameworks/esp-idf-master/components/ieee802154 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/infrared C:/Espressif/frameworks/esp-idf-master/components/json C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lcd C:/Espressif/frameworks/esp-idf-master/components/log C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lora C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/lvgl C:/Espressif/frameworks/esp-idf-master/components/lwip C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/main C:/Espressif/frameworks/esp-idf-master/components/mbedtls C:/Espressif/frameworks/esp-idf-master/components/mqtt C:/Espressif/frameworks/esp-idf-master/components/newlib C:/Espressif/frameworks/esp-idf-master/components/nvs_flash C:/Espressif/frameworks/esp-idf-master/components/nvs_sec_provider C:/Espressif/frameworks/esp-idf-master/components/openthread C:/Espressif/frameworks/esp-idf-master/components/partition_table C:/Espressif/frameworks/esp-idf-master/components/protobuf-c C:/Espressif/frameworks/esp-idf-master/components/protocomm C:/Espressif/frameworks/esp-idf-master/components/pthread C:/Espressif/frameworks/esp-idf-master/components/riscv C:/Espressif/frameworks/esp-idf-master/components/rt C:/Espressif/frameworks/esp-idf-master/components/sdmmc C:/Espressif/frameworks/esp-idf-master/components/soc C:/Espressif/frameworks/esp-idf-master/components/spi_flash C:/Espressif/frameworks/esp-idf-master/components/spiffs C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/sx126x C:/Espressif/frameworks/esp-idf-master/components/tcp_transport C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/tools C:/Espressif/frameworks/esp-idf-master/components/ulp C:/Espressif/frameworks/esp-idf-master/components/unity C:/Espressif/frameworks/esp-idf-master/components/usb C:/Espressif/frameworks/esp-idf-master/components/vfs C:/Espressif/frameworks/esp-idf-master/components/wear_levelling C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/wifi C:/Espressif/frameworks/esp-idf-master/components/wifi_provisioning C:/Espressif/frameworks/esp-idf-master/components/wpa_supplicant
+-- Configuring done (15.5s)
+-- Generating done (2.0s)
+-- Build files have been written to: C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build
+[1/8] Building C object esp-idf/lcd/CMakeFiles/__idf_lcd.dir/src/lcd_lora_funcs.c.obj
+[2/8] Linking C static library esp-idf\lcd\liblcd.a
+[3/8] Generating ld/sections.ld
+[4/8] Linking CXX executable PolyCast5.elf
+[5/8] Generating binary image from built executable
+esptool.py v4.9.dev6
+Creating esp32c5 image...
+Merged 2 ELF sections
+Successfully created esp32c5 image.
+Generated C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/PolyCast5.bin
+[6/8] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\build\esp-idf\esptool_py && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-master/components/partition_table/check_sizes.py --offset 0x8000 partition --type app C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/partition_table/partition-table.bin C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/PolyCast5.bin"
+PolyCast5.bin binary size 0x1aa610 bytes. Smallest app partition is 0x200000 bytes. 0x559f0 bytes (17%) free.
+[6/8] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Espressif\frameworks\esp-idf-master\components\esptool_py && C:\Espressif\tools\cmake\3.30.2\bin\cmake.exe -D IDF_PATH=C:/Espressif/frameworks/esp-idf-master -D SERIAL_TOOL=C:/Espressif/python_env/idf5.5_py3.11_env/Scripts/python.exe;;C:/Espressif/frameworks/esp-idf-master/components/esptool_py/esptool/esptool.py;--chip;esp32c5 -D SERIAL_TOOL_ARGS=--before=default_reset;--after=hard_reset;write_flash;@app-flash_args -D WORKING_DIRECTORY=C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build -P C:/Espressif/frameworks/esp-idf-master/components/esptool_py/run_serial_tool.cmake"
+esptool.py --chip esp32c5 -p COM10 -b 460800 --before=default_reset --after=hard_reset write_flash --flash_mode dio --flash_freq 80m --flash_size 8MB 0x10000 PolyCast5.bin
+esptool.py v4.9.dev6
+Serial port COM10
+Connecting...
+Chip is ESP32-C5 (revision v0.1)
+Features: WiFi 6, BT 5, IEEE802.15.4
+Crystal is 48MHz
+USB mode: USB-Serial/JTAG
+MAC: 60:55:f9:ff:fe:fc:e0:64
+BASE MAC: 60:55:f9:fc:e0:64
+MAC_EXT: ff:fe
+Uploading stub...
+Running stub...
+Stub running...
+Changing baud rate to 460800
+Changed.
+Configuring flash size...
+Flash will be erased from 0x00010000 to 0x001bafff...
+Compressed 1746448 bytes to 910417...
+Writing at 0x00010000... (1 %)
+Writing at 0x0001c724... (3 %)
+Writing at 0x00029b05... (5 %)
+Writing at 0x000350e6... (7 %)
+Writing at 0x00047c00... (8 %)
+Writing at 0x0004f0b9... (10 %)
+Writing at 0x00057a0a... (12 %)
+Writing at 0x00061278... (14 %)
+Writing at 0x0006ac55... (16 %)
+Writing at 0x00075a70... (17 %)
+Writing at 0x0007f480... (19 %)
+Writing at 0x000865c9... (21 %)
+Writing at 0x0008ca90... (23 %)
+Writing at 0x0009353d... (25 %)
+Writing at 0x0009ae3a... (26 %)
+Writing at 0x000a26fb... (28 %)
+Writing at 0x000aabf1... (30 %)
+Writing at 0x000b224b... (32 %)
+Writing at 0x000b8ef1... (33 %)
+Writing at 0x000bf2f7... (35 %)
+Writing at 0x000c584e... (37 %)
+Writing at 0x000ccea2... (39 %)
+Writing at 0x000d2e30... (41 %)
+Writing at 0x000d8f60... (42 %)
+Writing at 0x000dee67... (44 %)
+Writing at 0x000e64c2... (46 %)
+Writing at 0x000eeb60... (48 %)
+Writing at 0x000f6d86... (50 %)
+Writing at 0x000fe3c5... (51 %)
+Writing at 0x00105234... (53 %)
+Writing at 0x0010c4cb... (55 %)
+Writing at 0x00113462... (57 %)
+Writing at 0x0011a132... (58 %)
+Writing at 0x0012117a... (60 %)
+Writing at 0x001285ec... (62 %)
+Writing at 0x0012ecc4... (64 %)
+Writing at 0x00135529... (66 %)
+Writing at 0x0013c255... (67 %)
+Writing at 0x001427a7... (69 %)
+Writing at 0x00148df9... (71 %)
+Writing at 0x0014f795... (73 %)
+Writing at 0x00155654... (75 %)
+Writing at 0x0015b4fc... (76 %)
+Writing at 0x0016145b... (78 %)
+Writing at 0x0016785f... (80 %)
+Writing at 0x0016df54... (82 %)
+Writing at 0x00173dc2... (83 %)
+Writing at 0x00179c10... (85 %)
+Writing at 0x001802f6... (87 %)
+Writing at 0x00186937... (89 %)
+Writing at 0x0018ca28... (91 %)
+Writing at 0x00192f73... (92 %)
+Writing at 0x001990e1... (94 %)
+Writing at 0x001a00b4... (96 %)
+Writing at 0x001a74d5... (98 %)
+Writing at 0x001ad044... (100 %)
+Wrote 1746448 bytes (910417 compressed) at 0x00010000 in 7.2 seconds (effective 1939.1 kbit/s)...
+Hash of data verified.
+
+Leaving...
+Hard resetting via RTS pin...

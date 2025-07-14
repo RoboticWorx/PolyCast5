@@ -237,7 +237,10 @@ static void lcd_task(void *pvParameters)
 				lcd_lora_plan_subpage(&ui_btns, &ui_menu, &lora_menu, &lora_plan_menu);
 			}
 			else if (ui_menu.page == LORA_PLAN_CONFIRM_SUBPAGE) {
-				lcd_lora_plan_confirm_subpage(&ui_btns, &ui_menu, &lora_menu, &lora_plan_menu);
+				lcd_lora_plan_confirm_subpage(&ui_btns, &ui_menu, &lora_plan_menu);
+			}
+			else if (ui_menu.page == LORA_PLAN_TIMES_SUBPAGE) {
+				lcd_lora_plan_times_subpage(&ui_btns, &ui_menu, &lora_plan_menu);
 			}
 			// ESP-NOW page
 			else if (ui_menu.page == ESPNOW_PAGE) {

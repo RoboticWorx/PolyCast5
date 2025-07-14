@@ -1327,15 +1327,25 @@ void lcd_lora_plan_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 	}
 }
 
-void lcd_lora_plan_confirm_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu)
+void lcd_lora_plan_confirm_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_plan_menu_t *lora_plan_menu)
 {
 	static bool init = false;
-	static lv_obj_t *lbl_ins = NULL;
+	static lv_obj_t *lbl_ins_top = NULL;
+	static lv_obj_t *lbl_ins_bot = NULL;
+	static lv_obj_t *lbl_conf = NULL;
 	
 	if (!init) {
-		lbl_ins = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_ins, "Please make sure the\ntargeted PolyPlug is\nconnected to Wi-Fi\nbefore proceeding! If\nnot, please do so in the\nWi-Fi menu via 'sync'.", user_secondary_color,
-	    		&lv_font_montserrat_14, LV_ALIGN_CENTER, 0, -15);
+		lbl_ins_top = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_ins_top, "Please make sure the\n targeted PolyPlug is\n  connected to Wi-Fi\n  before proceeding!", user_secondary_color,
+	    		&lv_font_montserrat_14, LV_ALIGN_CENTER, 0, -25);
+	    		
+	    lbl_ins_bot = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_ins_bot, "If not, please do so in the\n   Wi-Fi menu via 'sync'.", user_secondary_color,
+	    		&lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 27);
+	    		
+	    lbl_conf = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_conf, "Press select to confirm", user_secondary_color,
+	    		&lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -5);
 	    
 	    init = true;
 	}
@@ -1343,9 +1353,12 @@ void lcd_lora_plan_confirm_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_
 	// Back
     if (ui_btns->left_btn == 1) {
 		// Reset objects
-		lv_obj_del(lbl_ins);
+		lv_obj_del(lbl_ins_top);
+		lv_obj_del(lbl_ins_bot);
+		lv_obj_del(lbl_conf);
 		
 		// Reset statics
+		lbl_ins_top = lbl_ins_bot = lbl_conf = NULL;
 		init = false;
 		
 		// Show arrows
@@ -1361,6 +1374,262 @@ void lcd_lora_plan_confirm_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_
 		
 		// Go back
 		ui_menu->page = LORA_PLAN_SUBPAGE;
+	}
+	// Home or power off
+    else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Reset objects
+		lv_obj_del(lbl_ins_top);
+		lv_obj_del(lbl_ins_bot);
+		lv_obj_del(lbl_conf);
+		
+		// Reset statics
+		lbl_ins_top = lbl_ins_bot = lbl_conf = NULL;
+		init = false;
+		
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+	}
+	// Confirm
+    else if (ui_btns->select_btn == 1) {
+		// Reset objects
+		lv_obj_del(lbl_ins_top);
+		lv_obj_del(lbl_ins_bot);
+		lv_obj_del(lbl_conf);
+		
+		// Reset statics
+		lbl_ins_top = lbl_ins_bot = lbl_conf = NULL;
+		init = false;
+		
+		// Show arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = LORA_PLAN_TIMES_SUBPAGE;
+	}
+}
+
+/* lcd_lora_plan_times_subpage HELPERS */
+// Helper to update the full time range label using individual char labels
+static void update_time_label(lv_obj_t *time_labels[], char *start_time, char *end_time) {
+    const char *full_str = "00:00:00-00:00:00";  // Template for positions
+    for (int i = 0; i < 17; i++) {  // Full string length without null
+        char ch[2] = { full_str[i], '\0' };  // Single char
+        if (i < 8) {
+            ch[0] = start_time[i];  // Override with actual start
+        } else if (i == 8) {
+            ch[0] = '-';
+        } else {
+            ch[0] = end_time[i - 9];  // Override with actual end (skip "-")
+        }
+
+        lv_label_set_text(time_labels[i], ch);
+    }
+}
+// Helper to get digit value at position (0-5) in time string
+static int get_digit(char *time_str, uint8_t pos) {
+    uint8_t str_pos[] = {0, 1, 3, 4, 6, 7}; // Positions in "HH:MM:SS"
+    return time_str[str_pos[pos]] - '0';
+}
+// Helper to set digit value at position
+static void set_digit(char *time_str, uint8_t pos, int val) {
+    uint8_t str_pos[] = {0, 1, 3, 4, 6, 7};
+    time_str[str_pos[pos]] = '0' + val;
+}
+
+void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_plan_menu_t *lora_plan_menu)
+{
+	#define PLAN_TIME_DIGITS 12 // HHMMSS (ignoring :) for both times
+	#define PLAN_TIME_STR_LEN 9 // "HH:MM:SS\0"
+	#define PLAN_TIME_DIGIT_WIDTH 12 // Fixed width per digit/colon (adjust based on font metrics)
+	#define PLAN_TIME_X_BASE -96
+
+	// Create statics
+	static lv_obj_t *lbl_subpage_times = NULL;
+	static lv_obj_t *lbl_selected_icon = NULL;
+	static lv_obj_t *lbl_ins = NULL;
+	static lv_obj_t *time_labels[17]; // 8 for start ("HH:MM:SS") + 1 for "-" + 8 for end
+
+	static int cursor_x_offsets[12];
+	static uint8_t selected_digit = 0; // 0-11: positions across both HHMMSS
+	static char start_time[PLAN_TIME_STR_LEN] = "00:00:00";
+	static char end_time[PLAN_TIME_STR_LEN] = "00:00:00";
+	
+	static bool init = false;
+
+	// Do once
+	if (!init) {
+		// Create and format text labels
+		lbl_subpage_times = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_subpage_times, "ON time - OFF time", user_secondary_color,
+				&lv_font_montserrat_20, LV_ALIGN_CENTER, 0, -25);
+				
+		lbl_ins = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_ins, "* Time is 24h format *", user_secondary_color,
+				&lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -15);
+
+		// Create individual char label for each digit
+		for (int i = 0; i < 17; i++) {
+			time_labels[i] = lv_label_create(ACTIVE_SCR);
+			lcd_format_label(time_labels[i], "0", user_secondary_color,
+					 &lv_font_montserrat_18, LV_ALIGN_CENTER, PLAN_TIME_X_BASE + (i * PLAN_TIME_DIGIT_WIDTH), 0);
+			
+			// Set fixed width to prevent shifting
+			lv_obj_set_width(time_labels[i], PLAN_TIME_DIGIT_WIDTH);
+			lv_obj_set_style_text_align(time_labels[i], LV_TEXT_ALIGN_CENTER, 0);
+		}
+		
+		update_time_label(time_labels, start_time, end_time); // Initial update
+
+		// Tracking arrow
+		lbl_selected_icon = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_selected_icon, LV_SYMBOL_EJECT, user_secondary_color,
+				&lv_font_montserrat_14, LV_ALIGN_CENTER, cursor_x_offsets[0], 20);
+		
+		// Calculate digit offsets
+		cursor_x_offsets[0] = PLAN_TIME_X_BASE + (0 * PLAN_TIME_DIGIT_WIDTH);
+		cursor_x_offsets[1] = PLAN_TIME_X_BASE + (1 * PLAN_TIME_DIGIT_WIDTH);
+		cursor_x_offsets[2] = PLAN_TIME_X_BASE + (3 * PLAN_TIME_DIGIT_WIDTH);
+		cursor_x_offsets[3] = PLAN_TIME_X_BASE + (4 * PLAN_TIME_DIGIT_WIDTH);
+		cursor_x_offsets[4] = PLAN_TIME_X_BASE + (6 * PLAN_TIME_DIGIT_WIDTH);
+		cursor_x_offsets[5] = PLAN_TIME_X_BASE + (7 * PLAN_TIME_DIGIT_WIDTH);
+		cursor_x_offsets[6] = PLAN_TIME_X_BASE + (9 * PLAN_TIME_DIGIT_WIDTH);
+		cursor_x_offsets[7] = PLAN_TIME_X_BASE + (10 * PLAN_TIME_DIGIT_WIDTH);
+		cursor_x_offsets[8] = PLAN_TIME_X_BASE + (12 * PLAN_TIME_DIGIT_WIDTH);
+		cursor_x_offsets[9] = PLAN_TIME_X_BASE + (13 * PLAN_TIME_DIGIT_WIDTH);
+		cursor_x_offsets[10] = PLAN_TIME_X_BASE + (15 * PLAN_TIME_DIGIT_WIDTH);
+		cursor_x_offsets[11] = PLAN_TIME_X_BASE + (16 * PLAN_TIME_DIGIT_WIDTH);
+		
+		// Set cursor X position
+		lv_obj_set_x(lbl_selected_icon, cursor_x_offsets[selected_digit]);
+		
+		init = true;
+	}
+	
+	// Confirm
+	if (ui_btns->right_btn == 1 && selected_digit == 11) {
+		
+	}
+	// Go back
+	else if (ui_btns->left_btn == 1 && selected_digit == 0) {
+		// Reset objects
+		lv_obj_delete(lbl_subpage_times);
+		lv_obj_delete(lbl_selected_icon);
+		lv_obj_delete(lbl_ins);
+		for (int i = 0; i < 17; i++) {
+			lv_obj_delete(time_labels[i]);
+		}
+
+		// Reset statics
+		lbl_subpage_times = lbl_selected_icon = lbl_ins = NULL;
+		selected_digit = 0;
+		strcpy(start_time, "00:00:00");
+		strcpy(end_time, "00:00:00");
+		init = false;
+
+		// Reveal the plan container and label
+		lv_obj_remove_flag(lora_plan_menu->plan_cont, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(lora_plan_menu->lbl_days_ins, LV_OBJ_FLAG_HIDDEN);
+
+		lcd_lora_update_plan_menu(lora_plan_menu);
+
+		// Go back
+		ui_menu->page = LORA_PLAN_SUBPAGE;
+	}
+	// Digit right
+	else if (ui_btns->right_btn == 1) {
+		// Increment with wrap
+		selected_digit = (selected_digit + 1) % PLAN_TIME_DIGITS;
+		
+		// Set cursor X position
+		lv_obj_set_x(lbl_selected_icon, cursor_x_offsets[selected_digit]);
+		
+		// Update
+		update_time_label(time_labels, start_time, end_time);
+	}
+	// Digit left
+	else if (ui_btns->left_btn == 1) {
+		// Decrement with wrap
+		selected_digit = (selected_digit + PLAN_TIME_DIGITS - 1) % PLAN_TIME_DIGITS;
+		
+		// Set cursor X position
+		lv_obj_set_x(lbl_selected_icon, cursor_x_offsets[selected_digit]);
+		
+		// Update
+		update_time_label(time_labels, start_time, end_time);
+	}
+	// Digit up
+	else if (ui_btns->up_btn == 1) {
+		// Select time string and adjusted pos (0-5)
+		char *current_time_str = (selected_digit < 6) ? start_time : end_time; // Which half
+		uint8_t adj_pos = selected_digit % 6;
+		int digit_val = get_digit(current_time_str, adj_pos);
+		int max_val = 9;
+		int min_val = 0;
+
+		// Range limits based on position
+		if (adj_pos == 0) { // Tens of hours (0-2)
+			max_val = 2;
+		}
+		else if (adj_pos == 1) { // Hours
+			max_val = 3;
+		}
+		else if (adj_pos == 2 || adj_pos == 4) { // Tens of min/sec (0-5)
+			max_val = 5;
+		}
+
+		// Increment with wrap
+		digit_val = (digit_val + 1 > max_val) ? min_val : digit_val + 1;
+		
+		// Update
+		set_digit(current_time_str, adj_pos, digit_val);
+		update_time_label(time_labels, start_time, end_time);
+	}
+	// Digit down
+	else if (ui_btns->down_btn == 1) {
+		// Select time string and adjusted pos (0-5)
+		char *current_time_str = (selected_digit < 6) ? start_time : end_time; // Which half
+		uint8_t adj_pos = selected_digit % 6;
+		int digit_val = get_digit(current_time_str, adj_pos);
+		int max_val = 9;
+		int min_val = 0;
+
+		// Range limits based on position
+		if (adj_pos == 0) { // Tens of hours (0-2)
+			max_val = 2;
+		}
+		else if (adj_pos == 1) { // Hours
+			max_val = 3;
+		}
+		else if (adj_pos == 2 || adj_pos == 4) { // Tens of min/sec (0-5)
+			max_val = 5;
+		}
+
+		// Decrement with wrap
+		digit_val = (digit_val - 1 < min_val) ? max_val : digit_val - 1;
+		
+		// Update
+		set_digit(current_time_str, adj_pos, digit_val);
+		update_time_label(time_labels, start_time, end_time);
+	}
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Reset objects
+		lv_obj_delete(lbl_subpage_times);
+		lv_obj_delete(lbl_selected_icon);
+		lv_obj_delete(lbl_ins);
+		for (int i = 0; i < 17; i++) {
+			lv_obj_delete(time_labels[i]);
+		}
+
+		// Reset statics
+		lbl_subpage_times = lbl_selected_icon = lbl_ins = NULL;
+		selected_digit = 0;
+		strcpy(start_time, "00:00:00");
+		strcpy(end_time, "00:00:00");
+		init = false;
+
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 
@@ -1462,9 +1731,6 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		// Reset statics
 		do_once = false;
 		away_menu = NULL;
-		
-		// Show right arrow
-		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
