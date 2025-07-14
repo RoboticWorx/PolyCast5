@@ -202,14 +202,14 @@ static void lcd_task(void *pvParameters)
 			
 			if (ui_menu.page == HOME_PAGE) {
 				// Show cool two frame animation and allow user to change animation scrolling up/down				
-				lcd_home_page_selected(&ui_menu, &ui_btns);
+				lcd_home_page(&ui_menu, &ui_btns);
 			} 
 			else if (ui_menu.page == SELECTION_PAGE) {
-				lcd_selection_page_selected(&ui_menu, &ui_btns, &ir_menu, &lora_menu, &espnow_menu, &wifi_menu, &tools_menu, &settings_menu);
+				lcd_selection_page(&ui_menu, &ui_btns, &ir_menu, &lora_menu, &espnow_menu, &wifi_menu, &tools_menu, &settings_menu);
 			}
 			// IR remotes page
 			else if (ui_menu.page == INFRARED_PAGE) {
-				lcd_infrared_page_selected(&ui_btns, &ui_menu, &ir_menu);
+				lcd_infrared_page(&ui_btns, &ui_menu, &ir_menu);
 			}
 			else if (ui_menu.page == INFRARED_REMOTE_NAME_PAGE) {
 				lcd_ir_create_custom_name(&ui_btns, &ui_menu, &ir_menu);
@@ -219,26 +219,29 @@ static void lcd_task(void *pvParameters)
 			}
 			// LoRa page (PolyPlugs)
 			else if (ui_menu.page == LORA_PAGE) {
-				lcd_lora_page_selected(&ui_btns, &ui_menu, &lora_menu);
+				lcd_lora_page(&ui_btns, &ui_menu, &lora_menu);
 			}
 			else if (ui_menu.page == LORA_NAME_PAGE) {
 				lcd_lora_create_custom_name(&ui_btns, &ui_menu, &lora_menu);
 			}
 			else if (ui_menu.page == LORA_SUBPAGE) {
-				lcd_lora_subpage_selected(&ui_btns, &ui_menu, &lora_menu, &lora_plan_menu);
+				lcd_lora_subpage(&ui_btns, &ui_menu, &lora_menu, &lora_plan_menu);
 			}
 			else if (ui_menu.page == LORA_LOOP_SUBPAGE) {
-				lcd_lora_subpage_loop_selected(&ui_btns, &ui_menu, &lora_menu);
+				lcd_lora_loop_subpage(&ui_btns, &ui_menu, &lora_menu);
 			}
 			else if (ui_menu.page == LORA_AWAY_SUBPAGE) {
-				lcd_lora_subpage_away_selected(&ui_btns, &ui_menu, &lora_menu);
+				lcd_lora_away_subpage(&ui_btns, &ui_menu, &lora_menu);
 			}
 			else if (ui_menu.page == LORA_PLAN_SUBPAGE) {
-				lcd_lora_subpage_plan_selected(&ui_btns, &ui_menu, &lora_menu, &lora_plan_menu);
+				lcd_lora_plan_subpage(&ui_btns, &ui_menu, &lora_menu, &lora_plan_menu);
+			}
+			else if (ui_menu.page == LORA_PLAN_SUBPAGE) {
+				lcd_lora_plan_confirm_subpage(&ui_btns, &ui_menu, &lora_menu, &lora_plan_menu);
 			}
 			// ESP-NOW page
 			else if (ui_menu.page == ESPNOW_PAGE) {
-				lcd_espnow_page_selected(&ui_btns, &ui_menu, &espnow_menu);
+				lcd_espnow_page(&ui_btns, &ui_menu, &espnow_menu);
 			}
 			else if (ui_menu.page == ESPNOW_RX_MAC_PAGE) {
 				lcd_espnow_get_rx_mac(&ui_btns, &ui_menu, &espnow_menu);
@@ -247,11 +250,11 @@ static void lcd_task(void *pvParameters)
 				lcd_espnow_create_custom_name(&ui_btns, &ui_menu, &espnow_menu);
 			}
 			else if (ui_menu.page == ESPNOW_OPTION_PAGE) {
-				lcd_espnow_option_selected(&ui_btns, &ui_menu, &espnow_menu);
+				lcd_espnow_option(&ui_btns, &ui_menu, &espnow_menu);
 			}
 			// Wi-Fi page
 			else if (ui_menu.page == WIFI_PAGE) {
-				lcd_wifi_page_selected(&ui_btns, &ui_menu, &wifi_menu);
+				lcd_wifi_page(&ui_btns, &ui_menu, &wifi_menu);
 			}
 			else if (ui_menu.page == WIFI_SCAN_PAGE) {
 				lcd_wifi_scan_page(&ui_btns, &ui_menu, &wifi_menu);
@@ -276,7 +279,7 @@ static void lcd_task(void *pvParameters)
 			}
 			// Tools page
 			else if (ui_menu.page == TOOLS_PAGE) {
-				lcd_tools_page_selected(&ui_btns, &ui_menu, &tools_menu);
+				lcd_tools_page(&ui_btns, &ui_menu, &tools_menu);
 			}
 			else if (ui_menu.page == TOOLS_COIN_PAGE) {
 				lcd_tools_coin_page(&ui_btns, &ui_menu, &tools_menu);
@@ -289,7 +292,7 @@ static void lcd_task(void *pvParameters)
 			}
 			// Settings page
 			else if (ui_menu.page == SETTINGS_PAGE) {
-				lcd_settings_page_selected(&ui_btns, &ui_menu, &settings_menu);
+				lcd_settings_page(&ui_btns, &ui_menu, &settings_menu);
 			}
 			else if (ui_menu.page == SETTINGS_COLORS_PAGE) {
 				lcd_settings_colors_page(&ui_btns, &ui_menu, &settings_menu);

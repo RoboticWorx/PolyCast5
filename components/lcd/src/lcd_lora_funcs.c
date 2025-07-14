@@ -638,7 +638,7 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
     }
 }
 
-void lcd_lora_subpage_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu) 
+void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu) 
 {	
 	// If received a valid receipt from the receiver
 	if (xSemaphoreTake(xLoraReceiptValidSemaphore, 0) == pdTRUE) {
@@ -857,7 +857,7 @@ void lcd_lora_subpage_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu
 	}
 }
 
-void lcd_lora_subpage_loop_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu)
+void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu)
 {
 	#define TIME_OPT_COUNT (sizeof(time_opts)/sizeof(time_opts[0]))
 	#define Y_SEL_POS 43
@@ -1152,7 +1152,7 @@ void lcd_lora_setup_plan_page(ui_menu_t *ui_menu, lora_plan_menu_t *lora_plan_me
     lv_obj_add_flag(lora_plan_menu->lbl_days_ins, LV_OBJ_FLAG_HIDDEN);
 }
 
-void lcd_lora_subpage_plan_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu)
+void lcd_lora_plan_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu)
 {
 	#define PLAN_COLUMNS 4 // 4x2 grid to fit 8 buttons
 	
@@ -1160,8 +1160,29 @@ void lcd_lora_subpage_plan_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora
 	static const char *days[7] = {"MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"};
 	static bool days_selected[7] = {false};
 	
+	// Confirm
+	if (ui_btns->right_btn == 1 && lora_plan_menu->plan_index == 7) {		
+		// Reset all labels and days
+		for (int i = 0; i < 7; i++) {
+			days_selected[i] = false;
+			lv_obj_t *lbl = lv_obj_get_child(lora_plan_menu->plan_btns[i], 0);
+			char buf[20];
+			snprintf(buf, sizeof(buf), "%s\n%s", LV_SYMBOL_CLOSE, days[i]);
+			lv_label_set_text(lbl, buf);
+		}
+		
+		// Reset text
+		lv_label_set_text(lora_plan_menu->lbl_days_ins, LORA_PLAN_SEL_INS);
+		
+		// Hide plan items
+		lv_obj_add_flag(lora_plan_menu->plan_cont, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(lora_plan_menu->lbl_days_ins, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = LORA_PLAN_CONFIRM_SUBPAGE;
+	}
 	// Go right
-	if (ui_btns->right_btn == 1) {		
+	else if (ui_btns->right_btn == 1) {		
 		// Update selection right
 		lora_plan_menu->plan_index = (lora_plan_menu->plan_index + 1) % LORA_PLAN_SUBMENU_COUNT;
 		
@@ -1299,6 +1320,11 @@ void lcd_lora_subpage_plan_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora
 	}
 }
 
+void lcd_lora_plan_confirm_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu)
+{
+	
+}
+
 void lcd_lora_update_plan_menu(lora_plan_menu_t *lora_plan_menu)
 {
 	/* Update container */
@@ -1321,7 +1347,7 @@ void lcd_lora_update_plan_menu(lora_plan_menu_t *lora_plan_menu)
 	lv_obj_add_style(lora_plan_menu->plan_btns[lora_plan_menu->plan_index], &lora_plan_menu->plan_sel_style, 0);
 }
 
-void lcd_lora_subpage_away_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu)
+void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu)
 {
 	// Create statics
 	static lora_menu_t *away_menu;

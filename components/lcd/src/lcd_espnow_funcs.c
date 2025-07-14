@@ -1093,7 +1093,7 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
     }
 }
 
-void lcd_espnow_option_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
+void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 {
 	#define BUF_SIZE 4
 	

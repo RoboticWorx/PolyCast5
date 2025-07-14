@@ -87,7 +87,7 @@ void lcd_lora_setup_plan_page(ui_menu_t *ui_menu, lora_plan_menu_t *lora_plan_me
  * @param [in] lora_menu LoRa menu structure
  * @param [in] lora_plan_menu LoRa plan menu structure
  */
-void lcd_lora_subpage_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu);
+void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu);
 
 /**
  * @brief Updates the LoRa menu labels based on user menu input
@@ -110,7 +110,7 @@ void lcd_lora_update_submenu(lora_menu_t *lora_menu);
  * @param [in] ui_menu UI menu structure
  * @param [in] lora_menu LoRa menu structure
  */
-void lcd_lora_subpage_away_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu);
+void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu);
 
 /**
  * @brief Executes when user selects "LOOP" from LoRa subpage
@@ -119,7 +119,7 @@ void lcd_lora_subpage_away_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora
  * @param [in] ui_menu UI menu structure
  * @param [in] lora_menu LoRa menu structure
  */
-void lcd_lora_subpage_loop_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu);
+void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu);
 
 /**
  * @brief Executes when user selects "PLAN" from LoRa subpage
@@ -129,7 +129,9 @@ void lcd_lora_subpage_loop_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora
  * @param [in] lora_menu LoRa menu structure
  * @param [in] lora_plan_menu LoRa plan menu structure
  */
-void lcd_lora_subpage_plan_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu);
+void lcd_lora_plan_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu);
+
+void lcd_lora_plan_confirm_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu);
 
 /**
  * @brief Updates plan menu based on user selection

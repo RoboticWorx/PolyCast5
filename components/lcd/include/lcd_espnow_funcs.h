@@ -83,7 +83,7 @@ void lcd_espnow_update_menu(espnow_menu_t *espnow_menu);
  * @param [in] ui_menu UI menu structure
  * @param [in] espnow_menu ESP-NOW menu structure
  */
-void lcd_espnow_option_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espnow_menu);
+void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espnow_menu);
 
 /**
  * @brief Takes user input to create a name for adding/renaming a selected ESP32

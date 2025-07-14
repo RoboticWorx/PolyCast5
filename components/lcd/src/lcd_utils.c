@@ -96,9 +96,8 @@ typedef struct {
     lv_timer_t *timer; // LVGL timer
 } anim_t;
 
-// Define animation frames
+// Define animation frame paths
 const char *city_paths[CITY_FRAME_CNT] = { // 64.84KB each
-	// 64.84KB each
 	ANIM_CITY_1, ANIM_CITY_2, ANIM_CITY_3,	ANIM_CITY_4, ANIM_CITY_5,
 	ANIM_CITY_6, ANIM_CITY_7, ANIM_CITY_8,	ANIM_CITY_9, ANIM_CITY_10,
 	/*ANIM_CITY_11, ANIM_CITY_12, ANIM_CITY_13, ANIM_CITY_14, ANIM_CITY_15,
@@ -112,7 +111,7 @@ const char *city_paths[CITY_FRAME_CNT] = { // 64.84KB each
 	ANIM_CITY_51, ANIM_CITY_52, ANIM_CITY_53, ANIM_CITY_54, ANIM_CITY_55,
 	ANIM_CITY_56, ANIM_CITY_57, ANIM_CITY_58, ANIM_CITY_59, ANIM_CITY_60,*/
 };
-	
+
 const char *black_hole_paths[BLACK_HOLE_FRAME_CNT] = {
 	ANIM_BLACK_HOLE_1, ANIM_BLACK_HOLE_2, ANIM_BLACK_HOLE_3,
 	ANIM_BLACK_HOLE_4, ANIM_BLACK_HOLE_5, ANIM_BLACK_HOLE_6,
@@ -345,7 +344,7 @@ void lcd_lvgl_init(void)
      // Reserve slots in the decoded-image cache
     lv_image_cache_init((CITY_FRAME_CNT + BLACK_HOLE_FRAME_CNT + MATRIX_RAIN_FRAME_CNT) * 2);
 
-    // Draw‐buffer: HOR_RES × DRAW_LINES lines
+    // Draw‐buffer: HOR_RES x DRAW_LINES lines
     // Allocate space for 20 lines of 240 px each (≈9.6 kB), DMA-capable in DRAM
     static DRAM_ATTR lv_color_t buf[HOR_RES * DRAW_LINES * 2]
         __attribute__((aligned(4)));
@@ -368,7 +367,7 @@ void lcd_lvgl_init(void)
     esp_timer_create(&tick_args, &tick_timer);
     esp_timer_start_periodic(tick_timer, 1000);
     
-    // Pre-load animations for quick access if needed (but longer boot time)
+    // Pre-load animations for quick access (but longer boot time)
 	warm_anim(city_paths, CITY_FRAME_CNT);
 	warm_anim(black_hole_paths, BLACK_HOLE_FRAME_CNT);
 	warm_anim(matrix_rain_paths, MATRIX_RAIN_FRAME_CNT);
@@ -744,7 +743,7 @@ static void transition_animation(bool dir)
     lcd_anim_nvs_save();
 }
 
-void lcd_home_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
+void lcd_home_page(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
 {
 	
 	if (ui_btns->up_btn == 1) {
@@ -922,7 +921,7 @@ static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t* ir_menu, lo
 	}
 }
 
-void lcd_selection_page_selected(ui_menu_t *ui_menu, ui_btns_t *ui_btns, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu, wifi_menu_t* wifi_menu, tools_menu_t* tools_menu, settings_menu_t* settings_menu) 
+void lcd_selection_page(ui_menu_t *ui_menu, ui_btns_t *ui_btns, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu, wifi_menu_t* wifi_menu, tools_menu_t* tools_menu, settings_menu_t* settings_menu) 
 {
 	if (ui_btns->up_btn == 1) {
 		scrolling_menu = true;
@@ -1013,7 +1012,7 @@ void lcd_funcs_transition_back(bool home, ui_menu_t *ui_menu)
 	}
 }
 
-void lcd_infrared_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_menu) 
+void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_menu) 
 {	
 	static bool initalized = false;
 	
@@ -1079,7 +1078,7 @@ void lcd_infrared_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_
 	}
 }
 
-void lcd_lora_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu) 
+void lcd_lora_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu) 
 {
 	// Only execute once
 	static bool do_once = false;
@@ -1164,7 +1163,7 @@ void lcd_lora_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t 
 	}
 }
 
-void lcd_espnow_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
+void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 {
 	// Statics
 	static bool do_once = false;
@@ -1267,7 +1266,7 @@ void lcd_espnow_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_men
 	}
 }
 
-void lcd_wifi_page_selected(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
+void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {
 	// Statics
 	static bool do_once, connected = false;
@@ -1452,7 +1451,7 @@ void lcd_wifi_page_selected(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 	}
 }
 
-void lcd_tools_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
+void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
 {
 	// Statics
 	static bool do_once = false;
@@ -1551,7 +1550,7 @@ void lcd_tools_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
 	}
 }
 
-void lcd_settings_page_selected(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
+void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
 	// Statics
 	static bool do_once = false;
