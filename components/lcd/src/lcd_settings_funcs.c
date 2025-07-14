@@ -347,11 +347,12 @@ void lcd_settings_colors_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_m
 		lv_obj_delete(lbl_ins);
 		lv_obj_delete(lbl_primary);
 		lv_obj_delete(lbl_secondary);
+		lv_obj_delete(lbl_selected);
 		lv_obj_delete(primary_color_box);
 		lv_obj_delete(secondary_color_box);
 		
 		// Reset statics
-		lbl_ins = primary_color_box = secondary_color_box = lbl_primary = lbl_secondary = NULL;
+		lbl_ins = primary_color_box = secondary_color_box = lbl_primary = lbl_secondary = lbl_selected = NULL;
 		do_once = false;
 		
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep

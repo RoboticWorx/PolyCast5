@@ -58,10 +58,14 @@
 	#define MATRIX_RAIN_FRAME_CNT 5
 #endif
 
-// Cycle order
-#define CITY 0
-#define BLACK_HOLE 1
-#define MATRIX_RAIN 2
+// Number each sequentially
+enum
+{
+	CITY,
+	BLACK_HOLE,
+	MATRIX_RAIN
+};
+
 
 static uint8_t anim_active = 0; // Default determined in lcd_anim_nvs_load
 
@@ -157,9 +161,13 @@ typedef struct {
 static anim_t city_anim = {
     .frames = city_paths,
     .frame_cnt = CITY_FRAME_CNT,
-    .pingpong = false,
+    #ifdef POLYCAST5_BUILD_FULL_ANIMS
+    	.pingpong = false,
+    #else
+    	.pingpong = true,
+    #endif
     .forward = true,
-    .cur = CITY_FRAME_CNT - 1,
+    .cur = 0,
     .img = NULL,
     .timer = NULL
 };
@@ -169,7 +177,7 @@ static anim_t black_hole_anim = {
     .frame_cnt = BLACK_HOLE_FRAME_CNT,
     .pingpong = false,
     .forward = true,
-    .cur = BLACK_HOLE_FRAME_CNT - 1,
+    .cur = 0,
     .img = NULL,
     .timer = NULL
 };
@@ -177,9 +185,13 @@ static anim_t black_hole_anim = {
 static anim_t matrix_rain_anim = {
     .frames = matrix_rain_paths,
     .frame_cnt = MATRIX_RAIN_FRAME_CNT,
-    .pingpong = false,
+    #ifdef POLYCAST5_BUILD_FULL_ANIMS
+    	.pingpong = false,
+    #else
+    	.pingpong = true,
+    #endif
     .forward = true,
-    .cur = MATRIX_RAIN_FRAME_CNT - 1,
+    .cur = 0,
     .img = NULL,
     .timer = NULL
 };
