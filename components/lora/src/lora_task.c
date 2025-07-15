@@ -87,7 +87,7 @@ static void lora_task(void *pvParameters) {
 	sx126x_pkt_params_lora_t lora_pkt_params = {
 		.preamble_len_in_symb = 12,
 		.header_type = SX126X_LORA_PKT_EXPLICIT,
-		.pld_len_in_bytes = PAYLOAD_LENGTH,
+		.pld_len_in_bytes = LORA_PAYLOAD_LENGTH,
 		.crc_is_on = true,
 		.invert_iq_is_on = false,
 	};
@@ -176,11 +176,9 @@ static void lora_task(void *pvParameters) {
 	status = sx126x_set_dio_irq_params(
 		NULL,
 		SX126X_IRQ_ALL, // Enable all IRQs
-		SX126X_IRQ_TX_DONE | SX126X_IRQ_RX_DONE | SX126X_IRQ_TIMEOUT |
-			SX126X_IRQ_HEADER_ERROR |
-			SX126X_IRQ_CRC_ERROR, // Enable IRQ finished
-		SX126X_IRQ_NONE,		  // No IRQs mapped to DIO2
-		SX126X_IRQ_NONE			  // No IRQs mapped to DIO3
+		SX126X_IRQ_TX_DONE | SX126X_IRQ_RX_DONE | SX126X_IRQ_TIMEOUT | SX126X_IRQ_HEADER_ERROR | SX126X_IRQ_CRC_ERROR, // DIO1 event on
+		SX126X_IRQ_NONE, // No IRQs mapped to DIO2
+		SX126X_IRQ_NONE // No IRQs mapped to DIO3
 	);
 	if (status != SX126X_STATUS_OK) {
 		ESP_LOGE(TAG, "Failed to set DIO IRQ parameters");
@@ -196,12 +194,11 @@ static void lora_task(void *pvParameters) {
 		.intr_type = GPIO_INTR_POSEDGE, // Trigger on rising edge
 	};
 	gpio_config(&io_conf);
-
 	gpio_isr_handler_add(SX126X_DIO1_PIN, dio1_isr_handler, NULL);
 
-	char payload[CYPHERTEXT_LENGTH] = {0}; // Hold data to send
+	char payload[LORA_CYPHERTEXT_LENGTH] = {0}; // Hold data to send
 	for (;;) {
-		
+		// Generate encryption key requested
 		if (xSemaphoreTake(xLoraGenerateEncKeySemaphore, 0) == pdTRUE) {
 			lora_generate_random_key();
 		}
@@ -221,7 +218,7 @@ static void lora_task(void *pvParameters) {
 		else if (!waiting_for_ack && uxQueueMessagesWaiting(xLoraSendEncQueue) > 0) {
 			xQueuePeek(xLoraSendEncQueue, &lora_cmd, 0);
 			
-			memcpy(encryption_key, lora_cmd.key, ENC_KEY_LEN);
+			memcpy(encryption_key, lora_cmd.key, LORA_ENC_KEY_LEN);
 			
 			// Create unique message ID
 			uint32_t msg_id = lora_create_msg_id();
@@ -271,7 +268,7 @@ static void lora_event_handler_task(void *pvParameters) {
 			else if (irq_flags & SX126X_IRQ_RX_DONE) {
 				// Read the received packet
 				
-				uint8_t rx_buffer[PAYLOAD_LENGTH];
+				uint8_t rx_buffer[LORA_PAYLOAD_LENGTH];
 				uint8_t rx_size = 0;
 				
 				sx126x_rx_buffer_status_t rx_status;

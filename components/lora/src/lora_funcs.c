@@ -16,7 +16,7 @@
 static const char *TAG = "LORA_FUNCS";
 
 uint32_t expected_rx_id = 0;
-uint8_t encryption_key[ENC_KEY_LEN] = {0};
+uint8_t encryption_key[LORA_ENC_KEY_LEN] = {0};
 
 bool waiting_for_ack = false;
 
@@ -97,20 +97,20 @@ void lora_process_received_message(uint8_t *message, size_t message_len) {
 	}
 
 	// The expected message length is 80 bytes (16 IV + 64 cyphertext)
-	if (message_len != CYPHERTEXT_LENGTH + 16) {
+	if (message_len != LORA_CYPHERTEXT_LENGTH + 16) {
 		ESP_LOGE(TAG, "Unexpected message length: %u bytes\n", (unsigned)message_len);
 		return;
 	}
 
-	uint8_t iv[IV_LENGTH];			// To hold IV
-	memcpy(iv, message, IV_LENGTH); // Extract the IV (first 16 bytes)
+	uint8_t iv[LORA_IV_LENGTH]; // To hold IV
+	memcpy(iv, message, LORA_IV_LENGTH); // Extract the IV (first 16 bytes)
 
-	uint8_t ciphertext[CYPHERTEXT_LENGTH]; // To hold cyphertext
-	memcpy(ciphertext, message + IV_LENGTH,
-		   CYPHERTEXT_LENGTH); // Extract the ciphertext (remaining 64 bytes)
+	uint8_t ciphertext[LORA_CYPHERTEXT_LENGTH]; // To hold cyphertext
+	memcpy(ciphertext, message + LORA_IV_LENGTH,
+		   LORA_CYPHERTEXT_LENGTH); // Extract the ciphertext (remaining 64 bytes)
 
 	#ifdef POLYCAST5_DEBUG
-        ESP_LOG_BUFFER_HEX(TAG, iv, IV_LENGTH);
+        ESP_LOG_BUFFER_HEX(TAG, iv, LORA_IV_LENGTH);
     #endif
     
 	// Initialize the AES context with the key and received IV.
@@ -120,9 +120,9 @@ void lora_process_received_message(uint8_t *message, size_t message_len) {
 	// Decrypt "ciphertext"
 	AES_CBC_decrypt_buffer(&ctx, ciphertext, sizeof(ciphertext));
 
-	ciphertext[sizeof(ciphertext) - 1] = '\0'; // Ensure null termination
+	ciphertext[sizeof(ciphertext) - 1] = '\0'; // Ensure NULL termination
 	
-	// "cyphertext" is now decrypted
+	// 'cyphertext' is now decrypted
 	#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Decrypted text: %s\n", ciphertext);
     #endif
@@ -154,13 +154,24 @@ void lora_process_received_message(uint8_t *message, size_t message_len) {
 	}
 }
 
-void lora_encrypt_and_transmit(uint8_t plaintext[]) {
-
-	uint8_t buffer[CYPHERTEXT_LENGTH]; // Padded to 64 bytes (must be multiple
-									   // of 16)
+void lora_encrypt_and_transmit(uint8_t plaintext[])
+{
+	// Measure how many bytes of real data we have, up to the max
+    size_t plaintext_len = strnlen((char*)plaintext, LORA_CYPHERTEXT_LENGTH + 1);
+    
+    // Check length
+    if (plaintext_len > LORA_CYPHERTEXT_LENGTH) {
+        ESP_LOGE(TAG,
+            "LoRa plaintext too long (%u bytes), max is %u",
+            (unsigned)plaintext_len,
+            (unsigned)LORA_CYPHERTEXT_LENGTH);
+        return;
+    }
+    
+	uint8_t buffer[LORA_CYPHERTEXT_LENGTH] = {0}; // Padded to 64 bytes (must be multiple of 16)
 	memcpy(buffer, plaintext, sizeof(buffer)); // Copy the 64 bytes into buffer
 
-	uint8_t iv[IV_LENGTH];				// To hold IV
+	uint8_t iv[LORA_IV_LENGTH]; // To hold IV
 	generate_random_iv(iv, sizeof(iv)); // Generate random IV into iv[16]
 
 	/*ESP_LOGE(TAG, "Generated IV: ");
@@ -175,10 +186,10 @@ void lora_encrypt_and_transmit(uint8_t plaintext[]) {
 
 	AES_CBC_encrypt_buffer(&ctx, buffer, sizeof(buffer)); // Encrypt buffer
 
-	uint8_t message[IV_LENGTH + CYPHERTEXT_LENGTH]; // New buffer to send
-	memcpy(message, iv, IV_LENGTH);					// First 16 bytes are IV
-	memcpy(message + IV_LENGTH, buffer,
-		   CYPHERTEXT_LENGTH); // Next are the cyphertext
+	uint8_t message[LORA_IV_LENGTH + LORA_CYPHERTEXT_LENGTH]; // New buffer to send
+	memcpy(message, iv, LORA_IV_LENGTH);					// First 16 bytes are IV
+	memcpy(message + LORA_IV_LENGTH, buffer,
+		   LORA_CYPHERTEXT_LENGTH); // Next are the cyphertext
 
 	/*ESP_LOGE(TAG, "Message to send (hex): ");
 	for (int i = 0; i < (int)sizeof(message); i++)

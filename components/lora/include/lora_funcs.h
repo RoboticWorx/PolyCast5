@@ -4,12 +4,12 @@
 #include "aes.h"
 #include "sx126x_hal.h"
 
-#define CYPHERTEXT_LENGTH 64
-#define IV_LENGTH 16
-#define PAYLOAD_LENGTH (CYPHERTEXT_LENGTH + IV_LENGTH)
+#define LORA_CYPHERTEXT_LENGTH 64
+#define LORA_IV_LENGTH 16
+#define LORA_PAYLOAD_LENGTH (LORA_CYPHERTEXT_LENGTH + LORA_IV_LENGTH)
 
-#define ENC_KEY_LEN 16
-#define INSTR_LEN 20
+#define LORA_ENC_KEY_LEN 16
+#define LORA_MAX_INSTR_LEN 32
 
 typedef struct sx126x_s {
 	void *context;
@@ -20,12 +20,12 @@ typedef struct sx126x_s {
 } sx126x_t;
 
 typedef struct {
-    uint8_t key[ENC_KEY_LEN];
+	char instr[LORA_MAX_INSTR_LEN];
+    uint8_t key[LORA_ENC_KEY_LEN];
     int index;
-    char instr[INSTR_LEN];
 } lora_cmd_t;
 
-extern uint8_t encryption_key[ENC_KEY_LEN];
+extern uint8_t encryption_key[LORA_ENC_KEY_LEN];
 
 void lora_generate_random_key(void);
 uint32_t lora_create_msg_id(void);

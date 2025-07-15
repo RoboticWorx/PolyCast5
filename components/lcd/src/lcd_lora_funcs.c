@@ -56,6 +56,8 @@ static const char* TAG = "LCD_LORA_FUNCS";
 
 static const int submenu_count = sizeof(submenu_options)/sizeof(submenu_options[0]);
 
+static char plan_selected_days[8]; // Up to 7 days + NULL
+
 static char name_buf[MAX_CUSTOM_NAME_LEN + 1] = {0};
 static bool lora_menu_overwrite = false;
 
@@ -376,7 +378,7 @@ static void update_name_label_lcd(lv_obj_t *lbl_display, char cur_char, int cur_
 
 void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu)
 {
-	static uint8_t received_enc_key_nvs[ENC_KEY_LEN];
+	static uint8_t received_enc_key_nvs[LORA_ENC_KEY_LEN];
 	
     // Declare statics
     static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
@@ -596,19 +598,19 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 			// Get shared encryption key and do the same under the same index
 			if (xQueueReceive(xEspSendEncKeyQueueNVS, received_enc_key_nvs, portMAX_DELAY) == pdPASS) {
 				// Allocate a fresh buffer for this entry
-		        uint8_t *slot = malloc(ENC_KEY_LEN);
+		        uint8_t *slot = malloc(LORA_ENC_KEY_LEN);
 		        if (!slot) {
-		            ESP_LOGE(TAG, "Out of memory allocating ENC_KEY_LEN key");
+		            ESP_LOGE(TAG, "Out of memory allocating LORA_ENC_KEY_LEN key");
 		            return;
 		        }
-		        memcpy(slot, received_enc_key_nvs, ENC_KEY_LEN);
+		        memcpy(slot, received_enc_key_nvs, LORA_ENC_KEY_LEN);
 		        
 		        // Save to keys at next available position
 		        lora_menu->keys[lora_menu->size - 1] = slot;
 		        
 		        #ifdef POLYCAST5_DEBUG
 				    ESP_LOGI(TAG, "Key saved at slot %d:", lora_menu->size - 1);
-					ESP_LOG_BUFFER_HEX("SAVED IN QUEUE", lora_menu->keys[lora_menu->size - 1], ENC_KEY_LEN);
+					ESP_LOG_BUFFER_HEX("SAVED IN QUEUE", lora_menu->keys[lora_menu->size - 1], LORA_ENC_KEY_LEN);
 				#endif
 		        
 				lcd_lora_key_nvs_save(lora_menu);
@@ -709,11 +711,11 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 	// Send selected
 	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 0) {
 		lora_cmd.index = lora_menu->submenu.index;
-		memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
+		memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
 		xQueueSend(xLoraSendEncQueue, &lora_cmd, 0);
 		
 		#ifdef POLYCAST5_DEBUG
-		    //ESP_LOG_BUFFER_HEX("SENDING WITH KEY", lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
+		    //ESP_LOG_BUFFER_HEX("SENDING WITH KEY", lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
 		#endif
 		
 		// Reset receipt label
@@ -977,7 +979,7 @@ void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		
 		// Send the data to lora_task
 		lora_cmd.index = lora_menu->submenu.index;
-		memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
+		memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
 		snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "on %s off %s", time_opts[on_idx], time_opts[off_idx]);
 		xQueueSend(xLoraSendEncQueue, &lora_cmd, 0);
 
@@ -1161,7 +1163,22 @@ void lcd_lora_plan_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 	static bool days_selected[7] = {false};
 	
 	// Confirm
-	if (ui_btns->right_btn == 1 && lora_plan_menu->plan_index == 7) {		
+	if (ui_btns->right_btn == 1 && lora_plan_menu->plan_index == 7) {
+		// Save selected days into global
+		int pos = 0;
+	    for (int i = 0; i < 7; i++) {
+			// If day selected
+	        if (days_selected[i]) {
+	            // '1' + i gives '1' for Monday (i==0), '2' for Tuesday, ... '7' for Sunday
+	            plan_selected_days[pos++] = '1' + i;
+	        }
+	    }
+	    plan_selected_days[pos] = '\0'; // Terminate
+		
+		#ifdef POLYCAST5_DEBUG
+		    ESP_LOGI(TAG, "Days selected = '%s'", plan_selected_days);
+	    #endif
+		
 		// Reset all labels and days
 		for (int i = 0; i < 7; i++) {
 			days_selected[i] = false;
@@ -1437,7 +1454,7 @@ static void set_digit(char *time_str, uint8_t pos, int val) {
     time_str[str_pos[pos]] = '0' + val;
 }
 
-void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_plan_menu_t *lora_plan_menu)
+void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu)
 {
 	#define PLAN_TIME_DIGITS 12 // HHMMSS (ignoring :) for both times
 	#define PLAN_TIME_STR_LEN 9 // "HH:MM:SS\0"
@@ -1508,7 +1525,50 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_pl
 	
 	// Confirm
 	if (ui_btns->right_btn == 1 && selected_digit == 11) {
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "Confirmed: start_time = '%s', end_time = '%s'", start_time, end_time);
+		#endif
 		
+		// Send the data to lora_task
+		lora_cmd.index = lora_menu->submenu.index;
+		memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
+		// Remove colons
+		int h1, m1, s1, h2, m2, s2;
+		sscanf(start_time, "%2d:%2d:%2d", &h1,&m1,&s1);
+		sscanf(end_time, "%2d:%2d:%2d", &h2,&m2,&s2);
+		snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "d %s o %02d%02d%02d f %02d%02d%02d",
+				plan_selected_days, h1, m1, s1, h2, m2, s2);
+		xQueueSend(xLoraSendEncQueue, &lora_cmd, 0);
+		
+		// Reset objects
+		lv_obj_delete(lbl_subpage_times);
+		lv_obj_delete(lbl_selected_icon);
+		lv_obj_delete(lbl_ins);
+		for (int i = 0; i < 17; i++) {
+			lv_obj_delete(time_labels[i]);
+		}
+
+		// Reset statics
+		lbl_subpage_times = lbl_selected_icon = lbl_ins = NULL;
+		selected_digit = 0;
+		strcpy(start_time, "00:00:00");
+		strcpy(end_time, "00:00:00");
+		init = false;
+		
+		// Confirmation text
+		lv_obj_t *lbl_send_conf = lv_label_create(ACTIVE_SCR); // Create and format label
+		lcd_format_label(lbl_send_conf, "Sending to PolyPlug...", user_secondary_color,
+				 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+		lv_timer_handler();
+		vTaskDelay(pdMS_TO_TICKS(1000)); // Wait 1000ms
+		lv_obj_del(lbl_send_conf); // Delete label
+		lcd_clear_pending_inputs = true;
+
+		// Show LoRa submenu cont
+		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+
+		// Go back
+		ui_menu->page = LORA_SUBPAGE;
 	}
 	// Go back
 	else if (ui_btns->left_btn == 1 && selected_digit == 0) {
@@ -1572,7 +1632,7 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_pl
 			max_val = 2;
 		}
 		else if (adj_pos == 1) { // Hours
-			max_val = 3;
+			max_val = (get_digit(current_time_str, 0) == 2) ? 3 : 9;
 		}
 		else if (adj_pos == 2 || adj_pos == 4) { // Tens of min/sec (0-5)
 			max_val = 5;
@@ -1599,7 +1659,7 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_pl
 			max_val = 2;
 		}
 		else if (adj_pos == 1) { // Hours
-			max_val = 3;
+			max_val = (get_digit(current_time_str, 0) == 2) ? 3 : 9;
 		}
 		else if (adj_pos == 2 || adj_pos == 4) { // Tens of min/sec (0-5)
 			max_val = 5;
@@ -1753,7 +1813,7 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		
 		// Send the data to lora_task
 		lora_cmd.index = lora_menu->submenu.index;
-		memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], ENC_KEY_LEN);
+		memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
 		snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "away %s", away_menu->options[away_menu->index]);
 		xQueueSend(xLoraSendEncQueue, &lora_cmd, 0);
 
@@ -1764,6 +1824,7 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		lv_timer_handler();
 		vTaskDelay(pdMS_TO_TICKS(500)); // Wait 500ms
 		lv_obj_del(lbl_send_conf); // Delete label
+		lcd_clear_pending_inputs = true;
 		
 		// Delete away_menu lv_obj
 		lv_obj_del(away_menu->main_list);
@@ -1850,7 +1911,7 @@ esp_err_t lcd_lora_key_nvs_save(const lora_menu_t *menu)
         snprintf(key, sizeof(key), LORA_ENC_KEY_FMT, i);
         
         // Store the key string at each key starting at index 1 to match user options
-        err = nvs_set_blob(h, key, menu->keys[i + 1], ENC_KEY_LEN);
+        err = nvs_set_blob(h, key, menu->keys[i + 1], LORA_ENC_KEY_LEN);
         
         // Exit if error
         if (err != ESP_OK)
@@ -1949,19 +2010,19 @@ esp_err_t lcd_lora_key_nvs_load(lora_menu_t *menu)
         char key[16];
         snprintf(key, sizeof(key), LORA_ENC_KEY_FMT, i);
         
-        // Read exactly ENC_KEY_LEN bytes
-        size_t blob_len = ENC_KEY_LEN;
+        // Read exactly LORA_ENC_KEY_LEN bytes
+        size_t blob_len = LORA_ENC_KEY_LEN;
         
         // First check existence & size
         err = nvs_get_blob(h, key, NULL, &blob_len);
         if (err == ESP_ERR_NVS_NOT_FOUND) {
             continue;
         }
-        if (err != ESP_OK || blob_len != ENC_KEY_LEN) {
+        if (err != ESP_OK || blob_len != LORA_ENC_KEY_LEN) {
             break;
         }
 
-        uint8_t *buf = malloc(ENC_KEY_LEN);
+        uint8_t *buf = malloc(LORA_ENC_KEY_LEN);
         if (!buf) {
             err = ESP_ERR_NO_MEM;
             break;
@@ -2081,7 +2142,7 @@ esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx)
     }
 
 	// Buffer
-    uint8_t tmp[ENC_KEY_LEN];
+    uint8_t tmp[LORA_ENC_KEY_LEN];
 
 	// Shift all keys down one
     for (uint8_t i = del_idx; i < user_cnt; i++) {
@@ -2091,13 +2152,13 @@ esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx)
         snprintf(src, sizeof src, LORA_ENC_KEY_FMT, i);
         snprintf(dst, sizeof dst, LORA_ENC_KEY_FMT, i - 1);
 
-        size_t len = ENC_KEY_LEN;
+        size_t len = LORA_ENC_KEY_LEN;
         // Get key from src
         err = nvs_get_blob(h, src, tmp, &len);
-        if (err != ESP_OK || len != ENC_KEY_LEN) break;
+        if (err != ESP_OK || len != LORA_ENC_KEY_LEN) break;
 
 		// Set key to new dst
-        err = nvs_set_blob(h, dst, tmp, ENC_KEY_LEN);
+        err = nvs_set_blob(h, dst, tmp, LORA_ENC_KEY_LEN);
         if (err != ESP_OK) break;
     }
 
