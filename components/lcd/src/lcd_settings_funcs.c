@@ -1,3 +1,4 @@
+#include "core/lv_obj_scroll.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
 
@@ -15,6 +16,8 @@
 
 #include "lcd_utils.h"
 #include "lcd_settings_funcs.h"
+
+#define TAG "LCD_SETTINGS"
 
 #define SETTINGS_COLOR_NS "se_co_ns" // NVS namespace
 #define SETTINGS_COLOR_PRIM_KEY "se_pr_ke"
@@ -211,6 +214,216 @@ void lcd_settings_update_menu(settings_menu_t *menu)
     
     // Enable scrolling if list gets too long
     lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
+}
+
+static void create_next_box(lv_obj_t *pin_container, lv_obj_t **pin_labels, int *num_boxes) {
+	if (*num_boxes >= SETTINGS_MAX_PIN_LEN) {
+		return;
+	}
+	
+	// Create new box
+	lv_obj_t *box = lv_obj_create(pin_container);
+	lv_obj_set_size(box, 35, 35);
+	lv_obj_set_style_bg_color(box, user_primary_color, 0);
+	lv_obj_set_style_border_color(box, user_secondary_color, 0);
+	lv_obj_set_style_border_width(box, 2, 0);
+	lv_obj_set_scrollbar_mode(box, LV_SCROLLBAR_MODE_OFF);
+	
+	// Fill with label
+	lv_obj_t *label = lv_label_create(box);
+	lv_label_set_text(label, "");
+	lv_obj_set_style_text_font(label, &lv_font_montserrat_18, 0);
+	lv_obj_set_style_text_color(label, user_secondary_color, 0);
+	lv_obj_center(label);
+	
+	pin_labels[*num_boxes] = label;
+	(*num_boxes)++;
+}
+static const char *code_to_symbol(char c) {
+    switch(c) {
+        case 'U':
+        	return LV_SYMBOL_UP;
+        case 'D':
+        	return LV_SYMBOL_DOWN;
+        case 'L':
+        	return LV_SYMBOL_LEFT;
+        case 'R':
+        	return LV_SYMBOL_RIGHT;
+        default:
+        	return "";
+    }
+}
+static void rebuild_pin_boxes(lv_obj_t *pin_container, lv_obj_t **pin_labels, char *unlock_pin, int *num_boxes, int num_filled)
+{
+	// Start fresh
+    lv_obj_clean(pin_container);
+    *num_boxes = 0;
+    
+    if (num_filled == 0) {
+        // Nothing entered yet: one blank slot
+        create_next_box(pin_container, pin_labels, num_boxes);
+    }
+	else {
+		// Fill for each
+		for (int i = 0; i < num_filled; i++) {
+		    create_next_box(pin_container, pin_labels, num_boxes);
+		    lv_label_set_text(pin_labels[i], code_to_symbol(unlock_pin[i]));
+		}
+	}
+    
+}
+void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
+{
+	// Statics
+	static bool do_once = false;
+	static int num_filled = 0;
+	static int num_boxes = 0;
+	
+	static lv_obj_t *pin_container;
+	static lv_obj_t *lbl_ins;
+	static lv_obj_t *lbl_conf;
+	static lv_obj_t *pin_labels[SETTINGS_MAX_PIN_LEN];
+	static lv_style_t container_style;
+	
+	// Only execute once
+	if (!do_once) {
+		// Clear any old PIN data
+    	memset(settings_menu->unlock_pin, 0, sizeof(settings_menu->unlock_pin));
+		
+		// Create labels
+		lbl_ins = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_ins, "Create pin with arrows:", user_secondary_color,
+        			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 18);
+        			 
+        lbl_conf = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_conf, "  Home to back,\nSelect to confirm", user_secondary_color,
+        			 &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -13);
+		
+		// Create pin container
+		pin_container = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(pin_container, LV_SIZE_CONTENT, 37);
+		lv_obj_center(pin_container);
+		lv_obj_set_style_bg_color(pin_container, user_primary_color, 0);
+		lv_obj_set_style_border_width(pin_container, 0, 0);
+		lv_obj_set_flex_flow(pin_container, LV_FLEX_FLOW_ROW);
+		lv_obj_set_style_pad_column(pin_container, 5, 0);
+		lv_obj_set_scrollbar_mode(pin_container, LV_SCROLLBAR_MODE_OFF);
+		
+		// Remove outside padding
+		lv_style_init(&container_style);
+		lv_style_set_pad_left(&container_style, 0);
+		lv_style_set_pad_right(&container_style, 0);
+		lv_style_set_pad_top(&container_style, 0);
+		lv_style_set_pad_bottom(&container_style, 0);
+		lv_obj_add_style(pin_container, &container_style, 0);
+		
+		rebuild_pin_boxes(pin_container, pin_labels, settings_menu->unlock_pin, &num_boxes, num_filled);
+		
+		do_once = true;
+	}
+	
+	// Pin input
+	if ((ui_btns->up_btn == 1 || ui_btns->down_btn == 1 || ui_btns->left_btn == 1 || ui_btns->right_btn == 1) && (num_filled < SETTINGS_MAX_PIN_LEN)) {
+		char code = '\0';
+		
+		// Assign code for unlock_pin
+        if (ui_btns->up_btn) {
+			code = 'U';
+		}
+        else if(ui_btns->down_btn) {
+			code = 'D';
+		}
+        else if(ui_btns->left_btn) {
+			code = 'L';
+		} 
+        else if(ui_btns->right_btn) {
+			code = 'R';
+		}
+
+		// Save and rebuild
+        settings_menu->unlock_pin[num_filled++] = code;
+        rebuild_pin_boxes(pin_container, pin_labels, settings_menu->unlock_pin, &num_boxes, num_filled);
+	}
+	// Save
+	else if (ui_btns->select_btn == 1) {
+		settings_menu->unlock_pin[num_filled] = '\0'; // Ensure termination
+			
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "Entered pin: %s", settings_menu->unlock_pin);
+		#endif
+			
+		// Signal LCD to change text "Set unlock pin" to "Remove unlock pin"
+		//dsdsf
+			
+		// Reset objects
+		lv_obj_delete(pin_container); // Clears children
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_conf);
+		lv_style_reset(&container_style);
+			
+		// Reset statics
+		pin_container = NULL;
+		num_filled = num_boxes = 0;
+		lbl_ins = lbl_conf = NULL;
+		do_once = false;
+			
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+			
+		// Show settings list
+		lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+		// Switch pages
+		ui_menu->page = SETTINGS_PAGE;
+	}
+	// Go back
+	else if (ui_btns->home_btn == 1) {
+		// Back a box
+	    if (num_filled > 0) {
+			// Remove one and rebuild
+	        settings_menu->unlock_pin[--num_filled] = '\0';
+            rebuild_pin_boxes(pin_container, pin_labels, settings_menu->unlock_pin, &num_boxes, num_filled);
+	    }
+	    // First box: exit
+	    else {
+	        // Reset objects
+			lv_obj_delete(pin_container); // Clears children
+			lv_obj_delete(lbl_ins);
+			lv_obj_delete(lbl_conf);
+			lv_style_reset(&container_style);
+			
+			// Reset statics
+			pin_container = NULL;
+			num_filled = num_boxes = 0;
+			lbl_ins = lbl_conf = NULL;
+			do_once = false;
+			
+			// Hide right arrow
+			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+			
+			// Show settings list
+			lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// Switch pages
+			ui_menu->page = SETTINGS_PAGE;
+	    }
+	}
+	// Power off
+	else if (ui_btns->pwr_btn == 1) {
+		// Reset objects
+		lv_obj_delete(pin_container); // Clears children
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_conf);
+		lv_style_reset(&container_style);
+			
+		// Reset statics
+		pin_container = NULL;
+		num_filled = num_boxes = 0;
+		lbl_ins = lbl_conf = NULL;
+		do_once = false;
+		
+		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+	}
 }
 
 void lcd_settings_colors_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)

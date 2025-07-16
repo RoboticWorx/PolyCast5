@@ -884,7 +884,7 @@ void lcd_espnow_setup_send_page(espnow_menu_t *espnow_menu)
 					 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
 					 
 	espnow_menu->espnow_submenu.lbl_edit = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(espnow_menu->espnow_submenu.lbl_edit, LV_SYMBOL_PREV " EDIT", user_secondary_color,
+	lcd_format_label(espnow_menu->espnow_submenu.lbl_edit, LV_SYMBOL_HOME " EDIT", user_secondary_color,
 					 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_RIGHT, -5, -4);
 					 
 	espnow_menu->espnow_submenu.arrow_top = lv_label_create(ACTIVE_SCR);

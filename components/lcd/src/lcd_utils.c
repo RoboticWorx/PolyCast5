@@ -1596,6 +1596,20 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		settings_menu->index++;
 		lcd_settings_update_menu(settings_menu);
 	}
+	// Set unlock pin selected
+	else if (ui_btns->select_btn == 1 && settings_menu->index == 0) {
+		// Hide settings menu
+		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = SETTINGS_PIN_PAGE;
+	}
 	// Change colors selected
 	else if (ui_btns->select_btn == 1 && settings_menu->index == 1) {
 		// Hide settings menu
@@ -1659,25 +1673,15 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		// Switch pages
 		ui_menu->page = SELECTION_PAGE;
 	}
-	// Home selected
-	else if (ui_btns->home_btn == 1) {
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Hide settings menu
 		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
 		// Reset static
 		do_once = false;
 		
-		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-	}
-	// Power off selected
-	else if (ui_btns->pwr_btn == 1) {
-		// Hide settings menu
-		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Reset static
-		do_once = false;
-		
-		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 

@@ -39,6 +39,7 @@ uint32_t lora_create_msg_id(void)
 
 void lora_generate_random_key(void)
 {
+	// Generate random encryption key
 	esp_fill_random(encryption_key, sizeof(encryption_key));
 	
 	#ifdef POLYCAST5_DEBUG
@@ -55,8 +56,9 @@ void lora_set_rx_mode(void) // Call once to set RX mode and receive on EXTI8
 	#define RTC_FREQ_HZ 32768U
 	#define MS_TO_RTC_STEP(ms) ((uint32_t)(((uint64_t)(ms) * RTC_FREQ_HZ) / 1000U))
 
+	// Poll for SX1262 to be ready
 	while (gpio_get_level(SX126X_BUSY_PIN) == 1) {
-		vTaskDelay(pdMS_TO_TICKS(1)); // Poll for SX1262 to be ready
+		vTaskDelay(pdMS_TO_TICKS(1));
 	}
 
 	// Enter RX mode
@@ -69,10 +71,11 @@ void lora_set_rx_mode(void) // Call once to set RX mode and receive on EXTI8
 	}
 }
 
-void lora_tx(uint8_t tx_data[], uint8_t data_len) {
-
+void lora_tx(uint8_t tx_data[], uint8_t data_len)
+{
+	// Poll for SX1262 to be ready
 	while (gpio_get_level(SX126X_BUSY_PIN) == 1) {
-		vTaskDelay(pdMS_TO_TICKS(1)); // Poll for SX1262 to be ready
+		vTaskDelay(pdMS_TO_TICKS(1));
 	}
 
 	sx126x_status_t status = sx126x_write_buffer(NULL, 0, tx_data, data_len);
@@ -105,9 +108,8 @@ void lora_process_received_message(uint8_t *message, size_t message_len) {
 	uint8_t iv[LORA_IV_LENGTH]; // To hold IV
 	memcpy(iv, message, LORA_IV_LENGTH); // Extract the IV (first 16 bytes)
 
-	uint8_t ciphertext[LORA_CYPHERTEXT_LENGTH]; // To hold cyphertext
-	memcpy(ciphertext, message + LORA_IV_LENGTH,
-		   LORA_CYPHERTEXT_LENGTH); // Extract the ciphertext (remaining 64 bytes)
+	uint8_t ciphertext[LORA_CYPHERTEXT_LENGTH]; // Buffer to hold cyphertext
+	memcpy(ciphertext, message + LORA_IV_LENGTH, LORA_CYPHERTEXT_LENGTH); // Extract the ciphertext (remaining 64 bytes)
 
 	#ifdef POLYCAST5_DEBUG
         ESP_LOG_BUFFER_HEX(TAG, iv, LORA_IV_LENGTH);
@@ -117,7 +119,7 @@ void lora_process_received_message(uint8_t *message, size_t message_len) {
 	struct AES_ctx ctx;
 	AES_init_ctx_iv(&ctx, encryption_key, iv);
 
-	// Decrypt "ciphertext"
+	// Decrypt 'ciphertext'
 	AES_CBC_decrypt_buffer(&ctx, ciphertext, sizeof(ciphertext));
 
 	ciphertext[sizeof(ciphertext) - 1] = '\0'; // Ensure NULL termination
@@ -146,7 +148,7 @@ void lora_process_received_message(uint8_t *message, size_t message_len) {
 	            ESP_LOGW(TAG, "ACK ID wrong (got=%" PRIu32 ", want=%" PRIu32 ")", received_rx_id, expected_rx_id);
             #endif
         }
-	} 
+	}
 	else {
 		#ifdef POLYCAST5_DEBUG
         	ESP_LOGI(TAG, "Decrypted text does NOT match. Got: \"%s\"", ciphertext);
@@ -187,9 +189,8 @@ void lora_encrypt_and_transmit(uint8_t plaintext[])
 	AES_CBC_encrypt_buffer(&ctx, buffer, sizeof(buffer)); // Encrypt buffer
 
 	uint8_t message[LORA_IV_LENGTH + LORA_CYPHERTEXT_LENGTH]; // New buffer to send
-	memcpy(message, iv, LORA_IV_LENGTH);					// First 16 bytes are IV
-	memcpy(message + LORA_IV_LENGTH, buffer,
-		   LORA_CYPHERTEXT_LENGTH); // Next are the cyphertext
+	memcpy(message, iv, LORA_IV_LENGTH); // First 16 bytes are IV
+	memcpy(message + LORA_IV_LENGTH, buffer, LORA_CYPHERTEXT_LENGTH); // Next are the cyphertext
 
 	/*ESP_LOGE(TAG, "Message to send (hex): ");
 	for (int i = 0; i < (int)sizeof(message); i++)

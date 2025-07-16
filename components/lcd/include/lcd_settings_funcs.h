@@ -4,6 +4,8 @@
 #include "misc/lv_style.h"
 #include "misc/lv_types.h"
 
+#define SETTINGS_MAX_PIN_LEN 5
+
 #define MAX_SETTINGS_OPTIONS 20
 
 // Forward-declare structs (from lcd_utils.h)
@@ -19,6 +21,7 @@ typedef struct {
 	lv_style_t btn_style;
 	lv_style_t sel_style;
 	lv_obj_t *cont;
+	char unlock_pin[SETTINGS_MAX_PIN_LEN + 1];
 } settings_menu_t;
 
 extern settings_menu_t settings_menu;
@@ -36,6 +39,15 @@ void lcd_settings_setup_page(settings_menu_t *settings_menu);
  * @param [in] settings_menu Settings menu structure
  */
 void lcd_settings_update_menu(settings_menu_t *settings_menu);
+
+/**
+ * @brief Prompts user to create a pin to unlock the device
+ *
+ * @param [in] ui_btns User input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] settings_menu Settings menu structure
+ */
+void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
 
 /**
  * @brief Executes settings colors page so the user can adjust the primary and secondary device colors

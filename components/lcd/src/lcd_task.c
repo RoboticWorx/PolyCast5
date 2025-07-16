@@ -300,6 +300,9 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == SETTINGS_COLORS_PAGE) {
 				lcd_settings_colors_page(&ui_btns, &ui_menu, &settings_menu);
 			}
+			else if (ui_menu.page == SETTINGS_PIN_PAGE) {
+				lcd_settings_pin_page(&ui_btns, &ui_menu, &settings_menu);
+			}
 			else if (ui_menu.page == SETTINGS_COLORS_SEL_PAGE) {
 				lcd_settings_colors_sel_page(&ui_btns, &ui_menu, &settings_menu);
 			}
