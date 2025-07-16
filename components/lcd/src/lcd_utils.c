@@ -924,15 +924,6 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 		// Go to selection page
 		if (!settings_menu->pin_menu.pin_set || !settings_menu->pin_menu.prompt_pin) {
 			unhide_selection_widgets(ui_menu);
-		
-			// Show selection labels
-			/*lv_obj_remove_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_remove_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_remove_flag(ui_menu->lbl_mid, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_remove_flag(ui_menu->lbl_bot, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);*/
 			
 			ui_menu->page = SELECTION_PAGE;
 		}
@@ -1078,6 +1069,21 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 	            lv_obj_set_style_border_color(lv_obj_get_parent(unlock_labels[i]), lv_palette_main(LV_PALETTE_RED), 0);
 	        }
     	}
+	}
+	// Power off
+	else if (ui_btns->pwr_btn == 1) {
+		// Hide pin prompt
+		lv_obj_add_flag(settings_menu->pin_menu.pin_container, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(settings_menu->pin_menu.lbl_ins, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(settings_menu->pin_menu.lbl_back, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset
+	    num_filled = num_boxes = 0;
+		memset(input_pin, 0, sizeof(input_pin));
+		lcd_settings_rebuild_pin_boxes(settings_menu->pin_menu.pin_container, unlock_labels,
+        	input_pin, &num_boxes, num_filled);
+		
+		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
 	}
 }
 
