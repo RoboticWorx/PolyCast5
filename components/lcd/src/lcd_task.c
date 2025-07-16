@@ -98,6 +98,8 @@ static void lcd_task(void *pvParameters)
 	lcd_wifi_menu_nvs_load(&wifi_menu);
 	lcd_wifi_topic_keys_nvs_load(&wifi_menu);
 	
+	lcd_settings_pin_nvs_load(&settings_menu);
+	
 		
 	// Create common pages
 	lcd_ir_setup_page(&ir_menu);
@@ -116,6 +118,7 @@ static void lcd_task(void *pvParameters)
 	lcd_tools_setup_page(&tools_menu);
 	
 	lcd_settings_setup_page(&settings_menu);
+	lcd_settings_setup_pin_page(&settings_menu);
 	
 	
 	#ifdef POLYCAST5_ESPNOW_DUMP_NVS
@@ -202,10 +205,13 @@ static void lcd_task(void *pvParameters)
 			
 			if (ui_menu.page == HOME_PAGE) {
 				// Show cool two frame animation and allow user to change animation scrolling up/down				
-				lcd_home_page(&ui_menu, &ui_btns);
+				lcd_home_page(&ui_btns, &ui_menu, &settings_menu);
 			} 
+			else if (ui_menu.page == UNLOCK_PAGE) {
+				lcd_unlock_page(&ui_btns, &ui_menu, &settings_menu);
+			}
 			else if (ui_menu.page == SELECTION_PAGE) {
-				lcd_selection_page(&ui_menu, &ui_btns, &ir_menu, &lora_menu, &espnow_menu, &wifi_menu, &tools_menu, &settings_menu);
+				lcd_selection_page(&ui_btns, &ui_menu, &ir_menu, &lora_menu, &espnow_menu, &wifi_menu, &tools_menu, &settings_menu);
 			}
 			// IR remotes page
 			else if (ui_menu.page == INFRARED_PAGE) {

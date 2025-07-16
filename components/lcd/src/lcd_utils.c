@@ -1,3 +1,4 @@
+#include "lcd_settings_funcs.h"
 #include "polycast5_macros.h"
 
 #include <stdlib.h>
@@ -279,6 +280,9 @@ void lcd_device_sleep(void)
 	
 	go_to_sleep = false; // Clear sleep flag
 	lcd_clear_pending_inputs = true; // Clear if action button pressed to wake
+	
+	// Require pin re-entry
+	settings_menu.pin_menu.prompt_pin = true;
 }
 
 void lcd_init_driver(void)
@@ -718,85 +722,6 @@ void lcd_init_images()
 	}
 }
 
-static void start_animation(void)
-{
-    // Start the active
-    if (anim_active == CITY) {
-        lv_obj_remove_flag(city_anim.img, LV_OBJ_FLAG_HIDDEN);
-        lv_timer_resume(city_anim.timer);
-    }
-    else if (anim_active == BLACK_HOLE) {
-        lv_obj_remove_flag(black_hole_anim.img,  LV_OBJ_FLAG_HIDDEN);
-        lv_timer_resume(black_hole_anim.timer);
-    }
-    else if (anim_active == MATRIX_RAIN){
-		lv_obj_remove_flag(matrix_rain_anim.img,  LV_OBJ_FLAG_HIDDEN);
-        lv_timer_resume(matrix_rain_anim.timer);
-	}
-}
-
-static void stop_animations(void)
-{
-	// Halt all animations
-    lv_timer_pause(city_anim.timer);
-    lv_timer_pause(black_hole_anim.timer);
-    lv_timer_pause(matrix_rain_anim.timer);
-
-    lv_obj_add_flag(city_anim.img, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(black_hole_anim.img, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(matrix_rain_anim.img, LV_OBJ_FLAG_HIDDEN);
-}
-
-static void transition_animation(bool dir)
-{	
-	stop_animations();
-	
-	if (dir) {
-		anim_active = (anim_active + 1) % NUM_ANIMS; // + 1 with wrap
-	}
-	else {
-		anim_active = (anim_active + NUM_ANIMS - 1) % NUM_ANIMS; // - 1 with wrap
-	}
-	
-    start_animation();
-    
-    // Save choice to NVS
-    lcd_anim_nvs_save();
-}
-
-void lcd_home_page(ui_menu_t *ui_menu, ui_btns_t *ui_btns)
-{
-	
-	if (ui_btns->up_btn == 1) {
-		transition_animation(true);
-	}
-	else if (ui_btns->down_btn == 1) {
-		transition_animation(false);
-	}
-	else if (ui_btns->select_btn == 1) {
-		stop_animations();
-		
-		unhide_selection_widgets(ui_menu);
-		
-		// Show selection labels
-		lv_obj_remove_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->lbl_mid, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->lbl_bot, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-		
-		ui_menu->page = SELECTION_PAGE;
-	}
-	else if (ui_btns->left_btn == 1) {
-		
-	}
-	else if (ui_btns->right_btn == 1) {
-		
-	}
-}
-
 void lcd_init_selection_labels(ui_menu_t *ui_menu)
 {
 	// Create and format center button
@@ -942,7 +867,221 @@ static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t* ir_menu, lo
 	}
 }
 
-void lcd_selection_page(ui_menu_t *ui_menu, ui_btns_t *ui_btns, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu, wifi_menu_t* wifi_menu, tools_menu_t* tools_menu, settings_menu_t* settings_menu) 
+static void start_animation(void)
+{
+    // Start the active
+    if (anim_active == CITY) {
+        lv_obj_remove_flag(city_anim.img, LV_OBJ_FLAG_HIDDEN);
+        lv_timer_resume(city_anim.timer);
+    }
+    else if (anim_active == BLACK_HOLE) {
+        lv_obj_remove_flag(black_hole_anim.img,  LV_OBJ_FLAG_HIDDEN);
+        lv_timer_resume(black_hole_anim.timer);
+    }
+    else if (anim_active == MATRIX_RAIN){
+		lv_obj_remove_flag(matrix_rain_anim.img,  LV_OBJ_FLAG_HIDDEN);
+        lv_timer_resume(matrix_rain_anim.timer);
+	}
+}
+static void stop_animations(void)
+{
+	// Halt all animations
+    lv_timer_pause(city_anim.timer);
+    lv_timer_pause(black_hole_anim.timer);
+    lv_timer_pause(matrix_rain_anim.timer);
+
+    lv_obj_add_flag(city_anim.img, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(black_hole_anim.img, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(matrix_rain_anim.img, LV_OBJ_FLAG_HIDDEN);
+}
+static void transition_animation(bool dir)
+{	
+	stop_animations();
+	
+	if (dir) {
+		anim_active = (anim_active + 1) % NUM_ANIMS; // + 1 with wrap
+	}
+	else {
+		anim_active = (anim_active + NUM_ANIMS - 1) % NUM_ANIMS; // - 1 with wrap
+	}
+	
+    start_animation();
+    
+    // Save choice to NVS
+    lcd_anim_nvs_save();
+}
+void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
+{
+	if (ui_btns->up_btn == 1) {
+		transition_animation(true);
+	}
+	else if (ui_btns->down_btn == 1) {
+		transition_animation(false);
+	}
+	else if (ui_btns->select_btn == 1) {
+		stop_animations();
+		
+		// Go to selection page
+		if (!settings_menu->pin_menu.pin_set || !settings_menu->pin_menu.prompt_pin) {
+			unhide_selection_widgets(ui_menu);
+		
+			// Show selection labels
+			/*lv_obj_remove_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->lbl_mid, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->lbl_bot, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);*/
+			
+			ui_menu->page = SELECTION_PAGE;
+		}
+		// Prompt pin
+		else {
+			// Show arrows
+			lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+			
+			// Show pin prompt
+			lv_obj_remove_flag(settings_menu->pin_menu.pin_container, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(settings_menu->pin_menu.lbl_ins, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(settings_menu->pin_menu.lbl_back, LV_OBJ_FLAG_HIDDEN);
+	
+			ui_menu->page = UNLOCK_PAGE;
+		}
+	}
+	else if (ui_btns->left_btn == 1) {
+		
+	}
+	else if (ui_btns->right_btn == 1) {
+		
+	}
+}
+
+void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
+{
+	// Statics
+	static bool init = false;
+	static int num_filled = 0;
+	static int num_boxes = 0;
+	static char input_pin[SETTINGS_MAX_PIN_LEN + 1];
+	static lv_obj_t *unlock_labels[SETTINGS_MAX_PIN_LEN];
+	
+	if (!init) {
+		// Zero out
+		num_filled = num_boxes = 0;
+		memset(input_pin, 0, sizeof(input_pin));
+		
+		init = true;
+	}
+	
+	// Pin input
+	if ((ui_btns->up_btn == 1 || ui_btns->down_btn == 1 || ui_btns->left_btn == 1 || ui_btns->right_btn == 1) && (num_filled < SETTINGS_MAX_PIN_LEN)) {
+		char code = '\0';
+		
+		// Assign code for unlock_pin
+        if (ui_btns->up_btn) {
+			code = 'U';
+		}
+        else if(ui_btns->down_btn) {
+			code = 'D';
+		}
+        else if(ui_btns->left_btn) {
+			code = 'L';
+		} 
+        else if(ui_btns->right_btn) {
+			code = 'R';
+		}
+
+		// Save and rebuild
+        input_pin[num_filled++] = code;
+        lcd_settings_rebuild_pin_boxes(settings_menu->pin_menu.pin_container, unlock_labels,
+        		input_pin, &num_boxes, num_filled);
+	}
+	// Back
+    else if(ui_btns->home_btn) {
+		// Back one box
+		if (num_filled > 0) {
+	        input_pin[num_filled--] = '\0'; // Ensure termination
+	        lcd_settings_rebuild_pin_boxes(settings_menu->pin_menu.pin_container, unlock_labels,
+	        		input_pin, &num_boxes, num_filled);
+        }
+        // Go home
+        else {
+			// Hide arrows
+			lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+				
+			// Hide pin prompt
+			lv_obj_add_flag(settings_menu->pin_menu.pin_container, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_add_flag(settings_menu->pin_menu.lbl_ins, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_add_flag(settings_menu->pin_menu.lbl_back, LV_OBJ_FLAG_HIDDEN);
+			
+			// Reset
+	        init = false;
+	        
+	        start_animation();
+	        
+	        // Go back
+	        ui_menu->page = HOME_PAGE;
+		}
+    }
+	// Check against actual
+	else if (ui_btns->select_btn == 1) {
+		input_pin[num_filled] = '\0'; // Ensure termination
+			
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "Got pin: %s", input_pin);
+			//ESP_LOGI(TAG, "Need pin: %s", settings_menu->pin_menu.unlock_pin);
+		#endif
+		
+		// If PIN is correct
+	    if (strcmp(input_pin, settings_menu->pin_menu.unlock_pin) == 0) {
+			#ifdef POLYCAST5_DEBUG
+		        ESP_LOGI(TAG, "PIN accepted");
+	        #endif
+	        
+	        // Hide pin prompt
+			lv_obj_add_flag(settings_menu->pin_menu.pin_container, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_add_flag(settings_menu->pin_menu.lbl_ins, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_add_flag(settings_menu->pin_menu.lbl_back, LV_OBJ_FLAG_HIDDEN);
+			
+			// Reset
+	        num_filled = num_boxes = 0;
+			memset(input_pin, 0, sizeof(input_pin));
+			lcd_settings_rebuild_pin_boxes(settings_menu->pin_menu.pin_container, unlock_labels,
+        		input_pin, &num_boxes, num_filled);
+        	
+        	// Update options text
+        	settings_menu->options[0] = SETTINGS_REMOVE_LOCK_TXT;
+			lv_list_set_button_text(settings_menu->main_list, settings_menu->btns[0], settings_menu->options[0]);
+			
+			// Won't prompt again unless power off
+			settings_menu->pin_menu.prompt_pin = false;
+	
+	        // Go to selection page
+	        unhide_selection_widgets(ui_menu);
+	        
+	        ui_menu->page = SELECTION_PAGE;
+	    }
+		else {
+	        #ifdef POLYCAST5_DEBUG
+		        ESP_LOGI(TAG, "PIN denied");
+	        #endif
+	
+	        // Outline red
+	        for (int i = 0; i < num_boxes; i++) {
+	            lv_obj_set_style_border_color(lv_obj_get_parent(unlock_labels[i]), lv_palette_main(LV_PALETTE_RED), 0);
+	        }
+    	}
+	}
+}
+
+void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu, wifi_menu_t* wifi_menu, tools_menu_t* tools_menu, settings_menu_t* settings_menu) 
 {
 	if (ui_btns->up_btn == 1) {
 		scrolling_menu = true;
@@ -1604,11 +1743,24 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		// Reset static
 		do_once = false;
 		
-		// Show right arrow
-		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-		
-		// Switch pages
-		ui_menu->page = SETTINGS_PIN_PAGE;
+		// Removing set pin
+		if (settings_menu->pin_menu.pin_set) {
+			settings_menu->options[0] = SETTINGS_SET_LOCK_TXT;
+			settings_menu->pin_menu.pin_set = false;
+			lv_list_set_button_text(settings_menu->main_list, settings_menu->btns[0], settings_menu->options[0]);
+			
+			// Update NVS
+			memset(settings_menu->pin_menu.unlock_pin, 0, sizeof(settings_menu->pin_menu.unlock_pin));
+			lcd_settings_pin_nvs_save(settings_menu);
+		}
+		// Setting pin
+		else {
+			// Show right arrow
+			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+						
+			// Switch pages
+			ui_menu->page = SETTINGS_PIN_PAGE;
+		}
 	}
 	// Change colors selected
 	else if (ui_btns->select_btn == 1 && settings_menu->index == 1) {

@@ -18,6 +18,7 @@
 // Define each sequentially (0, 1, 2, ...)
 enum {
     HOME_PAGE,
+    UNLOCK_PAGE,
     SELECTION_PAGE,
     
     LORA_PAGE,
@@ -214,16 +215,26 @@ void lcd_update_battery(ui_menu_t *ui_menu, uint8_t battery_percentage);
 /**
  * @brief Display/scroll through home page animations
  *
- * @param [in] ui_menu UI menu structure
  * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] settings_menu Settings menu structure
  */
-void lcd_home_page(ui_menu_t *ui_menu, ui_btns_t *ui_btns);
+void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
+
+/**
+ * @brief Display/scroll through home page animations
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] settings_menu Settings menu structure
+ */
+void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
 
 /**
  * @brief Executes on selection page
  *
- * @param [in] ui_menu UI menu structure
  * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
  * @param [in] ir_menu IR menu structure
  * @param [in] lora_menu LoRa menu structure
  * @param [in] espnow_menu ESP-NOW menu structure
@@ -231,7 +242,7 @@ void lcd_home_page(ui_menu_t *ui_menu, ui_btns_t *ui_btns);
  * @param [in] tools_menu Tools menu structure
   @param [in] settings_menu Settings menu structure
  */
-void lcd_selection_page(ui_menu_t *ui_menu, ui_btns_t *ui_btns, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu, wifi_menu_t* wifi_menu, tools_menu_t* tools_menu, settings_menu_t* settings_menu);
+void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu, wifi_menu_t* wifi_menu, tools_menu_t* tools_menu, settings_menu_t* settings_menu);
 
 /**
  * @brief Executes on infrared page

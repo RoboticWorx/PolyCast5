@@ -23,14 +23,21 @@
 #define SETTINGS_COLOR_PRIM_KEY "se_pr_ke"
 #define SETTINGS_COLOR_SEC_KEY "se_se_ke"
 
+#define SETTINGS_PIN_NS "se_pi_ns"
+#define SETTINGS_PIN_KEY "se_pi_ke"
+#define SETTINGS_PIN_SET_KEY "se_pse_ke"
+
 #define COLOR_OPTION_COUNT 23
 
 settings_menu_t settings_menu = {
-    .options = {"Set unlock pin", "Change colors", "Adjust haptics", "Adjust sleep timer", "Reboot", "Factory reset"},
+    .options = {SETTINGS_SET_LOCK_TXT, "Change colors", "Adjust haptics", "Adjust sleep timer", "Reboot", "Factory reset"},
     .size = 6,
     .index = 0,
     .cont = NULL,
+    .pin_menu.pin_set = false,
 };
+
+static bool primary_color_selected = true;
 
 static const lv_color_t primary_color_options[COLOR_OPTION_COUNT] = {
 	// Neutrals
@@ -97,8 +104,6 @@ static const lv_color_t secondary_color_options[COLOR_OPTION_COUNT] = {
 	LV_COLOR_MAKE(0xA0, 0x20, 0xF0), // Pure Purple
 	LV_COLOR_MAKE(0x30, 0x19, 0x34), // Dark Purple
 };
-
-static bool primary_color_selected = true;
 
 void lcd_settings_setup_page(settings_menu_t *menu)
 {
@@ -253,7 +258,8 @@ static const char *code_to_symbol(char c) {
         	return "";
     }
 }
-static void rebuild_pin_boxes(lv_obj_t *pin_container, lv_obj_t **pin_labels, char *unlock_pin, int *num_boxes, int num_filled)
+
+void lcd_settings_rebuild_pin_boxes(lv_obj_t *pin_container, lv_obj_t **pin_labels, char *unlock_pin, int *num_boxes, int num_filled)
 {
 	// Start fresh
     lv_obj_clean(pin_container);
@@ -272,6 +278,59 @@ static void rebuild_pin_boxes(lv_obj_t *pin_container, lv_obj_t **pin_labels, ch
 	}
     
 }
+
+void lcd_settings_setup_pin_page(settings_menu_t *menu)
+{
+	// Refresh prompt if pin_set
+	if (menu->pin_menu.pin_set) {
+		menu->pin_menu.prompt_pin = true;
+	}
+	else {
+		menu->pin_menu.prompt_pin = false;
+	}
+	
+	// Update text based on NVS load
+	menu->options[0] = menu->pin_menu.pin_set ? SETTINGS_REMOVE_LOCK_TXT : SETTINGS_SET_LOCK_TXT;
+	
+	static lv_style_t container_style;
+	static int zero = 0;
+	
+	// Create labels
+	menu->pin_menu.lbl_ins = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(menu->pin_menu.lbl_ins, "Enter PIN:", user_secondary_color, 
+			&lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 18);
+			
+	menu->pin_menu.lbl_back = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(menu->pin_menu.lbl_back, "Press home to go back", user_secondary_color, 
+			&lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -18);
+		
+	// Create pin container
+	menu->pin_menu.pin_container = lv_obj_create(ACTIVE_SCR);
+	lv_obj_set_size(menu->pin_menu.pin_container, LV_SIZE_CONTENT, 37);
+	lv_obj_center(menu->pin_menu.pin_container);
+	lv_obj_set_style_bg_color(menu->pin_menu.pin_container, user_primary_color, 0);
+	lv_obj_set_style_border_width(menu->pin_menu.pin_container, 0, 0);
+	lv_obj_set_flex_flow(menu->pin_menu.pin_container, LV_FLEX_FLOW_ROW);
+	lv_obj_set_style_pad_column(menu->pin_menu.pin_container, 5, 0);
+	lv_obj_set_scrollbar_mode(menu->pin_menu.pin_container, LV_SCROLLBAR_MODE_OFF);
+		
+	// Remove outside padding
+	lv_style_init(&container_style);
+	lv_style_set_pad_left(&container_style, 0);
+	lv_style_set_pad_right(&container_style, 0);
+	lv_style_set_pad_top(&container_style, 0);
+	lv_style_set_pad_bottom(&container_style, 0);
+	lv_obj_add_style(menu->pin_menu.pin_container, &container_style, 0);
+	
+	static lv_obj_t *unlock_labels[SETTINGS_MAX_PIN_LEN];
+	lcd_settings_rebuild_pin_boxes(menu->pin_menu.pin_container, unlock_labels, menu->pin_menu.unlock_pin, &zero, 0);
+	
+	// Hide all for now
+	lv_obj_add_flag(menu->pin_menu.pin_container, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(menu->pin_menu.lbl_ins, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(menu->pin_menu.lbl_back, LV_OBJ_FLAG_HIDDEN);
+}
+
 void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
 	// Statics
@@ -288,11 +347,11 @@ void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu
 	// Only execute once
 	if (!do_once) {
 		// Clear any old PIN data
-    	memset(settings_menu->unlock_pin, 0, sizeof(settings_menu->unlock_pin));
+    	memset(settings_menu->pin_menu.unlock_pin, 0, sizeof(settings_menu->pin_menu.unlock_pin));
 		
 		// Create labels
 		lbl_ins = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_ins, "Create pin with arrows:", user_secondary_color,
+		lcd_format_label(lbl_ins, "Create PIN with arrows:", user_secondary_color,
         			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 18);
         			 
         lbl_conf = lv_label_create(ACTIVE_SCR);
@@ -317,7 +376,7 @@ void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu
 		lv_style_set_pad_bottom(&container_style, 0);
 		lv_obj_add_style(pin_container, &container_style, 0);
 		
-		rebuild_pin_boxes(pin_container, pin_labels, settings_menu->unlock_pin, &num_boxes, num_filled);
+		lcd_settings_rebuild_pin_boxes(pin_container, pin_labels, settings_menu->pin_menu.unlock_pin, &num_boxes, num_filled);
 		
 		do_once = true;
 	}
@@ -341,32 +400,37 @@ void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu
 		}
 
 		// Save and rebuild
-        settings_menu->unlock_pin[num_filled++] = code;
-        rebuild_pin_boxes(pin_container, pin_labels, settings_menu->unlock_pin, &num_boxes, num_filled);
+        settings_menu->pin_menu.unlock_pin[num_filled++] = code;
+        lcd_settings_rebuild_pin_boxes(pin_container, pin_labels, settings_menu->pin_menu.unlock_pin, &num_boxes, num_filled);
 	}
 	// Save
 	else if (ui_btns->select_btn == 1) {
-		settings_menu->unlock_pin[num_filled] = '\0'; // Ensure termination
+		settings_menu->pin_menu.unlock_pin[num_filled] = '\0'; // Ensure termination
 			
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGI(TAG, "Entered pin: %s", settings_menu->unlock_pin);
+			ESP_LOGI(TAG, "Entered pin: %s", settings_menu->pin_menu.unlock_pin);
 		#endif
-			
-		// Signal LCD to change text "Set unlock pin" to "Remove unlock pin"
-		//dsdsf
-			
+		
+		// Update menu text and flag
+		settings_menu->options[0] = SETTINGS_REMOVE_LOCK_TXT;
+		lv_list_set_button_text(settings_menu->main_list, settings_menu->btns[0], settings_menu->options[0]);
+		settings_menu->pin_menu.pin_set = true;
+		
+		// Save to NVS
+		lcd_settings_pin_nvs_save(settings_menu);
+		
 		// Reset objects
 		lv_obj_delete(pin_container); // Clears children
 		lv_obj_delete(lbl_ins);
 		lv_obj_delete(lbl_conf);
 		lv_style_reset(&container_style);
-			
+		
 		// Reset statics
 		pin_container = NULL;
 		num_filled = num_boxes = 0;
 		lbl_ins = lbl_conf = NULL;
 		do_once = false;
-			
+		
 		// Hide right arrow
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 			
@@ -381,8 +445,8 @@ void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu
 		// Back a box
 	    if (num_filled > 0) {
 			// Remove one and rebuild
-	        settings_menu->unlock_pin[--num_filled] = '\0';
-            rebuild_pin_boxes(pin_container, pin_labels, settings_menu->unlock_pin, &num_boxes, num_filled);
+	        settings_menu->pin_menu.unlock_pin[num_filled--] = '\0';
+            lcd_settings_rebuild_pin_boxes(pin_container, pin_labels, settings_menu->pin_menu.unlock_pin, &num_boxes, num_filled);
 	    }
 	    // First box: exit
 	    else {
@@ -871,4 +935,95 @@ void lcd_settings_color_nvs_load(void)
     }
 }
 
+esp_err_t lcd_settings_pin_nvs_save(const settings_menu_t *menu)
+{
+    nvs_handle_t h;
+    
+    // Open NVS
+    esp_err_t err = nvs_open(SETTINGS_PIN_NS, NVS_READWRITE, &h);
+    
+    // Check
+    if (err != ESP_OK) {
+		return err;
+	}
 
+    // Save pin_set as a u8
+    err = nvs_set_u8(h, SETTINGS_PIN_SET_KEY, menu->pin_menu.pin_set ? 1 : 0);
+    
+    if (err != ESP_OK) {
+		goto out;
+	}
+
+    // Save unlock_pin as a string
+    err = nvs_set_str(h, SETTINGS_PIN_KEY, menu->pin_menu.unlock_pin);
+    
+    if (err != ESP_OK) {
+		goto out;
+	}
+
+    // Persist to NVS
+    err = nvs_commit(h);
+
+	out:
+    nvs_close(h);
+    return err;
+}
+
+esp_err_t lcd_settings_pin_nvs_load(settings_menu_t *menu)
+{
+    nvs_handle_t h;
+    
+    // Open NVS
+    esp_err_t err = nvs_open(SETTINGS_PIN_NS, NVS_READONLY, &h);
+    
+    // If nothing saved yet
+    if (err == ESP_ERR_NVS_NOT_FOUND || err == ESP_ERR_NVS_NOT_INITIALIZED) {
+        menu->pin_menu.pin_set = false;
+        menu->pin_menu.unlock_pin[0] = '\0';
+        return ESP_OK;
+    }
+    
+    if (err != ESP_OK) {
+		return err;
+	}
+
+    // Read pin_set
+    uint8_t u8;
+    
+    err = nvs_get_u8(h, SETTINGS_PIN_SET_KEY, &u8);
+    if (err == ESP_OK) {
+        menu->pin_menu.pin_set = (u8 != 0);
+    }
+    else if (err == ESP_ERR_NVS_NOT_FOUND) {
+        menu->pin_menu.pin_set = false;
+        err = ESP_OK;
+    }
+    else {
+        goto out;
+    }
+
+    // Read unlock_pin
+    size_t required_size = 0;
+    
+    // Get size
+    err = nvs_get_str(h, SETTINGS_PIN_KEY, NULL, &required_size);
+    
+    // If DNE
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        menu->pin_menu.unlock_pin[0] = '\0';
+        err = ESP_OK;
+    }
+    else if (err == ESP_OK) {
+		// Stored string too long for our buffer
+        if (required_size > sizeof(menu->pin_menu.unlock_pin)) {
+            err = ESP_ERR_NVS_INVALID_LENGTH;
+            goto out;
+        }
+        // Actually read it
+        err = nvs_get_str(h, SETTINGS_PIN_KEY, menu->pin_menu.unlock_pin, &required_size);
+    }
+
+	out:
+    nvs_close(h);
+    return err;
+}
