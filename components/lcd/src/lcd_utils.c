@@ -1,3 +1,4 @@
+#include "core/lv_obj.h"
 #include "lcd_settings_funcs.h"
 #include "polycast5_macros.h"
 
@@ -1053,6 +1054,9 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 			
 			// Won't prompt again unless power off
 			settings_menu->pin_menu.prompt_pin = false;
+			
+			// Hide right
+			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 	
 	        // Go to selection page
 	        unhide_selection_widgets(ui_menu);

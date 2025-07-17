@@ -14,6 +14,7 @@
 #include "nvs_flash.h"
 #include "widgets/label/lv_label.h"
 
+#include "gpio_task.h"
 #include "lcd_utils.h"
 #include "lcd_settings_funcs.h"
 
@@ -331,6 +332,69 @@ void lcd_settings_setup_pin_page(settings_menu_t *menu)
 	lv_obj_add_flag(menu->pin_menu.lbl_back, LV_OBJ_FLAG_HIDDEN);
 }
 
+static void confirm_entered_pin(ui_menu_t *ui_menu, settings_menu_t *settings_menu)
+{
+	lv_obj_t *lbl_ins = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_ins, "Your PIN is:", user_secondary_color,
+    		&lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 18);
+    		
+    lv_obj_t *lbl_ok = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_ok, "OK", user_secondary_color,
+    		&lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
+    		
+    lv_obj_t *lbl_write = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_write, "Don't forget it!", user_secondary_color,
+    		&lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -18);
+    
+    // Create symbols from unlock_pin
+	char symbol_buf[64];
+	symbol_buf[0] = '\0'; // Empty start
+	int offset = 0;
+	
+	// Append each arrow symbol
+	for (int i = 0; i < strlen(settings_menu->pin_menu.unlock_pin); i++) {
+	    const char *sym = code_to_symbol(settings_menu->pin_menu.unlock_pin[i]);
+	    
+	    int written = snprintf(symbol_buf + offset, sizeof(symbol_buf) - offset, "%s  ", sym);
+	    
+	    if (written < 0) {
+			break;
+		}
+		
+	    offset += written;
+	}
+	
+	// Display it
+	lv_obj_t *lbl_pin = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_pin, symbol_buf, user_secondary_color,
+			&lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
+   
+	// Wait for user to confirm
+    while (1) {
+		lv_timer_handler();
+		
+		// OK
+        if (xSemaphoreTake(xRightButtonSemaphore, 0) == pdTRUE) {
+            // Show arrows
+			lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+            
+            lv_obj_del(lbl_ins);
+            lv_obj_del(lbl_pin);
+            lv_obj_del(lbl_ok);
+            lv_obj_del(lbl_write);
+			
+			lcd_clear_pending_inputs = true; // Clear any false inputs
+            
+            // Exit
+            return;
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
 void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
 	// Statics
@@ -431,8 +495,20 @@ void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu
 		lbl_ins = lbl_conf = NULL;
 		do_once = false;
 		
+		// Hide arrows for confirmation
+		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+		
+		confirm_entered_pin(ui_menu, settings_menu);
+		
 		// Hide right arrow
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show others
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 			
 		// Show settings list
 		lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
