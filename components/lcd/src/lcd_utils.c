@@ -44,22 +44,25 @@
 
 
 /* Animation macros */
-#define NUM_ANIMS 3
+#define NUM_ANIMS 4
 
 #define CITY_FRAME_PERIOD 120 // 160
 #define BLACK_HOLE_FRAME_PERIOD 120
 #define MATRIX_RAIN_FRAME_PERIOD 100
+#define PYRAMID_FRAME_PERIOD 120
 
-#define CITY_FRAME_CNT 10 // >< Should be 60 when memory allows
-#define BLACK_HOLE_FRAME_CNT 18
-#define MATRIX_RAIN_FRAME_CNT 42
+#define CITY_FRAME_CNT 5 // 60 actual
+#define BLACK_HOLE_FRAME_CNT 5 // 18 actual
+#define MATRIX_RAIN_FRAME_CNT 5 // 42 actual
+#define PYRAMID_FRAME_CNT 56 // 56 actual
 
 // Number each sequentially
 enum
 {
 	CITY,
 	BLACK_HOLE,
-	MATRIX_RAIN
+	MATRIX_RAIN,
+	PYRAMID
 };
 
 
@@ -101,8 +104,8 @@ typedef struct {
 // Define animation frame paths
 const char *city_paths[CITY_FRAME_CNT] = { // 64.84KB each
 	ANIM_CITY_1, ANIM_CITY_2, ANIM_CITY_3,	ANIM_CITY_4, ANIM_CITY_5,
-	ANIM_CITY_6, ANIM_CITY_7, ANIM_CITY_8,	ANIM_CITY_9, ANIM_CITY_10,
-	/*ANIM_CITY_11, ANIM_CITY_12, ANIM_CITY_13, ANIM_CITY_14, ANIM_CITY_15,
+	/*ANIM_CITY_6, ANIM_CITY_7, ANIM_CITY_8,	ANIM_CITY_9, ANIM_CITY_10,
+	ANIM_CITY_11, ANIM_CITY_12, ANIM_CITY_13, ANIM_CITY_14, ANIM_CITY_15,
 	ANIM_CITY_16, ANIM_CITY_17, ANIM_CITY_18, ANIM_CITY_19, ANIM_CITY_20,
 	ANIM_CITY_21, ANIM_CITY_22, ANIM_CITY_23, ANIM_CITY_24, ANIM_CITY_25,
 	ANIM_CITY_26, ANIM_CITY_27, ANIM_CITY_28, ANIM_CITY_29, ANIM_CITY_30,
@@ -115,24 +118,37 @@ const char *city_paths[CITY_FRAME_CNT] = { // 64.84KB each
 };
 
 const char *black_hole_paths[BLACK_HOLE_FRAME_CNT] = {
-	ANIM_BLACK_HOLE_1, ANIM_BLACK_HOLE_2, ANIM_BLACK_HOLE_3,
-	ANIM_BLACK_HOLE_4, ANIM_BLACK_HOLE_5, ANIM_BLACK_HOLE_6,
-	ANIM_BLACK_HOLE_7, ANIM_BLACK_HOLE_8, ANIM_BLACK_HOLE_9,
-	ANIM_BLACK_HOLE_10, ANIM_BLACK_HOLE_11, ANIM_BLACK_HOLE_12,
-	ANIM_BLACK_HOLE_13, ANIM_BLACK_HOLE_14, ANIM_BLACK_HOLE_15,
-	ANIM_BLACK_HOLE_16, ANIM_BLACK_HOLE_17, ANIM_BLACK_HOLE_18
+	ANIM_BLACK_HOLE_1, ANIM_BLACK_HOLE_2, ANIM_BLACK_HOLE_3, ANIM_BLACK_HOLE_4, ANIM_BLACK_HOLE_5,
+	/*ANIM_BLACK_HOLE_6, ANIM_BLACK_HOLE_7, ANIM_BLACK_HOLE_8, ANIM_BLACK_HOLE_9, ANIM_BLACK_HOLE_10,
+	ANIM_BLACK_HOLE_11, ANIM_BLACK_HOLE_12, ANIM_BLACK_HOLE_13, ANIM_BLACK_HOLE_14, ANIM_BLACK_HOLE_15,
+	ANIM_BLACK_HOLE_16, ANIM_BLACK_HOLE_17, ANIM_BLACK_HOLE_18*/
 };
 	
 const char *matrix_rain_paths[MATRIX_RAIN_FRAME_CNT] = {
 	ANIM_MATRIX_RAIN_1, ANIM_MATRIX_RAIN_2, ANIM_MATRIX_RAIN_3, ANIM_MATRIX_RAIN_4,	ANIM_MATRIX_RAIN_5,
-	ANIM_MATRIX_RAIN_6, ANIM_MATRIX_RAIN_7, ANIM_MATRIX_RAIN_8, ANIM_MATRIX_RAIN_9,	ANIM_MATRIX_RAIN_10,
+	/*ANIM_MATRIX_RAIN_6, ANIM_MATRIX_RAIN_7, ANIM_MATRIX_RAIN_8, ANIM_MATRIX_RAIN_9,	ANIM_MATRIX_RAIN_10,
 	ANIM_MATRIX_RAIN_11, ANIM_MATRIX_RAIN_12, ANIM_MATRIX_RAIN_13, ANIM_MATRIX_RAIN_14, ANIM_MATRIX_RAIN_15,
 	ANIM_MATRIX_RAIN_16, ANIM_MATRIX_RAIN_17, ANIM_MATRIX_RAIN_18, ANIM_MATRIX_RAIN_19, ANIM_MATRIX_RAIN_20,
 	ANIM_MATRIX_RAIN_21, ANIM_MATRIX_RAIN_22, ANIM_MATRIX_RAIN_23, ANIM_MATRIX_RAIN_24, ANIM_MATRIX_RAIN_25,
 	ANIM_MATRIX_RAIN_26, ANIM_MATRIX_RAIN_27, ANIM_MATRIX_RAIN_28, ANIM_MATRIX_RAIN_29, ANIM_MATRIX_RAIN_30,
 	ANIM_MATRIX_RAIN_31, ANIM_MATRIX_RAIN_32, ANIM_MATRIX_RAIN_33, ANIM_MATRIX_RAIN_34, ANIM_MATRIX_RAIN_35,
 	ANIM_MATRIX_RAIN_36, ANIM_MATRIX_RAIN_37, ANIM_MATRIX_RAIN_38, ANIM_MATRIX_RAIN_39, ANIM_MATRIX_RAIN_40,
-	ANIM_MATRIX_RAIN_41, ANIM_MATRIX_RAIN_42
+	ANIM_MATRIX_RAIN_41, ANIM_MATRIX_RAIN_42*/
+};
+
+const char *pyramid_paths[PYRAMID_FRAME_CNT] = {
+	ANIM_PYRAMID_1, ANIM_PYRAMID_2, ANIM_PYRAMID_3, ANIM_PYRAMID_4, ANIM_PYRAMID_5,
+    ANIM_PYRAMID_6, ANIM_PYRAMID_7,  ANIM_PYRAMID_8, ANIM_PYRAMID_9, ANIM_PYRAMID_10,
+	ANIM_PYRAMID_11, ANIM_PYRAMID_12, ANIM_PYRAMID_13, ANIM_PYRAMID_14, ANIM_PYRAMID_15,
+    ANIM_PYRAMID_16, ANIM_PYRAMID_17, ANIM_PYRAMID_18, ANIM_PYRAMID_19, ANIM_PYRAMID_20,
+    ANIM_PYRAMID_21, ANIM_PYRAMID_22, ANIM_PYRAMID_23, ANIM_PYRAMID_24, ANIM_PYRAMID_25,
+    ANIM_PYRAMID_26, ANIM_PYRAMID_27, ANIM_PYRAMID_28, ANIM_PYRAMID_29, ANIM_PYRAMID_30,
+    ANIM_PYRAMID_31, ANIM_PYRAMID_32, ANIM_PYRAMID_33, ANIM_PYRAMID_34, ANIM_PYRAMID_35,
+    ANIM_PYRAMID_36, ANIM_PYRAMID_37, ANIM_PYRAMID_38, ANIM_PYRAMID_39, ANIM_PYRAMID_40,
+    ANIM_PYRAMID_41, ANIM_PYRAMID_42, ANIM_PYRAMID_43, ANIM_PYRAMID_44, ANIM_PYRAMID_45,
+    ANIM_PYRAMID_46, ANIM_PYRAMID_47, ANIM_PYRAMID_48, ANIM_PYRAMID_49, ANIM_PYRAMID_50,
+    ANIM_PYRAMID_51, ANIM_PYRAMID_52, ANIM_PYRAMID_53, ANIM_PYRAMID_54, ANIM_PYRAMID_55,
+    ANIM_PYRAMID_56
 };
 
 // Animation structs
@@ -159,6 +175,16 @@ static anim_t black_hole_anim = {
 static anim_t matrix_rain_anim = {
     .frames = matrix_rain_paths,
     .frame_cnt = MATRIX_RAIN_FRAME_CNT,
+    .pingpong = false,
+    .forward = true,
+    .cur = 0,
+    .img = NULL,
+    .timer = NULL
+};
+
+static anim_t pyramid_anim = {
+    .frames = pyramid_paths,
+    .frame_cnt = PYRAMID_FRAME_CNT,
     .pingpong = false,
     .forward = true,
     .cur = 0,
@@ -335,7 +361,7 @@ void lcd_lvgl_init(void)
     esp_vfs_spiffs_conf_t cfg = {
         .base_path = "/assets",
         .partition_label = "assets",
-        .max_files = (CITY_FRAME_CNT + BLACK_HOLE_FRAME_CNT + MATRIX_RAIN_FRAME_CNT) * 6, // Plenty of PSRAM available for now
+        .max_files = (CITY_FRAME_CNT + BLACK_HOLE_FRAME_CNT + MATRIX_RAIN_FRAME_CNT + PYRAMID_FRAME_CNT) * 6, // Plenty of PSRAM available for now
         .format_if_mount_failed = false
     };
     esp_err_t ret = esp_vfs_spiffs_register(&cfg);
@@ -354,7 +380,7 @@ void lcd_lvgl_init(void)
     lv_fs_posix_init();
     
      // Reserve slots in the decoded-image cache
-    lv_image_cache_init((CITY_FRAME_CNT + BLACK_HOLE_FRAME_CNT + MATRIX_RAIN_FRAME_CNT) * 3);
+    lv_image_cache_init((CITY_FRAME_CNT + BLACK_HOLE_FRAME_CNT + MATRIX_RAIN_FRAME_CNT + PYRAMID_FRAME_CNT) * 3);
 
     // Draw‐buffer: HOR_RES x DRAW_LINES lines
     // Allocate space for 20 lines of 240 px each (≈9.6 kB), DMA-capable in DRAM
@@ -383,6 +409,7 @@ void lcd_lvgl_init(void)
 	warm_anim(city_paths, CITY_FRAME_CNT);
 	warm_anim(black_hole_paths, BLACK_HOLE_FRAME_CNT);
 	warm_anim(matrix_rain_paths, MATRIX_RAIN_FRAME_CNT);
+	warm_anim(pyramid_paths, PYRAMID_FRAME_CNT);
 	
 	// Pre-load images too
 	warm_img(IMG_DICE_1);
@@ -687,7 +714,7 @@ void lcd_init_images()
     city_anim.timer = lv_timer_create(anim_timer_cb, CITY_FRAME_PERIOD, &city_anim);
     
     // Check if set
-    if(anim_active != CITY) {
+    if (anim_active != CITY) {
 		lv_obj_add_flag(city_anim.img, LV_OBJ_FLAG_HIDDEN);
 		lv_timer_pause(city_anim.timer);
 	}
@@ -702,7 +729,7 @@ void lcd_init_images()
     black_hole_anim.timer = lv_timer_create(anim_timer_cb, BLACK_HOLE_FRAME_PERIOD, &black_hole_anim);
     
     // Check if set
-    if(anim_active != BLACK_HOLE) {
+    if (anim_active != BLACK_HOLE) {
 		lv_obj_add_flag(black_hole_anim.img, LV_OBJ_FLAG_HIDDEN);
 		lv_timer_pause(black_hole_anim.timer);
 	}
@@ -717,9 +744,24 @@ void lcd_init_images()
     matrix_rain_anim.timer = lv_timer_create(anim_timer_cb, MATRIX_RAIN_FRAME_PERIOD, &matrix_rain_anim);
     
     // Check if set
-    if(anim_active != MATRIX_RAIN) {
+    if (anim_active != MATRIX_RAIN) {
 		lv_obj_add_flag(matrix_rain_anim.img, LV_OBJ_FLAG_HIDDEN);
 		lv_timer_pause(matrix_rain_anim.timer);
+	}
+	
+	/* Pyramid */
+    // Create image
+    pyramid_anim.img = lv_img_create(ACTIVE_SCR);
+    lv_img_set_src(pyramid_anim.img, pyramid_anim.frames[0]);
+    lv_obj_center(pyramid_anim.img);
+    
+    // Create timer
+    pyramid_anim.timer = lv_timer_create(anim_timer_cb, PYRAMID_FRAME_PERIOD, &pyramid_anim);
+    
+    // Check if set
+    if (anim_active != PYRAMID) {
+		lv_obj_add_flag(pyramid_anim.img, LV_OBJ_FLAG_HIDDEN);
+		lv_timer_pause(pyramid_anim.timer);
 	}
 }
 
@@ -883,6 +925,10 @@ static void start_animation(void)
 		lv_obj_remove_flag(matrix_rain_anim.img,  LV_OBJ_FLAG_HIDDEN);
         lv_timer_resume(matrix_rain_anim.timer);
 	}
+	else if (anim_active == PYRAMID){
+		lv_obj_remove_flag(pyramid_anim.img,  LV_OBJ_FLAG_HIDDEN);
+        lv_timer_resume(pyramid_anim.timer);
+	}
 }
 static void stop_animations(void)
 {
@@ -890,10 +936,12 @@ static void stop_animations(void)
     lv_timer_pause(city_anim.timer);
     lv_timer_pause(black_hole_anim.timer);
     lv_timer_pause(matrix_rain_anim.timer);
+    lv_timer_pause(pyramid_anim.timer);
 
     lv_obj_add_flag(city_anim.img, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(black_hole_anim.img, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(matrix_rain_anim.img, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(pyramid_anim.img, LV_OBJ_FLAG_HIDDEN);
 }
 static void transition_animation(bool dir)
 {	
