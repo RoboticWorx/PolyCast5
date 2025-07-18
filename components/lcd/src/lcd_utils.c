@@ -872,6 +872,11 @@ static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t* ir_menu, lo
 		// Show right arrow
 		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
+		// Build ir_list
+		xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
+		lcd_ir_build_current_menu(ir_menu, current_remote);
+		xSemaphoreGive(xInfraredDataMutex); // Release IR
+		
 		// Show IR list
 		lv_obj_remove_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);	
 		ui_menu->page = INFRARED_PAGE;
@@ -1266,26 +1271,36 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
 	}
 	// Back selected
 	else if (ui_btns->down_btn == 1) {
-		// Hide IR menu
-		lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 		
-		initalized = false; // Reset bool
+		// If at first remote, go back
+		if (current_remote == 0) {
+			// Hide IR menu
+			lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+					
+			// Hide right arrow
+			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+			
+			// Show selection labels
+			unhide_selection_widgets(ui_menu);
+			
+			ui_menu->page = SELECTION_PAGE;
+		}
+		// Else go back a remote
+		else {
+			current_remote--;
+			
+			// Rebuild menu with new remote
+			lcd_ir_build_current_menu(ir_menu, current_remote);
+		}
 		
-		// Hide right arrow
-		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-		
-		// Show selection labels
-		unhide_selection_widgets(ui_menu);
-		
-		ui_menu->page = SELECTION_PAGE;
+		xSemaphoreGive(xInfraredDataMutex); // Release IR
 	}
 	// Home or power off selected
 	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Hide IR menu
 		lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		initalized = false; // Reset bool
-		
+				
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 	// Switch to next remote
@@ -1299,13 +1314,13 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
 		xSemaphoreGive(xInfraredDataMutex); // Release IR
 		lcd_ir_update_menu(ir_menu);
 	}
-	// Down button pressed (scroll down)
+	// Scroll down
 	else if (ui_btns->right_btn == 1) {
 		// Update selection
 		ir_menu->index++;
 		lcd_ir_update_menu(ir_menu);
 	}
-	// Up button pressed (scroll up)
+	// Scroll up
 	else if (ui_btns->left_btn == 1) {
 		// Update selection
 		ir_menu->index--;

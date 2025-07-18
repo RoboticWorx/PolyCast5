@@ -38,13 +38,15 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 {
 	#define REMOTE_TXT "Remote option:"
 	#define SIG_TXT "Signal selected:"
-	#define SELECT_TXT "Press select to delete."
-	#define EDIT_TXT "Press edit to rename."
-	#define CREATE_TXT "Press select to create."
-	#define DELETE_REMOTE_TXT "Press select to delete."
 	
-	#define ADD_NEW_LABEL "Add new"
-	#define DELETE_LABEL "Delete"
+	#define SELECT_TXT "Select to delete signal."
+	#define EDIT_TXT "Press edit to rename."
+	
+	#define CREATE_REMOTE_TXT "Select to add remote."
+	#define DELETE_REMOTE_TXT "Select to delete remote."
+	
+	#define ADD_NEW_LABEL "Add REM"
+	#define DELETE_LABEL "Delete REM"
 	
 	// Declare statics
 	static lv_obj_t *lbl_title = NULL;
@@ -209,7 +211,7 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 				lv_label_set_text(lbl_select, EDIT_TXT);
 			}
 			else if (edit_idx == 1) {
-				lv_label_set_text(lbl_select, CREATE_TXT);
+				lv_label_set_text(lbl_select, CREATE_REMOTE_TXT);
 			}
 			else {
 				lv_label_set_text(lbl_select, DELETE_REMOTE_TXT);
@@ -260,7 +262,7 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 				lv_label_set_text(lbl_select, EDIT_TXT);
 			}
 			else if (edit_idx == 1) {
-				lv_label_set_text(lbl_select, CREATE_TXT);
+				lv_label_set_text(lbl_select, CREATE_REMOTE_TXT);
 			}
 			else {
 				lv_label_set_text(lbl_select, DELETE_REMOTE_TXT);
@@ -368,7 +370,7 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 		}
 		// If adding new remote
 		else if (new_remote) {
-			lv_label_set_text(lbl_dirs, "Enter new remote name\n	with arrow buttons:");
+			lv_label_set_text(lbl_dirs, "Enter new remote name\n	  with arrow buttons:");
 		}
 		
 		lbl_chars = lv_label_create(ACTIVE_SCR);
