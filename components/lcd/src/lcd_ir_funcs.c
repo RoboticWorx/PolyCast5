@@ -13,6 +13,7 @@
 
 #include "lcd_ir_funcs.h"
 #include "lcd_utils.h"
+#include "infrared_funcs.h"
 #include "infrared_task.h"
 #include "gpio_task.h"
 
@@ -62,9 +63,11 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 		lcd_format_label(lbl_title, REMOTE_TXT, user_secondary_color,
 				 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
 
+		xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 		lbl_name = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_name, remotes[current_remote].name, user_secondary_color, 
 				 &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, -1);
+		xSemaphoreGive(xInfraredDataMutex); // Release IR
 
 		lbl_back = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_back, "BACK", user_secondary_color, 
@@ -111,8 +114,10 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 		}
 		// Delete remote
 		else if (edit_idx == 2) {
+			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 			infrared_nvs_delete_remote(current_remote);
-
+			xSemaphoreGive(xInfraredDataMutex); // Release IR
+			
 			// Back to main page
 			ui_menu->page = INFRARED_PAGE;
 
@@ -178,7 +183,9 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 		
 		// Remote name
 		if (edit_idx == 0) {
+			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 			lv_label_set_text(lbl_name, remotes[current_remote].name);
+			xSemaphoreGive(xInfraredDataMutex); // Release IR
 		}
 		// New remote
 		else if (edit_idx == 1) {
@@ -190,7 +197,9 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 		}
 		// Editing signal
 		else {
+			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 			lv_label_set_text(lbl_name, remotes[current_remote].signal_names[edit_idx - 3]); // Default option offset
+			xSemaphoreGive(xInfraredDataMutex); // Release IR
 		}
 		
 		// Editing remote
@@ -225,7 +234,9 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 		
 		// Remote name
 		if (edit_idx == 0) {
+			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 			lv_label_set_text(lbl_name, remotes[current_remote].name);
+			xSemaphoreGive(xInfraredDataMutex); // Release IR
 		}
 		// New remote
 		else if (edit_idx == 1) {
@@ -237,7 +248,9 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 		}
 		// Editing signal
 		else {
+			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 			lv_label_set_text(lbl_name, remotes[current_remote].signal_names[edit_idx - 3]); // Default option offset
+			xSemaphoreGive(xInfraredDataMutex); // Release IR
 		}
 		
 		// Editing remote
@@ -303,13 +316,17 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 			// Renaming remote
 			if (ir_index_overwrite == 0) {
 				// Copy the old remote name into buffer
+				xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 				strncpy(name_buf, remotes[current_remote].name, MAX_CUSTOM_NAME_LEN);
+				xSemaphoreGive(xInfraredDataMutex); // Release IR
 			}
 			// Renaming signal
 			else {
 				// Copy the old signal name into buffer
 				size_t sig_idx = ir_index_overwrite - 3; // Offset by default options
+				xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 				strncpy(name_buf, remotes[current_remote].signal_names[sig_idx], MAX_CUSTOM_NAME_LEN);
+				xSemaphoreGive(xInfraredDataMutex); // Release IR
 			}
 
 			// Place cursor at the end
@@ -515,16 +532,20 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 		if (ir_menu_overwrite) {
 			// Rename remote
 			if (ir_index_overwrite == 0) {
+				xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 				free(remotes[current_remote].name);
 				remotes[current_remote].name = strdup(saved_name);
 				infrared_nvs_save_remote_name(current_remote);
+				xSemaphoreGive(xInfraredDataMutex); // Release IR
 			}
 			// Rename signal
 			else {
 				size_t sig_idx = ir_index_overwrite - 3; // Offset by default options
+				xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 				free(remotes[current_remote].signal_names[sig_idx]);
 				remotes[current_remote].signal_names[sig_idx] = strdup(saved_name);
 				infrared_nvs_save_signal_to_remote(current_remote, sig_idx, remotes[current_remote].signals[sig_idx], saved_name);
+				xSemaphoreGive(xInfraredDataMutex); // Release IR
 			}
 			
 			// Update the button’s label in-place
@@ -545,6 +566,7 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 				}
 				
 				// Add the remote
+				xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 				size_t new_idx = num_remotes;
 				remotes[new_idx].name = strdup(saved_name);
 				remotes[new_idx].num_signals = 0;
@@ -557,15 +579,19 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 				
 				// Save new remote to NVS
 				infrared_nvs_save_all_remotes();
+				xSemaphoreGive(xInfraredDataMutex); // Release IR
+
 				new_remote = false;
 			}
 			// Adding new signal name (signal data already saved when received)
 			else {
+				xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 				size_t ns = remotes[current_remote].num_signals - 1; // num_signals
 				
 				// Save to remote
 				remotes[current_remote].signal_names[ns] = strdup(saved_name);
 				infrared_nvs_save_signal_to_remote(current_remote, ns, remotes[current_remote].signals[ns], saved_name);
+				xSemaphoreGive(xInfraredDataMutex); // Release IR
 			}
 			
 			// Create new button for new option
@@ -707,6 +733,8 @@ void lcd_ir_setup_page(ir_menu_t *menu)
 
 void lcd_ir_build_current_menu(ir_menu_t *menu, size_t c)
 {
+	// *Already only called within xInfraredDataMutex
+	
 	// Clear existing buttons
 	lv_obj_clean(menu->main_list);
 

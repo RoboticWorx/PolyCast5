@@ -21,6 +21,8 @@ SemaphoreHandle_t xInfraredStartRxSemaphore;
 SemaphoreHandle_t xInfraredDisableSemaphore;
 SemaphoreHandle_t xInfraredSignalSavedSemaphore;
 
+SemaphoreHandle_t xInfraredDataMutex;
+
 QueueHandle_t xInfraredSignalToTxQueue;
 
 rmt_symbol_word_t ir_signal[MAX_PULSES]; // The active signal itself
@@ -37,11 +39,20 @@ int menu_idx; // Index received from menu
 static void infrared_task(void *pvParameters) {
 	// Create semaphores
 	xInfraredDisableSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xInfraredDisableSemaphore);
 	xInfraredStartRxSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xInfraredStartRxSemaphore);
 	xInfraredSignalSavedSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xInfraredSignalSavedSemaphore);
 	xInfraredRxEventSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xInfraredRxEventSemaphore);
+	
+	// Other
+	xInfraredDataMutex = xSemaphoreCreateMutex();
+	configASSERT(xInfraredDataMutex);
 	
 	xInfraredSignalToTxQueue = xQueueCreate(1, sizeof(int));
+	configASSERT(xInfraredSignalToTxQueue);
 		
 	#ifdef POLYCAST5_DEBUG
 		ESP_LOGI(TAG, "Initializing IR system...");
@@ -80,10 +91,14 @@ static void infrared_task(void *pvParameters) {
 				continue;
 			}
 			
+			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
+			
 			// Check if space available
 			if (!infrared_ensure_capacity()) {
 				ESP_LOGW(TAG, "Max signals reached, dropping new signal");
 				infrared_restart_rx();
+				
+				xSemaphoreGive(xInfraredDataMutex); // Release IR
 				continue;
 			}
 			
@@ -133,11 +148,15 @@ static void infrared_task(void *pvParameters) {
 				ESP_LOGI(TAG, "Saved signal index %zu for remote %zu (%zu pulses)", ns, current_remote, sig->length);
 			#endif
 			
+			xSemaphoreGive(xInfraredDataMutex); // Release IR
+			
 			xSemaphoreGive(xInfraredSignalSavedSemaphore); // Notify LCD we got and saved a valid signal
 		}
 		
 		// Transmit a specific signal (index menu_idx)
 		if (xQueueReceive(xInfraredSignalToTxQueue, &menu_idx, 0) == pdTRUE) {
+			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
+			
 			// Negative means delete index menu_idx
 			if (menu_idx < 0) {
 				menu_idx = -menu_idx; // Make positive
@@ -159,6 +178,8 @@ static void infrared_task(void *pvParameters) {
 				// Send
 				infrared_transmit_ir(sig->pulses, sig->length);
 			}
+			
+			xSemaphoreGive(xInfraredDataMutex); // Release IR
 		}
 		
 		vTaskDelay(pdMS_TO_TICKS(10));

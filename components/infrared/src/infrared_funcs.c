@@ -12,8 +12,11 @@
 #define SIGNAL_MIN_NS 1000
 #define SIGNAL_MAX_NS 15000000 // 15ms
 
-
 // Globals
+extern ir_remote_t remotes[MAX_REMOTES];
+extern size_t num_remotes;
+extern size_t current_remote;
+
 extern rmt_symbol_word_t ir_signal[MAX_PULSES]; // The signal
 
 extern volatile bool restart_rx_pending;

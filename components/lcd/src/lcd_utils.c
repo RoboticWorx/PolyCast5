@@ -28,6 +28,7 @@
 #include "lcd_utils.h"
 #include "wifi_funcs.h"
 #include "wifi_task.h"
+#include "infrared_funcs.h"
 #include "infrared_task.h"
 #include "gpio_funcs.h"
 #include "gpio_task.h"
@@ -1236,7 +1237,9 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
 	
 	// Do once
 	if (!initalized) {
+		xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 		lcd_ir_build_current_menu(ir_menu, current_remote);
+		xSemaphoreGive(xInfraredDataMutex); // Release IR
 		lv_obj_remove_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);	
 		
 		initalized = true;
@@ -1288,10 +1291,12 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
 	// Switch to next remote
 	else if (ui_btns->up_btn == 1) {
 		// Increment current_remote with wrap
+		xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 		current_remote = (current_remote + 1) % num_remotes;
 		
 		// Rebuild menu with new remote
 		lcd_ir_build_current_menu(ir_menu, current_remote);
+		xSemaphoreGive(xInfraredDataMutex); // Release IR
 		lcd_ir_update_menu(ir_menu);
 	}
 	// Down button pressed (scroll down)
