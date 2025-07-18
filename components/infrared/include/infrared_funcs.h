@@ -7,8 +7,6 @@
 #include "freertos/semphr.h"
 #include <stddef.h>
 
-#include "infrared_task.h"
-
 // Configuration macros
 #define RMT_RX_GPIO 24
 #define RMT_TX_GPIO 12
@@ -24,12 +22,33 @@
 #define RANDOM_TX_DELAY_MS 3000
 
 #define MAX_STORED_SIGNALS 100
+#define MAX_REMOTES 10
+
+// NVS keys
+#define IR_NS "ir_data"
+#define IR_NUM_REMOTES_KEY "num_rem"
+#define IR_REMOTE_NAME_FMT "r%d_name"
+#define IR_REMOTE_NSIG_FMT "r%d_nsig"
+#define IR_SIGNAL_NAME_FMT "r%d_s%d_name"
+#define IR_SIGNAL_BLOB_FMT "r%d_s%d_sig"
 
 // Stored signal structure
 typedef struct {
-    size_t length;
-    rmt_symbol_word_t pulses[];
+	size_t length;
+	rmt_symbol_word_t pulses[];
 } ir_signal_t;
+
+// Remote structure
+typedef struct ir_remote {
+	char *name;
+	char **signal_names;
+	ir_signal_t **signals;
+	size_t num_signals;
+} ir_remote_t;
+
+extern ir_remote_t remotes[MAX_REMOTES];
+extern size_t num_remotes;
+extern size_t current_remote;
 
 /** 
  * @brief Initialise RMT RX
@@ -60,21 +79,62 @@ void infrared_disable_rx(void);
 void infrared_transmit_ir(rmt_symbol_word_t *signal, size_t length);
 
 /** 
- * @brief Loads signals from NVS flash
+ * @brief Ensure there is enough space to add a new signals
  */
-void infrared_load_stored_signals(void);
-
-/** 
- * @brief Saves signal to NVS flash
- */
-void infrared_save_stored_signal(void);
-
-/** 
- * @brief Deletes signal from NVS flash
- */
-void infrared_delete_stored_signal(size_t index);
-
 bool infrared_ensure_capacity(void);
+
+/** 
+ * @brief Loads remotes and signals from NVS flash
+ */
+void infrared_nvs_load_remotes(void);
+
+/** 
+ * @brief Saves a specific signal blob and name for a remote to NVS
+ *
+ * @param remote_idx Index of the remote
+ * @param sig_idx Index of the signal within the remote
+ * @param sig The signal data
+ * @param name The signal name
+ */
+void infrared_nvs_save_signal_to_remote(size_t remote_idx, size_t sig_idx, ir_signal_t *sig, const char *name);
+
+/** 
+ * @brief Saves the number of signals for a remote to NVS
+ *
+ * @param remote_idx Index of the remote
+ */
+void infrared_nvs_save_remote_nsig(size_t remote_idx);
+
+/** 
+ * @brief Saves a remote's name to NVS
+ *
+ * @param remote_idx Index of the remote
+ */
+void infrared_nvs_save_remote_name(size_t remote_idx);
+
+/** 
+ * @brief Saves all remotes and signals to NVS
+ */
+void infrared_nvs_save_all_remotes(void);
+
+/** 
+ * @brief Deletes a given signal from a given remote over NVS
+ *
+ * @param remote_idx Index of the remote
+ * @param sig_idx Index of the signal to delete
+ */
+void infrared_nvs_delete_signal_from_remote(size_t remote_idx, size_t sig_idx);
+
+/** 
+ * @brief Deletes a given remote from NVS
+ *
+ * @param remote_idx Index of the remote to delete
+ */
+void infrared_nvs_delete_remote(size_t remote_idx);
+
+/** 
+ * @brief Clear all IR data from NVS
+ */
 void infrared_clear_nvs(void);
 
 #endif // INFRARED_FUNCS_H

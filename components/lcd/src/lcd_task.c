@@ -17,27 +17,27 @@ static const TickType_t btn_timer_interval = pdMS_TO_TICKS(200);
 #endif
 
 ui_menu_t ui_menu = {
-    .options = (const char *[]) {"Bluetooth","PolyPlug","ESP32","Infrared","Tools", "Settings","Wi-Fi"},
-    .size = 7,
-    .index = 1, // “LoRa” starts in the middle
-    .page = HOME_PAGE,
-    .lbl_top = NULL,
-    .lbl_mid = NULL,
-    .lbl_bot = NULL,
-    .arrow_bot = NULL,
-    .arrow_top = NULL,
-    .arrow_right = NULL,
-    .arrow_left = NULL,
+	.options = (const char *[]) {"Bluetooth","PolyPlug","ESP32","Infrared","Tools", "Settings","Wi-Fi"},
+	.size = 7,
+	.index = 1, // “LoRa” starts in the middle
+	.page = HOME_PAGE,
+	.lbl_top = NULL,
+	.lbl_mid = NULL,
+	.lbl_bot = NULL,
+	.arrow_bot = NULL,
+	.arrow_top = NULL,
+	.arrow_right = NULL,
+	.arrow_left = NULL,
 };
 
 ui_btns_t ui_btns = {
-    .up_btn = 0,
-    .down_btn = 0,
-    .right_btn = 0,
-    .left_btn = 0,
-    .select_btn = 0,
-    .home_btn = 0,
-    .pwr_btn = 0,
+	.up_btn = 0,
+	.down_btn = 0,
+	.right_btn = 0,
+	.left_btn = 0,
+	.select_btn = 0,
+	.home_btn = 0,
+	.pwr_btn = 0,
 };
 
 volatile bool lcd_clear_pending_inputs = false;
@@ -54,13 +54,13 @@ static void lcd_task(void *pvParameters)
 	lv_obj_set_scrollbar_mode(ACTIVE_SCR, LV_SCROLLBAR_MODE_OFF);
 	
 	// Set background
-    lv_obj_set_style_bg_color(ACTIVE_SCR, user_primary_color, 0);
-    lv_obj_set_style_bg_opa(ACTIVE_SCR, LV_OPA_COVER, 0); // Ensure the background is fully opaque
+	lv_obj_set_style_bg_color(ACTIVE_SCR, user_primary_color, 0);
+	lv_obj_set_style_bg_opa(ACTIVE_SCR, LV_OPA_COVER, 0); // Ensure the background is fully opaque
 					 
 	// Create images
 	lcd_init_images();
-    
-    TickType_t btn_timer_last = xTaskGetTickCount();
+	
+	TickType_t btn_timer_last = xTaskGetTickCount();
 	TickType_t sleep_timer_last = xTaskGetTickCount();
 	
 	uint8_t battery_percentage;
@@ -83,10 +83,10 @@ static void lcd_task(void *pvParameters)
 	
 	// Create common items
 	lcd_init_selection_labels(&ui_menu);
-	
+		
 	
 	// Load user data from NVS
-	lcd_ir_menu_nvs_load(&ir_menu, A_IR_REMOTE_NS, A_IR_REMOTE_KEY_COUNT, A_IR_REMOTE_KEY_FMT);
+	//lcd_ir_menu_nvs_load(&ir_menu, A_IR_REMOTE_NS, A_IR_REMOTE_KEY_COUNT, A_IR_REMOTE_KEY_FMT);
 	
 	lcd_lora_menu_nvs_load(&lora_menu);
 	lcd_lora_key_nvs_load(&lora_menu);
@@ -345,6 +345,6 @@ static void lcd_task(void *pvParameters)
 void lcd_task_create(void)
 {
 	if (xTaskCreatePinnedToCore(lcd_task, "lcd_task", 1024 * 8, NULL, tskIDLE_PRIORITY + 2, NULL, 0) != pdPASS) {
-	    ESP_LOGE(TAG, "Failed to start lcd_task");
+		ESP_LOGE(TAG, "Failed to start lcd_task");
 	}
 }

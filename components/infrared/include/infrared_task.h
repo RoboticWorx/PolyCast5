@@ -3,6 +3,8 @@
 
 #include "freertos/idf_additions.h"
 
+#include "infrared_funcs.h"
+
 extern SemaphoreHandle_t xInfraredRxEventSemaphore;
 extern SemaphoreHandle_t xInfraredStartRxSemaphore;
 extern SemaphoreHandle_t xInfraredDisableSemaphore;
