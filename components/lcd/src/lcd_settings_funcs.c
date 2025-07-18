@@ -2,6 +2,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
 
+#include "misc/lv_style.h"
 #include "nvs.h"
 #include "esp_system.h"
 #include "esp_log.h"
@@ -34,12 +35,17 @@
 #define COLOR_OPTION_COUNT 23
 
 settings_menu_t settings_menu = {
-    .options = {SETTINGS_SET_LOCK_TXT, "Change colors", "Adjust haptics", "Adjust sleep timer", "Reboot", "Factory reset"},
-    .size = 6,
-    .index = 0,
-    .cont = NULL,
-    .pin_menu.pin_set = false,
+	.options = {SETTINGS_SET_LOCK_TXT, "Change colors", "Adjust haptics", "Adjust sleep timer", "Reboot", "Factory reset"},
+	.size = 6,
+	.index = 0,
+	.cont = NULL,
+	.pin_menu.pin_set = false,
 };
+
+extern bool pin_signing_in;
+
+static uint32_t haptic_len_ms = 20;
+static bool btn_states[6] = {true, false, false, false, false, false};
 
 static bool primary_color_selected = true;
 
@@ -112,16 +118,16 @@ static const lv_color_t secondary_color_options[COLOR_OPTION_COUNT] = {
 void lcd_settings_setup_page(settings_menu_t *menu)
 {
 	// Create list
-    menu->main_list = lv_list_create(ACTIVE_SCR);
-    lv_obj_set_size(menu->main_list, 210, 106);
-    
-    // Format
-    lv_obj_set_scrollbar_mode(menu->main_list, LV_SCROLLBAR_MODE_OFF); // Never draw bars
-    lv_obj_set_style_bg_color(menu->main_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_align(menu->main_list, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_border_width(menu->main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_scrollbar_mode(menu->main_list, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_set_scroll_dir(menu->main_list, LV_DIR_VER);
+	menu->main_list = lv_list_create(ACTIVE_SCR);
+	lv_obj_set_size(menu->main_list, 210, 106);
+	
+	// Format
+	lv_obj_set_scrollbar_mode(menu->main_list, LV_SCROLLBAR_MODE_OFF); // Never draw bars
+	lv_obj_set_style_bg_color(menu->main_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+	lv_obj_align(menu->main_list, LV_ALIGN_CENTER, 0, 0);
+	lv_obj_set_style_border_width(menu->main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+	lv_obj_set_scrollbar_mode(menu->main_list, LV_SCROLLBAR_MODE_OFF);
+	lv_obj_set_scroll_dir(menu->main_list, LV_DIR_VER);
 
 	// Create button style
 	lv_style_init(&menu->btn_style);
@@ -168,31 +174,31 @@ void lcd_settings_setup_page(settings_menu_t *menu)
 	}
 	
 	// Create button for each option
-    for (int i = 0; i < menu->size; i++) {
+	for (int i = 0; i < menu->size; i++) {
 
-        menu->btns[i] = lv_list_add_btn(menu->main_list, NULL, menu->options[i]);
-        lv_obj_set_size(menu->btns[i], 200, 30);
+		menu->btns[i] = lv_list_add_btn(menu->main_list, NULL, menu->options[i]);
+		lv_obj_set_size(menu->btns[i], 200, 30);
 
-        // Style selected
-        if (i == menu->index) {
-            lv_obj_add_style(menu->btns[i], &menu->sel_style, 0);
-        }
-        else {
-            lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
-        }
+		// Style selected
+		if (i == menu->index) {
+			lv_obj_add_style(menu->btns[i], &menu->sel_style, 0);
+		}
+		else {
+			lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
+		}
 
-        // Create and format text label
-        lv_obj_t *lbl = lv_obj_get_child(menu->btns[i], 0);
-        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
-        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
-    }
+		// Create and format text label
+		lv_obj_t *lbl = lv_obj_get_child(menu->btns[i], 0);
+		lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+		lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+		lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+	}
 
-    // Format buttons as container
-    menu->cont = lv_obj_get_parent(menu->btns[0]);
-    lv_obj_set_flex_flow (menu->cont, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(menu->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(menu->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT); // Set button spacing
+	// Format buttons as container
+	menu->cont = lv_obj_get_parent(menu->btns[0]);
+	lv_obj_set_flex_flow (menu->cont, LV_FLEX_FLOW_COLUMN);
+	lv_obj_set_flex_align(menu->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+	lv_obj_set_style_pad_gap(menu->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT); // Set button spacing
 	
 	// Hide for now
 	lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -201,9 +207,9 @@ void lcd_settings_setup_page(settings_menu_t *menu)
 void lcd_settings_update_menu(settings_menu_t *menu)
 {
 	// Reveal
-    lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
-    // Wrap index
+	// Wrap index
 	if (menu->index >= menu->size) {
 		menu->index = 0;
 	}
@@ -211,18 +217,18 @@ void lcd_settings_update_menu(settings_menu_t *menu)
 		menu->index = menu->size - 1;
 	}
 
-    // Reset every button to unselected
-    for (int i = 0; i < menu->size; i++) {
-        lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
-        lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
-    }
+	// Reset every button to unselected
+	for (int i = 0; i < menu->size; i++) {
+		lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
+		lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
+	}
 
-    // Highlight only the current index
-    lv_obj_remove_style(menu->btns[menu->index], &menu->btn_style, 0);
-    lv_obj_add_style(menu->btns[menu->index], &menu->sel_style, 0);
-    
-    // Enable scrolling if list gets too long
-    lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
+	// Highlight only the current index
+	lv_obj_remove_style(menu->btns[menu->index], &menu->btn_style, 0);
+	lv_obj_add_style(menu->btns[menu->index], &menu->sel_style, 0);
+	
+	// Enable scrolling if list gets too long
+	lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
 }
 
 static void create_next_box(lv_obj_t *pin_container, lv_obj_t **pin_labels, int *num_boxes) {
@@ -249,38 +255,48 @@ static void create_next_box(lv_obj_t *pin_container, lv_obj_t **pin_labels, int 
 	(*num_boxes)++;
 }
 static const char *code_to_symbol(char c) {
-    switch(c) {
-        case 'U':
-        	return LV_SYMBOL_UP;
-        case 'D':
-        	return LV_SYMBOL_DOWN;
-        case 'L':
-        	return LV_SYMBOL_LEFT;
-        case 'R':
-        	return LV_SYMBOL_RIGHT;
-        default:
-        	return "";
-    }
+	switch(c) {
+		case 'U':
+			return LV_SYMBOL_UP;
+		case 'D':
+			return LV_SYMBOL_DOWN;
+		case 'L':
+			return LV_SYMBOL_LEFT;
+		case 'R':
+			return LV_SYMBOL_RIGHT;
+		default:
+			return "";
+	}
 }
 
 void lcd_settings_rebuild_pin_boxes(lv_obj_t *pin_container, lv_obj_t **pin_labels, char *unlock_pin, int *num_boxes, int num_filled)
 {
 	// Start fresh
-    lv_obj_clean(pin_container);
-    *num_boxes = 0;
-    
-    if (num_filled == 0) {
-        // Nothing entered yet: one blank slot
-        create_next_box(pin_container, pin_labels, num_boxes);
-    }
+	lv_obj_clean(pin_container);
+	*num_boxes = 0;
+	
+	if (num_filled == 0) {
+		// Nothing entered yet: one blank slot
+		create_next_box(pin_container, pin_labels, num_boxes);
+	}
 	else {
 		// Fill for each
 		for (int i = 0; i < num_filled; i++) {
-		    create_next_box(pin_container, pin_labels, num_boxes);
-		    lv_label_set_text(pin_labels[i], code_to_symbol(unlock_pin[i]));
+			create_next_box(pin_container, pin_labels, num_boxes);
+			
+			// If signing in, hide input with asterisk
+			if (pin_signing_in) {
+				lv_label_set_text(pin_labels[i], "*");
+				lv_obj_set_style_text_font(pin_labels[i], &lv_font_montserrat_30, 0);
+				lv_obj_align(pin_labels[i], LV_ALIGN_CENTER, 0, 6);
+			}
+			else {
+				lv_label_set_text(pin_labels[i], code_to_symbol(unlock_pin[i]));
+				lv_obj_set_style_text_font(pin_labels[i], &lv_font_montserrat_18, 0);
+				lv_obj_center(pin_labels[i]);
+			}
 		}
 	}
-    
 }
 
 void lcd_settings_setup_pin_page(settings_menu_t *menu)
@@ -344,32 +360,32 @@ static void confirm_entered_pin(ui_menu_t *ui_menu, settings_menu_t *settings_me
 {
 	lv_obj_t *lbl_ins = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_ins, "Your PIN is:", user_secondary_color,
-    		&lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 18);
-    		
-    lv_obj_t *lbl_ok = lv_label_create(ACTIVE_SCR);
+			&lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 18);
+			
+	lv_obj_t *lbl_ok = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_ok, "OK", user_secondary_color,
-    		&lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
-    		
-    lv_obj_t *lbl_write = lv_label_create(ACTIVE_SCR);
+			&lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
+			
+	lv_obj_t *lbl_write = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_write, "Don't forget it!", user_secondary_color,
-    		&lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -18);
-    
-    // Create symbols from unlock_pin
+			&lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -18);
+	
+	// Create symbols from unlock_pin
 	char symbol_buf[64];
 	symbol_buf[0] = '\0'; // Empty start
 	int offset = 0;
 	
 	// Append each arrow symbol
 	for (int i = 0; i < strlen(settings_menu->pin_menu.unlock_pin); i++) {
-	    const char *sym = code_to_symbol(settings_menu->pin_menu.unlock_pin[i]);
-	    
-	    int written = snprintf(symbol_buf + offset, sizeof(symbol_buf) - offset, "%s  ", sym);
-	    
-	    if (written < 0) {
+		const char *sym = code_to_symbol(settings_menu->pin_menu.unlock_pin[i]);
+		
+		int written = snprintf(symbol_buf + offset, sizeof(symbol_buf) - offset, "%s  ", sym);
+		
+		if (written < 0) {
 			break;
 		}
 		
-	    offset += written;
+		offset += written;
 	}
 	
 	// Display it
@@ -378,29 +394,29 @@ static void confirm_entered_pin(ui_menu_t *ui_menu, settings_menu_t *settings_me
 			&lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
    
 	// Wait for user to confirm
-    while (1) {
+	while (1) {
 		lv_timer_handler();
 		
 		// OK
-        if (xSemaphoreTake(xRightButtonSemaphore, 0) == pdTRUE) {
-            // Show arrows
+		if (xSemaphoreTake(xRightButtonSemaphore, 0) == pdTRUE) {
+			// Show arrows
 			lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-            
-            lv_obj_del(lbl_ins);
-            lv_obj_del(lbl_pin);
-            lv_obj_del(lbl_ok);
-            lv_obj_del(lbl_write);
+			
+			lv_obj_del(lbl_ins);
+			lv_obj_del(lbl_pin);
+			lv_obj_del(lbl_ok);
+			lv_obj_del(lbl_write);
 			
 			lcd_clear_pending_inputs = true; // Clear any false inputs
-            
-            // Exit
-            return;
-        }
-        
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
+			
+			// Exit
+			return;
+		}
+		
+		vTaskDelay(pdMS_TO_TICKS(10));
+	}
 }
 
 void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
@@ -419,16 +435,16 @@ void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu
 	// Only execute once
 	if (!do_once) {
 		// Clear any old PIN data
-    	memset(settings_menu->pin_menu.unlock_pin, 0, sizeof(settings_menu->pin_menu.unlock_pin));
+		memset(settings_menu->pin_menu.unlock_pin, 0, sizeof(settings_menu->pin_menu.unlock_pin));
 		
 		// Create labels
 		lbl_ins = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_ins, "Create PIN with arrows:", user_secondary_color,
-        			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 18);
-        			 
-        lbl_conf = lv_label_create(ACTIVE_SCR);
+					 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 18);
+					 
+		lbl_conf = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_conf, "  Home to back,\nSelect to confirm", user_secondary_color,
-        			 &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -13);
+					 &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -13);
 		
 		// Create pin container
 		pin_container = lv_obj_create(ACTIVE_SCR);
@@ -458,22 +474,22 @@ void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu
 		char code = '\0';
 		
 		// Assign code for unlock_pin
-        if (ui_btns->up_btn) {
+		if (ui_btns->up_btn) {
 			code = 'U';
 		}
-        else if(ui_btns->down_btn) {
+		else if(ui_btns->down_btn) {
 			code = 'D';
 		}
-        else if(ui_btns->left_btn) {
+		else if(ui_btns->left_btn) {
 			code = 'L';
 		} 
-        else if(ui_btns->right_btn) {
+		else if(ui_btns->right_btn) {
 			code = 'R';
 		}
 
 		// Save and rebuild
-        settings_menu->pin_menu.unlock_pin[num_filled++] = code;
-        lcd_settings_rebuild_pin_boxes(pin_container, pin_labels, settings_menu->pin_menu.unlock_pin, &num_boxes, num_filled);
+		settings_menu->pin_menu.unlock_pin[num_filled++] = code;
+		lcd_settings_rebuild_pin_boxes(pin_container, pin_labels, settings_menu->pin_menu.unlock_pin, &num_boxes, num_filled);
 	}
 	// Save
 	else if (ui_btns->select_btn == 1) {
@@ -527,14 +543,14 @@ void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu
 	// Go back
 	else if (ui_btns->home_btn == 1) {
 		// Back a box
-	    if (num_filled > 0) {
+		if (num_filled > 0) {
 			// Remove one and rebuild
-	        settings_menu->pin_menu.unlock_pin[num_filled--] = '\0';
-            lcd_settings_rebuild_pin_boxes(pin_container, pin_labels, settings_menu->pin_menu.unlock_pin, &num_boxes, num_filled);
-	    }
-	    // First box: exit
-	    else {
-	        // Reset objects
+			settings_menu->pin_menu.unlock_pin[num_filled--] = '\0';
+			lcd_settings_rebuild_pin_boxes(pin_container, pin_labels, settings_menu->pin_menu.unlock_pin, &num_boxes, num_filled);
+		}
+		// First box: exit
+		else {
+			// Reset objects
 			lv_obj_delete(pin_container); // Clears children
 			lv_obj_delete(lbl_ins);
 			lv_obj_delete(lbl_conf);
@@ -554,7 +570,7 @@ void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu
 			
 			// Switch pages
 			ui_menu->page = SETTINGS_PAGE;
-	    }
+		}
 	}
 	// Power off
 	else if (ui_btns->pwr_btn == 1) {
@@ -594,40 +610,40 @@ void lcd_settings_colors_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_m
 			
 		lbl_ins = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_ins, "Select a color to change:", user_secondary_color,
-        			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
+					 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
 
-        // Border color for contrast			 
-        lv_color_t darker_user_primary_color = lv_color_darken(user_primary_color, 100); // % darker 
-        			 
-        // Create color boxes to show the change
-	    primary_color_box = lv_obj_create(ACTIVE_SCR);
-	    lv_obj_set_size(primary_color_box,  100,  80);
-	    lv_obj_align(primary_color_box, LV_ALIGN_CENTER, -X_COL_POS,  10);
-	    lv_obj_set_style_bg_color(primary_color_box, user_primary_color, LV_PART_MAIN);
-	    lv_obj_set_style_bg_opa(primary_color_box, LV_OPA_COVER, LV_PART_MAIN);
-	    lv_obj_set_style_border_width(primary_color_box, 3, LV_PART_MAIN);
-	    lv_obj_set_style_border_color(primary_color_box, darker_user_primary_color, LV_PART_MAIN);
-	    
-	    secondary_color_box = lv_obj_create(ACTIVE_SCR);
-	    lv_obj_set_size(secondary_color_box,  100,  80);
-	    lv_obj_align(secondary_color_box, LV_ALIGN_CENTER, X_COL_POS,  10);
-	    lv_obj_set_style_bg_color(secondary_color_box, user_secondary_color, LV_PART_MAIN);
-	    lv_obj_set_style_bg_opa(secondary_color_box, LV_OPA_COVER, LV_PART_MAIN);
-	    lv_obj_set_style_border_width(secondary_color_box, 3, LV_PART_MAIN);
-	    lv_obj_set_style_border_color(secondary_color_box, darker_user_primary_color, LV_PART_MAIN);
-	    
-	    // Text labels
-	    lbl_primary = lv_label_create(ACTIVE_SCR);
+		// Border color for contrast			 
+		lv_color_t darker_user_primary_color = lv_color_darken(user_primary_color, 100); // % darker 
+					 
+		// Create color boxes to show the change
+		primary_color_box = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(primary_color_box,  100,  80);
+		lv_obj_align(primary_color_box, LV_ALIGN_CENTER, -X_COL_POS,  10);
+		lv_obj_set_style_bg_color(primary_color_box, user_primary_color, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(primary_color_box, LV_OPA_COVER, LV_PART_MAIN);
+		lv_obj_set_style_border_width(primary_color_box, 3, LV_PART_MAIN);
+		lv_obj_set_style_border_color(primary_color_box, darker_user_primary_color, LV_PART_MAIN);
+		
+		secondary_color_box = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(secondary_color_box,  100,  80);
+		lv_obj_align(secondary_color_box, LV_ALIGN_CENTER, X_COL_POS,  10);
+		lv_obj_set_style_bg_color(secondary_color_box, user_secondary_color, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(secondary_color_box, LV_OPA_COVER, LV_PART_MAIN);
+		lv_obj_set_style_border_width(secondary_color_box, 3, LV_PART_MAIN);
+		lv_obj_set_style_border_color(secondary_color_box, darker_user_primary_color, LV_PART_MAIN);
+		
+		// Text labels
+		lbl_primary = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_primary, "Primary", user_secondary_color,
-        			 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, -X_COL_POS, 43);
-        			 
-        lbl_secondary = lv_label_create(ACTIVE_SCR);
+					 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, -X_COL_POS, 43);
+					 
+		lbl_secondary = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_secondary, "Secondary", user_primary_color,
-        			 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, X_COL_POS, 43);
-        			 
-        lbl_selected = lv_label_create(ACTIVE_SCR);
+					 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, X_COL_POS, 43);
+					 
+		lbl_selected = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_selected, LV_SYMBOL_CLOSE, user_secondary_color,
-        			 &lv_font_montserrat_30, LV_ALIGN_CENTER, -X_COL_POS, 18);
+					 &lv_font_montserrat_30, LV_ALIGN_CENTER, -X_COL_POS, 18);
 		
 		do_once = true;
 	}
@@ -736,54 +752,54 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 	// Only execute once
 	if (!do_once) {
 		new_color_idx = 0;
-			    
+				
 		lbl_ins = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_ins, "Use up/down to adjust.", user_secondary_color,
-        			 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 18);
-        			 
+					 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 18);
+					 
 		lbl_arr = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_arr, LV_SYMBOL_MINUS LV_SYMBOL_RIGHT, user_secondary_color,
-        			 &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 10);
-        
-        // Border color for contrast			 
-        lv_color_t darker_user_primary_color = lv_color_darken(user_primary_color, 100); // % darker 
-        
-        // Create color boxes to show the change
-	    old_color_box = lv_obj_create(ACTIVE_SCR);
-	    lv_obj_set_size(old_color_box,  60,  60);
-	    lv_obj_align(old_color_box, LV_ALIGN_CENTER, -X_SEL_POS,  10);
-	    lv_obj_set_style_bg_opa(old_color_box, LV_OPA_COVER, LV_PART_MAIN);
-	    lv_obj_set_style_border_width(old_color_box, 3, LV_PART_MAIN);
-	    
-	    // Set 'old' box to what was selected
+					 &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 10);
+		
+		// Border color for contrast			 
+		lv_color_t darker_user_primary_color = lv_color_darken(user_primary_color, 100); // % darker 
+		
+		// Create color boxes to show the change
+		old_color_box = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(old_color_box,  60,  60);
+		lv_obj_align(old_color_box, LV_ALIGN_CENTER, -X_SEL_POS,  10);
+		lv_obj_set_style_bg_opa(old_color_box, LV_OPA_COVER, LV_PART_MAIN);
+		lv_obj_set_style_border_width(old_color_box, 3, LV_PART_MAIN);
+		
+		// Set 'old' box to what was selected
 		if (primary_color_selected) {
 			lv_obj_set_style_bg_color(old_color_box, user_primary_color, LV_PART_MAIN);
-	    	lv_obj_set_style_border_color(old_color_box, darker_user_primary_color, LV_PART_MAIN);
+			lv_obj_set_style_border_color(old_color_box, darker_user_primary_color, LV_PART_MAIN);
 		}
 		else {
 			lv_obj_set_style_bg_color(old_color_box, user_secondary_color, LV_PART_MAIN);
-	    	lv_obj_set_style_border_color(old_color_box, darker_user_primary_color, LV_PART_MAIN);
+			lv_obj_set_style_border_color(old_color_box, darker_user_primary_color, LV_PART_MAIN);
 		}
 
-        // New color
-	    new_color_box = lv_obj_create(ACTIVE_SCR);
-	    lv_obj_set_size(new_color_box,  60,  60);
-	    lv_obj_align(new_color_box, LV_ALIGN_CENTER, X_SEL_POS,  10);
-	    lv_obj_set_style_bg_color(new_color_box, user_secondary_color, LV_PART_MAIN);
-	    lv_obj_set_style_bg_opa(new_color_box, LV_OPA_COVER, LV_PART_MAIN);
-	    lv_obj_set_style_border_width(new_color_box, 3, LV_PART_MAIN);
-	    lv_obj_set_style_border_color(new_color_box, user_secondary_color, LV_PART_MAIN);
-	    
-	    const lv_color_t *opts = primary_color_selected ? primary_color_options : secondary_color_options;
-        lv_color_t c = opts[new_color_idx];
-        
-        // Skip if forbidden color (current or secondary)
-        while(lv_color_eq(c, user_primary_color) || lv_color_eq(c, user_secondary_color)) {
-	        new_color_idx = (new_color_idx + 1) % COLOR_OPTION_COUNT;
-	        c = opts[new_color_idx];
-	    }
-        lv_obj_set_style_bg_color(new_color_box, c, LV_PART_MAIN);
-        lv_obj_set_style_border_color(new_color_box, c, LV_PART_MAIN);
+		// New color
+		new_color_box = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(new_color_box,  60,  60);
+		lv_obj_align(new_color_box, LV_ALIGN_CENTER, X_SEL_POS,  10);
+		lv_obj_set_style_bg_color(new_color_box, user_secondary_color, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(new_color_box, LV_OPA_COVER, LV_PART_MAIN);
+		lv_obj_set_style_border_width(new_color_box, 3, LV_PART_MAIN);
+		lv_obj_set_style_border_color(new_color_box, user_secondary_color, LV_PART_MAIN);
+		
+		const lv_color_t *opts = primary_color_selected ? primary_color_options : secondary_color_options;
+		lv_color_t c = opts[new_color_idx];
+		
+		// Skip if forbidden color (current or secondary)
+		while(lv_color_eq(c, user_primary_color) || lv_color_eq(c, user_secondary_color)) {
+			new_color_idx = (new_color_idx + 1) % COLOR_OPTION_COUNT;
+			c = opts[new_color_idx];
+		}
+		lv_obj_set_style_bg_color(new_color_box, c, LV_PART_MAIN);
+		lv_obj_set_style_border_color(new_color_box, c, LV_PART_MAIN);
 
 		do_once = true;
 	}
@@ -791,44 +807,44 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 	// Increment new color up
 	if (ui_btns->up_btn == 1) {
 		// Pick which palette to use
-	    const lv_color_t *opts = primary_color_selected ? primary_color_options : secondary_color_options;
-                                
+		const lv_color_t *opts = primary_color_selected ? primary_color_options : secondary_color_options;
+								
 		// Increment with wrap
 		new_color_idx = (new_color_idx + 1) % COLOR_OPTION_COUNT;
 		
 		// Assign to index of selected
-        lv_color_t c = opts[new_color_idx];
-        
-        // Skip if forbidden color (current or secondary)
-	    while(lv_color_eq(c, user_primary_color) || lv_color_eq(c, user_secondary_color)) {
-	        new_color_idx = (new_color_idx + 1) % COLOR_OPTION_COUNT;
-	        c = opts[new_color_idx];
-	    }
-        
-        // Show
-        lv_obj_set_style_bg_color(new_color_box, c, LV_PART_MAIN);
-        lv_obj_set_style_border_color(new_color_box, c, LV_PART_MAIN);
+		lv_color_t c = opts[new_color_idx];
+		
+		// Skip if forbidden color (current or secondary)
+		while(lv_color_eq(c, user_primary_color) || lv_color_eq(c, user_secondary_color)) {
+			new_color_idx = (new_color_idx + 1) % COLOR_OPTION_COUNT;
+			c = opts[new_color_idx];
+		}
+		
+		// Show
+		lv_obj_set_style_bg_color(new_color_box, c, LV_PART_MAIN);
+		lv_obj_set_style_border_color(new_color_box, c, LV_PART_MAIN);
 	}
 	// Decrement new color down
 	else if (ui_btns->down_btn == 1) {
 		// Pick which palette to use
-	    const lv_color_t *opts = primary_color_selected ? primary_color_options : secondary_color_options;
-                                
+		const lv_color_t *opts = primary_color_selected ? primary_color_options : secondary_color_options;
+								
 		// Decrement with wrap
 		new_color_idx = (new_color_idx + COLOR_OPTION_COUNT - 1) % COLOR_OPTION_COUNT;
 		
 		// Assign to index of selected
-        lv_color_t c = opts[new_color_idx];
-        
-        // Skip if forbidden color (current or secondary)
-	    while(lv_color_eq(c, user_primary_color) || lv_color_eq(c, user_secondary_color)) {
-	        new_color_idx = (new_color_idx + COLOR_OPTION_COUNT - 1) % COLOR_OPTION_COUNT;
-	        c = opts[new_color_idx];
-	    }
-        
-        // Show
-        lv_obj_set_style_bg_color(new_color_box, c, LV_PART_MAIN);
-        lv_obj_set_style_border_color(new_color_box, c, LV_PART_MAIN);
+		lv_color_t c = opts[new_color_idx];
+		
+		// Skip if forbidden color (current or secondary)
+		while(lv_color_eq(c, user_primary_color) || lv_color_eq(c, user_secondary_color)) {
+			new_color_idx = (new_color_idx + COLOR_OPTION_COUNT - 1) % COLOR_OPTION_COUNT;
+			c = opts[new_color_idx];
+		}
+		
+		// Show
+		lv_obj_set_style_bg_color(new_color_box, c, LV_PART_MAIN);
+		lv_obj_set_style_border_color(new_color_box, c, LV_PART_MAIN);
 	}
 	// Confirm new color
 	else if (ui_btns->select_btn == 1) {
@@ -901,6 +917,179 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 	}
 }
 
+// lcd_settings_adjust_haptics_page helpers
+static void haptic_switch_event(lv_event_t *e) {
+	lv_obj_t *sw = lv_event_get_target(e);
+	intptr_t idx = (intptr_t)lv_event_get_user_data(e);
+	
+	// Assign btn_states
+	btn_states[idx] = lv_obj_has_state(sw, LV_STATE_CHECKED);
+}
+void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
+{
+	#define ADJ_HAPTIC_Y_OFFSET 38
+	
+	static bool init = false;
+	static int selected = 0;
+	
+	static lv_obj_t *cont, *slider, *lbl_spin, *pointer, *sw_row[6], *sw_arr[6];
+	
+	static lv_style_t row_style;
+	
+	const char *btn_names[6] = {
+		"Buzz on Select ", "Buzz on Home ", "Buzz on Up       ",
+		"Buzz on Down ", "Buzz on Left     ", "Buzz on Right  "
+	};
+
+	if (!init) {
+		// Create parent container
+		cont = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(cont, 210, 106);
+		lv_obj_center(cont);
+		lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
+		lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+		lv_obj_set_style_pad_row(cont, 4, LV_PART_MAIN);
+		lv_obj_set_style_pad_left(cont, 20, LV_PART_MAIN | LV_STATE_DEFAULT); // Space for pointer
+		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_bg_opa(cont, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+		lv_obj_set_style_border_width(cont, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+				
+		// Labels
+		lbl_spin = lv_label_create(cont);
+		lcd_format_label(lbl_spin, "", user_secondary_color,
+					&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
+		lv_label_set_text_fmt(lbl_spin, "Buzz for %" PRIu32 " ms", haptic_len_ms);
+		
+		// Slider
+		slider = lv_slider_create(cont);
+		lv_obj_set_size(slider, 100, 5);
+		lv_obj_align(slider, LV_ALIGN_TOP_MID, 30, 0);
+		lv_slider_set_range(slider, HAPTIC_MIN_MS, HAPTIC_MAX_MS);
+		lv_slider_set_value(slider, haptic_len_ms, LV_ANIM_OFF);
+		
+		lv_obj_add_event_cb(slider, NULL, LV_EVENT_VALUE_CHANGED, lbl_spin);
+		
+		// Six switch rows
+		for (int i = 0; i < 6; i++) {
+		    // Create a row container for each row
+		    sw_row[i] = lv_obj_create(cont);
+		    lv_obj_set_size(sw_row[i], 180, 30);
+		    lv_obj_set_style_bg_color(sw_row[i], user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+			lv_obj_set_style_bg_opa(sw_row[i], LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+			lv_obj_set_scrollbar_mode(sw_row[i], LV_SCROLLBAR_MODE_OFF);
+			lv_obj_set_style_border_width(sw_row[i], 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+			lv_style_init(&row_style);
+			lv_style_set_margin_top(&row_style, 2);
+			lv_style_set_margin_bottom(&row_style, 2);
+			lv_obj_add_style(sw_row[i], &row_style, 0);
+			
+		    // Flex formatting
+		    lv_obj_set_flex_flow(sw_row[i],  LV_FLEX_FLOW_ROW);
+		    lv_obj_set_flex_align(sw_row[i], LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+			
+		    // Add the label into the row
+		    lv_obj_t *lbl = lv_label_create(sw_row[i]);
+		    lcd_format_label(lbl, btn_names[i], user_secondary_color,
+		    		&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
+			
+		    // Add the switch
+		    sw_arr[i] = lv_switch_create(sw_row[i]);
+		    lv_obj_set_size(sw_arr[i], 30, 20);
+		    if (btn_states[i]) {
+		        lv_obj_add_state(sw_arr[i], LV_STATE_CHECKED);
+		    }
+		    lv_obj_add_event_cb(sw_arr[i], haptic_switch_event, LV_EVENT_VALUE_CHANGED, (void*)(intptr_t)i);
+			
+		    lv_obj_set_style_margin_right(lbl, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+		}
+
+		// Pointer on screen
+		pointer = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(pointer, LV_SYMBOL_PLAY, user_secondary_color,
+				 &lv_font_montserrat_16, LV_ALIGN_TOP_LEFT, 23, 28);
+
+		init = true;
+	}
+
+	// Scroll down
+	if (ui_btns->down_btn == 1) {
+		// Decrement with wrap
+		selected = (selected + 1) % 7;
+		
+        lv_obj_scroll_by(cont, 0, -ADJ_HAPTIC_Y_OFFSET, LV_ANIM_ON); 
+	}
+	// Scroll up
+	else if (ui_btns->up_btn == 1) {
+		// Increment with wrap
+		selected = (selected + 6) % 7;
+		
+        lv_obj_scroll_by(cont, 0, ADJ_HAPTIC_Y_OFFSET, LV_ANIM_ON);
+	}
+	// Toggle/iterate
+	else if (ui_btns->select_btn == 1) {
+		// Iterate slider
+		if (selected == 0) {
+			// Increment slider with wrap
+			haptic_len_ms = (haptic_len_ms + 1) % HAPTIC_MAX_MS;
+			lv_slider_set_value(slider, haptic_len_ms, LV_ANIM_OFF);
+			
+			// Update label
+			lv_label_set_text_fmt(lbl_spin, "Buzz for %" PRIu32 " ms", haptic_len_ms);
+		}
+		// Toggle selected switch
+		else {
+			lv_obj_t *sw = sw_arr[selected - 1];
+			
+			// Toggle
+			if (lv_obj_has_state(sw, LV_STATE_CHECKED)) {
+				lv_obj_clear_state(sw, LV_STATE_CHECKED);
+			}
+			else {
+				lv_obj_add_state(sw, LV_STATE_CHECKED);
+			}
+		}
+	}
+	// Back
+	else if (ui_btns->left_btn == 1) {
+		// Delete objects
+		lv_obj_del(cont); // Deletes all children
+		lv_obj_del(pointer);
+		lv_style_reset(&row_style);
+		
+		// Reset statics
+		cont = slider = lbl_spin = pointer = NULL;
+		init = false;
+		selected = 0;
+		for (int i = 0; i < 6; i++) {
+			sw_arr[i] = sw_row[i] = NULL;
+		}
+
+		// Show settings
+		lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+		ui_menu->page = SETTINGS_PAGE;
+	}
+	// Home or power off
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Delete objects
+		lv_obj_del(cont); // Deletes all children
+		lv_obj_del(pointer);
+		lv_style_reset(&row_style);
+		
+		// Reset statics
+		cont = slider = lbl_spin = pointer = NULL;
+		init = false;
+		selected = 0;
+		for (int i = 0; i < 6; i++) {
+			sw_arr[i] = sw_row[i] = NULL;
+		}
+
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);
+	}
+}
+
 void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
 	// Statics
@@ -913,11 +1102,11 @@ void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
 	if (!do_once) {
 		lbl_ins = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_ins, "Press select to factory reset.", user_secondary_color,
-        			 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 18);
-        			 
-        lbl_note = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_note, "NOTE: This will erase\n       all user data!", user_secondary_color,
-        			 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+					 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 18);
+					 
+		lbl_note = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_note, "NOTE: This will erase\n	   all user data!", user_secondary_color,
+					 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
 
 		do_once = true;
 	}
@@ -975,141 +1164,153 @@ void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
 	}
 }
 
+/* NVS functions */
+
 void lcd_settings_color_nvs_save(int new_color_idx, bool is_primary)
 {
-    esp_err_t err;
-    nvs_handle_t handle;
+	esp_err_t err;
+	nvs_handle_t handle;
 
-    // Open NVS
-    err = nvs_open(SETTINGS_COLOR_NS, NVS_READWRITE, &handle);
-    ESP_ERROR_CHECK(err);
+	// Open NVS
+	err = nvs_open(SETTINGS_COLOR_NS, NVS_READWRITE, &handle);
+	ESP_ERROR_CHECK(err);
 
-    // Pick a key for primary vs secondary
-    const char *key = is_primary ? SETTINGS_COLOR_PRIM_KEY : SETTINGS_COLOR_SEC_KEY;
+	// Pick a key for primary vs secondary
+	const char *key = is_primary ? SETTINGS_COLOR_PRIM_KEY : SETTINGS_COLOR_SEC_KEY;
 
-    // Store the index
-    err = nvs_set_i32(handle, key, new_color_idx);
-    ESP_ERROR_CHECK(err);
+	// Store the index
+	err = nvs_set_i32(handle, key, new_color_idx);
+	ESP_ERROR_CHECK(err);
 
-    //Commit & close
-    err = nvs_commit(handle);
-    ESP_ERROR_CHECK(err);
-    nvs_close(handle);
+	//Commit & close
+	err = nvs_commit(handle);
+	ESP_ERROR_CHECK(err);
+	nvs_close(handle);
 }
 
 void lcd_settings_color_nvs_load(void)
 {
-    esp_err_t err;
-    nvs_handle_t handle;
+	esp_err_t err;
+	nvs_handle_t handle;
 
 	// Open NVS
-    err = nvs_open(SETTINGS_COLOR_NS, NVS_READONLY, &handle);
-    if(err == ESP_OK) {
-        int32_t idx;
-        // Get primary color
-        if(nvs_get_i32(handle, SETTINGS_COLOR_PRIM_KEY, &idx) == ESP_OK) {
-            user_primary_color = primary_color_options[idx];
-        }
-        
-        // Get secondary color
-        if(nvs_get_i32(handle, SETTINGS_COLOR_SEC_KEY, &idx) == ESP_OK) {
-            user_secondary_color = secondary_color_options[idx];
-        }
-        nvs_close(handle);
-    }
+	err = nvs_open(SETTINGS_COLOR_NS, NVS_READONLY, &handle);
+	if (err == ESP_OK) {
+		int32_t idx;
+		// Get primary color
+		if (nvs_get_i32(handle, SETTINGS_COLOR_PRIM_KEY, &idx) == ESP_OK) {
+			user_primary_color = primary_color_options[idx];
+		}
+		
+		// Get secondary color
+		if (nvs_get_i32(handle, SETTINGS_COLOR_SEC_KEY, &idx) == ESP_OK) {
+			user_secondary_color = secondary_color_options[idx];
+		}
+		nvs_close(handle);
+	}
 }
 
-esp_err_t lcd_settings_pin_nvs_save(const settings_menu_t *menu)
+void lcd_settings_pin_nvs_save(const settings_menu_t *menu)
 {
-    nvs_handle_t h;
-    
-    // Open NVS
-    esp_err_t err = nvs_open(SETTINGS_PIN_NS, NVS_READWRITE, &h);
-    
-    // Check
-    if (err != ESP_OK) {
-		return err;
+	nvs_handle_t h;
+	
+	// Open NVS
+	esp_err_t err = nvs_open(SETTINGS_PIN_NS, NVS_READWRITE, &h);
+	
+	// Check
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_pin_nvs_save NVS open error");
 	}
 
-    // Save pin_set as a u8
-    err = nvs_set_u8(h, SETTINGS_PIN_SET_KEY, menu->pin_menu.pin_set ? 1 : 0);
-    
-    if (err != ESP_OK) {
+	// Save pin_set as a u8
+	err = nvs_set_u8(h, SETTINGS_PIN_SET_KEY, menu->pin_menu.pin_set ? 1 : 0);
+	
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_pin_nvs_save NVS set u8 error");
 		goto out;
 	}
 
-    // Save unlock_pin as a string
-    err = nvs_set_str(h, SETTINGS_PIN_KEY, menu->pin_menu.unlock_pin);
-    
-    if (err != ESP_OK) {
+	// Save unlock_pin as a string
+	err = nvs_set_str(h, SETTINGS_PIN_KEY, menu->pin_menu.unlock_pin);
+	
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_pin_nvs_save NVS set str error");
 		goto out;
 	}
 
-    // Persist to NVS
-    err = nvs_commit(h);
+	// Persist to NVS
+	nvs_commit(h);
 
 	out:
-    nvs_close(h);
-    return err;
+	nvs_close(h);
 }
 
-esp_err_t lcd_settings_pin_nvs_load(settings_menu_t *menu)
+void lcd_settings_pin_nvs_load(settings_menu_t *menu)
 {
-    nvs_handle_t h;
-    
-    // Open NVS
-    esp_err_t err = nvs_open(SETTINGS_PIN_NS, NVS_READONLY, &h);
-    
-    // If nothing saved yet
-    if (err == ESP_ERR_NVS_NOT_FOUND || err == ESP_ERR_NVS_NOT_INITIALIZED) {
-        menu->pin_menu.pin_set = false;
-        menu->pin_menu.unlock_pin[0] = '\0';
-        return ESP_OK;
-    }
-    
-    if (err != ESP_OK) {
-		return err;
+	nvs_handle_t h;
+	
+	// Open NVS
+	esp_err_t err = nvs_open(SETTINGS_PIN_NS, NVS_READONLY, &h);
+	
+	// If nothing saved yet
+	if (err == ESP_ERR_NVS_NOT_FOUND || err == ESP_ERR_NVS_NOT_INITIALIZED) {
+		menu->pin_menu.pin_set = false;
+		menu->pin_menu.unlock_pin[0] = '\0';
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGW(TAG, "lcd_settings_pin_nvs_load NVS DNE");
+		#endif
+	}
+	
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_pin_nvs_load NVS open error");
 	}
 
-    // Read pin_set
-    uint8_t u8;
-    
-    err = nvs_get_u8(h, SETTINGS_PIN_SET_KEY, &u8);
-    if (err == ESP_OK) {
-        menu->pin_menu.pin_set = (u8 != 0);
-    }
-    else if (err == ESP_ERR_NVS_NOT_FOUND) {
-        menu->pin_menu.pin_set = false;
-        err = ESP_OK;
-    }
-    else {
-        goto out;
-    }
+	// Read pin_set
+	uint8_t u8;
+	
+	err = nvs_get_u8(h, SETTINGS_PIN_SET_KEY, &u8);
+	if (err == ESP_OK) {
+		menu->pin_menu.pin_set = (u8 != 0);
+	}
+	else if (err == ESP_ERR_NVS_NOT_FOUND) {
+		menu->pin_menu.pin_set = false;
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGW(TAG, "lcd_settings_pin_nvs_load nvs_get_u8 ESP_ERR_NVS_NOT_FOUND");
+		#endif
+	}
+	else {
+		goto out;
+	}
 
-    // Read unlock_pin
-    size_t required_size = 0;
-    
-    // Get size
-    err = nvs_get_str(h, SETTINGS_PIN_KEY, NULL, &required_size);
-    
-    // If DNE
-    if (err == ESP_ERR_NVS_NOT_FOUND) {
-        menu->pin_menu.unlock_pin[0] = '\0';
-        err = ESP_OK;
-    }
-    else if (err == ESP_OK) {
+	// Read unlock_pin
+	size_t required_size = 0;
+	
+	// Get size
+	err = nvs_get_str(h, SETTINGS_PIN_KEY, NULL, &required_size);
+	
+	// If DNE
+	if (err == ESP_ERR_NVS_NOT_FOUND) {
+		menu->pin_menu.unlock_pin[0] = '\0';
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGW(TAG, "lcd_settings_pin_nvs_load nvs_get_str ESP_ERR_NVS_NOT_FOUND");
+		#endif
+	}
+	else if (err == ESP_OK) {
 		// Stored string too long for our buffer
-        if (required_size > sizeof(menu->pin_menu.unlock_pin)) {
-            err = ESP_ERR_NVS_INVALID_LENGTH;
-            goto out;
-        }
-        // Actually read it
-        err = nvs_get_str(h, SETTINGS_PIN_KEY, menu->pin_menu.unlock_pin, &required_size);
-    }
+		if (required_size > sizeof(menu->pin_menu.unlock_pin)) {
+			ESP_LOGE(TAG, "lcd_settings_pin_nvs_load size error");
+			goto out;
+		}
+		// Actually read it
+		err = nvs_get_str(h, SETTINGS_PIN_KEY, menu->pin_menu.unlock_pin, &required_size);
+		
+		if (err != ESP_OK) {
+			ESP_LOGE(TAG, "lcd_settings_pin_nvs_load set str error");
+		}
+	}
 
 	out:
-    nvs_close(h);
-    return err;
+	nvs_close(h);
 }
 
 void lcd_settings_pin_attempts_nvs_save(void)
@@ -1120,6 +1321,7 @@ void lcd_settings_pin_attempts_nvs_save(void)
 	esp_err_t err = nvs_open(SETTINGS_ATTEMPTS_NS, NVS_READWRITE, &h);
 	if (err != ESP_OK) {
 		ESP_LOGE(TAG, "Pin attempts NVS open error");
+		goto out;
 	}
 
 	// Store pin_attempts as a uint32
@@ -1137,6 +1339,7 @@ void lcd_settings_pin_attempts_nvs_save(void)
 	}
 	
 	// Close NVS
+	out:
 	nvs_close(h);
 }
 
@@ -1150,6 +1353,8 @@ void lcd_settings_pin_attempts_nvs_load(void)
 		#ifdef POLYCAST5_DEBUG
 			ESP_LOGW(TAG, "Pin attempts NS DNE");
 		#endif
+		
+		goto out;
 	}
 	
 	// Get the uint32
@@ -1172,5 +1377,6 @@ void lcd_settings_pin_attempts_nvs_load(void)
 	#endif
 	
 	// Close NVS
+	out:
 	nvs_close(h);
 }

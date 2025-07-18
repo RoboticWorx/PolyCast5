@@ -294,6 +294,11 @@ uint8_t gpio_volts_to_soc(float voltage)
 
 void gpio_spin_haptic(uint32_t ms)
 {
+	// Skip if blank
+	if (ms == HAPTIC_MIN_MS) {
+		return;
+	}
+	
     gpio_set_level(HAPTIC_PIN, 1); // Haptic ON
     
     // Re-arm the timer with the new period

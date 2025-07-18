@@ -43,6 +43,9 @@ typedef struct {
     bool prev; // Last sampled state (1 = released, 0 = pressed)
 } btn_state_t;
 
+static const TickType_t adc_timer_interval = pdMS_TO_TICKS(20000); // 20s
+static uint32_t haptic_ms = 20;
+
 // Buttons and states: same order as buttonSemaphores
 static btn_state_t buttons[6] = {
     {USER_BUTTON_UP,     0, 1},
@@ -68,9 +71,6 @@ static inline void give_button_sem(size_t i)
     // Dereference the pointer and give it
     xSemaphoreGive(*buttonSemaphores[i]);
 }
-
-static const TickType_t adc_timer_interval = pdMS_TO_TICKS(20000); // 20s
-static uint32_t haptic_ms = 20;
 
 static void adc_task(void *arg)
 {

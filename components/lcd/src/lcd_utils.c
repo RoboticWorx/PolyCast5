@@ -68,6 +68,7 @@ enum
 };
 
 uint32_t pin_attempts = 0;
+bool pin_signing_in = false;
 
 static uint8_t anim_active = 0; // Default determined in lcd_anim_nvs_load
 
@@ -1005,6 +1006,8 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 				// Show
 				lv_obj_remove_flag(settings_menu->pin_menu.lbl_attempts, LV_OBJ_FLAG_HIDDEN);
 			}
+			
+			pin_signing_in = true;
 	
 			ui_menu->page = UNLOCK_PAGE;
 		}
@@ -1020,19 +1023,10 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
 	// Statics
-	static bool init = false;
 	static int num_filled = 0;
 	static int num_boxes = 0;
 	static char input_pin[SETTINGS_MAX_PIN_LEN + 1];
 	static lv_obj_t *unlock_labels[SETTINGS_MAX_PIN_LEN];
-	
-	if (!init) {
-		// Zero out
-		num_filled = num_boxes = 0;
-		memset(input_pin, 0, sizeof(input_pin));
-		
-		init = true;
-	}
 	
 	// Pin input
 	if ((ui_btns->up_btn == 1 || ui_btns->down_btn == 1 || ui_btns->left_btn == 1 || ui_btns->right_btn == 1) && (num_filled < SETTINGS_MAX_PIN_LEN)) {
@@ -1080,7 +1074,8 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 			lv_obj_add_flag(settings_menu->pin_menu.lbl_attempts, LV_OBJ_FLAG_HIDDEN);
 			
 			// Reset
-			init = false;
+			num_filled = num_boxes = 0; // Zero out
+			memset(input_pin, 0, sizeof(input_pin));
 			
 			start_animation();
 			
@@ -1116,6 +1111,8 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 			memset(input_pin, 0, sizeof(input_pin));
 			lcd_settings_rebuild_pin_boxes(settings_menu->pin_menu.pin_container, unlock_labels,
 				input_pin, &num_boxes, num_filled);
+				
+			pin_signing_in = false;
 			
 			// Update options text
 			settings_menu->options[0] = SETTINGS_REMOVE_LOCK_TXT;
@@ -1897,6 +1894,17 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		// Switch pages
 		ui_menu->page = SETTINGS_COLORS_PAGE;
 	}
+	// Adjust haptics selected
+	else if (ui_btns->select_btn == 1 && settings_menu->index == 2) {
+		// Hide settings menu
+		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		// Switch pages
+		ui_menu->page = SETTINGS_HAPTIC_PAGE;
+	}
 	// Reboot selected
 	else if (ui_btns->select_btn == 1 && settings_menu->index == 4) {
 		// Hide settings menu
@@ -1923,7 +1931,6 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		// Hide arrows
 		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Switch pages
 		ui_menu->page = SETTINGS_FACTORY_RST_PAGE;

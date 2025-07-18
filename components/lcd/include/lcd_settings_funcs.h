@@ -28,11 +28,11 @@ typedef struct {
 } settings_pin_menu_t;
 
 typedef struct {
-    char *options[MAX_SETTINGS_OPTIONS];
-    lv_obj_t *btns[MAX_SETTINGS_OPTIONS];
-    int size;
-    int index;
-    lv_obj_t *main_list;
+	char *options[MAX_SETTINGS_OPTIONS];
+	lv_obj_t *btns[MAX_SETTINGS_OPTIONS];
+	int size;
+	int index;
+	lv_obj_t *main_list;
 	lv_style_t btn_style;
 	lv_style_t sel_style;
 	lv_obj_t *cont;
@@ -101,6 +101,15 @@ void lcd_settings_colors_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_m
 void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
 
 /**
+ * @brief Executes adjust haptics page so user can change haptic settings
+ *
+ * @param [in] ui_btns User input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] settings_menu Settings menu structure
+ */
+void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
+
+/**
  * @brief Executes factory reset page
  *
  * @param [in] ui_btns User input structure
@@ -108,6 +117,8 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
  * @param [in] settings_menu Settings menu structure
  */
 void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
+
+/* NVS functions */
 
 /**
  * @brief Saves the current primary and secondary colors to NVS
@@ -126,19 +137,15 @@ void lcd_settings_color_nvs_load(void);
  * @brief Saves the entered unlock PIN to NVS
  *
  * @param [in] settings_menu_t Settings menu structure
- *
- * @returns ESP error status
  */
-esp_err_t lcd_settings_pin_nvs_save(const settings_menu_t *menu);
+void lcd_settings_pin_nvs_save(const settings_menu_t *menu);
 
 /**
  * @brief Loads the saved unlock PIN from NVS
  *
  * @param [in] settings_menu_t Settings menu structure
- *
- * @returns ESP error status
  */
-esp_err_t lcd_settings_pin_nvs_load(settings_menu_t *menu);
+void lcd_settings_pin_nvs_load(settings_menu_t *menu);
 
 /**
  * @brief Saves the current pin entry attempts global to NVS
