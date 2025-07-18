@@ -1366,7 +1366,7 @@ void lcd_wifi_sync_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		
 		lbl_ins = lv_label_create(ACTIVE_SCR);
 		
-        lcd_format_label(lbl_ins, "1. Bring near desired PolyPlug.\n2. Press the top right button\non the PolyPlug.\n3. Confirm LED is showing\ngreen on the PolyPlug.\n4. On this device, hit the\nright arrow to confirm.", user_secondary_color,
+        lcd_format_label(lbl_ins, "1. Bring near desired PolyPlug.\n2. Press the top right button\non the PolyPlug.\n3. Confirm LED is showing\nblue on the PolyPlug.\n4. On this device, hit the\nright arrow to confirm.", user_secondary_color,
                          &lv_font_montserrat_14, LV_ALIGN_CENTER, 6, 6);
 		
 		init = true;

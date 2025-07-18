@@ -24,6 +24,7 @@ typedef struct {
 	lv_obj_t *pin_container;
 	lv_obj_t *lbl_ins;
 	lv_obj_t *lbl_back;
+	lv_obj_t *lbl_attempts;
 } settings_pin_menu_t;
 
 typedef struct {
@@ -139,5 +140,14 @@ esp_err_t lcd_settings_pin_nvs_save(const settings_menu_t *menu);
  */
 esp_err_t lcd_settings_pin_nvs_load(settings_menu_t *menu);
 
+/**
+ * @brief Saves the current pin entry attempts global to NVS
+ */
+void lcd_settings_pin_attempts_nvs_save(void);
+
+/**
+ * @brief Loads the current pin entry attempts into global from NVS
+ */
+void lcd_settings_pin_attempts_nvs_load(void);
 
 #endif // LCD_SETTINGS_FUNCS_H

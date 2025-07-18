@@ -99,6 +99,7 @@ static void lcd_task(void *pvParameters)
 	lcd_wifi_topic_keys_nvs_load(&wifi_menu);
 	
 	lcd_settings_pin_nvs_load(&settings_menu);
+	lcd_settings_pin_attempts_nvs_load(); // Loads pin_attempts global
 	
 		
 	// Create common pages

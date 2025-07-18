@@ -26,6 +26,7 @@
 
 #include "lcd_asset_macros.h"
 #include "lcd_utils.h"
+#include "widgets/label/lv_label.h"
 #include "wifi_funcs.h"
 #include "wifi_task.h"
 #include "infrared_funcs.h"
@@ -66,6 +67,7 @@ enum
 	PYRAMID
 };
 
+uint32_t pin_attempts = 0;
 
 static uint8_t anim_active = 0; // Default determined in lcd_anim_nvs_load
 
@@ -620,9 +622,7 @@ static esp_err_t lcd_anim_nvs_save(void)
 		#endif
 	}
 	else {
-		#ifdef POLYCAST5_DEBUG
-			ESP_LOGI(TAG, "Failed to save NVS animation");
-		#endif
+		ESP_LOGE(TAG, "Failed to save NVS animation");
 	}
 	
 	// Close NVS
@@ -994,6 +994,17 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 			lv_obj_remove_flag(settings_menu->pin_menu.pin_container, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_remove_flag(settings_menu->pin_menu.lbl_ins, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_remove_flag(settings_menu->pin_menu.lbl_back, LV_OBJ_FLAG_HIDDEN);
+			
+			// Show wrong attempts
+			if (pin_attempts > 0) {
+				// Build and set attempts string
+				char buf[18];
+				snprintf(buf, sizeof(buf), "WRONG: %" PRIu32, pin_attempts);
+				lv_label_set_text(settings_menu->pin_menu.lbl_attempts, buf);
+				
+				// Show
+				lv_obj_remove_flag(settings_menu->pin_menu.lbl_attempts, LV_OBJ_FLAG_HIDDEN);
+			}
 	
 			ui_menu->page = UNLOCK_PAGE;
 		}
@@ -1066,6 +1077,7 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 			lv_obj_add_flag(settings_menu->pin_menu.pin_container, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_add_flag(settings_menu->pin_menu.lbl_ins, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_add_flag(settings_menu->pin_menu.lbl_back, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_add_flag(settings_menu->pin_menu.lbl_attempts, LV_OBJ_FLAG_HIDDEN);
 			
 			// Reset
 			init = false;
@@ -1095,9 +1107,12 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 			lv_obj_add_flag(settings_menu->pin_menu.pin_container, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_add_flag(settings_menu->pin_menu.lbl_ins, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_add_flag(settings_menu->pin_menu.lbl_back, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_add_flag(settings_menu->pin_menu.lbl_attempts, LV_OBJ_FLAG_HIDDEN);
 			
 			// Reset
 			num_filled = num_boxes = 0;
+			pin_attempts = 0;
+			lcd_settings_pin_attempts_nvs_save(); // Saves pin_attempts global
 			memset(input_pin, 0, sizeof(input_pin));
 			lcd_settings_rebuild_pin_boxes(settings_menu->pin_menu.pin_container, unlock_labels,
 				input_pin, &num_boxes, num_filled);
@@ -1121,11 +1136,22 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 			#ifdef POLYCAST5_DEBUG
 				ESP_LOGI(TAG, "PIN denied");
 			#endif
-	
+			
 			// Outline red
 			for (int i = 0; i < num_boxes; i++) {
 				lv_obj_set_style_border_color(lv_obj_get_parent(unlock_labels[i]), lv_palette_main(LV_PALETTE_RED), 0);
 			}
+			
+			pin_attempts++;
+			lcd_settings_pin_attempts_nvs_save(); // Saves pin_attempts global
+			
+			// Build and set attempts string
+			char buf[18];
+			snprintf(buf, sizeof(buf), "WRONG: %" PRIu32, pin_attempts);
+			lv_label_set_text(settings_menu->pin_menu.lbl_attempts, buf);
+			
+			// Show attempts
+			lv_obj_remove_flag(settings_menu->pin_menu.lbl_attempts, LV_OBJ_FLAG_HIDDEN);
 		}
 	}
 	// Power off
@@ -1134,6 +1160,7 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 		lv_obj_add_flag(settings_menu->pin_menu.pin_container, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(settings_menu->pin_menu.lbl_ins, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(settings_menu->pin_menu.lbl_back, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(settings_menu->pin_menu.lbl_attempts, LV_OBJ_FLAG_HIDDEN);
 		
 		// Reset
 		num_filled = num_boxes = 0;

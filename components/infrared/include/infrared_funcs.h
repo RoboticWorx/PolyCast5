@@ -21,8 +21,8 @@
 #define RANDOM_TX_THRESHOLD 15
 #define RANDOM_TX_DELAY_MS 3000
 
-#define MAX_STORED_SIGNALS 100
-#define MAX_REMOTES 10
+#define MAX_STORED_SIGNALS 1000 // 20 signals per remote
+#define MAX_REMOTES 50
 
 // NVS keys
 #define IR_NS "ir_data"

@@ -28,6 +28,9 @@
 #define SETTINGS_PIN_KEY "se_pi_ke"
 #define SETTINGS_PIN_SET_KEY "se_pse_ke"
 
+#define SETTINGS_ATTEMPTS_NS "pin_attempts"
+#define SETTINGS_ATTEMPTS_KEY "attempts_key"
+
 #define COLOR_OPTION_COUNT 23
 
 settings_menu_t settings_menu = {
@@ -301,10 +304,14 @@ void lcd_settings_setup_pin_page(settings_menu_t *menu)
 	lcd_format_label(menu->pin_menu.lbl_ins, "Enter PIN:", user_secondary_color, 
 			&lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 18);
 			
+	menu->pin_menu.lbl_attempts = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(menu->pin_menu.lbl_attempts, "", user_secondary_color, 
+			&lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, -32);
+			
 	menu->pin_menu.lbl_back = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(menu->pin_menu.lbl_back, "Press home to go back", user_secondary_color, 
-			&lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -18);
-		
+			&lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -16);
+	
 	// Create pin container
 	menu->pin_menu.pin_container = lv_obj_create(ACTIVE_SCR);
 	lv_obj_set_size(menu->pin_menu.pin_container, LV_SIZE_CONTENT, 37);
@@ -314,7 +321,7 @@ void lcd_settings_setup_pin_page(settings_menu_t *menu)
 	lv_obj_set_flex_flow(menu->pin_menu.pin_container, LV_FLEX_FLOW_ROW);
 	lv_obj_set_style_pad_column(menu->pin_menu.pin_container, 5, 0);
 	lv_obj_set_scrollbar_mode(menu->pin_menu.pin_container, LV_SCROLLBAR_MODE_OFF);
-		
+	
 	// Remove outside padding
 	lv_style_init(&container_style);
 	lv_style_set_pad_left(&container_style, 0);
@@ -330,6 +337,7 @@ void lcd_settings_setup_pin_page(settings_menu_t *menu)
 	lv_obj_add_flag(menu->pin_menu.pin_container, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(menu->pin_menu.lbl_ins, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(menu->pin_menu.lbl_back, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(menu->pin_menu.lbl_attempts, LV_OBJ_FLAG_HIDDEN);
 }
 
 static void confirm_entered_pin(ui_menu_t *ui_menu, settings_menu_t *settings_menu)
@@ -1102,4 +1110,67 @@ esp_err_t lcd_settings_pin_nvs_load(settings_menu_t *menu)
 	out:
     nvs_close(h);
     return err;
+}
+
+void lcd_settings_pin_attempts_nvs_save(void)
+{
+	nvs_handle_t h;
+	
+	// Open NVS
+	esp_err_t err = nvs_open(SETTINGS_ATTEMPTS_NS, NVS_READWRITE, &h);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "Pin attempts NVS open error");
+	}
+
+	// Store pin_attempts as a uint32
+	err = nvs_set_u32(h, SETTINGS_ATTEMPTS_KEY, pin_attempts);
+	if (err == ESP_OK) {
+		// Commit to flash
+		err = nvs_commit(h);
+		
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "Saved pin attempts: %" PRIu32, pin_attempts);
+		#endif
+	}
+	else {
+		ESP_LOGE(TAG, "Failed to save pin attempts: %" PRIu32, pin_attempts);
+	}
+	
+	// Close NVS
+	nvs_close(h);
+}
+
+void lcd_settings_pin_attempts_nvs_load(void)
+{
+	nvs_handle_t h;
+	
+	// Open NVS
+	esp_err_t err = nvs_open(SETTINGS_ATTEMPTS_NS, NVS_READONLY, &h);
+	if (err != ESP_OK) {
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGW(TAG, "Pin attempts NS DNE");
+		#endif
+	}
+	
+	// Get the uint32
+	uint32_t stored = 0;
+	err = nvs_get_u32(h, SETTINGS_ATTEMPTS_KEY, &stored);
+	switch (err) {
+		case ESP_OK:
+			pin_attempts = stored;
+			break;
+		case ESP_ERR_NVS_NOT_FOUND:
+			// First‐boot or key erased: default
+			pin_attempts = 0;
+			break;
+		default:
+			break;
+	}
+	
+	#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Loaded pin attempts: %" PRIu32, stored);
+	#endif
+	
+	// Close NVS
+	nvs_close(h);
 }

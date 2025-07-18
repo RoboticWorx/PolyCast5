@@ -42,7 +42,7 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 	#define SELECT_TXT "Select to delete signal."
 	#define EDIT_TXT "Press edit to rename."
 	
-	#define CREATE_REMOTE_TXT "Select to add remote."
+	#define CREATE_REMOTE_TXT "Select to add a remote."
 	#define DELETE_REMOTE_TXT "Select to delete remote."
 	
 	#define ADD_NEW_LABEL "Add REM"

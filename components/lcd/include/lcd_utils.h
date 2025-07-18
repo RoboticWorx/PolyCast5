@@ -12,6 +12,8 @@
 
 #include "gpio_funcs.h"
 
+#define ACTIVE_SCR (lv_scr_act())
+
 #define HOR_RES 240
 #define VER_RES 135
 
@@ -63,7 +65,7 @@ enum {
     SETTINGS_PIN_PAGE
 };
 
-#define ACTIVE_SCR (lv_scr_act())
+extern uint32_t pin_attempts;
 
 extern lv_color_t user_primary_color;
 extern lv_color_t user_secondary_color;
