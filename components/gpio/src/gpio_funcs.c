@@ -298,15 +298,23 @@ uint8_t gpio_volts_to_soc(float voltage)
 
 void gpio_spin_haptic(uint32_t ms)
 {
-	// Skip if blank
-	if (ms == HAPTIC_MIN_MS) {
-		return;
+	// Cap
+	if (ms < HAPTIC_MIN_MS) {
+		ms = HAPTIC_MIN_MS;
+	}
+	else if (ms > HAPTIC_MAX_MS) {
+		ms = HAPTIC_MAX_MS;
+	}
+	
+	TickType_t ticks = pdMS_TO_TICKS(ms);
+    if (ticks == 0) {
+		ticks = 1; // Can't be 0
 	}
 	
     gpio_set_level(HAPTIC_PIN, 1); // Haptic ON
     
     // Re-arm the timer with the new period
-    xTimerChangePeriod(haptic_timer, pdMS_TO_TICKS(ms), 0);
+    xTimerChangePeriod(haptic_timer, ticks, 0);
     xTimerStart(haptic_timer, 0);
     
     // Haptic OFF when timer expires

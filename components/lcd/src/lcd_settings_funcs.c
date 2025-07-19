@@ -32,6 +32,10 @@
 #define SETTINGS_ATTEMPTS_NS "pin_attempts"
 #define SETTINGS_ATTEMPTS_KEY "attempts_key"
 
+#define SETTINGS_HAPTICS_NS "haptic_data"
+#define SETTINGS_HAPTIC_DUR_KEY "haptic_dur"
+#define SETTINGS_HAPTIC_STATES_KEY "haptic_states"
+
 #define COLOR_OPTION_COUNT 23
 
 settings_menu_t settings_menu = {
@@ -44,8 +48,8 @@ settings_menu_t settings_menu = {
 
 extern bool pin_signing_in;
 
-static uint32_t haptic_len_ms = 20;
-static bool btn_states[6] = {true, false, false, false, false, false};
+extern volatile uint8_t haptic_len_ms;
+extern volatile bool haptic_btns[6];
 
 static bool primary_color_selected = true;
 
@@ -917,14 +921,6 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 	}
 }
 
-// lcd_settings_adjust_haptics_page helpers
-static void haptic_switch_event(lv_event_t *e) {
-	lv_obj_t *sw = lv_event_get_target(e);
-	intptr_t idx = (intptr_t)lv_event_get_user_data(e);
-	
-	// Assign btn_states
-	btn_states[idx] = lv_obj_has_state(sw, LV_STATE_CHECKED);
-}
 void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
 	#define ADJ_HAPTIC_Y_OFFSET 38
@@ -942,6 +938,10 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 	};
 
 	if (!init) {
+		xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics
+	    lcd_settings_haptics_nvs_load(); // Reload haptics
+	    xSemaphoreGive(xHapticsMutex); // Release haptics
+		
 		// Create parent container
 		cont = lv_obj_create(ACTIVE_SCR);
 		lv_obj_set_size(cont, 210, 106);
@@ -960,7 +960,8 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 		lbl_spin = lv_label_create(cont);
 		lcd_format_label(lbl_spin, "", user_secondary_color,
 					&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
-		lv_label_set_text_fmt(lbl_spin, "Buzz for %" PRIu32 " ms", haptic_len_ms);
+		xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics
+		lv_label_set_text_fmt(lbl_spin, "Buzz for %" PRIu8 " ms", haptic_len_ms);
 		
 		// Slider
 		slider = lv_slider_create(cont);
@@ -968,8 +969,7 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 		lv_obj_align(slider, LV_ALIGN_TOP_MID, 30, 0);
 		lv_slider_set_range(slider, HAPTIC_MIN_MS, HAPTIC_MAX_MS);
 		lv_slider_set_value(slider, haptic_len_ms, LV_ANIM_OFF);
-		
-		lv_obj_add_event_cb(slider, NULL, LV_EVENT_VALUE_CHANGED, lbl_spin);
+		xSemaphoreGive(xHapticsMutex); // Release haptics
 		
 		// Six switch rows
 		for (int i = 0; i < 6; i++) {
@@ -997,10 +997,11 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 		    // Add the switch
 		    sw_arr[i] = lv_switch_create(sw_row[i]);
 		    lv_obj_set_size(sw_arr[i], 30, 20);
-		    if (btn_states[i]) {
+		    xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics
+		    if (haptic_btns[i]) {
 		        lv_obj_add_state(sw_arr[i], LV_STATE_CHECKED);
 		    }
-		    lv_obj_add_event_cb(sw_arr[i], haptic_switch_event, LV_EVENT_VALUE_CHANGED, (void*)(intptr_t)i);
+		    xSemaphoreGive(xHapticsMutex); // Release haptics
 			
 		    lv_obj_set_style_margin_right(lbl, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
 		}
@@ -1029,27 +1030,39 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 	}
 	// Toggle/iterate
 	else if (ui_btns->select_btn == 1) {
+		xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics        
 		// Iterate slider
 		if (selected == 0) {
 			// Increment slider with wrap
-			haptic_len_ms = (haptic_len_ms + 1) % HAPTIC_MAX_MS;
+			haptic_len_ms = (haptic_len_ms + 1) % (HAPTIC_MAX_MS + 1);
+			if (haptic_len_ms < HAPTIC_MIN_MS) {
+				haptic_len_ms = HAPTIC_MIN_MS;
+			}
+			
 			lv_slider_set_value(slider, haptic_len_ms, LV_ANIM_OFF);
 			
 			// Update label
-			lv_label_set_text_fmt(lbl_spin, "Buzz for %" PRIu32 " ms", haptic_len_ms);
+			lv_label_set_text_fmt(lbl_spin, "Buzz for %" PRIu8 " ms", haptic_len_ms);
 		}
 		// Toggle selected switch
 		else {
-			lv_obj_t *sw = sw_arr[selected - 1];
+			int idx = selected - 1;
+			lv_obj_t *sw = sw_arr[idx];
 			
 			// Toggle
 			if (lv_obj_has_state(sw, LV_STATE_CHECKED)) {
 				lv_obj_clear_state(sw, LV_STATE_CHECKED);
+				haptic_btns[idx] = false;
 			}
 			else {
 				lv_obj_add_state(sw, LV_STATE_CHECKED);
+				haptic_btns[idx] = true;
 			}
 		}
+		
+		// Persist to NVS
+		lcd_settings_haptics_nvs_save();
+		xSemaphoreGive(xHapticsMutex); // Release haptics
 	}
 	// Back
 	else if (ui_btns->left_btn == 1) {
@@ -1379,4 +1392,74 @@ void lcd_settings_pin_attempts_nvs_load(void)
 	// Close NVS
 	out:
 	nvs_close(h);
+}
+
+void lcd_settings_haptics_nvs_save(void)
+{
+    nvs_handle_t h;
+    
+    // Open NVS
+    esp_err_t err = nvs_open(SETTINGS_HAPTICS_NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "lcd_settings_haptics_nvs_save: open failed (%s)", esp_err_to_name(err));
+        return;
+    }
+
+    // Save the haptic length
+    err = nvs_set_u8(h, SETTINGS_HAPTIC_DUR_KEY, haptic_len_ms);
+    if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_haptics_nvs_save: len set failed");
+	}
+
+    // Pack the 6 bools into a single byte mask
+    uint8_t mask = 0;
+    for (int i = 0; i < 6; i++) {
+        if (haptic_btns[i]) {
+			mask |= (1 << i);
+		}
+    }
+    
+    // Save that mask
+    err = nvs_set_u8(h, SETTINGS_HAPTIC_STATES_KEY, mask);
+    if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_haptics_nvs_save: states set failed");
+	}
+
+	// Commit changes
+    err = nvs_commit(h);
+    if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_haptics_nvs_save: commit failed");
+	}
+	
+	// Close NVS
+    nvs_close(h);
+}
+
+void lcd_settings_haptics_nvs_load(void)
+{
+    nvs_handle_t h;
+    
+    // Open NVS
+    esp_err_t err = nvs_open(SETTINGS_HAPTICS_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+        // First boot: leave defaults
+        return;
+    }
+
+    // Load slider length
+    uint8_t len;
+    if (nvs_get_u8(h, SETTINGS_HAPTIC_DUR_KEY, &len) == ESP_OK) {
+        haptic_len_ms = len;
+    }
+
+    // Load haptic btn states
+    uint8_t mask;
+    if (nvs_get_u8(h, SETTINGS_HAPTIC_STATES_KEY, &mask) == ESP_OK) {
+        for (int i = 0; i < 6; i++) {
+            haptic_btns[i] = !!(mask & (1 << i));
+        }
+    }
+    
+    // Close NVS
+    nvs_close(h);
 }

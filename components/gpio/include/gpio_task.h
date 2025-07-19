@@ -3,12 +3,13 @@
 
 #include "freertos/idf_additions.h"
 
-#define HAPTIC_MAX_MS 41
-#define HAPTIC_MIN_MS 0
+#define HAPTIC_MAX_MS 50
+#define HAPTIC_MIN_MS 10
 
 // Mutex
 extern SemaphoreHandle_t xSPIBusMutex;
 extern SemaphoreHandle_t xI2CBusMutex;
+extern SemaphoreHandle_t xHapticsMutex;
 
 // Regular
 extern SemaphoreHandle_t xPowerButtonSemaphore;

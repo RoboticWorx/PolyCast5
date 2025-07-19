@@ -19,6 +19,7 @@
 
 SemaphoreHandle_t xSPIBusMutex;
 SemaphoreHandle_t xI2CBusMutex;
+SemaphoreHandle_t xHapticsMutex;
 
 SemaphoreHandle_t xPowerButtonSemaphore;
 SemaphoreHandle_t xStartAdcBatSemaphore;
@@ -46,26 +47,28 @@ typedef struct {
     bool prev; // Last sampled state (1 = released, 0 = pressed)
 } btn_state_t;
 
+volatile uint8_t haptic_len_ms = 20; // Default buzz 20ms
+volatile bool haptic_btns[6] = {false, false, false, false, false, true}; // Default buzz on select
+
 static const TickType_t adc_timer_interval = pdMS_TO_TICKS(20000); // 20s
-static uint32_t haptic_ms = 20;
 
 // Buttons and states: same order as buttonSemaphores
 static btn_state_t buttons[6] = {
+	{USER_BUTTON_SELECT, 0, 1},
+	{USER_BUTTON_HOME,   0, 1},
     {USER_BUTTON_UP,     0, 1},
     {USER_BUTTON_DOWN,   0, 1},
-    {USER_BUTTON_RIGHT,  0, 1},
     {USER_BUTTON_LEFT,   0, 1},
-    {USER_BUTTON_HOME,   0, 1},
-    {USER_BUTTON_SELECT, 0, 1},
+    {USER_BUTTON_RIGHT,  0, 1},
 };
 
 static SemaphoreHandle_t *buttonSemaphores[] = {
+	&xSelectButtonSemaphore,
+	&xHomeButtonSemaphore,
     &xUpButtonSemaphore,
     &xDownButtonSemaphore,
-    &xRightButtonSemaphore,
     &xLeftButtonSemaphore,
-    &xHomeButtonSemaphore,
-    &xSelectButtonSemaphore,
+    &xRightButtonSemaphore,
 };
 
 // Helper to “give” the right semaphore based on index
@@ -141,6 +144,9 @@ static void adc_task(void *arg)
 
 static void gpio_task(void *arg)
 {
+	xHapticsMutex = xSemaphoreCreateMutex();
+	configASSERT(xHapticsMutex);
+	
 	xUpButtonSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xUpButtonSemaphore);
     xDownButtonSemaphore = xSemaphoreCreateBinary();
@@ -211,10 +217,12 @@ static void gpio_task(void *arg)
 	                give_button_sem(i); // Signal the press
 	                b->ticks = REPEAT_START_MS / POLL_MS;
 	                
-	                // If select button
-	                if (i == 5) {
-						gpio_spin_haptic(haptic_ms);
-					}
+	                // Haptic feedback if this button is enabled in settings
+	                xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics
+		            if (haptic_btns[i]) {
+		                gpio_spin_haptic(haptic_len_ms);
+		            }
+		            xSemaphoreGive(xHapticsMutex); // Release haptics
 	            }
 	            else if (b->ticks == 0) { // Time to auto-repeat
 	                give_button_sem(i); // Repeat the press

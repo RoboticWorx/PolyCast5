@@ -157,4 +157,14 @@ void lcd_settings_pin_attempts_nvs_save(void);
  */
 void lcd_settings_pin_attempts_nvs_load(void);
 
+/**
+ * @brief Saves the current haptic length and states to NVS
+ */
+void lcd_settings_haptics_nvs_save(void);
+
+/**
+ * @brief Loads the current haptic length and states from NVS
+ */
+void lcd_settings_haptics_nvs_load(void);
+
 #endif // LCD_SETTINGS_FUNCS_H

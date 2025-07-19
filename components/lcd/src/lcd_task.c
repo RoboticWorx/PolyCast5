@@ -102,8 +102,10 @@ static void lcd_task(void *pvParameters)
 	
 	lcd_settings_pin_nvs_load(&settings_menu);
 	lcd_settings_pin_attempts_nvs_load(); // Loads pin_attempts global
+	xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics
+	lcd_settings_haptics_nvs_load(); // Load haptics
+	xSemaphoreGive(xHapticsMutex); // Release haptics
 	
-		
 	// Create common pages
 	lcd_ir_setup_page(&ir_menu);
 	
@@ -189,7 +191,12 @@ static void lcd_task(void *pvParameters)
 			if (xPowerButtonSemaphore && xSemaphoreTake(xPowerButtonSemaphore, 0) == pdTRUE) {
 				ui_btns.pwr_btn = 1;
 				
-				lv_label_set_text(ui_menu.lbl_battery_txt, "..."); // Start with dots until battery updated
+				if (!is_charging) {
+					lv_label_set_text(ui_menu.lbl_battery_txt, "..."); // Start with dots until battery updated
+				}
+				else {
+					lv_label_set_text(ui_menu.lbl_battery_txt, ""); // Or blank if charging
+				}
 				lv_timer_handler();
 				
 				go_to_sleep = true;
