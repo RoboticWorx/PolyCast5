@@ -10,6 +10,8 @@
 
 static const char *TAG = "LCD_TASK";
 
+static volatile bool is_charging = false;
+
 static const TickType_t btn_timer_interval = pdMS_TO_TICKS(200);
 
 #ifdef POLYCAST5_EN_SLEEP_TIMER
@@ -337,8 +339,14 @@ static void lcd_task(void *pvParameters)
 		#endif
 		
 		// Update battery text
+		if (xIsChargingSemaphore && xSemaphoreTake(xIsChargingSemaphore, 0) == pdTRUE) {
+			is_charging = true;
+		}
+		else if (xNotChargingSemaphore && xSemaphoreTake(xNotChargingSemaphore, 0) == pdTRUE) {
+			is_charging = false;
+		}
 		if (xAdcBatReadingQueue && xQueueReceive(xAdcBatReadingQueue, &battery_percentage, 0) == pdTRUE) {
-			lcd_update_battery(&ui_menu, battery_percentage);
+			lcd_update_battery(&ui_menu, battery_percentage, is_charging);
 		}
 
 		lv_timer_handler();

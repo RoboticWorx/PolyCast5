@@ -21,6 +21,9 @@ extern SemaphoreHandle_t xLeftButtonSemaphore; // Left btn pressed
 extern SemaphoreHandle_t xHomeButtonSemaphore; // Back btn pressed
 extern SemaphoreHandle_t xSelectButtonSemaphore; // Select btn pressed
 
+extern SemaphoreHandle_t xIsChargingSemaphore;
+extern SemaphoreHandle_t xNotChargingSemaphore;
+
 extern SemaphoreHandle_t xLedBlueSemaphore;
 extern SemaphoreHandle_t xLedRedSemaphore;
 extern SemaphoreHandle_t xLedGreenSemaphore;

@@ -30,6 +30,9 @@ SemaphoreHandle_t xLeftButtonSemaphore;
 SemaphoreHandle_t xHomeButtonSemaphore;
 SemaphoreHandle_t xSelectButtonSemaphore;
 
+SemaphoreHandle_t xIsChargingSemaphore;
+SemaphoreHandle_t xNotChargingSemaphore;
+
 SemaphoreHandle_t xLedBlueSemaphore;
 SemaphoreHandle_t xLedRedSemaphore;
 SemaphoreHandle_t xLedGreenSemaphore;
@@ -151,6 +154,11 @@ static void gpio_task(void *arg)
     xSelectButtonSemaphore = xSemaphoreCreateBinary();
     configASSERT(xSelectButtonSemaphore);
     
+    xIsChargingSemaphore = xSemaphoreCreateBinary();
+    configASSERT(xIsChargingSemaphore);
+    xNotChargingSemaphore = xSemaphoreCreateBinary();
+    configASSERT(xNotChargingSemaphore);
+    
     xLedBlueSemaphore = xSemaphoreCreateBinary();
     configASSERT(xLedBlueSemaphore);
     xLedRedSemaphore = xSemaphoreCreateBinary();
@@ -182,6 +190,9 @@ static void gpio_task(void *arg)
 	if (xTaskCreate(adc_task, "adc_task", 1024 * 2, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
 	    ESP_LOGE(TAG, "Failed to start adc_task");
 	}
+	
+	// Get opposite initial charging state to update once
+	bool was_charging = !(gpio_read_input(CHG_IND_PIN) == 0);
 	
 	while (1) 
 	{
@@ -226,6 +237,22 @@ static void gpio_task(void *arg)
 	    if (gpio_read_input(USER_BUTTON_POWER) == 0) {
 			xSemaphoreGive(xPowerButtonSemaphore);
 		}
+		
+		// Update LCD based on if charging or not
+		bool is_charging = (gpio_read_input(CHG_IND_PIN) == 0);
+		if (is_charging != was_charging) { // Only update on state change
+			// LiPo is charging
+	        if (is_charging) {
+	            xSemaphoreGive(xIsChargingSemaphore);
+	        }
+	        // LiPo is not charging
+	        else {
+	            xSemaphoreGive(xNotChargingSemaphore);
+	        }
+	        xSemaphoreGive(xStartAdcBatSemaphore); // Update battery reading
+	        
+	        was_charging = is_charging;
+	    }
 	    
 	    // Reset hotkey
 	    if (gpio_read_input(USER_BUTTON_HOME) == 0 && gpio_read_input(USER_BUTTON_RIGHT) == 0) {

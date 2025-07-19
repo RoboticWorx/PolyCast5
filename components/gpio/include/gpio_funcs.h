@@ -20,6 +20,7 @@
 #define USER_BUTTON_DOWN 6
 #define USER_BUTTON_SELECT 4
 #define USER_BUTTON_POWER 0
+#define CHG_IND_PIN 7
 
 #define HAPTIC_PIN 10
 #define ADC_PIN 5

@@ -212,8 +212,9 @@ void lcd_clear_user_in();
  *
  * @param [in] ui_menu UI menu structure
  * @param [in] battery_percentage Battery percentage read and calculated from adc_task
+ * @param [in] charging If the battery is charging or not
 */
-void lcd_update_battery(ui_menu_t *ui_menu, uint8_t battery_percentage);
+void lcd_update_battery(ui_menu_t *ui_menu, uint8_t battery_percentage, bool charging);
 
 /**
  * @brief Display/scroll through home page animations

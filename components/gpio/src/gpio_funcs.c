@@ -164,7 +164,7 @@ esp_err_t gpio_write_output(uint8_t pin, bool level)
     xSemaphoreGive(xI2CBusMutex); // Release I2C bus
     
     if (level) {
-        out |=  (1 << pin);
+        out |= (1 << pin);
     } else {
         out &= ~(1 << pin);
     }
@@ -188,7 +188,7 @@ void gpio_init_battery_adc(void)
 	// Configure ADC channel
     adc_oneshot_chan_cfg_t chan_cfg = {
         .bitwidth = ADC_BITWIDTH_12,
-        .atten     = ADC_ATTEN_DB_12,
+        .atten = ADC_ATTEN_DB_12,
     };
     ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CH, &chan_cfg));
 
@@ -198,9 +198,9 @@ void gpio_init_battery_adc(void)
     
     // Configure curve fitting
     adc_cali_curve_fitting_config_t cfg = {
-	    .unit_id   = ADC_UNIT_1,
-	    .atten     = ADC_ATTEN_DB_12,
-	    .bitwidth  = ADC_BITWIDTH_12,
+	    .unit_id = ADC_UNIT_1,
+	    .atten = ADC_ATTEN_DB_12,
+	    .bitwidth = ADC_BITWIDTH_12,
 	};
 	ESP_ERROR_CHECK(adc_cali_create_scheme_curve_fitting(&cfg, &cali_handle));
 }
@@ -243,17 +243,21 @@ float gpio_get_battery_voltage(void)
 	
 	float Vadc = pin_mv / 1000.0f; // Convert to volts
 	
+	#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Raw voltage reading: %f", Vadc);
+	#endif
+	
     //return Vadc;
     
     // Undo divider + op amp: Vbat = (Vadc + off) / gain
     const float R42 = 10000, R43 = 27400;
     const float R44 = 10000, R45 = 27400;
     const float R40 =  2200, R41 = 22000;
-    const float Vref = 3.3f * (R41 / (R40 + R41));
+    const float Vref = 3.30f * (R41 / (R40 + R41));
     const float gain = (1.0f + R45 / R44) * (R43 / (R42+R43));
-    const float off  = (R45 / R44) * Vref;
+    const float off = (R45 / R44) * Vref;
 
-    return (Vadc + off)/gain;
+    return (Vadc + off) / gain;
 }
 
 uint8_t gpio_volts_to_soc(float voltage)

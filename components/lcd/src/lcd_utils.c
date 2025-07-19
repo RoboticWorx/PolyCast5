@@ -1,4 +1,6 @@
 #include "core/lv_obj.h"
+#include "core/lv_obj_pos.h"
+#include "font/lv_symbol_def.h"
 #include "lcd_settings_funcs.h"
 #include "polycast5_macros.h"
 
@@ -835,27 +837,40 @@ void lcd_clear_user_in()
 	ui_btns.pwr_btn = 0;
 }
 
-void lcd_update_battery(ui_menu_t *ui_menu, uint8_t battery_percentage)
+void lcd_update_battery(ui_menu_t *ui_menu, uint8_t battery_percentage, bool charging)
 {
-	char buf[4]; // 3 + 1 max
-	snprintf(buf, sizeof(buf), "%u", battery_percentage);
-	lv_label_set_text(ui_menu->lbl_battery_txt, buf);
-	
-	// Update icon based on battery level
-	if (battery_percentage >= 80) { // 80-100
-		lv_label_set_text(ui_menu->lbl_battery_icon, LV_SYMBOL_BATTERY_FULL);
+	// If not charging, update percentage
+	if (!charging) {
+		lv_obj_align(ui_menu->lbl_battery_icon, LV_ALIGN_TOP_RIGHT, -2, -3); // Revert formatting
+		
+		char buf[4]; // 3 max + NULL
+		snprintf(buf, sizeof(buf), "%u", battery_percentage);
+		lv_label_set_text(ui_menu->lbl_battery_txt, buf);
+		
+		// Update icon based on battery level
+		if (battery_percentage >= 80) { // 80-100
+			lv_label_set_text(ui_menu->lbl_battery_icon, LV_SYMBOL_BATTERY_FULL);
+		}
+		else if (battery_percentage >= 60) { // 60-79
+			lv_label_set_text(ui_menu->lbl_battery_icon, LV_SYMBOL_BATTERY_3);
+		}
+		else if (battery_percentage >= 40) { // 40-59
+			lv_label_set_text(ui_menu->lbl_battery_icon, LV_SYMBOL_BATTERY_2);
+		}
+		else if (battery_percentage >= 20) { // 20-39
+			lv_label_set_text(ui_menu->lbl_battery_icon, LV_SYMBOL_BATTERY_1);
+		}
+		else { // 0-19
+			lv_label_set_text(ui_menu->lbl_battery_icon, LV_SYMBOL_BATTERY_EMPTY);
+		}
 	}
-	else if (battery_percentage >= 60) { // 60-79
-		lv_label_set_text(ui_menu->lbl_battery_icon, LV_SYMBOL_BATTERY_3);
-	}
-	else if (battery_percentage >= 40) { // 40-59
-		lv_label_set_text(ui_menu->lbl_battery_icon, LV_SYMBOL_BATTERY_2);
-	}
-	else if (battery_percentage >= 20) { // 20-39
-		lv_label_set_text(ui_menu->lbl_battery_icon, LV_SYMBOL_BATTERY_1);
-	}
-	else { // 0-19
-		lv_label_set_text(ui_menu->lbl_battery_icon, LV_SYMBOL_BATTERY_EMPTY);
+	// Else show CHG symbol instead
+	else {
+		lv_label_set_text(ui_menu->lbl_battery_txt, ""); // No text
+		
+		// Format and set CHG symbol
+		lv_obj_align(ui_menu->lbl_battery_icon, LV_ALIGN_TOP_RIGHT, -4, 2);
+		lv_label_set_text(ui_menu->lbl_battery_icon, LV_SYMBOL_CHARGE);
 	}
 }
 
@@ -869,7 +884,7 @@ static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t* ir_menu, lo
 		
 	const char *option = lv_label_get_text(ui_menu->lbl_mid);
 	
-   	if (strcmp(option, "Infrared") == 0) {	
+	if (strcmp(option, "Infrared") == 0) {	
 		// Show right arrow
 		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
