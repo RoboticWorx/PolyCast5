@@ -14,9 +14,7 @@
 
 //#define POLYCAST5_CYCLE_RGB_ON_BOOT 1 // Cycle through the RGB LED to make sure it is working
 
-//#define POLYCAST5_EN_SLEEP_TIMER 1 // Enable sleep timer
-
-#define POLYCAST5_DEFAULT_SLEEP_TIME_MS (30 * 1000) // 30 sec
+#define POLYCAST5_EN_SLEEP_TIMER 1 // Enable sleep timer
 
 
 #endif // POLYCAST5_MACROS_H

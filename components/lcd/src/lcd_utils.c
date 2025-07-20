@@ -1920,6 +1920,17 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		// Switch pages
 		ui_menu->page = SETTINGS_HAPTIC_PAGE;
 	}
+	// Adjust sleep timer selected
+	else if (ui_btns->select_btn == 1 && settings_menu->index == 3) {
+		// Hide settings menu
+		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		// Switch pages
+		ui_menu->page = SETTINGS_SLEEP_TIMER_PAGE;
+	}
 	// Reboot selected
 	else if (ui_btns->select_btn == 1 && settings_menu->index == 4) {
 		// Hide settings menu

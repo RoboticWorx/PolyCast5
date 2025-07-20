@@ -22,7 +22,7 @@
 // RX MAC addresses saved via ESP-NOW
 #define ESPNOW_RX_MAC_NS "espnow_rxmac" // Namespace
 #define ESPNOW_RX_MAC_KEY_COUNT "count" // u8: number of MACs
-#define ESPNOW_RX_MAC_KEY_FMT "mac_%d"// e.g. "mac_0", "mac_1", ...
+#define ESPNOW_RX_MAC_KEY_FMT "rxmac_%d"// e.g. "mac_0", "mac_1", ...
 
 // Menu options for ESP-NOW
 #define ESPNOW_MENU_NS "espnow_menu" // Namespace
@@ -32,7 +32,7 @@
 // Local master key for ESP-NOW peers
 #define ESPNOW_LMK_NS "espnow_lmk" // Namespace
 #define ESPNOW_LMK_KEY_COUNT "count" // u8: number of keys
-#define ESPNOW_LMK_KEY_FMT "key_%02d" // e.g. "key_00", "key_01", ...
+#define ESPNOW_LMK_KEY_FMT "lmk_%02d" // e.g. "key_00", "key_01", ...
 
 #define RX_MAC_IN_SEL_COLOR lv_palette_main(LV_PALETTE_RED)
 #define TX_TXT "Transmit: "

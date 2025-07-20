@@ -31,7 +31,7 @@
 #define SETTINGS_PIN_KEY "combo" // Stored PIN combination
 #define SETTINGS_PIN_SET_KEY "set" // Whether PIN is enabled (0 or 1)
 
-// Attempt limit settings
+// Attempt count settings
 #define SETTINGS_ATTEMPTS_NS "set_attempts" // NVS namespace
 #define SETTINGS_ATTEMPTS_KEY "num_attempts" // Number of wrong entry attempts
 
@@ -40,7 +40,14 @@
 #define SETTINGS_HAPTIC_DUR_KEY "duration" // Vibration duration (ms)
 #define SETTINGS_HAPTIC_STATES_KEY "states" // Which buttons to buzz on
 
+// Sleep timer settings
+#define SETTINGS_SLEEP_TIMER_NS "set_sleep" // NVS namespace
+#define SETTINGS_SLEEP_TIMER_KEY "timer_len" // Sleep timer length
+
 #define COLOR_OPTION_COUNT 23
+
+#define SLEEP_TIMER_MIN_S 5 // 5 sec
+#define SLEEP_TIMER_MAX_S 120 // 2 min
 
 settings_menu_t settings_menu = {
 	.options = {SETTINGS_SET_LOCK_TXT, "Change colors", "Adjust haptics", "Adjust sleep timer", "Reboot", "Factory reset"},
@@ -54,6 +61,8 @@ extern bool pin_signing_in;
 
 extern volatile uint8_t haptic_len_ms;
 extern volatile bool haptic_btns[6];
+
+extern uint8_t sleep_time_s;
 
 static bool primary_color_selected = true;
 
@@ -1107,6 +1116,104 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 	}
 }
 
+void lcd_settings_sleep_timer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
+{
+	#define SLEEP_TIMER_TXT "When home,\nsleep after\n%us / %u.%02um"
+	
+	// Statics
+	static bool init = false;
+	
+	static lv_obj_t *lbl_ins;
+	static lv_obj_t *slider;
+	
+	// Only execute once
+	if (!init) {
+		uint32_t mins = sleep_time_s / 60;
+	    uint32_t frac = (sleep_time_s % 60) * 100 / 60;
+	    
+		lbl_ins = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_ins, "", user_secondary_color,
+					 &lv_font_montserrat_18, LV_ALIGN_CENTER, -25, 0);
+		lv_label_set_text_fmt(lbl_ins, SLEEP_TIMER_TXT, (unsigned)sleep_time_s, (unsigned)mins, (unsigned)frac);
+
+		// Slider
+		slider = lv_slider_create(ACTIVE_SCR);
+		lv_obj_set_size(slider, 10, 100);
+		lv_obj_align(slider, LV_ALIGN_CENTER, 55, 0);
+		lv_slider_set_range(slider, SLEEP_TIMER_MIN_S, SLEEP_TIMER_MAX_S);
+		lv_slider_set_value(slider, sleep_time_s, LV_ANIM_OFF);
+		
+		init = true;
+	}
+	
+	// Increase sleep timer
+	if (ui_btns->up_btn == 1) {
+		sleep_time_s += 5;
+		
+		// Wrap
+		if (sleep_time_s > SLEEP_TIMER_MAX_S) {
+			sleep_time_s = SLEEP_TIMER_MIN_S;
+		}
+		
+		// Create text
+		uint32_t mins = sleep_time_s / 60;
+	    uint32_t frac = (sleep_time_s % 60) * 100 / 60;
+		lv_label_set_text_fmt(lbl_ins, SLEEP_TIMER_TXT, (unsigned)sleep_time_s, (unsigned)mins, (unsigned)frac);
+		lv_slider_set_value(slider, sleep_time_s, LV_ANIM_OFF);
+		
+		// Persist to NVS
+		lcd_settings_sleep_timer_nvs_save();
+	}
+	// Decrease sleep timer
+	else if (ui_btns->down_btn == 1) {
+		sleep_time_s -= 5;
+		
+		// Wrap
+		if (sleep_time_s < SLEEP_TIMER_MIN_S) {
+			sleep_time_s = SLEEP_TIMER_MAX_S;
+		}
+		
+		// Create text
+		uint32_t mins = sleep_time_s / 60;
+	    uint32_t frac = (sleep_time_s % 60) * 100 / 60;
+		lv_label_set_text_fmt(lbl_ins, SLEEP_TIMER_TXT, (unsigned)sleep_time_s, (unsigned)mins, (unsigned)frac);
+		lv_slider_set_value(slider, sleep_time_s, LV_ANIM_OFF);
+		
+		// Persist to NVS
+		lcd_settings_sleep_timer_nvs_save();
+	}
+	// Back selected
+	else if (ui_btns->left_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(slider);
+		
+		// Reset statics
+		lbl_ins = NULL;
+		slider = NULL;
+		init = false;
+		
+		// Show settings list
+		lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = SETTINGS_PAGE;
+	}
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(slider);
+		
+		// Reset statics
+		lbl_ins = NULL;
+		slider = NULL;
+		init = false;
+		
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+	}
+}
+
 void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
 	// Statics
@@ -1462,6 +1569,57 @@ void lcd_settings_haptics_nvs_load(void)
         for (int i = 0; i < 6; i++) {
             haptic_btns[i] = !!(mask & (1 << i));
         }
+    }
+    
+    // Close NVS
+    nvs_close(h);
+}
+
+void lcd_settings_sleep_timer_nvs_save(void)
+{
+    nvs_handle_t h;
+    
+    // Open NVS
+    esp_err_t err = nvs_open(SETTINGS_SLEEP_TIMER_NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "lcd_settings_sleep_timer_nvs_save: open failed (%s)", esp_err_to_name(err));
+        return;
+    }
+
+    // Save the timer length
+    err = nvs_set_u8(h, SETTINGS_SLEEP_TIMER_KEY, sleep_time_s);
+    if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_sleep_timer_nvs_save: len set failed");
+	}
+
+	// Commit changes
+    err = nvs_commit(h);
+    if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_sleep_timer_nvs_save: commit failed");
+	}
+	
+	// Close NVS
+    nvs_close(h);
+}
+
+void lcd_settings_sleep_timer_nvs_load(void)
+{
+    nvs_handle_t h;
+    
+    // Open NVS
+    esp_err_t err = nvs_open(SETTINGS_SLEEP_TIMER_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+        // First boot: leave defaults
+        return;
+    }
+
+    // Load sleep timer length
+    uint8_t len;
+    if (nvs_get_u8(h, SETTINGS_SLEEP_TIMER_KEY, &len) == ESP_OK) {
+        sleep_time_s = len;
+        #ifdef POLYCAST5_DEBUG
+        	ESP_LOGI(TAG, "Loaded sleep timer: %u sec", sleep_time_s);
+        #endif
     }
     
     // Close NVS

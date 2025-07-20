@@ -110,6 +110,15 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
 
 /**
+ * @brief Executes adjust sleep timer page so user can change sleep timer duration
+ *
+ * @param [in] ui_btns User input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] settings_menu Settings menu structure
+ */
+void lcd_settings_sleep_timer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
+
+/**
  * @brief Executes factory reset page
  *
  * @param [in] ui_btns User input structure
@@ -166,5 +175,15 @@ void lcd_settings_haptics_nvs_save(void);
  * @brief Loads the current haptic length and states from NVS
  */
 void lcd_settings_haptics_nvs_load(void);
+
+/**
+ * @brief Saves the current sleep timer length to NVS
+ */
+void lcd_settings_sleep_timer_nvs_save(void);
+
+/**
+ * @brief Loads the current sleep timer length from NVS
+ */
+void lcd_settings_sleep_timer_nvs_load(void);
 
 #endif // LCD_SETTINGS_FUNCS_H

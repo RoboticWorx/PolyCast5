@@ -63,18 +63,25 @@ typedef struct {
 } wifi_mqtt_t;
 
 /**
+ * @brief Gets previous Wi-Fi config from NVS
+ *
+ * @returns Wi-Fi login information
+ */
+wifi_login_t wifi_funcs_get_prev(void);
+
+/**
  * @brief Scan and print available networks
  *
  * @param [in] wifi_scan Wi-Fi scan structure
  *
- * @return ESP_ERR
+ * @returns ESP error status
  */
 esp_err_t wifi_funcs_scan(wifi_scan_t *wifi_scan);
 
 /**
  * @brief Connect to a given Wi-Fi network
  *
- * @return ESP_ERR
+ * @returns ESP error status
  */
 esp_err_t wifi_funcs_connect(void);
 
@@ -85,18 +92,45 @@ esp_err_t wifi_funcs_connect(void);
  * @param [in] bssid Network BSSID
  * @param [in] password Network password
  *
- * @return ESP_ERR
+ * @returns ESP error status
  */
 esp_err_t wifi_funcs_radio_start(const char *ssid, const uint8_t* bssid, const char *password);
 
-void wifi_funcs_wifi_event_init(void);
-void wifi_funcs_mqtt_client_init(void);
-
+/**
+ * @brief Disconnects from MQTT and Wi-Fi, then stops Wi-Fi
+ *
+ * @returns ESP error status
+ */
 esp_err_t wifi_funcs_radio_stop(void);
-void wifi_funcs_get_current_date_time(void);
-wifi_login_t wifi_funcs_get_prev(void);
+
+/**
+ * @brief Creates MQTT ESP event group
+ */
+void wifi_funcs_wifi_event_init(void);
+
+/**
+ * @brief Initializes MQTT client
+ */
+void wifi_funcs_mqtt_client_init(void);\
+
+/**
+ * @brief Initializes Wi-Fi promiscuous mode to sniff packets
+ *
+ * @param [in] network Network to sniff
+ */
 void wifi_funcs_init_promiscuous(wifi_sniff_t *network);
 
+/**
+ * @brief Gets the current date and time from pool.ntp
+ */
+void wifi_funcs_get_current_date_time(void);
+
+/**
+ * @brief Sends data via MQTT to receiver
+ *
+ * @param [in] payload Data to send
+ * @param [in] key Unique topic key to filter
+ */
 void wifi_funcs_mqtt_client_publish(char *payload, const uint8_t key[16]);
 
 #endif // WIFI_FUNCS_H

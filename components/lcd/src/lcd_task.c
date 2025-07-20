@@ -14,9 +14,7 @@ static volatile bool is_charging = false;
 
 static const TickType_t btn_timer_interval = pdMS_TO_TICKS(200);
 
-#ifdef POLYCAST5_EN_SLEEP_TIMER
-	static const TickType_t sleep_timer_interval = pdMS_TO_TICKS(POLYCAST5_DEFAULT_SLEEP_TIME_MS);
-#endif
+uint8_t sleep_time_s = 30; // Default 30s
 
 ui_menu_t ui_menu = {
 	.options = (const char *[]) {"Bluetooth","PolyPlug","ESP32","Infrared","Tools", "Settings","Wi-Fi"},
@@ -102,6 +100,7 @@ static void lcd_task(void *pvParameters)
 	
 	lcd_settings_pin_nvs_load(&settings_menu);
 	lcd_settings_pin_attempts_nvs_load(); // Loads pin_attempts global
+	lcd_settings_sleep_timer_nvs_load();
 	xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics
 	lcd_settings_haptics_nvs_load(); // Load haptics
 	xSemaphoreGive(xHapticsMutex); // Release haptics
@@ -124,7 +123,6 @@ static void lcd_task(void *pvParameters)
 	
 	lcd_settings_setup_page(&settings_menu);
 	lcd_settings_setup_pin_page(&settings_menu);
-	
 	
 	#ifdef POLYCAST5_ESPNOW_DUMP_NVS
 		lcd_espnow_dump_nvs();
@@ -325,6 +323,9 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == SETTINGS_HAPTIC_PAGE) {
 				lcd_settings_adjust_haptics_page(&ui_btns, &ui_menu, &settings_menu);
 			}
+			else if (ui_menu.page == SETTINGS_SLEEP_TIMER_PAGE) {
+				lcd_settings_sleep_timer_page(&ui_btns, &ui_menu, &settings_menu);
+			}
 			else if (ui_menu.page == SETTINGS_FACTORY_RST_PAGE) {
 				lcd_settings_factory_rst_page(&ui_btns, &ui_menu, &settings_menu);
 			}
@@ -332,6 +333,9 @@ static void lcd_task(void *pvParameters)
 		
 		// Sleep condition
 		#ifdef POLYCAST5_EN_SLEEP_TIMER
+			TickType_t sleep_timer_interval = pdMS_TO_TICKS(sleep_time_s * 1000);
+			
+			// If home and sleep_timer_interval has passed without intervention
 			if ((ui_menu.page == HOME_PAGE) && ((xTaskGetTickCount() - sleep_timer_last >= sleep_timer_interval) || go_to_sleep)) {
 				lcd_device_sleep();
 				
