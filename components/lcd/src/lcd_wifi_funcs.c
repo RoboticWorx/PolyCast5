@@ -24,13 +24,15 @@
 #include "gpio_task.h"
 #include "lcd_utils.h"
 
-#define WIFI_MENU_NS "wifim_data" // NVS namespace
-#define WIFI_MENU_KEY_COUNT "wifim_count" // u8: number of saved topic keys
-#define WIFI_MENU_KEY_FMT "wifim_op%02d" // Blob key format
+// Wi-Fi menu options
+#define WIFI_MENU_NS "wifi_menu" // NVS namespace for menu entries
+#define WIFI_MENU_KEY_COUNT "count" // u8: number of menu items
+#define WIFI_MENU_KEY_FMT "item_%02d" // e.g. "menu_00", "menu_01", ...
 
-#define WIFI_TOPIC_NS "wifit_data"
-#define WIFI_TOPIC_KEY_COUNT "wifit_count"
-#define WIFI_TOPIC_KEY_FMT "wifit_op%02d"
+// Wi-Fi topics
+#define WIFI_TOPIC_NS "wifi_topics" // NVS namespace for topic list
+#define WIFI_TOPIC_KEY_COUNT "count" // u8: number of topics
+#define WIFI_TOPIC_KEY_FMT "topic_%02d" // e.g. "topic_00", "topic_01", ...
 
 #define MAX_PASSWORD_LEN 32
 #define NUM_CHAR_ROWS 4

@@ -21,20 +21,24 @@
 
 #define TAG "LCD_SETTINGS"
 
-#define SETTINGS_COLOR_NS "setc_data" // NVS namespace
-#define SETTINGS_COLOR_PRIM_KEY "setc_prim"
-#define SETTINGS_COLOR_SEC_KEY "setc_sec"
+// Color settings
+#define SETTINGS_COLOR_NS "set_color" // NVS namespace
+#define SETTINGS_COLOR_PRIM_KEY "primary" // Primary color value
+#define SETTINGS_COLOR_SEC_KEY "secondary" // Secondary color value
 
-#define SETTINGS_PIN_NS "setp_data"
-#define SETTINGS_PIN_KEY "setp_combo"
-#define SETTINGS_PIN_SET_KEY "setp_set"
+// PIN settings
+#define SETTINGS_PIN_NS "set_pin" // NVS namespace
+#define SETTINGS_PIN_KEY "combo" // Stored PIN combination
+#define SETTINGS_PIN_SET_KEY "set" // Whether PIN is enabled (0 or 1)
 
-#define SETTINGS_ATTEMPTS_NS "seta_data"
-#define SETTINGS_ATTEMPTS_KEY "seta_pin"
+// Attempt limit settings
+#define SETTINGS_ATTEMPTS_NS "set_attempts" // NVS namespace
+#define SETTINGS_ATTEMPTS_KEY "num_attempts" // Number of wrong entry attempts
 
-#define SETTINGS_HAPTICS_NS "seth_data"
-#define SETTINGS_HAPTIC_DUR_KEY "seth_dur"
-#define SETTINGS_HAPTIC_STATES_KEY "seth_states"
+// Haptics settings
+#define SETTINGS_HAPTICS_NS "set_haptics" // NVS namespace
+#define SETTINGS_HAPTIC_DUR_KEY "duration" // Vibration duration (ms)
+#define SETTINGS_HAPTIC_STATES_KEY "states" // Which buttons to buzz on
 
 #define COLOR_OPTION_COUNT 23
 

@@ -44,7 +44,7 @@
 #define IR_LABELS_OFFSET 20
 
 #define LCD_ANIM_NS "anim_data"
-#define LCD_ANIM_KEY "anim_selected"
+#define LCD_ANIM_KEY "selected"
 
 
 /* Animation macros */

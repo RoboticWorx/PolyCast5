@@ -1,0 +1,85 @@
+Command: ninja app-flash
+[1/2] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\build\esp-idf\esptool_py && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-master/components/partition_table/check_sizes.py --offset 0x8000 partition --type app C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/partition_table/partition-table.bin C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/PolyCast5.bin"
+PolyCast5.bin binary size 0x1add20 bytes. Smallest app partition is 0x200000 bytes. 0x522e0 bytes (16%) free.
+[1/2] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Espressif\frameworks\esp-idf-master\components\esptool_py && C:\Espressif\tools\cmake\3.30.2\bin\cmake.exe -D IDF_PATH=C:/Espressif/frameworks/esp-idf-master -D SERIAL_TOOL=C:/Espressif/python_env/idf5.5_py3.11_env/Scripts/python.exe;;C:/Espressif/frameworks/esp-idf-master/components/esptool_py/esptool/esptool.py;--chip;esp32c5 -D SERIAL_TOOL_ARGS=--before=default_reset;--after=hard_reset;write_flash;@app-flash_args -D WORKING_DIRECTORY=C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build -P C:/Espressif/frameworks/esp-idf-master/components/esptool_py/run_serial_tool.cmake"
+esptool.py --chip esp32c5 -p COM10 -b 460800 --before=default_reset --after=hard_reset write_flash --flash_mode dio --flash_freq 80m --flash_size 8MB 0x10000 PolyCast5.bin
+esptool.py v4.9.dev6
+Serial port COM10
+Connecting...
+Chip is ESP32-C5 (revision v0.1)
+Features: WiFi 6, BT 5, IEEE802.15.4
+Crystal is 48MHz
+USB mode: USB-Serial/JTAG
+MAC: 60:55:f9:ff:fe:fc:e0:64
+BASE MAC: 60:55:f9:fc:e0:64
+MAC_EXT: ff:fe
+Uploading stub...
+Running stub...
+Stub running...
+Changing baud rate to 460800
+Changed.
+Configuring flash size...
+Flash will be erased from 0x00010000 to 0x001bdfff...
+Compressed 1760544 bytes to 917876...
+Writing at 0x00010000... (1 %)
+Writing at 0x0001c552... (3 %)
+Writing at 0x00029ccb... (5 %)
+Writing at 0x00035408... (7 %)
+Writing at 0x00047f2a... (8 %)
+Writing at 0x0004f2c9... (10 %)
+Writing at 0x00057bc9... (12 %)
+Writing at 0x00061402... (14 %)
+Writing at 0x0006ac68... (15 %)
+Writing at 0x00075a9f... (17 %)
+Writing at 0x0007f54e... (19 %)
+Writing at 0x000868dd... (21 %)
+Writing at 0x0008ccde... (22 %)
+Writing at 0x00093798... (24 %)
+Writing at 0x0009b0c9... (26 %)
+Writing at 0x000a2916... (28 %)
+Writing at 0x000aadda... (29 %)
+Writing at 0x000b2c12... (31 %)
+Writing at 0x000b92c2... (33 %)
+Writing at 0x000bfede... (35 %)
+Writing at 0x000c61fa... (36 %)
+Writing at 0x000cda11... (38 %)
+Writing at 0x000d380e... (40 %)
+Writing at 0x000d9c12... (42 %)
+Writing at 0x000dfb83... (43 %)
+Writing at 0x000e5e05... (45 %)
+Writing at 0x000eed5e... (47 %)
+Writing at 0x000f6637... (49 %)
+Writing at 0x000fe8fe... (50 %)
+Writing at 0x00105b0b... (52 %)
+Writing at 0x0010cb4d... (54 %)
+Writing at 0x00113a40... (56 %)
+Writing at 0x0011ac6e... (57 %)
+Writing at 0x00121676... (59 %)
+Writing at 0x00128b48... (61 %)
+Writing at 0x0012f5ec... (63 %)
+Writing at 0x00135d14... (64 %)
+Writing at 0x0013ccdf... (66 %)
+Writing at 0x00143109... (68 %)
+Writing at 0x00149856... (70 %)
+Writing at 0x001506cb... (71 %)
+Writing at 0x00156264... (73 %)
+Writing at 0x0015c269... (75 %)
+Writing at 0x00162152... (77 %)
+Writing at 0x001682c8... (78 %)
+Writing at 0x0016ea79... (80 %)
+Writing at 0x00174bd7... (82 %)
+Writing at 0x0017ab30... (84 %)
+Writing at 0x00180e3a... (85 %)
+Writing at 0x001874ac... (87 %)
+Writing at 0x0018d619... (89 %)
+Writing at 0x001939a8... (91 %)
+Writing at 0x00199e75... (92 %)
+Writing at 0x001a02bc... (94 %)
+Writing at 0x001a78e0... (96 %)
+Writing at 0x001add09... (98 %)
+Writing at 0x001bda4e... (100 %)
+Wrote 1760544 bytes (917876 compressed) at 0x00010000 in 7.4 seconds (effective 1911.6 kbit/s)...
+Hash of data verified.
+
+Leaving...
+Hard resetting via RTS pin...
