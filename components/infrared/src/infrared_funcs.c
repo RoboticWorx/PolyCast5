@@ -9,6 +9,14 @@
 #include "infrared_funcs.h"
 #include "infrared_task.h"
 
+// NVS keys
+#define IR_NS "ir_data"
+#define IR_NUM_REMOTES_KEY "ir_numr"
+#define IR_REMOTE_NAME_FMT "ir_namer%d"
+#define IR_REMOTE_NSIG_FMT "ir_nums%d"
+#define IR_SIGNAL_NAME_FMT "ir_nar%d_s%d"
+#define IR_SIGNAL_BLOB_FMT "ir_sir%d_s%d"
+
 #define SIGNAL_MIN_NS 1000
 #define SIGNAL_MAX_NS 15000000 // 15ms
 

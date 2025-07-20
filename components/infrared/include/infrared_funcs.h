@@ -24,14 +24,6 @@
 #define MAX_STORED_SIGNALS 1000 // 20 signals per remote
 #define MAX_REMOTES 50
 
-// NVS keys
-#define IR_NS "ir_data"
-#define IR_NUM_REMOTES_KEY "num_rem"
-#define IR_REMOTE_NAME_FMT "r%d_name"
-#define IR_REMOTE_NSIG_FMT "r%d_nsig"
-#define IR_SIGNAL_NAME_FMT "r%d_s%d_name"
-#define IR_SIGNAL_BLOB_FMT "r%d_s%d_sig"
-
 // Stored signal structure
 typedef struct {
 	size_t length;

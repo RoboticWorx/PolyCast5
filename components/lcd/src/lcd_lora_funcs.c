@@ -25,6 +25,14 @@
 
 //#include "gpio_task.h"
 
+#define LORA_OPTIONS_NS "loram_data" // NVS namespace
+#define LORA_OPTIONS_KEY_COUNT "loram_count" // u8: number of option
+#define LORA_OPTIONS_KEY_FMT "loram_op%02d" // loram_op00, loram_op01 ...
+
+#define LORA_ENC_NS "lorae_data"
+#define LORA_ENC_KEY_COUNT "lorae_count"
+#define LORA_ENC_KEY_FMT "lorae_op%02d"
+
 #define LORA_PLAN_SEL_INS "Select day(s)"
 
 lora_menu_t lora_menu = {

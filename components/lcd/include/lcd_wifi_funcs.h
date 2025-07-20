@@ -9,14 +9,6 @@
 #define MAX_WIFI_SUBOPTIONS 20
 #define TOPIC_KEY_LEN 16
 
-#define WIFI_MENU_NS "wf_mn_ns" // NVS namespace
-#define WIFI_MENU_KEY_COUNT "wf_mn_ke" // u8: number of saved topic keys
-#define WIFI_MENU_KEY_FMT "wf_mn%02d" // Blob key format
-
-#define WIFI_TOPIC_NS "wf_tp_ns"
-#define WIFI_TOPIC_KEY_COUNT "wf_tp_ke"
-#define WIFI_TOPIC_KEY_FMT "wf_tp%02d"
-
 // Forward-declare structs (from lcd_funcs.h)
 typedef struct ui_btns_t ui_btns_t;
 typedef struct ui_menu_t ui_menu_t;

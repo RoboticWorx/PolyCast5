@@ -17,7 +17,6 @@ idf_component_register(
         infrared
         espnow
         wifi
-        tools
         lvgl
         driver
         freertos

@@ -43,8 +43,8 @@
 #define SCROLL_SPEED 400
 #define IR_LABELS_OFFSET 20
 
-#define LCD_ANIM_NS "lc_an_ns"
-#define LCD_ANIM_KEY "lc_an_ke"
+#define LCD_ANIM_NS "anim_data"
+#define LCD_ANIM_KEY "anim_selected"
 
 
 /* Animation macros */

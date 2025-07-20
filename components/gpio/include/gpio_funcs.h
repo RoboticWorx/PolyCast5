@@ -31,7 +31,7 @@
 void gpio_init_nvs(void);
 
 /**
- * @brief Initialize the TCA9535 I²C expander and configure:
+ * @brief Initialize the TCA9535 I2C expander and configure:
  *          - Port 0 = all inputs
  *          - Port 1 = all outputs
  *

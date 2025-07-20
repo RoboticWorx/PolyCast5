@@ -8,14 +8,6 @@
 #define MAX_LORA_OPTIONS 20
 #define LORA_PLAN_SUBMENU_COUNT 8
 
-#define LORA_OPTIONS_NS "lo_op_ns" // NVS namespace
-#define LORA_OPTIONS_KEY_COUNT "lo_op_ke" // u8: number of option
-#define LORA_OPTIONS_KEY_FMT "lo_op%02d" // lo_op00, lo_op01 …
-
-#define LORA_ENC_NS "lo_en_ns" // NVS namespace
-#define LORA_ENC_KEY_COUNT "lo_en_ke" // u8: number of user remotes
-#define LORA_ENC_KEY_FMT "lo_en%02d" // lo_en00, lo_en01 …
-
 // Forward-declare structs (from lcd_utils.h)
 typedef struct ui_btns_t ui_btns_t;
 typedef struct ui_menu_t ui_menu_t;

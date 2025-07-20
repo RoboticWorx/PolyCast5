@@ -19,6 +19,18 @@
 
 #include "gpio_task.h"
 
+#define ESPNOW_RX_MAC_NS "espr_data" // NVS namespace
+#define ESPNOW_RX_MAC_KEY_COUNT "espr_count" // u8: number of option
+#define ESPNOW_RX_MAC_KEY_FMT "espr_op%d"
+
+#define ESPNOW_MENU_NS "espm_data" // NVS namespace
+#define ESPNOW_MENU_KEY_COUNT "espm_count" // u8: number of option
+#define ESPNOW_MENU_KEY_FMT "espm_op%02d"
+
+#define ESPNOW_LMK_NS "espl_data"
+#define ESPNOW_LMK_KEY_COUNT "espl_count"
+#define ESPNOW_LMK_KEY_FMT "espl_op%02d"
+
 #define RX_MAC_IN_SEL_COLOR lv_palette_main(LV_PALETTE_RED)
 #define TX_TXT "Transmit: "
 #define RX_TXT "Received: "

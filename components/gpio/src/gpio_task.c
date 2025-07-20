@@ -48,7 +48,7 @@ typedef struct {
 } btn_state_t;
 
 volatile uint8_t haptic_len_ms = 20; // Default buzz 20ms
-volatile bool haptic_btns[6] = {false, false, false, false, false, true}; // Default buzz on select
+volatile bool haptic_btns[6] = {true, false, false, false, false, false}; // Default buzz on select
 
 static const TickType_t adc_timer_interval = pdMS_TO_TICKS(20000); // 20s
 

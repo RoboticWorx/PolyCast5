@@ -9,18 +9,6 @@
 
 #include "espnow_funcs.h"
 
-#define ESPNOW_RX_MAC_NS "es_rxm_ns" // NVS namespace
-#define ESPNOW_RX_MAC_KEY_COUNT "es_rxm_ke" // u8: number of option
-#define ESPNOW_RX_MAC_KEY_FMT "es_rxm%d"
-
-#define ESPNOW_MENU_NS "es_me_ns" // NVS namespace
-#define ESPNOW_MENU_KEY_COUNT "es_me_ke" // u8: number of option
-#define ESPNOW_MENU_KEY_FMT "es_me%02d"
-
-#define ESPNOW_LMK_NS "es_lm_ns"
-#define ESPNOW_LMK_KEY_COUNT "es_lm_ke"
-#define ESPNOW_LMK_KEY_FMT "es_lm%02d"
-
 #define MAX_ESPNOW_OPTIONS 20
 
 // Forward-declare structs (from lcd_utils.h)

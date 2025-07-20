@@ -21,20 +21,20 @@
 
 #define TAG "LCD_SETTINGS"
 
-#define SETTINGS_COLOR_NS "se_co_ns" // NVS namespace
-#define SETTINGS_COLOR_PRIM_KEY "se_pr_ke"
-#define SETTINGS_COLOR_SEC_KEY "se_se_ke"
+#define SETTINGS_COLOR_NS "setc_data" // NVS namespace
+#define SETTINGS_COLOR_PRIM_KEY "setc_prim"
+#define SETTINGS_COLOR_SEC_KEY "setc_sec"
 
-#define SETTINGS_PIN_NS "se_pi_ns"
-#define SETTINGS_PIN_KEY "se_pi_ke"
-#define SETTINGS_PIN_SET_KEY "se_pse_ke"
+#define SETTINGS_PIN_NS "setp_data"
+#define SETTINGS_PIN_KEY "setp_combo"
+#define SETTINGS_PIN_SET_KEY "setp_set"
 
-#define SETTINGS_ATTEMPTS_NS "pin_attempts"
-#define SETTINGS_ATTEMPTS_KEY "attempts_key"
+#define SETTINGS_ATTEMPTS_NS "seta_data"
+#define SETTINGS_ATTEMPTS_KEY "seta_pin"
 
-#define SETTINGS_HAPTICS_NS "haptic_data"
-#define SETTINGS_HAPTIC_DUR_KEY "haptic_dur"
-#define SETTINGS_HAPTIC_STATES_KEY "haptic_states"
+#define SETTINGS_HAPTICS_NS "seth_data"
+#define SETTINGS_HAPTIC_DUR_KEY "seth_dur"
+#define SETTINGS_HAPTIC_STATES_KEY "seth_states"
 
 #define COLOR_OPTION_COUNT 23
 

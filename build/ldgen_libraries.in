@@ -91,6 +91,5 @@ $<TARGET_FILE:__idf_espnow>
 $<TARGET_FILE:__idf_lora>
 $<TARGET_FILE:__idf_sx126x>
 $<TARGET_FILE:__idf_infrared>
-$<TARGET_FILE:__idf_tools>
 $<TARGET_FILE:__idf_lcd>
 $<TARGET_FILE:__idf_main>

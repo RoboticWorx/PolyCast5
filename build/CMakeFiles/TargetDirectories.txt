@@ -897,13 +897,6 @@ C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/infrared/CMakeFile
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/infrared/CMakeFiles/install.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/infrared/CMakeFiles/install/local.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/infrared/CMakeFiles/install/strip.dir
-C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/tools/CMakeFiles/__idf_tools.dir
-C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/tools/CMakeFiles/edit_cache.dir
-C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/tools/CMakeFiles/rebuild_cache.dir
-C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/tools/CMakeFiles/list_install_components.dir
-C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/tools/CMakeFiles/install.dir
-C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/tools/CMakeFiles/install/local.dir
-C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/tools/CMakeFiles/install/strip.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/lcd/CMakeFiles/__idf_lcd.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/lcd/CMakeFiles/edit_cache.dir
 C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/lcd/CMakeFiles/rebuild_cache.dir
