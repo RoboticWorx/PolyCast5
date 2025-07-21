@@ -1,4 +1,4 @@
-<img width="1477" height="440" alt="PolyCast5 Only Wordmark" src="https://github.com/user-attachments/assets/e182adc3-6113-4af5-ae3b-2cc43cea5ffc" />
+<img width="1108" height="330 alt="PolyCast5 Only Wordmark" src="https://github.com/user-attachments/assets/e182adc3-6113-4af5-ae3b-2cc43cea5ffc" />
 
 PolyCast5 Firmware
 ====================
