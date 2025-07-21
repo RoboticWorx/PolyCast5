@@ -1,13 +1,19 @@
-img here
+<p align="center">
+  <img
+    src="https://github.com/user-attachments/assets/745ff4fc-c3f0-4f40-b177-9631ba14db68"
+    alt="PolyCast5"
+    width="75%"
+  />
+</p>
 
 PolyCast5 Firmware
 ====================
 Welcome to the official GitHub page for the PolyCast5!
 
 You can find some relevant links below:
-* [PolyCast5 official website](). An easy explanation of what you can do with it and how it works!
-* [PolyCast5 user documentation](). How to use it and unleash its full capabilities.
-* [PolyCast5 attachment tutorials](). Custom builds you can control with your PolyCast5. Including:
+* [PolyCast5 official website](https://polycast5.com/). An easy explanation of what you can do with it and how it works!
+* [PolyCast5 user documentation](https://polycast5.com/pages/docs). How to use it and unleash its full capabilities.
+* [PolyCast5 attachment tutorials](https://polycast5.com/pages/tutorials). Custom builds you can control with your PolyCast5. Including:
     * Home light switcher
     * Door locker/unlocker
     * Button pusher
@@ -20,7 +26,7 @@ Please check [ESP-IDF docs](https://docs.espressif.com/projects/esp-idf/en/lates
 
 ## Project Structure
 * `main` - Initialization code. The program runs from here.
-* `build` - How the program is built as well as the compiled code.
+* `build` - ESP-IDF as well as compiled code.
 * `components` - The various pieces of the application broken into folders.
     * `bluetooth` - Relevant Bluetooth functions and task. Used to communicate with a connected BLE device as a HID.
     * `common` - Shared macros across the entirety of the program used for build and debugging.

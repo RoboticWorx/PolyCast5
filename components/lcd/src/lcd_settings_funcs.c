@@ -946,14 +946,14 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 	static lv_style_t row_style;
 	
 	const char *btn_names[6] = {
-		"Buzz on Select ", "Buzz on Home ", "Buzz on Up       ",
-		"Buzz on Down ", "Buzz on Left     ", "Buzz on Right  "
+		"Buzz on Select ", "Buzz on Home ", "Buzz on Up	   ",
+		"Buzz on Down ", "Buzz on Left	 ", "Buzz on Right  "
 	};
 
 	if (!init) {
 		xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics
-	    lcd_settings_haptics_nvs_load(); // Reload haptics
-	    xSemaphoreGive(xHapticsMutex); // Release haptics
+		lcd_settings_haptics_nvs_load(); // Reload haptics
+		xSemaphoreGive(xHapticsMutex); // Release haptics
 		
 		// Create parent container
 		cont = lv_obj_create(ACTIVE_SCR);
@@ -986,10 +986,10 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 		
 		// Six switch rows
 		for (int i = 0; i < 6; i++) {
-		    // Create a row container for each row
-		    sw_row[i] = lv_obj_create(cont);
-		    lv_obj_set_size(sw_row[i], 180, 30);
-		    lv_obj_set_style_bg_color(sw_row[i], user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+			// Create a row container for each row
+			sw_row[i] = lv_obj_create(cont);
+			lv_obj_set_size(sw_row[i], 180, 30);
+			lv_obj_set_style_bg_color(sw_row[i], user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
 			lv_obj_set_style_bg_opa(sw_row[i], LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
 			lv_obj_set_scrollbar_mode(sw_row[i], LV_SCROLLBAR_MODE_OFF);
 			lv_obj_set_style_border_width(sw_row[i], 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -998,25 +998,25 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 			lv_style_set_margin_bottom(&row_style, 2);
 			lv_obj_add_style(sw_row[i], &row_style, 0);
 			
-		    // Flex formatting
-		    lv_obj_set_flex_flow(sw_row[i],  LV_FLEX_FLOW_ROW);
-		    lv_obj_set_flex_align(sw_row[i], LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+			// Flex formatting
+			lv_obj_set_flex_flow(sw_row[i],  LV_FLEX_FLOW_ROW);
+			lv_obj_set_flex_align(sw_row[i], LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 			
-		    // Add the label into the row
-		    lv_obj_t *lbl = lv_label_create(sw_row[i]);
-		    lcd_format_label(lbl, btn_names[i], user_secondary_color,
-		    		&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
+			// Add the label into the row
+			lv_obj_t *lbl = lv_label_create(sw_row[i]);
+			lcd_format_label(lbl, btn_names[i], user_secondary_color,
+					&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
 			
-		    // Add the switch
-		    sw_arr[i] = lv_switch_create(sw_row[i]);
-		    lv_obj_set_size(sw_arr[i], 30, 20);
-		    xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics
-		    if (haptic_btns[i]) {
-		        lv_obj_add_state(sw_arr[i], LV_STATE_CHECKED);
-		    }
-		    xSemaphoreGive(xHapticsMutex); // Release haptics
+			// Add the switch
+			sw_arr[i] = lv_switch_create(sw_row[i]);
+			lv_obj_set_size(sw_arr[i], 30, 20);
+			xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics
+			if (haptic_btns[i]) {
+				lv_obj_add_state(sw_arr[i], LV_STATE_CHECKED);
+			}
+			xSemaphoreGive(xHapticsMutex); // Release haptics
 			
-		    lv_obj_set_style_margin_right(lbl, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+			lv_obj_set_style_margin_right(lbl, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
 		}
 
 		// Pointer on screen
@@ -1032,18 +1032,18 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 		// Decrement with wrap
 		selected = (selected + 1) % 7;
 		
-        lv_obj_scroll_by(cont, 0, -ADJ_HAPTIC_Y_OFFSET, LV_ANIM_ON); 
+		lv_obj_scroll_by(cont, 0, -ADJ_HAPTIC_Y_OFFSET, LV_ANIM_ON); 
 	}
 	// Scroll up
 	else if (ui_btns->up_btn == 1) {
 		// Increment with wrap
 		selected = (selected + 6) % 7;
 		
-        lv_obj_scroll_by(cont, 0, ADJ_HAPTIC_Y_OFFSET, LV_ANIM_ON);
+		lv_obj_scroll_by(cont, 0, ADJ_HAPTIC_Y_OFFSET, LV_ANIM_ON);
 	}
 	// Toggle/iterate
 	else if (ui_btns->select_btn == 1) {
-		xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics        
+		xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics		
 		// Iterate slider
 		if (selected == 0) {
 			// Increment slider with wrap
@@ -1129,8 +1129,8 @@ void lcd_settings_sleep_timer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
 	// Only execute once
 	if (!init) {
 		uint32_t mins = sleep_time_s / 60;
-	    uint32_t frac = (sleep_time_s % 60) * 100 / 60;
-	    
+		uint32_t frac = (sleep_time_s % 60) * 100 / 60;
+		
 		lbl_ins = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_ins, "", user_secondary_color,
 					 &lv_font_montserrat_18, LV_ALIGN_CENTER, -25, 0);
@@ -1157,7 +1157,7 @@ void lcd_settings_sleep_timer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
 		
 		// Create text
 		uint32_t mins = sleep_time_s / 60;
-	    uint32_t frac = (sleep_time_s % 60) * 100 / 60;
+		uint32_t frac = (sleep_time_s % 60) * 100 / 60;
 		lv_label_set_text_fmt(lbl_ins, SLEEP_TIMER_TXT, (unsigned)sleep_time_s, (unsigned)mins, (unsigned)frac);
 		lv_slider_set_value(slider, sleep_time_s, LV_ANIM_OFF);
 		
@@ -1175,7 +1175,7 @@ void lcd_settings_sleep_timer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
 		
 		// Create text
 		uint32_t mins = sleep_time_s / 60;
-	    uint32_t frac = (sleep_time_s % 60) * 100 / 60;
+		uint32_t frac = (sleep_time_s % 60) * 100 / 60;
 		lv_label_set_text_fmt(lbl_ins, SLEEP_TIMER_TXT, (unsigned)sleep_time_s, (unsigned)mins, (unsigned)frac);
 		lv_slider_set_value(slider, sleep_time_s, LV_ANIM_OFF);
 		
@@ -1507,121 +1507,121 @@ void lcd_settings_pin_attempts_nvs_load(void)
 
 void lcd_settings_haptics_nvs_save(void)
 {
-    nvs_handle_t h;
-    
-    // Open NVS
-    esp_err_t err = nvs_open(SETTINGS_HAPTICS_NS, NVS_READWRITE, &h);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "lcd_settings_haptics_nvs_save: open failed (%s)", esp_err_to_name(err));
-        return;
-    }
+	nvs_handle_t h;
+	
+	// Open NVS
+	esp_err_t err = nvs_open(SETTINGS_HAPTICS_NS, NVS_READWRITE, &h);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_haptics_nvs_save: open failed (%s)", esp_err_to_name(err));
+		return;
+	}
 
-    // Save the haptic length
-    err = nvs_set_u8(h, SETTINGS_HAPTIC_DUR_KEY, haptic_len_ms);
-    if (err != ESP_OK) {
+	// Save the haptic length
+	err = nvs_set_u8(h, SETTINGS_HAPTIC_DUR_KEY, haptic_len_ms);
+	if (err != ESP_OK) {
 		ESP_LOGE(TAG, "lcd_settings_haptics_nvs_save: len set failed");
 	}
 
-    // Pack the 6 bools into a single byte mask
-    uint8_t mask = 0;
-    for (int i = 0; i < 6; i++) {
-        if (haptic_btns[i]) {
+	// Pack the 6 bools into a single byte mask
+	uint8_t mask = 0;
+	for (int i = 0; i < 6; i++) {
+		if (haptic_btns[i]) {
 			mask |= (1 << i);
 		}
-    }
-    
-    // Save that mask
-    err = nvs_set_u8(h, SETTINGS_HAPTIC_STATES_KEY, mask);
-    if (err != ESP_OK) {
+	}
+	
+	// Save that mask
+	err = nvs_set_u8(h, SETTINGS_HAPTIC_STATES_KEY, mask);
+	if (err != ESP_OK) {
 		ESP_LOGE(TAG, "lcd_settings_haptics_nvs_save: states set failed");
 	}
 
 	// Commit changes
-    err = nvs_commit(h);
-    if (err != ESP_OK) {
+	err = nvs_commit(h);
+	if (err != ESP_OK) {
 		ESP_LOGE(TAG, "lcd_settings_haptics_nvs_save: commit failed");
 	}
 	
 	// Close NVS
-    nvs_close(h);
+	nvs_close(h);
 }
 
 void lcd_settings_haptics_nvs_load(void)
 {
-    nvs_handle_t h;
-    
-    // Open NVS
-    esp_err_t err = nvs_open(SETTINGS_HAPTICS_NS, NVS_READONLY, &h);
-    if (err != ESP_OK) {
-        // First boot: leave defaults
-        return;
-    }
+	nvs_handle_t h;
+	
+	// Open NVS
+	esp_err_t err = nvs_open(SETTINGS_HAPTICS_NS, NVS_READONLY, &h);
+	if (err != ESP_OK) {
+		// First boot: leave defaults
+		return;
+	}
 
-    // Load slider length
-    uint8_t len;
-    if (nvs_get_u8(h, SETTINGS_HAPTIC_DUR_KEY, &len) == ESP_OK) {
-        haptic_len_ms = len;
-    }
+	// Load slider length
+	uint8_t len;
+	if (nvs_get_u8(h, SETTINGS_HAPTIC_DUR_KEY, &len) == ESP_OK) {
+		haptic_len_ms = len;
+	}
 
-    // Load haptic btn states
-    uint8_t mask;
-    if (nvs_get_u8(h, SETTINGS_HAPTIC_STATES_KEY, &mask) == ESP_OK) {
-        for (int i = 0; i < 6; i++) {
-            haptic_btns[i] = !!(mask & (1 << i));
-        }
-    }
-    
-    // Close NVS
-    nvs_close(h);
+	// Load haptic btn states
+	uint8_t mask;
+	if (nvs_get_u8(h, SETTINGS_HAPTIC_STATES_KEY, &mask) == ESP_OK) {
+		for (int i = 0; i < 6; i++) {
+			haptic_btns[i] = !!(mask & (1 << i));
+		}
+	}
+	
+	// Close NVS
+	nvs_close(h);
 }
 
 void lcd_settings_sleep_timer_nvs_save(void)
 {
-    nvs_handle_t h;
-    
-    // Open NVS
-    esp_err_t err = nvs_open(SETTINGS_SLEEP_TIMER_NS, NVS_READWRITE, &h);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "lcd_settings_sleep_timer_nvs_save: open failed (%s)", esp_err_to_name(err));
-        return;
-    }
+	nvs_handle_t h;
+	
+	// Open NVS
+	esp_err_t err = nvs_open(SETTINGS_SLEEP_TIMER_NS, NVS_READWRITE, &h);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_sleep_timer_nvs_save: open failed (%s)", esp_err_to_name(err));
+		return;
+	}
 
-    // Save the timer length
-    err = nvs_set_u8(h, SETTINGS_SLEEP_TIMER_KEY, sleep_time_s);
-    if (err != ESP_OK) {
+	// Save the timer length
+	err = nvs_set_u8(h, SETTINGS_SLEEP_TIMER_KEY, sleep_time_s);
+	if (err != ESP_OK) {
 		ESP_LOGE(TAG, "lcd_settings_sleep_timer_nvs_save: len set failed");
 	}
 
 	// Commit changes
-    err = nvs_commit(h);
-    if (err != ESP_OK) {
+	err = nvs_commit(h);
+	if (err != ESP_OK) {
 		ESP_LOGE(TAG, "lcd_settings_sleep_timer_nvs_save: commit failed");
 	}
 	
 	// Close NVS
-    nvs_close(h);
+	nvs_close(h);
 }
 
 void lcd_settings_sleep_timer_nvs_load(void)
 {
-    nvs_handle_t h;
-    
-    // Open NVS
-    esp_err_t err = nvs_open(SETTINGS_SLEEP_TIMER_NS, NVS_READONLY, &h);
-    if (err != ESP_OK) {
-        // First boot: leave defaults
-        return;
-    }
+	nvs_handle_t h;
+	
+	// Open NVS
+	esp_err_t err = nvs_open(SETTINGS_SLEEP_TIMER_NS, NVS_READONLY, &h);
+	if (err != ESP_OK) {
+		// First boot: leave defaults
+		return;
+	}
 
-    // Load sleep timer length
-    uint8_t len;
-    if (nvs_get_u8(h, SETTINGS_SLEEP_TIMER_KEY, &len) == ESP_OK) {
-        sleep_time_s = len;
-        #ifdef POLYCAST5_DEBUG
-        	ESP_LOGI(TAG, "Loaded sleep timer: %u sec", sleep_time_s);
-        #endif
-    }
-    
-    // Close NVS
-    nvs_close(h);
+	// Load sleep timer length
+	uint8_t len;
+	if (nvs_get_u8(h, SETTINGS_SLEEP_TIMER_KEY, &len) == ESP_OK) {
+		sleep_time_s = len;
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "Loaded sleep timer: %u sec", sleep_time_s);
+		#endif
+	}
+	
+	// Close NVS
+	nvs_close(h);
 }

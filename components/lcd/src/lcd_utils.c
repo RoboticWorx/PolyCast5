@@ -1306,7 +1306,11 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
 	// Selected specific signal
 	else if (ui_btns->select_btn == 1 && ir_menu->index >= 3) {
 		// Transmit signal at index
-		xQueueSend(xInfraredSignalToTxQueue, &ir_menu->index, 0);
+		xQueueSend(xInfraredSignalToTxQueue, &ir_menu->index, portMAX_DELAY);
+		
+		// RGB indicator
+		uint8_t rgb_state = RGB_BLINK_PURPLE;
+		xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
 	}
 	// Back selected
 	else if (ui_btns->down_btn == 1) {

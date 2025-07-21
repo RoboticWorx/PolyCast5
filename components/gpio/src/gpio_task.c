@@ -1,3 +1,4 @@
+#include "freertos/idf_additions.h"
 #include "polycast5_macros.h"
 
 #include "freertos/FreeRTOS.h"
@@ -34,17 +35,13 @@ SemaphoreHandle_t xSelectButtonSemaphore;
 SemaphoreHandle_t xIsChargingSemaphore;
 SemaphoreHandle_t xNotChargingSemaphore;
 
-SemaphoreHandle_t xLedBlueSemaphore;
-SemaphoreHandle_t xLedRedSemaphore;
-SemaphoreHandle_t xLedGreenSemaphore;
-SemaphoreHandle_t xLedOffSemaphore;
-
 QueueHandle_t xAdcBatReadingQueue;
+QueueHandle_t xLEDQueue;
 
 typedef struct {
-    uint8_t pin; // Expander pin number
-    uint16_t ticks; // Ticks until next event
-    bool prev; // Last sampled state (1 = released, 0 = pressed)
+	uint8_t pin; // Expander pin number
+	uint16_t ticks; // Ticks until next event
+	bool prev; // Last sampled state (1 = released, 0 = pressed)
 } btn_state_t;
 
 volatile uint8_t haptic_len_ms = 20; // Default buzz 20ms
@@ -52,30 +49,32 @@ volatile bool haptic_btns[6] = {true, false, false, false, false, false}; // Def
 
 static const TickType_t adc_timer_interval = pdMS_TO_TICKS(20000); // 20s
 
+static uint8_t rgb_data = 255;
+
 // Buttons and states: same order as buttonSemaphores
 static btn_state_t buttons[6] = {
 	{USER_BUTTON_SELECT, 0, 1},
 	{USER_BUTTON_HOME,   0, 1},
-    {USER_BUTTON_UP,     0, 1},
-    {USER_BUTTON_DOWN,   0, 1},
-    {USER_BUTTON_LEFT,   0, 1},
-    {USER_BUTTON_RIGHT,  0, 1},
+	{USER_BUTTON_UP,	 0, 1},
+	{USER_BUTTON_DOWN,   0, 1},
+	{USER_BUTTON_LEFT,   0, 1},
+	{USER_BUTTON_RIGHT,  0, 1},
 };
 
 static SemaphoreHandle_t *buttonSemaphores[] = {
 	&xSelectButtonSemaphore,
 	&xHomeButtonSemaphore,
-    &xUpButtonSemaphore,
-    &xDownButtonSemaphore,
-    &xLeftButtonSemaphore,
-    &xRightButtonSemaphore,
+	&xUpButtonSemaphore,
+	&xDownButtonSemaphore,
+	&xLeftButtonSemaphore,
+	&xRightButtonSemaphore,
 };
 
 // Helper to “give” the right semaphore based on index
 static inline void give_button_sem(size_t i)
 {
-    // Dereference the pointer and give it
-    xSemaphoreGive(*buttonSemaphores[i]);
+	// Dereference the pointer and give it
+	xSemaphoreGive(*buttonSemaphores[i]);
 }
 
 static void adc_task(void *arg)
@@ -83,7 +82,7 @@ static void adc_task(void *arg)
 	static uint8_t last_percentage = 100;
 		
 	// Get battery charge on start
-    gpio_init_battery_adc();
+	gpio_init_battery_adc();
 	float v = gpio_get_battery_voltage();
 	#ifdef POLYCAST5_DEBUG
 		ESP_LOGI(TAG, "Startup voltage: %f", v);
@@ -103,8 +102,8 @@ static void adc_task(void *arg)
 	}
 	
 	TickType_t adc_timer_last = xTaskGetTickCount();
-	    
-    while (1) {
+		
+	while (1) {
 		// Update battery status every adc_timer_interval
 		if ((xTaskGetTickCount() - adc_timer_last >= adc_timer_interval) || (xSemaphoreTake(xStartAdcBatSemaphore, 0) == pdTRUE)) {
 			adc_timer_last = xTaskGetTickCount();
@@ -139,7 +138,7 @@ static void adc_task(void *arg)
 		}
 		
 		vTaskDelay(pdMS_TO_TICKS(10));
-    }
+	}
 }
 
 static void gpio_task(void *arg)
@@ -149,40 +148,33 @@ static void gpio_task(void *arg)
 	
 	xUpButtonSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xUpButtonSemaphore);
-    xDownButtonSemaphore = xSemaphoreCreateBinary();
-    configASSERT(xDownButtonSemaphore);
-    xRightButtonSemaphore = xSemaphoreCreateBinary();
-    configASSERT(xRightButtonSemaphore);
-    xLeftButtonSemaphore = xSemaphoreCreateBinary();
-    configASSERT(xLeftButtonSemaphore);
-    xHomeButtonSemaphore = xSemaphoreCreateBinary();
-    configASSERT(xHomeButtonSemaphore);
-    xSelectButtonSemaphore = xSemaphoreCreateBinary();
-    configASSERT(xSelectButtonSemaphore);
-    
-    xIsChargingSemaphore = xSemaphoreCreateBinary();
-    configASSERT(xIsChargingSemaphore);
-    xNotChargingSemaphore = xSemaphoreCreateBinary();
-    configASSERT(xNotChargingSemaphore);
-    
-    xLedBlueSemaphore = xSemaphoreCreateBinary();
-    configASSERT(xLedBlueSemaphore);
-    xLedRedSemaphore = xSemaphoreCreateBinary();
-    configASSERT(xLedRedSemaphore);
-    xLedGreenSemaphore = xSemaphoreCreateBinary();
-    configASSERT(xLedGreenSemaphore);
-    xLedOffSemaphore = xSemaphoreCreateBinary();
-    configASSERT(xLedOffSemaphore);
-    
-    xStartAdcBatSemaphore = xSemaphoreCreateBinary();
+	xDownButtonSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xDownButtonSemaphore);
+	xRightButtonSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xRightButtonSemaphore);
+	xLeftButtonSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xLeftButtonSemaphore);
+	xHomeButtonSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xHomeButtonSemaphore);
+	xSelectButtonSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xSelectButtonSemaphore);
+	
+	xIsChargingSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xIsChargingSemaphore);
+	xNotChargingSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xNotChargingSemaphore);
+	
+	xStartAdcBatSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xStartAdcBatSemaphore);
-    
-    xAdcBatReadingQueue = xQueueCreate(1, sizeof(uint8_t));
+	
+	xAdcBatReadingQueue = xQueueCreate(1, sizeof(uint8_t));
 	configASSERT(xAdcBatReadingQueue);
-    
-	gpio_write_output(0, 0); // Red LED
-	gpio_write_output(1, 0); // Green LED
-	gpio_write_output(2, 0); // Blue LED
+	xLEDQueue = xQueueCreate(1, sizeof(uint8_t));
+	configASSERT(xLEDQueue);
+		
+	gpio_write_output(RED_RGB_LED_PIN, 0); // Red LED
+	gpio_write_output(GREEN_RGB_LED_PIN, 0); // Green LED
+	gpio_write_output(BLUE_RGB_LED_PIN, 0); // Blue LED
 	gpio_write_output(3, 0); // NC
 	gpio_write_output(4, 0); // NC
 	gpio_write_output(5, 0); // NC
@@ -194,7 +186,7 @@ static void gpio_task(void *arg)
 	#endif
 	
 	if (xTaskCreate(adc_task, "adc_task", 1024 * 2, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
-	    ESP_LOGE(TAG, "Failed to start adc_task");
+		ESP_LOGE(TAG, "Failed to start adc_task");
 	}
 	
 	// Get opposite initial charging state to update once
@@ -203,93 +195,83 @@ static void gpio_task(void *arg)
 	while (1) 
 	{
 		#ifdef POLYCAST5_DEBUG_GPIO
-        	//ESP_LOGI(TAG, "GPIO_UP: %d GPIO_DOWN: %d GPIO_RIGHT: %d", gpio_read_input(USER_BUTTON_UP), gpio_read_input(USER_BUTTON_DOWN), gpio_read_input(USER_BUTTON_RIGHT));
-        #endif
+			//ESP_LOGI(TAG, "GPIO_UP: %d GPIO_DOWN: %d GPIO_RIGHT: %d", gpio_read_input(USER_BUTTON_UP), gpio_read_input(USER_BUTTON_DOWN), gpio_read_input(USER_BUTTON_RIGHT));
+		#endif
 	
-	    // Press + auto-repeat state machine
-	    for (size_t i = 0; i < 6; i++) {
-	        btn_state_t *b = &buttons[i]; // Get the button
-	        bool level = gpio_read_input(b->pin); // Read its state: 0 = pressed, 1 = released
+		// Press + auto-repeat state machine
+		for (size_t i = 0; i < 6; i++) {
+			btn_state_t *b = &buttons[i]; // Get the button
+			bool level = gpio_read_input(b->pin); // Read its state: 0 = pressed, 1 = released
 	
 			// Button pressed
-	        if (level == 0) {
-	            if (b->prev == 1) { // New press
-	                give_button_sem(i); // Signal the press
-	                b->ticks = REPEAT_START_MS / POLL_MS;
-	                
-	                // Haptic feedback if this button is enabled in settings
-	                xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics
-		            if (haptic_btns[i]) {
-		                gpio_spin_haptic(haptic_len_ms);
-		            }
-		            xSemaphoreGive(xHapticsMutex); // Release haptics
-	            }
-	            else if (b->ticks == 0) { // Time to auto-repeat
-	                give_button_sem(i); // Repeat the press
-	                b->ticks = REPEAT_NEXT_MS / POLL_MS;
-	            }
-	            else { // Waiting for next repeat
-	                b->ticks--; // Tick down
-	            }
-	        }
-	        else { // Button released
-	            // Reset for next press
-	            b->ticks = 0;
-	        }
-	        
-	        // Set previous
-	        b->prev = level;
-	    }
-	    
-	    // Go to sleep requested
-	    if (gpio_read_input(USER_BUTTON_POWER) == 0) {
+			if (level == 0) {
+				if (b->prev == 1) { // New press
+					give_button_sem(i); // Signal the press
+					b->ticks = REPEAT_START_MS / POLL_MS;
+					
+					// Haptic feedback if this button is enabled in settings
+					xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics
+					if (haptic_btns[i]) {
+						gpio_spin_haptic(haptic_len_ms);
+					}
+					xSemaphoreGive(xHapticsMutex); // Release haptics
+				}
+				else if (b->ticks == 0) { // Time to auto-repeat
+					give_button_sem(i); // Repeat the press
+					b->ticks = REPEAT_NEXT_MS / POLL_MS;
+				}
+				else { // Waiting for next repeat
+					b->ticks--; // Tick down
+				}
+			}
+			else { // Button released
+				// Reset for next press
+				b->ticks = 0;
+			}
+			
+			// Set previous
+			b->prev = level;
+		}
+		
+		// Go to sleep requested
+		if (gpio_read_input(USER_BUTTON_POWER) == 0) {
 			xSemaphoreGive(xPowerButtonSemaphore);
 		}
 		
 		// Update LCD based on if charging or not
 		bool is_charging = (gpio_read_input(CHG_IND_PIN) == 0);
 		if (is_charging != was_charging) { // Only update on state change
-			// LiPo is charging
-	        if (is_charging) {
-	            xSemaphoreGive(xIsChargingSemaphore);
-	        }
-	        // LiPo is not charging
-	        else {
-	            xSemaphoreGive(xNotChargingSemaphore);
-	        }
-	        xSemaphoreGive(xStartAdcBatSemaphore); // Update battery reading
-	        
-	        was_charging = is_charging;
-	    }
-	    
-	    // Reset hotkey
-	    if (gpio_read_input(USER_BUTTON_HOME) == 0 && gpio_read_input(USER_BUTTON_RIGHT) == 0) {
+			// LiPo is charging	
+			if (is_charging) {
+				xSemaphoreGive(xIsChargingSemaphore);
+			}
+			// LiPo is not charging
+			else {
+				xSemaphoreGive(xNotChargingSemaphore);
+			}
+			xSemaphoreGive(xStartAdcBatSemaphore); // Update battery reading
+			
+			was_charging = is_charging;
+		}
+		
+		// Reset hotkey
+		if (gpio_read_input(USER_BUTTON_HOME) == 0 && gpio_read_input(USER_BUTTON_RIGHT) == 0) {
 			esp_restart();
 		}
 	
-	    // RGB LED handling
-	    if (xSemaphoreTake(xLedBlueSemaphore, 0) == pdTRUE) {
-			gpio_write_output(2, 1);
+		// RGB LED handling
+		if (xQueueReceive(xLEDQueue, &rgb_data, 0) == pdTRUE) {
+			gpio_rgb_indicate(rgb_data);
 		}
-	    if (xSemaphoreTake(xLedRedSemaphore, 0) == pdTRUE) {
-			gpio_write_output(0, 1);
-		}
-	    if (xSemaphoreTake(xLedGreenSemaphore, 0) == pdTRUE) {
-			gpio_write_output(1, 1);
-		}
-	    if (xSemaphoreTake(xLedOffSemaphore, 0) == pdTRUE) {
-	        gpio_write_output(0, 0);
-	        gpio_write_output(1, 0);
-	        gpio_write_output(2, 0);
-	    }
-	    
-	    vTaskDelay(pdMS_TO_TICKS(POLL_MS));
+		
+		
+		vTaskDelay(pdMS_TO_TICKS(POLL_MS));
 	}
 }
 
 void gpio_task_create(void)
 {
 	if (xTaskCreate(gpio_task, "gpio_task", 1024 * 2, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
-	    ESP_LOGE(TAG, "Failed to start gpio_task");
+		ESP_LOGE(TAG, "Failed to start gpio_task");
 	}
 }

@@ -332,17 +332,15 @@ static void lcd_task(void *pvParameters)
 		}
 		
 		// Sleep condition
-		#ifdef POLYCAST5_EN_SLEEP_TIMER
+		#ifdef POLYCAST5_DIS_SLEEP_TIMER
+			if ((ui_menu.page == HOME_PAGE) && go_to_sleep) {
+				lcd_device_sleep();
+			}
+		#else
 			TickType_t sleep_timer_interval = pdMS_TO_TICKS(sleep_time_s * 1000);
 			
 			// If home and sleep_timer_interval has passed without intervention
 			if ((ui_menu.page == HOME_PAGE) && ((xTaskGetTickCount() - sleep_timer_last >= sleep_timer_interval) || go_to_sleep)) {
-				lcd_device_sleep();
-				
-				sleep_timer_last = xTaskGetTickCount();
-			}
-		#else
-			if ((ui_menu.page == HOME_PAGE) && go_to_sleep) {
 				lcd_device_sleep();
 				
 				sleep_timer_last = xTaskGetTickCount();

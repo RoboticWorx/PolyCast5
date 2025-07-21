@@ -19,25 +19,25 @@
 #include "img_coin_tails.h"
 
 tools_menu_t tools_menu = {
-    .options = {"Coin flipper", "Dice roller", "Number generator", "Read the docs"},
-    .size = 4,
-    .index = 0,
-    .cont = NULL,
+	.options = {"Coin flipper", "Dice roller", "Number generator", "Read the docs"},
+	.size = 4,
+	.index = 0,
+	.cont = NULL,
 };
 
 void lcd_tools_setup_page(tools_menu_t *menu)
 {
 	// Create list
-    menu->main_list = lv_list_create(ACTIVE_SCR);
-    lv_obj_set_size(menu->main_list, 210, 106);
-    
-    // Format
-    lv_obj_set_scrollbar_mode(menu->main_list, LV_SCROLLBAR_MODE_OFF); // Never draw bars
-    lv_obj_set_style_bg_color(menu->main_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_align(menu->main_list, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_border_width(menu->main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_scrollbar_mode(menu->main_list, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_set_scroll_dir(menu->main_list, LV_DIR_VER);
+	menu->main_list = lv_list_create(ACTIVE_SCR);
+	lv_obj_set_size(menu->main_list, 210, 106);
+	
+	// Format
+	lv_obj_set_scrollbar_mode(menu->main_list, LV_SCROLLBAR_MODE_OFF); // Never draw bars
+	lv_obj_set_style_bg_color(menu->main_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+	lv_obj_align(menu->main_list, LV_ALIGN_CENTER, 0, 0);
+	lv_obj_set_style_border_width(menu->main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+	lv_obj_set_scrollbar_mode(menu->main_list, LV_SCROLLBAR_MODE_OFF);
+	lv_obj_set_scroll_dir(menu->main_list, LV_DIR_VER);
 
 	// Create button style
 	lv_style_init(&menu->btn_style);
@@ -84,31 +84,31 @@ void lcd_tools_setup_page(tools_menu_t *menu)
 	}
 	
 	// Create button for each option
-    for (int i = 0; i < menu->size; i++) {
+	for (int i = 0; i < menu->size; i++) {
 
-        menu->btns[i] = lv_list_add_btn(menu->main_list, NULL, menu->options[i]);
-        lv_obj_set_size(menu->btns[i], 200, 30);
+		menu->btns[i] = lv_list_add_btn(menu->main_list, NULL, menu->options[i]);
+		lv_obj_set_size(menu->btns[i], 200, 30);
 
-        // Style selected
-        if (i == menu->index) {
-            lv_obj_add_style(menu->btns[i], &menu->sel_style, 0);
-        }
-        else {
-            lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
-        }
+		// Style selected
+		if (i == menu->index) {
+			lv_obj_add_style(menu->btns[i], &menu->sel_style, 0);
+		}
+		else {
+			lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
+		}
 
-        // Create and format text label
-        lv_obj_t *lbl = lv_obj_get_child(menu->btns[i], 0);
-        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
-        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
-    }
+		// Create and format text label
+		lv_obj_t *lbl = lv_obj_get_child(menu->btns[i], 0);
+		lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+		lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+		lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+	}
 
-    // Format buttons as container
-    menu->cont = lv_obj_get_parent(menu->btns[0]);
-    lv_obj_set_flex_flow (menu->cont, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(menu->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(menu->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT); // Set button spacing
+	// Format buttons as container
+	menu->cont = lv_obj_get_parent(menu->btns[0]);
+	lv_obj_set_flex_flow (menu->cont, LV_FLEX_FLOW_COLUMN);
+	lv_obj_set_flex_align(menu->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+	lv_obj_set_style_pad_gap(menu->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT); // Set button spacing
 	
 	// Hide for now
 	lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -117,9 +117,9 @@ void lcd_tools_setup_page(tools_menu_t *menu)
 void lcd_tools_update_menu(tools_menu_t *menu)
 {
 	// Reveal
-    lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
-    // Wrap index
+	// Wrap index
 	if (menu->index >= menu->size) {
 		menu->index = 0;
 	}
@@ -127,18 +127,18 @@ void lcd_tools_update_menu(tools_menu_t *menu)
 		menu->index = menu->size - 1;
 	}
 
-    // Reset every button to unselected
-    for (int i = 0; i < menu->size; i++) {
-        lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
-        lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
-    }
+	// Reset every button to unselected
+	for (int i = 0; i < menu->size; i++) {
+		lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
+		lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
+	}
 
-    // Highlight only the current index
-    lv_obj_remove_style(menu->btns[menu->index], &menu->btn_style, 0);
-    lv_obj_add_style(menu->btns[menu->index], &menu->sel_style, 0);
-    
-    // Enable scrolling if list gets too long
-    lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
+	// Highlight only the current index
+	lv_obj_remove_style(menu->btns[menu->index], &menu->btn_style, 0);
+	lv_obj_add_style(menu->btns[menu->index], &menu->sel_style, 0);
+	
+	// Enable scrolling if list gets too long
+	lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
 }
 
 void lcd_tools_coin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
@@ -158,27 +158,27 @@ void lcd_tools_coin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 	if (!do_once) {
 		lbl_ins = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_ins, "Press select to flip!", user_secondary_color,
-        			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
-        			 
-        lbl_result = lv_label_create(ACTIVE_SCR);
+					 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
+					 
+		lbl_result = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_result, "Ready", user_secondary_color,
-        			 &lv_font_montserrat_18, LV_ALIGN_CENTER, 62, 16);
-        
-        // Create coin image
+					 &lv_font_montserrat_18, LV_ALIGN_CENTER, 62, 16);
+		
+		// Create coin image
 		coin_heads = lv_img_create(ACTIVE_SCR);
-	    lv_img_set_src(coin_heads, &img_coin_heads);
-	    lv_obj_align(coin_heads, LV_ALIGN_CENTER, -40, 16);
-	    
-	    coin_tails = lv_img_create(ACTIVE_SCR);
-	    lv_img_set_src(coin_tails, &img_coin_tails);
-	    lv_obj_align(coin_tails, LV_ALIGN_CENTER, -40, 16);
-	    lv_obj_add_flag(coin_tails, LV_OBJ_FLAG_HIDDEN); // Hide for now
+		lv_img_set_src(coin_heads, &img_coin_heads);
+		lv_obj_align(coin_heads, LV_ALIGN_CENTER, -40, 16);
+		
+		coin_tails = lv_img_create(ACTIVE_SCR);
+		lv_img_set_src(coin_tails, &img_coin_tails);
+		lv_obj_align(coin_tails, LV_ALIGN_CENTER, -40, 16);
+		lv_obj_add_flag(coin_tails, LV_OBJ_FLAG_HIDDEN); // Hide for now
 		
 		do_once = true;
 	}
 	
 	// Flip the coin
-	if (ui_btns->select_btn == 1) {
+	if (ui_btns->select_btn == 1) {		
 		lv_label_set_text(lbl_result, "Flipping...");
 		
 		uint32_t one_or_zero = esp_random() % 2;
@@ -270,12 +270,12 @@ void lcd_tools_docs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		
 		lbl_ins = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_ins, QR_COM_TXT, user_secondary_color,
-        			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 7);
-        
-        // Create QR
+					 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 7);
+		
+		// Create QR
 		qr_active = lv_img_create(ACTIVE_SCR);
-	    lv_img_set_src(qr_active, QR_PC5_COM);
-	    lv_obj_align(qr_active, LV_ALIGN_CENTER, 0, 13);
+		lv_img_set_src(qr_active, QR_PC5_COM);
+		lv_obj_align(qr_active, LV_ALIGN_CENTER, 0, 13);
 		
 		do_once = true;
 	}
@@ -384,42 +384,42 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		
 		// Create dice img
 		img_dice = lv_img_create(ACTIVE_SCR);
-	    lv_img_set_src(img_dice, IMG_DICE_2);
-	    lv_obj_align(img_dice, LV_ALIGN_CENTER, -65, 0);
+		lv_img_set_src(img_dice, IMG_DICE_2);
+		lv_obj_align(img_dice, LV_ALIGN_CENTER, -65, 0);
 		
 		lbl_ins = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_ins, "Press select to roll!", user_secondary_color,
-        			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
-        			 
-        lbl_dice = lv_label_create(ACTIVE_SCR);
+					 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
+					 
+		lbl_dice = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_dice, "Dice\n", user_secondary_color,
-        			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, X_POS - 65, Y_POS);
-        			 
-        lbl_sides = lv_label_create(ACTIVE_SCR);
+					 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, X_POS - 65, Y_POS);
+					 
+		lbl_sides = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_sides, "Sides\n", user_secondary_color,
-        			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, X_POS, Y_POS);
-        			 
+					 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, X_POS, Y_POS);
+					 
 		char buf[BUF_SIZE];
 		snprintf(buf, sizeof(buf), "%u", dice);
-        lbl_num_dice = lv_label_create(ACTIVE_SCR);
+		lbl_num_dice = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_num_dice, buf, user_secondary_color,
-        			 &lv_font_montserrat_24, LV_ALIGN_TOP_MID, X_POS - 65, Y_POS + 25);
-        			 
-        snprintf(buf, sizeof(buf), "%u", sides);
-        lbl_num_sides = lv_label_create(ACTIVE_SCR);
+					 &lv_font_montserrat_24, LV_ALIGN_TOP_MID, X_POS - 65, Y_POS + 25);
+					 
+		snprintf(buf, sizeof(buf), "%u", sides);
+		lbl_num_sides = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_num_sides, buf, user_secondary_color,
-        			 &lv_font_montserrat_24, LV_ALIGN_TOP_MID, X_POS, Y_POS + 25);
-        			 
-        lbl_pointer = lv_label_create(ACTIVE_SCR);
+					 &lv_font_montserrat_24, LV_ALIGN_TOP_MID, X_POS, Y_POS + 25);
+					 
+		lbl_pointer = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_pointer, LV_SYMBOL_EJECT, user_secondary_color,
-        			 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, X_POS - 65, Y_POS + 58);
-        			 
-        lbl_result = lv_label_create(ACTIVE_SCR);
+					 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, X_POS - 65, Y_POS + 58);
+					 
+		lbl_result = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_result, "", user_secondary_color,
-        			 &lv_font_montserrat_22, LV_ALIGN_BOTTOM_LEFT, 15, -14);		 
-        
-        // Create a style for dice boxes
-        lv_style_reset(&style_dice); // Reset
+					 &lv_font_montserrat_22, LV_ALIGN_BOTTOM_LEFT, 15, -14);		 
+		
+		// Create a style for dice boxes
+		lv_style_reset(&style_dice); // Reset
 		lv_style_init(&style_dice); // Init
 		
 		lv_style_set_radius(&style_dice, 8);
@@ -438,32 +438,33 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		lv_obj_add_style(lbl_dice, &style_dice, 0);
 		
 		// Create a scrollable log container for each roll result
-	    cont_roll_log = lv_obj_create(ACTIVE_SCR);
-	    lv_obj_set_size(cont_roll_log, 210, 106);
-	    lv_obj_set_style_bg_color(cont_roll_log, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-	    lv_obj_align(cont_roll_log, LV_ALIGN_CENTER, 0, 0);
-	    // Format
-	    lv_obj_set_scroll_dir(cont_roll_log, LV_DIR_VER);
-	    lv_obj_set_scrollbar_mode(cont_roll_log, LV_SCROLLBAR_MODE_AUTO);
-	    lv_obj_set_style_pad_top(cont_roll_log, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
+		cont_roll_log = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(cont_roll_log, 210, 106);
+		lv_obj_set_style_bg_color(cont_roll_log, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_align(cont_roll_log, LV_ALIGN_CENTER, 0, 0);
+		// Format
+		lv_obj_set_scroll_dir(cont_roll_log, LV_DIR_VER);
+		lv_obj_set_scrollbar_mode(cont_roll_log, LV_SCROLLBAR_MODE_AUTO);
+		lv_obj_set_style_pad_top(cont_roll_log, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
 		lv_obj_set_style_pad_bottom(cont_roll_log, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
 		lv_obj_set_style_pad_left(cont_roll_log, 15, LV_PART_MAIN | LV_STATE_DEFAULT);
 		lv_obj_set_style_pad_right(cont_roll_log, 15, LV_PART_MAIN | LV_STATE_DEFAULT);
 	
-	    // Create the history log
-	    lbl_roll_log = lv_label_create(cont_roll_log);
+		// Create the history log
+		lbl_roll_log = lv_label_create(cont_roll_log);
 		lv_obj_set_style_text_font(lbl_roll_log, &lv_font_montserrat_16, 0);
 		lv_obj_set_style_text_color(lbl_roll_log, user_secondary_color, 0); 
-	    lv_label_set_long_mode(lbl_roll_log, LV_LABEL_LONG_WRAP);
-	    lv_obj_set_width(lbl_roll_log, 180);
-	    lv_label_set_text(lbl_roll_log, roll_log_buf);
-	    
-	    lv_obj_add_flag(cont_roll_log, LV_OBJ_FLAG_HIDDEN); // Hide history cont
-	    	    		
+		lv_label_set_long_mode(lbl_roll_log, LV_LABEL_LONG_WRAP);
+		lv_obj_set_width(lbl_roll_log, 180);
+		lv_label_set_text(lbl_roll_log, roll_log_buf);
+		
+		lv_obj_add_flag(cont_roll_log, LV_OBJ_FLAG_HIDDEN); // Hide history cont
+						
 		do_once = true;
 	}
 	
-	if (ui_btns->select_btn == 1) {
+	// Roll the dice
+	if (ui_btns->select_btn == 1) {		
 		uint32_t zero_to_five = esp_random() % NUM_IMGS; // Random end frame
 		
 		// Animate
@@ -508,7 +509,7 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 			else {
 				snprintf(tmp, sizeof(tmp), "%u + ", roll);
 			}
-	        strlcat(roll_log_buf, tmp, sizeof(roll_log_buf));
+			strlcat(roll_log_buf, tmp, sizeof(roll_log_buf));
 		}
 		
 		// Format and display new value

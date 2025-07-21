@@ -22,8 +22,32 @@
 #define USER_BUTTON_POWER 0
 #define CHG_IND_PIN 7
 
+#define RED_RGB_LED_PIN 0
+#define GREEN_RGB_LED_PIN 1
+#define BLUE_RGB_LED_PIN 2
+
 #define HAPTIC_PIN 10
 #define ADC_PIN 5
+
+#define HAPTIC_MAX_MS 50
+#define HAPTIC_MIN_MS 10
+
+// RGB LED states
+enum {
+	RGB_SET_OFF,
+	
+	//RGB_SET_RED,
+	//RGB_SET_GREEN,
+	RGB_SET_BLUE,
+	RGB_SET_PURPLE, // B + R
+	RGB_SET_TEAL, // B + G
+	
+	//RGB_BLINK_RED,
+	//RGB_BLINK_GREEN,
+	RGB_BLINK_BLUE,
+	RGB_BLINK_PURPLE, // B + R
+	RGB_BLINK_TEAL, // B + G
+};
 
 /** 
  * @brief Initialise NVS flash
@@ -95,5 +119,12 @@ uint8_t gpio_volts_to_soc(float voltage);
  * @param [in] ms Time on in milliseconds
  */
 void gpio_spin_haptic(uint32_t ms);
+
+/** 
+ * @brief Indicate HW state via the built-in RGB LED
+ *
+ * @param [in] rgb_data The state to indicate
+ */
+void gpio_rgb_indicate(uint8_t rgb_data);
 
 #endif // GPIO_FUNCS_H

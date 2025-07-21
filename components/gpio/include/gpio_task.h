@@ -3,9 +3,6 @@
 
 #include "freertos/idf_additions.h"
 
-#define HAPTIC_MAX_MS 50
-#define HAPTIC_MIN_MS 10
-
 // Mutex
 extern SemaphoreHandle_t xSPIBusMutex;
 extern SemaphoreHandle_t xI2CBusMutex;
@@ -25,13 +22,9 @@ extern SemaphoreHandle_t xSelectButtonSemaphore; // Select btn pressed
 extern SemaphoreHandle_t xIsChargingSemaphore;
 extern SemaphoreHandle_t xNotChargingSemaphore;
 
-extern SemaphoreHandle_t xLedBlueSemaphore;
-extern SemaphoreHandle_t xLedRedSemaphore;
-extern SemaphoreHandle_t xLedGreenSemaphore;
-extern SemaphoreHandle_t xLedOffSemaphore;
-
 // Queues
 extern QueueHandle_t xAdcBatReadingQueue;
+extern QueueHandle_t xLEDQueue;
 
 /**
  * @brief  Create the GPIO expander task.
