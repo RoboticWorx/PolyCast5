@@ -1,7 +1,7 @@
 <p align="center">
   <img
     src="https://github.com/user-attachments/assets/eef5a6b3-55bc-4e2d-8c93-2dc318f9f670"
-    alt="PolyCast5 Only Wordmark"
+    alt="PolyCast5"
     width="75%"
   />
 </p>
