@@ -137,7 +137,12 @@ static void adc_task(void *arg)
 			}
 		}
 		
-		vTaskDelay(pdMS_TO_TICKS(10));
+		// RGB LED handling
+		if (xQueueReceive(xLEDQueue, &rgb_data, 0) == pdTRUE) {
+			gpio_rgb_indicate(rgb_data);
+		}
+		
+		vTaskDelay(pdMS_TO_TICKS(1));
 	}
 }
 
@@ -258,12 +263,6 @@ static void gpio_task(void *arg)
 		if (gpio_read_input(USER_BUTTON_HOME) == 0 && gpio_read_input(USER_BUTTON_RIGHT) == 0) {
 			esp_restart();
 		}
-	
-		// RGB LED handling
-		if (xQueueReceive(xLEDQueue, &rgb_data, 0) == pdTRUE) {
-			gpio_rgb_indicate(rgb_data);
-		}
-		
 		
 		vTaskDelay(pdMS_TO_TICKS(POLL_MS));
 	}

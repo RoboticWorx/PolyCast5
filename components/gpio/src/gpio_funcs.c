@@ -19,7 +19,7 @@
 #define ADC_CH ADC_CHANNEL_4
 #define NUM_ADC_SAMPLES 16384
 
-#define RGB_BLINK_TOTAL_MS 200
+#define RGB_BLINK_TOTAL_MS 125
 #define RGB_BLINK_PERIOD_MS 25
 
 static TimerHandle_t rgb_blink_timer;
@@ -77,8 +77,12 @@ static void IRAM_ATTR rgb_blink_cb(TimerHandle_t xTimer)
 	rgb_blink_state = !rgb_blink_state;
 	// Turn the LEDs on or off based on rgb_blink_color + state
 	switch(rgb_blink_color) {
-		case RGB_SET_BLUE:
+		case RGB_SET_RED:
 			gpio_write_output(RED_RGB_LED_PIN, rgb_blink_state);
+			break;
+			
+		case RGB_SET_BLUE:
+			gpio_write_output(BLUE_RGB_LED_PIN, rgb_blink_state);
 			break;
 			
 		case RGB_SET_PURPLE:
@@ -384,8 +388,12 @@ void gpio_rgb_indicate(uint8_t rgb_data)
 
 	switch(rgb_data) {
 		// Solid color cases
-		case RGB_SET_BLUE:
+		case RGB_SET_RED:
 			gpio_write_output(RED_RGB_LED_PIN, 1);
+			break;
+			
+		case RGB_SET_BLUE:
+			gpio_write_output(BLUE_RGB_LED_PIN, 1);
 			break;
 			
 		case RGB_SET_PURPLE:
@@ -399,6 +407,13 @@ void gpio_rgb_indicate(uint8_t rgb_data)
 			break;
 
 		// Blink cases: start the timers
+		case RGB_BLINK_RED:
+			rgb_blink_color = RGB_SET_RED;
+			rgb_blink_state = false;
+			xTimerStart(rgb_blink_timer, 0);
+			xTimerStart(rgb_blink_stop_timer, 0);
+			break;
+		
 		case RGB_BLINK_BLUE:
 			rgb_blink_color = RGB_SET_BLUE;
 			rgb_blink_state = false;

@@ -946,8 +946,8 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 	static lv_style_t row_style;
 	
 	const char *btn_names[6] = {
-		"Buzz on Select ", "Buzz on Home ", "Buzz on Up	   ",
-		"Buzz on Down ", "Buzz on Left	 ", "Buzz on Right  "
+		"Buzz on Select ", "Buzz on Home ", "Buzz on Up       ",
+		"Buzz on Down ", "Buzz on Left     ", "Buzz on Right  "
 	};
 
 	if (!init) {

@@ -1149,6 +1149,10 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 				ESP_LOGI(TAG, "PIN denied");
 			#endif
 			
+			// RGB indicator
+			uint8_t rgb_state = RGB_BLINK_RED;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+			
 			// Outline red
 			for (int i = 0; i < num_boxes; i++) {
 				lv_obj_set_style_border_color(lv_obj_get_parent(unlock_labels[i]), lv_palette_main(LV_PALETTE_RED), 0);
