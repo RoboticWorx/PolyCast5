@@ -1293,19 +1293,19 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
 		initalized = true;
 	}
 	
-	// Add new signal selected
-	if (ui_btns->select_btn == 1 && ir_menu->index == 1) {
-		lcd_ir_save_new_signal(ui_menu, ir_menu);
-		
-		initalized = false;
-	}
 	// Edit selected
-	else if (ui_btns->select_btn == 1 && ir_menu->index == 2) {
+	if (ui_btns->select_btn == 1 && ir_menu->index == 1) {
 		lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN); // Hide IR menu
 		
 		initalized = false; // Reset bool
 		
 		ui_menu->page = INFRARED_REMOTE_EDIT_PAGE;
+	}
+	// Add new signal selected
+	else if (ui_btns->select_btn == 1 && ir_menu->index == 2) {
+		lcd_ir_save_new_signal(ui_menu, ir_menu);
+		
+		initalized = false;
 	}
 	// Selected specific signal
 	else if (ui_btns->select_btn == 1 && ir_menu->index >= 3) {
@@ -1939,8 +1939,19 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		// Switch pages
 		ui_menu->page = SETTINGS_SLEEP_TIMER_PAGE;
 	}
-	// Reboot selected
+	// Adjust sleep timer selected
 	else if (ui_btns->select_btn == 1 && settings_menu->index == 4) {
+		// Hide settings menu
+		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		// Switch pages
+		ui_menu->page = SETTINGS_RGB_LED_PAGE;
+	}
+	// Reboot selected
+	else if (ui_btns->select_btn == 1 && settings_menu->index == 6) {
 		// Hide settings menu
 		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -1955,7 +1966,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		esp_restart();
 	}
 	// Factory reset selected
-	else if (ui_btns->select_btn == 1 && settings_menu->index == 5) {
+	else if (ui_btns->select_btn == 1 && settings_menu->index == 7) {
 		// Hide settings menu
 		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		

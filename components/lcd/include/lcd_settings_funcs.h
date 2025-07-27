@@ -119,6 +119,15 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 void lcd_settings_sleep_timer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
 
 /**
+ * @brief Executes adjust RGB LED page so user can change the RGB LED configuration
+ *
+ * @param [in] ui_btns User input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] settings_menu Settings menu structure
+ */
+void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
+
+/**
  * @brief Executes factory reset page
  *
  * @param [in] ui_btns User input structure

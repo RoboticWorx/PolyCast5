@@ -50,8 +50,8 @@
 #define SLEEP_TIMER_MAX_S 120 // 2 min
 
 settings_menu_t settings_menu = {
-	.options = {SETTINGS_SET_LOCK_TXT, "Change colors", "Adjust haptics", "Adjust sleep timer", "Reboot", "Factory reset"},
-	.size = 6,
+	.options = {SETTINGS_SET_LOCK_TXT, "Change colors", "Adjust haptics", "Adjust sleep timer", "Adjust RBG LED", "Adjust LCD", "Reboot", "Factory reset"},
+	.size = 8,
 	.index = 0,
 	.cont = NULL,
 	.pin_menu.pin_set = false,
@@ -1208,6 +1208,182 @@ void lcd_settings_sleep_timer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
 		// Reset statics
 		lbl_ins = NULL;
 		slider = NULL;
+		init = false;
+		
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+	}
+}
+
+void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
+{	
+	#define RGB_BLINK_EVERY_TXT "Blink\nevery\n%u ms"
+	#define RGB_BLINK_FOR_TXT "Blink\nfor\n%u ms"
+	
+	#define RGB_POINTER_OFFSET 15
+	
+	// Statics
+	static bool init = false;
+	static bool every_selected = true;
+	
+	static int blink_every_ms = RGB_EVERY_MIN_MS;
+	static int blink_for_ms = RGB_FOR_MIN_MS;
+	static lv_obj_t *lbl_every;
+	static lv_obj_t *lbl_for;
+	static lv_obj_t *slider_every;
+	static lv_obj_t *slider_for;
+	static lv_obj_t *pointer;
+	
+	// Only execute once
+	if (!init) {
+		// Label
+		lbl_every = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_every, "", user_secondary_color,
+					 &lv_font_montserrat_18, LV_ALIGN_LEFT_MID, 20, 0);
+		lv_label_set_text_fmt(lbl_every, RGB_BLINK_EVERY_TXT, (unsigned)blink_every_ms);
+
+		// Slider
+		slider_every = lv_slider_create(ACTIVE_SCR);
+		lv_obj_set_size(slider_every, 10, 100);
+		lv_obj_align(slider_every, LV_ALIGN_LEFT_MID, 98, 0);
+		lv_slider_set_range(slider_every, RGB_EVERY_MIN_MS, RGB_EVERY_MAX_MS);
+		lv_slider_set_value(slider_every, blink_every_ms, LV_ANIM_OFF);
+		
+		// Label
+		lbl_for = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_for, "", user_secondary_color,
+					 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -20, 0);
+		lv_label_set_text_fmt(lbl_for, RGB_BLINK_FOR_TXT, (unsigned)blink_for_ms);
+
+		// Slider
+		slider_for = lv_slider_create(ACTIVE_SCR);
+		lv_obj_set_size(slider_for, 10, 100);
+		lv_obj_align(slider_for, LV_ALIGN_RIGHT_MID, -98, 0);
+		lv_slider_set_range(slider_for, RGB_FOR_MIN_MS, RGB_FOR_MAX_MS);
+		lv_slider_set_value(slider_for, blink_for_ms, LV_ANIM_OFF);
+		
+		// Pointer
+		pointer = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(pointer, LV_SYMBOL_EJECT, user_secondary_color,
+					 &lv_font_montserrat_20, LV_ALIGN_LEFT_MID, 20 + RGB_POINTER_OFFSET, 50);
+		
+		init = true;
+	}
+	
+	// Increase sleep timer
+	if (ui_btns->up_btn == 1) {
+		// On first option
+		if (every_selected) {
+			blink_every_ms += 5;
+		
+			// Wrap
+			if (blink_every_ms > RGB_EVERY_MAX_MS) {
+				blink_every_ms = RGB_EVERY_MIN_MS;
+			}
+			
+			// Create text
+			lv_label_set_text_fmt(lbl_every, RGB_BLINK_EVERY_TXT, (unsigned)blink_every_ms);
+			lv_slider_set_value(slider_every, blink_every_ms, LV_ANIM_OFF);
+		}
+		// Second option (for duration)
+		else {
+			blink_for_ms += 10;
+		
+			// Wrap
+			if (blink_for_ms > RGB_FOR_MAX_MS) {
+				blink_for_ms = RGB_FOR_MIN_MS;
+			}
+			
+			// Create text
+			lv_label_set_text_fmt(lbl_for, RGB_BLINK_FOR_TXT, (unsigned)blink_for_ms);
+			lv_slider_set_value(slider_for, blink_for_ms, LV_ANIM_OFF);
+		}
+		
+		// Persist to NVS
+		//lcd_settings_adjust_rgb_led_nvs_save();
+	}
+	// Decrease sleep timer
+	else if (ui_btns->down_btn == 1) {		
+		// On first option
+		if (every_selected) {
+			blink_every_ms -= 5;
+		
+			// Wrap
+			if (blink_every_ms < RGB_EVERY_MIN_MS) {
+				blink_every_ms = RGB_EVERY_MAX_MS;
+			}
+			
+			// Create text
+			lv_label_set_text_fmt(lbl_every, RGB_BLINK_EVERY_TXT, (unsigned)blink_every_ms);
+			lv_slider_set_value(slider_every, blink_every_ms, LV_ANIM_OFF);
+		}
+		// Second option (for duration)
+		else {
+			blink_for_ms -= 10;
+		
+			// Wrap
+			if (blink_for_ms  < RGB_FOR_MIN_MS) {
+				blink_for_ms  = RGB_FOR_MAX_MS;
+			}
+			
+			// Create text
+			lv_label_set_text_fmt(lbl_for, RGB_BLINK_FOR_TXT, (unsigned)blink_for_ms);
+			lv_slider_set_value(slider_for, blink_for_ms, LV_ANIM_OFF);
+		}
+		
+		// Persist to NVS
+		//lcd_settings_adjust_rgb_led_nvs_save();
+	}
+	// Move selector
+	else if (ui_btns->right_btn == 1) {
+		every_selected = !every_selected;
+		
+		if (every_selected) {
+			lv_obj_set_x(pointer, lv_obj_get_x(lbl_every) + RGB_POINTER_OFFSET);
+		}
+		else {
+			lv_obj_set_x(pointer, lv_obj_get_x(lbl_for) + RGB_POINTER_OFFSET);
+		}
+	}
+	// Back selected
+	else if (ui_btns->left_btn == 1) {
+		// On left-most
+		if (every_selected) {
+			// Delete objects
+			lv_obj_delete(pointer);
+			lv_obj_delete(lbl_every);
+			lv_obj_delete(lbl_for);
+			lv_obj_delete(slider_every);
+			lv_obj_delete(slider_for);
+			
+			// Reset statics
+			lbl_every = lbl_for = pointer = NULL;
+			slider_every = slider_for = NULL;
+			init = false;
+			
+			// Show settings list
+			lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// Switch pages
+			ui_menu->page = SETTINGS_PAGE;
+		}
+		// Select lbl_every
+		else {
+			every_selected = true;
+			lv_obj_set_x(pointer, lv_obj_get_x(lbl_every) + RGB_POINTER_OFFSET);
+		}
+	}
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Delete objects
+		lv_obj_delete(pointer);
+		lv_obj_delete(lbl_every);
+		lv_obj_delete(lbl_for);
+		lv_obj_delete(slider_every);
+		lv_obj_delete(slider_for);
+		
+		// Reset statics
+		lbl_every = lbl_for = pointer = NULL;
+		slider_every = slider_for = NULL;
 		init = false;
 		
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep

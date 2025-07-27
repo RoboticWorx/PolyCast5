@@ -755,7 +755,7 @@ void lcd_ir_build_current_menu(ir_menu_t *menu, size_t c)
 	lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
 
 	// Add New button
-	menu->btns[1] = lv_list_add_btn(menu->main_list, NULL, "Add New");
+	menu->btns[1] = lv_list_add_btn(menu->main_list, NULL, "Edit");
 	lv_obj_set_size(menu->btns[1], 100, 28);
 	lv_obj_add_style(menu->btns[1], &menu->btn_style, 0);
 	
@@ -765,7 +765,7 @@ void lcd_ir_build_current_menu(ir_menu_t *menu, size_t c)
 	lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
 
 	// Edit button
-	menu->btns[2] = lv_list_add_btn(menu->main_list, NULL, "Edit");
+	menu->btns[2] = lv_list_add_btn(menu->main_list, NULL, "Add New");
 	lv_obj_set_size(menu->btns[2], 100, 28);
 	lv_obj_add_style(menu->btns[2], &menu->btn_style, 0);
 	

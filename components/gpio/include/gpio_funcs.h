@@ -32,6 +32,11 @@
 #define HAPTIC_MAX_MS 50
 #define HAPTIC_MIN_MS 10
 
+#define RGB_EVERY_MAX_MS 50
+#define RGB_EVERY_MIN_MS 0
+#define RGB_FOR_MAX_MS 500
+#define RGB_FOR_MIN_MS 50
+
 // RGB LED states
 enum {
 	RGB_SET_OFF,

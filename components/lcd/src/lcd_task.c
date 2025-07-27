@@ -323,6 +323,9 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == SETTINGS_HAPTIC_PAGE) {
 				lcd_settings_adjust_haptics_page(&ui_btns, &ui_menu, &settings_menu);
 			}
+			else if (ui_menu.page == SETTINGS_RGB_LED_PAGE) {
+				lcd_settings_adjust_rgb_led_page(&ui_btns, &ui_menu, &settings_menu);
+			}
 			else if (ui_menu.page == SETTINGS_SLEEP_TIMER_PAGE) {
 				lcd_settings_sleep_timer_page(&ui_btns, &ui_menu, &settings_menu);
 			}
