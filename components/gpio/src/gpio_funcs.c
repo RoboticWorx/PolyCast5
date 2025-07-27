@@ -9,6 +9,7 @@
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
 
+#include "portmacro.h"
 #include "tca9535.h"
 
 #include "gpio_funcs.h"
@@ -19,8 +20,8 @@
 #define ADC_CH ADC_CHANNEL_4
 #define NUM_ADC_SAMPLES 16384
 
-#define RGB_BLINK_TOTAL_MS 125
-#define RGB_BLINK_PERIOD_MS 25
+volatile int16_t rbg_blink_period_ms = 25; // Default rgb period
+volatile int16_t rgb_blink_total_ms = 125; // Default rgb total
 
 static TimerHandle_t rgb_blink_timer;
 static TimerHandle_t rgb_blink_stop_timer;
@@ -80,6 +81,10 @@ static void IRAM_ATTR rgb_blink_cb(TimerHandle_t xTimer)
 		case RGB_SET_RED:
 			gpio_write_output(RED_RGB_LED_PIN, rgb_blink_state);
 			break;
+		
+		case RGB_SET_GREEN:
+			gpio_write_output(GREEN_RGB_LED_PIN, rgb_blink_state);
+			break;
 			
 		case RGB_SET_BLUE:
 			gpio_write_output(BLUE_RGB_LED_PIN, rgb_blink_state);
@@ -103,7 +108,7 @@ static void IRAM_ATTR rgb_blink_cb(TimerHandle_t xTimer)
 static void IRAM_ATTR rgb_blink_stop_cb(TimerHandle_t xTimer)
 {
 	// Stop the periodic toggle
-	xTimerStop(rgb_blink_timer, 0);
+	xTimerStop(rgb_blink_timer, portMAX_DELAY);
 
 	// Ensure all LEDs off
 	gpio_write_output(RED_RGB_LED_PIN, 0);
@@ -160,14 +165,14 @@ esp_err_t gpio_init(void)
 	haptic_timer = xTimerCreate("haptic_off", pdMS_TO_TICKS(10), pdFALSE, NULL, haptic_off_cb);
 	configASSERT(haptic_timer);
 	
+	// No need to use xRgbLedMutex since this function is called from main
 	// Create the periodic blink timer
-	rgb_blink_timer = xTimerCreate("rgb_blink", pdMS_TO_TICKS(RGB_BLINK_PERIOD_MS), pdTRUE, NULL, rgb_blink_cb);
+	rgb_blink_timer = xTimerCreate("rgb_blink", pdMS_TO_TICKS(rbg_blink_period_ms), pdTRUE, NULL, rgb_blink_cb);
 	configASSERT(rgb_blink_timer);
 
 	// Create the one-shot blink stop timer
-	rgb_blink_stop_timer = xTimerCreate("rgb_blink_stop", pdMS_TO_TICKS(RGB_BLINK_TOTAL_MS), pdFALSE, NULL, rgb_blink_stop_cb);
+	rgb_blink_stop_timer = xTimerCreate("rgb_blink_stop", pdMS_TO_TICKS(rgb_blink_total_ms), pdFALSE, NULL, rgb_blink_stop_cb);
 	configASSERT(rgb_blink_stop_timer);
-	
 	
 	esp_err_t ret = TCA9535Init();
 	if (ret != ESP_OK) {
@@ -370,17 +375,36 @@ void gpio_spin_haptic(uint32_t ms)
 	gpio_set_level(HAPTIC_PIN, 1); // Haptic ON
 	
 	// Re-arm the timer with the new period
-	xTimerChangePeriod(haptic_timer, ticks, 0);
-	xTimerStart(haptic_timer, 0);
+	xTimerChangePeriod(haptic_timer, ticks, portMAX_DELAY);
+	xTimerStart(haptic_timer, portMAX_DELAY);
 	
 	// Haptic OFF when timer expires
 }
 
 void gpio_rgb_indicate(uint8_t rgb_data)
 {
+	xSemaphoreTake(xRgbLedMutex, portMAX_DELAY); // Lock RGB LED
+	// Skip if invalid (pdMS_TO_TICKS rounds down to 0)
+	if (rbg_blink_period_ms < 10) {
+		xSemaphoreGive(xRgbLedMutex); // Release RGB LED
+		return;
+	}
+	
+	/*
+		Note:
+		A light blinking at a frequency of around 50-60Hz+ will typically
+		appear as a solid, continuous light to the human eye.
+		This frequency, known as the critical flicker fusion frequency.
+	*/
+	
 	// Stop any previous blinking
-	xTimerStop(rgb_blink_timer, 0);
-	xTimerStop(rgb_blink_stop_timer, 0);
+	xTimerStop(rgb_blink_timer, portMAX_DELAY);
+	xTimerStop(rgb_blink_stop_timer, portMAX_DELAY);
+	
+	// Update periods
+	xTimerChangePeriod(rgb_blink_timer, pdMS_TO_TICKS(rbg_blink_period_ms), portMAX_DELAY);
+	xTimerChangePeriod(rgb_blink_stop_timer, pdMS_TO_TICKS(rgb_blink_total_ms), portMAX_DELAY);
+	xSemaphoreGive(xRgbLedMutex); // Release RGB LED
 	
 	// All LEDs OFF to start
 	gpio_write_output(RED_RGB_LED_PIN, 0);
@@ -391,6 +415,10 @@ void gpio_rgb_indicate(uint8_t rgb_data)
 		// Solid color cases
 		case RGB_SET_RED:
 			gpio_write_output(RED_RGB_LED_PIN, 1);
+			break;
+			
+		case RGB_SET_GREEN:
+			gpio_write_output(GREEN_RGB_LED_PIN, 1);
 			break;
 			
 		case RGB_SET_BLUE:
@@ -407,33 +435,40 @@ void gpio_rgb_indicate(uint8_t rgb_data)
 			gpio_write_output(GREEN_RGB_LED_PIN, 1);
 			break;
 
-		// Blink cases: start the timers
+		// Blink cases: start timers
 		case RGB_BLINK_RED:
 			rgb_blink_color = RGB_SET_RED;
 			rgb_blink_state = false;
-			xTimerStart(rgb_blink_timer, 0);
-			xTimerStart(rgb_blink_stop_timer, 0);
+			xTimerStart(rgb_blink_timer, portMAX_DELAY);
+			xTimerStart(rgb_blink_stop_timer, portMAX_DELAY);
+			break;
+			
+		case RGB_BLINK_GREEN:
+			rgb_blink_color = RGB_SET_GREEN;
+			rgb_blink_state = false;
+			xTimerStart(rgb_blink_timer, portMAX_DELAY);
+			xTimerStart(rgb_blink_stop_timer, portMAX_DELAY);
 			break;
 		
 		case RGB_BLINK_BLUE:
 			rgb_blink_color = RGB_SET_BLUE;
 			rgb_blink_state = false;
-			xTimerStart(rgb_blink_timer, 0);
-			xTimerStart(rgb_blink_stop_timer, 0);
+			xTimerStart(rgb_blink_timer, portMAX_DELAY);
+			xTimerStart(rgb_blink_stop_timer, portMAX_DELAY);
 			break;
 
 		case RGB_BLINK_PURPLE:
 			rgb_blink_color = RGB_SET_PURPLE;
 			rgb_blink_state = false;
-			xTimerStart(rgb_blink_timer, 0);
-			xTimerStart(rgb_blink_stop_timer, 0);
+			xTimerStart(rgb_blink_timer, portMAX_DELAY);
+			xTimerStart(rgb_blink_stop_timer, portMAX_DELAY);
 			break;
 			
 		case RGB_BLINK_TEAL:
 			rgb_blink_color = RGB_SET_TEAL;
 			rgb_blink_state = false;
-			xTimerStart(rgb_blink_timer, 0);
-			xTimerStart(rgb_blink_stop_timer, 0);
+			xTimerStart(rgb_blink_timer, portMAX_DELAY);
+			xTimerStart(rgb_blink_stop_timer, portMAX_DELAY);
 			break;
 
 		default:

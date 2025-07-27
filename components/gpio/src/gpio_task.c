@@ -21,6 +21,7 @@
 SemaphoreHandle_t xSPIBusMutex;
 SemaphoreHandle_t xI2CBusMutex;
 SemaphoreHandle_t xHapticsMutex;
+SemaphoreHandle_t xRgbLedMutex;
 
 SemaphoreHandle_t xPowerButtonSemaphore;
 SemaphoreHandle_t xStartAdcBatSemaphore;
@@ -145,6 +146,8 @@ static void gpio_task(void *arg)
 {
 	xHapticsMutex = xSemaphoreCreateMutex();
 	configASSERT(xHapticsMutex);
+	xRgbLedMutex = xSemaphoreCreateMutex();
+	configASSERT(xRgbLedMutex);
 	
 	xUpButtonSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xUpButtonSemaphore);

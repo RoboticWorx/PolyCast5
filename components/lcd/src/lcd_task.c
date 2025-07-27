@@ -104,6 +104,9 @@ static void lcd_task(void *pvParameters)
 	xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics
 	lcd_settings_haptics_nvs_load(); // Load haptics
 	xSemaphoreGive(xHapticsMutex); // Release haptics
+	xSemaphoreTake(xRgbLedMutex, portMAX_DELAY); // Lock RGB LED
+	lcd_settings_rgb_led_nvs_load();
+	xSemaphoreGive(xRgbLedMutex); // Release RGB LED
 	
 	// Create common pages
 	lcd_ir_setup_page(&ir_menu);

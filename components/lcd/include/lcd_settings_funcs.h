@@ -195,4 +195,14 @@ void lcd_settings_sleep_timer_nvs_save(void);
  */
 void lcd_settings_sleep_timer_nvs_load(void);
 
+/**
+ * @brief Saves the current RGB LED period and total duration to NVS
+ */
+void lcd_settings_rgb_led_nvs_save(void);
+
+/**
+ * @brief Loads the current RGB LED period and total duration from NVS
+ */
+void lcd_settings_rgb_led_nvs_load(void);
+
 #endif // LCD_SETTINGS_FUNCS_H

@@ -44,6 +44,11 @@
 #define SETTINGS_SLEEP_TIMER_NS "set_sleep" // NVS namespace
 #define SETTINGS_SLEEP_TIMER_KEY "timer_len" // Sleep timer length
 
+// RGB LED settings
+#define SETTINGS_RGB_LED_NS "set_rgb" // NVS namespace
+#define SETTINGS_RGB_LED_PERIOD_KEY "every_ms" // RGB LED blink period
+#define SETTINGS_RGB_LED_TOTAL_KEY "for_ms" // RGB LED blink total time
+
 #define COLOR_OPTION_COUNT 23
 
 #define SLEEP_TIMER_MIN_S 5 // 5 sec
@@ -63,6 +68,9 @@ extern volatile uint8_t haptic_len_ms;
 extern volatile bool haptic_btns[6];
 
 extern uint8_t sleep_time_s;
+
+extern int16_t rbg_blink_period_ms;
+extern int16_t rgb_blink_total_ms;
 
 static bool primary_color_selected = true;
 
@@ -1216,8 +1224,8 @@ void lcd_settings_sleep_timer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
 
 void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {	
-	#define RGB_BLINK_EVERY_TXT "Blink\nevery\n%u ms"
-	#define RGB_BLINK_FOR_TXT "Blink\nfor\n%u ms"
+	#define RGB_BLINK_EVERY_TXT "Blink\nevery\n%d ms"
+	#define RGB_BLINK_FOR_TXT "Blink\nfor\n%d ms"
 	
 	#define RGB_POINTER_OFFSET 15
 	
@@ -1225,8 +1233,6 @@ void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 	static bool init = false;
 	static bool every_selected = true;
 	
-	static int blink_every_ms = RGB_EVERY_MIN_MS;
-	static int blink_for_ms = RGB_FOR_MIN_MS;
 	static lv_obj_t *lbl_every;
 	static lv_obj_t *lbl_for;
 	static lv_obj_t *slider_every;
@@ -1235,103 +1241,120 @@ void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 	
 	// Only execute once
 	if (!init) {
+		xSemaphoreTake(xRgbLedMutex, portMAX_DELAY); // Lock RGB LED
 		// Label
 		lbl_every = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_every, "", user_secondary_color,
 					 &lv_font_montserrat_18, LV_ALIGN_LEFT_MID, 20, 0);
-		lv_label_set_text_fmt(lbl_every, RGB_BLINK_EVERY_TXT, (unsigned)blink_every_ms);
+		// Half the time is off: blink every would be double
+		lv_label_set_text_fmt(lbl_every, RGB_BLINK_EVERY_TXT, (unsigned)(rbg_blink_period_ms * 2));
 
 		// Slider
 		slider_every = lv_slider_create(ACTIVE_SCR);
 		lv_obj_set_size(slider_every, 10, 100);
 		lv_obj_align(slider_every, LV_ALIGN_LEFT_MID, 98, 0);
-		lv_slider_set_range(slider_every, RGB_EVERY_MIN_MS, RGB_EVERY_MAX_MS);
-		lv_slider_set_value(slider_every, blink_every_ms, LV_ANIM_OFF);
+		lv_slider_set_range(slider_every, RGB_PERIOD_MIN_MS, RGB_PERIOD_MAX_MS);
+		lv_slider_set_value(slider_every, rbg_blink_period_ms, LV_ANIM_OFF);
 		
 		// Label
 		lbl_for = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_for, "", user_secondary_color,
 					 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -20, 0);
-		lv_label_set_text_fmt(lbl_for, RGB_BLINK_FOR_TXT, (unsigned)blink_for_ms);
-
+		lv_label_set_text_fmt(lbl_for, RGB_BLINK_FOR_TXT, (unsigned)rgb_blink_total_ms);
+		
 		// Slider
 		slider_for = lv_slider_create(ACTIVE_SCR);
 		lv_obj_set_size(slider_for, 10, 100);
 		lv_obj_align(slider_for, LV_ALIGN_RIGHT_MID, -98, 0);
-		lv_slider_set_range(slider_for, RGB_FOR_MIN_MS, RGB_FOR_MAX_MS);
-		lv_slider_set_value(slider_for, blink_for_ms, LV_ANIM_OFF);
+		lv_slider_set_range(slider_for, RGB_TOTAL_MIN_MS, RGB_TOTAL_MAX_MS);
+		lv_slider_set_value(slider_for, rgb_blink_total_ms, LV_ANIM_OFF);
 		
 		// Pointer
 		pointer = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(pointer, LV_SYMBOL_EJECT, user_secondary_color,
 					 &lv_font_montserrat_20, LV_ALIGN_LEFT_MID, 20 + RGB_POINTER_OFFSET, 50);
+		xSemaphoreGive(xRgbLedMutex); // Release RGB LED
 		
 		init = true;
 	}
 	
 	// Increase sleep timer
 	if (ui_btns->up_btn == 1) {
+		xSemaphoreTake(xRgbLedMutex, portMAX_DELAY); // Lock RGB LED
 		// On first option
 		if (every_selected) {
-			blink_every_ms += 5;
+			rbg_blink_period_ms += 5;
 		
 			// Wrap
-			if (blink_every_ms > RGB_EVERY_MAX_MS) {
-				blink_every_ms = RGB_EVERY_MIN_MS;
+			if (rbg_blink_period_ms > RGB_PERIOD_MAX_MS) {
+				rbg_blink_period_ms = RGB_PERIOD_MIN_MS;
+			}
+			// Skip 5
+			else if (rbg_blink_period_ms > 0 && rbg_blink_period_ms < 10) {
+				rbg_blink_period_ms = 10;
 			}
 			
-			// Create text
-			lv_label_set_text_fmt(lbl_every, RGB_BLINK_EVERY_TXT, (unsigned)blink_every_ms);
-			lv_slider_set_value(slider_every, blink_every_ms, LV_ANIM_OFF);
+			// Update text
+			// Half the time is off: blink every would be double
+			lv_label_set_text_fmt(lbl_every, RGB_BLINK_EVERY_TXT, (unsigned)(rbg_blink_period_ms * 2));
+			lv_slider_set_value(slider_every, rbg_blink_period_ms, LV_ANIM_OFF);
 		}
 		// Second option (for duration)
 		else {
-			blink_for_ms += 10;
+			rgb_blink_total_ms += 10;
 		
 			// Wrap
-			if (blink_for_ms > RGB_FOR_MAX_MS) {
-				blink_for_ms = RGB_FOR_MIN_MS;
+			if (rgb_blink_total_ms > RGB_TOTAL_MAX_MS) {
+				rgb_blink_total_ms = RGB_TOTAL_MIN_MS;
 			}
 			
-			// Create text
-			lv_label_set_text_fmt(lbl_for, RGB_BLINK_FOR_TXT, (unsigned)blink_for_ms);
-			lv_slider_set_value(slider_for, blink_for_ms, LV_ANIM_OFF);
+			// Update text
+			lv_label_set_text_fmt(lbl_for, RGB_BLINK_FOR_TXT, (unsigned)rgb_blink_total_ms);
+			lv_slider_set_value(slider_for, rgb_blink_total_ms, LV_ANIM_OFF);
 		}
 		
 		// Persist to NVS
-		//lcd_settings_adjust_rgb_led_nvs_save();
+		lcd_settings_rgb_led_nvs_save();
+		xSemaphoreGive(xRgbLedMutex); // Release RGB LED
 	}
 	// Decrease sleep timer
 	else if (ui_btns->down_btn == 1) {		
+		xSemaphoreTake(xRgbLedMutex, portMAX_DELAY); // Lock RGB LED
 		// On first option
 		if (every_selected) {
-			blink_every_ms -= 5;
-		
+			rbg_blink_period_ms -= 5;
+			
 			// Wrap
-			if (blink_every_ms < RGB_EVERY_MIN_MS) {
-				blink_every_ms = RGB_EVERY_MAX_MS;
+			if (rbg_blink_period_ms < RGB_PERIOD_MIN_MS) {
+				rbg_blink_period_ms = RGB_PERIOD_MAX_MS;
+			}
+			// Skip 5
+			else if (rbg_blink_period_ms > 0 && rbg_blink_period_ms < 10) {
+				rbg_blink_period_ms = 0;
 			}
 			
-			// Create text
-			lv_label_set_text_fmt(lbl_every, RGB_BLINK_EVERY_TXT, (unsigned)blink_every_ms);
-			lv_slider_set_value(slider_every, blink_every_ms, LV_ANIM_OFF);
+			// Update text
+			// Half the time is off: blink every would be double
+			lv_label_set_text_fmt(lbl_every, RGB_BLINK_EVERY_TXT, (unsigned)(rbg_blink_period_ms * 2));
+			lv_slider_set_value(slider_every, rbg_blink_period_ms, LV_ANIM_OFF);
 		}
 		// Second option (for duration)
 		else {
-			blink_for_ms -= 10;
+			rgb_blink_total_ms -= 10;
 		
 			// Wrap
-			if (blink_for_ms  < RGB_FOR_MIN_MS) {
-				blink_for_ms  = RGB_FOR_MAX_MS;
+			if (rgb_blink_total_ms  < RGB_TOTAL_MIN_MS) {
+				rgb_blink_total_ms  = RGB_TOTAL_MAX_MS;
 			}
 			
-			// Create text
-			lv_label_set_text_fmt(lbl_for, RGB_BLINK_FOR_TXT, (unsigned)blink_for_ms);
-			lv_slider_set_value(slider_for, blink_for_ms, LV_ANIM_OFF);
+			// Update text
+			lv_label_set_text_fmt(lbl_for, RGB_BLINK_FOR_TXT, (unsigned)rgb_blink_total_ms);
+			lv_slider_set_value(slider_for, rgb_blink_total_ms, LV_ANIM_OFF);
 		}
 		
 		// Persist to NVS
-		//lcd_settings_adjust_rgb_led_nvs_save();
+		lcd_settings_rgb_led_nvs_save();
+		xSemaphoreGive(xRgbLedMutex); // Release RGB LED
 	}
 	// Move selector
 	else if (ui_btns->right_btn == 1) {
@@ -1343,6 +1366,12 @@ void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 		else {
 			lv_obj_set_x(pointer, lv_obj_get_x(lbl_for) + RGB_POINTER_OFFSET);
 		}
+	}
+	// Test setting
+	else if (ui_btns->select_btn == 1) {
+		// RGB indicator
+		uint8_t rgb_state = RGB_BLINK_GREEN;
+		xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
 	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {
@@ -1795,6 +1824,71 @@ void lcd_settings_sleep_timer_nvs_load(void)
 		sleep_time_s = len;
 		#ifdef POLYCAST5_DEBUG
 			ESP_LOGI(TAG, "Loaded sleep timer: %u sec", sleep_time_s);
+		#endif
+	}
+	
+	// Close NVS
+	nvs_close(h);
+}
+
+void lcd_settings_rgb_led_nvs_save(void)
+{
+	nvs_handle_t h;
+	
+	// Open NVS
+	esp_err_t err = nvs_open(SETTINGS_RGB_LED_NS, NVS_READWRITE, &h);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_rgb_led_nvs_save: open failed (%s)", esp_err_to_name(err));
+		return;
+	}
+	
+	// Save the RGB LED period
+	err = nvs_set_i16(h, SETTINGS_RGB_LED_PERIOD_KEY, rbg_blink_period_ms);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_rgb_led_nvs_save: rbg_blink_period_ms set failed");
+	}
+	
+	// Save the RGB LED total duration
+	err = nvs_set_i16(h, SETTINGS_RGB_LED_TOTAL_KEY, rgb_blink_total_ms);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_rgb_led_nvs_save: rgb_blink_total_ms set failed");
+	}
+
+	// Commit changes
+	err = nvs_commit(h);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_rgb_led_nvs_save: commit failed");
+	}
+	
+	// Close NVS
+	nvs_close(h);
+}
+
+void lcd_settings_rgb_led_nvs_load(void)
+{
+	nvs_handle_t h;
+	
+	// Open NVS
+	esp_err_t err = nvs_open(SETTINGS_RGB_LED_NS, NVS_READONLY, &h);
+	if (err != ESP_OK) {
+		// First boot: leave defaults
+		return;
+	}
+
+	// Load the RGB LED period
+	int16_t len;
+	if (nvs_get_i16(h, SETTINGS_RGB_LED_PERIOD_KEY, &len) == ESP_OK) {
+		rbg_blink_period_ms = len;
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "Loaded RGB LED period: %d ms", rbg_blink_period_ms);
+		#endif
+	}
+	
+	// Load the RGB LED total duration
+	if (nvs_get_i16(h, SETTINGS_RGB_LED_TOTAL_KEY, &len) == ESP_OK) {
+		rgb_blink_total_ms = len;
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "Loaded RGB LED total duration: %d ms", rgb_blink_total_ms);
 		#endif
 	}
 	
