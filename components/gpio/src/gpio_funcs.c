@@ -286,6 +286,7 @@ float gpio_get_battery_voltage(void)
 		sum += raw;
 		esp_rom_delay_us(5);
 	}
+	
 	int avg_raw = sum / NUM_ADC_SAMPLES;
 	
 	#ifdef POLYCAST5_DEBUG
@@ -307,7 +308,7 @@ float gpio_get_battery_voltage(void)
 	// Undo divider + op amp: Vbat = (Vadc + off) / gain
 	const float R42 = 10000, R43 = 27400;
 	const float R44 = 10000, R45 = 27400;
-	const float R40 =  2200, R41 = 22000;
+	const float R40 = 2200, R41 = 22000;
 	const float Vref = 3.30f * (R41 / (R40 + R41));
 	const float gain = (1.0f + R45 / R44) * (R43 / (R42+R43));
 	const float off = (R45 / R44) * Vref;

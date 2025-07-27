@@ -1,0 +1,16 @@
+Command: cmake -G Ninja -DPYTHON_DEPS_CHECKED=1 -DPYTHON=C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe -DESP_PLATFORM=1 -DCCACHE_ENABLE=0 C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5
+Traceback (most recent call last):
+  File "C:\Espressif\frameworks\esp-idf-master\components\esp_rom\gen_gdbinit.py", line 72, in <module>
+    gdbinit_lines = generate_gdbinit_rom_add_symbols(target)
+  File "C:\Espressif\frameworks\esp-idf-master\components\esp_rom\gen_gdbinit.py", line 32, in generate_gdbinit_rom_add_symbols
+    raise EnvironmentError(
+        'ESP_ROM_ELF_DIR environment variable is not defined. Please try to run IDF "install" and "export" scripts.')
+OSError: ESP_ROM_ELF_DIR environment variable is not defined. Please try to run IDF "install" and "export" scripts.
+CMake Warning at C:/Espressif/frameworks/esp-idf-master/tools/cmake/gdbinit.cmake:52 (message):
+  Error while generating esp_rom gdbinit
+Call Stack (most recent call first):
+  C:/Espressif/frameworks/esp-idf-master/tools/cmake/project.cmake:356 (__generate_gdbinit)
+  C:/Espressif/frameworks/esp-idf-master/tools/cmake/project.cmake:957 (__project_info)
+  CMakeLists.txt:7 (project)
+
+
