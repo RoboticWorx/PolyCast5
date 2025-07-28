@@ -1,15 +1,17 @@
-#include "freertos/projdefs.h"
 #include "polycast5_macros.h"
+
+#include "freertos/projdefs.h"
+#include "portmacro.h"
 
 #include "nvs_flash.h"
 
+#include "driver/ledc.h"
 #include "driver/i2c.h"
 #include "esp_log.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
 
-#include "portmacro.h"
 #include "tca9535.h"
 
 #include "gpio_funcs.h"
@@ -116,6 +118,41 @@ static void IRAM_ATTR rgb_blink_stop_cb(TimerHandle_t xTimer)
 	gpio_write_output(BLUE_RGB_LED_PIN, 0);
 }
 
+static void init_ledc_pwm(void)
+{
+	// Configure LEDC timer
+    ledc_timer_config_t timer_config = {
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .duty_resolution = LCD_LEDC_RESOLUTION,
+        .timer_num = LCD_LEDC_TIMER,
+        .freq_hz = LCD_LEDC_FREQ_HZ,
+        .clk_cfg = LEDC_USE_XTAL_CLK
+    };
+    esp_err_t err = ledc_timer_config(&timer_config);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "LEDC timer config failed: %s\n", esp_err_to_name(err));
+        return;
+    }
+
+    // Configure LEDC channel
+    ledc_channel_config_t channel_config = {
+        .gpio_num = ST7789_LEDA_PIN,
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .channel = LCD_LEDC_CHANNEL,
+        .intr_type = LEDC_INTR_DISABLE, // No interrupts needed
+        .timer_sel = LCD_LEDC_TIMER,
+        .duty = 100, // Start with 100% duty (ON)
+        .hpoint = 0,
+        .sleep_mode = LEDC_SLEEP_MODE_NO_ALIVE_NO_PD,
+        .flags.output_invert = 1 // P-CH inversion
+    };
+    err = ledc_channel_config(&channel_config);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "LEDC channel config failed: %s\n", esp_err_to_name(err));
+        return;
+    }
+}
+
 esp_err_t gpio_init(void)
 {
 	// Configure outputs
@@ -160,6 +197,7 @@ esp_err_t gpio_init(void)
 	gpio_install_isr_service(0);
 	//gpio_isr_handler_add(TCA9535_INT_GPIO, tca9535_int_isr, NULL);	
 	
+	init_ledc_pwm();
 	
 	// Create a timer for the haptic motor
 	haptic_timer = xTimerCreate("haptic_off", pdMS_TO_TICKS(10), pdFALSE, NULL, haptic_off_cb);
@@ -391,10 +429,14 @@ void gpio_rgb_indicate(uint8_t rgb_data)
 	}
 	
 	/*
-		Note:
+		Fun fact:
 		A light blinking at a frequency of around 50-60Hz+ will typically
 		appear as a solid, continuous light to the human eye.
-		This frequency, known as the critical flicker fusion frequency.
+		This frequency is known as the critical flicker fusion frequency.
+		(Observed when rbg_blink_period_ms < 20.)
+		
+		If you look at the RGB LED when it's like this in your peripheral‐vision,
+		you can see the blinking better being that the threshold can creep up to 80–90Hz.
 	*/
 	
 	// Stop any previous blinking

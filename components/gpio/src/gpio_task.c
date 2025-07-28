@@ -22,6 +22,7 @@ SemaphoreHandle_t xSPIBusMutex;
 SemaphoreHandle_t xI2CBusMutex;
 SemaphoreHandle_t xHapticsMutex;
 SemaphoreHandle_t xRgbLedMutex;
+SemaphoreHandle_t xLEDCMutex;
 
 SemaphoreHandle_t xPowerButtonSemaphore;
 SemaphoreHandle_t xStartAdcBatSemaphore;
@@ -36,6 +37,8 @@ SemaphoreHandle_t xSelectButtonSemaphore;
 SemaphoreHandle_t xIsChargingSemaphore;
 SemaphoreHandle_t xNotChargingSemaphore;
 
+SemaphoreHandle_t xLEDCSemaphore;
+
 QueueHandle_t xAdcBatReadingQueue;
 QueueHandle_t xLEDQueue;
 
@@ -48,9 +51,13 @@ typedef struct {
 volatile uint8_t haptic_len_ms = 20; // Default buzz 20ms
 volatile bool haptic_btns[6] = {true, false, false, false, false, false}; // Default buzz on select
 
+int8_t lcd_ledc_brightness = 100;
+
 static const TickType_t adc_timer_interval = pdMS_TO_TICKS(20000); // 20s
 
 static uint8_t rgb_data = 255;
+
+static const uint32_t lcd_max_duty = (1 << LCD_LEDC_RESOLUTION) - 1;
 
 // Buttons and states: same order as buttonSemaphores
 static btn_state_t buttons[6] = {
@@ -148,6 +155,8 @@ static void gpio_task(void *arg)
 	configASSERT(xHapticsMutex);
 	xRgbLedMutex = xSemaphoreCreateMutex();
 	configASSERT(xRgbLedMutex);
+	xLEDCMutex = xSemaphoreCreateMutex();
+	configASSERT(xLEDCMutex);
 	
 	xUpButtonSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xUpButtonSemaphore);
@@ -170,11 +179,14 @@ static void gpio_task(void *arg)
 	xStartAdcBatSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xStartAdcBatSemaphore);
 	
+	xLEDCSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xLEDCSemaphore);
+	
 	xAdcBatReadingQueue = xQueueCreate(1, sizeof(uint8_t));
 	configASSERT(xAdcBatReadingQueue);
 	xLEDQueue = xQueueCreate(1, sizeof(uint8_t));
 	configASSERT(xLEDQueue);
-		
+	
 	gpio_write_output(RED_RGB_LED_PIN, 0); // Red LED
 	gpio_write_output(GREEN_RGB_LED_PIN, 0); // Green LED
 	gpio_write_output(BLUE_RGB_LED_PIN, 0); // Blue LED
@@ -266,6 +278,30 @@ static void gpio_task(void *arg)
 		if (xQueueReceive(xLEDQueue, &rgb_data, 0) == pdTRUE) {
 			gpio_rgb_indicate(rgb_data);
 		}
+		
+		// Update LEDC
+		if (xSemaphoreTake(xLEDCSemaphore, 0) == pdTRUE) {
+			xSemaphoreTake(xLEDCMutex, portMAX_DELAY); // Lock LEDC
+            // Clamp values
+			if (lcd_ledc_brightness > 100) {
+				lcd_ledc_brightness = 100;
+			}
+			else if (lcd_ledc_brightness < 0) {
+				lcd_ledc_brightness = 0;
+			}
+
+            // Scale to duty cycle (higher duty = brighter)
+            uint32_t duty = (lcd_ledc_brightness * lcd_max_duty) / 100;
+
+            // Set and update duty
+            ledc_set_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CHANNEL, duty);
+            ledc_update_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CHANNEL);
+			
+			#ifdef POLYCAST5_DEBUG
+	            ESP_LOGI(TAG, "Brightness set to %u%% (duty: %u)\n", lcd_ledc_brightness, duty);
+            #endif
+            xSemaphoreGive(xLEDCMutex); // Release LEDC
+        }
 		
 		vTaskDelay(pdMS_TO_TICKS(POLL_MS));
 	}

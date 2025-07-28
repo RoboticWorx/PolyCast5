@@ -49,6 +49,10 @@
 #define SETTINGS_RGB_LED_PERIOD_KEY "every_ms" // RGB LED blink period
 #define SETTINGS_RGB_LED_TOTAL_KEY "for_ms" // RGB LED blink total time
 
+// LCD LEDC settings
+#define SETTINGS_LCD_LEDC_NS "set_ledc" // NVS namespace
+#define SETTINGS_LCD_LEDC_KEY "brightness" // LCD brightness
+
 #define COLOR_OPTION_COUNT 23
 
 #define SLEEP_TIMER_MIN_S 5 // 5 sec
@@ -71,6 +75,8 @@ extern uint8_t sleep_time_s;
 
 extern int16_t rbg_blink_period_ms;
 extern int16_t rgb_blink_total_ms;
+
+extern int8_t lcd_ledc_brightness;
 
 static bool primary_color_selected = true;
 
@@ -1389,6 +1395,9 @@ void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 			slider_every = slider_for = NULL;
 			init = false;
 			
+			// Hide right arrow
+			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+			
 			// Show settings list
 			lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 			
@@ -1413,6 +1422,118 @@ void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 		// Reset statics
 		lbl_every = lbl_for = pointer = NULL;
 		slider_every = slider_for = NULL;
+		init = false;
+		
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+	}
+}
+
+void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
+{
+	#define ADJ_LCD_INS_TXT "LCD brightness:"
+	#define ADJ_LCD_TXT "%d%%"
+	
+	#define LCD_LEDC_MAX 100
+	#define LCD_LEDC_MIN 0
+	
+	// Statics
+	static bool init = false;
+	
+	static lv_obj_t *lbl_ins;
+	static lv_obj_t *lbl_val;
+	static lv_obj_t *slider;
+	
+	// Only execute once
+	if (!init) {
+		lbl_ins = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_ins, ADJ_LCD_INS_TXT, user_secondary_color,
+					 &lv_font_montserrat_18, LV_ALIGN_CENTER, -25, -13);
+		
+		xSemaphoreTake(xLEDCMutex, portMAX_DELAY); // Lock LEDC
+		lbl_val = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_val, "", user_secondary_color,
+					 &lv_font_montserrat_24, LV_ALIGN_CENTER, -20, 13);
+		lv_label_set_text_fmt(lbl_val, ADJ_LCD_TXT, lcd_ledc_brightness);
+
+		// Slider
+		slider = lv_slider_create(ACTIVE_SCR);
+		lv_obj_set_size(slider, 10, 100);
+		lv_obj_align(slider, LV_ALIGN_CENTER, 65, 0);
+		lv_slider_set_range(slider, LCD_LEDC_MIN, LCD_LEDC_MAX);
+		lv_slider_set_value(slider, lcd_ledc_brightness, LV_ANIM_OFF);
+		xSemaphoreGive(xLEDCMutex); // Release LEDC
+		
+		init = true;
+	}
+	
+	// Increase brightness
+	if (ui_btns->up_btn == 1) {
+		xSemaphoreTake(xLEDCMutex, portMAX_DELAY); // Lock LEDC
+		lcd_ledc_brightness += 5;
+		
+		// Wrap
+		if (lcd_ledc_brightness > LCD_LEDC_MAX) {
+			lcd_ledc_brightness = LCD_LEDC_MIN;
+		}
+		
+		// Create text
+		lv_label_set_text_fmt(lbl_val, ADJ_LCD_TXT, lcd_ledc_brightness);
+		lv_slider_set_value(slider, lcd_ledc_brightness, LV_ANIM_OFF);
+				
+		// Persist to NVS
+		lcd_settings_lcd_ledc_nvs_save();
+		xSemaphoreGive(xLEDCMutex); // Release LEDC
+		
+		xSemaphoreGive(xLEDCSemaphore); // Update brightness
+	}
+	// Decrease brightness
+	else if (ui_btns->down_btn == 1) {
+		xSemaphoreTake(xLEDCMutex, portMAX_DELAY); // Lock LEDC
+		lcd_ledc_brightness -= 5;
+		
+		// Wrap
+		if (lcd_ledc_brightness < LCD_LEDC_MIN) {
+			lcd_ledc_brightness = LCD_LEDC_MAX;
+		}
+		
+		// Create text
+		lv_label_set_text_fmt(lbl_val, ADJ_LCD_TXT, lcd_ledc_brightness);
+		lv_slider_set_value(slider, lcd_ledc_brightness, LV_ANIM_OFF);
+		
+		// Persist to NVS
+		lcd_settings_lcd_ledc_nvs_save();
+		xSemaphoreGive(xLEDCMutex); // Release LEDC
+		
+		xSemaphoreGive(xLEDCSemaphore); // Update brightness
+	}
+	// Back selected
+	else if (ui_btns->left_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_val);
+		lv_obj_delete(slider);
+		
+		// Reset statics
+		lbl_ins = lbl_val = NULL;
+		slider = NULL;
+		init = false;
+		
+		// Show settings list
+		lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = SETTINGS_PAGE;
+	}
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_val);
+		lv_obj_delete(slider);
+		
+		// Reset statics
+		lbl_ins = lbl_val = NULL;
+		slider = NULL;
 		init = false;
 		
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
@@ -1894,4 +2015,68 @@ void lcd_settings_rgb_led_nvs_load(void)
 	
 	// Close NVS
 	nvs_close(h);
+}
+
+void lcd_settings_lcd_ledc_nvs_save(void)
+{
+    nvs_handle_t h;
+    
+    // Open NVS
+    esp_err_t err = nvs_open(SETTINGS_LCD_LEDC_NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "lcd_settings_lcd_ledc_nvs_save: open failed (%s)", esp_err_to_name(err));
+        return;
+    }
+
+    // Save the brightness (0-100)
+    err = nvs_set_i8(h, SETTINGS_LCD_LEDC_KEY, lcd_ledc_brightness);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "lcd_settings_lcd_ledc_nvs_save: brightness set failed");
+    }
+
+    // Commit changes
+    err = nvs_commit(h);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "lcd_settings_lcd_ledc_nvs_save: commit failed");
+    }
+    
+    // Close NVS
+    nvs_close(h);
+}
+
+void lcd_settings_lcd_ledc_nvs_load(void)
+{
+    nvs_handle_t h;
+    
+    // Open NVS
+    esp_err_t err = nvs_open(SETTINGS_LCD_LEDC_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+        // First boot or NS doesn't exist: return default
+        #ifdef POLYCAST5_DEBUG
+            ESP_LOGI(TAG, "LCD brightness NS not found, using default %d%%", lcd_ledc_brightness);
+        #endif
+        return;
+    }
+
+    // Load the brightness
+    int8_t loaded;
+    err = nvs_get_i8(h, SETTINGS_LCD_LEDC_KEY, &loaded);
+    if (err == ESP_OK) {
+        lcd_ledc_brightness = loaded;
+        #ifdef POLYCAST5_DEBUG
+            ESP_LOGI(TAG, "Loaded LCD brightness: %d%%", lcd_ledc_brightness);
+        #endif
+    }
+    else if (err == ESP_ERR_NVS_NOT_FOUND) {
+        // Key not found: use default
+        #ifdef POLYCAST5_DEBUG
+            ESP_LOGI(TAG, "LCD brightness key not found, using default 100%%");
+        #endif
+    }
+    else {
+        ESP_LOGE(TAG, "lcd_settings_lcd_ledc_nvs_load: get failed (%s)", esp_err_to_name(err));
+    }
+    
+    // Close NVS
+    nvs_close(h);
 }

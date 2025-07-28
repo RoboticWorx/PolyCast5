@@ -8,6 +8,8 @@
 #include "lcd_utils.h"
 #include "widgets/label/lv_label.h"
 
+extern int8_t lcd_ledc_brightness;
+
 static const char *TAG = "LCD_TASK";
 
 static volatile bool is_charging = false;
@@ -83,11 +85,18 @@ static void lcd_task(void *pvParameters)
 	
 	// Create common items
 	lcd_init_selection_labels(&ui_menu);
-		
-	
-	// Load user data from NVS
-	//lcd_ir_menu_nvs_load(&ir_menu, A_IR_REMOTE_NS, A_IR_REMOTE_KEY_COUNT, A_IR_REMOTE_KEY_FMT);
-	
+
+
+	// Set brightness at boot
+	xSemaphoreTake(xLEDCMutex, portMAX_DELAY); // Lock LEDC
+	lcd_settings_lcd_ledc_nvs_load();
+    uint32_t duty = (lcd_ledc_brightness * ((1 << LCD_LEDC_RESOLUTION) - 1)) / 100;
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CHANNEL, duty);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CHANNEL);
+    xSemaphoreGive(xLEDCMutex); // Release LEDC
+    
+    
+	/* Load all user settings */
 	lcd_lora_menu_nvs_load(&lora_menu);
 	lcd_lora_key_nvs_load(&lora_menu);
 	
@@ -108,7 +117,7 @@ static void lcd_task(void *pvParameters)
 	lcd_settings_rgb_led_nvs_load();
 	xSemaphoreGive(xRgbLedMutex); // Release RGB LED
 	
-	// Create common pages
+	/* Create common pages */
 	lcd_ir_setup_page(&ir_menu);
 	
 	lcd_lora_setup_page(&lora_menu);
@@ -326,11 +335,14 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == SETTINGS_HAPTIC_PAGE) {
 				lcd_settings_adjust_haptics_page(&ui_btns, &ui_menu, &settings_menu);
 			}
+			else if (ui_menu.page == SETTINGS_SLEEP_TIMER_PAGE) {
+				lcd_settings_sleep_timer_page(&ui_btns, &ui_menu, &settings_menu);
+			}
 			else if (ui_menu.page == SETTINGS_RGB_LED_PAGE) {
 				lcd_settings_adjust_rgb_led_page(&ui_btns, &ui_menu, &settings_menu);
 			}
-			else if (ui_menu.page == SETTINGS_SLEEP_TIMER_PAGE) {
-				lcd_settings_sleep_timer_page(&ui_btns, &ui_menu, &settings_menu);
+			else if (ui_menu.page == SETTINGS_LCD_PAGE) {
+				lcd_settings_adjust_lcd_page(&ui_btns, &ui_menu, &settings_menu);
 			}
 			else if (ui_menu.page == SETTINGS_FACTORY_RST_PAGE) {
 				lcd_settings_factory_rst_page(&ui_btns, &ui_menu, &settings_menu);

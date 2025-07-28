@@ -1,9 +1,11 @@
 #ifndef GPIO_FUNCS_H
 #define GPIO_FUNCS_H
 
-#include "esp_err.h"
 #include <stdint.h>
 #include <stdbool.h>
+
+#include "esp_err.h"
+#include "driver/ledc.h"
 
 #define SPI_MISO_PIN 2 // MISO for SX126x
 #define SPI_MOSI_PIN 7 // SPI2 MOSI
@@ -28,6 +30,11 @@
 
 #define HAPTIC_PIN 10
 #define ADC_PIN 5
+
+#define LCD_LEDC_RESOLUTION LEDC_TIMER_10_BIT // 0-1023
+#define LCD_LEDC_FREQ_HZ 5000 // 5kHz PWM
+#define LCD_LEDC_CHANNEL LEDC_CHANNEL_0
+#define LCD_LEDC_TIMER LEDC_TIMER_0
 
 #define HAPTIC_MAX_MS 50
 #define HAPTIC_MIN_MS 10

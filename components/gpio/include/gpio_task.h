@@ -8,6 +8,7 @@ extern SemaphoreHandle_t xSPIBusMutex;
 extern SemaphoreHandle_t xI2CBusMutex;
 extern SemaphoreHandle_t xHapticsMutex;
 extern SemaphoreHandle_t xRgbLedMutex;
+extern SemaphoreHandle_t xLEDCMutex;
 
 // Regular
 extern SemaphoreHandle_t xPowerButtonSemaphore;
@@ -23,9 +24,12 @@ extern SemaphoreHandle_t xSelectButtonSemaphore; // Select btn pressed
 extern SemaphoreHandle_t xIsChargingSemaphore;
 extern SemaphoreHandle_t xNotChargingSemaphore;
 
+extern SemaphoreHandle_t xLEDCSemaphore;
+
 // Queues
 extern QueueHandle_t xAdcBatReadingQueue;
 extern QueueHandle_t xLEDQueue;
+extern QueueHandle_t xLEDCQueue;
 
 /**
  * @brief  Create the GPIO expander task.

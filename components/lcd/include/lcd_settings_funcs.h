@@ -128,6 +128,15 @@ void lcd_settings_sleep_timer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
 void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
 
 /**
+ * @brief Executes adjust LCD page so user can change the LCD brightness
+ *
+ * @param [in] ui_btns User input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] settings_menu Settings menu structure
+ */
+void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
+
+/**
  * @brief Executes factory reset page
  *
  * @param [in] ui_btns User input structure
@@ -204,5 +213,15 @@ void lcd_settings_rgb_led_nvs_save(void);
  * @brief Loads the current RGB LED period and total duration from NVS
  */
 void lcd_settings_rgb_led_nvs_load(void);
+
+/**
+ * @brief Saves the current LCD brightness to NVS
+ */
+void lcd_settings_lcd_ledc_nvs_save(void);
+
+/**
+ * @brief Loads the current LCD brightness from NVS
+ */
+void lcd_settings_lcd_ledc_nvs_load(void);
 
 #endif // LCD_SETTINGS_FUNCS_H

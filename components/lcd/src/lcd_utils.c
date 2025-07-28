@@ -1939,7 +1939,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		// Switch pages
 		ui_menu->page = SETTINGS_SLEEP_TIMER_PAGE;
 	}
-	// Adjust sleep timer selected
+	// Adjust RGB LED selected
 	else if (ui_btns->select_btn == 1 && settings_menu->index == 4) {
 		// Hide settings menu
 		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -1947,8 +1947,22 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		// Reset static
 		do_once = false;
 		
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		// Switch pages
 		ui_menu->page = SETTINGS_RGB_LED_PAGE;
+	}
+	// Adjust LCD selected
+	else if (ui_btns->select_btn == 1 && settings_menu->index == 5) {
+		// Hide settings menu
+		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		// Switch pages
+		ui_menu->page = SETTINGS_LCD_PAGE;
 	}
 	// Reboot selected
 	else if (ui_btns->select_btn == 1 && settings_menu->index == 6) {
