@@ -59,7 +59,7 @@
 #define SLEEP_TIMER_MAX_S 120 // 2 min
 
 settings_menu_t settings_menu = {
-	.options = {SETTINGS_SET_LOCK_TXT, "Change colors", "Adjust haptics", "Adjust sleep timer", "Adjust RBG LED", "Adjust LCD", "Reboot", "Factory reset"},
+	.options = {SETTINGS_SET_LOCK_TXT, "Change colors", "Adjust haptics", "Adjust sleep timer", "Adjust RBG LED", "LCD brightness", "Reboot", "Factory reset"},
 	.size = 8,
 	.index = 0,
 	.cont = NULL,
@@ -960,8 +960,8 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 	static lv_style_t row_style;
 	
 	const char *btn_names[6] = {
-		"Buzz on Select ", "Buzz on Home ", "Buzz on Up       ",
-		"Buzz on Down ", "Buzz on Left     ", "Buzz on Right  "
+		"Buzz on Select ", "Buzz on Home ", "Buzz on Up	   ",
+		"Buzz on Down ", "Buzz on Left	 ", "Buzz on Right  "
 	};
 
 	if (!init) {
@@ -1428,10 +1428,49 @@ void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 	}
 }
 
+// Helper to calculate power savings based on lcd brightness
+static float get_mA(int brightness) {
+	// Create struct for % vs mA
+	static const struct {
+		int b;
+		float ma;
+	} points[] = { // Observed values (% brightness, mA draw):
+		{100, 67.0f}, {80, 62.0f}, {60, 57.5f},
+		{40, 53.0f}, {20, 49.0f}, {0, 44.5f}
+	};
+	
+	const int num_intervals = sizeof(points) / sizeof(points[0]) - 1;
+	
+	// Cap
+	if (brightness >= 100) {
+		return 67.0f;
+	}
+	else if (brightness <= 0) {
+		return 44.5f;
+	}
+
+	// Linearly interpolate actual based on points
+	for (int i = 0; i < num_intervals; i++) {
+		int b_hi = points[i].b;
+		float ma_hi = points[i].ma;
+		int b_lo = points[i + 1].b;
+		float ma_lo = points[i + 1].ma;
+		
+		// If actual brightness is between the two points
+		if (b_lo <= brightness && brightness <= b_hi) {
+			// Interpolate mA based on percentage fraction
+			float frac = (float)(brightness - b_lo) / (b_hi - b_lo);
+			return ma_lo + frac * (ma_hi - ma_lo);
+		}
+	}
+	
+	return 44.5f; // Fallback
+}
 void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
 	#define ADJ_LCD_INS_TXT "LCD brightness:"
 	#define ADJ_LCD_TXT "%d%%"
+	#define ADJ_LCD_SAVINGS_TXT "Saves ~%d mA"
 	
 	#define LCD_LEDC_MAX 100
 	#define LCD_LEDC_MIN 0
@@ -1441,6 +1480,7 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 	
 	static lv_obj_t *lbl_ins;
 	static lv_obj_t *lbl_val;
+	static lv_obj_t *lbl_savings;
 	static lv_obj_t *slider;
 	
 	// Only execute once
@@ -1454,6 +1494,18 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 		lcd_format_label(lbl_val, "", user_secondary_color,
 					 &lv_font_montserrat_24, LV_ALIGN_CENTER, -20, 13);
 		lv_label_set_text_fmt(lbl_val, ADJ_LCD_TXT, lcd_ledc_brightness);
+		
+		lbl_savings = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_savings, "", user_secondary_color,
+					&lv_font_montserrat_16, LV_ALIGN_CENTER, -20, 40);
+		float savings_f = 67.0f - get_mA(lcd_ledc_brightness); // Max - mA draw
+		int savings = (int)(savings_f + 0.5f); // Round to nearest int
+		if (savings > 0) {
+			lv_label_set_text_fmt(lbl_savings, ADJ_LCD_SAVINGS_TXT, savings);
+		}
+		else { // Don't show if savings is 0mA
+			lv_label_set_text(lbl_savings, "");
+		}
 
 		// Slider
 		slider = lv_slider_create(ACTIVE_SCR);
@@ -1479,6 +1531,16 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 		// Create text
 		lv_label_set_text_fmt(lbl_val, ADJ_LCD_TXT, lcd_ledc_brightness);
 		lv_slider_set_value(slider, lcd_ledc_brightness, LV_ANIM_OFF);
+		
+		// Update savings text
+		float savings_f = 67.0f - get_mA(lcd_ledc_brightness);
+		int savings = (int)(savings_f + 0.5f);
+		if (savings > 0) {
+			lv_label_set_text_fmt(lbl_savings, ADJ_LCD_SAVINGS_TXT, savings);
+		}
+		else {
+			lv_label_set_text(lbl_savings, "");
+		}
 				
 		// Persist to NVS
 		lcd_settings_lcd_ledc_nvs_save();
@@ -1500,6 +1562,16 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 		lv_label_set_text_fmt(lbl_val, ADJ_LCD_TXT, lcd_ledc_brightness);
 		lv_slider_set_value(slider, lcd_ledc_brightness, LV_ANIM_OFF);
 		
+		// Update savings text
+		float savings_f = 67.0f - get_mA(lcd_ledc_brightness);
+		int savings = (int)(savings_f + 0.5f);
+		if (savings > 0) {
+			lv_label_set_text_fmt(lbl_savings, ADJ_LCD_SAVINGS_TXT, savings);
+		}
+		else {
+			lv_label_set_text(lbl_savings, "");
+		}
+		
 		// Persist to NVS
 		lcd_settings_lcd_ledc_nvs_save();
 		xSemaphoreGive(xLEDCMutex); // Release LEDC
@@ -1511,10 +1583,11 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 		// Delete objects
 		lv_obj_delete(lbl_ins);
 		lv_obj_delete(lbl_val);
+		lv_obj_delete(lbl_savings);
 		lv_obj_delete(slider);
 		
 		// Reset statics
-		lbl_ins = lbl_val = NULL;
+		lbl_ins = lbl_val = lbl_savings = NULL;
 		slider = NULL;
 		init = false;
 		
@@ -1529,10 +1602,11 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 		// Delete objects
 		lv_obj_delete(lbl_ins);
 		lv_obj_delete(lbl_val);
+		lv_obj_delete(lbl_savings);
 		lv_obj_delete(slider);
 		
 		// Reset statics
-		lbl_ins = lbl_val = NULL;
+		lbl_ins = lbl_val = lbl_savings = NULL;
 		slider = NULL;
 		init = false;
 		
@@ -2019,64 +2093,64 @@ void lcd_settings_rgb_led_nvs_load(void)
 
 void lcd_settings_lcd_ledc_nvs_save(void)
 {
-    nvs_handle_t h;
-    
-    // Open NVS
-    esp_err_t err = nvs_open(SETTINGS_LCD_LEDC_NS, NVS_READWRITE, &h);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "lcd_settings_lcd_ledc_nvs_save: open failed (%s)", esp_err_to_name(err));
-        return;
-    }
+	nvs_handle_t h;
+	
+	// Open NVS
+	esp_err_t err = nvs_open(SETTINGS_LCD_LEDC_NS, NVS_READWRITE, &h);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_lcd_ledc_nvs_save: open failed (%s)", esp_err_to_name(err));
+		return;
+	}
 
-    // Save the brightness (0-100)
-    err = nvs_set_i8(h, SETTINGS_LCD_LEDC_KEY, lcd_ledc_brightness);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "lcd_settings_lcd_ledc_nvs_save: brightness set failed");
-    }
+	// Save the brightness (0-100)
+	err = nvs_set_i8(h, SETTINGS_LCD_LEDC_KEY, lcd_ledc_brightness);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_lcd_ledc_nvs_save: brightness set failed");
+	}
 
-    // Commit changes
-    err = nvs_commit(h);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "lcd_settings_lcd_ledc_nvs_save: commit failed");
-    }
-    
-    // Close NVS
-    nvs_close(h);
+	// Commit changes
+	err = nvs_commit(h);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_lcd_ledc_nvs_save: commit failed");
+	}
+	
+	// Close NVS
+	nvs_close(h);
 }
 
 void lcd_settings_lcd_ledc_nvs_load(void)
 {
-    nvs_handle_t h;
-    
-    // Open NVS
-    esp_err_t err = nvs_open(SETTINGS_LCD_LEDC_NS, NVS_READONLY, &h);
-    if (err != ESP_OK) {
-        // First boot or NS doesn't exist: return default
-        #ifdef POLYCAST5_DEBUG
-            ESP_LOGI(TAG, "LCD brightness NS not found, using default %d%%", lcd_ledc_brightness);
-        #endif
-        return;
-    }
+	nvs_handle_t h;
+	
+	// Open NVS
+	esp_err_t err = nvs_open(SETTINGS_LCD_LEDC_NS, NVS_READONLY, &h);
+	if (err != ESP_OK) {
+		// First boot or NS doesn't exist: return default
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "LCD brightness NS not found, using default %d%%", lcd_ledc_brightness);
+		#endif
+		return;
+	}
 
-    // Load the brightness
-    int8_t loaded;
-    err = nvs_get_i8(h, SETTINGS_LCD_LEDC_KEY, &loaded);
-    if (err == ESP_OK) {
-        lcd_ledc_brightness = loaded;
-        #ifdef POLYCAST5_DEBUG
-            ESP_LOGI(TAG, "Loaded LCD brightness: %d%%", lcd_ledc_brightness);
-        #endif
-    }
-    else if (err == ESP_ERR_NVS_NOT_FOUND) {
-        // Key not found: use default
-        #ifdef POLYCAST5_DEBUG
-            ESP_LOGI(TAG, "LCD brightness key not found, using default 100%%");
-        #endif
-    }
-    else {
-        ESP_LOGE(TAG, "lcd_settings_lcd_ledc_nvs_load: get failed (%s)", esp_err_to_name(err));
-    }
-    
-    // Close NVS
-    nvs_close(h);
+	// Load the brightness
+	int8_t loaded;
+	err = nvs_get_i8(h, SETTINGS_LCD_LEDC_KEY, &loaded);
+	if (err == ESP_OK) {
+		lcd_ledc_brightness = loaded;
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "Loaded LCD brightness: %d%%", lcd_ledc_brightness);
+		#endif
+	}
+	else if (err == ESP_ERR_NVS_NOT_FOUND) {
+		// Key not found: use default
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "LCD brightness key not found, using default 100%%");
+		#endif
+	}
+	else {
+		ESP_LOGE(TAG, "lcd_settings_lcd_ledc_nvs_load: get failed (%s)", esp_err_to_name(err));
+	}
+	
+	// Close NVS
+	nvs_close(h);
 }
