@@ -1303,9 +1303,35 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
 	}
 	// Add new signal selected
 	else if (ui_btns->select_btn == 1 && ir_menu->index == 2) {
-		lcd_ir_save_new_signal(ui_menu, ir_menu);
-		
-		initalized = false;
+		// Abort if we've reached the maximum number of peers
+		if (ir_menu->size >= MAX_IR_OPTIONS) {
+			#ifdef POLYCAST5_DEBUG
+				ESP_LOGW(TAG, "Max IR menu options reached");
+			#endif
+			
+			// Hide IR menu
+			lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// User notice
+			lv_obj_t *lbl_rst = lv_label_create(ACTIVE_SCR);
+			lcd_format_label(lbl_rst, "Max signals added!", user_secondary_color,
+					 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+			lv_timer_handler();
+			vTaskDelay(pdMS_TO_TICKS(1000));
+			lv_obj_del(lbl_rst);
+			lcd_clear_pending_inputs = true;
+			
+			// Show IR menu
+			lv_obj_remove_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			return;
+		}
+		// Else we're good to add another
+		else {
+			lcd_ir_save_new_signal(ui_menu, ir_menu);
+			
+			initalized = false;
+		}
 	}
 	// Selected specific signal
 	else if (ui_btns->select_btn == 1 && ir_menu->index >= 3) {
@@ -1400,15 +1426,42 @@ void lcd_lora_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_men
 	}
 	// Add PolyPlug selected
 	else if (ui_btns->select_btn == 1 && lora_menu->index == 0) {
-		xSemaphoreGive(xWifiDisconnectSemaphore); // Disconnect from Wi-Fi if connected
-		
-		// Show right arrow
-		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-		
-		// Hide LoRa menu
-		lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		lcd_lora_create_enc_key(ui_menu, lora_menu);
+		// Abort if we've reached the maximum number of peers
+		// Compare with total user plugs: Total size - "Add PolyPlug" + 1 (since not yet size++) -> just lora_menu->size
+		if (lora_menu->size >= MAX_LORA_OPTIONS) {
+			#ifdef POLYCAST5_DEBUG
+				ESP_LOGW(TAG, "Max LoRa PolyPlug entries reached");
+			#endif
+			
+			// Hide LoRa menu
+			lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// User notice
+			lv_obj_t *lbl_rst = lv_label_create(ACTIVE_SCR);
+			lcd_format_label(lbl_rst, "Max Plugs added!", user_secondary_color,
+					 &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
+			lv_timer_handler();
+			vTaskDelay(pdMS_TO_TICKS(1000));
+			lv_obj_del(lbl_rst);
+			lcd_clear_pending_inputs = true;
+			
+			// Show LoRa menu
+			lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			return;
+		}
+		// Else we're good to add another
+		else {
+			xSemaphoreGive(xWifiDisconnectSemaphore); // Disconnect from Wi-Fi if connected
+			
+			// Show right arrow
+			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+			
+			// Hide LoRa menu
+			lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			lcd_lora_create_enc_key(ui_menu, lora_menu);
+		}
 	}
 	// PolyPlug selected
 	else if (ui_btns->select_btn == 1) {
@@ -1487,16 +1540,42 @@ void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espn
 	}
 	// Add ESP32 selected
 	else if (ui_btns->select_btn == 1 && espnow_menu->index == 0) {
-		// Hide ESP-NOW menu
-		lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Reset static
-		do_once = false;
-		
-		// Show right arrow
-		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-		
-		ui_menu->page = ESPNOW_RX_MAC_PAGE;
+		// Abort if we've reached the maximum number of peers
+		if (espnow_menu->size >= MAX_ESPNOW_OPTIONS) {
+			#ifdef POLYCAST5_DEBUG
+				ESP_LOGW(TAG, "Max ESP-NOW entries reached");
+			#endif
+			
+			// Hide ESP-NOW menu
+			lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// User notice
+			lv_obj_t *lbl_rst = lv_label_create(ACTIVE_SCR);
+			lcd_format_label(lbl_rst, "Max ESP32s added!", user_secondary_color,
+					 &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
+			lv_timer_handler();
+			vTaskDelay(pdMS_TO_TICKS(1000));
+			lv_obj_del(lbl_rst);
+			lcd_clear_pending_inputs = true;
+			
+			// Show ESP-NOW menu
+			lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			return;
+		}
+		// Else we're good to add another
+		else {
+			// Hide ESP-NOW menu
+			lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// Reset static
+			do_once = false;
+			
+			// Show right arrow
+			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+			
+			ui_menu->page = ESPNOW_RX_MAC_PAGE;
+		}
 	}
 	// Specific selected
 	else if (ui_btns->select_btn == 1) {

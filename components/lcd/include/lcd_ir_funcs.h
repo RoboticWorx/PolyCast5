@@ -7,7 +7,7 @@
 
 #include <string.h>
 
-#define MAX_IR_OPTIONS 20
+#define MAX_IR_OPTIONS 33 // MAX_IR_OPTIONS - 3 default is num signals
 #define MAX_CUSTOM_NAME_LEN 12
 
 // Forward-declare structs (from lcd_utils.h)

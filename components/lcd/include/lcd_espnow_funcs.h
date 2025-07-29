@@ -9,7 +9,7 @@
 
 #include "espnow_funcs.h"
 
-#define MAX_ESPNOW_OPTIONS 20
+#define MAX_ESPNOW_OPTIONS 51 // - 1 for "Add ESP32"
 
 // Forward-declare structs (from lcd_utils.h)
 typedef struct ui_btns_t ui_btns_t;

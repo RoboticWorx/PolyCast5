@@ -5,7 +5,8 @@
 
 #include "esp_err.h"
 
-#define MAX_LORA_OPTIONS 20
+#define MAX_LORA_OPTIONS 51 // - 1 for "Add PolyPlug"
+#define MAX_LORA_SUBMENU_OPTIONS 6 // SEND, LOOP, PLAN, AWAY, EDIT, DEL
 #define LORA_PLAN_SUBMENU_COUNT 8
 
 // Forward-declare structs (from lcd_utils.h)
@@ -13,8 +14,8 @@ typedef struct ui_btns_t ui_btns_t;
 typedef struct ui_menu_t ui_menu_t;
 
 typedef struct {
-    char *options[MAX_LORA_OPTIONS];
-    lv_obj_t *btns[MAX_LORA_OPTIONS];
+    char *options[MAX_LORA_SUBMENU_OPTIONS];
+    lv_obj_t *btns[MAX_LORA_SUBMENU_OPTIONS];
     int size;
     int index;
     lv_obj_t *cont;

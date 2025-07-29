@@ -175,7 +175,7 @@ void lcd_lora_setup_subpage(lora_menu_t *menu)
 	// Initialize submenu struct
 	menu->submenu.size = submenu_count;
 	menu->submenu.index = 0;
-	for (int i = 0; i < submenu_count && i < MAX_LORA_OPTIONS; i++) {
+	for (int i = 0; i < submenu_count; i++) {
 		menu->submenu.options[i] = (char*)submenu_options[i];
 	}
 	

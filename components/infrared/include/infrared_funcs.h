@@ -21,7 +21,7 @@
 #define RANDOM_TX_THRESHOLD 15
 #define RANDOM_TX_DELAY_MS 3000
 
-#define MAX_STORED_SIGNALS 1000 // 20 signals per remote
+#define MAX_STORED_SIGNALS 1650 // 30 signals per remote if 50 (33 - 3 default)
 #define MAX_REMOTES 50
 
 // Stored signal structure
