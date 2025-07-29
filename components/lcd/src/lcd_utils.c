@@ -1027,11 +1027,23 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 			ui_menu->page = UNLOCK_PAGE;
 		}
 	}
+	// Go to hotkey page
 	else if (ui_btns->left_btn == 1) {
+		stop_animations();
 		
+		// Show arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+		hotkey_menu.index = 2;
+		lcd_hotkey_update_menu(&hotkey_menu);
+
+		ui_menu->page = HOTKEY_PAGE;
 	}
 	else if (ui_btns->right_btn == 1) {
-		
+
 	}
 }
 
@@ -1185,6 +1197,67 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 			input_pin, &num_boxes, num_filled);
 		
 		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+	}
+}
+
+void lcd_hotkey_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotkey_menu)
+{
+	// Exit
+	if (ui_btns->right_btn == 1 && hotkey_menu->index == 2) {
+		// Hide cont
+		lv_obj_add_flag(hotkey_menu->cont, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(hotkey_menu->lbl_ins, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(hotkey_menu->lbl_arrow, LV_OBJ_FLAG_HIDDEN);
+		
+		// Go back
+		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+	}
+	// Scroll right
+	else if (ui_btns->right_btn == 1) {
+		// Update selection
+		hotkey_menu->index++;
+		lcd_hotkey_update_menu(hotkey_menu);
+	}
+	// Scroll left
+	else if (ui_btns->left_btn == 1) {
+		// Update selection
+		hotkey_menu->index--;
+		lcd_hotkey_update_menu(hotkey_menu);
+	}
+	// Scroll up
+	else if (ui_btns->up_btn == 1 && hotkey_menu->index != 2) {
+		// Update selection
+		if (hotkey_menu->index > 2) {
+			hotkey_menu->index -= 3;
+		}
+		else if (hotkey_menu->index < 3) {
+			hotkey_menu->index += 3;
+		}
+		lcd_hotkey_update_menu(hotkey_menu);
+	}
+	// Scroll down
+	else if (ui_btns->down_btn == 1 && hotkey_menu->index != 2) {
+		// Update selection
+		if (hotkey_menu->index < 3) {
+			hotkey_menu->index += 3;
+		}
+		else if (hotkey_menu->index > 2) {
+			hotkey_menu->index -= 3;
+		}
+		lcd_hotkey_update_menu(hotkey_menu);
+	}
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Reset selection
+		hotkey_menu->index = 2;
+		lcd_hotkey_update_menu(hotkey_menu);
+		
+		// Hide cont
+		lv_obj_add_flag(hotkey_menu->cont, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(hotkey_menu->lbl_ins, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(hotkey_menu->lbl_arrow, LV_OBJ_FLAG_HIDDEN);
+		
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 

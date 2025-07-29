@@ -118,6 +118,8 @@ static void lcd_task(void *pvParameters)
 	xSemaphoreGive(xRgbLedMutex); // Release RGB LED
 	
 	/* Create common pages */
+	lcd_hotkey_setup_page(&hotkey_menu);
+	
 	lcd_ir_setup_page(&ir_menu);
 	
 	lcd_lora_setup_page(&lora_menu);
@@ -229,6 +231,9 @@ static void lcd_task(void *pvParameters)
 			} 
 			else if (ui_menu.page == UNLOCK_PAGE) {
 				lcd_unlock_page(&ui_btns, &ui_menu, &settings_menu);
+			}
+			else if (ui_menu.page == HOTKEY_PAGE) {
+				lcd_hotkey_page(&ui_btns, &ui_menu, &hotkey_menu);
 			}
 			else if (ui_menu.page == SELECTION_PAGE) {
 				lcd_selection_page(&ui_btns, &ui_menu, &ir_menu, &lora_menu, &espnow_menu, &wifi_menu, &tools_menu, &settings_menu);

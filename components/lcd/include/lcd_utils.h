@@ -9,6 +9,7 @@
 #include "lcd_wifi_funcs.h"
 #include "lcd_tools_funcs.h"
 #include "lcd_settings_funcs.h"
+#include "lcd_hotkey_funcs.h"
 
 #include "gpio_funcs.h"
 
@@ -21,6 +22,7 @@
 enum {
     HOME_PAGE,
     UNLOCK_PAGE,
+    HOTKEY_PAGE,
     SELECTION_PAGE,
     
     LORA_PAGE,
@@ -229,13 +231,22 @@ void lcd_update_battery(ui_menu_t *ui_menu, uint8_t battery_percentage, bool cha
 void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
 
 /**
- * @brief Display/scroll through home page animations
+ * @brief Executes unlock page where the user must enter a pin to gain access
  *
  * @param [in] ui_btns UI input structure
  * @param [in] ui_menu UI menu structure
  * @param [in] settings_menu Settings menu structure
  */
 void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
+
+/**
+ * @brief Executes hotkey page where the user can configure hotkeys
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] hotkey_menu Hotkey menu structure
+ */
+void lcd_hotkey_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotkey_menu);
 
 /**
  * @brief Executes on selection page
