@@ -1,4 +1,4 @@
-# Install script for directory: C:/Espressif/esp-idf-master/components/bootloader/subproject/components/micro-ecc
+# Install script for directory: C:/Espressif/frameworks/esp-idf-master/components/bootloader/subproject/components/micro-ecc
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

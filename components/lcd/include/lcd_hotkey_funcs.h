@@ -37,13 +37,4 @@ void lcd_hotkey_setup_page(hotkey_menu_t *hotkey_menu);
  */
 void lcd_hotkey_update_menu(hotkey_menu_t *hotkey_menu);
 
-/**
- * @brief Executes the selected hotkey configuration option
- *
- * @param [in] ui_btns UI input structure
- * @param [in] ui_menu UI menu structure
- * @param [in] hotkey_menu Hotkey menu structure
- */
-void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotkey_menu);
-
 #endif // LCD_HOTKEY_FUNCS_H

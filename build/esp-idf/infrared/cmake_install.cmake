@@ -1,4 +1,4 @@
-# Install script for directory: C:/Projects/ESP/PolyCast5/components/infrared
+# Install script for directory: C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/components/infrared
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

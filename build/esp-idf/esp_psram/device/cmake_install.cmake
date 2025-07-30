@@ -1,4 +1,4 @@
-# Install script for directory: C:/Espressif/esp-idf-master/components/esp_psram/device
+# Install script for directory: C:/Espressif/frameworks/esp-idf-master/components/esp_psram/device
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

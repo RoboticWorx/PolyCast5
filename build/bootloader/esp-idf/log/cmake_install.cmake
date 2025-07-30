@@ -1,4 +1,4 @@
-# Install script for directory: C:/Espressif/esp-idf-master/components/log
+# Install script for directory: C:/Espressif/frameworks/esp-idf-master/components/log
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

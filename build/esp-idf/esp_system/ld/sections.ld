@@ -1,6 +1,6 @@
 /* Automatically generated file; DO NOT EDIT */
 /* Espressif IoT Development Framework Linker Script */
-/* Generated from: C:\Projects\ESP\PolyCast5\build\esp-idf\esp_system\ld\sections.ld.in */
+/* Generated from: C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\build\esp-idf\esp_system\ld\sections.ld.in */
 
 /*
 

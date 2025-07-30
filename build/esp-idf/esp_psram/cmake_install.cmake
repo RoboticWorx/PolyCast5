@@ -1,4 +1,4 @@
-# Install script for directory: C:/Espressif/esp-idf-master/components/esp_psram
+# Install script for directory: C:/Espressif/frameworks/esp-idf-master/components/esp_psram
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -39,11 +39,11 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("C:/Projects/ESP/PolyCast5/build/esp-idf/esp_psram/device/cmake_install.cmake")
+  include("C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_psram/device/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("C:/Projects/ESP/PolyCast5/build/esp-idf/esp_psram/xip_impl/cmake_install.cmake")
+  include("C:/Users/Jatki/OneDrive/Documents/ESP/PolyCast5/build/esp-idf/esp_psram/xip_impl/cmake_install.cmake")
 endif()
 

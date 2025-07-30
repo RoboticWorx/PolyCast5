@@ -23,7 +23,6 @@ enum {
     HOME_PAGE,
     UNLOCK_PAGE,
     HOTKEY_PAGE,
-    HOTKEY_OPTION_PAGE,
     SELECTION_PAGE,
     
     LORA_PAGE,
