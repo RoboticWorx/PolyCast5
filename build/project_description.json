@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "PolyCast5",
-    "project_version":    "a438f26d-dirty",
+    "project_version":    "bfff0972-dirty",
     "project_path":       "C:/Projects/ESP/PolyCast5",
     "idf_path":           "C:/Espressif/esp-idf-master",
     "build_dir":          "C:/Projects/ESP/PolyCast5/build",
@@ -3113,18 +3113,6 @@
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "include_dirs": [ "include" ]
-        },
-        "lvgl__lvgl": {
-            "alias": "idf::lvgl__lvgl",
-            "target": "___idf_lvgl__lvgl",
-            "prefix": "idf",
-            "dir": "C:/Projects/ESP/PolyCast5/managed_components/lvgl__lvgl",
-            "lib": "__idf_lvgl__lvgl",
-            "reqs": [],
-            "priv_reqs": [],
-            "managed_reqs": [],
-            "managed_priv_reqs": [],
-            "include_dirs": []
         }
     },
     "debug_prefix_map_gdbinit": "",
