@@ -6,7 +6,7 @@ dependencies:
   lvgl:
     dependencies: []
     source:
-      path: C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\components\lvgl
+      path: C:\Projects\ESP\PolyCast5\components\lvgl
       type: local
     version: 9.2.2
 direct_dependencies:
