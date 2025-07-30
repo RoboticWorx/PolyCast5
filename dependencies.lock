@@ -3,15 +3,16 @@ dependencies:
     source:
       type: idf
     version: 5.5.0
-  lvgl:
+  lvgl/lvgl:
+    component_hash: b702d642e03e95928046d5c6726558e6444e112420c77efa5fdb6650b0a13c5d
     dependencies: []
     source:
-      path: C:\Users\Jatki\OneDrive\Documents\ESP\PolyCast5\components\lvgl
-      type: local
-    version: 9.2.2
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 9.3.0
 direct_dependencies:
 - idf
 - lvgl/lvgl
-manifest_hash: 0500ccfdaf77ec2b6bd0835e6f86164226f5f2afb37922cbb637ef1a5fcd069f
+manifest_hash: 84ba8c2962e8a1867b44a8e158e66387b7897184a4fe1585766f0c7e7bcfa6a1
 target: esp32c5
 version: 2.0.0

@@ -1204,13 +1204,23 @@ void lcd_hotkey_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotk
 {
 	// Exit
 	if (ui_btns->right_btn == 1 && hotkey_menu->index == 2) {
-		// Hide cont
+		// Hide hotkey page
 		lv_obj_add_flag(hotkey_menu->cont, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(hotkey_menu->lbl_ins, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(hotkey_menu->lbl_arrow, LV_OBJ_FLAG_HIDDEN);
 		
 		// Go back
 		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+	}
+	// Select option
+	else if (ui_btns->select_btn == 1) {
+		// Hide hotkey page
+		lv_obj_add_flag(hotkey_menu->cont, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(hotkey_menu->lbl_ins, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(hotkey_menu->lbl_arrow, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = HOTKEY_OPTION_PAGE;
 	}
 	// Scroll right
 	else if (ui_btns->right_btn == 1) {
@@ -1252,7 +1262,7 @@ void lcd_hotkey_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotk
 		hotkey_menu->index = 2;
 		lcd_hotkey_update_menu(hotkey_menu);
 		
-		// Hide cont
+		// Hide hotkey page
 		lv_obj_add_flag(hotkey_menu->cont, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(hotkey_menu->lbl_ins, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(hotkey_menu->lbl_arrow, LV_OBJ_FLAG_HIDDEN);
