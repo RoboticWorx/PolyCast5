@@ -1139,8 +1139,33 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
 		if (espnow_cmd.enc) {
 			memcpy(espnow_cmd.lmk, espnow_menu->lmk[espnow_menu->index], LMK_LEN);
 		}
+		
+		// If recording command as hotkey
+		if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+			// Zero out at start
+			memset(&hotkey_cmd.espnow_cmd[hotkey_cmd.active_idx], 0, sizeof(espnow_cmd_t));
+			
+			// Save into hotkey struct under selected "Hotx"
+			hotkey_cmd.espnow_cmd[hotkey_cmd.active_idx].cmd_to_send = espnow_menu->espnow_submenu.cmd_to_send;
+			memcpy(hotkey_cmd.espnow_cmd[hotkey_cmd.active_idx].mac_selected, espnow_menu->rx_mac[espnow_menu->index], ESPNOW_MAC_SIZE);
+			
+			// enc = true if no LMK
+			hotkey_cmd.espnow_cmd[hotkey_cmd.active_idx].enc = memcmp(espnow_menu->lmk[espnow_menu->index], (uint8_t[LMK_LEN]){0}, LMK_LEN) != 0;
+			// If enc, copy LMK
+			if (hotkey_cmd.espnow_cmd[hotkey_cmd.active_idx].enc) {
+				memcpy(hotkey_cmd.espnow_cmd[hotkey_cmd.active_idx].lmk, espnow_menu->lmk[espnow_menu->index], LMK_LEN);
+			}
+			
+			// Flag that command exists
+			hotkey_cmd.has_espnow[hotkey_cmd.active_idx] = true;
+			// Remove others
+			hotkey_cmd.has_lora[hotkey_cmd.active_idx] = false;
+			
+			// Hide hotkey icon
+			lv_obj_add_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN);
+		}
 
-		// Send it to ESP-NOW task
+		// Send the command
 		xQueueSend(xEspSendCmdQueue, &espnow_cmd, portMAX_DELAY);
 		
 		// RGB indicator

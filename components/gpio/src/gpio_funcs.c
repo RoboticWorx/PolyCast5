@@ -290,7 +290,7 @@ void gpio_init_battery_adc(void)
 	};
 	ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CH, &chan_cfg));
 
-	#ifdef POLYCAST5_DEBUG
+	#ifdef POLYCAST5_DEBUG_ADC
 		ESP_LOGI(TAG, "ADC initialized");
 	#endif
 	
@@ -332,7 +332,7 @@ float gpio_get_battery_voltage(void)
 	
 	int avg_raw = sum / NUM_ADC_SAMPLES;
 	
-	#ifdef POLYCAST5_DEBUG
+	#ifdef POLYCAST5_DEBUG_ADC
 		ESP_LOGI(TAG, "Raw battery reading: %d", avg_raw);
 	#endif
 	
@@ -342,7 +342,7 @@ float gpio_get_battery_voltage(void)
 	
 	float Vadc = pin_mv / 1000.0f; // Convert to volts
 	
-	#ifdef POLYCAST5_DEBUG
+	#ifdef POLYCAST5_DEBUG_ADC
 		ESP_LOGI(TAG, "Raw voltage reading: %f", Vadc);
 	#endif
 	

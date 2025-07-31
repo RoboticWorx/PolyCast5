@@ -86,7 +86,7 @@ typedef struct ui_menu_t {
     int index; // the one that’s currently in the middle
     int page;
     lv_obj_t *btn_mid;
-    lv_obj_t *lbl_top; // the three labels on screen
+    lv_obj_t *lbl_top; // The three labels on screen
     lv_obj_t *lbl_mid;
     lv_obj_t *lbl_bot;
     lv_obj_t *arrow_bot;
@@ -95,6 +95,7 @@ typedef struct ui_menu_t {
     lv_obj_t *arrow_left;
     lv_obj_t *lbl_battery_txt;
     lv_obj_t *lbl_battery_icon;
+    lv_obj_t *lbl_hotkey_icon;
 } ui_menu_t;
 
 typedef struct ui_btns_t {
@@ -126,8 +127,17 @@ void lcd_lvgl_init(void);
 
 /**
  * @brief Initialize and create selection labels
+ *
+ * @param [in] ui_menu UI menu structure
  */
 void lcd_init_selection_labels(ui_menu_t *ui_menu);
+
+/**
+ * @brief Unhide and show selection labels
+ *
+ * @param [in] ui_menu UI menu structure
+ */
+void lcd_unhide_selection_widgets(ui_menu_t *ui_menu);
 
 /**
  * @brief Clears all NVS for namespace

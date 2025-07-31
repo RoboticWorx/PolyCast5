@@ -1,7 +1,3 @@
-#include "core/lv_obj.h"
-#include "core/lv_obj_pos.h"
-#include "font/lv_symbol_def.h"
-#include "lcd_settings_funcs.h"
 #include "polycast5_macros.h"
 
 #include <stdlib.h>
@@ -22,19 +18,24 @@
 #include "st7789.h"
 #include "tca9535.h"
 
+#include "core/lv_obj.h"
+#include "core/lv_obj_pos.h"
+#include "font/lv_symbol_def.h"
+#include "widgets/label/lv_label.h"
 #include "draw/lv_image_decoder_private.h"
 #include "draw/lv_image_decoder.h"
 #include "misc/lv_timer.h"
 
 #include "lcd_asset_macros.h"
 #include "lcd_utils.h"
-#include "widgets/label/lv_label.h"
 #include "wifi_funcs.h"
 #include "wifi_task.h"
 #include "infrared_funcs.h"
 #include "infrared_task.h"
 #include "gpio_funcs.h"
 #include "gpio_task.h"
+#include "lora_task.h"
+#include "espnow_task.h"
 
 #define DRAW_LINES 20
 #define FLUSH_CHUNK 2
@@ -45,6 +46,14 @@
 
 #define LCD_ANIM_NS "anim_data"
 #define LCD_ANIM_KEY "selected"
+
+
+/* Hotkey macros */
+#define HOTKEY_SHORT_HOME_IDX 0
+#define HOTKEY_LONG_HOME_IDX 1
+#define HOTKEY_LONG_LEFT_IDX 2
+#define HOTKEY_SHORT_RIGHT_IDX 3
+#define HOTKEY_LONG_RIGHT_IDX 4
 
 
 /* Animation macros */
@@ -581,26 +590,26 @@ void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32
 	lv_anim_start(&a2);
 }
 
-static void unhide_selection_widgets(ui_menu_t *m)
+void lcd_unhide_selection_widgets(ui_menu_t *ui_menu)
 {
 	// Show center button and it's label
-	lv_obj_t *btn_mid = lv_obj_get_parent(m->lbl_mid);
+	lv_obj_t *btn_mid = lv_obj_get_parent(ui_menu->lbl_mid);
 	lv_obj_remove_flag(btn_mid, LV_OBJ_FLAG_HIDDEN);
-	lv_obj_remove_flag(m->lbl_mid, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_remove_flag(ui_menu->lbl_mid, LV_OBJ_FLAG_HIDDEN);
 
 	// Show top and bottom labels
-	lv_obj_remove_flag(m->lbl_top, LV_OBJ_FLAG_HIDDEN);
-	lv_obj_remove_flag(m->lbl_bot, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_remove_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_remove_flag(ui_menu->lbl_bot, LV_OBJ_FLAG_HIDDEN);
 
 	// Ensure arrows visible
-	lv_obj_remove_flag(m->arrow_top, LV_OBJ_FLAG_HIDDEN);
-	lv_obj_remove_flag(m->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-	lv_obj_remove_flag(m->arrow_left, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 
 	// Reset X-coord so they are back on-screen
-	lv_obj_set_x(m->lbl_top, 0);
+	lv_obj_set_x(ui_menu->lbl_top, 0);
 	lv_obj_set_x(btn_mid, 0);
-	lv_obj_set_x(m->lbl_bot, 0);
+	lv_obj_set_x(ui_menu->lbl_bot, 0);
 }
 
 /* Write the current anim_active into flash */
@@ -778,7 +787,7 @@ void lcd_init_selection_labels(ui_menu_t *ui_menu)
 	// Format labels
 	ui_menu->lbl_top = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(ui_menu->lbl_top, "Bluetooth", user_secondary_color,
-					 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
+				&lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
 
 	ui_menu->lbl_mid = lv_label_create(ui_menu->btn_mid);
 	lcd_format_label(ui_menu->lbl_mid, "PolyPlug",
@@ -787,43 +796,51 @@ void lcd_init_selection_labels(ui_menu_t *ui_menu)
 					 
 	ui_menu->lbl_bot = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(ui_menu->lbl_bot, "ESP32", user_secondary_color,
-					 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -15);
+				&lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -15);
 	
 	// Arrows		 
 	ui_menu->arrow_top = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(ui_menu->arrow_top, LV_SYMBOL_UP, user_secondary_color,
-					 &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+				&lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
 					 
 	ui_menu->arrow_left = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(ui_menu->arrow_left, LV_SYMBOL_LEFT, user_secondary_color,
-					 &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 0);
+				&lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 0);
 
 	ui_menu->arrow_right = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(ui_menu->arrow_right, LV_SYMBOL_RIGHT, user_secondary_color,
-					 &lv_font_montserrat_14, LV_ALIGN_RIGHT_MID, -4, 0);
+				&lv_font_montserrat_14, LV_ALIGN_RIGHT_MID, -4, 0);
 
 	ui_menu->arrow_bot = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(ui_menu->arrow_bot, LV_SYMBOL_DOWN, user_secondary_color,
-					 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
+				&lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
 
 	// Battery icon
 	ui_menu->lbl_battery_txt = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(ui_menu->lbl_battery_txt, "...", user_secondary_color,
-					 &lv_font_montserrat_14, LV_ALIGN_TOP_RIGHT, -28, 0);
-
+				&lv_font_montserrat_14, LV_ALIGN_TOP_RIGHT, -28, 0);
+				
 	ui_menu->lbl_battery_icon = lv_label_create(ACTIVE_SCR); // 3, 2, 1, EMPTY
 	lcd_format_label(ui_menu->lbl_battery_icon, LV_SYMBOL_BATTERY_FULL, user_secondary_color,
-					 &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
+				 &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
+
+	// Hotkey icon
+	ui_menu->lbl_hotkey_icon = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(ui_menu->lbl_hotkey_icon, LV_SYMBOL_EYE_OPEN, user_secondary_color,
+				 &lv_font_montserrat_18, LV_ALIGN_TOP_LEFT, 4, -1);
 					 
 	// Hide all for now
 	lv_obj_add_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->lbl_mid, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->lbl_bot, LV_OBJ_FLAG_HIDDEN);
+	
 	lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+	
+	lv_obj_add_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN);
 }
 
 void lcd_clear_user_in()
@@ -994,7 +1011,7 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 		
 		// Go to selection page
 		if (!settings_menu->pin_menu.pin_set || !settings_menu->pin_menu.prompt_pin) {
-			unhide_selection_widgets(ui_menu);
+			lcd_unhide_selection_widgets(ui_menu);
 			
 			ui_menu->page = SELECTION_PAGE;
 		}
@@ -1042,8 +1059,141 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 
 		ui_menu->page = HOTKEY_PAGE;
 	}
+	/* HOTKEYS */
+	// Long press home
+	else if (xSemaphoreTake(xHomeButtonLongSemaphore, 0) == pdTRUE) {
+		// If LoRa command exists
+		if (hotkey_cmd.has_lora[HOTKEY_LONG_HOME_IDX]) {
+			// RGB indicator
+			uint8_t rgb_state = RGB_BLINK_TEAL;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+			
+			// Send the command
+			xQueueSend(xLoraSendEncQueue, &hotkey_cmd.lora_cmd[HOTKEY_LONG_HOME_IDX], portMAX_DELAY);
+		}
+		// Else ESP-NOW
+		else if (hotkey_cmd.has_espnow[HOTKEY_LONG_HOME_IDX]) {
+			// RGB indicator
+			uint8_t rgb_state = RGB_BLINK_TEAL;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+			
+			// Send the command
+			xQueueSend(xEspSendCmdQueue, &hotkey_cmd.espnow_cmd[HOTKEY_LONG_HOME_IDX], portMAX_DELAY);
+		}
+		else {
+			#ifdef POLYCAST5_DEBUG
+				ESP_LOGW(TAG, "Long home hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_HOME_IDX,
+						hotkey_cmd.has_lora[HOTKEY_LONG_HOME_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_HOME_IDX]);
+			#endif
+		}
+	}
+	// Long press left
+	else if (xSemaphoreTake(xLeftButtonLongSemaphore, 0) == pdTRUE) {
+		// If LoRa command exists
+		if (hotkey_cmd.has_lora[HOTKEY_LONG_LEFT_IDX]) {
+			// RGB indicator
+			uint8_t rgb_state = RGB_BLINK_TEAL;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+			
+			// Send the command
+			xQueueSend(xLoraSendEncQueue, &hotkey_cmd.lora_cmd[HOTKEY_LONG_LEFT_IDX], portMAX_DELAY);
+		}
+		// Else ESP-NOW
+		else if (hotkey_cmd.has_espnow[HOTKEY_LONG_LEFT_IDX]) {
+			// RGB indicator
+			uint8_t rgb_state = RGB_BLINK_TEAL;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+			
+			// Send the command
+			xQueueSend(xEspSendCmdQueue, &hotkey_cmd.espnow_cmd[HOTKEY_LONG_LEFT_IDX], portMAX_DELAY);
+		}
+		else {
+			#ifdef POLYCAST5_DEBUG
+				ESP_LOGW(TAG, "Long left hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_LEFT_IDX,
+						hotkey_cmd.has_lora[HOTKEY_LONG_LEFT_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_LEFT_IDX]);
+			#endif
+		}
+	}
+	// Long press right
+	else if (xSemaphoreTake(xRightButtonLongSemaphore, 0) == pdTRUE) {
+		// If LoRa command exists
+		if (hotkey_cmd.has_lora[HOTKEY_LONG_RIGHT_IDX]) {
+			// RGB indicator
+			uint8_t rgb_state = RGB_BLINK_TEAL;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+			
+			// Send the command
+			xQueueSend(xLoraSendEncQueue, &hotkey_cmd.lora_cmd[HOTKEY_LONG_RIGHT_IDX], portMAX_DELAY);
+		}
+		// Else ESP-NOW
+		else if (hotkey_cmd.has_espnow[HOTKEY_LONG_RIGHT_IDX]) {
+			// RGB indicator
+			uint8_t rgb_state = RGB_BLINK_TEAL;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+			
+			// Send the command
+			xQueueSend(xEspSendCmdQueue, &hotkey_cmd.espnow_cmd[HOTKEY_LONG_RIGHT_IDX], portMAX_DELAY);
+		}
+		else {
+			#ifdef POLYCAST5_DEBUG
+				ESP_LOGW(TAG, "Long right hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_RIGHT_IDX,
+						hotkey_cmd.has_lora[HOTKEY_LONG_RIGHT_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_RIGHT_IDX]);
+			#endif
+		}
+	}
+	// Short press home
+	else if (ui_btns->home_btn == 1) {
+		// If LoRa command exists
+		if (hotkey_cmd.has_lora[HOTKEY_SHORT_HOME_IDX]) {
+			// RGB indicator
+			uint8_t rgb_state = RGB_BLINK_TEAL;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+			
+			// Send the command
+			xQueueSend(xLoraSendEncQueue, &hotkey_cmd.lora_cmd[HOTKEY_SHORT_HOME_IDX], portMAX_DELAY);
+		}
+		// Else ESP-NOW
+		else if (hotkey_cmd.has_espnow[HOTKEY_SHORT_HOME_IDX]) {
+			// RGB indicator
+			uint8_t rgb_state = RGB_BLINK_TEAL;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+			
+			// Send the command
+			xQueueSend(xEspSendCmdQueue, &hotkey_cmd.espnow_cmd[HOTKEY_SHORT_HOME_IDX], portMAX_DELAY);
+		}
+		else {
+			#ifdef POLYCAST5_DEBUG
+				ESP_LOGW(TAG, "Short home hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_SHORT_HOME_IDX,
+						hotkey_cmd.has_lora[HOTKEY_SHORT_HOME_IDX], hotkey_cmd.has_espnow[HOTKEY_SHORT_HOME_IDX]);
+			#endif
+		}
+	}
+	// Short press right
 	else if (ui_btns->right_btn == 1) {
-
+		// If LoRa command exists
+		if (hotkey_cmd.has_lora[HOTKEY_SHORT_RIGHT_IDX]) {
+			// RGB indicator
+			uint8_t rgb_state = RGB_BLINK_TEAL;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+			
+			// Send the command
+			xQueueSend(xLoraSendEncQueue, &hotkey_cmd.lora_cmd[HOTKEY_SHORT_RIGHT_IDX], portMAX_DELAY);
+		}
+		// Else ESP-NOW
+		else if (hotkey_cmd.has_espnow[HOTKEY_SHORT_RIGHT_IDX]) {
+			// RGB indicator
+			uint8_t rgb_state = RGB_BLINK_TEAL;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+			
+			// Send the command
+			xQueueSend(xEspSendCmdQueue, &hotkey_cmd.espnow_cmd[HOTKEY_SHORT_RIGHT_IDX], portMAX_DELAY);
+		}
+		else {
+			#ifdef POLYCAST5_DEBUG
+				ESP_LOGW(TAG, "Short right hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_SHORT_RIGHT_IDX,
+						hotkey_cmd.has_lora[HOTKEY_SHORT_RIGHT_IDX], hotkey_cmd.has_espnow[HOTKEY_SHORT_RIGHT_IDX]);
+			#endif
+		}
 	}
 }
 
@@ -1152,7 +1302,7 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 	
 			// Go to selection page
-			unhide_selection_widgets(ui_menu);
+			lcd_unhide_selection_widgets(ui_menu);
 			
 			ui_menu->page = SELECTION_PAGE;
 		}
@@ -1257,11 +1407,7 @@ void lcd_hotkey_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotk
 		lcd_hotkey_update_menu(hotkey_menu);
 	}
 	// Home or power off selected
-	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
-		// Reset selection
-		hotkey_menu->index = 2;
-		lcd_hotkey_update_menu(hotkey_menu);
-		
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {		
 		// Hide hotkey page
 		lv_obj_add_flag(hotkey_menu->cont, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(hotkey_menu->lbl_ins, LV_OBJ_FLAG_HIDDEN);
@@ -1438,7 +1584,7 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
 			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 			
 			// Show selection labels
-			unhide_selection_widgets(ui_menu);
+			lcd_unhide_selection_widgets(ui_menu);
 			
 			ui_menu->page = SELECTION_PAGE;
 		}
@@ -1569,7 +1715,7 @@ void lcd_lora_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_men
 		lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
 		// Show selection labels
-		unhide_selection_widgets(ui_menu);
+		lcd_unhide_selection_widgets(ui_menu);
 		
 		// Reset static
 		do_once = false;
@@ -1695,7 +1841,7 @@ void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espn
 		lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
 		// Show selection labels
-		unhide_selection_widgets(ui_menu);
+		lcd_unhide_selection_widgets(ui_menu);
 		
 		// Reset static
 		do_once = false;
@@ -1890,7 +2036,7 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
 		// Show selection labels
-		unhide_selection_widgets(ui_menu);
+		lcd_unhide_selection_widgets(ui_menu);
 		
 		// Reset static
 		do_once = false;
@@ -1989,7 +2135,7 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
 		lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
 		// Show selection labels
-		unhide_selection_widgets(ui_menu);
+		lcd_unhide_selection_widgets(ui_menu);
 		
 		// Reset static
 		do_once = false;
@@ -2162,7 +2308,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
 		// Show selection labels
-		unhide_selection_widgets(ui_menu);
+		lcd_unhide_selection_widgets(ui_menu);
 		
 		// Reset static
 		do_once = false;

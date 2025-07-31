@@ -14,12 +14,21 @@ extern SemaphoreHandle_t xLEDCMutex;
 extern SemaphoreHandle_t xPowerButtonSemaphore;
 extern SemaphoreHandle_t xStartAdcBatSemaphore;
 
+// Short presses
 extern SemaphoreHandle_t xUpButtonSemaphore; // Up btn pressed
 extern SemaphoreHandle_t xDownButtonSemaphore; // Down btn pressed
 extern SemaphoreHandle_t xRightButtonSemaphore; // Right btn pressed
 extern SemaphoreHandle_t xLeftButtonSemaphore; // Left btn pressed
 extern SemaphoreHandle_t xHomeButtonSemaphore; // Back btn pressed
 extern SemaphoreHandle_t xSelectButtonSemaphore; // Select btn pressed
+
+// Long presses
+extern SemaphoreHandle_t xSelectButtonLongSemaphore;  
+extern SemaphoreHandle_t xHomeButtonLongSemaphore;    
+extern SemaphoreHandle_t xUpButtonLongSemaphore;      
+extern SemaphoreHandle_t xDownButtonLongSemaphore;    
+extern SemaphoreHandle_t xLeftButtonLongSemaphore;    
+extern SemaphoreHandle_t xRightButtonLongSemaphore; 
 
 extern SemaphoreHandle_t xIsChargingSemaphore;
 extern SemaphoreHandle_t xNotChargingSemaphore;

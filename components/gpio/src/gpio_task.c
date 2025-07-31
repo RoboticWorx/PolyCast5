@@ -15,8 +15,9 @@
 #define TAG "GPIO_TASK"
 
 #define POLL_MS 20
-#define REPEAT_START_MS 400
 #define REPEAT_NEXT_MS 100
+#define LONG_PRESS_THRESHOLD_MS 500 // Trigger long press
+#define REPEAT_START_MS (LONG_PRESS_THRESHOLD_MS + 100) // Start repeating short presses
 
 SemaphoreHandle_t xSPIBusMutex;
 SemaphoreHandle_t xI2CBusMutex;
@@ -27,12 +28,21 @@ SemaphoreHandle_t xLEDCMutex;
 SemaphoreHandle_t xPowerButtonSemaphore;
 SemaphoreHandle_t xStartAdcBatSemaphore;
 
+// Short presses
 SemaphoreHandle_t xUpButtonSemaphore;
 SemaphoreHandle_t xDownButtonSemaphore;
 SemaphoreHandle_t xRightButtonSemaphore;
 SemaphoreHandle_t xLeftButtonSemaphore;
 SemaphoreHandle_t xHomeButtonSemaphore;
 SemaphoreHandle_t xSelectButtonSemaphore;
+
+// Long presses
+SemaphoreHandle_t xSelectButtonLongSemaphore;  
+SemaphoreHandle_t xHomeButtonLongSemaphore;	
+SemaphoreHandle_t xUpButtonLongSemaphore;	  
+SemaphoreHandle_t xDownButtonLongSemaphore;	
+SemaphoreHandle_t xLeftButtonLongSemaphore;	
+SemaphoreHandle_t xRightButtonLongSemaphore; 
 
 SemaphoreHandle_t xIsChargingSemaphore;
 SemaphoreHandle_t xNotChargingSemaphore;
@@ -46,6 +56,8 @@ typedef struct {
 	uint8_t pin; // Expander pin number
 	uint16_t ticks; // Ticks until next event
 	bool prev; // Last sampled state (1 = released, 0 = pressed)
+	TickType_t press_start_tick; // When we first saw the press
+	bool long_press_fired; // Have we already sent the long-press event
 } btn_state_t;
 
 volatile uint8_t haptic_len_ms = 20; // Default buzz 20ms
@@ -61,15 +73,15 @@ static const uint32_t lcd_max_duty = (1 << LCD_LEDC_RESOLUTION) - 1;
 
 // Buttons and states: same order as buttonSemaphores
 static btn_state_t buttons[6] = {
-	{USER_BUTTON_SELECT, 0, 1},
-	{USER_BUTTON_HOME,   0, 1},
-	{USER_BUTTON_UP,	 0, 1},
-	{USER_BUTTON_DOWN,   0, 1},
-	{USER_BUTTON_LEFT,   0, 1},
-	{USER_BUTTON_RIGHT,  0, 1},
+	{USER_BUTTON_SELECT, 0, 1, 0, false},
+	{USER_BUTTON_HOME,   0, 1, 0, false},
+	{USER_BUTTON_UP,	 0, 1, 0, false},
+	{USER_BUTTON_DOWN,   0, 1, 0, false},
+	{USER_BUTTON_LEFT,   0, 1, 0, false},
+	{USER_BUTTON_RIGHT,  0, 1, 0, false},
 };
 
-static SemaphoreHandle_t *buttonSemaphores[] = {
+static SemaphoreHandle_t *shortSems[6] = {
 	&xSelectButtonSemaphore,
 	&xHomeButtonSemaphore,
 	&xUpButtonSemaphore,
@@ -78,11 +90,21 @@ static SemaphoreHandle_t *buttonSemaphores[] = {
 	&xRightButtonSemaphore,
 };
 
-// Helper to “give” the right semaphore based on index
-static inline void give_button_sem(size_t i)
-{
-	// Dereference the pointer and give it
-	xSemaphoreGive(*buttonSemaphores[i]);
+static SemaphoreHandle_t *longSems[6] = {
+	&xSelectButtonLongSemaphore,
+	&xHomeButtonLongSemaphore,
+	&xUpButtonLongSemaphore,
+	&xDownButtonLongSemaphore,
+	&xLeftButtonLongSemaphore,
+	&xRightButtonLongSemaphore,
+};
+
+// Helper to give the semaphore based on index
+static inline void give_short(size_t i) {
+	xSemaphoreGive(*shortSems[i]);
+}
+static inline void give_long(size_t i) {
+	xSemaphoreGive(*longSems[i]);
 }
 
 static void adc_task(void *arg)
@@ -92,13 +114,13 @@ static void adc_task(void *arg)
 	// Get battery charge on start
 	gpio_init_battery_adc();
 	float v = gpio_get_battery_voltage();
-	#ifdef POLYCAST5_DEBUG
+	#ifdef POLYCAST5_DEBUG_ADC
 		ESP_LOGI(TAG, "Startup voltage: %f", v);
 	#endif
 	gpio_deinit_battery_adc();
 		
 	uint8_t percentage = gpio_volts_to_soc(v);
-	#ifdef POLYCAST5_DEBUG
+	#ifdef POLYCAST5_DEBUG_ADC
 		ESP_LOGI(TAG, "Startup percentage: %u%%", percentage);
 	#endif
 	
@@ -122,7 +144,7 @@ static void adc_task(void *arg)
 						
 			uint8_t percentage = gpio_volts_to_soc(v);
 			
-			#ifdef POLYCAST5_DEBUG
+			#ifdef POLYCAST5_DEBUG_ADC
 				ESP_LOGI(TAG, "Battery voltage: %f", v);
 				ESP_LOGI(TAG, "Battery percentage: %u%%", percentage);
 			#endif
@@ -135,7 +157,7 @@ static void adc_task(void *arg)
 				last_percentage = percentage;
 			}
 			
-			#ifdef POLYCAST5_DEBUG
+			#ifdef POLYCAST5_DEBUG_ADC
 				ESP_LOGI(TAG, "NEW battery percentage: %u%%", percentage);
 			#endif
 			
@@ -170,6 +192,19 @@ static void gpio_task(void *arg)
 	configASSERT(xHomeButtonSemaphore);
 	xSelectButtonSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xSelectButtonSemaphore);
+	
+	xUpButtonLongSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xUpButtonLongSemaphore);
+	xSelectButtonLongSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xSelectButtonLongSemaphore);
+	xHomeButtonLongSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xHomeButtonLongSemaphore);
+	xDownButtonLongSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xDownButtonLongSemaphore);
+	xLeftButtonLongSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xLeftButtonLongSemaphore);
+	xRightButtonLongSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xRightButtonLongSemaphore);
 	
 	xIsChargingSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xIsChargingSemaphore);
@@ -209,10 +244,6 @@ static void gpio_task(void *arg)
 	
 	while (1) 
 	{
-		#ifdef POLYCAST5_DEBUG_GPIO
-			//ESP_LOGI(TAG, "GPIO_UP: %d GPIO_DOWN: %d GPIO_RIGHT: %d", gpio_read_input(USER_BUTTON_UP), gpio_read_input(USER_BUTTON_DOWN), gpio_read_input(USER_BUTTON_RIGHT));
-		#endif
-	
 		// Press + auto-repeat state machine
 		for (size_t i = 0; i < 6; i++) {
 			btn_state_t *b = &buttons[i]; // Get the button
@@ -220,28 +251,60 @@ static void gpio_task(void *arg)
 	
 			// Button pressed
 			if (level == 0) {
-				if (b->prev == 1) { // New press
-					give_button_sem(i); // Signal the press
-					b->ticks = REPEAT_START_MS / POLL_MS;
+				// New press
+				if (b->prev == 1) {
+					b->press_start_tick = xTaskGetTickCount();
+					b->long_press_fired = false;
+					b->ticks = REPEAT_START_MS / POLL_MS; // Convert ms to poll cycles
 					
-					// Haptic feedback if this button is enabled in settings
+					// Give haptic feedback if button is enabled
 					xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics
 					if (haptic_btns[i]) {
 						gpio_spin_haptic(haptic_len_ms);
 					}
 					xSemaphoreGive(xHapticsMutex); // Release haptics
 				}
-				else if (b->ticks == 0) { // Time to auto-repeat
-					give_button_sem(i); // Repeat the press
-					b->ticks = REPEAT_NEXT_MS / POLL_MS;
-				}
-				else { // Waiting for next repeat
-					b->ticks--; // Tick down
+				// Else long-press
+				else {
+					// If not yet fired long press
+					if (!b->long_press_fired) {
+						// Get elapsed time
+						TickType_t held = xTaskGetTickCount() - b->press_start_tick;
+						
+						// If time is above LONG_PRESS_THRESHOLD_MS
+						if (held >= pdMS_TO_TICKS(LONG_PRESS_THRESHOLD_MS)) {
+							b->long_press_fired = true;
+							give_long(i);
+							#ifdef POLYCAST5_DEBUG_GPIO
+								ESP_LOGI(TAG, "Long press fired");
+							#endif
+						}
+					}
+					// Auto-repeat short-press every b->ticks
+					if (b->ticks == 0) {
+						give_short(i);
+						b->ticks = REPEAT_NEXT_MS / POLL_MS;
+						#ifdef POLYCAST5_DEBUG_GPIO
+							ESP_LOGI(TAG, "Auto repeat give short");
+						#endif
+					}
+					else {
+						b->ticks--;
+					}
 				}
 			}
-			else { // Button released
-				// Reset for next press
+			// Button released
+			else if (b->prev == 0) {
+				// Reset ticks
 				b->ticks = 0;
+				
+				// If wasn't a long press, give short press
+				if (!b->long_press_fired) {
+					give_short(i);
+					#ifdef POLYCAST5_DEBUG_GPIO
+						ESP_LOGI(TAG, "Btn release give short");
+					#endif
+				}
 			}
 			
 			// Set previous
@@ -282,7 +345,7 @@ static void gpio_task(void *arg)
 		// Update LEDC
 		if (xSemaphoreTake(xLEDCSemaphore, 0) == pdTRUE) {
 			xSemaphoreTake(xLEDCMutex, portMAX_DELAY); // Lock LEDC
-            // Clamp values
+			// Clamp values
 			if (lcd_ledc_brightness > 100) {
 				lcd_ledc_brightness = 100;
 			}
@@ -290,18 +353,18 @@ static void gpio_task(void *arg)
 				lcd_ledc_brightness = 0;
 			}
 
-            // Scale to duty cycle (higher duty = brighter)
-            uint32_t duty = (lcd_ledc_brightness * lcd_max_duty) / 100;
+			// Scale to duty cycle (higher duty = brighter)
+			uint32_t duty = (lcd_ledc_brightness * lcd_max_duty) / 100;
 
-            // Set and update duty
-            ledc_set_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CHANNEL, duty);
-            ledc_update_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CHANNEL);
+			// Set and update duty
+			ledc_set_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CHANNEL, duty);
+			ledc_update_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CHANNEL);
 			
 			#ifdef POLYCAST5_DEBUG
-	            ESP_LOGI(TAG, "Brightness set to %u%% (duty: %u)\n", lcd_ledc_brightness, duty);
-            #endif
-            xSemaphoreGive(xLEDCMutex); // Release LEDC
-        }
+				ESP_LOGI(TAG, "Brightness set to %u%% (duty: %u)\n", lcd_ledc_brightness, duty);
+			#endif
+			xSemaphoreGive(xLEDCMutex); // Release LEDC
+		}
 		
 		vTaskDelay(pdMS_TO_TICKS(POLL_MS));
 	}

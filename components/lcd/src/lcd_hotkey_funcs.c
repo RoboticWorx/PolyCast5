@@ -14,6 +14,8 @@ hotkey_menu_t hotkey_menu = {
 	.cont = NULL,
 };
 
+hotkey_cmd_t hotkey_cmd;
+
 void lcd_hotkey_setup_page(hotkey_menu_t *menu)
 {
 	// Create container
@@ -121,7 +123,7 @@ void lcd_hotkey_update_menu(hotkey_menu_t *menu)
 
 void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotkey_menu)
 {
-	#define HOTKEY_Y_OFFSET 30
+	#define HOTKEY_Y_OFFSET 40
 	// Statics
 	static bool init = false;
 	static lv_obj_t *cont = NULL;
@@ -146,7 +148,7 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
 
 		// Title label
 		title_lbl = lv_label_create(cont);
-		lv_label_set_text_fmt(title_lbl, "%s Instructions", hotkey_menu->options[hotkey_menu->index]);
+		lv_label_set_text_fmt(title_lbl, "%s Hotkey", hotkey_menu->options[hotkey_menu->index]);
 		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
 		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
 		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
@@ -159,29 +161,39 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
 		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
 		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
-		// Set custom text based on hotkey index (assuming triggers; adjust as needed)
+		// Set custom text based on hotkey index
 		const char *instr_text = "";
 		
 		/* Set instruction text */
 		// Hot1
 		if (hotkey_menu->index == 0) {
-			instr_text = "Configure your command for Hot1:\n\nThis hotkey is triggered when short-pressing the home button while on the home page.\n\nTo configure this command, click the right button then send any ESP32, PolyPlug, or Infrared signal.";
+			instr_text = "How to configure your command for Hot1:\n\nThis hotkey is triggered when SHORT pressing the "
+			"HOME button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
+			"ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to show waiting for a command.";
 		}
 		// Hot2
 		else if (hotkey_menu->index == 1) {
-			instr_text = "This hotkey (Hot2) is triggered by long pressing the down arrow button from the homescreen. Use it for quick access to features such as toggling settings or activating modules.";
+			instr_text = "How to configure your command for Hot2:\n\nThis hotkey is triggered when LONG pressing the "
+			"HOME button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
+			"ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to show waiting for a command.";
 		}
 		// Hot3
 		else if (hotkey_menu->index == 2) {
-			instr_text = "This hotkey (Hot3) is triggered by long pressing the left arrow button from the homescreen. Ideal for shortcuts to communication tools or device controls.";
+			instr_text = "How to configure your command for Hot3:\n\nThis hotkey is triggered when LONG pressing the "
+			"LEFT button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
+			"ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to show waiting for a command.";
 		}
 		// Hot4
 		else if (hotkey_menu->index == 3) {
-			instr_text = "This hotkey (Hot4) is triggered by long pressing the right arrow button from the homescreen. Customize it for rapid execution of predefined commands or scripts.";
+			instr_text = "How to configure your command for Hot4:\n\nThis hotkey is triggered when SHORT pressing the "
+			"RIGHT button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
+			"ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to show waiting for a command.";
 		}
 		// Hot5
 		else if (hotkey_menu->index == 4) {
-			instr_text = "This hotkey (Hot5) is triggered by long pressing the select button from the homescreen. Perfect for emergency actions or frequently used operations.";
+			instr_text = "How to configure your command for Hot5:\n\nThis hotkey is triggered when LONG pressing the "
+			"RIGHT button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
+			"ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to show waiting for a command.";
 		}
 		lv_label_set_text(instr_lbl, instr_text);
 	
@@ -211,6 +223,33 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
 	}
 	else if (ui_btns->down_btn == 1) {
 		lv_obj_scroll_by(cont, 0, -HOTKEY_Y_OFFSET, LV_ANIM_ON);
+	}
+	else if (ui_btns->right_btn == 1) {
+		// Save active index
+		hotkey_cmd.active_idx = hotkey_menu->index; // Hot1-Hot5 0-based
+		
+		// Delete objects
+		lv_obj_del(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+		
+		// Hide arrows
+		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show selection menu
+		lcd_unhide_selection_widgets(ui_menu);
+		
+		// Show hotkey icon
+		lv_obj_remove_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch
+		ui_menu->page = SELECTION_PAGE;
 	}
 }
 

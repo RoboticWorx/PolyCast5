@@ -47,12 +47,6 @@ lora_menu_t lora_menu = {
 
 lora_plan_menu_t lora_plan_menu = {0};
 
-static lora_cmd_t lora_cmd = {
-	.key = {0},
-	.index = -1,
-	.instr = {0}
-};
-
 static const char *submenu_options[] = {
 	LV_SYMBOL_UPLOAD "\nSEND",
 	LV_SYMBOL_LOOP "\nLOOP",
@@ -719,10 +713,32 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 		lcd_lora_update_submenu(lora_menu);
 	}
 	// Send selected
-	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 0) {
+	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 0) {		
+		// Build the packet
+		lora_cmd_t lora_cmd = {}; // Zero out
 		lora_cmd.index = lora_menu->submenu.index;
 		memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
-		xQueueSend(xLoraSendEncQueue, &lora_cmd, 0);
+		
+		// If recording command as hotkey
+		if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+			// Zero out at start
+			memset(&hotkey_cmd.lora_cmd[hotkey_cmd.active_idx], 0, sizeof(lora_cmd_t));
+			
+			// Save into hotkey struct under selected "Hotx"
+			hotkey_cmd.lora_cmd[hotkey_cmd.active_idx].index = lora_menu->submenu.index;
+			memcpy(hotkey_cmd.lora_cmd[hotkey_cmd.active_idx].key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
+			
+			// Flag that command exists
+			hotkey_cmd.has_lora[hotkey_cmd.active_idx] = true;
+			// Remove others
+			hotkey_cmd.has_espnow[hotkey_cmd.active_idx] = false;
+			
+			// Hide hotkey icon
+			lv_obj_add_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN);
+		}
+		
+		// Send the command
+		xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY);
 		
 		// RGB indicator
 		uint8_t rgb_state = RGB_BLINK_TEAL;
@@ -992,10 +1008,11 @@ void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		lbl_bot_time = NULL;
 		
 		// Send the data to lora_task
+		lora_cmd_t lora_cmd = {}; // Zero out
 		lora_cmd.index = lora_menu->submenu.index;
 		memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
 		snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "on %s off %s", time_opts[on_idx], time_opts[off_idx]);
-		xQueueSend(xLoraSendEncQueue, &lora_cmd, 0);
+		xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY);
 
 		// Confirmation text
 		lcd_format_label(lbl_subpage_ins, "Sending to PolyPlug...", user_secondary_color,
@@ -1544,6 +1561,7 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		#endif
 		
 		// Send the data to lora_task
+		lora_cmd_t lora_cmd = {}; // Zero out
 		lora_cmd.index = lora_menu->submenu.index;
 		memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
 		// Remove colons
@@ -1552,7 +1570,7 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		sscanf(end_time, "%2d:%2d:%2d", &h2,&m2,&s2);
 		snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "d %s o %02d%02d%02d f %02d%02d%02d",
 				plan_selected_days, h1, m1, s1, h2, m2, s2);
-		xQueueSend(xLoraSendEncQueue, &lora_cmd, 0);
+		xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY);
 		
 		// Reset objects
 		lv_obj_delete(lbl_subpage_times);
@@ -1826,10 +1844,11 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		lv_obj_add_flag(away_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
 		// Send the data to lora_task
+		lora_cmd_t lora_cmd = {}; // Zero out
 		lora_cmd.index = lora_menu->submenu.index;
 		memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
 		snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "away %s", away_menu->options[away_menu->index]);
-		xQueueSend(xLoraSendEncQueue, &lora_cmd, 0);
+		xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY);
 
 		// Confirmation text
 		lv_obj_t *lbl_send_conf = lv_label_create(ACTIVE_SCR); // Create and format label

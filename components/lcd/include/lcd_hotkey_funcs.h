@@ -1,6 +1,8 @@
 #ifndef LCD_HOTKEY_FUNCS_H
 #define LCD_HOTKEY_FUNCS_H
 
+#include "espnow_funcs.h"
+#include "lora_funcs.h"
 #include "lvgl.h"
 
 // Forward-declare structs (from lcd_utils.h)
@@ -21,7 +23,16 @@ typedef struct {
 	lv_style_t sel_style;
 } hotkey_menu_t;
 
+typedef struct {
+	uint8_t active_idx;
+	bool has_lora[MAX_HOTKEY_OPTIONS]; // Hot0-Hot5
+	bool has_espnow[MAX_HOTKEY_OPTIONS];
+	lora_cmd_t lora_cmd[MAX_HOTKEY_OPTIONS];
+	espnow_cmd_t espnow_cmd[MAX_HOTKEY_OPTIONS];
+} hotkey_cmd_t;
+
 extern hotkey_menu_t hotkey_menu;
+extern hotkey_cmd_t hotkey_cmd;
 
 /**
  * @brief Pre-load hotkey page for quick access

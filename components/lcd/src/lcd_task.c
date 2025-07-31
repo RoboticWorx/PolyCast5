@@ -19,7 +19,7 @@ static const TickType_t btn_timer_interval = pdMS_TO_TICKS(200);
 uint8_t sleep_time_s = 30; // Default 30s
 
 ui_menu_t ui_menu = {
-	.options = (const char *[]) {"Bluetooth","PolyPlug","ESP32","Infrared","Tools", "Settings","Wi-Fi"},
+	.options = (const char *[]) {"Bluetooth", "PolyPlug", "ESP32", "Infrared", "Tools",  "Settings", "Wi-Fi"},
 	.size = 7,
 	.index = 1, // “LoRa” starts in the middle
 	.page = HOME_PAGE,
