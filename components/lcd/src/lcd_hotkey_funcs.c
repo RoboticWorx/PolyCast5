@@ -165,7 +165,7 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
 		/* Set instruction text */
 		// Hot1
 		if (hotkey_menu->index == 0) {
-			instr_text = "This hotkey (Hot1) is triggered by long pressing the up arrow button from the homescreen. Configure it to perform a custom action like launching a tool or sending a signal.";
+			instr_text = "Configure your command for Hot1:\n\nThis hotkey is triggered when short-pressing the home button while on the home page.\n\nTo configure this command, click the right button then send any ESP32, PolyPlug, or Infrared signal.";
 		}
 		// Hot2
 		else if (hotkey_menu->index == 1) {

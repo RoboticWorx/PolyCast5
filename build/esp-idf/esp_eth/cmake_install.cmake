@@ -1,4 +1,4 @@
-# Install script for directory: C:/Espressif/esp-idf-master/components/esp_eth
+# Install script for directory: C:/Espressif/frameworks/esp-idf-v5.5/components/esp_eth
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

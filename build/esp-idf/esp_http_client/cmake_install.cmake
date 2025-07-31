@@ -1,4 +1,4 @@
-# Install script for directory: C:/Espressif/esp-idf-master/components/esp_http_client
+# Install script for directory: C:/Espressif/frameworks/esp-idf-v5.5/components/esp_http_client
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

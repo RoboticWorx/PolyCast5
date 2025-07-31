@@ -1,4 +1,4 @@
-# Install script for directory: C:/Espressif/esp-idf-master/components/unity
+# Install script for directory: C:/Espressif/frameworks/esp-idf-v5.5/components/unity
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

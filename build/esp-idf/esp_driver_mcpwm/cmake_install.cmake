@@ -1,4 +1,4 @@
-# Install script for directory: C:/Espressif/esp-idf-master/components/esp_driver_mcpwm
+# Install script for directory: C:/Espressif/frameworks/esp-idf-v5.5/components/esp_driver_mcpwm
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

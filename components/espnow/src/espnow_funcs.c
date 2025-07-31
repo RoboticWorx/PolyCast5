@@ -52,10 +52,14 @@ esp_err_t espnow_funcs_wifi_radio_stop(void)
     return ESP_OK;
 }
 
-static void send_cb(const uint8_t *mac, esp_now_send_status_t status)
+static void send_cb(const wifi_tx_info_t *info, esp_now_send_status_t status)
 {
 	#ifdef POLYCAST5_DEBUG
-        	ESP_LOGI(TAG, "Send to %02X:%02X:%02X:%02X:%02X:%02X | %s", mac[0],mac[1],mac[2],mac[3],mac[4],mac[5], status == ESP_NOW_SEND_SUCCESS ? "OK" : "FAIL");
+		ESP_LOGI(TAG,
+			"Send to %02X:%02X:%02X:%02X:%02X:%02X | %s",
+			info->des_addr[0], info->des_addr[1], info->des_addr[2],
+			info->des_addr[3], info->des_addr[4], info->des_addr[5],
+			status == ESP_NOW_SEND_SUCCESS ? "OK" : "FAIL");
     #endif
     
     if (status == ESP_NOW_SEND_SUCCESS) {

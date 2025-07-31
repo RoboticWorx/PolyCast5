@@ -1,4 +1,4 @@
-# Install script for directory: C:/Espressif/esp-idf-master/components/hal
+# Install script for directory: C:/Espressif/frameworks/esp-idf-v5.5/components/hal
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

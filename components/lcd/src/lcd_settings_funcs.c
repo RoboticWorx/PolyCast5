@@ -1783,6 +1783,8 @@ void lcd_settings_pin_nvs_load(settings_menu_t *menu)
 		#ifdef POLYCAST5_DEBUG
 			ESP_LOGW(TAG, "lcd_settings_pin_nvs_load NVS DNE");
 		#endif
+		
+		return;
 	}
 	
 	if (err != ESP_OK) {

@@ -1,4 +1,4 @@
-# Install script for directory: C:/Espressif/esp-idf-master/components/mbedtls/mbedtls
+# Install script for directory: C:/Espressif/frameworks/esp-idf-v5.5/components/mbedtls/mbedtls
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

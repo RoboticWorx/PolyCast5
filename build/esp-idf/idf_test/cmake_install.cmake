@@ -1,4 +1,4 @@
-# Install script for directory: C:/Espressif/esp-idf-master/components/idf_test
+# Install script for directory: C:/Espressif/frameworks/esp-idf-v5.5/components/idf_test
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
