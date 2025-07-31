@@ -5,6 +5,7 @@
 
 #include "lcd_task.h"
 #include "gpio_task.h"
+#include "lcd_hotkey_funcs.h"
 #include "lcd_utils.h"
 #include "widgets/label/lv_label.h"
 
@@ -97,6 +98,8 @@ static void lcd_task(void *pvParameters)
     
     
 	/* Load all user settings */
+	lcd_hotkey_nvs_load(&hotkey_cmd);
+	
 	lcd_lora_menu_nvs_load(&lora_menu);
 	lcd_lora_key_nvs_load(&lora_menu);
 	

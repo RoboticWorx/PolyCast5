@@ -735,6 +735,9 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 			
 			// Hide hotkey icon
 			lv_obj_add_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN);
+			
+			// Persist to NVS
+			lcd_hotkey_nvs_save(&hotkey_cmd);
 		}
 		
 		// Send the command

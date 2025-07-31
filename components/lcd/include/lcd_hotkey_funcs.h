@@ -57,4 +57,18 @@ void lcd_hotkey_update_menu(hotkey_menu_t *hotkey_menu);
  */
 void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotkey_menu);
 
+/**
+ * @brief Loads hotkey commands from NVS
+ *
+ * @param [in] hotkey_cmd Hotkey command structure
+ */
+void lcd_hotkey_nvs_load(hotkey_cmd_t *hotkey_cmd);
+
+/**
+ * @brief Saves hotkey commands to NVS
+ *
+ * @param [in] hotkey_cmd Hotkey command structure
+ */
+void lcd_hotkey_nvs_save(const hotkey_cmd_t *hotkey_cmd);
+
 #endif // LCD_HOTKEY_FUNCS_H

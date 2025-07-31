@@ -1,6 +1,7 @@
 #include "core/lv_obj_pos.h"
 
 #include "core/lv_obj.h"
+#include "lcd_hotkey_funcs.h"
 #include "portmacro.h"
 #include "misc/lv_area.h"
 
@@ -1133,7 +1134,7 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
 		espnow_cmd_t espnow_cmd = {0};
 		memcpy(espnow_cmd.mac_selected, espnow_menu->rx_mac[espnow_menu->index], ESPNOW_MAC_SIZE);
 		espnow_cmd.cmd_to_send = espnow_menu->espnow_submenu.cmd_to_send;
-		// enc = true if no LMK
+		// enc = true if LMK
 		espnow_cmd.enc = memcmp(espnow_menu->lmk[espnow_menu->index], (uint8_t[LMK_LEN]){0}, LMK_LEN) != 0;
 		// If enc, copy LMK
 		if (espnow_cmd.enc) {
@@ -1149,7 +1150,7 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
 			hotkey_cmd.espnow_cmd[hotkey_cmd.active_idx].cmd_to_send = espnow_menu->espnow_submenu.cmd_to_send;
 			memcpy(hotkey_cmd.espnow_cmd[hotkey_cmd.active_idx].mac_selected, espnow_menu->rx_mac[espnow_menu->index], ESPNOW_MAC_SIZE);
 			
-			// enc = true if no LMK
+			// enc = true if LMK
 			hotkey_cmd.espnow_cmd[hotkey_cmd.active_idx].enc = memcmp(espnow_menu->lmk[espnow_menu->index], (uint8_t[LMK_LEN]){0}, LMK_LEN) != 0;
 			// If enc, copy LMK
 			if (hotkey_cmd.espnow_cmd[hotkey_cmd.active_idx].enc) {
@@ -1163,6 +1164,9 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
 			
 			// Hide hotkey icon
 			lv_obj_add_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN);
+			
+			// Persist to NVS
+			lcd_hotkey_nvs_save(&hotkey_cmd);
 		}
 
 		// Send the command

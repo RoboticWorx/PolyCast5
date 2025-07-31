@@ -1,3 +1,6 @@
+#include "esp_log.h"
+#include "nvs.h"
+
 #include "core/lv_obj.h"
 #include "core/lv_obj_pos.h"
 #include "misc/lv_area.h"
@@ -6,6 +9,11 @@
 
 #include "lcd_hotkey_funcs.h"
 #include "lcd_utils.h"
+
+#define TAG "LCD_HOTKEY_FUNCS"
+
+#define HOTKEY_NS "hotkeys" // NVS namespace
+#define HOTKEY_KEY "data" // Data blob
 
 hotkey_menu_t hotkey_menu = {
 	.options = {"Hot1", "Hot2", "Hot3", "Hot4", "Hot5"},
@@ -251,5 +259,65 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
 		// Switch
 		ui_menu->page = SELECTION_PAGE;
 	}
+}
+
+void lcd_hotkey_nvs_save(const hotkey_cmd_t *src)
+{
+ 	nvs_handle_t h;
+
+	// Open NVS
+ 	esp_err_t err = nvs_open(HOTKEY_NS, NVS_READWRITE, &h);
+ 	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_hotkey_nvs_save nvs_open failed");
+
+		nvs_close(h);
+		return;
+	}
+
+	// Save the data
+	err = nvs_set_blob(h, HOTKEY_KEY, src, sizeof(*src));
+	if (err == ESP_OK) {
+		// Commit changes if success
+		err = nvs_commit(h);
+	}
+	else {
+		ESP_LOGE(TAG, "lcd_hotkey_nvs_save set_blob failed");
+	}
+
+	// Close NVS
+ 	nvs_close(h);
+}
+
+void lcd_hotkey_nvs_load(hotkey_cmd_t *dst)
+{
+ 	nvs_handle_t h;
+
+	// Open NVS
+ 	esp_err_t err = nvs_open(HOTKEY_NS, NVS_READONLY, &h);
+ 	if (err != ESP_OK) {
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGW(TAG, "lcd_hotkey_nvs_load nvs_open failed: probably DNE");
+		#endif
+
+		nvs_close(h);
+		return;
+	}
+
+ 	size_t sz = sizeof(*dst);
+
+	// Get data blob
+ 	err = nvs_get_blob(h, HOTKEY_KEY, dst, &sz);
+
+	// Check if first boot
+	if (err == ESP_ERR_NVS_NOT_FOUND) {
+		memset(dst, 0, sizeof(*dst)); // Zero out
+	}
+	// Other error
+	else if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_hotkey_nvs_load get_blob failed");
+	}
+
+	// Close NVS
+ 	nvs_close(h);
 }
 
