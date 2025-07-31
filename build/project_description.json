@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "PolyCast5",
-    "project_version":    "5461375b-dirty",
+    "project_version":    "e56c3051-dirty",
     "project_path":       "C:/Projects/ESP/PolyCast5",
     "idf_path":           "C:/Espressif/frameworks/esp-idf-v5.5",
     "build_dir":          "C:/Projects/ESP/PolyCast5/build",
@@ -11,7 +11,7 @@
     "app_elf":            "PolyCast5.elf",
     "app_bin":            "PolyCast5.bin",
     "build_type":         "flash_app",
-    "git_revision":       "v5.5",
+    "git_revision":       "v5.5-1-gb66b5448e0-dirty",
     "target":             "esp32c5",
     "rev":                "",
     "min_rev":            "100",
