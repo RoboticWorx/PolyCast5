@@ -153,10 +153,11 @@ void lcd_lora_update_plan_menu(lora_plan_menu_t *lora_plan_menu);
 /**
  * @brief Prompts user on how to pair a PolyPlug then sends a Semaphore to generate a random enc key to share
  *
+ * @param [in] ui_btns UI input structure
  * @param [in] ui_menu UI menu structure
  * @param [in] lora_menu LoRa menu structure
  */
-void lcd_lora_create_enc_key(ui_menu_t *ui_menu, lora_menu_t *lora_menu);
+void lcd_lora_add_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu);
 
 /**
  * @brief Takes user input to create a name for/rename a designated PolyPlug

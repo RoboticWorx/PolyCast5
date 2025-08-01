@@ -258,6 +258,9 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == LORA_PAGE) {
 				lcd_lora_page(&ui_btns, &ui_menu, &lora_menu);
 			}
+			else if (ui_menu.page == LORA_ADD_PAGE) {
+				lcd_lora_add_page(&ui_btns, &ui_menu, &lora_menu);
+			}
 			else if (ui_menu.page == LORA_NAME_PAGE) {
 				lcd_lora_create_custom_name(&ui_btns, &ui_menu, &lora_menu);
 			}

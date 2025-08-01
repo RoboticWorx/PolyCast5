@@ -298,60 +298,109 @@ void lcd_lora_update_submenu(lora_menu_t *menu)
 	//lv_obj_scroll_to_view(menu->submenu.btns[menu->submenu.index], LV_ANIM_ON); // LV_ANIM_OFF
 }
 
-void lcd_lora_create_enc_key(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
+void lcd_lora_add_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu)
 {
-	lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-	lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-		
-	lv_obj_t *lbl_key_ins = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(lbl_key_ins, "1. Bring near desired PolyPlug.\n2. Press the top right button\non the PolyPlug.\n3. Confirm LED is showing\nblue on the PolyPlug.\n4. On this device, hit the\nright arrow to confirm.", user_secondary_color,
-						 &lv_font_montserrat_14, LV_ALIGN_CENTER, 6, 6);
-					
-	while (1) {
-		lv_timer_handler();
-		
-		// User hit cancel
-		if (xSemaphoreTake(xLeftButtonSemaphore, 0) == pdTRUE) {
-			
-			lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-			
-			lv_obj_del(lbl_key_ins);
-			
-			lcd_clear_pending_inputs = true; // Clear any false inputs
-			
-			// Hide right arrow
-			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-			
-			// Show LoRa menu
-			lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-			
-			// Go back
-			return;
-		}
-		// User hit confirm
-		else if (xSemaphoreTake(xRightButtonSemaphore, 0) == pdTRUE) {
-			// Generate encryption key
-			xSemaphoreGive(xLoraGenerateEncKeySemaphore);
-			
-			lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-			
-			lv_obj_del(lbl_key_ins);
-			
-			lcd_clear_pending_inputs = true; // Clear any false inputs
-			
-			// Show right arrow
-			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-			
-			// Prompt to enter name
-			ui_menu->page = LORA_NAME_PAGE;
+	#define LORA_ADD_Y_OFFSET 40
+	
+	// Statics
+	static bool init = false;
+	static lv_obj_t *cont = NULL;
+	static lv_obj_t *title_lbl = NULL;
+	static lv_obj_t *instr_lbl = NULL;
+	
+	if (!init) {
+		// Create a scrollable container for the instructions
+		cont = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(cont, 210, 106);
+		lv_obj_center(cont);
+		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
 
-			// Go back
-			return;
-		}
+		// Title label
+		title_lbl = lv_label_create(cont);
+		lv_label_set_text(title_lbl, "Adding a PolyPlug:");
+		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+		// Instructions label (scrollable if text is long)
+		instr_lbl = lv_label_create(cont);
+		lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+		lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
+		lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
+		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+
+		// Set custom text based on hotkey index
+		const char *instr_text = "How to quickly add a new PolyPlug:\n\nFirst, walk toward the PolyPlug you want to add so that you can see it."
+			"\n\nThen, with the outlet part facing toward you (power side facing away), press the right-most button on the top of the PolyPlug."
+			"\n\nOnce pressed, a light should turn blue to indicate it is ready to pair.When it does, press the right button on this "
+			"device (PolyCast5) to pair.\n\nIf it doesn't turn blue, wait a few seconds then press it again or try power cycling.";
 		
-		vTaskDelay(pdMS_TO_TICKS(10));
+		lv_label_set_text(instr_lbl, instr_text);
+	
+		init = true;
+	}
+	
+	if (ui_btns->up_btn == 1) {
+		lv_obj_scroll_by(cont, 0, LORA_ADD_Y_OFFSET, LV_ANIM_ON);
+	}
+	else if (ui_btns->down_btn == 1) {
+		lv_obj_scroll_by(cont, 0, -LORA_ADD_Y_OFFSET, LV_ANIM_ON);
+	}
+	// Go back
+	else if (ui_btns->left_btn) {
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		// Delete objects
+		lv_obj_del(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+			
+		// Show LoRa menu
+		lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch back
+		ui_menu->page = LORA_PAGE;
+	}
+	// Confirm
+	else if (ui_btns->right_btn == 1) {
+		// Delete objects
+		lv_obj_del(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+		
+		// Generate encryption key
+		xSemaphoreGive(xLoraGenerateEncKeySemaphore);
+					
+		// Prompt to enter name
+		ui_menu->page = LORA_NAME_PAGE;
+	}
+	// Home or power off
+	else if ((ui_btns->home_btn || ui_btns->pwr_btn) && lora_menu_overwrite) {
+		// Delete objects
+		lv_obj_del(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+		
+ 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 
