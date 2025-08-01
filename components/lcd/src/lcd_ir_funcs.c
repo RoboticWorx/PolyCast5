@@ -735,14 +735,18 @@ void lcd_ir_setup_page(ir_menu_t *menu)
 
 void lcd_ir_build_current_menu(ir_menu_t *menu, size_t c)
 {
-	// *Already only called within xInfraredDataMutex
+	// Already only called within xInfraredDataMutex
 	
 	// Clear existing buttons
-	lv_obj_clean(menu->main_list);
+	lv_obj_clean(menu->main_list); // Deletes children
 
 	// Reset to basic
 	menu->index = 0;
 	menu->size = 3 + remotes[c].num_signals;
+	
+	#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Building '%u' signals for remote '%u'", remotes[c].num_signals, c);
+	#endif
 
 	// Set remote name button
 	menu->btns[0] = lv_list_add_btn(menu->main_list, NULL, remotes[c].name);

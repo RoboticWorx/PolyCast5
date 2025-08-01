@@ -2,6 +2,7 @@
 #include <stdio.h>
 
 #include "freertos/FreeRTOS.h"
+#include "freertos/projdefs.h"
 #include "freertos/task.h"
 
 #include "driver/gpio.h"
@@ -135,6 +136,9 @@ void app_main(void) {
 	//ble_hid_task_start_up();
 	
 	#ifdef POLYCAST5_DEBUG_RAM
+		// Wait for tasks to allocate
+		vTaskDelay(pdMS_TO_TICKS(8000));
+	
 		// Log again after allocating some things
 	    // Prints how much of that is free for malloc()
 	    free_ext = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);

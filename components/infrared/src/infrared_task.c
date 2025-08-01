@@ -28,7 +28,7 @@ QueueHandle_t xInfraredSignalToTxQueue;
 rmt_symbol_word_t ir_signal[MAX_PULSES]; // The active signal itself
 
 ir_remote_t remotes[MAX_REMOTES]; // Remotes array
-size_t num_remotes = 0;
+size_t num_remotes = 1; // 1 default
 size_t current_remote = 0;
 
 volatile bool restart_rx_pending = false; // Global restart flag

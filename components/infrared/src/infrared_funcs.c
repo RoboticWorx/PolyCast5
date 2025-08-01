@@ -246,14 +246,9 @@ void infrared_nvs_load_remotes(void)
 	
 	// Open NVS
 	esp_err_t ret = nvs_open(IR_NS, NVS_READONLY, &h);
-	
-	// Error check
+
+	// Default when namespace is missing
 	if (ret == ESP_ERR_NVS_NOT_FOUND) {
-		#ifdef POLYCAST5_DEBUG
-			ESP_LOGI(TAG, "No stored remotes found in NVS");
-		#endif
-		
-		// Default
 		num_remotes = 1;
 		current_remote = 0;
 		remotes[0].name = strdup("REMOTE");
@@ -264,128 +259,102 @@ void infrared_nvs_load_remotes(void)
 	}
 	
 	if (ret != ESP_OK) {
-		ESP_LOGE(TAG, "Failed to open NVS: %s", esp_err_to_name(ret));
+		ESP_LOGE(TAG, "infrared_nvs_load_remotes open failed: %s", esp_err_to_name(ret));
 		return;
 	}
 
-	// Load num_remotes
-	uint8_t stored_num = 1; // 1 default
-	ret = nvs_get_u8(h, IR_NUM_REMOTES_KEY, &stored_num);
-	
-	// Check
-	if (ret != ESP_OK) {
-		if (ret != ESP_ERR_NVS_NOT_FOUND) {
-			ESP_LOGE(TAG, "Failed to read num_remotes: %s", esp_err_to_name(ret));
-		}
-		
-		nvs_close(h);
-		return;
+	// How many remotes are stored
+	uint8_t stored_num = 1; // 1 -> default
+	if (nvs_get_u8(h, IR_NUM_REMOTES_KEY, &stored_num) != ESP_OK) {
+		stored_num = 1;
 	}
 	
-	// Assign extracted to global
-	num_remotes = stored_num;
-	
-	// Cap at max
-	if (num_remotes > MAX_REMOTES) {
-		num_remotes = MAX_REMOTES;
-		
-		#ifdef POLYCAST5_DEBUG
-			ESP_LOGW(TAG, "Capping remotes at %d", MAX_REMOTES);
-		#endif
-	}
-	
-	// Make sure at least one default
+	// Assign num_remotes
+	num_remotes = MIN(stored_num, MAX_REMOTES);
 	if (num_remotes == 0) {
 		num_remotes = 1;
 	}
 
-	// Load each remote
+	// Load every remote
 	for (size_t r = 0; r < num_remotes; r++) {
 		char key[32];
 
-		// Load name
+		// Get remote name
 		size_t len = 0;
-		sprintf(key, IR_REMOTE_NAME_FMT, (int)r); // Format key
-		
-		// Get length
+		sprintf(key, IR_REMOTE_NAME_FMT, (int)r);
 		ret = nvs_get_str(h, key, NULL, &len);
-		
-		// Check
-		if (ret != ESP_OK) {
-			remotes[r].name = strdup("REMOTE");
+
+		if (ret != ESP_OK || len == 0) { // If empty or missing
+			remotes[r].name = strdup("REMOTE"); // Default
 		}
-		else {
-			// If found allocate length
+		else {			
 			remotes[r].name = malloc(len);
-			
-			// Get the actual remote name and save
-			nvs_get_str(h, key, remotes[r].name, &len);
+			if (!remotes[r].name) { // Out of heap -> fallback
+				remotes[r].name = strdup("REMOTE");
+			}
+			else {
+				remotes[r].name[0] = '\0'; // Always NULL-terminated
+				nvs_get_str(h, key, remotes[r].name, &len);
+			}
 		}
 
-		// Load num_signals
+		// Get number of signals
 		uint32_t nsig = 0;
-		
-		// Format key
 		sprintf(key, IR_REMOTE_NSIG_FMT, (int)r);
-		ret = nvs_get_u32(h, key, &nsig); // Get num_signals
-		
-		// Assign default if DNE 
-		if (ret != ESP_OK) {
-			nsig = 0;
-		}
-		
-		// Save to struct
-		remotes[r].num_signals = nsig;
-		remotes[r].signals = malloc(nsig * sizeof(ir_signal_t *)); // Allocate signal length
-		remotes[r].signal_names = malloc(nsig * sizeof(char *)); // Allocate signal name
+		nvs_get_u32(h, key, &nsig); // If fails, nsig stays 0
 
-		// Load signals for remote
+		remotes[r].num_signals = nsig;
+		remotes[r].signals = nsig ? malloc(nsig * sizeof(ir_signal_t *)) : NULL;
+		remotes[r].signal_names = nsig ? malloc(nsig * sizeof(char *)) : NULL;
+
+		// Load every signal
 		for (size_t s = 0; s < nsig; s++) {
-			// Format name key
+			// Read signal name (can be empty)
 			sprintf(key, IR_SIGNAL_NAME_FMT, (int)r, (int)s);
 			
 			len = 0;
-			ret = nvs_get_str(h, key, NULL, &len); // Get name length
-			
-			// Save name if exists
-			if (ret == ESP_OK) {
-				remotes[r].signal_names[s] = malloc(len); // Allocate for name
-				nvs_get_str(h, key, remotes[r].signal_names[s], &len); // Save
+			if (nvs_get_str(h, key, NULL, &len) == ESP_OK && len) {
+				// Get actual name
+				remotes[r].signal_names[s] = malloc(len);
+				nvs_get_str(h, key, remotes[r].signal_names[s], &len);
 			}
 			else {
+				// Default empty
 				remotes[r].signal_names[s] = strdup("");
 			}
 
-			// Get actual signal
-			// Format key
+			// Read signal blob
 			sprintf(key, IR_SIGNAL_BLOB_FMT, (int)r, (int)s);
-			
 			size_t blob_size = 0;
-			ret = nvs_get_blob(h, key, NULL, &blob_size); // Get signal size
 			
-			// If bad blob, skip
-			if (ret != ESP_OK || blob_size < sizeof(ir_signal_t)) {
-				continue;
+			// If good
+			if (nvs_get_blob(h, key, NULL, &blob_size) == ESP_OK && blob_size >= sizeof(ir_signal_t))
+			{
+				ir_signal_t *sig = malloc(blob_size);
+				
+				// If good malloc
+				if (sig) {
+					// Get signal
+					if (nvs_get_blob(h, key, sig, &blob_size) == ESP_OK) {
+						remotes[r].signals[s] = sig;
+					}
+					// Else free bad
+					else {
+						free(sig);
+						remotes[r].signals[s] = NULL;
+					}
+				}
+				else {
+					remotes[r].signals[s] = NULL;
+				}
 			}
-			
-			// Allocate space for signal
-			ir_signal_t *sig = malloc(blob_size);
-			
-			// Get the signal
-			ret = nvs_get_blob(h, key, sig, &blob_size);
-			
-			// Save to struct if good
-			if (ret == ESP_OK) {
-				remotes[r].signals[s] = sig;
-			}
-			// Else bad
+			// Otherwise assign NULL
 			else {
-				free(sig);
+				remotes[r].signals[s] = NULL;
 			}
 		}
 	}
 
-	// Close NVS
 	nvs_close(h);
 }
 

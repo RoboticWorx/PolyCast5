@@ -1,3 +1,4 @@
+#include "freertos/idf_additions.h"
 #include "polycast5_macros.h"
 
 #include "freertos/projdefs.h"
@@ -328,6 +329,11 @@ float gpio_get_battery_voltage(void)
 		ESP_ERROR_CHECK(adc_oneshot_read(adc1_handle, ADC_CH, &raw));
 		sum += raw;
 		esp_rom_delay_us(5);
+
+		// Yield to task_wdt
+		if (i % 100 == 0) {
+			vTaskDelay(pdMS_TO_TICKS(1));
+		}
 	}
 	
 	int avg_raw = sum / NUM_ADC_SAMPLES;
