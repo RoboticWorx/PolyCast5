@@ -216,12 +216,15 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
 		// Switch
 		ui_menu->page = HOTKEY_PAGE;
 	}
+	// Scroll up
 	else if (ui_btns->up_btn == 1) {
 		lv_obj_scroll_by(cont, 0, HOTKEY_Y_OFFSET, LV_ANIM_ON);
 	}
+	// Scroll down
 	else if (ui_btns->down_btn == 1) {
 		lv_obj_scroll_by(cont, 0, -HOTKEY_Y_OFFSET, LV_ANIM_ON);
 	}
+	// Confirm and active viewer
 	else if (ui_btns->right_btn == 1) {
 		// Save active index
 		hotkey_cmd.active_idx = hotkey_menu->index; // Hot1-Hot6 0-based
@@ -248,6 +251,18 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
 		
 		// Switch
 		ui_menu->page = SELECTION_PAGE;
+	}
+	// Home or power off
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {		
+		// Delete objects
+		lv_obj_del(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+		
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 

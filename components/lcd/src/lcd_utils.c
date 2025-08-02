@@ -82,6 +82,8 @@ enum
 uint32_t pin_attempts = 0;
 bool pin_signing_in = false;
 
+static bool pin_to_selection_page = true; // Flag on if going to selection or hotkey page from pin
+
 static uint8_t anim_active = 0; // Default determined in lcd_anim_nvs_load
 
 /* LCD */
@@ -1000,24 +1002,28 @@ static void transition_animation(bool dir)
 	lcd_anim_nvs_save();
 }
 void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
-{
+{	
 	if (ui_btns->up_btn == 1) {
 		transition_animation(true);
 	}
 	else if (ui_btns->down_btn == 1) {
 		transition_animation(false);
 	}
+	// Request selection page
 	else if (ui_btns->select_btn == 1) {
 		stop_animations();
 		
-		// Go to selection page
+		// Go to selection page if pin not set
 		if (!settings_menu->pin_menu.pin_set || !settings_menu->pin_menu.prompt_pin) {
 			lcd_unhide_selection_widgets(ui_menu);
 			
 			ui_menu->page = SELECTION_PAGE;
 		}
-		// Prompt pin
+		// Else prompt pin
 		else {
+			// Going to pin to selection page
+			pin_to_selection_page = true;
+			
 			// Show arrows
 			lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
@@ -1045,22 +1051,61 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 			ui_menu->page = UNLOCK_PAGE;
 		}
 	}
-	// Go to hotkey page
+	// Request hotkey page
 	else if (ui_btns->left_btn == 1) {
 		stop_animations();
 		
-		// Show arrows
-		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-
-		hotkey_menu.index = (MAX_HOTKEY_OPTIONS - 1);
-		lcd_hotkey_update_menu(&hotkey_menu);
-
-		ui_menu->page = HOTKEY_PAGE;
+		// Go to hotkey page if pin not set
+		if (!settings_menu->pin_menu.pin_set || !settings_menu->pin_menu.prompt_pin) {
+			// Show arrows
+			lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+	
+			// Default index
+			hotkey_menu.index = (MAX_HOTKEY_OPTIONS - 1);
+			lcd_hotkey_update_menu(&hotkey_menu);
+	
+			// Switch pages
+			ui_menu->page = HOTKEY_PAGE;
+		}
+		// Else prompt pin
+		else {
+			// Going to pin to hotkey page
+			pin_to_selection_page = false;
+			
+			// Show arrows
+			lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+			
+			// Show pin prompt
+			lv_obj_remove_flag(settings_menu->pin_menu.pin_container, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(settings_menu->pin_menu.lbl_ins, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(settings_menu->pin_menu.lbl_back, LV_OBJ_FLAG_HIDDEN);
+			
+			// Show wrong attempts
+			if (pin_attempts > 0) {
+				// Build and set attempts string
+				char buf[18];
+				snprintf(buf, sizeof(buf), "WRONG: %" PRIu32, pin_attempts);
+				lv_label_set_text(settings_menu->pin_menu.lbl_attempts, buf);
+				
+				// Show
+				lv_obj_remove_flag(settings_menu->pin_menu.lbl_attempts, LV_OBJ_FLAG_HIDDEN);
+			}
+			
+			pin_signing_in = true;
+	
+			ui_menu->page = UNLOCK_PAGE;
+		}		
 	}
 	/* HOTKEYS */
+	// Note: If you'd like it so you can only use hotkeys if the device is unlocked,
+	// simply add '&& (!settings_menu->pin_menu.pin_set || !settings_menu->pin_menu.prompt_pin)' to each hoykey 'else if'
+	
 	// Long press home
 	else if (xSemaphoreTake(xHomeButtonLongSemaphore, 0) == pdTRUE) {
 		// If LoRa command exists
@@ -1326,13 +1371,26 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 			// Won't prompt again unless power off
 			settings_menu->pin_menu.prompt_pin = false;
 			
-			// Hide right
-			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-	
-			// Go to selection page
-			lcd_unhide_selection_widgets(ui_menu);
-			
-			ui_menu->page = SELECTION_PAGE;
+			// If going to selection page
+			if (pin_to_selection_page) {
+				// Hide right
+				lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+				// Go to selection page
+				lcd_unhide_selection_widgets(ui_menu);
+				
+				// Switch to selection page
+				ui_menu->page = SELECTION_PAGE;
+			}
+			// Else going to hotkey page
+			else {
+				// Default index
+				hotkey_menu.index = (MAX_HOTKEY_OPTIONS - 1);
+				lcd_hotkey_update_menu(&hotkey_menu);
+		
+				// Switch to hotkey page
+				ui_menu->page = HOTKEY_PAGE;
+			}
 		}
 		else {
 			#ifdef POLYCAST5_DEBUG
