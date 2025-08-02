@@ -13,7 +13,7 @@ idf_component_register(
     	"media/include"
     
     REQUIRES
-    	common lvgl sx126x infrared espnow lora wifi gpio bootloader_support spiffs
+    	common lvgl sx126x infrared espnow lora wifi bluetooth gpio bootloader_support spiffs
     
     PRIV_REQUIRES
 )

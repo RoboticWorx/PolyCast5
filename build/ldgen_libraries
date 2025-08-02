@@ -112,6 +112,7 @@ C:/Projects/ESP/PolyCast5/build/esp-idf/esp_coex/libesp_coex.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/esp_wifi/libesp_wifi.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/esp_driver_spi/libesp_driver_spi.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/esp_gdbstub/libesp_gdbstub.a
+C:/Projects/ESP/PolyCast5/build/esp-idf/bt/libbt.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/unity/libunity.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/cmock/libcmock.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/unity/libunity.a
@@ -139,6 +140,7 @@ C:/Projects/ESP/PolyCast5/build/esp-idf/esp_driver_cam/libesp_driver_cam.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/esp_psram/libesp_psram.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/esp_eth/libesp_eth.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/esp_hid/libesp_hid.a
+C:/Projects/ESP/PolyCast5/build/esp-idf/bt/libbt.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/tcp_transport/libtcp_transport.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/esp_http_client/libesp_http_client.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/esp_http_server/libesp_http_server.a
@@ -177,10 +179,12 @@ C:/Projects/ESP/PolyCast5/build/esp-idf/espnow/libespnow.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/lora/liblora.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/sx126x/libsx126x.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/infrared/libinfrared.a
+C:/Projects/ESP/PolyCast5/build/esp-idf/bluetooth/libbluetooth.a
+C:/Projects/ESP/PolyCast5/build/esp-idf/esp_hid/libesp_hid.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/lcd/liblcd.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/lvgl/liblvgl.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/infrared/libinfrared.a
+C:/Projects/ESP/PolyCast5/build/esp-idf/bluetooth/libbluetooth.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/spiffs/libspiffs.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/main/libmain.a
 C:/Projects/ESP/PolyCast5/build/esp-idf/lcd/liblcd.a
-C:/Projects/ESP/PolyCast5/build/esp-idf/esp_hid/libesp_hid.a

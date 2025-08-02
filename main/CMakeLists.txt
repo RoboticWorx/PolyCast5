@@ -17,6 +17,7 @@ idf_component_register(
         infrared
         espnow
         wifi
+        bluetooth
         lvgl
         driver
         freertos

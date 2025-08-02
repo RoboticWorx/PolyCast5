@@ -11630,7 +11630,10 @@
                                 "help": "Defines maximum number of concurrent BLE connections. For ESP32, user\nis expected to configure BTDM_CTRL_BLE_MAX_CONN from controller menu\nalong with this option. Similarly for ESP32-C3 or ESP32-S3, user is expected to\nconfigure BT_CTRL_BLE_MAX_ACT from controller menu.\nFor ESP32C2, ESP32C6 and ESP32H2, each connection will take about 1k DRAM.",
                                 "id": "BT_NIMBLE_MAX_CONNECTIONS",
                                 "name": "BT_NIMBLE_MAX_CONNECTIONS",
-                                "range": null,
+                                "range": [
+                                    1,
+                                    70
+                                ],
                                 "title": "Maximum number of concurrent connections",
                                 "type": "int"
                             },
@@ -11660,7 +11663,10 @@
                                 "help": "Defines maximum number of BLE Connection Oriented Channels. When set to (0), BLE COC is not compiled in",
                                 "id": "BT_NIMBLE_L2CAP_COC_MAX_NUM",
                                 "name": "BT_NIMBLE_L2CAP_COC_MAX_NUM",
-                                "range": null,
+                                "range": [
+                                    0,
+                                    9
+                                ],
                                 "title": "Maximum number of connection oriented channels",
                                 "type": "int"
                             },
@@ -12132,7 +12138,10 @@
                                 "help": "Time interval between RPA address change.",
                                 "id": "BT_NIMBLE_RPA_TIMEOUT",
                                 "name": "BT_NIMBLE_RPA_TIMEOUT",
-                                "range": null,
+                                "range": [
+                                    1,
+                                    41400
+                                ],
                                 "title": "RPA timeout in seconds",
                                 "type": "int"
                             },
@@ -12297,7 +12306,10 @@
                                         "help": "Defines maximum number of connection reattempts.",
                                         "id": "BT_NIMBLE_MAX_CONN_REATTEMPT",
                                         "name": "BT_NIMBLE_MAX_CONN_REATTEMPT",
-                                        "range": null,
+                                        "range": [
+                                            1,
+                                            255
+                                        ],
                                         "title": "Maximum number connection reattempts",
                                         "type": "int"
                                     }
@@ -12434,7 +12446,10 @@
                                                         "help": "Set this option to set the upper limit for number of periodic sync\nconnections. This should be less than maximum connections allowed by\ncontroller.",
                                                         "id": "BT_NIMBLE_MAX_PERIODIC_SYNCS",
                                                         "name": "BT_NIMBLE_MAX_PERIODIC_SYNCS",
-                                                        "range": null,
+                                                        "range": [
+                                                            0,
+                                                            8
+                                                        ],
                                                         "title": "Maximum number of periodic advertising syncs",
                                                         "type": "int"
                                                     },
@@ -12444,7 +12459,10 @@
                                                         "help": "Set this option to set the upper limit for number of periodic advertiser list.",
                                                         "id": "BT_NIMBLE_MAX_PERIODIC_ADVERTISER_LIST",
                                                         "name": "BT_NIMBLE_MAX_PERIODIC_ADVERTISER_LIST",
-                                                        "range": null,
+                                                        "range": [
+                                                            1,
+                                                            5
+                                                        ],
                                                         "title": "Maximum number of periodic advertiser list",
                                                         "type": "int"
                                                     }
@@ -12594,7 +12612,10 @@
                                 "help": "BLE list size",
                                 "id": "BT_NIMBLE_WHITELIST_SIZE",
                                 "name": "BT_NIMBLE_WHITELIST_SIZE",
-                                "range": null,
+                                "range": [
+                                    1,
+                                    31
+                                ],
                                 "title": "BLE white list size",
                                 "type": "int"
                             },
@@ -14175,7 +14196,10 @@
                                 "help": "Configure the size of resolving list used in link layer.",
                                 "id": "BT_LE_LL_RESOLV_LIST_SIZE",
                                 "name": "BT_LE_LL_RESOLV_LIST_SIZE",
-                                "range": null,
+                                "range": [
+                                    1,
+                                    5
+                                ],
                                 "title": "BLE LL Resolving list size",
                                 "type": "int"
                             },
@@ -14258,7 +14282,10 @@
                                 "help": "config the max count of duplicate scan list",
                                 "id": "BT_LE_LL_DUP_SCAN_LIST_COUNT",
                                 "name": "BT_LE_LL_DUP_SCAN_LIST_COUNT",
-                                "range": null,
+                                "range": [
+                                    5,
+                                    100
+                                ],
                                 "title": "BLE duplicate scan list count",
                                 "type": "int"
                             },
@@ -14268,7 +14295,10 @@
                                 "help": "Sleep clock accuracy of our device (in ppm)",
                                 "id": "BT_LE_LL_SCA",
                                 "name": "BT_LE_LL_SCA",
-                                "range": null,
+                                "range": [
+                                    0,
+                                    500
+                                ],
                                 "title": "BLE Sleep clock accuracy",
                                 "type": "int"
                             },
@@ -14401,7 +14431,10 @@
                                         "help": "The number of unprocessed advertising report that bluetooth host can save.If you set\n`BT_CTRL_BLE_ADV_REPORT_FLOW_CTRL_NUM` to a small value, this may cause adv packets lost.\nIf you set `BT_CTRL_BLE_ADV_REPORT_FLOW_CTRL_NUM` to a large value, bluetooth host may cache a\nlot of adv packets and this may cause system memory run out. For example, if you set\nit to 50, the maximum memory consumed by host is 35 * 50 bytes. Please set\n`BT_CTRL_BLE_ADV_REPORT_FLOW_CTRL_NUM` according to your system free memory and handle adv\npackets as fast as possible, otherwise it will cause adv packets lost.",
                                         "id": "BT_CTRL_BLE_ADV_REPORT_FLOW_CTRL_NUM",
                                         "name": "BT_CTRL_BLE_ADV_REPORT_FLOW_CTRL_NUM",
-                                        "range": null,
+                                        "range": [
+                                            50,
+                                            1000
+                                        ],
                                         "title": "BLE adv report flow control number",
                                         "type": "int"
                                     },
@@ -14411,7 +14444,10 @@
                                         "help": "When adv report flow control is enabled, The ADV lost event will be generated when the number\nof ADV packets lost in the controller reaches this threshold. It is better to set a larger value.\nIf you set `BT_CTRL_BLE_ADV_REPORT_DISCARD_THRSHOLD` to a small value or printf every adv lost event, it\nmay cause adv packets lost more.",
                                         "id": "BT_CTRL_BLE_ADV_REPORT_DISCARD_THRSHOLD",
                                         "name": "BT_CTRL_BLE_ADV_REPORT_DISCARD_THRSHOLD",
-                                        "range": null,
+                                        "range": [
+                                            1,
+                                            1000
+                                        ],
                                         "title": "BLE adv lost event threshold value",
                                         "type": "int"
                                     }
@@ -14482,7 +14518,10 @@
                                         "help": "If the period value is non-zero, the controller will periodically clear the device information\nstored in the scan duuplicate filter. If it is 0, the scan duuplicate filter will not be cleared\nuntil the scanning is disabled. Duplicate advertisements for this period should not be sent to the\nHost in advertising report events.\nThere are two scenarios where the ADV packet will be repeatedly reported:\n1. The duplicate scan cache is full, the controller will delete the oldest device information and\nadd new device information.\n2. When the refresh period is up, the controller will clear all device information and start filtering\nagain.",
                                         "id": "BT_LE_SCAN_DUPL_CACHE_REFRESH_PERIOD",
                                         "name": "BT_LE_SCAN_DUPL_CACHE_REFRESH_PERIOD",
-                                        "range": null,
+                                        "range": [
+                                            0,
+                                            1000
+                                        ],
                                         "title": "Duplicate scan list refresh period (seconds)",
                                         "type": "int"
                                     }
@@ -14770,7 +14809,10 @@
                                 "help": "The value of upperlimitmax needs to be a power of 2.",
                                 "id": "BT_CTRL_SCAN_BACKOFF_UPPERLIMITMAX",
                                 "name": "BT_CTRL_SCAN_BACKOFF_UPPERLIMITMAX",
-                                "range": null,
+                                "range": [
+                                    1,
+                                    256
+                                ],
                                 "title": "The value of upperlimitmax during scan backoff procedure",
                                 "type": "int"
                             },

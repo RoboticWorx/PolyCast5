@@ -1,11 +1,11 @@
 #ifndef BLUETOOTH_TASK_H
 #define BLUETOOTH_TASK_H
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include "freertos/idf_additions.h"
 
-void ble_hid_demo_task(void *pvParameters);
-void ble_hid_task_start_up(void);
-void ble_hid_task_shut_down(void);
+/**
+ * @brief Creates bluetooth task at shared priority
+ */
+void bluetooth_task_create(void);
 
 #endif // BLUETOOTH_TASK_H

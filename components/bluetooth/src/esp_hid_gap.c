@@ -743,7 +743,7 @@ esp_err_t esp_hid_ble_gap_adv_start(void)
 #if CONFIG_BT_NIMBLE_ENABLED
 #define GATT_SVR_SVC_HID_UUID 0x1812
 
-extern void ble_hid_task_start_up(void);
+//extern void ble_hid_task_start_up(void);
 static struct ble_hs_adv_fields fields;
 
 esp_err_t esp_hid_ble_gap_adv_init(uint16_t appearance, const char *device_name)
@@ -766,6 +766,9 @@ esp_err_t esp_hid_ble_gap_adv_init(uint16_t appearance, const char *device_name)
     fields.flags = BLE_HS_ADV_F_DISC_GEN |
                    BLE_HS_ADV_F_BREDR_UNSUP;
 
+    fields.appearance = ESP_HID_APPEARANCE_GENERIC;
+    fields.appearance_is_present = 1;
+
     /* Indicate that the TX power level field should be included; have the
      * stack fill this value automatically.  This is done by assigning the
      * special value BLE_HS_ADV_TX_PWR_LVL_AUTO.
@@ -787,7 +790,7 @@ esp_err_t esp_hid_ble_gap_adv_init(uint16_t appearance, const char *device_name)
     fields.uuids16_is_complete = 1;
 
     /* Initialize the security configuration */
-    ble_hs_cfg.sm_io_cap = BLE_SM_IO_CAP_DISP_YES_NO;
+    ble_hs_cfg.sm_io_cap = BLE_SM_IO_CAP_DISP_ONLY;
     ble_hs_cfg.sm_bonding = 1;
     ble_hs_cfg.sm_mitm = 1;
     ble_hs_cfg.sm_sc = 1;
@@ -852,7 +855,7 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
                 event->enc_change.status);
         rc = ble_gap_conn_find(event->enc_change.conn_handle, &desc);
         assert(rc == 0);
-        ble_hid_task_start_up();
+        //ble_hid_task_start_up();
         return 0;
 
     case BLE_GAP_EVENT_NOTIFY_TX:
@@ -888,7 +891,7 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
         if (event->passkey.params.action == BLE_SM_IOACT_DISP) {
             pkey.action = event->passkey.params.action;
             pkey.passkey = 123456; // This is the passkey to be entered on peer
-            ESP_LOGI(TAG, "Enter passkey %" PRIu32 "on the peer side", pkey.passkey);
+            ESP_LOGI(TAG, "Enter passkey %" PRIu32 " on the peer side", pkey.passkey);
             rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
             ESP_LOGI(TAG, "ble_sm_inject_io result: %d", rc);
         } else if (event->passkey.params.action == BLE_SM_IOACT_NUMCMP) {
@@ -1047,7 +1050,6 @@ static esp_err_t init_low_level(uint8_t mode)
         ESP_LOGE(TAG, "esp_nimble_init failed: %d", ret);
         return ret;
     }
-
 
     return ret;
 }

@@ -112,6 +112,7 @@ $<TARGET_FILE:idf::esp_coex>
 $<TARGET_FILE:idf::esp_wifi>
 $<TARGET_FILE:idf::esp_driver_spi>
 $<TARGET_FILE:idf::esp_gdbstub>
+$<TARGET_FILE:idf::bt>
 $<TARGET_FILE:idf::unity>
 $<TARGET_FILE:idf::cmock>
 $<TARGET_FILE:__idf_unity>
@@ -139,6 +140,7 @@ $<TARGET_FILE:idf::esp_driver_cam>
 $<TARGET_FILE:idf::esp_psram>
 $<TARGET_FILE:idf::esp_eth>
 $<TARGET_FILE:idf::esp_hid>
+$<TARGET_FILE:__idf_bt>
 $<TARGET_FILE:idf::tcp_transport>
 $<TARGET_FILE:idf::esp_http_client>
 $<TARGET_FILE:idf::esp_http_server>
@@ -177,10 +179,12 @@ $<TARGET_FILE:idf::espnow>
 $<TARGET_FILE:idf::lora>
 $<TARGET_FILE:idf::sx126x>
 $<TARGET_FILE:idf::infrared>
+$<TARGET_FILE:idf::bluetooth>
+$<TARGET_FILE:__idf_esp_hid>
 $<TARGET_FILE:idf::lcd>
 $<TARGET_FILE:__idf_lvgl>
 $<TARGET_FILE:__idf_infrared>
+$<TARGET_FILE:__idf_bluetooth>
 $<TARGET_FILE:__idf_spiffs>
 $<TARGET_FILE:idf::main>
 $<TARGET_FILE:__idf_lcd>
-$<TARGET_FILE:__idf_esp_hid>

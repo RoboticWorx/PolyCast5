@@ -463,6 +463,7 @@ C:/Projects/ESP/PolyCast5/build/esp-idf/esp_gdbstub/CMakeFiles/list_install_comp
 C:/Projects/ESP/PolyCast5/build/esp-idf/esp_gdbstub/CMakeFiles/install.dir
 C:/Projects/ESP/PolyCast5/build/esp-idf/esp_gdbstub/CMakeFiles/install/local.dir
 C:/Projects/ESP/PolyCast5/build/esp-idf/esp_gdbstub/CMakeFiles/install/strip.dir
+C:/Projects/ESP/PolyCast5/build/esp-idf/bt/CMakeFiles/__idf_bt.dir
 C:/Projects/ESP/PolyCast5/build/esp-idf/bt/CMakeFiles/edit_cache.dir
 C:/Projects/ESP/PolyCast5/build/esp-idf/bt/CMakeFiles/rebuild_cache.dir
 C:/Projects/ESP/PolyCast5/build/esp-idf/bt/CMakeFiles/list_install_components.dir
@@ -911,6 +912,13 @@ C:/Projects/ESP/PolyCast5/build/esp-idf/infrared/CMakeFiles/list_install_compone
 C:/Projects/ESP/PolyCast5/build/esp-idf/infrared/CMakeFiles/install.dir
 C:/Projects/ESP/PolyCast5/build/esp-idf/infrared/CMakeFiles/install/local.dir
 C:/Projects/ESP/PolyCast5/build/esp-idf/infrared/CMakeFiles/install/strip.dir
+C:/Projects/ESP/PolyCast5/build/esp-idf/bluetooth/CMakeFiles/__idf_bluetooth.dir
+C:/Projects/ESP/PolyCast5/build/esp-idf/bluetooth/CMakeFiles/edit_cache.dir
+C:/Projects/ESP/PolyCast5/build/esp-idf/bluetooth/CMakeFiles/rebuild_cache.dir
+C:/Projects/ESP/PolyCast5/build/esp-idf/bluetooth/CMakeFiles/list_install_components.dir
+C:/Projects/ESP/PolyCast5/build/esp-idf/bluetooth/CMakeFiles/install.dir
+C:/Projects/ESP/PolyCast5/build/esp-idf/bluetooth/CMakeFiles/install/local.dir
+C:/Projects/ESP/PolyCast5/build/esp-idf/bluetooth/CMakeFiles/install/strip.dir
 C:/Projects/ESP/PolyCast5/build/esp-idf/lcd/CMakeFiles/__idf_lcd.dir
 C:/Projects/ESP/PolyCast5/build/esp-idf/lcd/CMakeFiles/edit_cache.dir
 C:/Projects/ESP/PolyCast5/build/esp-idf/lcd/CMakeFiles/rebuild_cache.dir

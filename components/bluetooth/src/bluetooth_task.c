@@ -1,40 +1,43 @@
-#include "bluetooth_task.h"
-#include "bluetooth_funcs.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/projdefs.h"
+#include "freertos/task.h"
+
 #include "esp_log.h"
 
-void ble_hid_demo_task(void *pvParameters)
+#include "bluetooth_funcs.h"
+
+#define TAG "BLUETOOTH_TASK"
+
+volatile bool bluetooth_connected = false;
+
+static void bluetooth_task(void *arg)
 {
-    static bool send_volum_up = false;
+	bluetooth_init();
+	
+	static bool send_volum_up = false;
     while (1) {
-        ESP_LOGI(BLUETOOTH_TAG, "Send the volume");
-        if (send_volum_up) {
-            esp_hidd_send_consumer_value(HID_CONSUMER_VOLUME_UP, true);
-            vTaskDelay(100 / portTICK_PERIOD_MS);
-            esp_hidd_send_consumer_value(HID_CONSUMER_VOLUME_UP, false);
-        } else {
-            esp_hidd_send_consumer_value(HID_CONSUMER_VOLUME_DOWN, true);
-            vTaskDelay(100 / portTICK_PERIOD_MS);
-            esp_hidd_send_consumer_value(HID_CONSUMER_VOLUME_DOWN, false);
+		if (bluetooth_connected) {
+	        ESP_LOGI(TAG, "Send the volume");
+	        if (send_volum_up) {
+	            bluetooth_send_cmd(BLUETOOTH_CMD_VOLUME_UP, true);
+	            vTaskDelay(pdMS_TO_TICKS(100)); // Simulate press
+	            bluetooth_send_cmd(BLUETOOTH_CMD_VOLUME_UP, false);
+	        }
+	        else {
+	            bluetooth_send_cmd(BLUETOOTH_CMD_VOLUME_DOWN, true);
+	            vTaskDelay(pdMS_TO_TICKS(100));
+	            bluetooth_send_cmd(BLUETOOTH_CMD_VOLUME_DOWN, false);
+	        }
+	        
+	        send_volum_up = !send_volum_up;
         }
-        send_volum_up = !send_volum_up;
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        vTaskDelay(pdMS_TO_TICKS(3000));
     }
 }
 
-void ble_hid_task_start_up(void)
+void bluetooth_task_create(void)
 {
-    if (s_ble_hid_param.task_hdl) {
-        return;
-    }
-    bluetooth_init();
-    xTaskCreate(ble_hid_demo_task, "ble_hid_demo_task", 4 * 1024, NULL, configMAX_PRIORITIES - 3,
-                &s_ble_hid_param.task_hdl);
-}
-
-void ble_hid_task_shut_down(void)
-{
-    if (s_ble_hid_param.task_hdl) {
-        vTaskDelete(s_ble_hid_param.task_hdl);
-        s_ble_hid_param.task_hdl = NULL;
-    }
+	if (xTaskCreate(bluetooth_task, "bluetooth_task", 1024 * 4, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
+		ESP_LOGE(TAG, "Failed to start bluetooth_task");
+	}
 }
