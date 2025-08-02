@@ -16,7 +16,7 @@
 #define HOTKEY_KEY "data" // Data blob
 
 hotkey_menu_t hotkey_menu = {
-	.options = {"Hot1", "Hot2", "Hot3", "Hot4", "Hot5"},
+	.options = {"Hot1", "Hot2", "Hot3", "Hot4", "Hot5", "Hot6"},
 	.size = MAX_HOTKEY_OPTIONS,
 	.index = 0,
 	.cont = NULL,
@@ -28,15 +28,6 @@ void lcd_hotkey_setup_page(hotkey_menu_t *menu)
 {
 	// Create container
 	menu->cont = lv_obj_create(ACTIVE_SCR);
-	
-	// Create instruction labels
-	menu->lbl_arrow = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(menu->lbl_arrow, LV_SYMBOL_LEFT LV_SYMBOL_MINUS, user_secondary_color,
-				&lv_font_montserrat_12, LV_ALIGN_BOTTOM_RIGHT, -43, -44);
-	
-	menu->lbl_ins = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(menu->lbl_ins, "         |\nConfigure\n  hotkeys", user_secondary_color,
-				&lv_font_montserrat_14, LV_ALIGN_BOTTOM_RIGHT, -8, -5);
 	
 	// Format
 	lv_obj_set_size(menu->cont, 210, 106);
@@ -99,16 +90,12 @@ void lcd_hotkey_setup_page(hotkey_menu_t *menu)
 	
 	// Hide for now
 	lv_obj_add_flag(menu->cont, LV_OBJ_FLAG_HIDDEN);
-	lv_obj_add_flag(menu->lbl_ins, LV_OBJ_FLAG_HIDDEN);
-	lv_obj_add_flag(menu->lbl_arrow, LV_OBJ_FLAG_HIDDEN);
 }
 
 void lcd_hotkey_update_menu(hotkey_menu_t *menu)
 {
 	// Reveal
 	lv_obj_remove_flag(menu->cont, LV_OBJ_FLAG_HIDDEN);
-	lv_obj_remove_flag(menu->lbl_ins, LV_OBJ_FLAG_HIDDEN);
-	lv_obj_remove_flag(menu->lbl_arrow, LV_OBJ_FLAG_HIDDEN);
 
 	// Wrap index
 	if (menu->index >= menu->size) {
@@ -139,7 +126,6 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
 	static lv_obj_t *instr_lbl = NULL;
 	
 	if (!init) {
-		
 		// Create a scrollable container for the instructions
 		cont = lv_obj_create(ACTIVE_SCR);
 		lv_obj_set_size(cont, 210, 106);
@@ -193,13 +179,19 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
 		}
 		// Hot4
 		else if (hotkey_menu->index == 3) {
-			instr_text = "How to configure your command for Hot4:\n\nThis hotkey is triggered when SHORT pressing the "
-			"RIGHT button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
+			instr_text = "How to configure your command for Hot4:\n\nThis hotkey is triggered when LONG pressing the "
+			"SELECT button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
 			"ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to represent waiting for a command.";
 		}
 		// Hot5
 		else if (hotkey_menu->index == 4) {
-			instr_text = "How to configure your command for Hot5:\n\nThis hotkey is triggered when LONG pressing the "
+			instr_text = "How to configure your command for Hot5:\n\nThis hotkey is triggered when SHORT pressing the "
+			"RIGHT button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
+			"ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to represent waiting for a command.";
+		}
+		// Hot6
+		else if (hotkey_menu->index == 5) {
+			instr_text = "How to configure your command for Hot6:\n\nThis hotkey is triggered when LONG pressing the "
 			"RIGHT button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
 			"ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to represent waiting for a command.";
 		}
@@ -220,8 +212,6 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
 		
 		// Show hotkey page
 		lv_obj_remove_flag(hotkey_menu->cont, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(hotkey_menu->lbl_ins, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(hotkey_menu->lbl_arrow, LV_OBJ_FLAG_HIDDEN);
 		
 		// Switch
 		ui_menu->page = HOTKEY_PAGE;
@@ -234,7 +224,7 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
 	}
 	else if (ui_btns->right_btn == 1) {
 		// Save active index
-		hotkey_cmd.active_idx = hotkey_menu->index; // Hot1-Hot5 0-based
+		hotkey_cmd.active_idx = hotkey_menu->index; // Hot1-Hot6 0-based
 		
 		// Delete objects
 		lv_obj_del(cont); // Deletes children

@@ -52,8 +52,9 @@
 #define HOTKEY_SHORT_HOME_IDX 0
 #define HOTKEY_LONG_HOME_IDX 1
 #define HOTKEY_LONG_LEFT_IDX 2
-#define HOTKEY_SHORT_RIGHT_IDX 3
-#define HOTKEY_LONG_RIGHT_IDX 4
+#define HOTKEY_LONG_SELECT_IDX 3
+#define HOTKEY_SHORT_RIGHT_IDX 4
+#define HOTKEY_LONG_RIGHT_IDX 5
 
 
 /* Animation macros */
@@ -1054,7 +1055,7 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 		lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
-		hotkey_menu.index = 2;
+		hotkey_menu.index = (MAX_HOTKEY_OPTIONS - 1);
 		lcd_hotkey_update_menu(&hotkey_menu);
 
 		ui_menu->page = HOTKEY_PAGE;
@@ -1138,6 +1139,33 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 			#ifdef POLYCAST5_DEBUG
 				ESP_LOGW(TAG, "Long right hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_RIGHT_IDX,
 						hotkey_cmd.has_lora[HOTKEY_LONG_RIGHT_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_RIGHT_IDX]);
+			#endif
+		}
+	}
+	// Long press select
+	else if (xSemaphoreTake(xSelectButtonLongSemaphore, 0) == pdTRUE) {
+		// If LoRa command exists
+		if (hotkey_cmd.has_lora[HOTKEY_LONG_SELECT_IDX]) {
+			// RGB indicator
+			uint8_t rgb_state = RGB_BLINK_TEAL;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+			
+			// Send the command
+			xQueueSend(xLoraSendEncQueue, &hotkey_cmd.lora_cmd[HOTKEY_LONG_SELECT_IDX], portMAX_DELAY);
+		}
+		// Else ESP-NOW
+		else if (hotkey_cmd.has_espnow[HOTKEY_LONG_SELECT_IDX]) {
+			// RGB indicator
+			uint8_t rgb_state = RGB_BLINK_TEAL;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+			
+			// Send the command
+			xQueueSend(xEspSendCmdQueue, &hotkey_cmd.espnow_cmd[HOTKEY_LONG_SELECT_IDX], portMAX_DELAY);
+		}
+		else {
+			#ifdef POLYCAST5_DEBUG
+				ESP_LOGW(TAG, "Long select hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_SELECT_IDX,
+						hotkey_cmd.has_lora[HOTKEY_LONG_SELECT_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_SELECT_IDX]);
 			#endif
 		}
 	}
@@ -1353,11 +1381,9 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 void lcd_hotkey_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotkey_menu)
 {
 	// Exit
-	if (ui_btns->right_btn == 1 && hotkey_menu->index == 2) {
+	if (ui_btns->right_btn == 1 && hotkey_menu->index == (MAX_HOTKEY_OPTIONS - 1)) {
 		// Hide hotkey page
 		lv_obj_add_flag(hotkey_menu->cont, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(hotkey_menu->lbl_ins, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(hotkey_menu->lbl_arrow, LV_OBJ_FLAG_HIDDEN);
 		
 		// Go back
 		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
@@ -1366,8 +1392,6 @@ void lcd_hotkey_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotk
 	else if (ui_btns->select_btn == 1) {
 		// Hide hotkey page
 		lv_obj_add_flag(hotkey_menu->cont, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(hotkey_menu->lbl_ins, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(hotkey_menu->lbl_arrow, LV_OBJ_FLAG_HIDDEN);
 		
 		// Switch pages
 		ui_menu->page = HOTKEY_OPTION_PAGE;
@@ -1385,7 +1409,7 @@ void lcd_hotkey_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotk
 		lcd_hotkey_update_menu(hotkey_menu);
 	}
 	// Scroll up
-	else if (ui_btns->up_btn == 1 && hotkey_menu->index != 2) {
+	else if (ui_btns->up_btn == 1) {
 		// Update selection
 		if (hotkey_menu->index > 2) {
 			hotkey_menu->index -= 3;
@@ -1396,7 +1420,7 @@ void lcd_hotkey_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotk
 		lcd_hotkey_update_menu(hotkey_menu);
 	}
 	// Scroll down
-	else if (ui_btns->down_btn == 1 && hotkey_menu->index != 2) {
+	else if (ui_btns->down_btn == 1) {
 		// Update selection
 		if (hotkey_menu->index < 3) {
 			hotkey_menu->index += 3;
@@ -1410,8 +1434,6 @@ void lcd_hotkey_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotk
 	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {		
 		// Hide hotkey page
 		lv_obj_add_flag(hotkey_menu->cont, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(hotkey_menu->lbl_ins, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(hotkey_menu->lbl_arrow, LV_OBJ_FLAG_HIDDEN);
 		
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}

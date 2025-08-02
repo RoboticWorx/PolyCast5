@@ -9,7 +9,7 @@
 typedef struct ui_btns_t ui_btns_t;
 typedef struct ui_menu_t ui_menu_t;
 
-#define MAX_HOTKEY_OPTIONS 5 // Long/short left and home + long left
+#define MAX_HOTKEY_OPTIONS 6 // Long/short left and home + long left + long select
 
 typedef struct {
 	const char *options[MAX_HOTKEY_OPTIONS];
@@ -17,8 +17,6 @@ typedef struct {
 	int size;
 	int index;
 	lv_obj_t *cont;
-	lv_obj_t *lbl_ins;
-	lv_obj_t *lbl_arrow;
 	lv_style_t btn_style;
 	lv_style_t sel_style;
 } hotkey_menu_t;
