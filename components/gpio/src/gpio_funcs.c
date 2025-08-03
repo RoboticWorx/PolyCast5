@@ -449,9 +449,11 @@ void gpio_rgb_indicate(uint8_t rgb_data)
 	xTimerStop(rgb_blink_timer, portMAX_DELAY);
 	xTimerStop(rgb_blink_stop_timer, portMAX_DELAY);
 	
-	// Update periods
-	xTimerChangePeriod(rgb_blink_timer, pdMS_TO_TICKS(rbg_blink_period_ms), portMAX_DELAY);
-	xTimerChangePeriod(rgb_blink_stop_timer, pdMS_TO_TICKS(rgb_blink_total_ms), portMAX_DELAY);
+	// Update periods if blink cmd
+	if (rgb_data == RGB_BLINK_RED || rgb_data == RGB_BLINK_GREEN || rgb_data == RGB_BLINK_BLUE || rgb_data == RGB_BLINK_PURPLE || rgb_data == RGB_BLINK_TEAL) {
+		xTimerChangePeriod(rgb_blink_timer, pdMS_TO_TICKS(rbg_blink_period_ms), portMAX_DELAY);
+		xTimerChangePeriod(rgb_blink_stop_timer, pdMS_TO_TICKS(rgb_blink_total_ms), portMAX_DELAY);
+	}
 	xSemaphoreGive(xRgbLedMutex); // Release RGB LED
 	
 	// All LEDs OFF to start

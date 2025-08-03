@@ -15,6 +15,7 @@
 
 #include "lcd_utils.h"
 #include "lcd_bluetooth_funcs.h"
+#include "bluetooth_task.h"
 
 bluetooth_menu_t bluetooth_menu = {
 	.options = {"Pair New", "Media Controller", "Keyboard"},
@@ -137,4 +138,75 @@ void lcd_bluetooth_update_menu(bluetooth_menu_t *menu)
 	
 	// Enable scrolling if list gets too long
 	lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
+}
+
+void lcd_bluetooth_pair_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
+{
+	// Statics
+	static bool init = false;
+	
+	static lv_obj_t *lbl_ins;
+	static lv_obj_t *lbl_pin;
+	
+	// Only execute once
+	if (!init) {
+		// Create labels
+		lbl_ins = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_ins, "Bluetooth is now\n   advertising as\n'PolyCast5' for PC", user_secondary_color,
+				&lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
+
+		lbl_pin = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_pin, "Pin: 123456", user_secondary_color,
+				&lv_font_montserrat_24, LV_ALIGN_BOTTOM_MID, 0, -15);
+				
+		lv_timer_handler();
+		
+		// Initialize bluetooth
+		uint8_t cmd = BLUETOOTH_QUEUE_CMD_INIT;
+		xQueueSend(xBluetoothCmdQueue, &cmd, portMAX_DELAY);
+		
+		init = true;
+	}
+	
+	if (ui_btns->up_btn == 1) {
+		// Initialize bluetooth
+		uint8_t cmd = BLUETOOTH_QUEUE_CMD_VOL_UP;
+		xQueueSend(xBluetoothCmdQueue, &cmd, portMAX_DELAY);
+	}
+	else if (ui_btns->down_btn == 1) {
+		uint8_t cmd = BLUETOOTH_QUEUE_CMD_VOL_DOWN;
+		xQueueSend(xBluetoothCmdQueue, &cmd, portMAX_DELAY);
+	}
+	else if (ui_btns->select_btn == 1) {
+		uint8_t cmd = BLUETOOTH_QUEUE_CMD_DEINIT;
+		xQueueSend(xBluetoothCmdQueue, &cmd, portMAX_DELAY);
+	}
+	// Back selected
+	else if (ui_btns->left_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_pin);
+		
+		// Reset statics
+		lbl_ins = lbl_pin = NULL;
+		init = false;
+		
+		// Show bluetooth list
+		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = BLUETOOTH_PAGE;
+	}
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_pin);
+		
+		// Reset statics
+		lbl_ins = lbl_pin = NULL;
+		init = false;
+		
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+	}
 }

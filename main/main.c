@@ -141,7 +141,7 @@ void app_main(void) {
 	infrared_task_create();
 	espnow_task_create();
 	wifi_task_create();
-	//bluetooth_task_create();
+	bluetooth_task_create();
 	
 	#ifdef POLYCAST5_DEBUG_RAM
 		// Wait for tasks to allocate

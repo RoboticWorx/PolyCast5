@@ -1,5 +1,8 @@
 #include "polycast5_macros.h"
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -13,8 +16,46 @@
 //#include "services/bas/ble_svc_bas.h"
 
 #include "bluetooth_funcs.h"
+#include "gpio_funcs.h"
+#include "gpio_task.h"
 
 #define TAG "BLUETOOTH_FUNCS"
+
+#define HID_CC_RPT_MUTE 1
+#define HID_CC_RPT_POWER 2
+#define HID_CC_RPT_LAST 3
+#define HID_CC_RPT_ASSIGN_SEL 4
+#define HID_CC_RPT_PLAY	5
+#define HID_CC_RPT_PAUSE 6
+#define HID_CC_RPT_RECORD 7
+#define HID_CC_RPT_FAST_FWD 8
+#define HID_CC_RPT_REWIND 9
+#define HID_CC_RPT_SCAN_NEXT_TRK 10
+#define HID_CC_RPT_SCAN_PREV_TRK 11
+#define HID_CC_RPT_STOP 12
+
+#define HID_CC_RPT_CHANNEL_UP 0x10
+#define HID_CC_RPT_CHANNEL_DOWN 0x30
+#define HID_CC_RPT_VOLUME_UP 0x40
+#define HID_CC_RPT_VOLUME_DOWN 0x80
+
+// HID Consumer Control report bitmasks
+#define HID_CC_RPT_NUMERIC_BITS 0xF0
+#define HID_CC_RPT_CHANNEL_BITS 0xCF
+#define HID_CC_RPT_VOLUME_BITS 0x3F
+#define HID_CC_RPT_BUTTON_BITS 0xF0
+#define HID_CC_RPT_SELECTION_BITS 0xCF
+
+// Macros for the HID Consumer Control 2-byte report
+#define HID_CC_RPT_SET_NUMERIC(s, x)	(s)[0] &= HID_CC_RPT_NUMERIC_BITS;		(s)[0] = (x)
+#define HID_CC_RPT_SET_CHANNEL(s, x)	(s)[0] &= HID_CC_RPT_CHANNEL_BITS;		(s)[0] |= ((x) & 0x03) << 4
+#define HID_CC_RPT_SET_VOLUME_UP(s)		(s)[0] &= HID_CC_RPT_VOLUME_BITS;		(s)[0] |= 0x40
+#define HID_CC_RPT_SET_VOLUME_DOWN(s)	(s)[0] &= HID_CC_RPT_VOLUME_BITS;		(s)[0] |= 0x80
+#define HID_CC_RPT_SET_BUTTON(s, x)		(s)[1] &= HID_CC_RPT_BUTTON_BITS;		(s)[1] |= (x)
+#define HID_CC_RPT_SET_SELECTION(s, x)	(s)[1] &= HID_CC_RPT_SELECTION_BITS;	(s)[1] |= ((x) & 0x03) << 4
+
+#define HID_RPT_ID_CC_IN 3 // Consumer Control input report ID
+#define HID_CC_IN_RPT_LEN 2 // Consumer Control input report Len
 
 extern volatile bool bluetooth_connected;
 
@@ -207,6 +248,10 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 				ESP_LOGI(TAG, "CONNECT");
 			#endif
 			
+			// Indicate bluetooth is connected
+			uint8_t rgb_state = RGB_SET_BLUE;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+
 			bluetooth_connected = true;
 			break;
 		}
@@ -250,7 +295,11 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 			#ifdef POLYCAST5_DEBUG
 				ESP_LOGI(TAG, "DISCONNECT: %s", esp_hid_disconnect_reason_str(esp_hidd_dev_transport_get(param->disconnect.dev), param->disconnect.reason));
 			#endif
-			
+
+			// Indicate bluetooth disconnected
+			uint8_t rgb_state = RGB_SET_OFF;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+
 			bluetooth_connected = false;
 			esp_hid_ble_gap_adv_start();
 			break;
@@ -319,36 +368,36 @@ void bluetooth_init(void)
 
 void bluetooth_deinit(void)
 {
-    int rc;
-    esp_err_t err;
+	int rc;
+	esp_err_t err;
 
-    // Stop advertising
-    ble_gap_adv_stop();
+	// Stop advertising
+	ble_gap_adv_stop();
 
-    // Stop the NimBLE host thread (blocks until nimble_port_run() returns)
-    rc = nimble_port_stop();
-    if (rc) {
-        ESP_LOGE(TAG, "nimble_port_stop failed: %d", rc);
-        return;
-    }
+	// Stop the NimBLE host thread (blocks until nimble_port_run() returns)
+	rc = nimble_port_stop();
+	if (rc) {
+		ESP_LOGE(TAG, "nimble_port_stop failed: %d", rc);
+		return;
+	}
 
-    // De-initialize the host stack and controller
-    err = nimble_port_deinit();
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "nimble_port_deinit failed: %s", esp_err_to_name(err));
-        return;
-    }
+	// De-initialize the host stack and controller
+	err = nimble_port_deinit();
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "nimble_port_deinit failed: %s", esp_err_to_name(err));
+		return;
+	}
 
-    // Tear down the HID/GATT state
-    if (ble_hid_param.hid_dev) {
-        err = esp_hidd_dev_deinit(ble_hid_param.hid_dev);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "esp_hidd_dev_deinit failed: %s", esp_err_to_name(err));
-        }
-        ble_hid_param.hid_dev = NULL;
-    }
+	// Tear down the HID/GATT state
+	if (ble_hid_param.hid_dev) {
+		err = esp_hidd_dev_deinit(ble_hid_param.hid_dev);
+		if (err != ESP_OK) {
+			ESP_LOGE(TAG, "esp_hidd_dev_deinit failed: %s", esp_err_to_name(err));
+		}
+		ble_hid_param.hid_dev = NULL;
+	}
 
 	#ifdef POLYCAST5_DEBUG
-	    ESP_LOGI(TAG, "Bluetooth fully disabled");
-    #endif
+		ESP_LOGI(TAG, "Bluetooth fully disabled");
+	#endif
 }
