@@ -1,3 +1,4 @@
+#include "lcd_bluetooth_funcs.h"
 #include "polycast5_macros.h"
 
 #include <stdlib.h>
@@ -894,14 +895,14 @@ void lcd_update_battery(ui_menu_t *ui_menu, uint8_t battery_percentage, bool cha
 	}
 }
 
-static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu, wifi_menu_t* wifi_menu, tools_menu_t* tools_menu, settings_menu_t* settings_menu)
+static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t *ir_menu, lora_menu_t *lora_menu, espnow_menu_t *espnow_menu, wifi_menu_t *wifi_menu, tools_menu_t *tools_menu, settings_menu_t *settings_menu, bluetooth_menu_t *bluetooth_menu)
 {
 	// Hide selection labels
 	lv_obj_add_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->lbl_mid, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->lbl_bot, LV_OBJ_FLAG_HIDDEN);
-		
+	
 	const char *option = lv_label_get_text(ui_menu->lbl_mid);
 	
 	if (strcmp(option, "Infrared") == 0) {	
@@ -918,6 +919,8 @@ static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t* ir_menu, lo
 		ui_menu->page = INFRARED_PAGE;
 	}
 	else if (strcmp(option, "Bluetooth") == 0) {
+		// Show bluetooth list
+		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		ui_menu->page = BLUETOOTH_PAGE;
 	}
 	else if (strcmp(option, "PolyPlug") == 0) {
@@ -1497,7 +1500,7 @@ void lcd_hotkey_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotk
 	}
 }
 
-void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu, wifi_menu_t* wifi_menu, tools_menu_t* tools_menu, settings_menu_t* settings_menu) 
+void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_menu, lora_menu_t *lora_menu, espnow_menu_t *espnow_menu, wifi_menu_t *wifi_menu, tools_menu_t *tools_menu, settings_menu_t *settings_menu, bluetooth_menu_t *bluetooth_menu) 
 {
 	if (ui_btns->up_btn == 1) {
 		scrolling_menu = true;
@@ -1508,7 +1511,7 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t* ir_me
 		scrolling_up = true;
 	}
 	else if (ui_btns->select_btn == 1) {
-		lcd_selection_btn_pressed(ui_menu, ir_menu, lora_menu, espnow_menu, wifi_menu, tools_menu, settings_menu);
+		lcd_selection_btn_pressed(ui_menu, ir_menu, lora_menu, espnow_menu, wifi_menu, tools_menu, settings_menu, bluetooth_menu);
 	}
 	// Go back
 	else if (ui_btns->left_btn == 1) {
@@ -2401,6 +2404,57 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Hide settings menu
 		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+	}
+}
+
+void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
+{
+	// Statics
+	static bool do_once = false;
+	
+	// Only execute once
+	if (!do_once) {
+		// Show bluetooth list
+		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		do_once = true;
+	}
+	
+	// Up button pressed
+	if (ui_btns->up_btn == 1) {
+		// Update selection
+		bluetooth_menu->index--;
+		lcd_bluetooth_update_menu(bluetooth_menu);
+	}
+	// Down button pressed
+	else if (ui_btns->down_btn == 1) {
+		// Update selection
+		bluetooth_menu->index++;
+		lcd_bluetooth_update_menu(bluetooth_menu);
+	}
+	// Back selected
+	else if (ui_btns->left_btn == 1) {
+		// Hide bluetooth menu
+		lv_obj_add_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show selection labels
+		lcd_unhide_selection_widgets(ui_menu);
+		
+		// Reset static
+		do_once = false;
+		
+		// Switch pages
+		ui_menu->page = SELECTION_PAGE;
+	}
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Hide bluetooth menu
+		lv_obj_add_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
 		// Reset static
 		do_once = false;

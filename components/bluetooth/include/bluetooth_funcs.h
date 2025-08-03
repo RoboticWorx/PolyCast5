@@ -79,12 +79,17 @@
 #define HID_RPT_ID_CC_IN 3 // Consumer Control input report ID
 #define HID_CC_IN_RPT_LEN 2 // Consumer Control input report Len
 
-/** 
+/**
  * @brief Initialize Bluetooth
  */
 void bluetooth_init(void);
 
-/** 
+/**
+ * @brief Deinitialize Bluetooth
+ */
+void bluetooth_deinit(void);
+
+/**
  * @brief Send a media command over Bluetooth
  *
  * @param [in] key_cmd Command to send
@@ -92,7 +97,7 @@ void bluetooth_init(void);
  */
 void bluetooth_send_cmd(uint8_t key_cmd, bool key_pressed);
 
-/** 
+/**
  * @brief Send a keyboard command over Bluetooth
  *
  * @param [in] character Character to send

@@ -10,6 +10,7 @@
 #include "lcd_tools_funcs.h"
 #include "lcd_settings_funcs.h"
 #include "lcd_hotkey_funcs.h"
+#include "lcd_bluetooth_funcs.h"
 
 #include "gpio_funcs.h"
 
@@ -270,9 +271,10 @@ void lcd_hotkey_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotk
  * @param [in] espnow_menu ESP-NOW menu structure
  * @param [in] wifi_menu Wi-Fi menu structure
  * @param [in] tools_menu Tools menu structure
-  @param [in] settings_menu Settings menu structure
+ * @param [in] settings_menu Settings menu structure
+ * @param [in] bluetooth_menu Bluetooth menu structure
  */
-void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu, wifi_menu_t* wifi_menu, tools_menu_t* tools_menu, settings_menu_t* settings_menu);
+void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu, wifi_menu_t* wifi_menu, tools_menu_t* tools_menu, settings_menu_t* settings_menu, bluetooth_menu_t *bluetooth_menu);
 
 /**
  * @brief Executes on infrared page
@@ -327,6 +329,15 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
  * @param [in] settings_menu Settings menu structure
  */
 void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
+
+/**
+ * @brief Executes on bluetooth page
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] bluetooth_menu Bluetooth menu structure
+ */
+void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
 
 
 #endif /* LCD_FUNCS_H */

@@ -173,13 +173,6 @@ static void adc_task(void *arg)
 
 static void gpio_task(void *arg)
 {
-	xHapticsMutex = xSemaphoreCreateMutex();
-	configASSERT(xHapticsMutex);
-	xRgbLedMutex = xSemaphoreCreateMutex();
-	configASSERT(xRgbLedMutex);
-	xLEDCMutex = xSemaphoreCreateMutex();
-	configASSERT(xLEDCMutex);
-	
 	xUpButtonSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xUpButtonSemaphore);
 	xDownButtonSemaphore = xSemaphoreCreateBinary();

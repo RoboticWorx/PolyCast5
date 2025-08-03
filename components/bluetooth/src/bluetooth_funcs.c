@@ -316,3 +316,39 @@ void bluetooth_init(void)
 		ESP_LOGE(TAG, "esp_nimble_enable failed: %d", ret);
 	}
 }
+
+void bluetooth_deinit(void)
+{
+    int rc;
+    esp_err_t err;
+
+    // Stop advertising
+    ble_gap_adv_stop();
+
+    // Stop the NimBLE host thread (blocks until nimble_port_run() returns)
+    rc = nimble_port_stop();
+    if (rc) {
+        ESP_LOGE(TAG, "nimble_port_stop failed: %d", rc);
+        return;
+    }
+
+    // De-initialize the host stack and controller
+    err = nimble_port_deinit();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "nimble_port_deinit failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    // Tear down the HID/GATT state
+    if (ble_hid_param.hid_dev) {
+        err = esp_hidd_dev_deinit(ble_hid_param.hid_dev);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "esp_hidd_dev_deinit failed: %s", esp_err_to_name(err));
+        }
+        ble_hid_param.hid_dev = NULL;
+    }
+
+	#ifdef POLYCAST5_DEBUG
+	    ESP_LOGI(TAG, "Bluetooth fully disabled");
+    #endif
+}

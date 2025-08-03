@@ -100,10 +100,17 @@ void app_main(void) {
     lcd_lvgl_init();
 	spi_sx126x_init();
 	
+	// Create Mutexes used at boot
 	xSPIBusMutex = xSemaphoreCreateMutex();
 	configASSERT(xSPIBusMutex); // Ensure success
 	xI2CBusMutex = xSemaphoreCreateMutex();
 	configASSERT(xI2CBusMutex);
+	xHapticsMutex = xSemaphoreCreateMutex();
+	configASSERT(xHapticsMutex);
+	xRgbLedMutex = xSemaphoreCreateMutex();
+	configASSERT(xRgbLedMutex);
+	xLEDCMutex = xSemaphoreCreateMutex();
+	configASSERT(xLEDCMutex);
 	
 	xPowerButtonSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xPowerButtonSemaphore);
@@ -134,7 +141,7 @@ void app_main(void) {
 	infrared_task_create();
 	espnow_task_create();
 	wifi_task_create();
-	bluetooth_task_create();
+	//bluetooth_task_create();
 	
 	#ifdef POLYCAST5_DEBUG_RAM
 		// Wait for tasks to allocate

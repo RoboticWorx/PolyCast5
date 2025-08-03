@@ -1,3 +1,5 @@
+#include "polycast5_macros.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
 #include "freertos/task.h"
@@ -17,7 +19,10 @@ static void bluetooth_task(void *arg)
 	static bool send_volum_up = false;
     while (1) {
 		if (bluetooth_connected) {
-	        ESP_LOGI(TAG, "Send the volume");
+			#ifdef POLYCAST5_DEBUG
+		        ESP_LOGI(TAG, "Sending volume command");
+	        #endif
+	        
 	        if (send_volum_up) {
 	            bluetooth_send_cmd(BLUETOOTH_CMD_VOLUME_UP, true);
 	            vTaskDelay(pdMS_TO_TICKS(100)); // Simulate press
@@ -30,8 +35,10 @@ static void bluetooth_task(void *arg)
 	        }
 	        
 	        send_volum_up = !send_volum_up;
+	        
+	        
         }
-        vTaskDelay(pdMS_TO_TICKS(3000));
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 

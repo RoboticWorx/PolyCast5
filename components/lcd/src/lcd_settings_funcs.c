@@ -1,18 +1,20 @@
-#include "core/lv_obj_scroll.h"
+#include "polycast5_macros.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
 
-#include "misc/lv_style.h"
 #include "nvs.h"
+#include "nvs_flash.h"
 #include "esp_system.h"
 #include "esp_log.h"
 #include "esp_err.h"
 
+#include "core/lv_obj_scroll.h"
 #include "font/lv_symbol_def.h"
 #include "core/lv_obj_pos.h"
 #include "core/lv_obj.h"
+#include "misc/lv_style.h"
 #include "misc/lv_area.h"
-#include "nvs_flash.h"
 #include "widgets/label/lv_label.h"
 
 #include "gpio_task.h"
