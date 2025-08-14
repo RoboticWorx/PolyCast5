@@ -73,7 +73,8 @@ enum {
     SETTINGS_LCD_PAGE,
     SETTINGS_SLEEP_TIMER_PAGE,
     
-    BLUETOOTH_PAIR_PAGE
+    BLUETOOTH_PAIR_PAGE,
+    BLUETOOTH_MEDIA_PAGE,
 };
 
 extern uint32_t pin_attempts;

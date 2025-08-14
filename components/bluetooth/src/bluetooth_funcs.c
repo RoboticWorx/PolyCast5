@@ -33,6 +33,7 @@
 #define HID_CC_RPT_SCAN_NEXT_TRK 10
 #define HID_CC_RPT_SCAN_PREV_TRK 11
 #define HID_CC_RPT_STOP 12
+#define HID_CC_RPT_PLAY_PAUSE 13
 
 #define HID_CC_RPT_CHANNEL_UP 0x10
 #define HID_CC_RPT_CHANNEL_DOWN 0x30
@@ -58,6 +59,8 @@
 #define HID_CC_IN_RPT_LEN 2 // Consumer Control input report Len
 
 extern volatile bool bluetooth_connected;
+
+static bool gap_init = false;
 
 typedef struct {
 	TaskHandle_t task_hdl;
@@ -109,8 +112,9 @@ const unsigned char media_report_map[] = {
 	0x09, 0xB5,		//   Usage (Scan Next Track)
 	0x09, 0xB6,		//   Usage (Scan Previous Track)
 	0x09, 0xB7,		//   Usage (Stop)
+	0x09, 0xCD,		//	 Usage (Play/Pause)
 	0x15, 0x01,		//   Logical Minimum (1)
-	0x25, 0x0C,		//   Logical Maximum (12)
+	0x25, 0x0D,		//   Logical Maximum (13)
 	0x75, 0x04,		//   Report Size (4)
 	0x95, 0x01,		//   Report Count (1)
 	0x81, 0x00,		//   Input (Data,Array,Abs,No Wrap,Linear,Preferred State,No Null Position)
@@ -214,6 +218,10 @@ void bluetooth_send_cmd(uint8_t key_cmd, bool key_pressed)
 	
 			case BLUETOOTH_CMD_STOP:
 				HID_CC_RPT_SET_BUTTON(buffer, HID_CC_RPT_STOP);
+				break;
+
+			case BLUETOOTH_CMD_PLAY_PAUSE:
+				HID_CC_RPT_SET_BUTTON(buffer, HID_CC_RPT_PLAY_PAUSE);
 				break;
 	
 			default:
@@ -335,28 +343,32 @@ void bluetooth_init(void)
 {
 	esp_err_t ret;
 	
-	#ifdef POLYCAST5_DEBUG
-		ESP_LOGI(TAG, "Setting HID gap, mode:%d", HID_DEV_MODE);
-	#endif
-	
-	ret = esp_hid_gap_init(HID_DEV_MODE);
-	ESP_ERROR_CHECK(ret);
-	
-	ret = esp_hid_ble_gap_adv_init(ESP_HID_APPEARANCE_GENERIC, ble_hid_config.device_name);
-	ESP_ERROR_CHECK(ret);
-	
-	#ifdef POLYCAST5_DEBUG
-		ESP_LOGI(TAG, "Setting BLE device");
-	#endif
-	
+	if (!gap_init) {
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "Setting HID gap, mode:%d", HID_DEV_MODE);
+		#endif
+		
+		ret = esp_hid_gap_init(HID_DEV_MODE);
+		ESP_ERROR_CHECK(ret);
+		
+		ret = esp_hid_ble_gap_adv_init(ESP_HID_APPEARANCE_GENERIC, ble_hid_config.device_name);
+		ESP_ERROR_CHECK(ret);
+		
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "Setting BLE device");
+		#endif
+
+		gap_init = true;
+	}
+
 	ret = esp_hidd_dev_init(&ble_hid_config, ESP_HID_TRANSPORT_BLE, ble_hidd_event_callback, &ble_hid_param.hid_dev);
 	ESP_ERROR_CHECK(ret);
-	
+		
 	//ble_svc_bas_init();
 	
 	// Need to have a template to store
 	ble_store_config_init();
-
+	
 	ble_hs_cfg.store_status_cb = ble_store_util_status_rr;
 	
 	// Starting nimble task after GATTS is initialized

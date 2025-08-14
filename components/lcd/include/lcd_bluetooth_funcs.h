@@ -48,5 +48,14 @@ void lcd_bluetooth_update_menu(bluetooth_menu_t *bluetooth_menu);
  */
 void lcd_bluetooth_pair_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
 
+/**
+ * @brief Starts bluetooth and brings up the media controller menu
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] bluetooth_menu Bluetooth menu structure
+ */
+void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
+
 
 #endif // LCD_BLUETOOTH_FUNCS_H

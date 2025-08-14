@@ -1,3 +1,5 @@
+#include "font/lv_symbol_def.h"
+#include "misc/lv_timer.h"
 #include "polycast5_macros.h"
 
 #include "freertos/FreeRTOS.h"
@@ -169,17 +171,13 @@ void lcd_bluetooth_pair_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_m
 	}
 	
 	if (ui_btns->up_btn == 1) {
-		// Initialize bluetooth
-		uint8_t cmd = BLUETOOTH_QUEUE_CMD_VOL_UP;
-		xQueueSend(xBluetoothCmdQueue, &cmd, portMAX_DELAY);
+		
 	}
 	else if (ui_btns->down_btn == 1) {
-		uint8_t cmd = BLUETOOTH_QUEUE_CMD_VOL_DOWN;
-		xQueueSend(xBluetoothCmdQueue, &cmd, portMAX_DELAY);
+		
 	}
 	else if (ui_btns->select_btn == 1) {
-		uint8_t cmd = BLUETOOTH_QUEUE_CMD_DEINIT;
-		xQueueSend(xBluetoothCmdQueue, &cmd, portMAX_DELAY);
+		
 	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {
@@ -210,3 +208,293 @@ void lcd_bluetooth_pair_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_m
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
+
+void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
+{
+	// Macros
+	#define MEDIA_OUTER_SZ 130 // Diameter of big ring
+	#define MEDIA_OUTER_BW 2 // Ring border width
+	#define MEDIA_BTN_SZ 35 // Diameter of each small circle
+	#define MEDIA_BTN_RAD (MEDIA_BTN_SZ / 2)
+	#define MEDIA_OUTER_RAD (MEDIA_OUTER_SZ / 2)
+	#define MEDIA_MARGIN 8 // Extra gap from inner edge of outer ring
+	#define MEDIA_R (MEDIA_OUTER_RAD - MEDIA_BTN_RAD - MEDIA_MARGIN) // Offset for outer buttons
+	#define MEDIA_X_OFFSET 35
+
+	// Statics
+	static bool init = false;
+	static lv_obj_t *lbl_home = NULL;
+
+	// Outer ring
+	static lv_obj_t *ring = NULL;
+
+	// Inner circles
+	static lv_obj_t *circ_up = NULL, *circ_right = NULL, *circ_down = NULL, *circ_left = NULL, *circ_center = NULL;
+
+	// Labels
+	static lv_obj_t *lbl_up = NULL, *lbl_right = NULL, *lbl_down = NULL, *lbl_left = NULL, *lbl_center = NULL;
+
+	// Styles
+	static lv_style_t style_ring; // Big outer circle border
+	static lv_style_t style_circle; // Small circles border
+	static lv_style_t style_circle_pressed; // Small circle pressed
+
+	// Do once
+	if (!init) {
+		// Create home label
+		lbl_home = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_home, "HOME", user_secondary_color,
+				&lv_font_montserrat_16, LV_ALIGN_LEFT_MID, 17, 0);
+
+		// Create styles
+		lv_style_init(&style_ring);
+		lv_style_set_radius(&style_ring, LV_RADIUS_CIRCLE);
+		lv_style_set_bg_opa(&style_ring, LV_OPA_TRANSP);
+		lv_style_set_border_width(&style_ring, MEDIA_OUTER_BW);
+		lv_style_set_border_color(&style_ring, user_secondary_color);
+
+		lv_style_init(&style_circle);
+		lv_style_set_radius(&style_circle, LV_RADIUS_CIRCLE);
+		lv_style_set_bg_opa(&style_circle, LV_OPA_TRANSP);
+		lv_style_set_border_width(&style_circle, 2);
+		lv_style_set_border_color(&style_circle, user_secondary_color);
+
+		lv_style_init(&style_circle_pressed);
+		lv_style_set_radius(&style_circle_pressed, LV_RADIUS_CIRCLE);
+		lv_style_set_bg_opa(&style_circle_pressed, LV_OPA_COVER);
+		lv_style_set_bg_color(&style_circle_pressed, user_secondary_color);
+		lv_style_set_border_width(&style_circle_pressed, 2);
+		lv_style_set_border_color(&style_circle_pressed, user_secondary_color);
+
+		// Outer ring (acts as container for all 5 small circles)
+		ring = lv_obj_create(ACTIVE_SCR);
+		lv_obj_add_style(ring, &style_ring, 0);
+		lv_obj_set_size(ring, MEDIA_OUTER_SZ, MEDIA_OUTER_SZ);
+		lv_obj_align(ring, LV_ALIGN_CENTER, MEDIA_X_OFFSET, 0);
+		// No scrollbar
+		lv_obj_set_scrollbar_mode(ring, LV_SCROLLBAR_MODE_OFF);
+		lv_obj_clear_flag(ring, LV_OBJ_FLAG_SCROLLABLE);
+
+		// Small circles + labels
+		// UP
+		circ_up = lv_obj_create(ring);
+		lv_obj_add_style(circ_up, &style_circle, 0);
+		lv_obj_set_size(circ_up, MEDIA_BTN_SZ, MEDIA_BTN_SZ);
+		lv_obj_align(circ_up, LV_ALIGN_CENTER, 0, -MEDIA_R);
+		lv_obj_set_style_radius(circ_up, LV_RADIUS_CIRCLE, 0);
+		lv_obj_set_scrollbar_mode(circ_up, LV_SCROLLBAR_MODE_OFF);
+		lv_obj_clear_flag(circ_up, LV_OBJ_FLAG_SCROLLABLE);
+		lbl_up = lv_label_create(circ_up);
+		lv_label_set_text(lbl_up, LV_SYMBOL_VOLUME_MAX); // Vol+
+		lv_obj_set_style_text_font(lbl_up, &lv_font_montserrat_18, 0);
+		lv_obj_set_style_text_color(lbl_up, user_secondary_color, 0);
+		lv_obj_center(lbl_up);
+
+		// RIGHT
+		circ_right = lv_obj_create(ring);
+		lv_obj_add_style(circ_right, &style_circle, 0);
+		lv_obj_set_size(circ_right, MEDIA_BTN_SZ, MEDIA_BTN_SZ);
+		lv_obj_align(circ_right, LV_ALIGN_CENTER, MEDIA_R, 0);
+		lv_obj_set_style_radius(circ_right, LV_RADIUS_CIRCLE, 0);
+		lv_obj_set_scrollbar_mode(circ_right, LV_SCROLLBAR_MODE_OFF);
+		lv_obj_clear_flag(circ_right, LV_OBJ_FLAG_SCROLLABLE);
+		lbl_right = lv_label_create(circ_right);
+		lv_label_set_text(lbl_right, LV_SYMBOL_NEXT); // Next
+		lv_obj_set_style_text_font(lbl_right, &lv_font_montserrat_18, 0);
+		lv_obj_set_style_text_color(lbl_right, user_secondary_color, 0);
+		lv_obj_align(lbl_right, LV_ALIGN_CENTER, 1, 0);
+
+		// DOWN
+		circ_down = lv_obj_create(ring);
+		lv_obj_add_style(circ_down, &style_circle, 0);
+		lv_obj_set_size(circ_down, MEDIA_BTN_SZ, MEDIA_BTN_SZ);
+		lv_obj_align(circ_down, LV_ALIGN_CENTER, 0, MEDIA_R);
+		lv_obj_set_style_radius(circ_down, LV_RADIUS_CIRCLE, 0);
+		lv_obj_set_scrollbar_mode(circ_down, LV_SCROLLBAR_MODE_OFF);
+		lv_obj_clear_flag(circ_down, LV_OBJ_FLAG_SCROLLABLE);
+		lbl_down = lv_label_create(circ_down);
+		lv_label_set_text(lbl_down, LV_SYMBOL_VOLUME_MID); // Vol-
+		lv_obj_set_style_text_font(lbl_down, &lv_font_montserrat_18, 0);
+		lv_obj_set_style_text_color(lbl_down, user_secondary_color, 0);
+		lv_obj_center(lbl_down);
+
+		// LEFT
+		circ_left = lv_obj_create(ring);
+		lv_obj_add_style(circ_left, &style_circle, 0);
+		lv_obj_set_size(circ_left, MEDIA_BTN_SZ, MEDIA_BTN_SZ);
+		lv_obj_align(circ_left, LV_ALIGN_CENTER, -MEDIA_R, 0);
+		lv_obj_set_style_radius(circ_left, LV_RADIUS_CIRCLE, 0);
+		lv_obj_set_scrollbar_mode(circ_left, LV_SCROLLBAR_MODE_OFF);
+		lv_obj_clear_flag(circ_left, LV_OBJ_FLAG_SCROLLABLE);
+		lbl_left = lv_label_create(circ_left);
+		lv_label_set_text(lbl_left, LV_SYMBOL_PREV); // Previous
+		lv_obj_set_style_text_font(lbl_left, &lv_font_montserrat_18, 0);
+		lv_obj_set_style_text_color(lbl_left, user_secondary_color, 0);
+		lv_obj_align(lbl_left, LV_ALIGN_CENTER, 0, 0);
+
+		// CENTER
+		circ_center = lv_obj_create(ring);
+		lv_obj_add_style(circ_center, &style_circle, 0);
+		lv_obj_set_size(circ_center, MEDIA_BTN_SZ, MEDIA_BTN_SZ);
+		lv_obj_align(circ_center, LV_ALIGN_CENTER, 0, 0);
+		lv_obj_set_style_radius(circ_center, LV_RADIUS_CIRCLE, 0);
+		lv_obj_set_scrollbar_mode(circ_center, LV_SCROLLBAR_MODE_OFF);
+		lv_obj_clear_flag(circ_center, LV_OBJ_FLAG_SCROLLABLE);
+		lbl_center = lv_label_create(circ_center);
+		lv_label_set_text(lbl_center, LV_SYMBOL_PLAY);
+		lv_obj_set_style_text_font(lbl_center, &lv_font_montserrat_18, 0);
+		lv_obj_set_style_text_color(lbl_center, user_secondary_color, 0);
+		lv_obj_align(lbl_center, LV_ALIGN_CENTER, 2, 0);
+
+		lv_timer_handler();
+
+		// Active bluetooth
+		uint8_t cmd = BLUETOOTH_QUEUE_CMD_INIT;
+		xQueueSend(xBluetoothCmdQueue, &cmd, portMAX_DELAY);
+
+		init = true;
+	}
+
+	// Reset visuals if no button event this tick
+	if (ui_btns->up_btn != 1 && ui_btns->right_btn != 1 && ui_btns->down_btn != 1 && ui_btns->left_btn != 1 && ui_btns->select_btn != 1)
+	{
+		if (circ_up) {
+			lv_obj_remove_style(circ_up, &style_circle_pressed, 0);
+		}
+		if (circ_right)	{
+			lv_obj_remove_style(circ_right, &style_circle_pressed, 0);
+		}
+		if (circ_down) {
+			lv_obj_remove_style(circ_down, &style_circle_pressed, 0);
+		}
+		if (circ_left) {
+			lv_obj_remove_style(circ_left, &style_circle_pressed, 0);
+		}
+		if (circ_center) {
+			lv_obj_remove_style(circ_center, &style_circle_pressed, 0);
+		}
+
+		if (lbl_up) {
+			lv_obj_set_style_text_color(lbl_up, user_secondary_color, 0);
+		}
+		if (lbl_right) {
+			lv_obj_set_style_text_color(lbl_right, user_secondary_color, 0);
+		}
+		if (lbl_down) {
+			lv_obj_set_style_text_color(lbl_down, user_secondary_color, 0);
+		}
+		if (lbl_left) {
+			lv_obj_set_style_text_color(lbl_left, user_secondary_color, 0);
+		}
+		if (lbl_center)	{
+			lv_obj_set_style_text_color(lbl_center, user_secondary_color, 0);
+		}
+	}
+
+	/* Input handling */
+	// Volume up
+	if (ui_btns->up_btn == 1) {
+		// Invert circle
+		lv_obj_add_style(circ_up, &style_circle_pressed, 0);
+		lv_obj_set_style_text_color(lbl_up, user_primary_color, 0);
+
+		// Send command
+		uint8_t cmd = BLUETOOTH_QUEUE_CMD_VOL_UP;
+		xQueueSend(xBluetoothCmdQueue, &cmd, portMAX_DELAY);
+	}
+	// Next track
+	else if (ui_btns->right_btn == 1) {
+		// Invert circle
+		lv_obj_add_style(circ_right, &style_circle_pressed, 0);
+		lv_obj_set_style_text_color(lbl_right, user_primary_color, 0);
+
+		// Send command
+		uint8_t cmd = BLUETOOTH_QUEUE_CMD_NEXT_TRACK;
+		xQueueSend(xBluetoothCmdQueue, &cmd, portMAX_DELAY);
+	}
+	// Volume down
+	else if (ui_btns->down_btn == 1) {
+		// Invert circle
+		lv_obj_add_style(circ_down, &style_circle_pressed, 0);
+		lv_obj_set_style_text_color(lbl_down, user_primary_color, 0);
+
+		// Send command
+		uint8_t cmd = BLUETOOTH_QUEUE_CMD_VOL_DOWN;
+		xQueueSend(xBluetoothCmdQueue, &cmd, portMAX_DELAY);
+	}
+	// Previous track
+	else if (ui_btns->left_btn == 1) {		
+		// Invert circle
+		lv_obj_add_style(circ_left, &style_circle_pressed, 0);
+		lv_obj_set_style_text_color(lbl_left, user_primary_color, 0);
+
+		// Send command
+		uint8_t cmd = BLUETOOTH_QUEUE_CMD_PREV_TRACK;
+		xQueueSend(xBluetoothCmdQueue, &cmd, portMAX_DELAY);
+	}
+	// Pause/play
+	else if (ui_btns->select_btn == 1) {
+		// Invert circle
+		lv_obj_add_style(circ_center, &style_circle_pressed, 0);
+		lv_obj_set_style_text_color(lbl_center, user_primary_color, 0);
+
+		// Send command
+		uint8_t cmd = BLUETOOTH_QUEUE_CMD_PLAY_PAUSE;
+		xQueueSend(xBluetoothCmdQueue, &cmd, portMAX_DELAY);
+	}
+	// Go back
+	else if (ui_btns->home_btn == 1) {
+		// Deinit bluetooth
+		uint8_t cmd = BLUETOOTH_QUEUE_CMD_DEINIT;
+		xQueueSend(xBluetoothCmdQueue, &cmd, portMAX_DELAY);
+
+		// Delete objects
+		lv_obj_delete(ring); // Deletes children
+		lv_obj_delete(lbl_home);
+		
+		// Reset styles
+		lv_style_reset(&style_ring);
+		lv_style_reset(&style_circle);
+		lv_style_reset(&style_circle_pressed);
+		
+		// Reset statics
+		circ_up = circ_right = circ_down = circ_left = circ_center = NULL;
+		lbl_up = lbl_right = lbl_down = lbl_left = lbl_center = NULL;
+		lbl_home = NULL;
+		init = false;
+
+		// Show arrows
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+
+		// Show bluetooth list
+		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = BLUETOOTH_PAGE;
+	}
+	// Power off
+	else if (ui_btns->pwr_btn == 1) {
+		// Deinit bluetooth
+		uint8_t cmd = BLUETOOTH_QUEUE_CMD_DEINIT;
+		xQueueSend(xBluetoothCmdQueue, &cmd, portMAX_DELAY);
+
+		// Delete objects
+		lv_obj_delete(ring); // Deletes children
+		lv_obj_delete(lbl_home);
+		
+		// Reset styles
+		lv_style_reset(&style_ring);
+		lv_style_reset(&style_circle);
+		lv_style_reset(&style_circle_pressed);
+		
+		// Reset statics
+		circ_up = circ_right = circ_down = circ_left = circ_center = NULL;
+		lbl_up = lbl_right = lbl_down = lbl_left = lbl_center = NULL;
+		lbl_home = NULL;
+		init = false;
+
+		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+	}
+}
+

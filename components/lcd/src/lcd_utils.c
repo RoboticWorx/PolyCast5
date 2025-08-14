@@ -2472,6 +2472,21 @@ void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t
 		// Switch pages
 		ui_menu->page = BLUETOOTH_PAIR_PAGE;
 	}
+	// Media controller selected
+	else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 1) {
+		// Hide bluetooth menu
+		lv_obj_add_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+		// Hide arrows
+		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);	
+
+		// Reset static
+		do_once = false;
+		
+		// Switch pages
+		ui_menu->page = BLUETOOTH_MEDIA_PAGE;
+	}
 }
 
 

@@ -47,6 +47,24 @@ static void bluetooth_task(void *arg)
 	            vTaskDelay(pdMS_TO_TICKS(100));
 	            bluetooth_send_cmd(BLUETOOTH_CMD_VOLUME_DOWN, false);
 			}
+			// Next track command received
+			else if (bluetooth_cmd == BLUETOOTH_QUEUE_CMD_NEXT_TRACK && bluetooth_connected) {
+				bluetooth_send_cmd(BLUETOOTH_CMD_SCAN_NEXT_TRK, true);
+	            vTaskDelay(pdMS_TO_TICKS(100));
+	            bluetooth_send_cmd(BLUETOOTH_CMD_SCAN_NEXT_TRK, false);
+			}
+			// Previous track command received
+			else if (bluetooth_cmd == BLUETOOTH_QUEUE_CMD_PREV_TRACK && bluetooth_connected) {
+				bluetooth_send_cmd(BLUETOOTH_CMD_SCAN_PREV_TRK, true);
+	            vTaskDelay(pdMS_TO_TICKS(100));
+	            bluetooth_send_cmd(BLUETOOTH_CMD_SCAN_PREV_TRK, false);
+			}
+			// Play pause command received
+			else if (bluetooth_cmd == BLUETOOTH_QUEUE_CMD_PLAY_PAUSE && bluetooth_connected) {
+				bluetooth_send_cmd(BLUETOOTH_CMD_PLAY_PAUSE, true);
+	            vTaskDelay(pdMS_TO_TICKS(100));
+	            bluetooth_send_cmd(BLUETOOTH_CMD_PLAY_PAUSE, false);
+			}
 		}		
 		
 		//vTaskDelay(pdMS_TO_TICKS(10));
