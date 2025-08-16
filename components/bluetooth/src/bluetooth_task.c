@@ -61,9 +61,7 @@ static void bluetooth_task(void *arg)
 			}
 			// Play pause command received
 			else if (bluetooth_cmd == BLUETOOTH_QUEUE_CMD_PLAY_PAUSE && bluetooth_connected) {
-				bluetooth_send_cmd(BLUETOOTH_CMD_PLAY_PAUSE, true);
-	            vTaskDelay(pdMS_TO_TICKS(100));
-	            bluetooth_send_cmd(BLUETOOTH_CMD_PLAY_PAUSE, false);
+				bluetooth_kbd_type_string("poweofkpwoekfowjv ewpvow.", 1);
 			}
 		}		
 		

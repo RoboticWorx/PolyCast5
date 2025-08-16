@@ -13,7 +13,6 @@
 #include "esp_hidd.h"
 #include "esp_hid_gap.h"
 #include "esp_log.h"
-//#include "services/bas/ble_svc_bas.h"
 
 #include "bluetooth_funcs.h"
 #include "gpio_funcs.h"
@@ -21,11 +20,14 @@
 
 #define TAG "BLUETOOTH_FUNCS"
 
+#define DEVICE_NAME "PolyCast5"
+
+/* Consumer-control report encoding (matches your sender) */
 #define HID_CC_RPT_MUTE 1
 #define HID_CC_RPT_POWER 2
 #define HID_CC_RPT_LAST 3
 #define HID_CC_RPT_ASSIGN_SEL 4
-#define HID_CC_RPT_PLAY	5
+#define HID_CC_RPT_PLAY 5
 #define HID_CC_RPT_PAUSE 6
 #define HID_CC_RPT_RECORD 7
 #define HID_CC_RPT_FAST_FWD 8
@@ -35,276 +37,465 @@
 #define HID_CC_RPT_STOP 12
 #define HID_CC_RPT_PLAY_PAUSE 13
 
-#define HID_CC_RPT_CHANNEL_UP 0x10
-#define HID_CC_RPT_CHANNEL_DOWN 0x30
 #define HID_CC_RPT_VOLUME_UP 0x40
 #define HID_CC_RPT_VOLUME_DOWN 0x80
 
-// HID Consumer Control report bitmasks
+// Masks / setters (unchanged behavior)
 #define HID_CC_RPT_NUMERIC_BITS 0xF0
 #define HID_CC_RPT_CHANNEL_BITS 0xCF
 #define HID_CC_RPT_VOLUME_BITS 0x3F
 #define HID_CC_RPT_BUTTON_BITS 0xF0
 #define HID_CC_RPT_SELECTION_BITS 0xCF
 
-// Macros for the HID Consumer Control 2-byte report
-#define HID_CC_RPT_SET_NUMERIC(s, x)	(s)[0] &= HID_CC_RPT_NUMERIC_BITS;		(s)[0] = (x)
-#define HID_CC_RPT_SET_CHANNEL(s, x)	(s)[0] &= HID_CC_RPT_CHANNEL_BITS;		(s)[0] |= ((x) & 0x03) << 4
-#define HID_CC_RPT_SET_VOLUME_UP(s)		(s)[0] &= HID_CC_RPT_VOLUME_BITS;		(s)[0] |= 0x40
-#define HID_CC_RPT_SET_VOLUME_DOWN(s)	(s)[0] &= HID_CC_RPT_VOLUME_BITS;		(s)[0] |= 0x80
-#define HID_CC_RPT_SET_BUTTON(s, x)		(s)[1] &= HID_CC_RPT_BUTTON_BITS;		(s)[1] |= (x)
-#define HID_CC_RPT_SET_SELECTION(s, x)	(s)[1] &= HID_CC_RPT_SELECTION_BITS;	(s)[1] |= ((x) & 0x03) << 4
+#define HID_CC_RPT_SET_NUMERIC(s, x)   (s)[0] &= HID_CC_RPT_NUMERIC_BITS;   (s)[0] = (x)
+#define HID_CC_RPT_SET_CHANNEL(s, x)   (s)[0] &= HID_CC_RPT_CHANNEL_BITS;   (s)[0] |= ((x) & 0x03) << 4
+#define HID_CC_RPT_SET_VOLUME_UP(s)	   (s)[0] &= HID_CC_RPT_VOLUME_BITS;    (s)[0] |= HID_CC_RPT_VOLUME_UP
+#define HID_CC_RPT_SET_VOLUME_DOWN(s)  (s)[0] &= HID_CC_RPT_VOLUME_BITS;    (s)[0] |= HID_CC_RPT_VOLUME_DOWN
+#define HID_CC_RPT_SET_BUTTON(s, x)	   (s)[1] &= HID_CC_RPT_BUTTON_BITS;    (s)[1] |= (x)
+#define HID_CC_RPT_SET_SELECTION(s, x) (s)[1] &= HID_CC_RPT_SELECTION_BITS; (s)[1] |= ((x) & 0x03) << 4
 
-#define HID_RPT_ID_CC_IN 3 // Consumer Control input report ID
-#define HID_CC_IN_RPT_LEN 2 // Consumer Control input report Len
+#define HID_CC_IN_RPT_LEN 2 // 2-byte CC report
 
 extern volatile bool bluetooth_connected;
 
-static bool gap_init = false;
-
+/* BLE HID state */
 typedef struct {
 	TaskHandle_t task_hdl;
 	esp_hidd_dev_t *hid_dev;
 	uint8_t protocol_mode;
-	uint8_t *buffer;
 } ble_hid_param_t;
 
 static ble_hid_param_t ble_hid_param = {0};
 
-const unsigned char media_report_map[] = {
-	0x05, 0x0C,			// 	 Usage Page (Consumer)	
-	0x09, 0x01,			// 	 Usage (Consumer Control)
-	0xA1, 0x01,			//	 Collection (Application)
-	0x85, 0x03,			//   Report ID (3)
-	0x09, 0x02,			//   Usage (Numeric Key Pad)
-	0xA1, 0x02,		//   Collection (Logical)
-	0x05, 0x09,		//	 Usage Page (Button)
-	0x19, 0x01,		//	 Usage Minimum (0x01)
-	0x29, 0x0A,		//	 Usage Maximum (0x0A)
-	0x15, 0x01,		//	 Logical Minimum (1)
-	0x25, 0x0A,		//	 Logical Maximum (10)
-	0x75, 0x04,		//	 Report Size (4)
-	0x95, 0x01,		//	 Report Count (1)
-	0x81, 0x00,		//	 Input (Data,Array,Abs,No Wrap,Linear,Preferred State,No Null Position)
-	0xC0,			  		//   End Collection
-	0x05, 0x0C,		//   Usage Page (Consumer)
-	0x09, 0x86,		//   Usage (Channel)
-	0x15, 0xFF,		//   Logical Minimum (-1)
-	0x25, 0x01,		//   Logical Maximum (1)
-	0x75, 0x02,		//   Report Size (2)
-	0x95, 0x01,		//   Report Count (1)
-	0x81, 0x46,		//   Input (Data,Var,Rel,No Wrap,Linear,Preferred State,Null State)
-	0x09, 0xE9,		//   Usage (Volume Increment)
-	0x09, 0xEA,		//   Usage (Volume Decrement)
-	0x15, 0x00,		//   Logical Minimum (0)
-	0x75, 0x01,		//   Report Size (1)
-	0x95, 0x02,		//   Report Count (2)
-	0x81, 0x02,		//   Input (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
-	0x09, 0xE2,		//   Usage (Mute)
-	0x09, 0x30,		//   Usage (Power)
-	0x09, 0x83,		//   Usage (Recall Last)
-	0x09, 0x81,		//   Usage (Assign Selection)
-	0x09, 0xB0,		//   Usage (Play)
-	0x09, 0xB1,		//   Usage (Pause)
-	0x09, 0xB2,		//   Usage (Record)
-	0x09, 0xB3,		//   Usage (Fast Forward)
-	0x09, 0xB4,		//   Usage (Rewind)
-	0x09, 0xB5,		//   Usage (Scan Next Track)
-	0x09, 0xB6,		//   Usage (Scan Previous Track)
-	0x09, 0xB7,		//   Usage (Stop)
-	0x09, 0xCD,		//	 Usage (Play/Pause)
-	0x15, 0x01,		//   Logical Minimum (1)
-	0x25, 0x0D,		//   Logical Maximum (13)
-	0x75, 0x04,		//   Report Size (4)
-	0x95, 0x01,		//   Report Count (1)
-	0x81, 0x00,		//   Input (Data,Array,Abs,No Wrap,Linear,Preferred State,No Null Position)
-	0x09, 0x80,		//   Usage (Selection)
-	0xA1, 0x02,		//   Collection (Logical)
-	0x05, 0x09,		//	 Usage Page (Button)
-	0x19, 0x01,		//	 Usage Minimum (0x01)
-	0x29, 0x03,		//	 Usage Maximum (0x03)
-	0x15, 0x01,		//	 Logical Minimum (1)
-	0x25, 0x03,		//	 Logical Maximum (3)
-	0x75, 0x02,		//	 Report Size (2)
-	0x81, 0x00,		//	 Input (Data,Array,Abs,No Wrap,Linear,Preferred State,No Null Position)
-	0xC0,			  		//   End Collection
-	0x81, 0x03,		//   Input (Const,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
-	0xC0,			  		// 	 End Collection
+/* COMPOSITE REPORT MAP */
+// 	- Keyboard (Boot) on Report ID 1 (8-byte input, 1-byte LED out)
+// 	- Consumer Control on Report ID 3 (2-byte payload: bits + 4-bit array)
+const uint8_t data_report_map[] = {
+	/* Keyboard (Report ID 1) */
+	0x05, 0x01,					// Usage Page (Generic Desktop)
+	0x09, 0x06,					// Usage (Keyboard)
+	0xA1, 0x01,					// Collection (Application)
+	0x85, HID_RPT_ID_KB_IN,		// Report ID (1)
+
+	// Modifier bits (8 x 1-bit)
+	0x05, 0x07,					// Usage Page (Key Codes)
+	0x19, 0xE0,				// Usage Minimum (LeftControl)
+	0x29, 0xE7,				// Usage Maximum (Right GUI)
+	0x15, 0x00,				// Logical Minimum (0)
+	0x25, 0x01,				// Logical Maximum (1)
+	0x75, 0x01,				// Report Size (1)
+	0x95, 0x08,				// Report Count (8)
+	0x81, 0x02,				// Input (Data,Var,Abs)
+
+	// Reserved byte
+	0x75, 0x08,				// Report Size (8)
+	0x95, 0x01,				// Report Count (1)
+	0x81, 0x01,				// Input (Const,Array,Abs)
+
+	// 6-key rollover array
+	0x05, 0x07,				// Usage Page (Key Codes)
+	0x19, 0x00,				// Usage Minimum (0)
+	0x29, 0x65,				// Usage Maximum (101)
+	0x15, 0x00,				// Logical Minimum (0)
+	0x25, 0x65,				// Logical Maximum (101)
+	0x75, 0x08,				// Report Size (8)
+	0x95, 0x06,				// Report Count (6)
+	0x81, 0x00,				// Input (Data,Array,Abs)
+
+	// LED Output report (Num/Caps/Scroll/Kana, with padding)
+	0x05, 0x08,				// Usage Page (LEDs)
+	0x19, 0x01,				// Usage Minimum (Num Lock)
+	0x29, 0x05,				// Usage Maximum (Kana)
+	0x15, 0x00,				// Logical Minimum (0)
+	0x25, 0x01,				// Logical Maximum (1)
+	0x75, 0x01,				// Report Size (1)
+	0x95, 0x05,				// Report Count (5)
+	0x91, 0x02,				// Output (Data,Var,Abs)
+	0x75, 0x03,				// Report Size (3)
+	0x95, 0x01,				// Report Count (1)
+	0x91, 0x01,				// Output (Const,Array,Abs)
+
+	0xC0,							// End Collection (Keyboard)
+
+	/* Consumer Control (Report ID 3) */
+	// Canonical single 16-bit Consumer usage report
+	0x05, 0x0C,				// Usage Page (Consumer)
+	0x09, 0x01,				// Usage (Consumer Control)
+	0xA1, 0x01,				// Collection (Application)
+	0x85, HID_RPT_ID_CC_IN,	// Report ID (3)
+
+	// Declare selectable usage range (and match value range)
+	0x19, 0x00,				// Usage Minimum (0)
+	0x2A, 0x9C, 0x02,	// Usage Maximum (0x029C)
+	0x15, 0x00,				// Logical Minimum (0)
+	0x26, 0x9C, 0x02,	// Logical Maximum (0x029C)
+
+	// One 16-bit array entry = one Consumer usage (e.g., 0x00E9 for Vol+)
+	0x75, 0x10,				// Report Size (16)
+	0x95, 0x01,				// Report Count (1)
+	0x81, 0x00,				// Input (Data,Array,Abs)
+
+	0xC0							// End Collection (Consumer Control)
 };
 
+// One combined raw map
 static esp_hid_raw_report_map_t ble_report_maps[] = {
-	{
-		.data = media_report_map,
-		.len = sizeof(media_report_map)
-	}
+	{ .data = data_report_map, .len = sizeof(data_report_map) }
 };
 
 static esp_hid_device_config_t ble_hid_config = {
 	.vendor_id = 0x16C0,
 	.product_id = 0x05DF,
 	.version = 0x0100,
-	.device_name = "PolyCast5",
+	.device_name = DEVICE_NAME,
 	.manufacturer_name = "RoboticWorx",
 	.serial_number = "1234567890",
 	.report_maps = ble_report_maps,
 	.report_maps_len = 1
 };
 
-void bluetooth_send_cmd(uint8_t key_cmd, bool key_pressed)
+// Sends a single Consumer Control usage (press or release)
+static inline void cc_send_usage(uint16_t usage, bool key_pressed)
 {
-	uint8_t buffer[HID_CC_IN_RPT_LEN] = {0, 0};
-	
+	uint8_t rpt[2];
 	if (key_pressed) {
-		switch (key_cmd) {
-			case BLUETOOTH_CMD_CHANNEL_UP:
-				HID_CC_RPT_SET_CHANNEL(buffer, HID_CC_RPT_CHANNEL_UP);
-				break;
-	
-			case BLUETOOTH_CMD_CHANNEL_DOWN:
-				HID_CC_RPT_SET_CHANNEL(buffer, HID_CC_RPT_CHANNEL_DOWN);
-				break;
-	
-			case BLUETOOTH_CMD_VOLUME_UP:
-				HID_CC_RPT_SET_VOLUME_UP(buffer);
-				break;
-	
-			case BLUETOOTH_CMD_VOLUME_DOWN:
-				HID_CC_RPT_SET_VOLUME_DOWN(buffer);
-				break;
-	
-			case BLUETOOTH_CMD_MUTE:
-				HID_CC_RPT_SET_BUTTON(buffer, HID_CC_RPT_MUTE);
-				break;
-	
-			case BLUETOOTH_CMD_POWER:
-				HID_CC_RPT_SET_BUTTON(buffer, HID_CC_RPT_POWER);
-				break;
-	
-			case BLUETOOTH_CMD_RECALL_LAST:
-				HID_CC_RPT_SET_BUTTON(buffer, HID_CC_RPT_LAST);
-				break;
-	
-			case BLUETOOTH_CMD_ASSIGN_SEL:
-				HID_CC_RPT_SET_BUTTON(buffer, HID_CC_RPT_ASSIGN_SEL);
-				break;
-	
-			case BLUETOOTH_CMD_PLAY:
-				HID_CC_RPT_SET_BUTTON(buffer, HID_CC_RPT_PLAY);
-				break;
-	
-			case BLUETOOTH_CMD_PAUSE:
-				HID_CC_RPT_SET_BUTTON(buffer, HID_CC_RPT_PAUSE);
-				break;
-	
-			case BLUETOOTH_CMD_RECORD:
-				HID_CC_RPT_SET_BUTTON(buffer, HID_CC_RPT_RECORD);
-				break;
-	
-			case BLUETOOTH_CMD_FAST_FORWARD:
-				HID_CC_RPT_SET_BUTTON(buffer, HID_CC_RPT_FAST_FWD);
-				break;
-	
-			case BLUETOOTH_CMD_REWIND:
-				HID_CC_RPT_SET_BUTTON(buffer, HID_CC_RPT_REWIND);
-				break;
-	
-			case BLUETOOTH_CMD_SCAN_NEXT_TRK:
-				HID_CC_RPT_SET_BUTTON(buffer, HID_CC_RPT_SCAN_NEXT_TRK);
-				break;
-	
-			case BLUETOOTH_CMD_SCAN_PREV_TRK:
-				HID_CC_RPT_SET_BUTTON(buffer, HID_CC_RPT_SCAN_PREV_TRK);
-				break;
-	
-			case BLUETOOTH_CMD_STOP:
-				HID_CC_RPT_SET_BUTTON(buffer, HID_CC_RPT_STOP);
-				break;
-
-			case BLUETOOTH_CMD_PLAY_PAUSE:
-				HID_CC_RPT_SET_BUTTON(buffer, HID_CC_RPT_PLAY_PAUSE);
-				break;
-	
-			default:
-				break;
-		}
+		rpt[0] = (uint8_t)(usage & 0xFF); // LSB first
+		rpt[1] = (uint8_t)((usage >> 8) & 0xFF);
 	}
-	
-	#ifdef POLYCAST5_DEBUG
-		ESP_LOG_BUFFER_HEX("HID_PAYLOAD", buffer, 2);
-	#endif
-	
-	esp_hidd_dev_input_set(ble_hid_param.hid_dev, 0, HID_RPT_ID_CC_IN, buffer, HID_CC_IN_RPT_LEN);
-	return;
+	else {
+		rpt[0] = 0x00; rpt[1] = 0x00; // Release: no usage
+	}
+
+	// Map_index=0 because we have one raw map; Report ID = HID_RPT_ID_CC_IN (3)
+	esp_hidd_dev_input_set(ble_hid_param.hid_dev, 0, HID_RPT_ID_CC_IN, rpt, sizeof(rpt));
 }
 
+void bluetooth_send_cmd(uint8_t key_cmd, bool key_pressed)
+{
+	uint16_t usage = 0;
+
+	switch (key_cmd) {
+		// Volume
+		case BLUETOOTH_CMD_VOLUME_UP:
+			usage = 0x00E9;
+			break; // Volume Increment
+		case BLUETOOTH_CMD_VOLUME_DOWN:
+			usage = 0x00EA;
+			break; // Volume Decrement
+		case BLUETOOTH_CMD_MUTE:
+			usage = 0x00E2;
+			break; // Mute
+
+		// Transport
+		case BLUETOOTH_CMD_PLAY:
+			usage = 0x00B0;
+			break; // Play
+		case BLUETOOTH_CMD_PAUSE:
+			usage = 0x00B1;
+			break; // Pause
+		case BLUETOOTH_CMD_RECORD:
+			usage = 0x00B2;
+			break; // Record
+		case BLUETOOTH_CMD_FAST_FORWARD:
+			usage = 0x00B3;
+			break; // Fast Forward
+		case BLUETOOTH_CMD_REWIND:
+			usage = 0x00B4;
+			break; // Rewind
+		case BLUETOOTH_CMD_SCAN_NEXT_TRK:
+			usage = 0x00B5;
+			break; // Next
+		case BLUETOOTH_CMD_SCAN_PREV_TRK:
+			usage = 0x00B6;
+			break; // Previous
+		case BLUETOOTH_CMD_STOP:
+			usage = 0x00B7;
+			break; // Stop
+		case BLUETOOTH_CMD_PLAY_PAUSE:
+			usage = 0x00CD;
+			break; // Play/Pause (toggle)
+
+		// Power/menu
+		case BLUETOOTH_CMD_POWER:
+			usage = 0x0030;
+			break; // Power
+		case BLUETOOTH_CMD_MENU:
+			usage = 0x0040;
+			break; // Menu
+		default:
+			usage = 0;
+			break;
+	}
+
+	if (usage) {
+		#ifdef POLYCAST5_DEBUG
+			uint8_t dbg[2] = {(uint8_t)(usage & 0xFF), (uint8_t)(usage >> 8)};
+			ESP_LOG_BUFFER_HEX("HID_CC_USAGE", dbg, 2);
+		#endif
+
+		cc_send_usage(usage, key_pressed);
+	}
+}
+
+/* Keyboard helpers */
+#define HID_KB_IN_RPT_LEN 8
+
+// Wrap esp_hidd_dev_input_set; it wants a non-const buffer
+static inline void hid_input_send(uint8_t rpt_id, const uint8_t *data, size_t len)
+{
+	esp_hidd_dev_input_set(ble_hid_param.hid_dev, 0, rpt_id, (uint8_t *)data, len);
+}
+
+void bluetooth_kbd_send_raw(uint8_t modifiers, const uint8_t keys[6])
+{
+	uint8_t rpt[HID_KB_IN_RPT_LEN] = {0};
+	rpt[0] = modifiers;
+	for (int i = 0; i < 6; ++i) {
+		rpt[2 + i] = keys ? keys[i] : 0;
+	}
+
+	hid_input_send(HID_RPT_ID_KB_IN, rpt, sizeof(rpt));
+}
+
+void bluetooth_kbd_release_all(void)
+{
+	uint8_t rpt[HID_KB_IN_RPT_LEN] = {0};
+	hid_input_send(HID_RPT_ID_KB_IN, rpt, sizeof(rpt));
+}
+
+static bool ascii_to_hid(char c, uint8_t *mod, uint8_t *kc)
+{
+	*mod = 0;
+
+	// Letters
+	if (c >= 'a' && c <= 'z') {
+		*kc = HID_KC_A + (c - 'a');
+		return true;
+	}
+	if (c >= 'A' && c <= 'Z') {
+		*kc = HID_KC_A + (c - 'A');
+		*mod = MOD_LSHIFT;
+		return true;
+	}
+
+	// Digits (unshifted)
+	if (c >= '1' && c <= '9') {
+		*kc = 0x1E + (c - '1');
+		return true;
+	} // 1..9
+	if (c == '0') {
+		*kc = 0x27;
+		return true;
+	} // 0
+
+	// Whitespace / control
+	if (c == ' ') {
+		*kc = HID_KC_SPACE;
+		return true;
+	}
+	if (c == '\n' || c == '\r') {
+		*kc = HID_KC_ENTER;
+		return true;
+	}
+	if (c == '\t') {
+		*kc = HID_KC_TAB;
+		return true;
+	}
+	if (c == '\b') {
+		*kc = HID_KC_BSPACE;
+		return true;
+	}
+
+	// Number row shifted symbols
+	switch (c) {
+		case '!':
+			*kc = 0x1E;
+			*mod = MOD_LSHIFT;
+			return true; // Shift+1
+		case '@':
+			*kc = 0x1F;
+			*mod = MOD_LSHIFT;
+			return true; // Shift+2
+		case '#':
+			*kc = 0x20;
+			*mod = MOD_LSHIFT;
+			return true; // Shift+3
+		case '$':
+			*kc = 0x21;
+			*mod = MOD_LSHIFT;
+			return true; // Shift+4
+		case '%':
+			*kc = 0x22;
+			*mod = MOD_LSHIFT;
+			return true; // Shift+5
+		case '^':
+			*kc = 0x23;
+			*mod = MOD_LSHIFT;
+			return true; // Shift+6
+		case '&':
+			*kc = 0x24;
+			*mod = MOD_LSHIFT;
+			return true; // Shift+7
+		case '*':
+			*kc = 0x25;
+			*mod = MOD_LSHIFT;
+			return true; // Shift+8
+		case '(':
+			*kc = 0x26;
+			*mod = MOD_LSHIFT;
+			return true; // Shift+9
+		case ')':
+			*kc = 0x27;
+			*mod = MOD_LSHIFT;
+			return true; // Shift+0
+	}
+
+	// Punctuation keys (with shift variants)
+	switch (c) {
+		case '-':
+			*kc = HID_KC_MINUS;
+			return true;
+		case '_':
+			*kc = HID_KC_MINUS;
+			*mod = MOD_LSHIFT;
+			return true;
+
+		case '=':
+			*kc = HID_KC_EQUAL;
+			return true;
+		case '+':
+			*kc = HID_KC_EQUAL;
+			*mod = MOD_LSHIFT;
+			return true;
+
+		case '[':
+			*kc = HID_KC_LBRACKET;
+			return true;
+		case '{':
+			*kc = HID_KC_LBRACKET;
+			*mod = MOD_LSHIFT;
+			return true;
+
+		case ']':
+			*kc = HID_KC_RBRACKET;
+			return true;
+		case '}':
+			*kc = HID_KC_RBRACKET;
+			*mod = MOD_LSHIFT;
+			return true;
+
+		case '\\':
+			*kc = HID_KC_BACKSLASH;
+			return true;
+		case '|':
+			*kc = HID_KC_BACKSLASH;
+			*mod = MOD_LSHIFT;
+			return true;
+
+		case ';':
+			*kc = HID_KC_SEMICOLON;
+			return true;
+		case ':':
+			*kc = HID_KC_SEMICOLON;
+			*mod = MOD_LSHIFT;
+			return true;
+
+		case '\'':
+			*kc = HID_KC_APOSTROPHE;
+			return true;
+		case '\"':
+			*kc = HID_KC_APOSTROPHE;
+			*mod = MOD_LSHIFT;
+			return true;
+
+		case '`':
+			*kc = HID_KC_GRAVE;
+			return true;
+		case '~':
+			*kc = HID_KC_GRAVE;
+			*mod = MOD_LSHIFT;
+			return true;
+
+		case ',':
+			*kc = HID_KC_COMMA;
+			return true;
+		case '<':
+			*kc = HID_KC_COMMA;
+			*mod = MOD_LSHIFT;
+			return true;
+
+		case '.':
+			*kc = HID_KC_DOT;
+			return true;
+		case '>':
+			*kc = HID_KC_DOT;
+			*mod = MOD_LSHIFT;
+			return true;
+
+		case '/':
+			*kc = HID_KC_SLASH;
+			return true;
+		case '?':
+			*kc = HID_KC_SLASH;
+			*mod = MOD_LSHIFT;
+			return true;
+	}
+
+	// Not mapped
+	return false;
+}
+
+bool bluetooth_kbd_type_char(char c, uint32_t tap_ms)
+{
+	uint8_t mod, kc;
+	if (!ascii_to_hid(c, &mod, &kc)) {
+		return false;
+	}
+
+	uint8_t keys[6] = { kc, 0,0,0,0,0 };
+
+	bluetooth_kbd_send_raw(mod, keys);
+	vTaskDelay(pdMS_TO_TICKS(tap_ms));
+	bluetooth_kbd_release_all();
+	vTaskDelay(pdMS_TO_TICKS(tap_ms));
+
+	return true;
+}
+
+void bluetooth_kbd_type_string(const char *s, uint32_t tap_ms)
+{
+	if (!s) {
+		return;
+	}
+
+	while (*s) {
+		bluetooth_kbd_type_char(*s++, tap_ms);
+	}
+}
+
+/* HID events / init / deinit */
 static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
 {
 	esp_hidd_event_t event = (esp_hidd_event_t)id;
-	esp_hidd_event_data_t *param = (esp_hidd_event_data_t *)event_data;
+
+	(void)handler_args;
+	(void)base;
+	(void)event_data; // Silence unused warnings
 
 	switch (event) {
-		case ESP_HIDD_START_EVENT: {
-			#ifdef POLYCAST5_DEBUG
-				ESP_LOGI(TAG, "START");
-			#endif
-			
+		case ESP_HIDD_START_EVENT:
 			esp_hid_ble_gap_adv_start();
 			break;
-		}
 		case ESP_HIDD_CONNECT_EVENT: {
-			#ifdef POLYCAST5_DEBUG
-				ESP_LOGI(TAG, "CONNECT");
-			#endif
-			
-			// Indicate bluetooth is connected
+			// RGB indicator
 			uint8_t rgb_state = RGB_SET_BLUE;
 			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
 
 			bluetooth_connected = true;
 			break;
 		}
-		case ESP_HIDD_PROTOCOL_MODE_EVENT: {
-			#ifdef POLYCAST5_DEBUG
-				ESP_LOGI(TAG, "PROTOCOL MODE[%u]: %s", param->protocol_mode.map_index, param->protocol_mode.protocol_mode ? "REPORT" : "BOOT");
-			#endif
-			
-			break;
-		}
-		case ESP_HIDD_CONTROL_EVENT: {
-			#ifdef POLYCAST5_DEBUG
-				ESP_LOGI(TAG, "CONTROL[%u]: %sSUSPEND", param->control.map_index, param->control.control ? "EXIT_" : "");
-			#endif
-			
-			if (param->control.control) {
-				// Exit suspend
-			}
-			else {
-				// Suspend
-			}
-			break;
-		}
-		case ESP_HIDD_OUTPUT_EVENT: {
-			#ifdef POLYCAST5_DEBUG
-				ESP_LOGI(TAG, "OUTPUT[%u]: %8s ID: %2u, Len: %d, Data:", param->output.map_index, esp_hid_usage_str(param->output.usage), param->output.report_id, param->output.length);
-				ESP_LOG_BUFFER_HEX(TAG, param->output.data, param->output.length);
-			#endif
-			
-			break;
-		}
-		case ESP_HIDD_FEATURE_EVENT: {
-			#ifdef POLYCAST5_DEBUG
-				ESP_LOGI(TAG, "FEATURE[%u]: %8s ID: %2u, Len: %d, Data:", param->feature.map_index, esp_hid_usage_str(param->feature.usage), param->feature.report_id, param->feature.length);
-				ESP_LOG_BUFFER_HEX(TAG, param->feature.data, param->feature.length);
-			#endif
-			
-			break;
-		}
 		case ESP_HIDD_DISCONNECT_EVENT: {
-			#ifdef POLYCAST5_DEBUG
-				ESP_LOGI(TAG, "DISCONNECT: %s", esp_hid_disconnect_reason_str(esp_hidd_dev_transport_get(param->disconnect.dev), param->disconnect.reason));
-			#endif
-
-			// Indicate bluetooth disconnected
+			// RGB indicator
 			uint8_t rgb_state = RGB_SET_OFF;
 			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
 
@@ -312,26 +503,13 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 			esp_hid_ble_gap_adv_start();
 			break;
 		}
-		case ESP_HIDD_STOP_EVENT: {
-			#ifdef POLYCAST5_DEBUG
-				ESP_LOGI(TAG, "STOP");
-			#endif
-			
-			break;
-		}
 		default:
 			break;
 	}
-	return;
 }
 
-/* This function will return only when nimble_port_stop() is executed */
 static void ble_hid_device_host_task(void *param)
 {
-	#ifdef POLYCAST5_DEBUG
-		ESP_LOGI(TAG, "BLE Host Task Started");
-	#endif
-	
 	nimble_port_run();
 	nimble_port_freertos_deinit();
 }
@@ -342,36 +520,25 @@ void ble_store_config_init(void);
 void bluetooth_init(void)
 {
 	esp_err_t ret;
-	
-	if (!gap_init) {
-		#ifdef POLYCAST5_DEBUG
-			ESP_LOGI(TAG, "Setting HID gap, mode:%d", HID_DEV_MODE);
-		#endif
-		
+
+	static bool gap_inited_once = false;
+
+	if (!gap_inited_once) {
 		ret = esp_hid_gap_init(HID_DEV_MODE);
 		ESP_ERROR_CHECK(ret);
-		
-		ret = esp_hid_ble_gap_adv_init(ESP_HID_APPEARANCE_GENERIC, ble_hid_config.device_name);
-		ESP_ERROR_CHECK(ret);
-		
-		#ifdef POLYCAST5_DEBUG
-			ESP_LOGI(TAG, "Setting BLE device");
-		#endif
 
-		gap_init = true;
+		ret = esp_hid_ble_gap_adv_init(ESP_HID_APPEARANCE_KEYBOARD, DEVICE_NAME);
+		ESP_ERROR_CHECK(ret);
+
+		gap_inited_once = true;
 	}
 
 	ret = esp_hidd_dev_init(&ble_hid_config, ESP_HID_TRANSPORT_BLE, ble_hidd_event_callback, &ble_hid_param.hid_dev);
 	ESP_ERROR_CHECK(ret);
-		
-	//ble_svc_bas_init();
-	
-	// Need to have a template to store
+
 	ble_store_config_init();
-	
 	ble_hs_cfg.store_status_cb = ble_store_util_status_rr;
-	
-	// Starting nimble task after GATTS is initialized
+
 	ret = esp_nimble_enable(ble_hid_device_host_task);
 	if (ret) {
 		ESP_LOGE(TAG, "esp_nimble_enable failed: %d", ret);
@@ -380,32 +547,20 @@ void bluetooth_init(void)
 
 void bluetooth_deinit(void)
 {
-	int rc;
-	esp_err_t err;
-
-	// Stop advertising
 	ble_gap_adv_stop();
 
-	// Stop the NimBLE host thread (blocks until nimble_port_run() returns)
-	rc = nimble_port_stop();
-	if (rc) {
-		ESP_LOGE(TAG, "nimble_port_stop failed: %d", rc);
+	if (nimble_port_stop()) {
+		ESP_LOGE(TAG, "nimble_port_stop failed");
 		return;
 	}
 
-	// De-initialize the host stack and controller
-	err = nimble_port_deinit();
-	if (err != ESP_OK) {
-		ESP_LOGE(TAG, "nimble_port_deinit failed: %s", esp_err_to_name(err));
+	if (nimble_port_deinit() != ESP_OK) {
+		ESP_LOGE(TAG, "nimble_port_deinit failed");
 		return;
 	}
 
-	// Tear down the HID/GATT state
 	if (ble_hid_param.hid_dev) {
-		err = esp_hidd_dev_deinit(ble_hid_param.hid_dev);
-		if (err != ESP_OK) {
-			ESP_LOGE(TAG, "esp_hidd_dev_deinit failed: %s", esp_err_to_name(err));
-		}
+		esp_hidd_dev_deinit(ble_hid_param.hid_dev);
 		ble_hid_param.hid_dev = NULL;
 	}
 

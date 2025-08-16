@@ -20,9 +20,9 @@
 #include "bluetooth_task.h"
 
 bluetooth_menu_t bluetooth_menu = {
-	.options = {"Pair New", "Media Controller", "Keyboard"},
+	.options = {"Remove devices", "Media Controller", "Keyboard"},
 	.size = 3,
-	.index = 0,
+	.index = 1,
 	.cont = NULL,
 };
 
@@ -78,7 +78,7 @@ void lcd_bluetooth_setup_page(bluetooth_menu_t *menu)
 	// Create buttons
 	// Wrap index
 	if (menu->index >= menu->size) {
-		menu->index = 0;
+		menu->index = 1;
 	}
 	else if (menu->index < 0) {
 		menu->index = menu->size - 1;
