@@ -1,3 +1,4 @@
+#include "freertos/projdefs.h"
 #include "polycast5_macros.h"
 
 #include <stdbool.h>
@@ -10,6 +11,7 @@
 #include "host/ble_hs.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
+#include "services/bas/ble_svc_bas.h"
 #include "esp_hidd.h"
 #include "esp_hid_gap.h"
 #include "esp_log.h"
@@ -20,6 +22,7 @@
 
 #define TAG "BLUETOOTH_FUNCS"
 
+// Note: Security Level 2 in menuconfig 'BLE SM' required for iOS pairing!
 #define DEVICE_NAME "PolyCast5"
 
 /* Consumer-control report encoding (matches your sender) */
@@ -170,11 +173,11 @@ static inline void cc_send_usage(uint16_t usage, bool key_pressed)
 	esp_hidd_dev_input_set(ble_hid_param.hid_dev, 0, HID_RPT_ID_CC_IN, rpt, sizeof(rpt));
 }
 
-void bluetooth_send_cmd(uint8_t key_cmd, bool key_pressed)
+void bluetooth_send_media(uint8_t cmd, bool key_pressed)
 {
 	uint16_t usage = 0;
 
-	switch (key_cmd) {
+	switch (cmd) {
 		// Volume
 		case BLUETOOTH_CMD_VOLUME_UP:
 			usage = 0x00E9;
@@ -202,10 +205,10 @@ void bluetooth_send_cmd(uint8_t key_cmd, bool key_pressed)
 		case BLUETOOTH_CMD_REWIND:
 			usage = 0x00B4;
 			break; // Rewind
-		case BLUETOOTH_CMD_SCAN_NEXT_TRK:
+		case BLUETOOTH_CMD_NEXT_TRK:
 			usage = 0x00B5;
 			break; // Next
-		case BLUETOOTH_CMD_SCAN_PREV_TRK:
+		case BLUETOOTH_CMD_PREV_TRK:
 			usage = 0x00B6;
 			break; // Previous
 		case BLUETOOTH_CMD_STOP:
@@ -246,7 +249,7 @@ static inline void hid_input_send(uint8_t rpt_id, const uint8_t *data, size_t le
 	esp_hidd_dev_input_set(ble_hid_param.hid_dev, 0, rpt_id, (uint8_t *)data, len);
 }
 
-void bluetooth_kbd_send_raw(uint8_t modifiers, const uint8_t keys[6])
+static void bluetooth_kbd_send_raw(uint8_t modifiers, const uint8_t keys[6])
 {
 	uint8_t rpt[HID_KB_IN_RPT_LEN] = {0};
 	rpt[0] = modifiers;
@@ -257,7 +260,7 @@ void bluetooth_kbd_send_raw(uint8_t modifiers, const uint8_t keys[6])
 	hid_input_send(HID_RPT_ID_KB_IN, rpt, sizeof(rpt));
 }
 
-void bluetooth_kbd_release_all(void)
+static void bluetooth_kbd_release_all(void)
 {
 	uint8_t rpt[HID_KB_IN_RPT_LEN] = {0};
 	hid_input_send(HID_RPT_ID_KB_IN, rpt, sizeof(rpt));
@@ -445,14 +448,15 @@ static bool ascii_to_hid(char c, uint8_t *mod, uint8_t *kc)
 	return false;
 }
 
-bool bluetooth_kbd_type_char(char c, uint32_t tap_ms)
+static bool bluetooth_kbd_type_char(char c, uint32_t tap_ms)
 {
+	// Exit if char not mapped
 	uint8_t mod, kc;
 	if (!ascii_to_hid(c, &mod, &kc)) {
 		return false;
 	}
 
-	uint8_t keys[6] = { kc, 0,0,0,0,0 };
+	uint8_t keys[6] = {kc, 0,0,0,0,0};
 
 	bluetooth_kbd_send_raw(mod, keys);
 	vTaskDelay(pdMS_TO_TICKS(tap_ms));
@@ -462,15 +466,28 @@ bool bluetooth_kbd_type_char(char c, uint32_t tap_ms)
 	return true;
 }
 
-void bluetooth_kbd_type_string(const char *s, uint32_t tap_ms)
+void bluetooth_send_string(const char *s, uint32_t tap_ms)
 {
+	// If no string, exit
 	if (!s) {
 		return;
 	}
 
+	// Else type it out
 	while (*s) {
 		bluetooth_kbd_type_char(*s++, tap_ms);
 	}
+}
+
+void bluetooth_set_battery_level(uint8_t percent)
+{
+	// Cap at max
+	if (percent > 100) {
+		percent = 100;
+	}
+
+	// Updates the 0x2A19 characteristic; if a phone/PC subscribed, NimBLE will notify it
+	ble_svc_bas_battery_level_set(percent);
 }
 
 /* HID events / init / deinit */
@@ -492,6 +509,7 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
 
 			bluetooth_connected = true;
+			bluetooth_set_battery_level(100);
 			break;
 		}
 		case ESP_HIDD_DISCONNECT_EVENT: {
@@ -529,6 +547,9 @@ void bluetooth_init(void)
 
 		ret = esp_hid_ble_gap_adv_init(ESP_HID_APPEARANCE_KEYBOARD, DEVICE_NAME);
 		ESP_ERROR_CHECK(ret);
+
+		// Register the standard Battery Service (0x180F)
+		ble_svc_bas_init();
 
 		gap_inited_once = true;
 	}

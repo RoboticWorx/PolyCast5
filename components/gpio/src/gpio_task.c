@@ -50,6 +50,7 @@ SemaphoreHandle_t xNotChargingSemaphore;
 SemaphoreHandle_t xLEDCSemaphore;
 
 QueueHandle_t xAdcBatReadingQueue;
+QueueHandle_t xAdcBatBluetoothQueue;
 QueueHandle_t xLEDQueue;
 
 typedef struct {
@@ -165,6 +166,10 @@ static void adc_task(void *arg)
 			if (xQueueSend(xAdcBatReadingQueue, &percentage, portMAX_DELAY) != pdPASS) {
 				ESP_LOGE(TAG, "Failed to send xAdcBatReadingQueue: %u%%", percentage);
 			}
+			// And to bluetooth
+			if (xQueueSend(xAdcBatBluetoothQueue, &percentage, portMAX_DELAY) != pdPASS) {
+				ESP_LOGE(TAG, "Failed to send xAdcBatBluetoothQueue: %u%%", percentage);
+			}
 		}
 		
 		vTaskDelay(pdMS_TO_TICKS(10));
@@ -212,6 +217,8 @@ static void gpio_task(void *arg)
 	
 	xAdcBatReadingQueue = xQueueCreate(1, sizeof(uint8_t));
 	configASSERT(xAdcBatReadingQueue);
+	xAdcBatBluetoothQueue = xQueueCreate(1, sizeof(uint8_t));
+	configASSERT(xAdcBatBluetoothQueue);
 	xLEDQueue = xQueueCreate(1, sizeof(uint8_t));
 	configASSERT(xLEDQueue);
 	

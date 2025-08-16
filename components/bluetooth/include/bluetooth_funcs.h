@@ -4,21 +4,21 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// ---- Report IDs ----
+// Report IDs
 #define HID_RPT_ID_KB_IN     1   // Keyboard input (8 bytes)
 #define HID_RPT_ID_CC_IN     3   // Consumer Control input (2 bytes)  <-- keep 3 to match sender
 
-// ---- Keyboard modifier bits ----
-#define MOD_LCTRL  (1<<0)
+// Keyboard modifier bits
+#define MOD_LCTRL (1<<0)
 #define MOD_LSHIFT (1<<1)
-#define MOD_LALT   (1<<2)
-#define MOD_LGUI   (1<<3)
-#define MOD_RCTRL  (1<<4)
+#define MOD_LALT (1<<2)
+#define MOD_LGUI (1<<3)
+#define MOD_RCTRL (1<<4)
 #define MOD_RSHIFT (1<<5)
-#define MOD_RALT   (1<<6)
-#define MOD_RGUI   (1<<7)
+#define MOD_RALT (1<<6)
+#define MOD_RGUI (1<<7)
 
-// ---- Minimal HID keycodes (extend as needed) ----
+// Minimal HID keycodes
 #define HID_KC_A 0x04
 #define HID_KC_B 0x05
 #define HID_KC_C 0x06
@@ -58,50 +58,43 @@
 #define HID_KC_ENTER 0x28
 #define HID_KC_SPACE 0x2C
 
-// Punctuation & control keys (USB HID Usage Page 0x07)
-#define HID_KC_MINUS       0x2D  // - _
-#define HID_KC_EQUAL       0x2E  // = +
-#define HID_KC_LBRACKET    0x2F  // [ {
-#define HID_KC_RBRACKET    0x30  // ] }
-#define HID_KC_BACKSLASH   0x31  // \ |
-#define HID_KC_SEMICOLON   0x33  // ; :
-#define HID_KC_APOSTROPHE  0x34  // ' "
-#define HID_KC_GRAVE       0x35  // ` ~
-#define HID_KC_COMMA       0x36  // , <
-#define HID_KC_DOT         0x37  // . >
-#define HID_KC_SLASH       0x38  // / ?
-#define HID_KC_TAB         0x2B
-#define HID_KC_BSPACE      0x2A
+// Punctuation and control keys (USB HID Usage Page 0x07)
+#define HID_KC_MINUS 0x2D // - _
+#define HID_KC_EQUAL 0x2E // = +
+#define HID_KC_LBRACKET 0x2F // [ {
+#define HID_KC_RBRACKET 0x30 // ] }
+#define HID_KC_BACKSLASH 0x31 // \ |
+#define HID_KC_SEMICOLON 0x33 // ; :
+#define HID_KC_APOSTROPHE 0x34 // ' "
+#define HID_KC_GRAVE 0x35 // ` ~
+#define HID_KC_COMMA 0x36 // , <
+#define HID_KC_DOT 0x37 // . >
+#define HID_KC_SLASH 0x38 // / ?
+#define HID_KC_TAB 0x2B
+#define HID_KC_BSPACE 0x2A
 
-// ---- Consumer Control (keep your 2-byte layout) ----
+/* Consumer Control (keep your 2-byte layout) */
 // High byte bits for volume, low byte low-nibble for "button index"
-#define CC_PAYLOAD_LEN        2
-#define CC_VOL_UP_BIT         0x40    // 0x40 00
-#define CC_VOL_DOWN_BIT       0x80    // 0x80 00
-#define CC_BTN_PLAY           0x05    // 00 05
-#define CC_BTN_PAUSE          0x06    // 00 06
-#define CC_BTN_RECORD         0x07    // 00 07
-#define CC_BTN_FF             0x08    // 00 08
-#define CC_BTN_RW             0x09    // 00 09
-#define CC_BTN_NEXT           0x0A    // 00 0A
-#define CC_BTN_PREV           0x0B    // 00 0B
-#define CC_BTN_STOP           0x0C    // 00 0C
-#define CC_BTN_PLAY_PAUSE     0x0D    // 00 0D  (toggle)
+#define CC_PAYLOAD_LEN 2
+#define CC_VOL_UP_BIT 0x40 // 0x40 00
+#define CC_VOL_DOWN_BIT 0x80 // 0x80 00
+#define CC_BTN_PLAY 0x05 // 00 05
+#define CC_BTN_PAUSE 0x06 // 00 06
+#define CC_BTN_RECORD 0x07 // 00 07
+#define CC_BTN_FF 0x08 // 00 08
+#define CC_BTN_RW 0x09 // 00 09
+#define CC_BTN_NEXT 0x0A // 00 0A
+#define CC_BTN_PREV 0x0B // 00 0B
+#define CC_BTN_STOP 0x0C // 00 0C
+#define CC_BTN_PLAY_PAUSE 0x0D // 00 0D (toggle)
 
-// ---- Public API ----
-void bluetooth_init(void);
-void bluetooth_deinit(void);
+/* HID Consumer Usage IDs */
+// Self defined
+#define BLUETOOTH_CMD_INIT 0
+#define BLUETOOTH_CMD_DEINIT 1
+#define BLUETOOTH_CMD_SCRIPT_ONE 2
 
-// Media (existing)
-void bluetooth_send_cmd(uint8_t key_cmd, bool key_pressed);
-
-// Keyboard helpers
-void bluetooth_kbd_send_raw(uint8_t modifiers, const uint8_t keys[6]);
-void bluetooth_kbd_release_all(void);
-bool bluetooth_kbd_type_char(char c, uint32_t tap_ms);
-void bluetooth_kbd_type_string(const char *s, uint32_t tap_ms);
-
-// HID Consumer Usage IDs (subset)
+// Actual commands
 #define BLUETOOTH_CMD_POWER 48
 #define BLUETOOTH_CMD_RESET 49
 #define BLUETOOTH_CMD_SLEEP 50
@@ -120,8 +113,8 @@ void bluetooth_kbd_type_string(const char *s, uint32_t tap_ms);
 #define BLUETOOTH_CMD_RECORD 178
 #define BLUETOOTH_CMD_FAST_FORWARD 179
 #define BLUETOOTH_CMD_REWIND 180
-#define BLUETOOTH_CMD_SCAN_NEXT_TRK 181
-#define BLUETOOTH_CMD_SCAN_PREV_TRK 182
+#define BLUETOOTH_CMD_NEXT_TRK 181
+#define BLUETOOTH_CMD_PREV_TRK 182
 #define BLUETOOTH_CMD_STOP 183
 #define BLUETOOTH_CMD_PLAY_PAUSE 205
 
@@ -132,4 +125,37 @@ void bluetooth_kbd_type_string(const char *s, uint32_t tap_ms);
 #define BLUETOOTH_CMD_VOLUME_UP 233
 #define BLUETOOTH_CMD_VOLUME_DOWN 234
 
-#endif /* BLUETOOTH_FUNCS_H */
+/** 
+ * @brief Initialize bluetooth and start advertising to connect with last known
+ */
+void bluetooth_init(void);
+
+/** 
+ * @brief Deinitialize bluetooth
+ */
+void bluetooth_deinit(void);
+
+/** 
+ * @brief Send a media command over bluetooth
+ *
+ * @param [in] cmd Command to send
+ * @param [in] key_pressed Bool to simulate press
+ */
+void bluetooth_send_media(uint8_t key_cmd, bool key_pressed);
+
+/** 
+ * @brief Send a keyboard string over bluetooth
+ *
+ * @param [in] s String to send
+ * @param [in] tap_ms Delay between characters
+ */
+void bluetooth_send_string(const char *s, uint32_t tap_ms);
+
+/** 
+ * @brief Sends the battery level to the connected device
+ *
+ * @param [in] percent The battery level percentage to send
+ */
+void bluetooth_set_battery_level(uint8_t percent);
+
+#endif // BLUETOOTH_FUNCS_H

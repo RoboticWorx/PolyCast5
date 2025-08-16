@@ -2487,6 +2487,20 @@ void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t
 		// Switch pages
 		ui_menu->page = BLUETOOTH_MEDIA_PAGE;
 	}
+	// Keyboard selected
+	else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 2) {
+		// Hide bluetooth menu
+		lv_obj_add_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+		// Reset static
+		do_once = false;
+
+		// Show bluetooth keyboard menu
+		lv_obj_remove_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = BLUETOOTH_KEYBOARD_PAGE;
+	}
 }
 
 
