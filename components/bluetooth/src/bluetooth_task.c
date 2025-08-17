@@ -75,8 +75,7 @@ static void bluetooth_task(void *arg)
 			/* Text scripts */
 			// Script one command received
 			else if (bluetooth_cmd == BLUETOOTH_CMD_SCRIPT_ONE && bluetooth_connected) {
-				#define DAN_TXT "Hey Uncle Dan!\nJustin here on his PolyCast5 or Pentamote, I'm having trouble deciding. Perhaps you could help.\n\nPolyCast5 sounds cool and is super unique but can also feel like a mouth-full. Pentamote sounds pretty cool too and is faster to say but maybe loses some uniqueness.\n\nWhat do you think? I already own the .com for both which evens the playing field.\n\nOr maybe there is a better name I haven't thought of?\n\nThanks for your assistance.\n\n"
-				bluetooth_send_string(DAN_TXT, 1);
+				bluetooth_send_string("ScRiPT OnE!", 1);
 			}
 		}
 		

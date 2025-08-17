@@ -9,7 +9,7 @@
 #define ANIM_CITY_3  "A:/anim/city/anim_city_3.bin"
 #define ANIM_CITY_4  "A:/anim/city/anim_city_4.bin"
 #define ANIM_CITY_5  "A:/anim/city/anim_city_5.bin"
-/*#define ANIM_CITY_6  "A:/anim/city/anim_city_6.bin"
+#define ANIM_CITY_6  "A:/anim/city/anim_city_6.bin"
 #define ANIM_CITY_7  "A:/anim/city/anim_city_7.bin"
 #define ANIM_CITY_8  "A:/anim/city/anim_city_8.bin"
 #define ANIM_CITY_9  "A:/anim/city/anim_city_9.bin"
@@ -63,7 +63,7 @@
 #define ANIM_CITY_57 "A:/anim/city/anim_city_57.bin"
 #define ANIM_CITY_58 "A:/anim/city/anim_city_58.bin"
 #define ANIM_CITY_59 "A:/anim/city/anim_city_59.bin"
-#define ANIM_CITY_60 "A:/anim/city/anim_city_60.bin"*/
+#define ANIM_CITY_60 "A:/anim/city/anim_city_60.bin"
 
 // Black Hole
 #define ANIM_BLACK_HOLE_1  "A:/anim/black_hole/anim_black_hole_1.bin"
@@ -71,7 +71,7 @@
 #define ANIM_BLACK_HOLE_3  "A:/anim/black_hole/anim_black_hole_3.bin"
 #define ANIM_BLACK_HOLE_4  "A:/anim/black_hole/anim_black_hole_4.bin"
 #define ANIM_BLACK_HOLE_5  "A:/anim/black_hole/anim_black_hole_5.bin"
-/*#define ANIM_BLACK_HOLE_6  "A:/anim/black_hole/anim_black_hole_6.bin"
+#define ANIM_BLACK_HOLE_6  "A:/anim/black_hole/anim_black_hole_6.bin"
 #define ANIM_BLACK_HOLE_7  "A:/anim/black_hole/anim_black_hole_7.bin"
 #define ANIM_BLACK_HOLE_8  "A:/anim/black_hole/anim_black_hole_8.bin"
 #define ANIM_BLACK_HOLE_9  "A:/anim/black_hole/anim_black_hole_9.bin"
@@ -83,7 +83,7 @@
 #define ANIM_BLACK_HOLE_15 "A:/anim/black_hole/anim_black_hole_15.bin"
 #define ANIM_BLACK_HOLE_16 "A:/anim/black_hole/anim_black_hole_16.bin"
 #define ANIM_BLACK_HOLE_17 "A:/anim/black_hole/anim_black_hole_17.bin"
-#define ANIM_BLACK_HOLE_18 "A:/anim/black_hole/anim_black_hole_18.bin"*/
+#define ANIM_BLACK_HOLE_18 "A:/anim/black_hole/anim_black_hole_18.bin"
 
 // Matrix Rain
 #define ANIM_MATRIX_RAIN_1  "A:/anim/matrix_rain/anim_matrix_rain_1.bin"
@@ -91,7 +91,7 @@
 #define ANIM_MATRIX_RAIN_3  "A:/anim/matrix_rain/anim_matrix_rain_3.bin"
 #define ANIM_MATRIX_RAIN_4  "A:/anim/matrix_rain/anim_matrix_rain_4.bin"
 #define ANIM_MATRIX_RAIN_5  "A:/anim/matrix_rain/anim_matrix_rain_5.bin"
-/*#define ANIM_MATRIX_RAIN_6  "A:/anim/matrix_rain/anim_matrix_rain_6.bin"
+#define ANIM_MATRIX_RAIN_6  "A:/anim/matrix_rain/anim_matrix_rain_6.bin"
 #define ANIM_MATRIX_RAIN_7  "A:/anim/matrix_rain/anim_matrix_rain_7.bin"
 #define ANIM_MATRIX_RAIN_8  "A:/anim/matrix_rain/anim_matrix_rain_8.bin"
 #define ANIM_MATRIX_RAIN_9  "A:/anim/matrix_rain/anim_matrix_rain_9.bin"
@@ -127,7 +127,7 @@
 #define ANIM_MATRIX_RAIN_39 "A:/anim/matrix_rain/anim_matrix_rain_39.bin"
 #define ANIM_MATRIX_RAIN_40 "A:/anim/matrix_rain/anim_matrix_rain_40.bin"
 #define ANIM_MATRIX_RAIN_41 "A:/anim/matrix_rain/anim_matrix_rain_41.bin"
-#define ANIM_MATRIX_RAIN_42 "A:/anim/matrix_rain/anim_matrix_rain_42.bin"*/
+#define ANIM_MATRIX_RAIN_42 "A:/anim/matrix_rain/anim_matrix_rain_42.bin"
 
 // Pyramid
 #define ANIM_PYRAMID_1  "A:/anim/pyramid/anim_pyramid_1.bin"
