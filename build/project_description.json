@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "PolyCast5",
-    "project_version":    "f1ea83e9-dirty",
+    "project_version":    "702d4533-dirty",
     "project_path":       "C:/Projects/ESP/PolyCast5",
     "idf_path":           "C:/Espressif/frameworks/esp-idf-v5.5",
     "build_dir":          "C:/Projects/ESP/PolyCast5/build",
@@ -66,11 +66,11 @@
             "type": "LIBRARY",
             "lib": "__idf_bluetooth",
             "reqs": [ "common", "esp_hid", "bt" ],
-            "priv_reqs": [ "nvs_flash", "gpio" ],
+            "priv_reqs": [ "nvs_flash", "esp_http_server", "esp_wifi", "esp_netif", "gpio" ],
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "C:/Projects/ESP/PolyCast5/build/esp-idf/bluetooth/libbluetooth.a",
-            "sources": [ "C:/Projects/ESP/PolyCast5/components/bluetooth/src/bluetooth_funcs.c", "C:/Projects/ESP/PolyCast5/components/bluetooth/src/bluetooth_task.c", "C:/Projects/ESP/PolyCast5/components/bluetooth/src/esp_hid_gap.c" ],
+            "sources": [ "C:/Projects/ESP/PolyCast5/components/bluetooth/src/bluetooth_funcs.c", "C:/Projects/ESP/PolyCast5/components/bluetooth/src/bluetooth_task.c", "C:/Projects/ESP/PolyCast5/components/bluetooth/src/bluetooth_web_portal.c", "C:/Projects/ESP/PolyCast5/components/bluetooth/src/esp_hid_gap.c" ],
             "include_dirs": [ "include" ]
         },
         "bootloader": {
@@ -3055,7 +3055,7 @@
             "dir": "C:/Projects/ESP/PolyCast5/components/bluetooth",
             "lib": "__idf_bluetooth",
             "reqs": [ "common", "esp_hid", "bt" ],
-            "priv_reqs": [ "nvs_flash", "gpio" ],
+            "priv_reqs": [ "nvs_flash", "esp_http_server", "esp_wifi", "esp_netif", "gpio" ],
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "include_dirs": [ "include" ]

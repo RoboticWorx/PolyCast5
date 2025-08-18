@@ -19,6 +19,7 @@
 #include "lcd_bluetooth_funcs.h"
 #include "bluetooth_funcs.h"
 #include "bluetooth_task.h"
+#include "bluetooth_web_portal.h"
 
 bluetooth_menu_t bluetooth_menu = {
 	.options = {"How it works", "Media Controller", "Keyboard"},
@@ -685,6 +686,25 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 		do_once = false;
 		
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+	}
+	// Add script selected
+	else if (ui_btns->select_btn == 1 && bluetooth_menu->bluetooth_keyboard_menu.index == 0) {
+		// Deactivate bluetooth
+		uint8_t cmd = BLUETOOTH_CMD_DEINIT;
+		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+
+	    // Start SoftAP + web portal
+	    if (bluetooth_web_portal_start() == ESP_OK) {
+	        // Show quick instructions on-screen
+	        static lv_obj_t *lbl;
+	        if (!lbl) lbl = lv_label_create(ACTIVE_SCR);
+	        char msg[96];
+	        snprintf(msg, sizeof(msg),
+	                 "Connect Wi-Fi: \"PolyCast5-Setup\"\nOpen: http://%s", bluetooth_web_portal_get_ip());
+	        lcd_format_label(lbl, msg, user_secondary_color,
+	                         &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -6);
+	        lv_timer_handler();
+	    }
 	}
 	// Script one selected
 	else if (ui_btns->select_btn == 1 && bluetooth_menu->bluetooth_keyboard_menu.index == 1) {

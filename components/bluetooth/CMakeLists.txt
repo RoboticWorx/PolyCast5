@@ -13,5 +13,5 @@ idf_component_register(
     	common esp_hid bt
     
     PRIV_REQUIRES
-    	nvs_flash gpio
+    	nvs_flash esp_http_server esp_wifi esp_netif gpio
 )

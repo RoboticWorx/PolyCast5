@@ -75,7 +75,10 @@ static void bluetooth_task(void *arg)
 			/* Text scripts */
 			// Script one command received
 			else if (bluetooth_cmd == BLUETOOTH_CMD_SCRIPT_ONE && bluetooth_connected) {
-				bluetooth_send_string("ScRiPT OnE!", 1);
+				#define TEST_TXT_LN1 "Thanks for choosing PolyCast5! As you can see, this autotype feature can become quite handy. "
+				#define TEST_TXT_LN2 "It's perfect for funny pranks, autofilling long passwords, speeding up typing, coding, you name it! "
+				#define TEST_TXT_LN3 "To start adding your own text scripts, just go to 'Add Script' and follow the quick instructions.\n"
+				bluetooth_send_string(TEST_TXT_LN1 TEST_TXT_LN2 TEST_TXT_LN3, 1);
 			}
 		}
 		
