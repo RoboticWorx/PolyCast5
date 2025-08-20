@@ -92,7 +92,8 @@
 // Self defined
 #define BLUETOOTH_CMD_INIT 0
 #define BLUETOOTH_CMD_DEINIT 1
-#define BLUETOOTH_CMD_SCRIPT_ONE 2
+
+#define BLUETOOTH_SCRIPT_OFFSET 1000
 
 // Actual commands
 #define BLUETOOTH_CMD_POWER 48

@@ -1,3 +1,4 @@
+#include "bluetooth_web_portal.h"
 #include "polycast5_macros.h"
 
 #include "freertos/FreeRTOS.h"
@@ -18,13 +19,13 @@ QueueHandle_t xBluetoothMediaCmdQueue;
 
 volatile bool bluetooth_connected = false;
 
-static uint8_t bluetooth_cmd = 0;
+static uint16_t bluetooth_cmd = 0;
 static uint8_t battery_percentage = 100;
 static const TickType_t battery_timer_interval = pdMS_TO_TICKS(1000);
 
 static void bluetooth_task(void *arg)
 {
-	xBluetoothMediaCmdQueue = xQueueCreate(1, sizeof(uint8_t));
+	xBluetoothMediaCmdQueue = xQueueCreate(1, sizeof(uint16_t));
 	configASSERT(xBluetoothMediaCmdQueue);
 	
 	TickType_t battery_timer_last = xTaskGetTickCount();
@@ -73,12 +74,48 @@ static void bluetooth_task(void *arg)
 	            bluetooth_send_media(BLUETOOTH_CMD_PLAY_PAUSE, false);
 			}
 			/* Text scripts */
-			// Script one command received
-			else if (bluetooth_cmd == BLUETOOTH_CMD_SCRIPT_ONE && bluetooth_connected) {
-				#define TEST_TXT_LN1 "Thanks for choosing PolyCast5! As you can see, this autotype feature can become quite handy. "
-				#define TEST_TXT_LN2 "It's perfect for funny pranks, autofilling long passwords, speeding up typing, coding, you name it! "
-				#define TEST_TXT_LN3 "To start adding your own text scripts, just go to 'Add Script' and follow the quick instructions.\n"
-				bluetooth_send_string(TEST_TXT_LN1 TEST_TXT_LN2 TEST_TXT_LN3, 1);
+			else if (bluetooth_cmd >= BLUETOOTH_SCRIPT_OFFSET && bluetooth_connected) {
+				// Menu index that was encoded by the UI
+				uint16_t menu_idx = (uint16_t)(bluetooth_cmd - BLUETOOTH_SCRIPT_OFFSET);
+
+				#ifdef POLYCAST5_DEBUG
+					ESP_LOGI(TAG, "Received cmd index: %d -> menu index: ", bluetooth_cmd, menu_idx);
+				#endif
+			
+				// "Test" at menu index 1, handle it specially
+				if (menu_idx == 1) {
+					#define TEST_TXT_LN1 "Thanks for choosing PolyCast5! As you can see, this autotype feature can be quite handy. "
+					#define TEST_TXT_LN2 "It's perfect for funny pranks, auto-filling long passwords, speeding up typing, coding, you name it! "
+					#define TEST_TXT_LN3 "If you see yourself more an ethical hacker, this is also basically a Bluetooth USB Rubber Ducky. "
+					#define TEST_TXT_LN4 "To start adding your own text scripts, just go to 'Add/Edit Script' and follow the few simple instructions.\n"
+					bluetooth_send_string(TEST_TXT_LN1 TEST_TXT_LN2 TEST_TXT_LN3 TEST_TXT_LN4, 1);
+				}
+			
+				// Menu has 2 fixed rows before user scripts:
+				// So the first user script is menu_idx == 2 -> NVS index 0
+				if (menu_idx >= NUM_KEYBOARD_BASE) {
+					uint8_t script_idx = (uint8_t)(menu_idx - NUM_KEYBOARD_BASE); // 0-based NVS slot
+
+					char buf[512];
+					size_t blen = 0;
+
+					// Ask NVS for the stored body. Pass full sizeof(buf) so there's room for the NUL.
+					esp_err_t err = bt_script_body_get(script_idx, buf, sizeof(buf), &blen);
+					if (err == ESP_OK && blen > 0 && buf[0] != '\0') {
+						// NVS returns a C-string (blen typically includes the NUL). Just send it.
+						#ifdef POLYCAST5_DEBUG
+							ESP_LOGI(TAG, "Sending script: %s", buf);
+						#endif
+						bluetooth_send_string(buf, 1);
+					}
+					else {
+						ESP_LOGW(TAG, "No script body at idx=%u (err=%s, blen=%u)",
+								 (unsigned)script_idx, esp_err_to_name(err), (unsigned)blen);
+					}
+				}
+				else {
+					ESP_LOGW(TAG, "Unhandled menu_idx=%u for BLUETOOTH_SCRIPT_OFFSET", (unsigned)menu_idx);
+				}
 			}
 		}
 		

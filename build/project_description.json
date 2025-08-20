@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "PolyCast5",
-    "project_version":    "702d4533-dirty",
+    "project_version":    "a5494351-dirty",
     "project_path":       "C:/Projects/ESP/PolyCast5",
     "idf_path":           "C:/Espressif/frameworks/esp-idf-v5.5",
     "build_dir":          "C:/Projects/ESP/PolyCast5/build",
@@ -66,7 +66,7 @@
             "type": "LIBRARY",
             "lib": "__idf_bluetooth",
             "reqs": [ "common", "esp_hid", "bt" ],
-            "priv_reqs": [ "nvs_flash", "esp_http_server", "esp_wifi", "esp_netif", "gpio" ],
+            "priv_reqs": [ "gpio", "nvs_flash", "esp_http_server", "esp_wifi", "esp_netif", "json" ],
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "C:/Projects/ESP/PolyCast5/build/esp-idf/bluetooth/libbluetooth.a",
@@ -3055,7 +3055,7 @@
             "dir": "C:/Projects/ESP/PolyCast5/components/bluetooth",
             "lib": "__idf_bluetooth",
             "reqs": [ "common", "esp_hid", "bt" ],
-            "priv_reqs": [ "nvs_flash", "esp_http_server", "esp_wifi", "esp_netif", "gpio" ],
+            "priv_reqs": [ "gpio", "nvs_flash", "esp_http_server", "esp_wifi", "esp_netif", "json" ],
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "include_dirs": [ "include" ]

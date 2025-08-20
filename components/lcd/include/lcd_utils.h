@@ -76,6 +76,7 @@ enum {
     BLUETOOTH_PAIR_PAGE,
     BLUETOOTH_MEDIA_PAGE,
     BLUETOOTH_KEYBOARD_PAGE,
+    BLUETOOTH_SCRIPT_ADD_PAGE,
 };
 
 extern uint32_t pin_attempts;

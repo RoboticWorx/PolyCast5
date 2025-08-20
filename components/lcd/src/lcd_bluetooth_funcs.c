@@ -7,6 +7,7 @@
 
 #include "esp_log.h"
 #include "esp_err.h"
+#include "nvs.h"
 
 #include "core/lv_obj_pos.h"
 #include "core/lv_obj.h"
@@ -21,12 +22,96 @@
 #include "bluetooth_task.h"
 #include "bluetooth_web_portal.h"
 
+#define TAG "LCD_BLUETOOTH_FUNCS"
+
+static char s_script_labels[MAX_KEYBOARD_SCRIPTS][MAX_KEYBOARD_SCRIPTS + 1];
+
 bluetooth_menu_t bluetooth_menu = {
-	.options = {"How it works", "Media Controller", "Keyboard"},
-	.size = 3,
+	.options = {"How It Works", "Media Controller", "Keyboard"},
+	.size = NUM_BLUETOOTH_OPTIONS,
 	.index = 1,
 	.cont = NULL,
 };
+
+static void keyboard_menu_rebuild_lvlist(bluetooth_keyboard_menu_t *km)
+{
+    // Remove all old buttons (if any)
+    if (km->main_list != NULL) {
+        lv_obj_clean(km->main_list);
+    }
+
+    // Create a button for each row we currently have
+    for (int i = 0; i < km->size; i++) {
+        km->btns[i] = lv_list_add_btn(km->main_list, NULL, km->options[i]);
+        lv_obj_set_size(km->btns[i], 200, 30);
+
+        // Apply selected / normal style
+        if (i == km->index) {
+            lv_obj_add_style(km->btns[i], &km->sel_style, 0);
+        } else {
+            lv_obj_add_style(km->btns[i], &km->btn_style, 0);
+        }
+
+        // Center/scroll label inside the button
+        lv_obj_t *lbl = lv_obj_get_child(km->btns[i], 0);
+        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+    }
+
+    // Format button container (list’s internal container is parent of first button)
+    if (km->size > 0) {
+        km->cont = lv_obj_get_parent(km->btns[0]);
+        lv_obj_set_flex_flow (km->cont, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_flex_align(km->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_gap(km->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+}
+
+// Pulls labels from NVS and rebuilds the LVGL list
+static void keyboard_menu_refresh_from_nvs(bluetooth_keyboard_menu_t *km)
+{
+    // Base rows always present
+    km->options[0] = "Add/Edit Script";
+    km->options[1] = "Test";
+
+    // Read how many user scripts are stored
+    uint32_t count = bt_script_count_get();
+
+    // Cap by our storage
+    if (count > MAX_KEYBOARD_SCRIPTS) {
+        count = MAX_KEYBOARD_SCRIPTS;
+    }
+
+    // Pull labels for each user script i -> row (i + NUM_KEYBOARD_BASE)
+    for (uint32_t i = 0; i < count; i++) {
+        // Fill default label first
+        s_script_labels[i][0] = '\0';
+
+        // Try to read label from NVS (namespace/keys match the portal)
+        size_t len = sizeof(s_script_labels[i]);
+        esp_err_t err = bt_script_label_get(i, s_script_labels[i], len);
+        if (err != ESP_OK) {
+            // On error, show a placeholder rather than leaving a blank
+            snprintf(s_script_labels[i], sizeof(s_script_labels[i]), "Script %u", (unsigned)i);
+        }
+
+        km->options[NUM_KEYBOARD_BASE + i] = s_script_labels[i];
+    }
+
+    // New total size = base + user
+    km->size = NUM_KEYBOARD_BASE + (int)count;
+
+    // Keep selection in range
+    if (km->index >= km->size) {
+        km->index = (km->size > 1) ? 1 : 0;
+    } else if (km->index < 0) {
+        km->index = km->size - 1;
+    }
+
+    // Actually rebuild LVGL widgets to match new size
+    keyboard_menu_rebuild_lvlist(km);
+}
 
 static void lcd_bluetooth_setup_keyboard_page(bluetooth_keyboard_menu_t *menu)
 {
@@ -112,6 +197,9 @@ static void lcd_bluetooth_setup_keyboard_page(bluetooth_keyboard_menu_t *menu)
 	lv_obj_set_flex_flow (menu->cont, LV_FLEX_FLOW_COLUMN);
 	lv_obj_set_flex_align(menu->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 	lv_obj_set_style_pad_gap(menu->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT); // Set button spacing
+
+	// Update based on NVS
+	keyboard_menu_refresh_from_nvs(menu);
 	
 	// Hide for now
 	lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -122,9 +210,9 @@ void lcd_bluetooth_setup_page(bluetooth_menu_t *menu)
 	// Setup bluetooth keyboard menu once
 	bluetooth_keyboard_menu_t *km = &menu->bluetooth_keyboard_menu;
 	if (km->size <= 0) {
-		km->options[0] = "Add Script";
+		km->options[0] = "Add/Edit Script";
 		km->options[1] = "Test";
-		km->size = 2;
+		km->size = NUM_KEYBOARD_BASE; // Final index + 1
 		km->index = 1; // Default index
 	}
 	lcd_bluetooth_setup_keyboard_page(km);
@@ -292,7 +380,7 @@ void lcd_bluetooth_pair_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_m
 		lv_timer_handler();
 		
 		// Initialize bluetooth
-		uint8_t cmd = BLUETOOTH_CMD_INIT;
+		uint16_t cmd = BLUETOOTH_CMD_INIT;
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 		
 		init = true;
@@ -477,7 +565,7 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 		lv_timer_handler();
 
 		// Active bluetooth
-		uint8_t cmd = BLUETOOTH_CMD_INIT;
+		uint16_t cmd = BLUETOOTH_CMD_INIT;
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
 		init = true;
@@ -527,7 +615,7 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 		lv_obj_set_style_text_color(lbl_up, user_primary_color, 0);
 
 		// Send command
-		uint8_t cmd = BLUETOOTH_CMD_VOLUME_UP;
+		uint16_t cmd = BLUETOOTH_CMD_VOLUME_UP;
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 	}
 	// Next track
@@ -537,7 +625,7 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 		lv_obj_set_style_text_color(lbl_right, user_primary_color, 0);
 
 		// Send command
-		uint8_t cmd = BLUETOOTH_CMD_NEXT_TRK;
+		uint16_t cmd = BLUETOOTH_CMD_NEXT_TRK;
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 	}
 	// Volume down
@@ -547,7 +635,7 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 		lv_obj_set_style_text_color(lbl_down, user_primary_color, 0);
 
 		// Send command
-		uint8_t cmd = BLUETOOTH_CMD_VOLUME_DOWN;
+		uint16_t cmd = BLUETOOTH_CMD_VOLUME_DOWN;
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 	}
 	// Previous track
@@ -557,7 +645,7 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 		lv_obj_set_style_text_color(lbl_left, user_primary_color, 0);
 
 		// Send command
-		uint8_t cmd = BLUETOOTH_CMD_PREV_TRK;
+		uint16_t cmd = BLUETOOTH_CMD_PREV_TRK;
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 	}
 	// Pause/play
@@ -567,13 +655,13 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 		lv_obj_set_style_text_color(lbl_center, user_primary_color, 0);
 
 		// Send command
-		uint8_t cmd = BLUETOOTH_CMD_PLAY_PAUSE;
+		uint16_t cmd = BLUETOOTH_CMD_PLAY_PAUSE;
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 	}
 	// Go back
 	else if (ui_btns->home_btn == 1) {
 		// Deinit bluetooth
-		uint8_t cmd = BLUETOOTH_CMD_DEINIT;
+		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
 		// Delete objects
@@ -604,7 +692,7 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 	// Power off
 	else if (ui_btns->pwr_btn == 1) {
 		// Deinit bluetooth
-		uint8_t cmd = BLUETOOTH_CMD_DEINIT;
+		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
 		// Delete objects
@@ -633,11 +721,16 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 	
 	// Only execute once
 	if (!do_once) {
+		// Update based on NVS
+		keyboard_menu_refresh_from_nvs(&bluetooth_menu->bluetooth_keyboard_menu);
+
 		// Show bluetooth keyboard menu
 		lv_obj_remove_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
 
+		lv_timer_handler();
+
 		// Active bluetooth
-		uint8_t cmd = BLUETOOTH_CMD_INIT;
+		uint16_t cmd = BLUETOOTH_CMD_INIT;
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 		
 		do_once = true;
@@ -658,7 +751,7 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 	// Back selected
 	else if (ui_btns->left_btn == 1) {
 		// Deactivate bluetooth
-		uint8_t cmd = BLUETOOTH_CMD_DEINIT;
+		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
 		// Hide bluetooth keyboard menu
@@ -676,7 +769,7 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 	// Home or power off selected
 	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Deactivate bluetooth
-		uint8_t cmd = BLUETOOTH_CMD_DEINIT;
+		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
 		// Hide bluetooth keyboard menu
@@ -690,27 +783,127 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 	// Add script selected
 	else if (ui_btns->select_btn == 1 && bluetooth_menu->bluetooth_keyboard_menu.index == 0) {
 		// Deactivate bluetooth
-		uint8_t cmd = BLUETOOTH_CMD_DEINIT;
+		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-	    // Start SoftAP + web portal
-	    if (bluetooth_web_portal_start() == ESP_OK) {
-	        // Show quick instructions on-screen
-	        static lv_obj_t *lbl;
-	        if (!lbl) lbl = lv_label_create(ACTIVE_SCR);
-	        char msg[96];
-	        snprintf(msg, sizeof(msg),
-	                 "Connect Wi-Fi: \"PolyCast5-Setup\"\nOpen: http://%s", bluetooth_web_portal_get_ip());
-	        lcd_format_label(lbl, msg, user_secondary_color,
-	                         &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -6);
-	        lv_timer_handler();
-	    }
+		// Hide bluetooth keyboard menu
+		lv_obj_add_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		// Switch pages
+		ui_menu->page = BLUETOOTH_SCRIPT_ADD_PAGE;
 	}
-	// Script one selected
-	else if (ui_btns->select_btn == 1 && bluetooth_menu->bluetooth_keyboard_menu.index == 1) {
-		// Send script one
-		uint8_t cmd = BLUETOOTH_CMD_SCRIPT_ONE;
+	// Script selected
+	else if (ui_btns->select_btn == 1 && bluetooth_menu->bluetooth_keyboard_menu.index > 0) {
+		// Send script
+		uint16_t cmd = bluetooth_menu->bluetooth_keyboard_menu.index + BLUETOOTH_SCRIPT_OFFSET; // E.g. Send script index 1 => send 1001
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+	}
+}
+
+void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
+{
+	#define SCRIPT_ADD_Y_OFFSET 40
+	
+	// Statics
+	static bool init = false;
+	static lv_obj_t *cont = NULL;
+	static lv_obj_t *title_lbl = NULL;
+	static lv_obj_t *instr_lbl = NULL;
+	
+	if (!init) {
+		// Create a scrollable container for the instructions
+		cont = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(cont, 210, 106);
+		lv_obj_center(cont);
+		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
+
+		// Title label
+		title_lbl = lv_label_create(cont);
+		lv_label_set_text(title_lbl, "Adding a Script:");
+		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+		// Instructions label (scrollable if text is long)
+		instr_lbl = lv_label_create(cont);
+		lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+		lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
+		lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
+		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+
+
+		// Start SoftAP and web portal
+		char msg[64];
+	    if (bluetooth_web_portal_start() == ESP_OK) {
+			// Get portal IP
+	        snprintf(msg, sizeof(msg), "http://%s", bluetooth_web_portal_get_ip());
+	    }
+
+		// Set custom text based on hotkey index
+		const char *instr_text = "How to quickly add a new Bluetooth autotype text script:\n\nFirst, grab your phone or other device and navigate to Wi-Fi settings."
+				"\n\nThere, you should see a joinable Wi-Fi network named '" PORTAL_SSID "'. Click on it and enter the password '" PORTAL_PASS "'."
+				"\n\nOnce connected, open up your internet browser of choice and search:\n\n%s\n\nFrom there, follow the on-screen instructions. "
+				"DO NOT exit this page until you're done entering what you want into the web portal.";
+		
+		lv_label_set_text_fmt(instr_lbl, instr_text, msg);
+	
+		init = true;
+	}
+	
+	if (ui_btns->up_btn == 1) {
+		lv_obj_scroll_by(cont, 0, SCRIPT_ADD_Y_OFFSET, LV_ANIM_ON);
+	}
+	else if (ui_btns->down_btn == 1) {
+		lv_obj_scroll_by(cont, 0, -SCRIPT_ADD_Y_OFFSET, LV_ANIM_ON);
+	}
+	// Go back
+	else if (ui_btns->left_btn) {
+		// Turn off web portal
+		bluetooth_web_portal_stop();
+		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		// Delete objects
+		lv_obj_del(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+			
+		// Show bluetooth menu
+		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch back
+		ui_menu->page = BLUETOOTH_PAGE;
+	}
+	// Home or power off
+	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
+		// Turn off web portal
+		bluetooth_web_portal_stop();
+
+		// Delete objects
+		lv_obj_del(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+		
+ 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 

@@ -1,6 +1,7 @@
 #ifndef LCD_BLUETOOTH_FUNCS_H
 #define LCD_BLUETOOTH_FUNCS_H
 
+#include "bluetooth_web_portal.h"
 #include "esp_err.h"
 
 #include "misc/lv_style.h"
@@ -8,13 +9,15 @@
 
 #define NUM_BLUETOOTH_OPTIONS 3
 
+#define MAX_NUM_KEYBOARD_SCRIPTS 20
+
 // Forward-declare structs (from lcd_utils.h)
 typedef struct ui_btns_t ui_btns_t;
 typedef struct ui_menu_t ui_menu_t;
 
 typedef struct {
-	char *options[NUM_BLUETOOTH_OPTIONS];
-	lv_obj_t *btns[NUM_BLUETOOTH_OPTIONS];
+	char *options[NUM_KEYBOARD_BASE + MAX_NUM_KEYBOARD_SCRIPTS];
+	lv_obj_t *btns[NUM_KEYBOARD_BASE + MAX_NUM_KEYBOARD_SCRIPTS];
 	int size;
 	int index;
 	lv_obj_t *main_list;
@@ -84,6 +87,15 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
  * @param [in] bluetooth_menu Bluetooth menu structure
  */
 void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
+
+/**
+ * @brief Scrollable instructions to add a script as well as starts the http web portal
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] bluetooth_menu Bluetooth menu structure
+ */
+void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
 
 
 #endif // LCD_BLUETOOTH_FUNCS_H

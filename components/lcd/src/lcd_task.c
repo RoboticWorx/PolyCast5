@@ -377,6 +377,9 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == BLUETOOTH_KEYBOARD_PAGE) {
 				lcd_bluetooth_keyboard_page(&ui_btns, &ui_menu, &bluetooth_menu);
 			}
+			else if (ui_menu.page == BLUETOOTH_SCRIPT_ADD_PAGE) {
+				lcd_bluetooth_add_script_page(&ui_btns, &ui_menu, &bluetooth_menu);
+			}
 		}
 		
 		// Sleep condition
