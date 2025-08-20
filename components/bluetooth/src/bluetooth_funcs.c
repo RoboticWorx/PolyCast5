@@ -1,6 +1,7 @@
 #include "freertos/projdefs.h"
 #include "polycast5_macros.h"
 
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -282,14 +283,14 @@ static bool ascii_to_hid(char c, uint8_t *mod, uint8_t *kc)
 	}
 
 	// Digits (unshifted)
-	if (c >= '1' && c <= '9') {
+	if (c >= '1' && c <= '9') { // 1..9
 		*kc = 0x1E + (c - '1');
 		return true;
-	} // 1..9
-	if (c == '0') {
+	}
+	if (c == '0') { // 0
 		*kc = 0x27;
 		return true;
-	} // 0
+	}
 
 	// Whitespace / control
 	if (c == ' ') {
@@ -466,15 +467,266 @@ static bool bluetooth_kbd_type_char(char c, uint32_t tap_ms)
 	return true;
 }
 
-void bluetooth_send_string(const char *s, uint32_t tap_ms)
+// Case-insensitive strcmp
+static int icmp(const char *a, const char *b)
 {
-	// If no string, exit
-	if (!s) {
+	while (*a && *b) {
+		int da = tolower((unsigned char)*a++);
+		int db = tolower((unsigned char)*b++);
+
+		if (da != db) {
+			return da - db;
+		}
+	}
+
+	return (int)((unsigned char)*a) - (int)((unsigned char)*b);
+}
+
+// Map common key names used in tags to HID keycodes.
+// Returns true on success and writes *kc
+static bool key_name_to_hid(const char *name, uint8_t *kc)
+{
+	// Exit if NULL
+	if (!name || !kc) {
+		return false;
+	}
+
+	// Possible <...> commands
+	if (icmp(name, "enter") == 0 || icmp(name, "return") == 0) {
+		*kc = HID_KC_ENTER;
+		return true;
+	}
+	if (icmp(name, "tab") == 0) {
+		*kc = HID_KC_TAB;
+		return true;
+	}
+	if (icmp(name, "esc") == 0 || icmp(name, "escape") == 0) {
+		*kc = HID_KC_ESC;
+		return true;
+	}
+	if (icmp(name, "space") == 0 || icmp(name, "spacebar") == 0) {
+		*kc = HID_KC_SPACE;
+		return true;
+	}
+	if (icmp(name, "backspace") == 0 || icmp(name, "bs") == 0) {
+		*kc = HID_KC_BACKSPACE;
+		return true;
+	}
+	if (icmp(name, "del") == 0) {
+		*kc = HID_KC_DELETE;
+		return true;
+	}
+	if (icmp(name, "up") == 0) {
+		*kc = HID_KC_UP;
+		return true;
+	}
+	if (icmp(name, "down") == 0) {
+		*kc = HID_KC_DOWN;
+		return true;
+	}
+	if (icmp(name, "left") == 0) {
+		*kc = HID_KC_LEFT;
+		return true;
+	}
+	if (icmp(name, "right") == 0) {
+		*kc = HID_KC_RIGHT;
+		return true;
+	}
+	if (icmp(name, "home") == 0) {
+		*kc = HID_KC_HOME;
+		return true;
+	}
+	if (icmp(name, "end") == 0) {
+		*kc = HID_KC_END;
+		return true;
+	}
+	if (icmp(name, "pgup") == 0 || icmp(name, "pageup") == 0) {
+		*kc = HID_KC_PGUP;
+		return true;
+	}
+	if (icmp(name, "pgdn") == 0 || icmp(name, "pagedown") == 0) {
+		*kc = HID_KC_PGDN;
+		return true;
+	}
+
+	// F1-F24
+	if ((name[0] == 'f' || name[0] == 'F') && isdigit((unsigned char)name[1])) {
+		long fn = strtol(name + 1, NULL, 10);
+
+		if (fn >= 1 && fn <= 12) {
+			*kc = (uint8_t)(HID_KC_F1 + (fn - 1));
+			return true;
+		}
+	}
+
+	// Single ASCII letter/digit/symbol - let your existing ASCII->HID path handle it
+	// Report false here so the caller can fall back to ascii_to_hid()
+	return false;
+}
+
+// Compute modifier bitfield from tokens like "ctrl", "shift", "alt", "gui", "win", "cmd".
+static uint8_t mod_from_word(const char *w)
+{
+	// Exit if NULL
+	if (!w) {
+		return 0;
+	}
+
+	// Look for command
+	if (!icmp(w, "ctrl") || !icmp(w, "control") || !icmp(w, "ctl")) {
+		return MOD_LCTRL;
+	}
+	if (!icmp(w, "shift")) {
+		return MOD_LSHIFT;
+	}
+	if (!icmp(w, "alt") || !icmp(w, "option") || !icmp(w, "opt")) {
+		return MOD_LALT;
+	}
+	if (!icmp(w, "gui") || !icmp(w, "win")	|| !icmp(w, "cmd") || !icmp(w, "meta")) {
+		return MOD_LGUI;
+	}
+
+	return 0;
+}
+
+// Press one combo then release (wrapper around your existing raw send)
+static void bluetooth_send_combo(uint8_t modifiers, uint8_t keycode, uint32_t tap_ms) {
+	uint8_t keys[6] = { keycode, 0,0,0,0,0 };
+	bluetooth_kbd_send_raw(modifiers, keys);
+	vTaskDelay(pdMS_TO_TICKS(tap_ms));
+	bluetooth_kbd_release_all();
+	vTaskDelay(pdMS_TO_TICKS(tap_ms));
+}
+
+// Parse a <...+...> or <...> style token
+// Returns true if it consumed a token and sent it
+// *consumed_end points to the closing '>' or NULL if none
+static bool parse_and_send_tag(const char *start, const char **consumed_end, uint32_t tap_ms) {
+	// Start points at the '<'
+	const char *gt = strchr(start, '>'); // Points to first occurrence of '>'
+	if (!gt) {
+		*consumed_end = NULL;
+		return false; // No closing '>'
+	}
+
+	// Extract inside text (without < and >)
+	size_t len = (size_t)(gt - (start + 1));
+	if (len == 0) {
+		*consumed_end = gt;
+		return true; // Empty tag
+	}
+
+	char tmp[64]; // Buf
+
+	// Clamp
+	if (len >= sizeof(tmp)) {
+		len = sizeof(tmp) - 1;
+	}
+
+	memcpy(tmp, start + 1, len);
+	tmp[len] = '\0';
+
+	// If is <delay=x>
+	if (!strncasecmp(tmp, "delay=", 6)) { // Compares while ignoring differences in case
+		long ms = strtol(tmp + 6, NULL, 10); // Converts a string to a long int
+
+		// Min is 0
+		if (ms < 0) {
+			ms = 0;
+		}
+
+		// Delay that amount (blocks bluetooth_task)
+		vTaskDelay(pdMS_TO_TICKS((uint32_t)ms));
+
+		*consumed_end = gt;
+		return true;
+	}
+
+	/* IF NEEDED LATER:
+	// If is <text=x>
+	if (!strncasecmp(tmp, "text=", 5)) {
+		const char *payload = tmp + 5;
+
+		// Stream via existing per-char typer:
+		while (*payload) {
+			// Typed via internal helper; see bluetooth_send_string()/bluetooth_kbd_type_char()
+			// It presses & releases a single key with delays :contentReference[oaicite:1]{index=1}
+			bluetooth_kbd_type_char(*payload++, tap_ms);
+		}
+
+		*consumed_end = gt;
+		return true;
+	}
+	*/
+
+	// If is <...+...> / <...>: Split on '+'
+	uint8_t mods = 0;
+	uint8_t key  = 0;
+
+	char *save = NULL;
+	char *tok = strtok_r(tmp, "+", &save); // Returns a pointer to the beginning of the token
+	bool sent = false;
+
+	while (tok) {
+		// If this word is a modifier add it, otherwise it’s the 'primary' key
+		uint8_t add = mod_from_word(tok);
+
+		// If found something, bitwise OR to mods
+		if (add) {
+			mods |= add;
+		}
+		else {
+			// Try name mapping first
+			if (!key && key_name_to_hid(tok, &key)) {
+				// Okay -> got command
+			}
+			else if (!key) {
+				// Fallback: single ASCII char
+				uint8_t amod = 0, akc = 0;
+				if (ascii_to_hid(tok[0], &amod, &akc)) {
+					key = akc;
+					mods |= amod; // Include shift if needed by symbol
+				}
+			}
+		}
+
+		tok = strtok_r(NULL, "+", &save);
+	}
+
+	// Send mods
+	if (key) {
+		bluetooth_send_combo(mods, key, tap_ms);
+		sent = true;
+	}
+
+	*consumed_end = gt;
+	return sent;
+}
+
+// Send script
+void bluetooth_send_script(const char *script, uint32_t tap_ms)
+{
+	// Make sure exists
+	if (!script) {
 		return;
 	}
 
-	// Else type it out
+	const char *s = script;
+
+	// Check the script for tokens
 	while (*s) {
+		// If found command start
+		if (*s == '<') {
+			const char *gt = NULL;
+			
+			if (parse_and_send_tag(s, &gt, tap_ms) && gt) {
+				s = gt + 1; // Consumed a tag
+				continue;
+			}
+			// Malformed tag: no '>' -> type the '<' literally
+		}
+
+		// Ordinary text path, keep typing
 		bluetooth_kbd_type_char(*s++, tap_ms);
 	}
 }

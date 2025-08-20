@@ -73,6 +73,60 @@
 #define HID_KC_TAB 0x2B
 #define HID_KC_BSPACE 0x2A
 
+// Added keys for bt scripts
+#ifndef HID_KC_ESC
+#define HID_KC_ESC 0x29
+#endif
+
+// Friendly alias so both names work
+#ifndef HID_KC_BACKSPACE
+#define HID_KC_BACKSPACE HID_KC_BSPACE
+#endif
+
+#ifndef HID_KC_DELETE
+#define HID_KC_DELETE 0x4C // Delete (Forward Delete)
+#endif
+#ifndef HID_KC_HOME
+#define HID_KC_HOME 0x4A
+#endif
+#ifndef HID_KC_END
+#define HID_KC_END 0x4D
+#endif
+#ifndef HID_KC_PGUP
+#define HID_KC_PGUP 0x4B
+#endif
+#ifndef HID_KC_PGDN
+#define HID_KC_PGDN 0x4E
+#endif
+#ifndef HID_KC_RIGHT
+#define HID_KC_RIGHT 0x4F
+#endif
+#ifndef HID_KC_LEFT
+#define HID_KC_LEFT 0x50
+#endif
+#ifndef HID_KC_DOWN
+#define HID_KC_DOWN 0x51
+#endif
+#ifndef HID_KC_UP
+#define HID_KC_UP 0x52
+#endif
+
+// Function keys (F1..F12)
+#ifndef HID_KC_F1
+#define HID_KC_F1         0x3A
+#define HID_KC_F2         0x3B
+#define HID_KC_F3         0x3C
+#define HID_KC_F4         0x3D
+#define HID_KC_F5         0x3E
+#define HID_KC_F6         0x3F
+#define HID_KC_F7         0x40
+#define HID_KC_F8         0x41
+#define HID_KC_F9         0x42
+#define HID_KC_F10        0x43
+#define HID_KC_F11        0x44
+#define HID_KC_F12        0x45
+#endif
+
 /* Consumer Control (keep your 2-byte layout) */
 // High byte bits for volume, low byte low-nibble for "button index"
 #define CC_PAYLOAD_LEN 2
@@ -150,7 +204,7 @@ void bluetooth_send_media(uint8_t key_cmd, bool key_pressed);
  * @param [in] s String to send
  * @param [in] tap_ms Delay between characters
  */
-void bluetooth_send_string(const char *s, uint32_t tap_ms);
+void bluetooth_send_script(const char *s, uint32_t tap_ms);
 
 /** 
  * @brief Sends the battery level to the connected device
@@ -158,5 +212,6 @@ void bluetooth_send_string(const char *s, uint32_t tap_ms);
  * @param [in] percent The battery level percentage to send
  */
 void bluetooth_set_battery_level(uint8_t percent);
+
 
 #endif // BLUETOOTH_FUNCS_H

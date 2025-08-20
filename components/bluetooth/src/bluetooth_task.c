@@ -88,7 +88,7 @@ static void bluetooth_task(void *arg)
 					#define TEST_TXT_LN2 "It's perfect for funny pranks, auto-filling long passwords, speeding up typing, coding, you name it! "
 					#define TEST_TXT_LN3 "If you see yourself more an ethical hacker, this is also basically a Bluetooth USB Rubber Ducky. "
 					#define TEST_TXT_LN4 "To start adding your own text scripts, just go to 'Add/Edit Script' and follow the few simple instructions.\n"
-					bluetooth_send_string(TEST_TXT_LN1 TEST_TXT_LN2 TEST_TXT_LN3 TEST_TXT_LN4, 1);
+					bluetooth_send_script(TEST_TXT_LN1 TEST_TXT_LN2 TEST_TXT_LN3 TEST_TXT_LN4, 1);
 				}
 			
 				// Menu has 2 fixed rows before user scripts:
@@ -100,13 +100,13 @@ static void bluetooth_task(void *arg)
 					size_t blen = 0;
 
 					// Ask NVS for the stored body. Pass full sizeof(buf) so there's room for the NUL.
-					esp_err_t err = bt_script_body_get(script_idx, buf, sizeof(buf), &blen);
+					esp_err_t err = bluetooth_script_body_get(script_idx, buf, sizeof(buf), &blen);
 					if (err == ESP_OK && blen > 0 && buf[0] != '\0') {
 						// NVS returns a C-string (blen typically includes the NUL). Just send it.
 						#ifdef POLYCAST5_DEBUG
 							ESP_LOGI(TAG, "Sending script: %s", buf);
 						#endif
-						bluetooth_send_string(buf, 1);
+						bluetooth_send_script(buf, 1);
 					}
 					else {
 						ESP_LOGW(TAG, "No script body at idx=%u (err=%s, blen=%u)",

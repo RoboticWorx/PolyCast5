@@ -23,7 +23,6 @@
 #define BT_SCRIPT_MENU_KEY_SEL "selected"
 #define BT_SCRIPT_MENU_KEY_FMT "item_%02d"
 
-#define BT_SCRIPT_LABEL_MAX_LEN 32
 #define MAX_HTTP_BODY_TXT 2048
 
 static httpd_handle_t s_server = NULL;
@@ -44,6 +43,33 @@ static const char *INDEX_HTML =
 "<div><label>Name</label><input id=name maxlength=32 placeholder='Short label for device menu'></div>"
 "<div><label>Payload</label><textarea id=body placeholder='What the device should type…'></textarea></div>"
 "<div><button id=save>Save (add/edit)</button> <span id=msg></span></div>"
+
+"<p>Here are some additional commands so you can do more than just type text:</p>"
+"<p>"
+"&lt;delay=x&gt; - Wait for x milliseconds"
+"<br>&lt;enter&gt; - Enter"
+"<br>&lt;tab&gt; - Tab"
+"<br>&lt;esc&gt; - Escape"
+"<br>&lt;ctrl&gt; - Ctrl"
+"<br>&lt;shift&gt; - Shift"
+"<br>&lt;alt&gt; - Alt/Option"
+"<br>&lt;win&gt; - Windows/Cmd"
+"<br>&lt;bs&gt; - Backspace"
+"<br>&lt;del&gt; - Forward delete"
+"<br>&lt;up&gt; - Up arrow"
+"<br>&lt;down&gt; - Down arrow"
+"<br>&lt;left&gt; - Left arrow"
+"<br>&lt;right&gt; - Right arrow"
+"<br>&lt;home&gt; - Home"
+"<br>&lt;pgup&gt; - Page up"
+"<br>&lt;pgdn&gt; - Page down"
+"<br>&lt;fx&gt; - Function x (e.g. f1, f2, etc.)"
+"<br><br>You can also combine commands like &lt;ctrl+shift+v&gt; or &lt;ctrl+c&gt;. Please also note that hitting enter when typing is treated as &lt;enter&gt;."
+"<br><br>Example: If I want to open up a given program to run something on windows I would maybe have something like this with delays to make "
+"sure that the computer opened whatever before continuing: "
+"&lt;win+s&gt;&lt;delay=500&gt;browser&lt;enter&gt;&lt;delay=500&gt;https://youtu.be/dQw4w9WgXcQ?si=fCygLTFX4Usi2nlR&lt;enter&gt;"
+"</p>"
+
 "<hr><h3>Existing Scripts</h3><select id=list size=6 style='height:160px'></select>"
 "<script>"
 "async function refreshList(){let r=await fetch('/api/scripts');if(!r.ok)return;"
@@ -64,7 +90,7 @@ static const char *INDEX_HTML =
 /* ========= NVS handlers ========= */
 
 // Read the count of user scripts
-uint8_t bt_script_count_get(void)
+uint8_t bluetooth_script_count_get(void)
 {
  	nvs_handle_t h;
  	uint8_t count = 0;
@@ -158,7 +184,7 @@ static esp_err_t bt_script_selected_set(uint8_t idx)
 }
 
 // Read a script label into caller buffer (buflen should be >= BT_SCRIPT_LABEL_MAX_LEN + 1)
-esp_err_t bt_script_label_get(uint8_t idx, char *buf, size_t buflen)
+esp_err_t bluetooth_script_label_get(uint8_t idx, char *buf, size_t buflen)
 {
  	nvs_handle_t h;
  	
@@ -228,7 +254,7 @@ static esp_err_t bt_script_label_set(uint8_t idx, const char *label)
 }
 
 // Read a payload body into caller buffer (need must fit into buflen)
-esp_err_t bt_script_body_get(uint8_t idx, char *buf, size_t buflen, size_t *outlen)
+esp_err_t bluetooth_script_body_get(uint8_t idx, char *buf, size_t buflen, size_t *outlen)
 {
  	nvs_handle_t h;
  	
@@ -321,7 +347,7 @@ static esp_err_t root_get(httpd_req_t *req)
 static esp_err_t scripts_list_get(httpd_req_t *req)
 {
 	// Get num current scripts
- 	uint8_t count = bt_script_count_get();
+ 	uint8_t count = bluetooth_script_count_get();
 
 	// Allocate a JSON root object
  	cJSON *root = cJSON_CreateObject();
@@ -340,7 +366,7 @@ static esp_err_t scripts_list_get(httpd_req_t *req)
  	 	char lbl[BT_SCRIPT_LABEL_MAX_LEN + 1] = {0}; // Buffer
  	 	
  	 	// Add the label or "" to the array
- 	 	if ((bt_script_label_get(i, lbl, sizeof(lbl)) == ESP_OK) && (lbl[0] != '\0')) {
+ 	 	if ((bluetooth_script_label_get(i, lbl, sizeof(lbl)) == ESP_OK) && (lbl[0] != '\0')) {
  	 	 	cJSON_AddItemToArray(labels, cJSON_CreateString(lbl));
  	 	}
  	 	else {
@@ -433,8 +459,8 @@ static esp_err_t script_one_get(httpd_req_t *req)
  	size_t blen = 0;
  	
  	// Read label and body into buffers
- 	(void)bt_script_label_get((uint8_t)idx, name, sizeof(name));
- 	(void)bt_script_body_get((uint8_t)idx, body, MAX_HTTP_BODY_TXT + 1, &blen);
+ 	(void)bluetooth_script_label_get((uint8_t)idx, name, sizeof(name));
+ 	(void)bluetooth_script_body_get((uint8_t)idx, body, MAX_HTTP_BODY_TXT + 1, &blen);
 
  	// Build the JSON response
  	cJSON *root = cJSON_CreateObject();
@@ -561,7 +587,7 @@ static esp_err_t script_one_post(httpd_req_t *req)
  	}
 
  	// Auto-grow the count so saving at higher indices appends
- 	uint8_t count = bt_script_count_get();
+ 	uint8_t count = bluetooth_script_count_get();
  	if ((uint8_t)idx >= count) {
  	 	esp_err_t ecount = bt_script_count_set((uint8_t)(idx + 1));
  	 	

@@ -24,7 +24,7 @@
 
 #define TAG "LCD_BLUETOOTH_FUNCS"
 
-static char s_script_labels[MAX_KEYBOARD_SCRIPTS][MAX_KEYBOARD_SCRIPTS + 1];
+static char s_script_labels[MAX_KEYBOARD_SCRIPTS][BT_SCRIPT_LABEL_MAX_LEN + 1];
 
 bluetooth_menu_t bluetooth_menu = {
 	.options = {"How It Works", "Media Controller", "Keyboard"},
@@ -35,82 +35,82 @@ bluetooth_menu_t bluetooth_menu = {
 
 static void keyboard_menu_rebuild_lvlist(bluetooth_keyboard_menu_t *km)
 {
-    // Remove all old buttons (if any)
-    if (km->main_list != NULL) {
-        lv_obj_clean(km->main_list);
-    }
+	// Remove all old buttons (if any)
+	if (km->main_list != NULL) {
+		lv_obj_clean(km->main_list);
+	}
 
-    // Create a button for each row we currently have
-    for (int i = 0; i < km->size; i++) {
-        km->btns[i] = lv_list_add_btn(km->main_list, NULL, km->options[i]);
-        lv_obj_set_size(km->btns[i], 200, 30);
+	// Create a button for each row we currently have
+	for (int i = 0; i < km->size; i++) {
+		km->btns[i] = lv_list_add_btn(km->main_list, NULL, km->options[i]);
+		lv_obj_set_size(km->btns[i], 200, 30);
 
-        // Apply selected / normal style
-        if (i == km->index) {
-            lv_obj_add_style(km->btns[i], &km->sel_style, 0);
-        } else {
-            lv_obj_add_style(km->btns[i], &km->btn_style, 0);
-        }
+		// Apply selected / normal style
+		if (i == km->index) {
+			lv_obj_add_style(km->btns[i], &km->sel_style, 0);
+		} else {
+			lv_obj_add_style(km->btns[i], &km->btn_style, 0);
+		}
 
-        // Center/scroll label inside the button
-        lv_obj_t *lbl = lv_obj_get_child(km->btns[i], 0);
-        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
-        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
-    }
+		// Center/scroll label inside the button
+		lv_obj_t *lbl = lv_obj_get_child(km->btns[i], 0);
+		lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+		lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+		lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+	}
 
-    // Format button container (list’s internal container is parent of first button)
-    if (km->size > 0) {
-        km->cont = lv_obj_get_parent(km->btns[0]);
-        lv_obj_set_flex_flow (km->cont, LV_FLEX_FLOW_COLUMN);
-        lv_obj_set_flex_align(km->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_pad_gap(km->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
-    }
+	// Format button container (list’s internal container is parent of first button)
+	if (km->size > 0) {
+		km->cont = lv_obj_get_parent(km->btns[0]);
+		lv_obj_set_flex_flow (km->cont, LV_FLEX_FLOW_COLUMN);
+		lv_obj_set_flex_align(km->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+		lv_obj_set_style_pad_gap(km->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+	}
 }
 
 // Pulls labels from NVS and rebuilds the LVGL list
 static void keyboard_menu_refresh_from_nvs(bluetooth_keyboard_menu_t *km)
 {
-    // Base rows always present
-    km->options[0] = "Add/Edit Script";
-    km->options[1] = "Test";
+	// Base rows always present
+	km->options[0] = "Add/Edit Script";
+	km->options[1] = "Test";
 
-    // Read how many user scripts are stored
-    uint32_t count = bt_script_count_get();
+	// Read how many user scripts are stored
+	uint32_t count = bluetooth_script_count_get();
 
-    // Cap by our storage
-    if (count > MAX_KEYBOARD_SCRIPTS) {
-        count = MAX_KEYBOARD_SCRIPTS;
-    }
+	// Cap by our storage
+	if (count > MAX_KEYBOARD_SCRIPTS) {
+		count = MAX_KEYBOARD_SCRIPTS;
+	}
 
-    // Pull labels for each user script i -> row (i + NUM_KEYBOARD_BASE)
-    for (uint32_t i = 0; i < count; i++) {
-        // Fill default label first
-        s_script_labels[i][0] = '\0';
+	// Pull labels for each user script i -> row (i + NUM_KEYBOARD_BASE)
+	for (uint32_t i = 0; i < count; i++) {
+		// Fill default label first
+		s_script_labels[i][0] = '\0';
 
-        // Try to read label from NVS (namespace/keys match the portal)
-        size_t len = sizeof(s_script_labels[i]);
-        esp_err_t err = bt_script_label_get(i, s_script_labels[i], len);
-        if (err != ESP_OK) {
-            // On error, show a placeholder rather than leaving a blank
-            snprintf(s_script_labels[i], sizeof(s_script_labels[i]), "Script %u", (unsigned)i);
-        }
+		// Try to read label from NVS (namespace/keys match the portal)
+		size_t len = sizeof(s_script_labels[i]);
+		esp_err_t err = bluetooth_script_label_get(i, s_script_labels[i], len);
+		if (err != ESP_OK) {
+			// On error, show a placeholder rather than leaving a blank
+			snprintf(s_script_labels[i], sizeof(s_script_labels[i]), "Script %u", (unsigned)i);
+		}
 
-        km->options[NUM_KEYBOARD_BASE + i] = s_script_labels[i];
-    }
+		km->options[NUM_KEYBOARD_BASE + i] = s_script_labels[i];
+	}
 
-    // New total size = base + user
-    km->size = NUM_KEYBOARD_BASE + (int)count;
+	// New total size = base + user
+	km->size = NUM_KEYBOARD_BASE + (int)count;
 
-    // Keep selection in range
-    if (km->index >= km->size) {
-        km->index = (km->size > 1) ? 1 : 0;
-    } else if (km->index < 0) {
-        km->index = km->size - 1;
-    }
+	// Keep selection in range
+	if (km->index >= km->size) {
+		km->index = (km->size > 1) ? 1 : 0;
+	} else if (km->index < 0) {
+		km->index = km->size - 1;
+	}
 
-    // Actually rebuild LVGL widgets to match new size
-    keyboard_menu_rebuild_lvlist(km);
+	// Actually rebuild LVGL widgets to match new size
+	keyboard_menu_rebuild_lvlist(km);
 }
 
 static void lcd_bluetooth_setup_keyboard_page(bluetooth_keyboard_menu_t *menu)

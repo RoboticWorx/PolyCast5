@@ -5,6 +5,7 @@
 
 #define MAX_KEYBOARD_SCRIPTS 16
 #define NUM_KEYBOARD_BASE 2
+#define BT_SCRIPT_LABEL_MAX_LEN 32
 
 #define PORTAL_SSID "PolyCast5-BT-Scripts"
 #define PORTAL_PASS "pc5script"
@@ -33,7 +34,7 @@ const char *bluetooth_web_portal_get_ip(void);
  *
  * @returns Number of user added scripts
  */
-uint8_t bt_script_count_get(void);
+uint8_t bluetooth_script_count_get(void);
 
 /** 
  * @brief Gets the label of a given script
@@ -44,7 +45,7 @@ uint8_t bt_script_count_get(void);
  *
  * @returns ESP error status
  */
-esp_err_t bt_script_label_get(uint8_t idx, char *buf, size_t buflen);
+esp_err_t bluetooth_script_label_get(uint8_t idx, char *buf, size_t buflen);
 
 /** 
  * @brief Gets the body of a given script
@@ -56,6 +57,6 @@ esp_err_t bt_script_label_get(uint8_t idx, char *buf, size_t buflen);
  *
  * @returns ESP error status
  */
-esp_err_t bt_script_body_get(uint8_t idx, char *buf, size_t buflen, size_t *outlen);
+esp_err_t bluetooth_script_body_get(uint8_t idx, char *buf, size_t buflen, size_t *outlen);
 
 #endif // BLUETOOTH_WEB_PORTAL_H
