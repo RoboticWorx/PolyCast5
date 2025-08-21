@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "PolyCast5",
-    "project_version":    "343db46b-dirty",
+    "project_version":    "d38baff6-dirty",
     "project_path":       "C:/Projects/ESP/PolyCast5",
     "idf_path":           "C:/Espressif/frameworks/esp-idf-v5.5",
     "build_dir":          "C:/Projects/ESP/PolyCast5/build",
