@@ -24,6 +24,9 @@
 
 #define TAG "LCD_BLUETOOTH_FUNCS"
 
+#define KEYBOARD_SELECTED_IDX_NS "keyb_sel"
+#define KEYBOARD_SELECTED_IDX_KEY "selected"
+
 static char s_script_labels[MAX_KEYBOARD_SCRIPTS][BT_SCRIPT_LABEL_MAX_LEN + 1];
 
 bluetooth_menu_t bluetooth_menu = {
@@ -66,6 +69,9 @@ static void keyboard_menu_rebuild_lvlist(bluetooth_keyboard_menu_t *km)
 		lv_obj_set_flex_align(km->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 		lv_obj_set_style_pad_gap(km->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
 	}
+
+	// Scroll
+	lv_obj_scroll_to_view(km->btns[km->index], LV_ANIM_OFF);
 }
 
 // Pulls labels from NVS and rebuilds the LVGL list
@@ -103,6 +109,7 @@ static void keyboard_menu_refresh_from_nvs(bluetooth_keyboard_menu_t *km)
 	km->size = NUM_KEYBOARD_BASE + (int)count;
 
 	// Update index
+	km->index = lcd_bluetooth_script_selected_get();
 	if (km->index >= km->size) {
 		km->index = (km->size > 1) ? 1 : 0;
 	}
@@ -110,7 +117,7 @@ static void keyboard_menu_refresh_from_nvs(bluetooth_keyboard_menu_t *km)
 		km->index = km->size - 1;
 	}
 
-	// Actually rebuild LVGL widgets to match new size
+	// Rebuild LVGL widgets to match new size
 	keyboard_menu_rebuild_lvlist(km);
 }
 
@@ -748,12 +755,18 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 		// Update selection
 		bluetooth_menu->bluetooth_keyboard_menu.index--;
 		lcd_bluetooth_update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
+
+		// Save to NVS
+		lcd_bluetooth_script_selected_set(bluetooth_menu->bluetooth_keyboard_menu.index);
 	}
 	// Down button pressed
 	else if (ui_btns->down_btn == 1) {
 		// Update selection
 		bluetooth_menu->bluetooth_keyboard_menu.index++;
 		lcd_bluetooth_update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
+
+		// Save to NVS
+		lcd_bluetooth_script_selected_set(bluetooth_menu->bluetooth_keyboard_menu.index);
 	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {
@@ -914,3 +927,65 @@ void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
 	}
 }
 
+// Save the last-selected user script index (for convenience on LCD)
+esp_err_t lcd_bluetooth_script_selected_set(uint8_t idx)
+{
+ 	nvs_handle_t h;
+ 	
+ 	// Open NVS
+ 	esp_err_t err = nvs_open(KEYBOARD_SELECTED_IDX_NS, NVS_READWRITE, &h);
+ 	if (err != ESP_OK) {
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGE(TAG, "lcd_bluetooth_script_selected_set nvs_open failed: %s", esp_err_to_name(err));
+		#endif
+		
+ 	 	return err;
+ 	}
+ 	
+ 	// Set selected key
+ 	err = nvs_set_u8(h, KEYBOARD_SELECTED_IDX_KEY, idx);
+ 	if (err == ESP_OK) {
+		// Commit changes on success
+ 	 	err = nvs_commit(h);
+ 	}
+ 	else {
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGE(TAG, "lcd_bluetooth_script_selected_set nvs_set_u8 failed: %s", esp_err_to_name(err));
+		#endif
+	}
+	
+	// Close NVS
+ 	nvs_close(h);
+ 	return err;
+}
+
+// Read the previously selected index
+uint8_t lcd_bluetooth_script_selected_get(void)
+{
+ 	nvs_handle_t h;
+ 	uint8_t sel = 0;
+ 	
+ 	// Open NVS
+ 	esp_err_t err = nvs_open(KEYBOARD_SELECTED_IDX_NS, NVS_READONLY, &h);
+ 	if (err == ESP_OK) {
+		// Get count
+ 	 	if (nvs_get_u8(h, KEYBOARD_SELECTED_IDX_KEY, &sel) != ESP_OK) {
+			// 0 if DNE
+ 	 	 	sel = 0;
+ 	 	 	
+ 	 	 	#ifdef POLYCAST5_DEBUG
+				ESP_LOGE(TAG, "lcd_bluetooth_script_selected_set nvs_get_u8 failed: %s", esp_err_to_name(err));
+			#endif
+ 	 	}
+ 	 	
+ 	 	// Close NVS
+ 	 	nvs_close(h);
+ 	}
+ 	else {
+		#ifdef POLYCAST5_DEBUG
+			ESP_LOGW(TAG, "lcd_bluetooth_script_selected_set nvs_open failed: %s", esp_err_to_name(err));
+		#endif
+	}
+	
+	return sel;
+}

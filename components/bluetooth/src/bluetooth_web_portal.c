@@ -1,3 +1,4 @@
+#include "driver/sdspi_host.h"
 #include "polycast5_macros.h"
 
 #include <string.h>
@@ -13,14 +14,13 @@
 
 #include "bluetooth_web_portal.h"
 
-#define TAG "BT_WEB_PORTAL"
+#define TAG "BLUETOOTH_WEB_PORTAL"
 
 #define BT_SCRIPT_NS "bt_portal"
 #define BT_SCRIPT_KEY_FMT "script_%02d"
 
 #define BT_SCRIPT_MENU_NS "keyb_menu"
 #define BT_SCRIPT_MENU_KEY_COUNT "count"
-#define BT_SCRIPT_MENU_KEY_SEL "selected"
 #define BT_SCRIPT_MENU_KEY_FMT "item_%02d"
 
 #define MAX_HTTP_BODY_TXT 2048
@@ -42,7 +42,7 @@ static const char *INDEX_HTML =
 "<div><label>Script index</label><input id=idx type=number min=0 max=15 value=0> <button id=load>Load</button></div>"
 "<div><label>Name</label><input id=name maxlength=32 placeholder='Short label for device menu'></div>"
 "<div><label>Payload</label><textarea id=body placeholder='What the device should type…'></textarea></div>"
-"<div><button id=save>Save (add/edit)</button> <span id=msg></span></div>"
+"<div><button id=save>Save (add/edit)</button> <button id=del>Delete</button> <span id=msg></span></div>"
 
 "<p>Here are some additional commands so you can do more than just type text:</p>"
 "<p>"
@@ -84,6 +84,8 @@ static const char *INDEX_HTML =
 " document.getElementById('msg').textContent=r.ok?'Saved!':'Save failed';if(r.ok)refreshList();}"
 "document.getElementById('load').onclick=()=>loadOne(+document.getElementById('idx').value);"
 "document.getElementById('save').onclick=save;"
+"document.getElementById('del').onclick=async()=>{let i=+document.getElementById('idx').value;let r=await fetch('/api/script?index='+i,{method:'DELETE'});"
+"document.getElementById('msg').textContent=r.ok?'Deleted':'Delete failed';if(r.ok){refreshList();document.getElementById('name').value='';document.getElementById('body').value='';}};"
 "document.getElementById('list').ondblclick=e=>{if(e.target&&e.target.value!==undefined)loadOne(+e.target.value)};"
 "refreshList();"
 "</script></body></html>";
@@ -105,7 +107,7 @@ uint8_t bluetooth_script_count_get(void)
  	 	 	count = 0;
  	 	 	
  	 	 	#ifdef POLYCAST5_DEBUG
-				ESP_LOGE(TAG, "bt_script_count_get nvs_get_u8 failed: %s", esp_err_to_name(err));
+				ESP_LOGE(TAG, "bluetooth_script_count_get nvs_get_u8 failed: %s", esp_err_to_name(err));
 			#endif
  	 	}
  	 	
@@ -114,22 +116,33 @@ uint8_t bluetooth_script_count_get(void)
  	}
  	else {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bt_script_count_get nvs_open failed: %s", esp_err_to_name(err));
+			ESP_LOGE(TAG, "bluetooth_script_count_get nvs_open failed: %s", esp_err_to_name(err));
 		#endif
 	}
- 	return count;
+	
+ 	if (count > MAX_KEYBOARD_SCRIPTS) {
+	    count = MAX_KEYBOARD_SCRIPTS;
+	    ESP_LOGW(TAG, "bluetooth_script_count_get MAX_KEYBOARD_SCRIPTS reached: %d", MAX_KEYBOARD_SCRIPTS);
+	}
+	
+	return count;
 }
 
 // Persist the count of user scripts
-static esp_err_t bt_script_count_set(uint8_t count)
+static esp_err_t bluetooth_script_count_set(uint8_t count)
 {
  	nvs_handle_t h;
+ 	
+ 	if (count > MAX_KEYBOARD_SCRIPTS) {
+	    count = MAX_KEYBOARD_SCRIPTS;
+	    ESP_LOGW(TAG, "bluetooth_script_count_set MAX_KEYBOARD_SCRIPTS reached: %d", MAX_KEYBOARD_SCRIPTS);
+	}
  	
  	// Open NVS
  	esp_err_t err = nvs_open(BT_SCRIPT_MENU_NS, NVS_READWRITE, &h);
  	if (err != ESP_OK) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bt_script_count_set nvs_open failed: %s", esp_err_to_name(err));
+			ESP_LOGE(TAG, "bluetooth_script_count_set nvs_open failed: %s", esp_err_to_name(err));
 		#endif
 		
  	 	return err;
@@ -143,7 +156,7 @@ static esp_err_t bt_script_count_set(uint8_t count)
  	}
  	else {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bt_script_count_set nvs_set_u8 failed: %s", esp_err_to_name(err));
+			ESP_LOGE(TAG, "bluetooth_script_count_set nvs_set_u8 failed: %s", esp_err_to_name(err));
 		#endif
 	}
 	
@@ -152,39 +165,7 @@ static esp_err_t bt_script_count_set(uint8_t count)
  	return err;
 }
 
-// Save the last-selected user script index (for convenience on LCD/BT)
-static esp_err_t bt_script_selected_set(uint8_t idx)
-{
- 	nvs_handle_t h;
- 	
- 	// Open NVS
- 	esp_err_t err = nvs_open(BT_SCRIPT_MENU_NS, NVS_READWRITE, &h);
- 	if (err != ESP_OK) {
-		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bt_script_selected_set nvs_open failed: %s", esp_err_to_name(err));
-		#endif
-		
- 	 	return err;
- 	}
- 	
- 	// Set selected key
- 	err = nvs_set_u8(h, BT_SCRIPT_MENU_KEY_SEL, idx);
- 	if (err == ESP_OK) {
-		// Commit changes on success
- 	 	err = nvs_commit(h);
- 	}
- 	else {
-		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bt_script_selected_set nvs_set_u8 failed: %s", esp_err_to_name(err));
-		#endif
-	}
-	
-	// Close NVS
- 	nvs_close(h);
- 	return err;
-}
-
-// Read a script label into caller buffer (buflen should be >= BT_SCRIPT_LABEL_MAX_LEN + 1)
+// Read a script label into caller buffer (buflen should be >= bluetooth_SCRIPT_LABEL_MAX_LEN + 1)
 esp_err_t bluetooth_script_label_get(uint8_t idx, char *buf, size_t buflen)
 {
  	nvs_handle_t h;
@@ -193,7 +174,7 @@ esp_err_t bluetooth_script_label_get(uint8_t idx, char *buf, size_t buflen)
  	esp_err_t err = nvs_open(BT_SCRIPT_MENU_NS, NVS_READONLY, &h);
  	if (err != ESP_OK) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bt_script_label_get nvs_open failed: %s", esp_err_to_name(err));
+			ESP_LOGE(TAG, "bluetooth_script_label_get nvs_open failed: %s", esp_err_to_name(err));
 		#endif
 		
  	 	return err;
@@ -209,7 +190,7 @@ esp_err_t bluetooth_script_label_get(uint8_t idx, char *buf, size_t buflen)
  	err = nvs_get_str(h, key, buf, &need);
  	if (err != ESP_OK) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGW(TAG, "bt_script_label_get nvs_get_str failed: %s", esp_err_to_name(err));
+			ESP_LOGW(TAG, "bluetooth_script_label_get nvs_get_str failed: %s", esp_err_to_name(err));
 		#endif
 	}
 	
@@ -219,7 +200,7 @@ esp_err_t bluetooth_script_label_get(uint8_t idx, char *buf, size_t buflen)
 }
 
 // Write a label for the given script index
-static esp_err_t bt_script_label_set(uint8_t idx, const char *label)
+static esp_err_t bluetooth_script_label_set(uint8_t idx, const char *label)
 {
  	nvs_handle_t h;
  	
@@ -227,7 +208,7 @@ static esp_err_t bt_script_label_set(uint8_t idx, const char *label)
  	esp_err_t err = nvs_open(BT_SCRIPT_MENU_NS, NVS_READWRITE, &h);
  	if (err != ESP_OK) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bt_script_label_set nvs_open failed: %s", esp_err_to_name(err));
+			ESP_LOGE(TAG, "bluetooth_script_label_set nvs_open failed: %s", esp_err_to_name(err));
 		#endif
 		
  	 	return err;
@@ -245,7 +226,7 @@ static esp_err_t bt_script_label_set(uint8_t idx, const char *label)
  	}
  	else {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bt_script_label_set nvs_set_str failed: %s", esp_err_to_name(err));
+			ESP_LOGE(TAG, "bluetooth_script_label_set nvs_set_str failed: %s", esp_err_to_name(err));
 		#endif
 	}
 	
@@ -263,7 +244,7 @@ esp_err_t bluetooth_script_body_get(uint8_t idx, char *buf, size_t buflen, size_
  	esp_err_t err = nvs_open(BT_SCRIPT_NS, NVS_READONLY, &h);
  	if (err != ESP_OK) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bt_script_body_get nvs_open failed: %s", esp_err_to_name(err));
+			ESP_LOGE(TAG, "bluetooth_script_body_get nvs_open failed: %s", esp_err_to_name(err));
 		#endif
 		
  	 	return err;
@@ -289,7 +270,7 @@ esp_err_t bluetooth_script_body_get(uint8_t idx, char *buf, size_t buflen, size_
  	}
  	else {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bt_script_body_get string parameters wrong or NVS failed: %s", esp_err_to_name(err));
+			ESP_LOGE(TAG, "bluetooth_script_body_get string parameters wrong or NVS failed: %s", esp_err_to_name(err));
 		#endif
 	}
 	
@@ -299,7 +280,7 @@ esp_err_t bluetooth_script_body_get(uint8_t idx, char *buf, size_t buflen, size_
 }
 
 // Write a payload body for the given script index
-static esp_err_t bt_script_body_set(uint8_t idx, const char *body)
+static esp_err_t bluetooth_script_body_set(uint8_t idx, const char *body)
 {
  	nvs_handle_t h;
  	
@@ -307,7 +288,7 @@ static esp_err_t bt_script_body_set(uint8_t idx, const char *body)
  	esp_err_t err = nvs_open(BT_SCRIPT_NS, NVS_READWRITE, &h);
  	if (err != ESP_OK) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bt_script_body_set nvs_open failed: %s", esp_err_to_name(err));
+			ESP_LOGE(TAG, "bluetooth_script_body_set nvs_open failed: %s", esp_err_to_name(err));
 		#endif
 		
  	 	return err;
@@ -325,7 +306,7 @@ static esp_err_t bt_script_body_set(uint8_t idx, const char *body)
  	}
  	else {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bt_script_body_set nvs_set_str failed: %s", esp_err_to_name(err));
+			ESP_LOGE(TAG, "bluetooth_script_body_set nvs_set_str failed: %s", esp_err_to_name(err));
 		#endif
 	}
 	
@@ -499,6 +480,56 @@ static esp_err_t script_one_get(httpd_req_t *req)
  	return err;
 }
 
+// Trim leading/trailing ASCII blanks/control chars in-place
+static void trim_ascii(char *s)
+{
+	// Make sure valid
+    if (!s) {
+		return;
+	}
+
+    char *p = s;
+
+	// Go to space
+    while (*p && (unsigned char)*p <= ' ') {
+		p++;
+	}
+
+    size_t len = strlen(p);
+
+	// Trim
+    while (len > 0 && (unsigned char)p[len - 1] <= ' ') {
+        p[--len] = '\0';
+	}
+
+    if (p != s) {
+		memmove(s, p, len + 1);
+	}
+}
+
+// Derive label from first nonblank line of body
+static void label_from_body(const char *body_in, char *out, size_t outlen)
+{
+	// Make sure valid
+    if (!body_in || !out || outlen == 0) {
+		return;
+	}
+
+    size_t i = 0, n = 0;
+
+	// Skip blanks
+    while (body_in[i] && (unsigned char)body_in[i] <= ' ') {
+		i++;
+	}
+
+    while (body_in[i] && body_in[i] != '\n' && body_in[i] != '\r' && n + 1 < outlen) {
+        out[n++] = body_in[i++];
+    }
+    out[n] = '\0';
+
+    trim_ascii(out);
+}
+
 // POST /api/script -> {"index":N,"name":"...","body":"..."}
 static esp_err_t script_one_post(httpd_req_t *req)
 {
@@ -564,44 +595,55 @@ static esp_err_t script_one_post(httpd_req_t *req)
  	const char *name_in = ((jname != NULL) && (jname->valuestring != NULL)) ? jname->valuestring : "";
  	const char *body_in = ((jbody != NULL) && (jbody->valuestring != NULL)) ? jbody->valuestring : "";
 
- 	// Build a label within BT_SCRIPT_LABEL_MAX_LEN
- 	char label[BT_SCRIPT_LABEL_MAX_LEN + 1];
- 	// If the user provided a name, copy it
- 	if (name_in[0] != '\0') {
- 	 	strncpy(label, name_in, BT_SCRIPT_LABEL_MAX_LEN);
- 	 	label[BT_SCRIPT_LABEL_MAX_LEN] = '\0';
- 	}
- 	// Else, derive from the first line of the payload
- 	else {
- 	 	int n = 0;
- 	 	
- 	 	while ((body_in[n] != '\0') && (body_in[n] != '\n') && (body_in[n] != '\r') && (n < BT_SCRIPT_LABEL_MAX_LEN)) {
- 	 	 	label[n] = body_in[n];
- 	 	 	n++;
- 	 	}
- 	 	label[n] = '\0';
- 	 	
- 	 	// If payload is empty too, fall back to "Script NN"
- 	 	if (n == 0) {
- 	 	 	snprintf(label, sizeof(label), "Script %02d", idx);
- 	 	}
- 	}
+	// Reject saving empty scripts (ask client to use DELETE)
+    if ((name_in[0] == '\0') && (body_in[0] == '\0')) {
+		// Clean up
+        cJSON_Delete(j);
+		free(buf);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "empty script (use DELETE)");
+    }
 
- 	// Auto-grow the count so saving at higher indices appends
- 	uint8_t count = bluetooth_script_count_get();
- 	if ((uint8_t)idx >= count) {
- 	 	esp_err_t ecount = bt_script_count_set((uint8_t)(idx + 1));
- 	 	
- 	 	// If NVS update fails, return 500
- 	 	if (ecount != ESP_OK) {
- 	 	 	cJSON_Delete(j);
- 	 	 	free(buf);
- 	 	 	return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "nvs-count");
- 	 	}
- 	}
+	// Get count
+	uint8_t count = bluetooth_script_count_get();
+
+	// Avoid sparse indices: if idx > count, append at tail
+	if ((uint8_t)idx > count) {
+		idx = count;
+	}
+
+	// Build/clean label
+	char label[BT_SCRIPT_LABEL_MAX_LEN + 1];
+
+	// If name exists, use that
+	if (name_in[0] != '\0') {
+		strncpy(label, name_in, BT_SCRIPT_LABEL_MAX_LEN);
+		label[BT_SCRIPT_LABEL_MAX_LEN] = '\0';
+		trim_ascii(label);
+	}
+	// Else create label from body
+	else {
+		label_from_body(body_in, label, sizeof(label));
+
+		// If not that, just number it
+		if (label[0] == '\0') {
+			snprintf(label, sizeof(label), "Script %02d", idx);
+		}
+	}
+
+	// Grow count only when appending at tail
+	if ((uint8_t)idx >= count) {
+		// Update count
+		esp_err_t ecount = bluetooth_script_count_set((uint8_t)(idx + 1));
+
+		// Check
+		if (ecount != ESP_OK) {
+			cJSON_Delete(j); free(buf);
+			return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "nvs-count");
+		}
+	}
 
  	// Persist label to NVS
- 	esp_err_t err = bt_script_label_set((uint8_t)idx, label);
+ 	esp_err_t err = bluetooth_script_label_set((uint8_t)idx, label);
  	// If NVS update fails, return 500
  	if (err != ESP_OK) {
  	 	cJSON_Delete(j);
@@ -609,16 +651,13 @@ static esp_err_t script_one_post(httpd_req_t *req)
  	 	return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "nvs-label");
  	}
  	// Persist body to NVS
- 	err = bt_script_body_set((uint8_t)idx, body_in);
+ 	err = bluetooth_script_body_set((uint8_t)idx, body_in);
  	// If NVS update fails, return 500
  	if (err != ESP_OK) {
  	 	cJSON_Delete(j);
  	 	free(buf);
  	 	return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "nvs-body");
  	}
-
- 	// For convenience remember this index as "selected": persist to NVS
- 	(void)bt_script_selected_set((uint8_t)idx);
 
  	// Send a small success JSON in one call (no chunking)
  	char okjson[32];
@@ -628,7 +667,7 @@ static esp_err_t script_one_post(httpd_req_t *req)
  	 	strcpy(okjson, "{\"ok\":true}");
  	}
  	httpd_resp_set_type(req, "application/json");
- 	esp_err_t send_rc = httpd_resp_sendstr(req, okjson);
+ 	err = httpd_resp_sendstr(req, okjson);
  	
  	if (err != ESP_OK) {
 		#ifdef POLYCAST5_DEBUG
@@ -639,7 +678,46 @@ static esp_err_t script_one_post(httpd_req_t *req)
 	// Frees the parsed JSON and the body buffer, and returns the send status
  	cJSON_Delete(j);
  	free(buf);
- 	return send_rc;
+ 	return err;
+}
+
+static esp_err_t script_one_delete(httpd_req_t *req)
+{
+    int idx = -1;
+    if ((!get_query_index(req, &idx)) || (idx < 0)) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad index");
+    }
+
+    uint8_t count = bluetooth_script_count_get();
+    if ((uint8_t)idx >= count) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad index");
+    }
+
+    char next_label[BT_SCRIPT_LABEL_MAX_LEN + 1];
+    char *next_body = (char *)malloc(MAX_HTTP_BODY_TXT + 1);
+    if (!next_body) return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+
+    // Shift [idx+1..count-1] down into [idx..count-2]
+    for (uint8_t i = (uint8_t)idx; i + 1 < count; i++) {
+        next_label[0] = '\0';
+        size_t blen = 0;
+        (void)bluetooth_script_label_get(i + 1, next_label, sizeof(next_label));
+        (void)bluetooth_script_body_get (i + 1, next_body, MAX_HTTP_BODY_TXT + 1, &blen);
+
+        (void)bluetooth_script_label_set(i, next_label);
+        (void)bluetooth_script_body_set (i, (blen > 0) ? next_body : "");
+    }
+
+    // Clear old tail
+    (void)bluetooth_script_label_set(count - 1, "");
+    (void)bluetooth_script_body_set (count - 1, "");
+    free(next_body);
+
+    // Decrement count
+    (void)bluetooth_script_count_set(count - 1);
+
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, "{\"ok\":true}");
 }
 
 /* ========== HTTP server bootstrap ========== */
@@ -671,6 +749,9 @@ static httpd_handle_t start_http(void)
 
  	httpd_uri_t p1 = {.uri="/api/script", .method=HTTP_POST, .handler=script_one_post};
  	httpd_register_uri_handler(srv, &p1);
+
+    httpd_uri_t d1 = {.uri="/api/script", .method=HTTP_DELETE, .handler=script_one_delete};
+    httpd_register_uri_handler(srv, &d1);
 
  	return srv;
 }

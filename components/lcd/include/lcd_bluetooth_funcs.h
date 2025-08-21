@@ -95,5 +95,21 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
  */
 void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
 
+/** 
+ * @brief Sets the last selected script
+ *
+ * @param [in] idx Index to set
+ *
+ * @returns ESP error status
+ */
+esp_err_t lcd_bluetooth_script_selected_set(uint8_t idx);
+
+/** 
+ * @brief Gets the last selected script
+ *
+ * @returns The last selected script index
+ */
+uint8_t lcd_bluetooth_script_selected_get(void);
+
 
 #endif // LCD_BLUETOOTH_FUNCS_H
