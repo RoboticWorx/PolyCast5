@@ -368,8 +368,8 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == BLUETOOTH_PAGE) {
 				lcd_bluetooth_page(&ui_btns, &ui_menu, &bluetooth_menu);
 			}
-			else if (ui_menu.page == BLUETOOTH_PAIR_PAGE) {
-				lcd_bluetooth_pair_page(&ui_btns, &ui_menu, &bluetooth_menu);
+			else if (ui_menu.page == BLUETOOTH_HOW_PAGE) {
+				lcd_bluetooth_how_page(&ui_btns, &ui_menu, &bluetooth_menu);
 			}
 			else if (ui_menu.page == BLUETOOTH_MEDIA_PAGE) {
 				lcd_bluetooth_media_page(&ui_btns, &ui_menu, &bluetooth_menu);

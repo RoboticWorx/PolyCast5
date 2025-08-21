@@ -358,70 +358,104 @@ void lcd_bluetooth_update_keyboard_menu(bluetooth_keyboard_menu_t *menu)
 	lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
 }
 
-void lcd_bluetooth_pair_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
+void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
 {
+	#define HOW_Y_OFFSET 40
+	
 	// Statics
 	static bool init = false;
+	static lv_obj_t *cont = NULL;
+	static lv_obj_t *title_lbl = NULL;
+	static lv_obj_t *instr_lbl = NULL;
 	
-	static lv_obj_t *lbl_ins;
-	static lv_obj_t *lbl_pin;
-	
-	// Only execute once
 	if (!init) {
-		// Create labels
-		lbl_ins = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_ins, "Bluetooth is now\n   advertising as\n'PolyCast5' for PC", user_secondary_color,
-				&lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
+		// Create a scrollable container for the instructions
+		cont = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(cont, 210, 106);
+		lv_obj_center(cont);
+		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
 
-		lbl_pin = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_pin, "Pin: 123456", user_secondary_color,
-				&lv_font_montserrat_24, LV_ALIGN_BOTTOM_MID, 0, -15);
-				
-		lv_timer_handler();
+		// Title label
+		title_lbl = lv_label_create(cont);
+		lv_label_set_text(title_lbl, "How It Works:");
+		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+		// Instructions label (scrollable if text is long)
+		instr_lbl = lv_label_create(cont);
+		lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+		lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
+		lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
+		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+
+		// Set custom text based on hotkey index
+		const char *instr_text = "Bluetooth is now advertising as 'PolyCast5'.\n\nTo connect to it, just go to settings on any Bluetooth device "
+								 "such as a phone or PC, click on 'PolyCast5', and enter '123456' as the pin.\n\nAfter connecting once, PolyCast5 "
+								 "will automatically reconnect to the last known device after selecting an option from the Bluetooth menu.\n\nYou "
+								 "will also see the RGB LED turn blue to indicate PolyCast5 is currently connected to a device. If you don't wish to "
+								 "see this, it can be disabled in settings by setting 'Blink every' to 0 for 'Adjust RGB LED'.";
 		
-		// Initialize bluetooth
+		lv_label_set_text(instr_lbl, instr_text);
+
+		lv_timer_handler();
+		// Active bluetooth
 		uint16_t cmd = BLUETOOTH_CMD_INIT;
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		
+
 		init = true;
 	}
 	
 	if (ui_btns->up_btn == 1) {
-		
+		lv_obj_scroll_by(cont, 0, HOW_Y_OFFSET, LV_ANIM_ON);
 	}
 	else if (ui_btns->down_btn == 1) {
-		
+		lv_obj_scroll_by(cont, 0, -HOW_Y_OFFSET, LV_ANIM_ON);
 	}
-	else if (ui_btns->select_btn == 1) {
-		
-	}
-	// Back selected
-	else if (ui_btns->left_btn == 1) {
+	// Go back
+	else if (ui_btns->left_btn) {
+		// Deactivate bluetooth
+		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+
 		// Delete objects
-		lv_obj_delete(lbl_ins);
-		lv_obj_delete(lbl_pin);
+		lv_obj_del(cont); // Deletes children
 		
 		// Reset statics
-		lbl_ins = lbl_pin = NULL;
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
 		init = false;
-		
-		// Show bluetooth list
+			
+		// Show bluetooth menu
 		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
-		// Switch pages
+		// Switch back
 		ui_menu->page = BLUETOOTH_PAGE;
 	}
-	// Home or power off selected
-	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+	// Home or power off
+	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
+		// Deactivate bluetooth
+		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+
 		// Delete objects
-		lv_obj_delete(lbl_ins);
-		lv_obj_delete(lbl_pin);
+		lv_obj_del(cont); // Deletes children
 		
 		// Reset statics
-		lbl_ins = lbl_pin = NULL;
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
 		init = false;
 		
-		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+ 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 

@@ -90,7 +90,7 @@ static void bluetooth_task(void *arg)
 					#define TEST_TXT_LN4 "To start adding your own text scripts, just go to 'Add/Edit Script' and follow the few simple instructions.\n"
 					bluetooth_send_script(TEST_TXT_LN1 TEST_TXT_LN2 TEST_TXT_LN3 TEST_TXT_LN4, 1);
 				}
-			
+
 				// Menu has 2 fixed rows before user scripts:
 				// So the first user script is menu_idx == 2 -> NVS index 0
 				if (menu_idx >= NUM_KEYBOARD_BASE) {
