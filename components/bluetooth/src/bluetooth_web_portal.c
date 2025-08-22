@@ -1,3 +1,4 @@
+#include "bluetooth_task.h"
 #include "driver/sdspi_host.h"
 #include "polycast5_macros.h"
 
@@ -64,7 +65,7 @@ static const char *INDEX_HTML =
 "<br>&lt;pgup&gt; - Page up"
 "<br>&lt;pgdn&gt; - Page down"
 "<br>&lt;fx&gt; - Function x (e.g. f1, f2, etc.)"
-"<br><br>You can also combine commands like &lt;ctrl+shift+v&gt; or &lt;ctrl+c&gt;. Please also note that hitting enter when typing is treated as &lt;enter&gt;."
+"<br><br>You can also combine commands like &lt;ctrl+shift+v&gt; or &lt;ctrl+c&gt;. Please also note that hitting return/enter when typing is treated as &lt;enter&gt;."
 "<br><br>Example: If I want to open up a given program to run something on windows I would maybe have something like this with delays to make "
 "sure that the computer opened whatever before continuing: "
 "&lt;win+s&gt;&lt;delay=500&gt;browser&lt;enter&gt;&lt;delay=500&gt;https://youtu.be/dQw4w9WgXcQ?si=fCygLTFX4Usi2nlR&lt;enter&gt;"
@@ -95,6 +96,8 @@ static const char *INDEX_HTML =
 // Read the count of user scripts
 uint8_t bluetooth_script_count_get(void)
 {
+	xSemaphoreTake(xBluetoothScriptMutex, portMAX_DELAY); // Lock Bluetooth
+
  	nvs_handle_t h;
  	uint8_t count = 0;
  	
@@ -124,6 +127,8 @@ uint8_t bluetooth_script_count_get(void)
 	    count = MAX_KEYBOARD_SCRIPTS;
 	    ESP_LOGW(TAG, "bluetooth_script_count_get MAX_KEYBOARD_SCRIPTS reached: %d", MAX_KEYBOARD_SCRIPTS);
 	}
+
+	xSemaphoreGive(xBluetoothScriptMutex); // Release Bluetooth
 	
 	return count;
 }
@@ -168,6 +173,8 @@ static esp_err_t bluetooth_script_count_set(uint8_t count)
 // Read a script label into caller buffer (buflen should be >= bluetooth_SCRIPT_LABEL_MAX_LEN + 1)
 esp_err_t bluetooth_script_label_get(uint8_t idx, char *buf, size_t buflen)
 {
+	xSemaphoreTake(xBluetoothScriptMutex, portMAX_DELAY); // Lock Bluetooth
+
  	nvs_handle_t h;
  	
  	// Open NVS
@@ -176,8 +183,6 @@ esp_err_t bluetooth_script_label_get(uint8_t idx, char *buf, size_t buflen)
 		#ifdef POLYCAST5_DEBUG
 			ESP_LOGE(TAG, "bluetooth_script_label_get nvs_open failed: %s", esp_err_to_name(err));
 		#endif
-		
- 	 	return err;
  	}
  	
  	// Format key
@@ -196,6 +201,8 @@ esp_err_t bluetooth_script_label_get(uint8_t idx, char *buf, size_t buflen)
 	
 	// Close NVS
  	nvs_close(h);
+
+	xSemaphoreGive(xBluetoothScriptMutex); // Release Bluetooth
  	return err;
 }
 
@@ -499,7 +506,7 @@ static void trim_ascii(char *s)
 
 	// Trim
     while (len > 0 && (unsigned char)p[len - 1] <= ' ') {
-        p[--len] = '\0';
+        p[--len] = '\0'; // NUL-terminate
 	}
 
     if (p != s) {
@@ -525,7 +532,7 @@ static void label_from_body(const char *body_in, char *out, size_t outlen)
     while (body_in[i] && body_in[i] != '\n' && body_in[i] != '\r' && n + 1 < outlen) {
         out[n++] = body_in[i++];
     }
-    out[n] = '\0';
+    out[n] = '\0'; // NUL-terminate
 
     trim_ascii(out);
 }

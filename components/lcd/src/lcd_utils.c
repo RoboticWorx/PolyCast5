@@ -1110,7 +1110,7 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 	// simply add '&& (!settings_menu->pin_menu.pin_set || !settings_menu->pin_menu.prompt_pin)' to each hoykey 'else if'
 	
 	// Long press home
-	else if (xSemaphoreTake(xHomeButtonLongSemaphore, 0) == pdTRUE) {
+	else if (xHomeButtonLongSemaphore && xSemaphoreTake(xHomeButtonLongSemaphore, 0) == pdTRUE) {
 		// If LoRa command exists
 		if (hotkey_cmd.has_lora[HOTKEY_LONG_HOME_IDX]) {
 			// RGB indicator
@@ -1137,7 +1137,7 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 		}
 	}
 	// Long press left
-	else if (xSemaphoreTake(xLeftButtonLongSemaphore, 0) == pdTRUE) {
+	else if (xLeftButtonLongSemaphore && xSemaphoreTake(xLeftButtonLongSemaphore, 0) == pdTRUE) {
 		// If LoRa command exists
 		if (hotkey_cmd.has_lora[HOTKEY_LONG_LEFT_IDX]) {
 			// RGB indicator
@@ -1164,7 +1164,7 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 		}
 	}
 	// Long press right
-	else if (xSemaphoreTake(xRightButtonLongSemaphore, 0) == pdTRUE) {
+	else if (xRightButtonLongSemaphore && xSemaphoreTake(xRightButtonLongSemaphore, 0) == pdTRUE) {
 		// If LoRa command exists
 		if (hotkey_cmd.has_lora[HOTKEY_LONG_RIGHT_IDX]) {
 			// RGB indicator
@@ -1191,7 +1191,7 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 		}
 	}
 	// Long press select
-	else if (xSemaphoreTake(xSelectButtonLongSemaphore, 0) == pdTRUE) {
+	else if (xSelectButtonLongSemaphore && xSemaphoreTake(xSelectButtonLongSemaphore, 0) == pdTRUE) {
 		// If LoRa command exists
 		if (hotkey_cmd.has_lora[HOTKEY_LONG_SELECT_IDX]) {
 			// RGB indicator

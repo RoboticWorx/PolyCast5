@@ -5,6 +5,8 @@
 
 extern QueueHandle_t xBluetoothMediaCmdQueue;
 
+extern SemaphoreHandle_t xBluetoothScriptMutex;
+
 /**
  * @brief Creates bluetooth task at shared priority
  */

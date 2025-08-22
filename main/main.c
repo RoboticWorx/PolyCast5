@@ -22,14 +22,13 @@
 #include "lcd_utils.h"
 #include "lcd_task.h"
 #include "infrared_task.h"
-//#include "bluetooth_task.h"
+#include "bluetooth_task.h"
 //#include "bluetooth_funcs.h"
 #include "gpio_task.h"
 #include "gpio_funcs.h"
 #include "espnow_task.h"
 #include "espnow_funcs.h"
 #include "wifi_task.h"
-#include "bluetooth_task.h"
 
 // Logging tag
 static const char *TAG = "MAIN";
@@ -111,6 +110,9 @@ void app_main(void) {
 	configASSERT(xRgbLedMutex);
 	xLEDCMutex = xSemaphoreCreateMutex();
 	configASSERT(xLEDCMutex);
+	
+	xBluetoothScriptMutex = xSemaphoreCreateMutex();
+	configASSERT(xBluetoothScriptMutex);
 	
 	xPowerButtonSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xPowerButtonSemaphore);

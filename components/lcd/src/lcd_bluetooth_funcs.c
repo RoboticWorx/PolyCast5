@@ -20,14 +20,13 @@
 #include "lcd_bluetooth_funcs.h"
 #include "bluetooth_funcs.h"
 #include "bluetooth_task.h"
-#include "bluetooth_web_portal.h"
 
 #define TAG "LCD_BLUETOOTH_FUNCS"
 
 #define KEYBOARD_SELECTED_IDX_NS "keyb_sel"
 #define KEYBOARD_SELECTED_IDX_KEY "selected"
 
-static char s_script_labels[MAX_KEYBOARD_SCRIPTS][BT_SCRIPT_LABEL_MAX_LEN + 1];
+static char script_labels[MAX_KEYBOARD_SCRIPTS][BT_SCRIPT_LABEL_MAX_LEN + 1];
 
 bluetooth_menu_t bluetooth_menu = {
 	.options = {"How It Works", "Media Controller", "Keyboard"},
@@ -92,17 +91,17 @@ static void keyboard_menu_refresh_from_nvs(bluetooth_keyboard_menu_t *km)
 	// Pull labels for each user script i -> row (i + NUM_KEYBOARD_BASE)
 	for (uint32_t i = 0; i < count; i++) {
 		// Fill default label first
-		s_script_labels[i][0] = '\0';
+		script_labels[i][0] = '\0';
 
 		// Read label from NVS (namespace/keys match the portal)
-		size_t len = sizeof(s_script_labels[i]);
-		esp_err_t err = bluetooth_script_label_get(i, s_script_labels[i], len);
+		size_t len = sizeof(script_labels[i]);
+		esp_err_t err = bluetooth_script_label_get(i, script_labels[i], len);
 		if (err != ESP_OK) {
 			// On error, show a placeholder rather than leaving a blank
-			snprintf(s_script_labels[i], sizeof(s_script_labels[i]), "Script %u", (unsigned)i);
+			snprintf(script_labels[i], sizeof(script_labels[i]), "Script %u", (unsigned)i);
 		}
 
-		km->options[NUM_KEYBOARD_BASE + i] = s_script_labels[i];
+		km->options[NUM_KEYBOARD_BASE + i] = script_labels[i];
 	}
 
 	// New total = base + user

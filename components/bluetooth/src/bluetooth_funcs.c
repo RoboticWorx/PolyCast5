@@ -1,10 +1,10 @@
-#include "freertos/projdefs.h"
 #include "polycast5_macros.h"
 
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "freertos/projdefs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -250,7 +250,7 @@ static inline void hid_input_send(uint8_t rpt_id, const uint8_t *data, size_t le
 	esp_hidd_dev_input_set(ble_hid_param.hid_dev, 0, rpt_id, (uint8_t *)data, len);
 }
 
-static void bluetooth_kbd_send_raw(uint8_t modifiers, const uint8_t keys[6])
+static void kbd_send_raw(uint8_t modifiers, const uint8_t keys[6])
 {
 	uint8_t rpt[HID_KB_IN_RPT_LEN] = {0};
 	rpt[0] = modifiers;
@@ -261,7 +261,7 @@ static void bluetooth_kbd_send_raw(uint8_t modifiers, const uint8_t keys[6])
 	hid_input_send(HID_RPT_ID_KB_IN, rpt, sizeof(rpt));
 }
 
-static void bluetooth_kbd_release_all(void)
+static void kbd_release_all(void)
 {
 	uint8_t rpt[HID_KB_IN_RPT_LEN] = {0};
 	hid_input_send(HID_RPT_ID_KB_IN, rpt, sizeof(rpt));
@@ -449,7 +449,7 @@ static bool ascii_to_hid(char c, uint8_t *mod, uint8_t *kc)
 	return false;
 }
 
-static bool bluetooth_kbd_type_char(char c, uint32_t tap_ms)
+static bool kbd_type_char(char c, uint32_t tap_ms)
 {
 	// Exit if char not mapped
 	uint8_t mod, kc;
@@ -459,9 +459,9 @@ static bool bluetooth_kbd_type_char(char c, uint32_t tap_ms)
 
 	uint8_t keys[6] = {kc, 0,0,0,0,0};
 
-	bluetooth_kbd_send_raw(mod, keys);
+	kbd_send_raw(mod, keys);
 	vTaskDelay(pdMS_TO_TICKS(tap_ms));
-	bluetooth_kbd_release_all();
+	kbd_release_all();
 	vTaskDelay(pdMS_TO_TICKS(tap_ms));
 
 	return true;
@@ -590,11 +590,11 @@ static uint8_t mod_from_word(const char *w)
 }
 
 // Press one combo then release (wrapper around your existing raw send)
-static void bluetooth_send_combo(uint8_t modifiers, uint8_t keycode, uint32_t tap_ms) {
+static void send_combo(uint8_t modifiers, uint8_t keycode, uint32_t tap_ms) {
 	uint8_t keys[6] = { keycode, 0,0,0,0,0 };
-	bluetooth_kbd_send_raw(modifiers, keys);
+	kbd_send_raw(modifiers, keys);
 	vTaskDelay(pdMS_TO_TICKS(tap_ms));
-	bluetooth_kbd_release_all();
+	kbd_release_all();
 	vTaskDelay(pdMS_TO_TICKS(tap_ms));
 }
 
@@ -649,9 +649,9 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
 
 		// Stream via existing per-char typer:
 		while (*payload) {
-			// Typed via internal helper; see bluetooth_send_string()/bluetooth_kbd_type_char()
+			// Typed via internal helper; see bluetooth_send_string()/kbd_type_char()
 			// It presses & releases a single key with delays :contentReference[oaicite:1]{index=1}
-			bluetooth_kbd_type_char(*payload++, tap_ms);
+			kbd_type_char(*payload++, tap_ms);
 		}
 
 		*consumed_end = gt;
@@ -695,7 +695,7 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
 
 	// Send mods
 	if (key) {
-		bluetooth_send_combo(mods, key, tap_ms);
+		send_combo(mods, key, tap_ms);
 		sent = true;
 	}
 
@@ -727,7 +727,7 @@ void bluetooth_send_script(const char *script, uint32_t tap_ms)
 		}
 
 		// Ordinary text path, keep typing
-		bluetooth_kbd_type_char(*s++, tap_ms);
+		kbd_type_char(*s++, tap_ms);
 	}
 }
 
@@ -770,6 +770,7 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
 
 			bluetooth_connected = false;
+
 			esp_hid_ble_gap_adv_start();
 			break;
 		}
@@ -781,7 +782,7 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 static void ble_hid_device_host_task(void *param)
 {
 	nimble_port_run();
-	nimble_port_freertos_deinit();
+	nimble_port_freertos_deinit(); // esp_nimble_disable
 }
 
 // Declaration of extern esp function
@@ -803,11 +804,11 @@ void bluetooth_init(void)
 		// Register the standard Battery Service (0x180F)
 		ble_svc_bas_init();
 
+		ret = esp_hidd_dev_init(&ble_hid_config, ESP_HID_TRANSPORT_BLE, ble_hidd_event_callback, &ble_hid_param.hid_dev);
+		ESP_ERROR_CHECK(ret);
+
 		gap_inited_once = true;
 	}
-
-	ret = esp_hidd_dev_init(&ble_hid_config, ESP_HID_TRANSPORT_BLE, ble_hidd_event_callback, &ble_hid_param.hid_dev);
-	ESP_ERROR_CHECK(ret);
 
 	ble_store_config_init();
 	ble_hs_cfg.store_status_cb = ble_store_util_status_rr;
@@ -820,7 +821,7 @@ void bluetooth_init(void)
 
 void bluetooth_deinit(void)
 {
-	ble_gap_adv_stop();
+	ble_gap_adv_stop(); // Stop advertising
 
 	if (nimble_port_stop()) {
 		ESP_LOGE(TAG, "nimble_port_stop failed");

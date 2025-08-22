@@ -17,6 +17,8 @@
 
 QueueHandle_t xBluetoothMediaCmdQueue;
 
+SemaphoreHandle_t xBluetoothScriptMutex;
+
 volatile bool bluetooth_connected = false;
 
 static uint16_t bluetooth_cmd = 0;
@@ -123,7 +125,7 @@ static void bluetooth_task(void *arg)
 		xQueueReceive(xAdcBatBluetoothQueue, &battery_percentage, 0);
 		
 		// Update bluetooth battery level every battery_timer_interval
-		if (xTaskGetTickCount() - battery_timer_last >= battery_timer_interval) {
+		if (xTaskGetTickCount() - battery_timer_last >= battery_timer_interval && bluetooth_connected) {
 			battery_timer_last = xTaskGetTickCount();
 			
 			bluetooth_set_battery_level(battery_percentage);
