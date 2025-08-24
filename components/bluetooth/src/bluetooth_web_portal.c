@@ -48,6 +48,7 @@ static const char *INDEX_HTML =
 "<p>Here are some additional commands so you can do more than just type text:</p>"
 "<p>"
 "&lt;delay=x&gt; - Wait for x milliseconds"
+"<br>&lt;hold:c=x&gt; - Hold c for x milliseconds"
 "<br>&lt;enter&gt; - Enter"
 "<br>&lt;tab&gt; - Tab"
 "<br>&lt;esc&gt; - Escape"

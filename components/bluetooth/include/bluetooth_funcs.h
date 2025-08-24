@@ -157,7 +157,7 @@
  * @brief Initialize bluetooth and start advertising to connect with last known
  */
 void bluetooth_init(void);
-void bluetooth_hid_notify_state(bool enabled);
+
 /** 
  * @brief Deinitialize bluetooth
  */

@@ -589,11 +589,45 @@ static uint8_t mod_from_word(const char *w)
 	return 0;
 }
 
-// Press one combo then release (wrapper around your existing raw send)
-static void send_combo(uint8_t modifiers, uint8_t keycode, uint32_t tap_ms) {
-	uint8_t keys[6] = { keycode, 0,0,0,0,0 };
+// Lets users write things like <ctrl + d + s> with spaces
+static char *trim_tok(char *s)
+{
+	// Advance s past any leading space/tab/newline
+	while (*s && (unsigned char)*s <= ' ') {
+		++s;
+	}
+	
+	// Find the current (left-trimmed) end of the string
+	char *e = s + strlen(s);
+
+	// Walk backward from the end, turning trailing whitespace into '\0'
+	while (e > s && (unsigned char)e[-1] <= ' ') {
+		*--e = '\0';
+	}
+	
+	return s;
+}
+
+// Press up to 6 keys with optional modifiers, hold for hold_ms, then release
+// After release, wait tap_ms to preserve existing pacing
+static void send_chord(uint8_t modifiers, const uint8_t *keycodes, size_t nkeys, uint32_t hold_ms, uint32_t tap_ms)
+{
+	// HID keyboards support up to 6 simultaneous non-modifier keys per report
+	uint8_t keys[6] = {0};
+
+	// Safety clamp so we never overflow the HID array
+	if (nkeys > 6) {
+		nkeys = 6;
+	}
+
+	// Copy the requested chord into the HID rollover buffer
+	for (size_t i = 0; i < nkeys; ++i) {
+		keys[i] = keycodes[i];
+	}
+
+	// Send
 	kbd_send_raw(modifiers, keys);
-	vTaskDelay(pdMS_TO_TICKS(tap_ms));
+	vTaskDelay(pdMS_TO_TICKS(hold_ms));
 	kbd_release_all();
 	vTaskDelay(pdMS_TO_TICKS(tap_ms));
 }
@@ -626,7 +660,7 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
 	memcpy(tmp, start + 1, len);
 	tmp[len] = '\0';
 
-	// If is <delay=x>
+	// If is <delay=ms>
 	if (!strncasecmp(tmp, "delay=", 6)) { // Compares while ignoring differences in case
 		long ms = strtol(tmp + 6, NULL, 10); // Converts a string to a long int
 
@@ -640,6 +674,53 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
 
 		*consumed_end = gt;
 		return true;
+	}
+
+	// If is <hold:x=x>
+	const uint32_t DEFAULT_HOLD_MS = 50; // Used when hold has no explicit duration
+	bool is_hold = false;
+	uint32_t hold_ms = DEFAULT_HOLD_MS;
+	char *payload = tmp; // Points to the chord text that we'll parse into modifiers/keys
+
+	// If is <hold:chord=ms>
+	if (!strncasecmp(tmp, "hold:", 5)) {
+		is_hold = true; // Use hold_ms
+		payload = tmp + 5; // Start of chord
+
+		// Look for trailing "=ms"
+		char *eq = strrchr(payload, '=');
+		if (eq) {
+			// Points to characters after '='
+			char *ms_start = eq + 1;
+			ms_start = trim_tok(ms_start); // Remove any spaces
+
+			char *endptr = NULL;
+
+			// Read base-10 int
+			long ms = strtol(ms_start, &endptr, 10);
+
+			// If digit was found
+			if (endptr != ms_start) {
+				// Clamp at min and max
+				if (ms < 0) {
+					ms = 0;
+				}
+				if (ms > 100000) {
+					ms = 100000;
+				}
+
+				hold_ms = (uint32_t)ms;
+
+				// Strip the "=ms" part from payload and trim spaces before '='
+				// Back up over any spaces
+				char *e = eq;
+				while (e > payload && (unsigned char)e[-1] <= ' ') {
+					--e;
+				}
+
+				*e = '\0'; // NUL-terminate payload
+			}
+		}
 	}
 
 	/* IF NEEDED LATER:
@@ -661,46 +742,63 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
 
 	// If is <...+...> / <...>: Split on '+'
 	uint8_t mods = 0;
-	uint8_t key  = 0;
+	uint8_t keys[6] = {0};
+	size_t nkeys = 0;
 
 	char *save = NULL;
-	char *tok = strtok_r(tmp, "+", &save); // Returns a pointer to the beginning of the token
-	bool sent = false;
 
-	while (tok) {
-		// If this word is a modifier add it, otherwise it’s the 'primary' key
+	// Split the chord on '+'
+	for (char *tok = strtok_r(payload, "+", &save); tok; tok = strtok_r(NULL, "+", &save)) {
+		// Trim each token for whitespace tolerance
+		tok = trim_tok(tok);
+		if (!*tok) {
+			continue;
+		}
+
+		// If the token is a modifier word, OR it into the mods bitfield
+		// Modifiers (ctrl, shift, alt, gui/cmd/meta)
 		uint8_t add = mod_from_word(tok);
-
-		// If found something, bitwise OR to mods
 		if (add) {
 			mods |= add;
+			continue;
 		}
-		else {
-			// Try name mapping first
-			if (!key && key_name_to_hid(tok, &key)) {
-				// Okay -> got command
+
+		// If it's a named key, convert to its HID usage code and add it to the chord
+		// Named keys (enter, tab, esc, home, end, pgup, pgdn, f1..f12, etc.)
+		uint8_t kc = 0;
+		if (key_name_to_hid(tok, &kc)) {
+			if (nkeys < 6) {
+				keys[nkeys++] = kc;
 			}
-			else if (!key) {
-				// Fallback: single ASCII char
-				uint8_t amod = 0, akc = 0;
-				if (ascii_to_hid(tok[0], &amod, &akc)) {
-					key = akc;
-					mods |= amod; // Include shift if needed by symbol
+			continue;
+		}
+
+		// Else: Single ASCII character -> convert to HID
+		if (tok[1] == '\0') {
+			uint8_t amod = 0, akc = 0;
+			if (ascii_to_hid(tok[0], &amod, &akc)) {
+				mods |= amod; // Shift for symbols if needed
+				if (nkeys < 6) {
+					keys[nkeys++] = akc;
 				}
 			}
 		}
-
-		tok = strtok_r(NULL, "+", &save);
 	}
 
-	// Send mods
-	if (key) {
-		send_combo(mods, key, tap_ms);
-		sent = true;
+	// If we collected at least one key
+	if (nkeys > 0) {
+		// For non-hold tags: use tap_ms as the brief hold
+		// For hold tags: use hold_ms
+		uint32_t use_hold = is_hold ? hold_ms : tap_ms;
+
+		send_chord(mods, keys, nkeys, use_hold, tap_ms);
+
+		*consumed_end = gt;
+		return true;
 	}
 
-	*consumed_end = gt;
-	return sent;
+	*consumed_end = NULL;
+	return false;
 }
 
 // Send script
@@ -781,6 +879,7 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 
 static void ble_hid_device_host_task(void *param)
 {
+	// This function will return only when nimble_port_stop() is executed 
 	nimble_port_run();
 	nimble_port_freertos_deinit(); // esp_nimble_disable
 }
@@ -792,23 +891,17 @@ void bluetooth_init(void)
 {
 	esp_err_t ret;
 
-	static bool gap_inited_once = false;
+	ret = esp_hid_gap_init(HID_DEV_MODE);
+	ESP_ERROR_CHECK(ret);
 
-	if (!gap_inited_once) {
-		ret = esp_hid_gap_init(HID_DEV_MODE);
-		ESP_ERROR_CHECK(ret);
+	ret = esp_hid_ble_gap_adv_init(ESP_HID_APPEARANCE_KEYBOARD, DEVICE_NAME);
+	ESP_ERROR_CHECK(ret);
 
-		ret = esp_hid_ble_gap_adv_init(ESP_HID_APPEARANCE_KEYBOARD, DEVICE_NAME);
-		ESP_ERROR_CHECK(ret);
+	// Register the standard Battery Service (0x180F)
+	ble_svc_bas_init();
 
-		// Register the standard Battery Service (0x180F)
-		ble_svc_bas_init();
-
-		ret = esp_hidd_dev_init(&ble_hid_config, ESP_HID_TRANSPORT_BLE, ble_hidd_event_callback, &ble_hid_param.hid_dev);
-		ESP_ERROR_CHECK(ret);
-
-		gap_inited_once = true;
-	}
+	ret = esp_hidd_dev_init(&ble_hid_config, ESP_HID_TRANSPORT_BLE, ble_hidd_event_callback, &ble_hid_param.hid_dev);
+	ESP_ERROR_CHECK(ret);
 
 	ble_store_config_init();
 	ble_hs_cfg.store_status_cb = ble_store_util_status_rr;
