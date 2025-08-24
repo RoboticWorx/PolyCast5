@@ -705,8 +705,8 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
 				if (ms < 0) {
 					ms = 0;
 				}
-				if (ms > 100000) {
-					ms = 100000;
+				if (ms > 10000000) { // ~6.9 days
+					ms = 10000000;
 				}
 
 				hold_ms = (uint32_t)ms;
@@ -764,7 +764,7 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
 		}
 
 		// If it's a named key, convert to its HID usage code and add it to the chord
-		// Named keys (enter, tab, esc, home, end, pgup, pgdn, f1..f12, etc.)
+		// Named keys (enter, tab, esc, home, end, pgup, pgdn, f1...f12, etc.)
 		uint8_t kc = 0;
 		if (key_name_to_hid(tok, &kc)) {
 			if (nkeys < 6) {
@@ -797,6 +797,7 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
 		return true;
 	}
 
+	// Nothing actionable: do not consume and let caller type '<' literally
 	*consumed_end = NULL;
 	return false;
 }
