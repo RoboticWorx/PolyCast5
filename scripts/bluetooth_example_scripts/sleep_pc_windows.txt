@@ -1,0 +1,16 @@
+Script:
+
+<ctrl+alt+del><delay=500><up><delay=50><enter><delay=50><enter>
+
+Explanation:
+
+This script will put any Windows PC into sleep mode.
+
+Steps:
+- Opens Windows Security screen
+- Waits 500ms for it to open
+- Presses up to hover over power menu
+- Waits 50ms
+- Opens power menu
+- Waits 50ms
+- Selects "Sleep"

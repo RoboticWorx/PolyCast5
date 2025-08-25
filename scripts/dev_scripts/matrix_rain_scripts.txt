@@ -1,0 +1,391 @@
+Frames gathered from https://github.com/Rezmason/matrix if you're interested.
+
+I ended up cutting out all the odd frames to save some memory.
+
+------------------------------
+
+Script used:
+
+<!doctype html>
+<html>
+	<head>
+		<title>Matrix digital rain</title>
+		<meta charset="utf-8" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+		<style>
+			@supports (padding-top: env(safe-area-inset-top)) {
+				body {
+					padding: 0;
+					height: calc(100% + env(safe-area-inset-top));
+				}
+			}
+			body {
+				background: black;
+				overflow: hidden;
+				margin: 0;
+
+				font-family: monospace;
+				font-size: 2em;
+				text-align: center;
+			}
+
+			canvas {
+				width: 100vw;
+				height: 100vh;
+			}
+
+			p {
+				color: hsl(108, 90%, 70%);
+				text-shadow: hsl(108, 90%, 40%) 1px 0 10px;
+			}
+
+			.notice {
+				margin-top: 10em;
+				animation: fadeInAnimation ease 3s;
+				animation-iteration-count: 1;
+				animation-fill-mode: forwards;
+			}
+
+			@keyframes fadeInAnimation {
+				0% {
+					opacity: 0;
+				}
+				100% {
+					opacity: 1;
+				}
+			}
+
+			.pill {
+				display: inline-block;
+				background: gray;
+				border: 0.3em solid lightgray;
+				font-size: 1rem;
+				font-family: monospace;
+				color: white;
+				padding: 0.5em 1em;
+				border-radius: 2em;
+				min-width: 6rem;
+				margin: 3em;
+				text-decoration: none;
+				cursor: pointer;
+				text-transform: uppercase;
+				font-weight: bold;
+			}
+
+			.blue {
+				background: linear-gradient(skyblue, blue, black, black, darkblue);
+				border-color: darkblue;
+				color: lightblue;
+			}
+
+			.blue:hover {
+				border-color: blue;
+				color: white;
+			}
+
+			.red {
+				background: linear-gradient(lightpink, crimson, black, black, darkred);
+				border-color: darkred;
+				color: lightpink;
+			}
+
+			.red:hover {
+				border-color: crimson;
+				color: white;
+			}
+		</style>
+	</head>
+	<body>
+		<script>
+	    (function(){
+	      const orig = HTMLCanvasElement.prototype.getContext;
+	      HTMLCanvasElement.prototype.getContext = function(type, attrs) {
+	        if ((type === 'webgl' || type === 'webgl2')) {
+	          attrs = Object.assign({}, attrs, { preserveDrawingBuffer: true });
+	        }
+	        return orig.call(this, type, attrs);
+	      };
+	    })();
+	  </script>
+	
+	  <!-- 1) Force URL params -->
+	  <script>
+	    (function() {
+	      const q = new URLSearchParams(location.search);
+	      q.set('version',      'classic');
+	      q.set('skipIntro',    'true');
+	      q.set('numColumns',   '40');
+	      q.set('bloomStrength','0.4');
+	      q.set('loops',        'true');
+	      q.set('fps',          '20');
+	      if (location.search !== '?' + q.toString()) {
+	        location.search = q.toString();
+	      }
+	    })();
+	  </script>
+	
+	  <!-- 2) FileSaver.js & JSZip -->
+	  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+	  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+	
+	  <!-- 3) Matrix demo -->
+	  <script type="module" src="js/main.js"></script>
+	
+	  <!-- 4) Capture logic -->
+	  <script>
+	    window.addEventListener('load', () => {
+	
+	      // Wait for the real (non-zero) canvas
+	      function findCanvas() {
+	        return Array.from(document.querySelectorAll('canvas'))
+	                    .find(c => c.width > 0 && c.height > 0);
+	      }
+	      function waitForCanvas(cb) {
+	        const c = findCanvas();
+	        if (c) cb(c);
+	        else   setTimeout(() => waitForCanvas(cb), 50);
+	      }
+	
+	      waitForCanvas(mainCanvas => {
+	        // offscreen canvas for 240×135
+	        const w = 240, h = 135;
+	        const rs = document.createElement('canvas');
+	        rs.width = w; rs.height = h;
+	        const ctx = rs.getContext('2d');
+	
+	        const zip       = new JSZip();
+	        const FPS       = 20;             // match ?fps=20
+	        const CYCLE_SEC = 6;
+	        const WANT      = 100;             // change this for more frames
+	        const PERIOD_MS = (CYCLE_SEC * 1000) / WANT;
+	
+	        let kept = 0, intervalId;
+	
+	        function snap() {
+	          ctx.drawImage(
+	            mainCanvas,
+	            0, 0,
+	            mainCanvas.width, mainCanvas.height,
+	            0, 0,
+	            w, h
+	          );
+	          rs.toBlob(blob => {
+	            kept++;
+	            zip.file(
+	              `anim_matrix_rain_${kept}.png`,
+	              blob,
+	              { compression: 'STORE' }
+	            );
+	            if (kept === WANT) {
+	              clearInterval(intervalId);
+	              zip.generateAsync({ type:'blob', compression:'STORE' })
+	                 .then(zb => saveAs(zb, 'matrix_frames_240x135.zip'));
+	            }
+	          }, 'image/png');
+	        }
+	
+	        // warm-up then align to loop boundary
+	        setTimeout(() => {
+	          const now   = performance.now();
+	          const delay = (CYCLE_SEC * 1000) - (now % (CYCLE_SEC * 1000));
+	          setTimeout(() => {
+	            snap();                              // first frame
+	            intervalId = setInterval(snap, PERIOD_MS);
+	          }, delay + 100);
+	        }, 500);
+	      });
+	
+	    });
+	
+	// http://localhost:8000/index.html
+	</script>
+	</body>
+</html>
+
+------------------------------
+
+If you want full-res:
+
+<!doctype html>
+<html>
+	<head>
+		<title>Matrix digital rain</title>
+		<meta charset="utf-8" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+		<style>
+			@supports (padding-top: env(safe-area-inset-top)) {
+				body {
+					padding: 0;
+					height: calc(100% + env(safe-area-inset-top));
+				}
+			}
+			body {
+				background: black;
+				overflow: hidden;
+				margin: 0;
+
+				font-family: monospace;
+				font-size: 2em;
+				text-align: center;
+			}
+
+			canvas {
+				width: 100vw;
+				height: 100vh;
+			}
+
+			p {
+				color: hsl(108, 90%, 70%);
+				text-shadow: hsl(108, 90%, 40%) 1px 0 10px;
+			}
+
+			.notice {
+				margin-top: 10em;
+				animation: fadeInAnimation ease 3s;
+				animation-iteration-count: 1;
+				animation-fill-mode: forwards;
+			}
+
+			@keyframes fadeInAnimation {
+				0% {
+					opacity: 0;
+				}
+				100% {
+					opacity: 1;
+				}
+			}
+
+			.pill {
+				display: inline-block;
+				background: gray;
+				border: 0.3em solid lightgray;
+				font-size: 1rem;
+				font-family: monospace;
+				color: white;
+				padding: 0.5em 1em;
+				border-radius: 2em;
+				min-width: 6rem;
+				margin: 3em;
+				text-decoration: none;
+				cursor: pointer;
+				text-transform: uppercase;
+				font-weight: bold;
+			}
+
+			.blue {
+				background: linear-gradient(skyblue, blue, black, black, darkblue);
+				border-color: darkblue;
+				color: lightblue;
+			}
+
+			.blue:hover {
+				border-color: blue;
+				color: white;
+			}
+
+			.red {
+				background: linear-gradient(lightpink, crimson, black, black, darkred);
+				border-color: darkred;
+				color: lightpink;
+			}
+
+			.red:hover {
+				border-color: crimson;
+				color: white;
+			}
+		</style>
+	</head>
+	<body>
+		<script>
+    (function(){
+      const orig = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function(type, attrs) {
+        if (type==='webgl' || type==='webgl2') {
+          attrs = Object.assign({}, attrs, { preserveDrawingBuffer:true });
+        }
+        return orig.call(this, type, attrs);
+      };
+    })();
+  </script>
+
+  <!-- 1) Force URL params -->
+  <script>
+    (function(){
+      const q = new URLSearchParams(location.search);
+      q.set('version','classic');
+      q.set('skipIntro','true');
+      q.set('numColumns','40');
+      q.set('bloomStrength','0.4');
+      q.set('loops','true');
+      q.set('fps','20');
+      if (location.search !== '?'+q.toString()) {
+        location.search = q.toString();
+      }
+    })();
+  </script>
+
+  <!-- 2) FileSaver & JSZip -->
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+
+  <!-- 3) The Matrix demo -->
+  <script type="module" src="js/main.js"></script>
+
+  <!-- 4) Capture logic (100 frames, uncompressed) -->
+  <script>
+	window.addEventListener('load', () => {
+	// 1) Wait for the real canvas
+	function findCanvas() {
+		return Array.from(document.querySelectorAll('canvas'))
+					.find(c => c.width > 0 && c.height > 0);
+	}
+	function waitForCanvas(cb) {
+		const c = findCanvas();
+		c ? cb(c) : setTimeout(() => waitForCanvas(cb), 50);
+	}
+
+	waitForCanvas(mainCanvas => {
+		const zip       = new JSZip();
+		const WANT      = 100;
+		const CYCLE_SEC = 6;
+		const PERIOD_MS = (CYCLE_SEC * 1000) / WANT;
+
+		let kept = 0, intervalId;
+
+		// 2) Snap directly from the real canvas
+		function snap() {
+		mainCanvas.toBlob(blob => {
+			kept++;
+			zip.file(
+			`anim_matrix_rain_${kept}.png`,
+			blob,
+			{ compression: "STORE" }  // no compression
+			);
+			if (kept === WANT) {
+			clearInterval(intervalId);
+			zip.generateAsync({ type: 'blob', compression: "STORE" })
+				.then(zb => saveAs(zb, 'matrix_frames_native.zip'));
+			}
+		}, 'image/png');
+		}
+
+		// 3) Warm-up then align to loop boundary
+		setTimeout(() => {
+		const now   = performance.now();
+		const delay = (CYCLE_SEC * 1000) - (now % (CYCLE_SEC * 1000));
+		setTimeout(() => {
+			snap();                              // first frame at t≈0
+			intervalId = setInterval(snap, PERIOD_MS);
+		}, delay + 100);
+		}, 500);
+	});
+	});
+
+// http://localhost:8000/index.html
+</script>
+	</body>
+</html>

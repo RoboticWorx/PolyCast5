@@ -1,0 +1,16 @@
+Script:
+
+<win+s><delay=500>browser<enter><delay=500>https://youtu.be/dQw4w9WgXcQ?si=fCygLTFX4Usi2nlR<enter>
+
+Explanation:
+
+This script will automatically search for Rick Astley "Never Gonna Give You Up" video.
+
+Steps:
+- Opens Windows search
+- Waits 500ms for it to open
+- Types "browser"
+- Selects the browser that comes up
+- Waits 500ms for it to open
+- Types Rick Astley video URL into the search bar
+- Hits enter

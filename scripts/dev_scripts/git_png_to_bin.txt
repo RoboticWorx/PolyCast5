@@ -1,0 +1,11 @@
+for f in anim_city_*.png; do
+    base="${f%.png}"
+    python ~/Downloads/lvgl/scripts/LVGLImage.py \
+        --ofmt BIN \
+        --cf RGB565 \
+        --compress NONE \
+        --nemagfx \
+        -o . \
+        --name "$base" \
+        "$f"
+done
