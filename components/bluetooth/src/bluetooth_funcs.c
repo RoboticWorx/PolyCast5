@@ -1,3 +1,4 @@
+#include "esp_err.h"
 #include "polycast5_macros.h"
 
 #include <ctype.h>
@@ -60,7 +61,7 @@
 
 #define HID_CC_IN_RPT_LEN 2 // 2-byte CC report
 
-extern volatile bool bluetooth_connected;
+volatile bluetooth_state_t bluetooth_state = BT_STATE_OFF;
 
 /* BLE HID state */
 typedef struct {
@@ -852,15 +853,18 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 
 	switch (event) {
 		case ESP_HIDD_START_EVENT:
-			esp_hid_ble_gap_adv_start();
+			if (bluetooth_state == BT_STATE_RUNNING || bluetooth_state == BT_STATE_INITING) {
+		        esp_hid_ble_gap_adv_start();
+		    }
+
 			break;
 		case ESP_HIDD_CONNECT_EVENT: {
 			// RGB indicator
 			uint8_t rgb_state = RGB_SET_BLUE;
 			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
 
-			bluetooth_connected = true;
 			bluetooth_set_battery_level(100);
+
 			break;
 		}
 		case ESP_HIDD_DISCONNECT_EVENT: {
@@ -868,9 +872,10 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 			uint8_t rgb_state = RGB_SET_OFF;
 			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
 
-			bluetooth_connected = false;
+			if (bluetooth_state == BT_STATE_RUNNING || bluetooth_state == BT_STATE_INITING) {
+		        esp_hid_ble_gap_adv_start();
+		    }
 
-			esp_hid_ble_gap_adv_start();
 			break;
 		}
 		default:
@@ -890,6 +895,8 @@ void ble_store_config_init(void);
 
 void bluetooth_init(void)
 {
+	bluetooth_state = BT_STATE_INITING;
+
 	esp_err_t ret;
 
 	ret = esp_hid_gap_init(HID_DEV_MODE);
@@ -911,28 +918,46 @@ void bluetooth_init(void)
 	if (ret) {
 		ESP_LOGE(TAG, "esp_nimble_enable failed: %d", ret);
 	}
+
+	bluetooth_state = BT_STATE_RUNNING;
 }
+
+// Declare self-added function
+extern esp_err_t esp_hid_gap_deinit(void);
 
 void bluetooth_deinit(void)
 {
+	// If already off or deiniting, exit
+	if (bluetooth_state == BT_STATE_OFF || bluetooth_state == BT_STATE_DEINITING) {
+		return;
+	}
+
+	bluetooth_state = BT_STATE_DEINITING;
+
+	esp_hid_gap_deinit();
+
 	ble_gap_adv_stop(); // Stop advertising
 
-	if (nimble_port_stop()) {
-		ESP_LOGE(TAG, "nimble_port_stop failed");
-		return;
-	}
+	ble_gatts_reset();
 
-	if (nimble_port_deinit() != ESP_OK) {
-		ESP_LOGE(TAG, "nimble_port_deinit failed");
-		return;
-	}
+   if (nimble_port_stop()) {
+		   ESP_LOGE(TAG, "nimble_port_stop failed");
+		   return;
+   }
 
-	if (ble_hid_param.hid_dev) {
-		esp_hidd_dev_deinit(ble_hid_param.hid_dev);
-		ble_hid_param.hid_dev = NULL;
-	}
+   if (nimble_port_deinit() != ESP_OK) {
+		   ESP_LOGE(TAG, "nimble_port_deinit failed");
+		   return;
+   }
+
+   if (ble_hid_param.hid_dev) {
+		   esp_hidd_dev_deinit(ble_hid_param.hid_dev);
+		   ble_hid_param.hid_dev = NULL;
+   }
 
 	#ifdef POLYCAST5_DEBUG
 		ESP_LOGI(TAG, "Bluetooth fully disabled");
 	#endif
+
+	bluetooth_state = BT_STATE_OFF;
 }

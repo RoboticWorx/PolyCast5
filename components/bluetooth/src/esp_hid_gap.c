@@ -1093,6 +1093,22 @@ esp_err_t esp_hid_gap_init(uint8_t mode)
     return ESP_OK;
 }
 
+// Self-implemented function to deinit
+esp_err_t esp_hid_gap_deinit(void)
+{
+	if (bt_hidh_cb_semaphore != NULL) {
+		vSemaphoreDelete(bt_hidh_cb_semaphore);
+		bt_hidh_cb_semaphore = NULL;
+	}
+
+	if (ble_hidh_cb_semaphore != NULL) {
+		vSemaphoreDelete(ble_hidh_cb_semaphore);
+		ble_hidh_cb_semaphore = NULL;
+	}
+
+	return ESP_OK;
+}
+
 #if !CONFIG_BT_NIMBLE_ENABLED
 esp_err_t esp_hid_scan(uint32_t seconds, size_t *num_results, esp_hid_scan_result_t **results)
 {

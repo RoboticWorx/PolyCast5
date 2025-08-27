@@ -1,0 +1,10 @@
+Script:
+
+<hold:q=10000000>
+
+Explanation:
+
+This script spams the 'q' key for ~6.94 days (assuming you stay connected). This is an interesting HID attack as any other keyboard gets completely overwhelmed by the spamming of q's (or any other key) such that it is impossible to search anything.
+
+Steps:
+- Holds q key for 10000000ms

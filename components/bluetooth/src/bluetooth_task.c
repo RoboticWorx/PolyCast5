@@ -19,7 +19,7 @@ QueueHandle_t xBluetoothMediaCmdQueue;
 
 SemaphoreHandle_t xBluetoothScriptMutex;
 
-volatile bool bluetooth_connected = false;
+extern volatile bluetooth_state_t bluetooth_state;
 
 static uint16_t bluetooth_cmd = 0;
 static uint8_t battery_percentage = 100;
@@ -46,37 +46,37 @@ static void bluetooth_task(void *arg)
 			}
 			/* Media commands */
 			// Vol-up command received
-			else if (bluetooth_cmd == BLUETOOTH_CMD_VOLUME_UP && bluetooth_connected) {
+			else if (bluetooth_cmd == BLUETOOTH_CMD_VOLUME_UP && bluetooth_state == BT_STATE_RUNNING) {
 				bluetooth_send_media(BLUETOOTH_CMD_VOLUME_UP, true);
 	            vTaskDelay(pdMS_TO_TICKS(100)); // Simulate press
 	            bluetooth_send_media(BLUETOOTH_CMD_VOLUME_UP, false);
 			}
 			// Vol-down command received
-			else if (bluetooth_cmd == BLUETOOTH_CMD_VOLUME_DOWN && bluetooth_connected) {
+			else if (bluetooth_cmd == BLUETOOTH_CMD_VOLUME_DOWN && bluetooth_state == BT_STATE_RUNNING) {
 				bluetooth_send_media(BLUETOOTH_CMD_VOLUME_DOWN, true);
 	            vTaskDelay(pdMS_TO_TICKS(100));
 	            bluetooth_send_media(BLUETOOTH_CMD_VOLUME_DOWN, false);
 			}
 			// Next track command received
-			else if (bluetooth_cmd == BLUETOOTH_CMD_NEXT_TRK && bluetooth_connected) {
+			else if (bluetooth_cmd == BLUETOOTH_CMD_NEXT_TRK && bluetooth_state == BT_STATE_RUNNING) {
 				bluetooth_send_media(BLUETOOTH_CMD_NEXT_TRK, true);
 	            vTaskDelay(pdMS_TO_TICKS(100));
 	            bluetooth_send_media(BLUETOOTH_CMD_NEXT_TRK, false);
 			}
 			// Previous track command received
-			else if (bluetooth_cmd == BLUETOOTH_CMD_PREV_TRK && bluetooth_connected) {
+			else if (bluetooth_cmd == BLUETOOTH_CMD_PREV_TRK && bluetooth_state == BT_STATE_RUNNING) {
 				bluetooth_send_media(BLUETOOTH_CMD_PREV_TRK, true);
 	            vTaskDelay(pdMS_TO_TICKS(100));
 	            bluetooth_send_media(BLUETOOTH_CMD_PREV_TRK, false);
 			}
 			// Play pause command received
-			else if (bluetooth_cmd == BLUETOOTH_CMD_PLAY_PAUSE && bluetooth_connected) {
+			else if (bluetooth_cmd == BLUETOOTH_CMD_PLAY_PAUSE && bluetooth_state == BT_STATE_RUNNING) {
 				bluetooth_send_media(BLUETOOTH_CMD_PLAY_PAUSE, true);
 	            vTaskDelay(pdMS_TO_TICKS(100));
 	            bluetooth_send_media(BLUETOOTH_CMD_PLAY_PAUSE, false);
 			}
 			/* Text scripts */
-			else if (bluetooth_cmd >= BLUETOOTH_SCRIPT_OFFSET && bluetooth_connected) {
+			else if (bluetooth_cmd >= BLUETOOTH_SCRIPT_OFFSET && bluetooth_state == BT_STATE_RUNNING) {
 				// Menu index that was encoded by the UI
 				uint16_t menu_idx = (uint16_t)(bluetooth_cmd - BLUETOOTH_SCRIPT_OFFSET);
 
@@ -125,7 +125,7 @@ static void bluetooth_task(void *arg)
 		xQueueReceive(xAdcBatBluetoothQueue, &battery_percentage, 0);
 		
 		// Update bluetooth battery level every battery_timer_interval
-		if (xTaskGetTickCount() - battery_timer_last >= battery_timer_interval && bluetooth_connected) {
+		if (xTaskGetTickCount() - battery_timer_last >= battery_timer_interval && bluetooth_state == BT_STATE_RUNNING) {
 			battery_timer_last = xTaskGetTickCount();
 			
 			bluetooth_set_battery_level(battery_percentage);

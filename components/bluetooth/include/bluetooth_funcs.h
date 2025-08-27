@@ -153,6 +153,10 @@
 #define BLUETOOTH_CMD_VOLUME_UP 233
 #define BLUETOOTH_CMD_VOLUME_DOWN 234
 
+typedef enum {
+	BT_STATE_OFF = 0, BT_STATE_INITING, BT_STATE_RUNNING, BT_STATE_DEINITING
+} bluetooth_state_t;
+
 /** 
  * @brief Initialize bluetooth and start advertising to connect with last known
  */
