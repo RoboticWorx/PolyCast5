@@ -10,6 +10,8 @@ PolyCast5 Firmware
 ====================
 Welcome to the official GitHub page for the PolyCast5!
 
+PolyCast5 is a open-source multi-tool wireless remote that you can use to control outlets, custom devices, bluetooth devices, anything infrared, and more.
+
 You can find some relevant links below:
 * [PolyCast5 official website.](https://polycast5.com/) An easy explanation of what you can do with it and how it works!
 * [PolyCast5 user documentation.](https://polycast5.com/pages/docs) How to use it and unleash its full capabilities.
@@ -26,18 +28,20 @@ Please check [ESP-IDF docs](https://docs.espressif.com/projects/esp-idf/en/lates
 
 ## Project Structure
 * `main` - Initialization code. The program runs from here.
-* `build` - How the program is built. Contains ESP-IDF as well as the compiled code.
-* `components` - The various pieces of the application broken into folders.
-    * `bluetooth` - Bluetooth functions and task. Used to communicate with a connected BLE device as a HID.
+* `assets` - Media image files stored as `.bin` for SPIFFS access.
+* `scripts` - Bluetooth keystroke injection (autotype) examples as well as a few miscellaneous developement scripts.
+* `build` - Generated program build files. Contains ESP-IDF as well as the compiled code.
+* `components` - The various pieces of the application code broken into folders.
+    * `bluetooth` - Communicates with a connected BLE device as a Human Interface Device (HID) to behave as a media controller and autotype keyboard.
     * `common` - Shared macros across the entirety of the program used for build and debugging.
-    * `espnow` - [ESP-NOW](https://www.espressif.com/en/solutions/low-power-solutions/esp-now) functions and task. Used for sending instantaneous low-power commands to external ESP32 devices (e.g. light switcher, etc.).
-    * `gpio` - GPIO functions and task. Used to sample from the onboard GPIO expander, handle battery indication, as well as provide global user input semaphores.
-    * `infrared` - Infrared functions and task. Used in obtaining, saving, and replaying infrared signals.
-    * `lcd` - LCD functions and task. Contains a driver for a ST7789 display and well as navigates user input in coordination with LVGL.
-    * `lora` - LoRa functions and task. Used in communicating with the SX1262 LoRa radio as well as sending and receiving long-range signals for commanding [PolyPlugs](https://github.com/RoboticWorx/PolyPlug).
-    * `lvgl` - [LVGL](https://lvgl.io/) display library responsible for creating a nice user interface.
-    * `sx126x` - Driver for the SX1262 LoRa radio chip. Communicates commands over SPI.
-    * `wifi` - Wi-Fi functions and task. Used for connecting to networks, monitoring packets, MQTT, and other Wi-Fi capabilities.
+    * `espnow` - Sends instantaneous low-power [ESP-NOW](https://www.espressif.com/en/solutions/low-power-solutions/esp-now) commands to external ESP32 devices for interacting with custom builds or anything else. (e.g. light switcher, etc.)
+    * `gpio` - Samples from the onboard GPIO expander, handles battery indication, as well as button press/hold logic.
+    * `infrared` - Obtains, saves, and replays infrared signals for user infrared remotes. (e.g. TVs, air conditioners, etc.)
+    * `lcd` - Everything LCD.
+    * `lora` - Communicates with the LoRa radio to send and receive long-range signals for communicating with [PolyPlugs](https://github.com/RoboticWorx/PolyPlug).
+    * `lvgl` - [LVGL](https://lvgl.io/): Display library used to create nice graphics for the LCD.
+    * `sx126x` - Driver for the SX1262 LoRa radio chip.
+    * `wifi` - Connects to networks, monitors packets, and sends data over long distances via MQTT.
 
 ## Licensing
 *Code in this repository is licensed under [CC Attribution-NonCommercial-ShareAlike 4.0 International](https://github.com/RoboticWorx/PolyCast5/blob/main/LICENSE.md) ([canonical](https://creativecommons.org/licenses/by-nc-sa/4.0/)).*

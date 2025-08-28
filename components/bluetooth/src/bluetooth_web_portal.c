@@ -70,7 +70,7 @@ static const char *INDEX_HTML =
 "<br><br>Example: If I want to open up a given program to run something on windows I would maybe have something like this with delays to make "
 "sure that the computer opened whatever before continuing: "
 "&lt;win+s&gt;&lt;delay=500&gt;browser&lt;enter&gt;&lt;delay=500&gt;https://youtu.be/dQw4w9WgXcQ?si=fCygLTFX4Usi2nlR&lt;enter&gt;"
-"<br><br>More examples and info here: https://github.com/RoboticWorx/PolyCast5/tree/main/scripts/bluetooth_example_scripts"
+"<br><br>More examples and info here: https://github.com/RoboticWorx/PolyCast5/tree/main/scripts/bluetooth_examples"
 "</p>"
 
 "<hr><h3>Existing Scripts</h3><select id=list size=6 style='height:160px'></select>"

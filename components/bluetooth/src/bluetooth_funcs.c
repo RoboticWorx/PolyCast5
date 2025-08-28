@@ -922,7 +922,7 @@ void bluetooth_init(void)
 	bluetooth_state = BT_STATE_RUNNING;
 }
 
-// Declare self-added function
+// Declare self-implemented function
 extern esp_err_t esp_hid_gap_deinit(void);
 
 void bluetooth_deinit(void)
