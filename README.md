@@ -13,13 +13,24 @@ Welcome to the official GitHub page for the PolyCast5!
 PolyCast5 is a open-source multi-tool wireless remote that you can use to control outlets, custom devices, bluetooth devices, anything infrared, and more.
 
 You can find some relevant links below:
-* [PolyCast5 official website.](https://polycast5.com/) An easy explanation of what you can do with it and how it works!
+* [PolyCast5 official website.](https://polycast5.com/) A graphical explanation of what you can do with it and how it works!
 * [PolyCast5 user documentation.](https://polycast5.com/pages/docs) How to use it and unleash its full capabilities.
 * [PolyCast5 attachment tutorials.](https://polycast5.com/pages/tutorials) Custom builds you can control with your PolyCast5. Including:
     * Home light switcher
     * Door locker/unlocker
     * Button pusher
     * and more!
+
+## Functionality
+* **Outlet actuator**  - Turn on and off outlets/applicances wirelessly and set schedules, timers, and modes.
+* **Bluetooth controller** - Send media and autotype commands to instantly type out repetitive text, control volume, etc.
+* **Infrared remote** - Save and replay infrared signals for TVs, air conditioners, lamps, etc.
+* **ESP32 commander** - Use [ESP-NOW](https://www.espressif.com/en/solutions/low-power-solutions/esp-now) to send instant commands for controlling custom builds such as with Arduino. (It's really easy and Arduino-IDE compatible.)
+* **Wi-Fi sender and sniffer** - Send commands over long distances via MQTT or sniff network data and beacon frames to view active users, RSSI, and tons of network information.
+* **Offline tools** - Dice roller, coin flipper, random number generator, Ohm's law calculator, and more.
+* **Customizable settings** - Set a security pin, custom colors, haptics, RGB LED configuration, and more.
+
+_PolyCast5 also comes with cool, customizable homescreen animations and hotkeys!_
 
 ## Application
 PolyCast5 was developed on [ESP-IDF](https://github.com/espressif/esp-idf) with the [ESP32-C5](https://www.espressif.com/en/products/socs/esp32-c5) for its high-performance and dual-band wireless capabilities.
@@ -34,7 +45,7 @@ Please check [ESP-IDF docs](https://docs.espressif.com/projects/esp-idf/en/lates
 * `components` - The various pieces of the application code broken into folders.
     * `bluetooth` - Communicates with a connected BLE device as a Human Interface Device (HID) to behave as a media controller and autotype keyboard.
     * `common` - Shared macros across the entirety of the program used for build and debugging.
-    * `espnow` - Sends instantaneous low-power [ESP-NOW](https://www.espressif.com/en/solutions/low-power-solutions/esp-now) commands to external ESP32 devices for interacting with custom builds or anything else. (e.g. light switcher, etc.)
+    * `espnow` - Sends instantaneous low-power ESP-NOW commands to external ESP32 devices for interacting with custom builds or anything else. (e.g. light switcher, etc.)
     * `gpio` - Samples from the onboard GPIO expander, handles battery indication, as well as button press/hold logic.
     * `infrared` - Obtains, saves, and replays infrared signals for user infrared remotes. (e.g. TVs, air conditioners, etc.)
     * `lcd` - Everything LCD.
