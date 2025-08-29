@@ -25,7 +25,7 @@ You can find some relevant links below:
 * **Outlet actuator**  - Turn on and off outlets/applicances wirelessly and set schedules, timers, and modes.
 * **Bluetooth controller** - Send media and autotype commands to instantly type out repetitive text, control volume, etc.
 * **Infrared remote** - Save and replay infrared signals for TVs, air conditioners, lamps, etc.
-* **ESP32 commander** - Use [ESP-NOW](https://www.espressif.com/en/solutions/low-power-solutions/esp-now) to send instant commands for controlling custom builds such as with Arduino. (It's really easy and Arduino-IDE compatible.)
+* **ESP32 commander** - Use [ESP-NOW](https://www.espressif.com/en/solutions/low-power-solutions/esp-now) to send instant commands for controlling custom builds such as with Arduino. (It's really easy and Arduino IDE compatible.)
 * **Wi-Fi sender and sniffer** - Send commands over long distances via MQTT or sniff network data and beacon frames to view active users, RSSI, and tons of network information.
 * **Offline tools** - Dice roller, coin flipper, random number generator, Ohm's law calculator, and more.
 * **Customizable settings** - Set a security pin, custom colors, haptics, RGB LED configuration, and more.
@@ -35,7 +35,7 @@ _PolyCast5 also comes with cool, customizable homescreen animations and hotkeys!
 ## Application
 PolyCast5 was developed on [ESP-IDF](https://github.com/espressif/esp-idf) with the [ESP32-C5](https://www.espressif.com/en/products/socs/esp32-c5) for its high-performance and dual-band wireless capabilities.
 
-Please check [ESP-IDF docs](https://docs.espressif.com/projects/esp-idf/en/latest/get-started/index.html) for getting started instructions if you'd like to develop and have any difficulties.
+Please check [ESP-IDF docs](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c5/get-started/index.html) for getting started instructions if you'd like to develop and have any difficulties.
 
 ## Project Structure
 * `main` - Initialization code. The program runs from here.
@@ -50,7 +50,7 @@ Please check [ESP-IDF docs](https://docs.espressif.com/projects/esp-idf/en/lates
     * `infrared` - Obtains, saves, and replays infrared signals for user infrared remotes. (e.g. TVs, air conditioners, etc.)
     * `lcd` - Everything LCD.
     * `lora` - Communicates with the LoRa radio to send and receive long-range signals for communicating with [PolyPlugs](https://github.com/RoboticWorx/PolyPlug).
-    * `lvgl` - [LVGL](https://lvgl.io/): Display library used to create nice graphics for the LCD.
+    * `lvgl` - [LVGL](https://lvgl.io/) - Display library used to create nice graphics for the LCD.
     * `sx126x` - Driver for the SX1262 LoRa radio chip.
     * `wifi` - Connects to networks, monitors packets, and sends data over long distances via MQTT.
 

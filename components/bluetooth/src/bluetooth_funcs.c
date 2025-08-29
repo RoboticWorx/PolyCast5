@@ -893,6 +893,12 @@ static void ble_hid_device_host_task(void *param)
 // Declaration of extern esp function
 void ble_store_config_init(void);
 
+/*
+	IMPORTANT: To be able to init and deinit Bluetooth correctly as a HID,
+	an external patch was applied to ESP-IDF. You may have to apply it also.
+	Please see https://github.com/RoboticWorx/PolyCast5/tree/main/components/README.md
+*/
+
 void bluetooth_init(void)
 {
 	bluetooth_state = BT_STATE_INITING;

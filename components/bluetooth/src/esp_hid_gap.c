@@ -1093,6 +1093,12 @@ esp_err_t esp_hid_gap_init(uint8_t mode)
     return ESP_OK;
 }
 
+/*
+	IMPORTANT: To be able to init and deinit Bluetooth correctly as a HID,
+	an external patch was applied to ESP-IDF. You may have to apply it also.
+	Please see https://github.com/RoboticWorx/PolyCast5/tree/main/components/README.md
+*/
+
 // Self-implemented function to deinit
 esp_err_t esp_hid_gap_deinit(void)
 {
