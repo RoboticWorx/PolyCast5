@@ -75,7 +75,7 @@ static void bluetooth_task(void *arg)
 	            vTaskDelay(pdMS_TO_TICKS(100));
 	            bluetooth_send_media(BLUETOOTH_CMD_PLAY_PAUSE, false);
 			}
-			/* Text scripts */
+			/* Keyboard scripts */
 			else if (bluetooth_cmd >= BLUETOOTH_SCRIPT_OFFSET && bluetooth_state == BT_STATE_RUNNING) {
 				// Menu index that was encoded by the UI
 				uint16_t menu_idx = (uint16_t)(bluetooth_cmd - BLUETOOTH_SCRIPT_OFFSET);
@@ -91,7 +91,30 @@ static void bluetooth_task(void *arg)
 					#define TEST_TXT_LN3 "If you see yourself more an ethical hacker, this is also basically a Bluetooth USB Rubber Ducky. "
 					#define TEST_TXT_LN4 "To start adding your own text scripts, just go to 'Add/Edit Script' and follow the few simple instructions.\n"
 					bluetooth_send_script(TEST_TXT_LN1 TEST_TXT_LN2 TEST_TXT_LN3 TEST_TXT_LN4, 1);
+					continue;
 				}
+				/* If presentation mode command */
+				else if (bluetooth_cmd == BLUETOOTH_SCRIPT_PRESENTATION_START) {
+					bluetooth_send_script("<f5>", 1);
+					continue;
+				}
+				else if (bluetooth_cmd == BLUETOOTH_SCRIPT_PRESENTATION_ESC) {
+					bluetooth_send_script("<esc>", 1);
+					continue;
+				}
+				else if (bluetooth_cmd == BLUETOOTH_SCRIPT_PRESENTATION_BLANK) {
+					bluetooth_send_script("b", 1);
+					continue;
+				}
+				else if (bluetooth_cmd == BLUETOOTH_SCRIPT_PRESENTATION_LEFT) {
+					bluetooth_send_script("<left>", 1);
+					continue;
+				}
+				else if (bluetooth_cmd == BLUETOOTH_SCRIPT_PRESENTATION_RIGHT) {
+					bluetooth_send_script("<right>", 1);
+					continue;
+				}
+
 
 				// Menu has 2 fixed rows before user scripts:
 				// So the first user script is menu_idx == 2 -> NVS index 0

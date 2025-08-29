@@ -7,7 +7,7 @@
 #include "misc/lv_style.h"
 #include "misc/lv_types.h"
 
-#define NUM_BLUETOOTH_OPTIONS 3
+#define NUM_BLUETOOTH_OPTIONS 4
 
 // Forward-declare structs (from lcd_utils.h)
 typedef struct ui_btns_t ui_btns_t;
@@ -74,8 +74,9 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
  * @param [in] ui_btns UI input structure
  * @param [in] ui_menu UI menu structure
  * @param [in] bluetooth_menu Bluetooth menu structure
+ * @param [in] type Type of media controller: music, presentation, etc.
  */
-void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
+void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu, uint8_t type);
 
 /**
  * @brief Starts bluetooth and brings up the keyboard page to execute predefined texts or USB rubber ducky

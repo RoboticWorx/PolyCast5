@@ -896,7 +896,7 @@ void ble_store_config_init(void);
 /*
 	IMPORTANT: To be able to init and deinit Bluetooth correctly as a HID,
 	an external patch was applied to ESP-IDF. You may have to apply it also.
-	Please see https://github.com/RoboticWorx/PolyCast5/tree/main/components/README.md
+	Please see https://github.com/RoboticWorx/PolyCast5/blob/main/components/bluetooth/README.md
 */
 
 void bluetooth_init(void)
