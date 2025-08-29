@@ -75,6 +75,12 @@ static void bluetooth_task(void *arg)
 	            vTaskDelay(pdMS_TO_TICKS(100));
 	            bluetooth_send_media(BLUETOOTH_CMD_PLAY_PAUSE, false);
 			}
+			// Mute command received
+			else if (bluetooth_cmd == BLUETOOTH_CMD_MUTE && bluetooth_state == BT_STATE_RUNNING) {
+				bluetooth_send_media(BLUETOOTH_CMD_MUTE, true);
+	            vTaskDelay(pdMS_TO_TICKS(100));
+	            bluetooth_send_media(BLUETOOTH_CMD_MUTE, false);
+			}
 			/* Keyboard scripts */
 			else if (bluetooth_cmd >= BLUETOOTH_SCRIPT_OFFSET && bluetooth_state == BT_STATE_RUNNING) {
 				// Menu index that was encoded by the UI

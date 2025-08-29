@@ -658,19 +658,25 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 		lv_obj_set_scrollbar_mode(circ_center, LV_SCROLLBAR_MODE_OFF);
 		lv_obj_clear_flag(circ_center, LV_OBJ_FLAG_SCROLLABLE);
 		lbl_center = lv_label_create(circ_center);
-		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE || type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
+		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
 			lv_label_set_text(lbl_center, LV_SYMBOL_PLAY); // Pause/Play
 		}
 		else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
 			lv_label_set_text(lbl_center, LV_SYMBOL_FILE); // Blank page
 		}
+		else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
+			lv_label_set_text(lbl_center, LV_SYMBOL_MUTE); // Mute
+		}
 		lv_obj_set_style_text_font(lbl_center, &lv_font_montserrat_18, 0);
 		lv_obj_set_style_text_color(lbl_center, user_secondary_color, 0);
-		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE || type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
+		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
 			lv_obj_align(lbl_center, LV_ALIGN_CENTER, 2, 0);
 		}
 		else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
 			lv_obj_align(lbl_center, LV_ALIGN_CENTER, 1, 0);
+		}
+		else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
+			lv_obj_align(lbl_center, LV_ALIGN_CENTER, -1, 0);
 		}
 
 		lv_timer_handler();
@@ -814,13 +820,17 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 		lv_obj_set_style_text_color(lbl_center, user_primary_color, 0);
 
 		// Send command
-		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE || type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
+		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
 			uint16_t cmd = BLUETOOTH_CMD_PLAY_PAUSE;
 			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 		}
 		else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
 			// Send script
 			uint16_t cmd = BLUETOOTH_SCRIPT_PRESENTATION_BLANK;
+			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+		}
+		else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
+			uint16_t cmd = BLUETOOTH_CMD_MUTE;
 			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 		}
 	}
