@@ -374,6 +374,9 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
 				lcd_bluetooth_media_page(&ui_btns, &ui_menu, &bluetooth_menu, BLUETOOTH_MEDIA_CLASSIC_PAGE);
 			}
+			else if (ui_menu.page == BLUETOOTH_MEDIA_SCROLL_PAGE) {
+				lcd_bluetooth_media_page(&ui_btns, &ui_menu, &bluetooth_menu, BLUETOOTH_MEDIA_SCROLL_PAGE);
+			}
 			else if (ui_menu.page == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
 				lcd_bluetooth_media_page(&ui_btns, &ui_menu, &bluetooth_menu, BLUETOOTH_MEDIA_PRESENTATION_PAGE);
 			}

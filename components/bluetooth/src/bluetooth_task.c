@@ -114,7 +114,23 @@ static void bluetooth_task(void *arg)
 					bluetooth_send_script("<right>", 1);
 					continue;
 				}
-
+				/* If social mode command */
+				else if (bluetooth_cmd == BLUETOOTH_SCRIPT_SCROLL_UP) {
+					bluetooth_send_script("<up><up><up><up>", 1);
+					continue;
+				}
+				else if (bluetooth_cmd == BLUETOOTH_SCRIPT_SCROLL_DOWN) {
+					bluetooth_send_script("<down><down><down><down>", 1);
+					continue;
+				}
+				else if (bluetooth_cmd == BLUETOOTH_SCRIPT_SCROLL_PG_UP) {
+					bluetooth_send_script("<pgup>", 1);
+					continue;
+				}
+				else if (bluetooth_cmd == BLUETOOTH_SCRIPT_SCROLL_PG_DOWN) {
+					bluetooth_send_script("<pgdn>", 1);
+					continue;
+				}
 
 				// Menu has 2 fixed rows before user scripts:
 				// So the first user script is menu_idx == 2 -> NVS index 0

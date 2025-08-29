@@ -7,7 +7,7 @@
 #include "misc/lv_style.h"
 #include "misc/lv_types.h"
 
-#define NUM_BLUETOOTH_OPTIONS 4
+#define NUM_BLUETOOTH_OPTIONS 5
 
 // Forward-declare structs (from lcd_utils.h)
 typedef struct ui_btns_t ui_btns_t;
