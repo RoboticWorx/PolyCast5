@@ -76,12 +76,12 @@ static void lcd_task(void *pvParameters)
 	//lcd_ns_nvs_clear(ESPNOW_LMK_NS);
 	
 	#ifdef POLYCAST5_IR_NVS_CLEAR
-		lcd_ns_nvs_clear(A_IR_REMOTE_NS);
+	lcd_ns_nvs_clear(A_IR_REMOTE_NS);
 	#endif
 	
 	#ifdef POLYCAST5_WIFI_NVS_CLEAR
-		lcd_ns_nvs_clear(WIFI_MENU_NS);
-		lcd_ns_nvs_clear(WIFI_TOPIC_NS);
+	lcd_ns_nvs_clear(WIFI_MENU_NS);
+	lcd_ns_nvs_clear(WIFI_TOPIC_NS);
 	#endif
 	
 	
@@ -145,12 +145,12 @@ static void lcd_task(void *pvParameters)
 	lcd_bluetooth_setup_page(&bluetooth_menu);
 	
 	#ifdef POLYCAST5_ESPNOW_DUMP_NVS
-		lcd_espnow_dump_nvs();
+	lcd_espnow_dump_nvs();
 	#endif
 	
 	#ifdef POLYCAST5_WIFI_DUMP_NVS
-		lcd_wifi_dump_menu_nvs();
-		lcd_wifi_dump_wifi_topic_nvs();
+	lcd_wifi_dump_menu_nvs();
+	lcd_wifi_dump_wifi_topic_nvs();
 	#endif
 	
 	while (1)
@@ -390,18 +390,18 @@ static void lcd_task(void *pvParameters)
 		
 		// Sleep condition
 		#ifdef POLYCAST5_DIS_SLEEP_TIMER
-			if ((ui_menu.page == HOME_PAGE) && go_to_sleep) {
-				lcd_device_sleep();
-			}
+		if ((ui_menu.page == HOME_PAGE) && go_to_sleep) {
+			lcd_device_sleep();
+		}
 		#else
-			TickType_t sleep_timer_interval = pdMS_TO_TICKS(sleep_time_s * 1000);
+		TickType_t sleep_timer_interval = pdMS_TO_TICKS(sleep_time_s * 1000);
 			
-			// If home and sleep_timer_interval has passed without intervention
-			if ((ui_menu.page == HOME_PAGE) && ((xTaskGetTickCount() - sleep_timer_last >= sleep_timer_interval) || go_to_sleep)) {
-				lcd_device_sleep();
+		// If home and sleep_timer_interval has passed without intervention
+		if ((ui_menu.page == HOME_PAGE) && ((xTaskGetTickCount() - sleep_timer_last >= sleep_timer_interval) || go_to_sleep)) {
+			lcd_device_sleep();
 				
-				sleep_timer_last = xTaskGetTickCount();
-			}
+			sleep_timer_last = xTaskGetTickCount();
+		}
 		#endif
 		
 		// Update battery text

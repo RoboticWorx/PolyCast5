@@ -44,6 +44,12 @@ static void bluetooth_task(void *arg)
 			else if (bluetooth_cmd == BLUETOOTH_CMD_DEINIT) {
 				bluetooth_deinit();
 			}
+			// Unpair all devices command received
+			else if (bluetooth_cmd == BLUETOOTH_CMD_UNPAIR_ALL) {
+				bluetooth_unpair_all_peers();
+				bluetooth_deinit();
+				bluetooth_init();
+			}
 			/* Media commands */
 			// Vol-up command received
 			else if (bluetooth_cmd == BLUETOOTH_CMD_VOLUME_UP && bluetooth_state == BT_STATE_RUNNING) {
@@ -62,12 +68,16 @@ static void bluetooth_task(void *arg)
 				bluetooth_send_media(BLUETOOTH_CMD_NEXT_TRK, true);
 	            vTaskDelay(pdMS_TO_TICKS(100));
 	            bluetooth_send_media(BLUETOOTH_CMD_NEXT_TRK, false);
+				vTaskDelay(pdMS_TO_TICKS(10));
+				bluetooth_send_script("<right>", 1); // Also send right for if using next to fast forward
 			}
 			// Previous track command received
 			else if (bluetooth_cmd == BLUETOOTH_CMD_PREV_TRK && bluetooth_state == BT_STATE_RUNNING) {
 				bluetooth_send_media(BLUETOOTH_CMD_PREV_TRK, true);
 	            vTaskDelay(pdMS_TO_TICKS(100));
 	            bluetooth_send_media(BLUETOOTH_CMD_PREV_TRK, false);
+				vTaskDelay(pdMS_TO_TICKS(10));
+				bluetooth_send_script("<left>", 1); // Also send left for if using previous to rewind
 			}
 			// Play pause command received
 			else if (bluetooth_cmd == BLUETOOTH_CMD_PLAY_PAUSE && bluetooth_state == BT_STATE_RUNNING) {
@@ -87,7 +97,7 @@ static void bluetooth_task(void *arg)
 				uint16_t menu_idx = (uint16_t)(bluetooth_cmd - BLUETOOTH_SCRIPT_OFFSET);
 
 				#ifdef POLYCAST5_DEBUG
-					ESP_LOGI(TAG, "Received cmd index: %d -> menu index: ", bluetooth_cmd, menu_idx);
+				ESP_LOGI(TAG, "Received cmd index: %d -> menu index: ", bluetooth_cmd, menu_idx);
 				#endif
 			
 				// "Test" at menu index 1, handle it specially
@@ -151,7 +161,7 @@ static void bluetooth_task(void *arg)
 					if (err == ESP_OK && blen > 0 && buf[0] != '\0') {
 						// NVS returns a C-string (blen typically includes the NUL). Just send it.
 						#ifdef POLYCAST5_DEBUG
-							ESP_LOGI(TAG, "Sending script: %s", buf);
+						ESP_LOGI(TAG, "Sending script: %s", buf);
 						#endif
 						bluetooth_send_script(buf, 1);
 					}

@@ -234,8 +234,8 @@ void bluetooth_send_media(uint8_t cmd, bool key_pressed)
 
 	if (usage) {
 		#ifdef POLYCAST5_DEBUG
-			uint8_t dbg[2] = {(uint8_t)(usage & 0xFF), (uint8_t)(usage >> 8)};
-			ESP_LOG_BUFFER_HEX("HID_CC_USAGE", dbg, 2);
+		uint8_t dbg[2] = {(uint8_t)(usage & 0xFF), (uint8_t)(usage >> 8)};
+		ESP_LOG_BUFFER_HEX("HID_CC_USAGE", dbg, 2);
 		#endif
 
 		cc_send_usage(usage, key_pressed);
@@ -842,6 +842,51 @@ void bluetooth_set_battery_level(uint8_t percent)
 	ble_svc_bas_battery_level_set(percent);
 }
 
+void bluetooth_unpair_all_peers(void)
+{
+	int rc;
+
+	// Stop advertising to prevent incoming connections during the reset
+	rc = ble_gap_adv_stop();
+	if (rc != 0 && rc != BLE_HS_EALREADY) {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGE(TAG, "Failed to stop advertising; rc=%d", rc);
+		#endif
+		// Continue anyway, but aware of potential race conditions
+	}
+
+	#ifdef POLYCAST5_DEBUG
+	ESP_LOGI(TAG, "Deleting Bluetooth peer bonding keys...");
+	#endif
+
+	ble_addr_t peers[16];
+	int peer_count = 0;
+
+	// Retrieve and delete all bonded peers
+	// Also resets device identity (enabled in menuconfig)
+	// This makes the device appear as a "new" device so it won't auto-reconnect via BLE_OWN_ADDR_RPA_PUBLIC_DEFAULT
+	if (ble_store_util_bonded_peers(peers, &peer_count, (int)(sizeof(peers)/sizeof(peers[0]))) == 0) {
+		for (int i = 0; i < peer_count; ++i) {
+			rc = ble_gap_unpair(&peers[i]);
+			if (rc == 0) {
+				#ifdef POLYCAST5_DEBUG
+				ESP_LOGI(TAG, "Unpaired peer %d", i);
+				#endif
+			}
+			else {
+				#ifdef POLYCAST5_DEBUG
+				ESP_LOGW(TAG, "Failed to unpair peer %d; rc=%d", i, rc);
+				#endif
+			}
+		}
+	}
+	else {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "No bonded peers found to delete.");
+		#endif
+	}
+}
+
 /* HID events / init / deinit */
 static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
 {
@@ -901,6 +946,11 @@ void ble_store_config_init(void);
 
 void bluetooth_init(void)
 {
+	// If already on or initing, exit
+	if (bluetooth_state == BT_STATE_INITING || bluetooth_state == BT_STATE_RUNNING) {
+		return;
+	}
+
 	bluetooth_state = BT_STATE_INITING;
 
 	esp_err_t ret;
@@ -962,7 +1012,7 @@ void bluetooth_deinit(void)
    }
 
 	#ifdef POLYCAST5_DEBUG
-		ESP_LOGI(TAG, "Bluetooth fully disabled");
+	ESP_LOGI(TAG, "Bluetooth fully disabled");
 	#endif
 
 	bluetooth_state = BT_STATE_OFF;

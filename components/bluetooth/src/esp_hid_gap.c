@@ -26,6 +26,8 @@
 #include "esp_bt_device.h"
 #endif
 
+extern volatile bool pc5_og_bt_key;
+
 static const char *TAG = "ESP_HID_GAP";
 
 // uncomment to print all devices that were seen during a scan
@@ -936,8 +938,11 @@ esp_err_t esp_hid_ble_gap_adv_start(void)
     adv_params.disc_mode = BLE_GAP_DISC_MODE_GEN;
     adv_params.itvl_min = BLE_GAP_ADV_ITVL_MS(30);/* Recommended interval 30ms to 50ms */
     adv_params.itvl_max = BLE_GAP_ADV_ITVL_MS(50);
-    rc = ble_gap_adv_start(BLE_OWN_ADDR_PUBLIC, NULL, adv_duration_ms,
-                           &adv_params, nimble_hid_gap_event, NULL);
+    
+    // Changed from BLE_OWN_ADDR_PUBLIC -> use new IRK to generate a new RPA (identity address)
+	rc = ble_gap_adv_start(BLE_OWN_ADDR_RPA_PUBLIC_DEFAULT, NULL, adv_duration_ms,
+			&adv_params, nimble_hid_gap_event, NULL);
+
     if (rc != 0) {
         MODLOG_DFLT(ERROR, "error enabling advertisement; rc=%d\n", rc);
         return rc;

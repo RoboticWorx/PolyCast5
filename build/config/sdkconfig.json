@@ -213,7 +213,7 @@
     "BT_NIMBLE_ROLE_PERIPHERAL": true,
     "BT_NIMBLE_RPA_TIMEOUT": 900,
     "BT_NIMBLE_SECURITY_ENABLE": true,
-    "BT_NIMBLE_SMP_ID_RESET": false,
+    "BT_NIMBLE_SMP_ID_RESET": true,
     "BT_NIMBLE_SM_LEGACY": true,
     "BT_NIMBLE_SM_LVL": 2,
     "BT_NIMBLE_SM_SC": true,

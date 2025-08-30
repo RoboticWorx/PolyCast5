@@ -303,7 +303,7 @@ void lcd_device_sleep(void)
 	xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
 
 	#ifdef POLYCAST5_DEBUG
-		ESP_LOGI(TAG, "Entering light sleep");
+	ESP_LOGI(TAG, "Entering light sleep");
 	#endif
 
 	ESP_ERROR_CHECK(esp_light_sleep_start());
@@ -634,7 +634,7 @@ static esp_err_t lcd_anim_nvs_save(void)
 		err = nvs_commit(h);
 		
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGI(TAG, "Saved NVS animation: %u", anim_active);
+		ESP_LOGI(TAG, "Saved NVS animation: %u", anim_active);
 		#endif
 	}
 	else {
@@ -674,7 +674,7 @@ static esp_err_t lcd_anim_nvs_load(void)
 	}
 	
 	#ifdef POLYCAST5_DEBUG
-		ESP_LOGI(TAG, "Loaded NVS animation: %u", anim_active);
+	ESP_LOGI(TAG, "Loaded NVS animation: %u", anim_active);
 	#endif
 	
 	// Close NVS
@@ -950,7 +950,7 @@ static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t *ir_menu, lo
 	}
 	else {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGW(TAG, "Invalid menu option selected");
+		ESP_LOGW(TAG, "Invalid menu option selected");
 		#endif
 	}
 }
@@ -1131,8 +1131,8 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 		}
 		else {
 			#ifdef POLYCAST5_DEBUG
-				ESP_LOGW(TAG, "Long home hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_HOME_IDX,
-						hotkey_cmd.has_lora[HOTKEY_LONG_HOME_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_HOME_IDX]);
+			ESP_LOGW(TAG, "Long home hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_HOME_IDX,
+					hotkey_cmd.has_lora[HOTKEY_LONG_HOME_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_HOME_IDX]);
 			#endif
 		}
 	}
@@ -1158,8 +1158,8 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 		}
 		else {
 			#ifdef POLYCAST5_DEBUG
-				ESP_LOGW(TAG, "Long left hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_LEFT_IDX,
-						hotkey_cmd.has_lora[HOTKEY_LONG_LEFT_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_LEFT_IDX]);
+			ESP_LOGW(TAG, "Long left hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_LEFT_IDX,
+					hotkey_cmd.has_lora[HOTKEY_LONG_LEFT_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_LEFT_IDX]);
 			#endif
 		}
 	}
@@ -1185,8 +1185,8 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 		}
 		else {
 			#ifdef POLYCAST5_DEBUG
-				ESP_LOGW(TAG, "Long right hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_RIGHT_IDX,
-						hotkey_cmd.has_lora[HOTKEY_LONG_RIGHT_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_RIGHT_IDX]);
+			ESP_LOGW(TAG, "Long right hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_RIGHT_IDX,
+					hotkey_cmd.has_lora[HOTKEY_LONG_RIGHT_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_RIGHT_IDX]);
 			#endif
 		}
 	}
@@ -1212,8 +1212,8 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 		}
 		else {
 			#ifdef POLYCAST5_DEBUG
-				ESP_LOGW(TAG, "Long select hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_SELECT_IDX,
-						hotkey_cmd.has_lora[HOTKEY_LONG_SELECT_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_SELECT_IDX]);
+			ESP_LOGW(TAG, "Long select hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_SELECT_IDX,
+					hotkey_cmd.has_lora[HOTKEY_LONG_SELECT_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_SELECT_IDX]);
 			#endif
 		}
 	}
@@ -1239,8 +1239,8 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 		}
 		else {
 			#ifdef POLYCAST5_DEBUG
-				ESP_LOGW(TAG, "Short home hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_SHORT_HOME_IDX,
-						hotkey_cmd.has_lora[HOTKEY_SHORT_HOME_IDX], hotkey_cmd.has_espnow[HOTKEY_SHORT_HOME_IDX]);
+			ESP_LOGW(TAG, "Short home hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_SHORT_HOME_IDX,
+					hotkey_cmd.has_lora[HOTKEY_SHORT_HOME_IDX], hotkey_cmd.has_espnow[HOTKEY_SHORT_HOME_IDX]);
 			#endif
 		}
 	}
@@ -1266,8 +1266,8 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 		}
 		else {
 			#ifdef POLYCAST5_DEBUG
-				ESP_LOGW(TAG, "Short right hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_SHORT_RIGHT_IDX,
-						hotkey_cmd.has_lora[HOTKEY_SHORT_RIGHT_IDX], hotkey_cmd.has_espnow[HOTKEY_SHORT_RIGHT_IDX]);
+			ESP_LOGW(TAG, "Short right hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_SHORT_RIGHT_IDX,
+					hotkey_cmd.has_lora[HOTKEY_SHORT_RIGHT_IDX], hotkey_cmd.has_espnow[HOTKEY_SHORT_RIGHT_IDX]);
 			#endif
 		}
 	}
@@ -1341,14 +1341,14 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 		input_pin[num_filled] = '\0'; // Ensure termination
 			
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGI(TAG, "Got pin: %s", input_pin);
-			//ESP_LOGI(TAG, "Need pin: %s", settings_menu->pin_menu.unlock_pin);
+		ESP_LOGI(TAG, "Got pin: %s", input_pin);
+		//ESP_LOGI(TAG, "Need pin: %s", settings_menu->pin_menu.unlock_pin);
 		#endif
 		
 		// If PIN is correct
 		if (strcmp(input_pin, settings_menu->pin_menu.unlock_pin) == 0) {
 			#ifdef POLYCAST5_DEBUG
-				ESP_LOGI(TAG, "PIN accepted");
+			ESP_LOGI(TAG, "PIN accepted");
 			#endif
 			
 			// Hide pin prompt
@@ -1397,7 +1397,7 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 		}
 		else {
 			#ifdef POLYCAST5_DEBUG
-				ESP_LOGI(TAG, "PIN denied");
+			ESP_LOGI(TAG, "PIN denied");
 			#endif
 			
 			// RGB indicator
@@ -1618,7 +1618,7 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
 		// Abort if we've reached the maximum number of peers
 		if (ir_menu->size >= MAX_IR_OPTIONS) {
 			#ifdef POLYCAST5_DEBUG
-				ESP_LOGW(TAG, "Max IR menu options reached");
+			ESP_LOGW(TAG, "Max IR menu options reached");
 			#endif
 			
 			// Hide IR menu
@@ -1742,7 +1742,7 @@ void lcd_lora_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_men
 		// Compare with total user plugs: Total size - "Add PolyPlug" + 1 (since not yet size++) -> just lora_menu->size
 		if (lora_menu->size >= MAX_LORA_OPTIONS) {
 			#ifdef POLYCAST5_DEBUG
-				ESP_LOGW(TAG, "Max LoRa PolyPlug entries reached");
+			ESP_LOGW(TAG, "Max LoRa PolyPlug entries reached");
 			#endif
 			
 			// Hide LoRa menu
@@ -1856,7 +1856,7 @@ void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espn
 		// Abort if we've reached the maximum number of peers
 		if (espnow_menu->size >= MAX_ESPNOW_OPTIONS) {
 			#ifdef POLYCAST5_DEBUG
-				ESP_LOGW(TAG, "Max ESP-NOW entries reached");
+			ESP_LOGW(TAG, "Max ESP-NOW entries reached");
 			#endif
 			
 			// Hide ESP-NOW menu
@@ -2465,6 +2465,9 @@ void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t
 	else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 0) {
 		// Hide bluetooth menu
 		lv_obj_add_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Reset static
 		do_once = false;

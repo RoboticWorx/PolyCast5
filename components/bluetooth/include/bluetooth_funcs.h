@@ -119,6 +119,7 @@
 // Self defined
 #define BLUETOOTH_CMD_INIT 0
 #define BLUETOOTH_CMD_DEINIT 1
+#define BLUETOOTH_CMD_UNPAIR_ALL 2
 
 #define BLUETOOTH_SCRIPT_OFFSET 1000
 
@@ -179,6 +180,11 @@ void bluetooth_init(void);
  * @brief Deinitialize bluetooth
  */
 void bluetooth_deinit(void);
+
+/** 
+ * @brief Unpairs all bluetooth peers so nothing auto-connects
+ */
+void bluetooth_unpair_all_peers(void);
 
 /** 
  * @brief Send a media command over bluetooth

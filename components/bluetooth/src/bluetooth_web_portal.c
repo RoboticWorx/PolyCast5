@@ -111,7 +111,7 @@ uint8_t bluetooth_script_count_get(void)
  	 	 	count = 0;
  	 	 	
  	 	 	#ifdef POLYCAST5_DEBUG
-				ESP_LOGE(TAG, "bluetooth_script_count_get nvs_get_u8 failed: %s", esp_err_to_name(err));
+			ESP_LOGE(TAG, "bluetooth_script_count_get nvs_get_u8 failed: %s", esp_err_to_name(err));
 			#endif
  	 	}
  	 	
@@ -120,7 +120,7 @@ uint8_t bluetooth_script_count_get(void)
  	}
  	else {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bluetooth_script_count_get nvs_open failed: %s", esp_err_to_name(err));
+		ESP_LOGE(TAG, "bluetooth_script_count_get nvs_open failed: %s", esp_err_to_name(err));
 		#endif
 	}
 	
@@ -148,7 +148,7 @@ static esp_err_t bluetooth_script_count_set(uint8_t count)
  	esp_err_t err = nvs_open(BT_SCRIPT_MENU_NS, NVS_READWRITE, &h);
  	if (err != ESP_OK) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bluetooth_script_count_set nvs_open failed: %s", esp_err_to_name(err));
+		ESP_LOGE(TAG, "bluetooth_script_count_set nvs_open failed: %s", esp_err_to_name(err));
 		#endif
 		
  	 	return err;
@@ -162,7 +162,7 @@ static esp_err_t bluetooth_script_count_set(uint8_t count)
  	}
  	else {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bluetooth_script_count_set nvs_set_u8 failed: %s", esp_err_to_name(err));
+		ESP_LOGE(TAG, "bluetooth_script_count_set nvs_set_u8 failed: %s", esp_err_to_name(err));
 		#endif
 	}
 	
@@ -182,7 +182,7 @@ esp_err_t bluetooth_script_label_get(uint8_t idx, char *buf, size_t buflen)
  	esp_err_t err = nvs_open(BT_SCRIPT_MENU_NS, NVS_READONLY, &h);
  	if (err != ESP_OK) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bluetooth_script_label_get nvs_open failed: %s", esp_err_to_name(err));
+		ESP_LOGE(TAG, "bluetooth_script_label_get nvs_open failed: %s", esp_err_to_name(err));
 		#endif
  	}
  	
@@ -196,7 +196,7 @@ esp_err_t bluetooth_script_label_get(uint8_t idx, char *buf, size_t buflen)
  	err = nvs_get_str(h, key, buf, &need);
  	if (err != ESP_OK) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGW(TAG, "bluetooth_script_label_get nvs_get_str failed: %s", esp_err_to_name(err));
+		ESP_LOGW(TAG, "bluetooth_script_label_get nvs_get_str failed: %s", esp_err_to_name(err));
 		#endif
 	}
 	
@@ -216,7 +216,7 @@ static esp_err_t bluetooth_script_label_set(uint8_t idx, const char *label)
  	esp_err_t err = nvs_open(BT_SCRIPT_MENU_NS, NVS_READWRITE, &h);
  	if (err != ESP_OK) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bluetooth_script_label_set nvs_open failed: %s", esp_err_to_name(err));
+		ESP_LOGE(TAG, "bluetooth_script_label_set nvs_open failed: %s", esp_err_to_name(err));
 		#endif
 		
  	 	return err;
@@ -234,7 +234,7 @@ static esp_err_t bluetooth_script_label_set(uint8_t idx, const char *label)
  	}
  	else {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bluetooth_script_label_set nvs_set_str failed: %s", esp_err_to_name(err));
+		ESP_LOGE(TAG, "bluetooth_script_label_set nvs_set_str failed: %s", esp_err_to_name(err));
 		#endif
 	}
 	
@@ -252,7 +252,7 @@ esp_err_t bluetooth_script_body_get(uint8_t idx, char *buf, size_t buflen, size_
  	esp_err_t err = nvs_open(BT_SCRIPT_NS, NVS_READONLY, &h);
  	if (err != ESP_OK) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bluetooth_script_body_get nvs_open failed: %s", esp_err_to_name(err));
+		ESP_LOGE(TAG, "bluetooth_script_body_get nvs_open failed: %s", esp_err_to_name(err));
 		#endif
 		
  	 	return err;
@@ -278,7 +278,7 @@ esp_err_t bluetooth_script_body_get(uint8_t idx, char *buf, size_t buflen, size_
  	}
  	else {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bluetooth_script_body_get string parameters wrong or NVS failed: %s", esp_err_to_name(err));
+		ESP_LOGE(TAG, "bluetooth_script_body_get string parameters wrong or NVS failed: %s", esp_err_to_name(err));
 		#endif
 	}
 	
@@ -296,7 +296,7 @@ static esp_err_t bluetooth_script_body_set(uint8_t idx, const char *body)
  	esp_err_t err = nvs_open(BT_SCRIPT_NS, NVS_READWRITE, &h);
  	if (err != ESP_OK) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bluetooth_script_body_set nvs_open failed: %s", esp_err_to_name(err));
+		ESP_LOGE(TAG, "bluetooth_script_body_set nvs_open failed: %s", esp_err_to_name(err));
 		#endif
 		
  	 	return err;
@@ -314,7 +314,7 @@ static esp_err_t bluetooth_script_body_set(uint8_t idx, const char *body)
  	}
  	else {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "bluetooth_script_body_set nvs_set_str failed: %s", esp_err_to_name(err));
+		ESP_LOGE(TAG, "bluetooth_script_body_set nvs_set_str failed: %s", esp_err_to_name(err));
 		#endif
 	}
 	
@@ -382,7 +382,7 @@ static esp_err_t scripts_list_get(httpd_req_t *req)
  	
  	if (err != ESP_OK) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "scripts_list_get httpd_resp_sendstr failed: %s", esp_err_to_name(err));
+		ESP_LOGE(TAG, "scripts_list_get httpd_resp_sendstr failed: %s", esp_err_to_name(err));
 		#endif
 	}
  	
@@ -481,7 +481,7 @@ static esp_err_t script_one_get(httpd_req_t *req)
  	
  	if (err != ESP_OK) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "script_one_get httpd_resp_sendstr failed: %s", esp_err_to_name(err));
+		ESP_LOGE(TAG, "script_one_get httpd_resp_sendstr failed: %s", esp_err_to_name(err));
 		#endif
 	}
 	
@@ -679,7 +679,7 @@ static esp_err_t script_one_post(httpd_req_t *req)
  	
  	if (err != ESP_OK) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "script_one_post httpd_resp_sendstr failed: %s", esp_err_to_name(err));
+		ESP_LOGE(TAG, "script_one_post httpd_resp_sendstr failed: %s", esp_err_to_name(err));
 		#endif
 	}
 
@@ -772,7 +772,7 @@ esp_err_t bluetooth_web_portal_start(void)
  	// If already running, do nothing
  	if (s_server != NULL) {
  	 	#ifdef POLYCAST5_DEBUG
- 	 		ESP_LOGW(TAG, "Portal already running at http://%s", s_ip);
+ 	 	ESP_LOGW(TAG, "Portal already running at http://%s", s_ip);
  	 	#endif
  	 	
  	 	return ESP_OK;
@@ -791,7 +791,7 @@ esp_err_t bluetooth_web_portal_start(void)
  	esp_err_t err = esp_wifi_init(&wcfg);
  	if ((err != ESP_OK) && (err != ESP_ERR_WIFI_INIT_STATE)) {
  	 	#ifdef POLYCAST5_DEBUG
- 	 		ESP_LOGW(TAG, "esp_wifi_init error: %s", esp_err_to_name(err));
+ 	 	ESP_LOGW(TAG, "esp_wifi_init error: %s", esp_err_to_name(err));
  	 	#endif
  	 	
  	 	return err;
@@ -828,14 +828,14 @@ esp_err_t bluetooth_web_portal_start(void)
  	s_server = start_http();
  	if (s_server == NULL) {
  	 	#ifdef POLYCAST5_DEBUG
- 	 		ESP_LOGE(TAG, "start_http failed");
+ 	 	ESP_LOGE(TAG, "start_http failed");
  	 	#endif
  	 	
  	 	return ESP_FAIL;
  	}
 
  	#ifdef POLYCAST5_DEBUG
- 		ESP_LOGI(TAG, "Portal running at http://%s (SSID: " PORTAL_SSID ")", s_ip);
+ 	ESP_LOGI(TAG, "Portal running at http://%s (SSID: " PORTAL_SSID ")", s_ip);
  	#endif
  	
  	return ESP_OK;

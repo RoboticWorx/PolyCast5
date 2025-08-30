@@ -384,8 +384,9 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
 		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
 		// Set custom text based on hotkey index
-		const char *instr_text = "Bluetooth is now advertising as 'PolyCast5'.\n\nTo connect to it, just go to settings on any Bluetooth device "
-								 "such as a phone or PC, click on 'PolyCast5', and enter '123456' as the pin.\n\nAfter connecting once, PolyCast5 "
+		const char *instr_text = "Bluetooth is now advertising as 'PolyCast5'.\n\nClick the right arrow to forget all devices.\n\n"
+								 "To connect a new device, just go to settings on any Bluetooth device such as a phone or PC, "
+								 "click on 'PolyCast5', and enter '123456' as the pin.\n\nAfter connecting once, PolyCast5 "
 								 "will automatically reconnect to the last known device after selecting an option from the Bluetooth menu.\n\nYou "
 								 "will also see the RGB LED turn blue to indicate PolyCast5 is currently connected to a device. If you don't wish to "
 								 "see this, it can be disabled in settings by setting 'Blink every' to 0 for 'Adjust RGB LED'.";
@@ -406,11 +407,19 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
 	else if (ui_btns->down_btn == 1) {
 		lv_obj_scroll_by(cont, 0, -HOW_Y_OFFSET, LV_ANIM_ON);
 	}
+	else if (ui_btns->right_btn == 1) {
+		// Forget all bluetooth bonding keys
+		uint16_t cmd = BLUETOOTH_CMD_UNPAIR_ALL;
+		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+	}
 	// Go back
 	else if (ui_btns->left_btn) {
 		// Deactivate bluetooth
 		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
 		// Delete objects
 		lv_obj_del(cont); // Deletes children
@@ -1104,7 +1113,7 @@ esp_err_t lcd_bluetooth_script_selected_set(uint8_t idx)
  	esp_err_t err = nvs_open(KEYBOARD_SELECTED_IDX_NS, NVS_READWRITE, &h);
  	if (err != ESP_OK) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "lcd_bluetooth_script_selected_set nvs_open failed: %s", esp_err_to_name(err));
+		ESP_LOGE(TAG, "lcd_bluetooth_script_selected_set nvs_open failed: %s", esp_err_to_name(err));
 		#endif
 		
  	 	return err;
@@ -1118,7 +1127,7 @@ esp_err_t lcd_bluetooth_script_selected_set(uint8_t idx)
  	}
  	else {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "lcd_bluetooth_script_selected_set nvs_set_u8 failed: %s", esp_err_to_name(err));
+		ESP_LOGE(TAG, "lcd_bluetooth_script_selected_set nvs_set_u8 failed: %s", esp_err_to_name(err));
 		#endif
 	}
 	
@@ -1142,7 +1151,7 @@ uint8_t lcd_bluetooth_script_selected_get(void)
  	 	 	sel = 0;
  	 	 	
  	 	 	#ifdef POLYCAST5_DEBUG
-				ESP_LOGE(TAG, "lcd_bluetooth_script_selected_set nvs_get_u8 failed: %s", esp_err_to_name(err));
+			ESP_LOGE(TAG, "lcd_bluetooth_script_selected_set nvs_get_u8 failed: %s", esp_err_to_name(err));
 			#endif
  	 	}
  	 	
@@ -1151,7 +1160,7 @@ uint8_t lcd_bluetooth_script_selected_get(void)
  	}
  	else {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGW(TAG, "lcd_bluetooth_script_selected_set nvs_open failed: %s", esp_err_to_name(err));
+		ESP_LOGW(TAG, "lcd_bluetooth_script_selected_set nvs_open failed: %s", esp_err_to_name(err));
 		#endif
 	}
 	
