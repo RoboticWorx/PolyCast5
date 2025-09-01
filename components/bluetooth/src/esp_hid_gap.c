@@ -26,8 +26,6 @@
 #include "esp_bt_device.h"
 #endif
 
-extern volatile bool pc5_og_bt_key;
-
 static const char *TAG = "ESP_HID_GAP";
 
 // uncomment to print all devices that were seen during a scan

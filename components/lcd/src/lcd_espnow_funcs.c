@@ -377,7 +377,7 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 			
 		// Instruction text at the top	 
 		lbl_how_to = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_how_to, "polycast5.com/blogs\n	  /how/get-mac", user_secondary_color,
+		lcd_format_label(lbl_how_to, "polycast5.com/blogs\n      /how/get-mac", user_secondary_color,
 					 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 15);
 	}
 

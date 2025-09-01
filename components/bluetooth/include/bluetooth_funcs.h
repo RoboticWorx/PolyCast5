@@ -182,9 +182,9 @@ void bluetooth_init(void);
 void bluetooth_deinit(void);
 
 /** 
- * @brief Unpairs all bluetooth peers so nothing auto-connects
+ * @brief Forgets all bluetooth peers so nothing auto-connects
  */
-void bluetooth_unpair_all_peers(void);
+void bluetooth_forget_all_peers(void);
 
 /** 
  * @brief Send a media command over bluetooth

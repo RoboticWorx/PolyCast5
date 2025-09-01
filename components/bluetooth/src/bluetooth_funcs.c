@@ -842,7 +842,7 @@ void bluetooth_set_battery_level(uint8_t percent)
 	ble_svc_bas_battery_level_set(percent);
 }
 
-void bluetooth_unpair_all_peers(void)
+void bluetooth_forget_all_peers(void)
 {
 	int rc;
 

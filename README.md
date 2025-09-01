@@ -54,8 +54,6 @@ Please check [ESP-IDF docs](https://docs.espressif.com/projects/esp-idf/en/v5.5/
   * `sx126x` - Driver for the SX1262 LoRa radio chip.
   * `wifi` - Connects to networks, monitors packets, and sends data over long distances via MQTT.
 
-_Feel free to check out the [technical specs here](https://github.com/RoboticWorx/PolyCast5/blob/main/components/README.md)._
-
 ## Licensing
 *Code in this repository is licensed under [CC Attribution-NonCommercial-ShareAlike 4.0 International](https://github.com/RoboticWorx/PolyCast5/blob/main/LICENSE.md) ([canonical](https://creativecommons.org/licenses/by-nc-sa/4.0/)).*
 

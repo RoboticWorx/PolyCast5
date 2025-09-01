@@ -338,8 +338,9 @@ void lcd_lora_add_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora
 		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
 		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
-		// Set custom text based on hotkey index
-		const char *instr_text = "How to quickly add a new PolyPlug:\n\nFirst, walk toward the PolyPlug you want to add so that you can see it."
+		// Set instruction text
+		const char *instr_text = "polycast5.com/blogs/ docs/what-is-a-polyplug\n\nHow to quickly add a new PolyPlug:"
+			"\n\nFirst, walk toward the PolyPlug you want to add so that you can see it."
 			"\n\nThen, with the outlet part facing toward you (power side facing away), press the right-most button on the top of the PolyPlug."
 			"\n\nOnce pressed, a light should turn blue to indicate it is ready to pair.When it does, press the right button on this "
 			"device (PolyCast5) to pair.\n\nIf it doesn't turn blue, wait a few seconds then press it again or try power cycling.";

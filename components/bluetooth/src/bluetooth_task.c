@@ -46,7 +46,7 @@ static void bluetooth_task(void *arg)
 			}
 			// Unpair all devices command received
 			else if (bluetooth_cmd == BLUETOOTH_CMD_UNPAIR_ALL) {
-				bluetooth_unpair_all_peers();
+				bluetooth_forget_all_peers();
 				bluetooth_deinit();
 				bluetooth_init();
 			}
