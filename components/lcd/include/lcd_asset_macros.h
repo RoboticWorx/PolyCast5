@@ -1,6 +1,8 @@
 #ifndef LCD_ASSET_MACROS_H
 #define LCD_ASSET_MACROS_H
 
+#include "polycast5_macros.h"
+
 /* ANIMATIONS START */
 
 // City
@@ -130,6 +132,7 @@
 #define ANIM_MATRIX_RAIN_42 "A:/anim/matrix_rain/anim_matrix_rain_42.bin"
 
 // Pyramid
+#ifdef POLYCAST5_EN_PYRAMID_ANIM
 #define ANIM_PYRAMID_1  "A:/anim/pyramid/anim_pyramid_1.bin"
 #define ANIM_PYRAMID_2  "A:/anim/pyramid/anim_pyramid_2.bin"
 #define ANIM_PYRAMID_3  "A:/anim/pyramid/anim_pyramid_3.bin"
@@ -186,6 +189,8 @@
 #define ANIM_PYRAMID_54 "A:/anim/pyramid/anim_pyramid_54.bin"
 #define ANIM_PYRAMID_55 "A:/anim/pyramid/anim_pyramid_55.bin"
 #define ANIM_PYRAMID_56 "A:/anim/pyramid/anim_pyramid_56.bin"
+#endif
+
 
 /* ANIMATIONS END */
 

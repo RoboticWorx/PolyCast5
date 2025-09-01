@@ -59,17 +59,29 @@
 
 
 /* Animation macros */
+#ifdef POLYCAST5_EN_PYRAMID_ANIM
 #define NUM_ANIMS 4
+#else
+#define NUM_ANIMS 3
+#endif
 
 #define CITY_FRAME_PERIOD 120 // 160
 #define BLACK_HOLE_FRAME_PERIOD 120
 #define MATRIX_RAIN_FRAME_PERIOD 100
+
+#ifdef POLYCAST5_EN_PYRAMID_ANIM
 #define PYRAMID_FRAME_PERIOD 120
+#endif
 
 #define CITY_FRAME_CNT 60
 #define BLACK_HOLE_FRAME_CNT 18
 #define MATRIX_RAIN_FRAME_CNT 42
+
+#ifdef POLYCAST5_EN_PYRAMID_ANIM
 #define PYRAMID_FRAME_CNT 56
+#else
+#define PYRAMID_FRAME_CNT 0
+#endif
 
 // Number each sequentially
 enum
@@ -77,7 +89,9 @@ enum
 	CITY,
 	BLACK_HOLE,
 	MATRIX_RAIN,
+	#ifdef POLYCAST5_EN_PYRAMID_ANIM
 	PYRAMID
+	#endif
 };
 
 uint32_t pin_attempts = 0;
@@ -155,6 +169,7 @@ const char *matrix_rain_paths[MATRIX_RAIN_FRAME_CNT] = {
 	ANIM_MATRIX_RAIN_41, ANIM_MATRIX_RAIN_42
 };
 
+#ifdef POLYCAST5_EN_PYRAMID_ANIM
 const char *pyramid_paths[PYRAMID_FRAME_CNT] = {
 	ANIM_PYRAMID_1, ANIM_PYRAMID_2, ANIM_PYRAMID_3, ANIM_PYRAMID_4, ANIM_PYRAMID_5,
 	ANIM_PYRAMID_6, ANIM_PYRAMID_7,  ANIM_PYRAMID_8, ANIM_PYRAMID_9, ANIM_PYRAMID_10,
@@ -169,6 +184,8 @@ const char *pyramid_paths[PYRAMID_FRAME_CNT] = {
 	ANIM_PYRAMID_51, ANIM_PYRAMID_52, ANIM_PYRAMID_53, ANIM_PYRAMID_54, ANIM_PYRAMID_55,
 	ANIM_PYRAMID_56
 };
+#endif
+
 
 // Animation structs
 static anim_t city_anim = {
@@ -201,6 +218,7 @@ static anim_t matrix_rain_anim = {
 	.timer = NULL
 };
 
+#ifdef POLYCAST5_EN_PYRAMID_ANIM
 static anim_t pyramid_anim = {
 	.frames = pyramid_paths,
 	.frame_cnt = PYRAMID_FRAME_CNT,
@@ -210,6 +228,7 @@ static anim_t pyramid_anim = {
 	.img = NULL,
 	.timer = NULL
 };
+#endif
 
 
 static void st7789_flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_map)
@@ -428,7 +447,9 @@ void lcd_lvgl_init(void)
 	warm_anim(city_paths, CITY_FRAME_CNT);
 	warm_anim(black_hole_paths, BLACK_HOLE_FRAME_CNT);
 	warm_anim(matrix_rain_paths, MATRIX_RAIN_FRAME_CNT);
+	#ifdef POLYCAST5_EN_PYRAMID_ANIM
 	warm_anim(pyramid_paths, PYRAMID_FRAME_CNT);
+	#endif
 	
 	// Pre-load images too
 	warm_img(IMG_DICE_1);
@@ -767,6 +788,7 @@ void lcd_init_images()
 	}
 	
 	/* Pyramid */
+	#ifdef POLYCAST5_EN_PYRAMID_ANIM
 	// Create image
 	pyramid_anim.img = lv_img_create(ACTIVE_SCR);
 	lv_img_set_src(pyramid_anim.img, pyramid_anim.frames[0]);
@@ -780,6 +802,7 @@ void lcd_init_images()
 		lv_obj_add_flag(pyramid_anim.img, LV_OBJ_FLAG_HIDDEN);
 		lv_timer_pause(pyramid_anim.timer);
 	}
+	#endif
 }
 
 void lcd_init_selection_labels(ui_menu_t *ui_menu)
@@ -970,10 +993,12 @@ static void start_animation(void)
 		lv_obj_remove_flag(matrix_rain_anim.img,  LV_OBJ_FLAG_HIDDEN);
 		lv_timer_resume(matrix_rain_anim.timer);
 	}
+	#ifdef POLYCAST5_EN_PYRAMID_ANIM
 	else if (anim_active == PYRAMID){
 		lv_obj_remove_flag(pyramid_anim.img,  LV_OBJ_FLAG_HIDDEN);
 		lv_timer_resume(pyramid_anim.timer);
 	}
+	#endif
 }
 static void stop_animations(void)
 {
@@ -981,12 +1006,16 @@ static void stop_animations(void)
 	lv_timer_pause(city_anim.timer);
 	lv_timer_pause(black_hole_anim.timer);
 	lv_timer_pause(matrix_rain_anim.timer);
+	#ifdef POLYCAST5_EN_PYRAMID_ANIM
 	lv_timer_pause(pyramid_anim.timer);
+	#endif
 
 	lv_obj_add_flag(city_anim.img, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(black_hole_anim.img, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(matrix_rain_anim.img, LV_OBJ_FLAG_HIDDEN);
+	#ifdef POLYCAST5_EN_PYRAMID_ANIM
 	lv_obj_add_flag(pyramid_anim.img, LV_OBJ_FLAG_HIDDEN);
+	#endif
 }
 static void transition_animation(bool dir)
 {	
