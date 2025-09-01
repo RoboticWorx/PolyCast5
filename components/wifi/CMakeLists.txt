@@ -13,5 +13,5 @@ idf_component_register(
     	common
     
     PRIV_REQUIRES
-    	esp_wifi esp_netif espnow mqtt gpio
+    	esp_wifi esp_netif espnow mqtt gpio app_update esp_https_ota
 )
