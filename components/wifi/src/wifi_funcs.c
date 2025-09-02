@@ -214,6 +214,9 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 		xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
 				
 		wifi_connected = true;
+		
+		// Check for new firmware version
+		ota_update_check_start("https://raw.githubusercontent.com/RoboticWorx/pc5-test/main/manifest.json");
 	}
 }
 
@@ -284,28 +287,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 					#endif
 					
 					xSemaphoreGive(xWifiMqttSuccessSemaphore);
-				}
-			}
-			// Else if OTA topic (/ota)
-			else if (event->topic && event->topic_len >= 4 && strncmp(event->topic + event->topic_len - 4, "/ota", 4) == 0) {
-				// URL is the payload
-				char url[event->data_len + 1];
-				memcpy(url, event->data, event->data_len);
-				url[event->data_len] = '\0';
-				
-				// Check if Wi-Fi connected so I can OTA
-				if (!wifi_connected) { // If not connected
-					#ifdef POLYCAST5_DEBUG
-					ESP_LOGW(TAG, "Got OTA URL but Wi-Fi not connected yet");
-					#endif
-				}
-				else {
-					#ifdef POLYCAST5_DEBUG
-					ESP_LOGI(TAG, "Got OTA URL ='%s'", url);
-					#endif
-					
-					// Perform OTA update
-					ota_update_start(url);
 				}
 			}
 			break;

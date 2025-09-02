@@ -1,4 +1,5 @@
 {
-  "version": "v0.1.0",
-  "url": "https://github.com/RoboticWorx/pc5-test/releases/download/v1.4.0/PolyCast5.bin"
+  "version": "0.1.1",
+  "url": "https://github.com/RoboticWorx/pc5-test/releases/download/dev/PolyCast5.bin",
+  "size": 2434048
 }

@@ -1,3 +1,4 @@
+#include "nvs.h"
 #include "polycast5_macros.h"
 
 #include <string.h>
@@ -13,9 +14,8 @@
 
 #include "wifi_funcs.h"
 #include "wifi_task.h"
-#include "espnow_task.h"
-#include "espnow_funcs.h"
-#include "gpio_task.h"
+#include "ota_update.h"
+#include "esp_app_desc.h"
 
 #define TAG "WIFI_TASK"
 
@@ -83,9 +83,36 @@ static void wifi_task(void *param)
 	
 	uint8_t my_mac[6];
 	esp_read_mac(my_mac, ESP_MAC_WIFI_STA);
-		
+	
 	wifi_funcs_wifi_event_init();
 	wifi_funcs_mqtt_client_init();
+
+	// Let everything else initialize
+	vTaskDelay(pdMS_TO_TICKS(2000));
+
+	// Get here without crashing -> This is a valid OTA app
+	ota_update_mark_app_valid();
+
+	/* Update NVS FW version */
+	// If NVS version doesn't exist yet, set it
+	char dummy[64];
+	if (ota_update_get_nvs_version(dummy, sizeof(dummy)) != ESP_OK) {
+		// Read the current app's version string from the embedded app descriptor
+		const esp_app_desc_t *running = esp_app_get_description();
+		const char *cur = running ? running->version : "";
+		
+		// Save that version to NVS
+		ota_update_set_nvs_version(cur);
+		
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGW(TAG, "Setting first time FW version: %s", cur);
+		#endif
+	}
+	else {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Using pre-set PolyCast5 FW version '%s'", dummy);
+		#endif
+	}
 	
 	while (1) {
 		// Start a Wi-Fi scan
@@ -105,8 +132,8 @@ static void wifi_task(void *param)
 		// Specific network to connect selected
 		if (xQueueReceive(xWifiSelectedNetworkQueue, &selected_network, 0) == pdTRUE) {
 			#ifdef POLYCAST5_DEBUG
-				ESP_LOGI(TAG, "xWifiSelectedNetworkQueue received: ssid='%s', pass='%s'", selected_network.ssid, selected_network.password);
-				ESP_LOGI(TAG, "xWifiSelectedNetworkQueue received: bssid='%02x:%02x:%02x:%02x:%02x:%02x'",
+			ESP_LOGI(TAG, "xWifiSelectedNetworkQueue received: ssid='%s', pass='%s'", selected_network.ssid, selected_network.password);
+			ESP_LOGI(TAG, "xWifiSelectedNetworkQueue received: bssid='%02x:%02x:%02x:%02x:%02x:%02x'",
 				    selected_network.bssid[0], selected_network.bssid[1], selected_network.bssid[2],
 				    selected_network.bssid[3], selected_network.bssid[4], selected_network.bssid[5]);
 			#endif
@@ -115,7 +142,7 @@ static void wifi_task(void *param)
 			
 			if (selected_network.prev && strlen(selected_network.ssid) == 0) {
 				#ifdef POLYCAST5_DEBUG
-				    ESP_LOGW(TAG, "No previous network to connect to");
+				ESP_LOGW(TAG, "No previous network to connect to");
 			    #endif
 			    
 			    xSemaphoreGive(xWifiNetworkDisconnectedSemaphore);
@@ -165,8 +192,8 @@ static void wifi_task(void *param)
 		// Received channel to sniff
 		if (xQueueReceive(xWifiSniffQueue, &sniff_network, 0) == pdTRUE) {
 			#ifdef POLYCAST5_DEBUG
-				ESP_LOGI(TAG, "xWifiSniffQueue received: mask='%d', channel='%u'", sniff_network.mask, sniff_network.channel);
-				ESP_LOGI(TAG, "xWifiSniffQueue received: bssid='%02x:%02x:%02x:%02x:%02x:%02x'",
+			ESP_LOGI(TAG, "xWifiSniffQueue received: mask='%d', channel='%u'", sniff_network.mask, sniff_network.channel);
+			ESP_LOGI(TAG, "xWifiSniffQueue received: bssid='%02x:%02x:%02x:%02x:%02x:%02x'",
 				    sniff_network.target_bssid[0], sniff_network.target_bssid[1], sniff_network.target_bssid[2],
 				    sniff_network.target_bssid[3], sniff_network.target_bssid[4], sniff_network.target_bssid[5]);
 			#endif
