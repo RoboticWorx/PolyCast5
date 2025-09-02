@@ -240,9 +240,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 			// Subscribe to any polycast5/.../ack
 			esp_mqtt_client_subscribe(event->client, "polycast5/+/ack", 0);
 			
-			// Subscribe to any polycast5/.../ota
-			esp_mqtt_client_subscribe(event->client, "polycast5/+/ota", 0);
-			
 			xSemaphoreGive(xWifiMqttConnectedSemaphore); // Notify LCD we connected
 			
 			mqtt_connected = true;
@@ -265,6 +262,10 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 			break;
 			
 		case MQTT_EVENT_DATA:
+			#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "MQTT_EVENT_DATA triggered");
+			#endif
+			
 			// If received on active topic
 			if (event->topic_len == strlen(mqtt_active_ack_topic) && strncmp(event->topic, mqtt_active_ack_topic, event->topic_len) == 0) {
 				// Format received
@@ -285,9 +286,9 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 					xSemaphoreGive(xWifiMqttSuccessSemaphore);
 				}
 			}
-			// Else if OTA topic
+			// Else if OTA topic (/ota)
 			else if (event->topic && event->topic_len >= 4 && strncmp(event->topic + event->topic_len - 4, "/ota", 4) == 0) {
-				// Payload is the URL
+				// URL is the payload
 				char url[event->data_len + 1];
 				memcpy(url, event->data, event->data_len);
 				url[event->data_len] = '\0';
@@ -299,7 +300,12 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 					#endif
 				}
 				else {
-					ota_start(url);
+					#ifdef POLYCAST5_DEBUG
+					ESP_LOGI(TAG, "Got OTA URL ='%s'", url);
+					#endif
+					
+					// Perform OTA update
+					ota_update_start(url);
 				}
 			}
 			break;

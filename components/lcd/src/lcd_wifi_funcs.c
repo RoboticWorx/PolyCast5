@@ -39,7 +39,7 @@
 
 #define WIFI_MENU_START_SIZE 3
 
-#define MQTT_READY_TXT "0 = OFF	 1 = ON\nREST = CUSTOM"
+#define MQTT_READY_TXT "0 = OFF	    1 = ON\nREST = CUSTOM"
 #define MQTT_SENDING_TXT "Sending via\nMQTT broker..." 
 #define MQTT_CONNECTING_TXT "Please wait...\nConnecting..."
 
