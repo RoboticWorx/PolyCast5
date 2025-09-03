@@ -593,6 +593,26 @@
         "children": [],
         "depends_on": null,
         "help": null,
+        "id": "SOC_KEY_MANAGER_SUPPORTED",
+        "name": "SOC_KEY_MANAGER_SUPPORTED",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
+        "id": "SOC_HUK_SUPPORTED",
+        "name": "SOC_HUK_SUPPORTED",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
         "id": "SOC_MODEM_CLOCK_SUPPORTED",
         "name": "SOC_MODEM_CLOCK_SUPPORTED",
         "range": null,
@@ -625,6 +645,16 @@
         "help": null,
         "id": "SOC_PM_SUPPORTED",
         "name": "SOC_PM_SUPPORTED",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
+        "id": "SOC_CLOCK_TREE_MANAGEMENT_SUPPORTED",
+        "name": "SOC_CLOCK_TREE_MANAGEMENT_SUPPORTED",
         "range": null,
         "title": null,
         "type": "bool"
@@ -2523,6 +2553,16 @@
         "children": [],
         "depends_on": null,
         "help": null,
+        "id": "SOC_PARLIO_TX_SUPPORT_EOF_FROM_DMA",
+        "name": "SOC_PARLIO_TX_SUPPORT_EOF_FROM_DMA",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
         "id": "SOC_PARLIO_SUPPORT_SLEEP_RETENTION",
         "name": "SOC_PARLIO_SUPPORT_SLEEP_RETENTION",
         "range": null,
@@ -2735,6 +2775,16 @@
         "help": null,
         "id": "SOC_ECDSA_SUPPORT_HW_DETERMINISTIC_LOOP",
         "name": "SOC_ECDSA_SUPPORT_HW_DETERMINISTIC_LOOP",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
+        "id": "SOC_ECDSA_SUPPORT_CURVE_P384",
+        "name": "SOC_ECDSA_SUPPORT_CURVE_P384",
         "range": null,
         "title": null,
         "type": "bool"
@@ -3043,8 +3093,28 @@
         "children": [],
         "depends_on": null,
         "help": null,
+        "id": "SOC_SPI_MEM_SUPPORT_TSUS_TRES_SEPERATE_CTR",
+        "name": "SOC_SPI_MEM_SUPPORT_TSUS_TRES_SEPERATE_CTR",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
         "id": "SOC_MEMSPI_TIMING_TUNING_BY_MSPI_DELAY",
         "name": "SOC_MEMSPI_TIMING_TUNING_BY_MSPI_DELAY",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
+        "id": "SOC_MEMSPI_SRC_FREQ_120M_SUPPORTED",
+        "name": "SOC_MEMSPI_SRC_FREQ_120M_SUPPORTED",
         "range": null,
         "title": null,
         "type": "bool"
@@ -3453,6 +3523,26 @@
         "children": [],
         "depends_on": null,
         "help": null,
+        "id": "SOC_HUK_MEM_NEEDS_RECHARGE",
+        "name": "SOC_HUK_MEM_NEEDS_RECHARGE",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
+        "id": "SOC_KEY_MANAGER_SUPPORT_KEY_DEPLOYMENT",
+        "name": "SOC_KEY_MANAGER_SUPPORT_KEY_DEPLOYMENT",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
         "id": "SOC_KEY_MANAGER_ECDSA_KEY_DEPLOY",
         "name": "SOC_KEY_MANAGER_ECDSA_KEY_DEPLOY",
         "range": null,
@@ -3465,6 +3555,46 @@
         "help": null,
         "id": "SOC_KEY_MANAGER_FE_KEY_DEPLOY",
         "name": "SOC_KEY_MANAGER_FE_KEY_DEPLOY",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
+        "id": "SOC_KEY_MANAGER_FE_KEY_DEPLOY_XTS_AES_128",
+        "name": "SOC_KEY_MANAGER_FE_KEY_DEPLOY_XTS_AES_128",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
+        "id": "SOC_KEY_MANAGER_FE_KEY_DEPLOY_XTS_AES_256",
+        "name": "SOC_KEY_MANAGER_FE_KEY_DEPLOY_XTS_AES_256",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
+        "id": "SOC_KEY_MANAGER_HMAC_KEY_DEPLOY",
+        "name": "SOC_KEY_MANAGER_HMAC_KEY_DEPLOY",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
+        "id": "SOC_KEY_MANAGER_DS_KEY_DEPLOY",
+        "name": "SOC_KEY_MANAGER_DS_KEY_DEPLOY",
         "range": null,
         "title": null,
         "type": "bool"
@@ -3553,16 +3683,6 @@
         "children": [],
         "depends_on": null,
         "help": null,
-        "id": "SOC_FLASH_ENCRYPTION_XTS_AES_256",
-        "name": "SOC_FLASH_ENCRYPTION_XTS_AES_256",
-        "range": null,
-        "title": null,
-        "type": "bool"
-    },
-    {
-        "children": [],
-        "depends_on": null,
-        "help": null,
         "id": "SOC_FLASH_ENCRYPTION_XTS_AES_SUPPORT_PSEUDO_ROUND",
         "name": "SOC_FLASH_ENCRYPTION_XTS_AES_SUPPORT_PSEUDO_ROUND",
         "range": null,
@@ -3575,16 +3695,6 @@
         "help": null,
         "id": "SOC_PSRAM_ENCRYPTION_XTS_AES_128",
         "name": "SOC_PSRAM_ENCRYPTION_XTS_AES_128",
-        "range": null,
-        "title": null,
-        "type": "bool"
-    },
-    {
-        "children": [],
-        "depends_on": null,
-        "help": null,
-        "id": "SOC_PSRAM_ENCRYPTION_XTS_AES_256",
-        "name": "SOC_PSRAM_ENCRYPTION_XTS_AES_256",
         "range": null,
         "title": null,
         "type": "bool"
@@ -3633,6 +3743,36 @@
         "children": [],
         "depends_on": null,
         "help": null,
+        "id": "SOC_APM_CPU_APM_SUPPORTED",
+        "name": "SOC_APM_CPU_APM_SUPPORTED",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
+        "id": "SOC_APM_SUPPORT_LP_TEE_CTRL",
+        "name": "SOC_APM_SUPPORT_LP_TEE_CTRL",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
+        "id": "SOC_APM_SUPPORT_CTRL_CFG_LOCK",
+        "name": "SOC_APM_SUPPORT_CTRL_CFG_LOCK",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
         "id": "SOC_APM_SUPPORT_TEE_PERI_ACCESS_CTRL",
         "name": "SOC_APM_SUPPORT_TEE_PERI_ACCESS_CTRL",
         "range": null,
@@ -3645,6 +3785,26 @@
         "help": null,
         "id": "SOC_CRYPTO_DPA_PROTECTION_SUPPORTED",
         "name": "SOC_CRYPTO_DPA_PROTECTION_SUPPORTED",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
+        "id": "SOC_RNG_BUF_CHAIN_ENTROPY_SOURCE",
+        "name": "SOC_RNG_BUF_CHAIN_ENTROPY_SOURCE",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
+        "id": "SOC_RNG_RTC_TIMER_ENTROPY_SOURCE",
+        "name": "SOC_RNG_RTC_TIMER_ENTROPY_SOURCE",
         "range": null,
         "title": null,
         "type": "bool"
@@ -4183,6 +4343,16 @@
         "children": [],
         "depends_on": null,
         "help": null,
+        "id": "SOC_RNG_CLOCK_IS_INDEPENDENT",
+        "name": "SOC_RNG_CLOCK_IS_INDEPENDENT",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
         "id": "SOC_CLK_XTAL32K_SUPPORTED",
         "name": "SOC_CLK_XTAL32K_SUPPORTED",
         "range": null,
@@ -4455,6 +4625,26 @@
         "help": null,
         "id": "SOC_BLE_PERIODIC_ADV_ENH_SUPPORTED",
         "name": "SOC_BLE_PERIODIC_ADV_ENH_SUPPORTED",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
+        "id": "SOC_BLE_CTE_SUPPORTED",
+        "name": "SOC_BLE_CTE_SUPPORTED",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
+        "id": "SOC_PHY_CALIBRATION_CLOCK_IS_INDEPENDENT",
+        "name": "SOC_PHY_CALIBRATION_CLOCK_IS_INDEPENDENT",
         "range": null,
         "title": null,
         "type": "bool"
@@ -4986,27 +5176,48 @@
                         "children": [
                             {
                                 "children": [],
-                                "depends_on": "BOOTLOADER_ANTI_ROLLBACK_ENABLE",
-                                "help": "The secure version is the sequence number stored in the header of each bootloader.\n\nThe ROM Bootloader which runs the 2nd stage bootloader (PRIMARY or RECOVERY) checks that\nthe security version is greater or equal that recorded in the eFuse field.\nBootloaders that have a secure version in the image < secure version in efuse will not boot.\n\nThe security version is worth increasing if in previous versions there is\na significant vulnerability and their use is not acceptable.",
-                                "id": "BOOTLOADER_SECURE_VERSION",
-                                "name": "BOOTLOADER_SECURE_VERSION",
+                                "depends_on": "BOOTLOADER_RECOVERY_ENABLE",
+                                "help": "Flash address where the recovery bootloader is stored.\nThis value must be written to the eFuse field (ESP_EFUSE_RECOVERY_BOOTLOADER_FLASH_SECTOR)\nto activate the recovery bootloader in the ROM bootloader. The eFuse can be programmed\nusing espefuse.py or in the user application with the API esp_efuse_set_recovery_bootloader_offset().\nSetting this value in the config allows parttool.py to verify that it does not overlap with existing\npartitions in the partition table.\n\nThe address must be a multiple of the flash sector size (0x1000 bytes).\nThe eFuse field stores the offset in sectors.\nIf the feature is no longer needed or unused, you can burn the 0xFFF value to disable this feature in\nthe ROM bootloader.",
+                                "id": "BOOTLOADER_RECOVERY_OFFSET",
+                                "name": "BOOTLOADER_RECOVERY_OFFSET",
                                 "range": null,
-                                "title": "Secure version of bootloader",
-                                "type": "int"
+                                "title": "Recovery Bootloader Flash Offset",
+                                "type": "hex"
+                            },
+                            {
+                                "children": [
+                                    {
+                                        "children": [],
+                                        "depends_on": "BOOTLOADER_ANTI_ROLLBACK_ENABLE",
+                                        "help": "The secure version is the sequence number stored in the header of each bootloader.\n\nThe ROM Bootloader which runs the 2nd stage bootloader (PRIMARY or RECOVERY) checks that\nthe security version is greater or equal that recorded in the eFuse field.\nBootloaders that have a secure version in the image < secure version in efuse will not boot.\n\nThe security version is worth increasing if in previous versions there is\na significant vulnerability and their use is not acceptable.",
+                                        "id": "BOOTLOADER_SECURE_VERSION",
+                                        "name": "BOOTLOADER_SECURE_VERSION",
+                                        "range": null,
+                                        "title": "Secure version of bootloader",
+                                        "type": "int"
+                                    }
+                                ],
+                                "depends_on": "BOOTLOADER_RECOVERY_ENABLE",
+                                "help": "This option prevents rollback to previous bootloader image with lower security version.",
+                                "id": "BOOTLOADER_ANTI_ROLLBACK_ENABLE",
+                                "name": "BOOTLOADER_ANTI_ROLLBACK_ENABLE",
+                                "range": null,
+                                "title": "Enable bootloader rollback support",
+                                "type": "bool"
                             }
                         ],
                         "depends_on": "SOC_RECOVERY_BOOTLOADER_SUPPORTED",
-                        "help": "This option prevents rollback to previous bootloader image with lower security version.",
-                        "id": "BOOTLOADER_ANTI_ROLLBACK_ENABLE",
-                        "name": "BOOTLOADER_ANTI_ROLLBACK_ENABLE",
+                        "help": "The recovery bootloader feature is implemented in the ROM bootloader. It is required for safe OTA\nupdates of the bootloader. The feature is activated when the eFuse field\n(ESP_EFUSE_RECOVERY_BOOTLOADER_FLASH_SECTOR) is set, which defines the flash address of the\nrecovery bootloader. If activated and the primary bootloader fails to load, the ROM bootloader\nwill attempt to load the recovery bootloader from the address specified in eFuse.",
+                        "id": "BOOTLOADER_RECOVERY_ENABLE",
+                        "name": "BOOTLOADER_RECOVERY_ENABLE",
                         "range": null,
-                        "title": "Enable bootloader rollback support",
+                        "title": "Enable Recovery Bootloader",
                         "type": "bool"
                     }
                 ],
                 "depends_on": null,
-                "id": "bootloader-config-bootloader-rollback",
-                "title": "Bootloader Rollback",
+                "id": "bootloader-config-recovery-bootloader-and-rollback",
+                "title": "Recovery Bootloader and Rollback",
                 "type": "menu"
             },
             {
@@ -5887,10 +6098,20 @@
                         "range": null,
                         "title": "Using ECC curve NISTP256 (Recommended)",
                         "type": "bool"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "SECURE_SIGNED_APPS_ECDSA_V2_SCHEME && SOC_ECDSA_SUPPORT_CURVE_P384 && <choice SECURE_BOOT_ECDSA_KEY_LEN_SIZE>",
+                        "help": null,
+                        "id": "SECURE_BOOT_ECDSA_KEY_LEN_384_BITS",
+                        "name": "SECURE_BOOT_ECDSA_KEY_LEN_384_BITS",
+                        "range": null,
+                        "title": "Using ECC curve NISTP384 (Recommended)",
+                        "type": "bool"
                     }
                 ],
                 "depends_on": "SECURE_SIGNED_APPS_ECDSA_V2_SCHEME",
-                "help": "Select the ECDSA key size. Two key sizes are supported\n\n- 192 bit key using NISTP192 curve\n- 256 bit key using NISTP256 curve (Recommended)\n\nThe advantage of using 256 bit key is the extra randomness which makes it difficult to be\nbruteforced compared to 192 bit key.\nAt present, both key sizes are practically implausible to bruteforce.",
+                "help": "Select the ECDSA key size. Three key sizes are supported depending upon on the target:\n\n- 192 bit key using NISTP192 curve\n- 256 bit key using NISTP256 curve (Recommended)\n- 384 bit key using NISTP384 curve (Recommended)\n\nThe advantage of using 384 and 256 bit keys is the extra randomness which makes it difficult to be\nbruteforced compared to 192 bit key.\nAt present, both key sizes are practically implausible to bruteforce.",
                 "id": "security-features-ecdsa-key-size",
                 "name": "SECURE_BOOT_ECDSA_KEY_LEN_SIZE",
                 "title": "ECDSA key size",
@@ -6383,7 +6604,7 @@
                     {
                         "children": [],
                         "depends_on": "SOC_SUPPORTS_SECURE_DL_MODE && <choice SECURE_UART_ROM_DL_MODE>",
-                        "help": "If set, during startup the app will burn an eFuse bit to permanently switch the UART ROM\nDownload Mode into a separate Secure Download mode. This option can only work if\nDownload Mode is not already disabled by eFuse.\n\nSecure Download mode limits the use of Download Mode functions to update SPI config,\nchanging baud rate, basic flash write and a command to return a summary of currently\nenabled security features (`get_security_info`).\n\nSecure Download mode is not compatible with the esptool.py flasher stub feature,\nespefuse.py, read/writing memory or registers, encrypted download, or any other\nfeatures that interact with unsupported Download Mode commands.\n\nSecure Download mode should be enabled in any application where Flash Encryption\nand/or Secure Boot is enabled. Disabling this option does not immediately cancel\nthe benefits of the security features, but it increases the potential \"attack\nsurface\" for an attacker to try and bypass them with a successful physical attack.\n\nIt is also possible to enable secure download mode at runtime by calling\nesp_efuse_enable_rom_secure_download_mode()\n\nNote: Secure Download mode is not available for ESP32 (includes revisions till ECO3).",
+                        "help": "If set, during startup the app will burn an eFuse bit to permanently switch the UART ROM\nDownload Mode into a separate Secure Download mode. This option can only work if\nDownload Mode is not already disabled by eFuse.\n\nSecure Download mode limits the use of Download Mode functions to update SPI config,\nchanging baud rate, basic flash write and a command to return a summary of currently\nenabled security features (`get_security_info`).\n\nSecure Download mode is not compatible with the esptool.py flasher stub feature,\nespefuse.py, read/writing memory or registers, encrypted download, or any other\nfeatures that interact with unsupported Download Mode commands.\n\nSecure Download mode should be enabled in any application where Flash Encryption\nand/or Secure Boot is enabled. Disabling this option does not immediately cancel\nthe benefits of the security features, but it increases the potential \"attack\nsurface\" for an attacker to try and bypass them with a successful physical attack.\n\nIt is also possible to enable secure download mode at runtime by calling\nesp_efuse_enable_rom_secure_download_mode()\n\nNote: Secure Download mode is not available for ESP32.",
                         "id": "SECURE_ENABLE_SECURE_ROM_DL_MODE",
                         "name": "SECURE_ENABLE_SECURE_ROM_DL_MODE",
                         "range": null,
@@ -6590,6 +6811,16 @@
         "children": [],
         "depends_on": null,
         "help": null,
+        "id": "ESP_ROM_SYSTIMER_INIT_PATCH",
+        "name": "ESP_ROM_SYSTIMER_INIT_PATCH",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
         "id": "ESP_ROM_HAS_HEAP_TLSF",
         "name": "ESP_ROM_HAS_HEAP_TLSF",
         "range": null,
@@ -6762,6 +6993,16 @@
         "help": null,
         "id": "ESP_ROM_HAS_SUBOPTIMAL_NEWLIB_ON_MISALIGNED_MEMORY",
         "name": "ESP_ROM_HAS_SUBOPTIMAL_NEWLIB_ON_MISALIGNED_MEMORY",
+        "range": null,
+        "title": null,
+        "type": "bool"
+    },
+    {
+        "children": [],
+        "depends_on": null,
+        "help": null,
+        "id": "ESP_ROM_DELAY_US_PATCH",
+        "name": "ESP_ROM_DELAY_US_PATCH",
         "range": null,
         "title": null,
         "type": "bool"
@@ -8818,6 +9059,16 @@
                     },
                     {
                         "children": [],
+                        "depends_on": "SOC_PMU_PVT_SUPPORTED",
+                        "help": "If enabled, hp & lp voltage can be auto adjust by PVT characteristic.\nOtherwise, internal voltage will be set to fix dbias.\nThis is a must for stable mass production. Disable for debugging only.",
+                        "id": "ESP_ENABLE_PVT",
+                        "name": "ESP_ENABLE_PVT",
+                        "range": null,
+                        "title": "Auto adjust hp & lp voltage using pvt function (MUST ENABLE FOR MP)",
+                        "type": "bool"
+                    },
+                    {
+                        "children": [],
                         "depends_on": null,
                         "help": null,
                         "id": "ESP_INTR_IN_IRAM",
@@ -9036,6 +9287,16 @@
                         "id": "component-config-esp-system-settings-cache-config",
                         "title": "Cache config",
                         "type": "menu"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": null,
+                        "help": "The following system functions will be placed in IRAM if this option is enabled:\n- system startup\n- system time\n- system error\n- system restart\n- system crosscore\n- system debug\n- system APB backup DMA lock\n- system application tick hook\n- Unified Behavior Sanitizer (UBSAN) hook\n- Interrupt watchdog handler\n- XTAL32K watchdog timer\n- USB CDC functions for the esp_rom_printf (if ESP_CONSOLE_USB_CDC_SUPPORT_ETS_PRINTF=y)\n- IPC and IPC ISR",
+                        "id": "ESP_SYSTEM_IN_IRAM",
+                        "name": "ESP_SYSTEM_IN_IRAM",
+                        "range": null,
+                        "title": "Place system functions in IRAM",
+                        "type": "bool"
                     },
                     {
                         "children": [
@@ -9813,6 +10074,16 @@
                 "children": [
                     {
                         "children": [],
+                        "depends_on": "!ESP_SYSTEM_SINGLE_CORE_MODE || APPTRACE_GCOV_ENABLE",
+                        "help": null,
+                        "id": "ESP_IPC_ENABLE",
+                        "name": "ESP_IPC_ENABLE",
+                        "range": null,
+                        "title": null,
+                        "type": "bool"
+                    },
+                    {
+                        "children": [],
                         "depends_on": null,
                         "help": "Configure the IPC tasks stack size. An IPC task runs on each core (in dual core mode), and allows for\ncross-core function calls. See IPC documentation for more details. The default IPC stack size should be\nenough for most common simple use cases. However, users can increase/decrease the stack size to their\nneeds.",
                         "id": "ESP_IPC_TASK_STACK_SIZE",
@@ -9826,7 +10097,7 @@
                     },
                     {
                         "children": [],
-                        "depends_on": "!FREERTOS_UNICORE",
+                        "depends_on": "ESP_IPC_ENABLE",
                         "help": "If this option is not enabled then the IPC task will keep behavior same as prior to that of ESP-IDF v4.0,\nhence IPC task will run at (configMAX_PRIORITIES - 1) priority.",
                         "id": "ESP_IPC_USES_CALLERS_PRIORITY",
                         "name": "ESP_IPC_USES_CALLERS_PRIORITY",
@@ -11749,6 +12020,19 @@
                             },
                             {
                                 "children": [],
+                                "depends_on": "SOC_SPI_MEM_SUPPORT_TSUS_TRES_SEPERATE_CTR && !APP_BUILD_TYPE_PURE_RAM_APP",
+                                "help": "This config is used for setting Trs parameter. Trs means CS Latency Between Resume And Next Suspend.\nYou can refer to the chapter of AC CHARACTERISTICS of flash datasheet.\nFor high-performance scenarios, some flash chips allow this set value to be smaller than the\ngiven value in the datasheet without causing errors in the flash state machine.\nWhen you have any related needs, please contact espressif business team.",
+                                "id": "SPI_FLASH_SUSPEND_TRS_VAL_US",
+                                "name": "SPI_FLASH_SUSPEND_TRS_VAL_US",
+                                "range": [
+                                    20,
+                                    200
+                                ],
+                                "title": "SPI flash tRS value (refer to chapter AC CHARACTERISTICS)",
+                                "type": "int"
+                            },
+                            {
+                                "children": [],
                                 "depends_on": "!APP_BUILD_TYPE_PURE_RAM_APP",
                                 "help": "XMC-C series is regarded as not qualified for the Suspend feature, since its specification\nhas a tRS >= 1ms restriction. We strongly do not suggest using it for the Suspend feature.\nHowever, if your product in field has enabled this feature, you may still enable this\nconfig option to keep the legacy behavior.\n\nFor new users, DO NOT enable this config.",
                                 "id": "SPI_FLASH_FORCE_ENABLE_XMC_C_SUSPEND",
@@ -12022,8 +12306,28 @@
                                 "children": [],
                                 "depends_on": "!APP_BUILD_TYPE_PURE_RAM_APP",
                                 "help": null,
-                                "id": "SPI_FLASH_VENDOR_XMC_SUPPORTED",
-                                "name": "SPI_FLASH_VENDOR_XMC_SUPPORTED",
+                                "id": "SPI_FLASH_VENDOR_XMC_SUPPORT_ENABLED",
+                                "name": "SPI_FLASH_VENDOR_XMC_SUPPORT_ENABLED",
+                                "range": null,
+                                "title": null,
+                                "type": "bool"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": "!APP_BUILD_TYPE_PURE_RAM_APP",
+                                "help": null,
+                                "id": "SPI_FLASH_VENDOR_GD_SUPPORT_ENABLED",
+                                "name": "SPI_FLASH_VENDOR_GD_SUPPORT_ENABLED",
+                                "range": null,
+                                "title": null,
+                                "type": "bool"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": "!APP_BUILD_TYPE_PURE_RAM_APP",
+                                "help": null,
+                                "id": "SPI_FLASH_VENDOR_BOYA_SUPPORT_ENABLED",
+                                "name": "SPI_FLASH_VENDOR_BOYA_SUPPORT_ENABLED",
                                 "range": null,
                                 "title": null,
                                 "type": "bool"

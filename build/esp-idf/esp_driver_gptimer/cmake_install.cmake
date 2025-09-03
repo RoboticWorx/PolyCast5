@@ -1,4 +1,4 @@
-# Install script for directory: C:/Espressif/frameworks/esp-idf-v5.5/components/esp_driver_gptimer
+# Install script for directory: C:/Espressif/frameworks/esp-idf-v5.5.1/components/esp_driver_gptimer
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

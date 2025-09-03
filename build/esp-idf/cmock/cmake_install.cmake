@@ -1,4 +1,4 @@
-# Install script for directory: C:/Espressif/frameworks/esp-idf-v5.5/components/cmock
+# Install script for directory: C:/Espressif/frameworks/esp-idf-v5.5.1/components/cmock
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

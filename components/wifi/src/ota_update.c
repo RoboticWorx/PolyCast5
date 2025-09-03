@@ -15,6 +15,7 @@
 #include "esp_https_ota.h"
 #include "esp_crt_bundle.h"
 #include "esp_app_desc.h"
+#include "esp_http_client.h"
 
 #include "ota_update.h"
 
@@ -45,7 +46,7 @@ static bool http_get_small(const char *url, char *out, size_t out_sz)
 		.buffer_size_tx = 4096,
 		.keep_alive_enable = true,
 	};
-	
+
 	// Create the client
 	esp_http_client_handle_t h = esp_http_client_init(&cfg);
 	if (!h) { // Abort on failure

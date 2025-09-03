@@ -1,4 +1,4 @@
-# Install script for directory: C:/Espressif/frameworks/esp-idf-v5.5/components/app_update
+# Install script for directory: C:/Espressif/frameworks/esp-idf-v5.5.1/components/app_update
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
