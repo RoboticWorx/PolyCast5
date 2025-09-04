@@ -44,8 +44,9 @@
 #define MQTT_SENDING_TXT "Sending via\nMQTT broker..." 
 #define MQTT_CONNECTING_TXT "Please wait...\nConnecting..."
 
-extern char ota_update_info[512]; // ota_update.c
-extern char ota_update_url[512]; // ota_update.c
+// ota_update.c: Safe to use, no simultaneous calls
+extern char ota_update_info[512];
+extern char ota_update_url[512];
 
 wifi_menu_t wifi_menu = {
 	.options = {"Connect to network", "Monitor packets", "Sync with PolyPlug"},

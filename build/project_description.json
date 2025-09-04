@@ -70,7 +70,7 @@
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "C:/Projects/ESP/PolyCast5/build/esp-idf/bluetooth/libbluetooth.a",
-            "sources": [ "C:/Projects/ESP/PolyCast5/components/bluetooth/src/bluetooth_funcs.c", "C:/Projects/ESP/PolyCast5/components/bluetooth/src/bluetooth_task.c", "C:/Projects/ESP/PolyCast5/components/bluetooth/src/bluetooth_web_portal.c", "C:/Projects/ESP/PolyCast5/components/bluetooth/src/esp_hid_gap.c" ],
+            "sources": [ "C:/Projects/ESP/PolyCast5/components/bluetooth/src/bluetooth_funcs.c", "C:/Projects/ESP/PolyCast5/components/bluetooth/src/bluetooth_spam.c", "C:/Projects/ESP/PolyCast5/components/bluetooth/src/bluetooth_task.c", "C:/Projects/ESP/PolyCast5/components/bluetooth/src/bluetooth_web_portal.c", "C:/Projects/ESP/PolyCast5/components/bluetooth/src/esp_hid_gap.c" ],
             "include_dirs": [ "include" ]
         },
         "bootloader": {

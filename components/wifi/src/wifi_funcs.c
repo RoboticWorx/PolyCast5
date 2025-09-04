@@ -608,35 +608,37 @@ static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 	beacon.interval = interval;
 	beacon.timestamp = timestamp_seconds;
 	if (xQueueSend(xWifiBeaconQueue, &beacon, 0) != pdTRUE) {
-		//ESP_LOGE(TAG, "xWifiBeaconQueue send failed");
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGW(TAG, "xWifiBeaconQueue send failed");
+		#endif
 	}
 	
 	/*
-	Capability Information (cap_info): A 16-bit bitmask of the AP’s capabilities, defined by IEEE 802.11
+	Capability Information (cap_info): A 16-bit bitmask of the AP's capabilities, defined by IEEE 802.11
 	Example: cap=0x1431 -> binary 0001 0100 0011 0001
-	
-	| Bit | Name				| Value  | Set? | Meaning								 |
-	| --- | ------------------- | ------ | ---- | --------------------------------------- |
-	| 0   | ESS				 | 1	  | 1	| Infrastructure network (not IBSS).	  |
-	| 1   | IBSS				| 2	  | 0	| Ad hoc mode (not set).				  |
-	| 2   | CF‐Pollable		 | 4	  | 0	| Contention‐free polling (not set).	  |
-	| 3   | CF‐PollRequest	  | 8	  | 0	| Contention‐free request (not set).	  |
-	| 4   | Privacy			 | 0x10   | 1	| WEP/WPA/WPA2 encryption supported.	  |
-	| 5   | Short Preamble	  | 0x20   | 1	| Supports “short” preamble (faster RX).  |
-	| 6   | PBCC				| 0x40   | 0	| Packet Binary Convolutional Code (no).  |
-	| 7   | Channel Agility	 | 0x80   | 0	| Dynamic channel switching (no).		 |
-	| 8   | Spectrum Management | 0x100  | 0	| 5 GHz regulatory features (no).		 |
-	| 9   | QoS AP			  | 0x200  | 0	| Quality‐of‐Service AP (no).			 |
-	| 10  | Short Slot Time	 | 0x400  | 1	| 9 µs slot instead of 20 µs.			 |
-	| 11  | APSD				| 0x800  | 0	| Automatic Power‐Save Delivery (no).	 |
-	| 12  | Radio Measurement   | 0x1000 | 1	| 802.11k measurement (survey) supported. |
-	| 13  | DSSS‐OFDM		   | 0x2000 | 0	| Mixed‐mode DSSS/OFDM (no).			  |
-	| 14  | Delayed Block Ack   | 0x4000 | 0	| (802.11e feature) (no).				 |
-	| 15  | Immediate Block Ack | 0x8000 | 0	| (802.11e feature) (no).				 |
+    
+    | Bit | Name                | Value  | Set? | Meaning                                 |
+    | --- | ------------------- | ------ | ---- | --------------------------------------- |
+    | 0   | ESS                 | 1      | 1    | Infrastructure network (not IBSS).      |
+    | 1   | IBSS                | 2      | 0    | Ad hoc mode (not set).                  |
+    | 2   | CF‐Pollable         | 4      | 0    | Contention‐free polling (not set).      |
+    | 3   | CF‐PollRequest      | 8      | 0    | Contention‐free request (not set).      |
+    | 4   | Privacy             | 0x10   | 1    | WEP/WPA/WPA2 encryption supported.      |
+    | 5   | Short Preamble      | 0x20   | 1    | Supports 'short' preamble (faster RX).  |
+    | 6   | PBCC                | 0x40   | 0    | Packet Binary Convolutional Code (no).  |
+    | 7   | Channel Agility     | 0x80   | 0    | Dynamic channel switching (no).         |
+    | 8   | Spectrum Management | 0x100  | 0    | 5 GHz regulatory features (no).         |
+    | 9   | QoS AP              | 0x200  | 0    | Quality‐of‐Service AP (no).             |
+    | 10  | Short Slot Time     | 0x400  | 1    | 9 µs slot instead of 20 µs.             |
+    | 11  | APSD                | 0x800  | 0    | Automatic Power‐Save Delivery (no).     |
+    | 12  | Radio Measurement   | 0x1000 | 1    | 802.11k measurement (survey) supported. |
+    | 13  | DSSS‐OFDM           | 0x2000 | 0    | Mixed‐mode DSSS/OFDM (no).              |
+    | 14  | Delayed Block Ack   | 0x4000 | 0    | (802.11e feature) (no).                 |
+    | 15  | Immediate Block Ack | 0x8000 | 0    | (802.11e feature) (no).                 |
 	
 	So 0x1431 tells you your AP is:
 		- ESS (infrastructure AP, not ad-hoc)
-		- Privacy (it’s encrypting traffic)
+		- Privacy (it's encrypting traffic)
 		- Short Preamble (can use faster preamble)
 		- Short Slot Time (9 µs slots for faster contention)
 		- Radio Measurement (it supports 802.11k measurement features)
@@ -704,11 +706,11 @@ static void wifi_sniffer_data_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 	}
 	else if(!toDS && fromDS) {
 		// From DS: AP -> STA
-		sa = &frame[16]; // Addr3 is transmitter (the AP’s MAC)
+		sa = &frame[16]; // Addr3 is transmitter (the AP's MAC)
 	}
 	else if(toDS && !fromDS) {
 		// To DS: STA -> AP
-		sa = &frame[10]; // Addr2 is station’s MAC
+		sa = &frame[10]; // Addr2 is station's MAC
 	}
 	else {
 		// WDS: mesh or 4-addr; Addr4 is original source

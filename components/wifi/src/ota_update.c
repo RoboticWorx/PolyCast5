@@ -316,9 +316,6 @@ static void ota_check_task(void *_)
 	strlcpy(ota_update_info, jinfo->valuestring, sizeof(ota_update_info));
 	#ifdef POLYCAST5_DEBUG
 	ESP_LOGI(TAG, "ota_update_info: %s", ota_update_info);
-	#endif
-
-	#ifdef POLYCAST5_DEBUG
 	ESP_LOGI(TAG, "Current ver: %s | Available: %s", current_ver, new_ver);
 	#endif
 

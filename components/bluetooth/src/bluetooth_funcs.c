@@ -1,4 +1,3 @@
-#include "esp_err.h"
 #include "polycast5_macros.h"
 
 #include <ctype.h>
@@ -17,6 +16,7 @@
 #include "esp_hidd.h"
 #include "esp_hid_gap.h"
 #include "esp_log.h"
+#include "esp_err.h"
 
 #include "bluetooth_funcs.h"
 #include "gpio_funcs.h"
