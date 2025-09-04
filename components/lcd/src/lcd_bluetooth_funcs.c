@@ -20,7 +20,6 @@
 #include "lcd_bluetooth_funcs.h"
 #include "bluetooth_funcs.h"
 #include "bluetooth_task.h"
-#include "bluetooth_spam.h"
 
 #define TAG "LCD_BLUETOOTH_FUNCS"
 
