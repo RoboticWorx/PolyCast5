@@ -1,3 +1,4 @@
+#include "esp_err.h"
 #include "lcd_bluetooth_funcs.h"
 #include "polycast5_macros.h"
 
@@ -47,6 +48,9 @@
 
 #define LCD_ANIM_NS "anim_data"
 #define LCD_ANIM_KEY "selected"
+
+#define SEL_MENU_NS "sel_menu"
+#define SEL_MENU_INDEX_KEY "sel_idx"
 
 
 /* Hotkey macros */
@@ -460,7 +464,6 @@ void lcd_lvgl_init(void)
 	warm_img(IMG_DICE_6);
 	
 	// And QRs
-	warm_img(QR_ESP_ENC_RX_EX);
 	warm_img(QR_ESP_RX_EX);
 	warm_img(QR_PC5_COM);
 	warm_img(QR_PC5_DOCS);
@@ -550,8 +553,9 @@ static void scroll_ready_cb(lv_anim_t * a)
 void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32_t speed_px_s)
 {
 	// If already in animation, don't make a new one
-	if (already_scrolling) 
+	if (already_scrolling) {
 		return;
+	}
 	already_scrolling = true;
 	
 	// Decide start/end Y
@@ -584,8 +588,9 @@ void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32
 	lv_anim_t a1;
 	lv_anim_init(&a1);
 	lv_anim_set_var(&a1, menu->lbl_bot);
-	if (!scrolling_up)
+	if (!scrolling_up) {
 		lv_label_set_text(menu->lbl_bot, lv_label_get_text(menu->lbl_mid));
+	}
 	lv_anim_set_exec_cb(&a1, (lv_anim_exec_xcb_t)lv_obj_set_y);
 	lv_anim_set_path_cb(&a1, lv_anim_path_linear);
 	lv_anim_set_values(&a1, start_b, end_b);
@@ -595,8 +600,9 @@ void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32
 	lv_anim_t a2;
 	lv_anim_init(&a2);
 	lv_anim_set_var(&a2, menu->lbl_top);
-	if (scrolling_up)
+	if (scrolling_up) {
 		lv_label_set_text(menu->lbl_top, lv_label_get_text(menu->lbl_mid));
+	}
 	lv_anim_set_exec_cb(&a2, (lv_anim_exec_xcb_t)lv_obj_set_y);
 	lv_anim_set_path_cb(&a2, lv_anim_path_linear);
 	lv_anim_set_values(&a2, start_t, end_t);
@@ -805,56 +811,115 @@ void lcd_init_images()
 	#endif
 }
 
+static void lcd_selection_index_nvs_save(const ui_menu_t *ui_menu)
+{
+	nvs_handle_t h;
+	esp_err_t err;
+
+	// Open NVS
+	err = nvs_open(SEL_MENU_NS, NVS_READWRITE, &h);
+	if (err == ESP_OK) {
+		uint8_t idx = (uint8_t)(ui_menu->index % ui_menu->size);
+		
+		// Save index on success
+		nvs_set_u8(h, SEL_MENU_INDEX_KEY, idx);
+		
+		// Commit changes
+		nvs_commit(h);
+	
+		// Close NVS
+		nvs_close(h);
+	}
+	else {
+		ESP_LOGE(TAG, "lcd_selection_index_nvs_save nvs_open failed: %s", esp_err_to_name(err));
+	}
+}
+
+void lcd_selection_index_nvs_load(ui_menu_t *ui_menu)
+{
+	nvs_handle_t h;
+	esp_err_t err;
+
+	// Open NVS
+	err = nvs_open(SEL_MENU_NS, NVS_READONLY, &h);
+	if (err == ESP_OK) {
+		uint8_t idx = 0;
+
+		// Get index on success
+		err = nvs_get_u8(h, SEL_MENU_INDEX_KEY, &idx);
+		if (err == ESP_OK) {
+			// Check if valid
+			if (idx < ui_menu->size) {
+				ui_menu->index = (int)idx; // Assign
+			}
+		}
+		else {
+			ESP_LOGW(TAG, "lcd_selection_index_nvs_load nvs_get_u8 failed: %s", esp_err_to_name(err));
+		}
+
+		// Close NVS
+		nvs_close(h);
+	}
+	else {
+		ESP_LOGW(TAG, "lcd_selection_index_nvs_load nvs_open failed: %s", esp_err_to_name(err));
+	}
+}
+
 void lcd_init_selection_labels(ui_menu_t *ui_menu)
 {
 	// Create and format center button
 	ui_menu->btn_mid = lv_btn_create(ACTIVE_SCR);
 	lcd_format_center_button(ui_menu->btn_mid, user_primary_color, user_secondary_color);
 
+	// Resolve indices
+    int size = ui_menu->size;
+    int mid = ((ui_menu->index % size) + size) % size;
+    int top = (mid - 1 + size) % size; // 0 -> size - 1
+    int bot = (mid + 1) % size; // size - 1 -> 0
+
 	// Format labels
 	ui_menu->lbl_top = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(ui_menu->lbl_top, "Bluetooth", user_secondary_color,
-				&lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
+	lcd_format_label(ui_menu->lbl_top, ui_menu->options[top], user_secondary_color,
+			&lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
 
 	ui_menu->lbl_mid = lv_label_create(ui_menu->btn_mid);
-	lcd_format_label(ui_menu->lbl_mid, "PolyPlug",
-					 user_secondary_color, &lv_font_montserrat_30,
-					 LV_ALIGN_CENTER, 0, 0);
+	lcd_format_label(ui_menu->lbl_mid, ui_menu->options[mid], user_secondary_color, 
+			&lv_font_montserrat_30, LV_ALIGN_CENTER, 0, 0);
 					 
 	ui_menu->lbl_bot = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(ui_menu->lbl_bot, "ESP32", user_secondary_color,
-				&lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -15);
+	lcd_format_label(ui_menu->lbl_bot, ui_menu->options[bot], user_secondary_color,
+			&lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -15);
 	
 	// Arrows		 
 	ui_menu->arrow_top = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(ui_menu->arrow_top, LV_SYMBOL_UP, user_secondary_color,
-				&lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+			&lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
 					 
 	ui_menu->arrow_left = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(ui_menu->arrow_left, LV_SYMBOL_LEFT, user_secondary_color,
-				&lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 0);
+			&lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 0);
 
 	ui_menu->arrow_right = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(ui_menu->arrow_right, LV_SYMBOL_RIGHT, user_secondary_color,
-				&lv_font_montserrat_14, LV_ALIGN_RIGHT_MID, -4, 0);
+			&lv_font_montserrat_14, LV_ALIGN_RIGHT_MID, -4, 0);
 
 	ui_menu->arrow_bot = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(ui_menu->arrow_bot, LV_SYMBOL_DOWN, user_secondary_color,
-				&lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
+			&lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
 
 	// Battery icon
 	ui_menu->lbl_battery_txt = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(ui_menu->lbl_battery_txt, "...", user_secondary_color,
-				&lv_font_montserrat_14, LV_ALIGN_TOP_RIGHT, -28, 0);
+			&lv_font_montserrat_14, LV_ALIGN_TOP_RIGHT, -28, 0);
 				
 	ui_menu->lbl_battery_icon = lv_label_create(ACTIVE_SCR); // 3, 2, 1, EMPTY
 	lcd_format_label(ui_menu->lbl_battery_icon, LV_SYMBOL_BATTERY_FULL, user_secondary_color,
-				 &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
+			&lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
 
 	// Hotkey icon
 	ui_menu->lbl_hotkey_icon = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(ui_menu->lbl_hotkey_icon, LV_SYMBOL_EYE_OPEN, user_secondary_color,
-				 &lv_font_montserrat_18, LV_ALIGN_TOP_LEFT, 4, -1);
+			&lv_font_montserrat_18, LV_ALIGN_TOP_LEFT, 4, -1);
 					 
 	// Hide all for now
 	lv_obj_add_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
@@ -1582,11 +1647,13 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
 	if (scrolling_menu) {
 		if (scrolling_up) {
 			ui_menu->index = (ui_menu->index + 1) % ui_menu->size;
+			lcd_selection_index_nvs_save(ui_menu); // Save the index
 			const char *next_bottom = ui_menu->options[(ui_menu->index + 1) % ui_menu->size];
 			lcd_scroll_anim(ui_menu, next_bottom, scrolling_up, SCROLL_SPEED);
 		}
 		else {
 			ui_menu->index = (ui_menu->index + ui_menu->size - 1) % ui_menu->size;
+			lcd_selection_index_nvs_save(ui_menu); // Save the index
 			const char *next_top = ui_menu->options[(ui_menu->index + ui_menu->size - 1) % ui_menu->size];
 			lcd_scroll_anim(ui_menu, next_top, scrolling_up, SCROLL_SPEED);
 		}

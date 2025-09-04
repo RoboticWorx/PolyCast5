@@ -1,3 +1,4 @@
+# Many files
 for f in anim_city_*.png; do
     base="${f%.png}"
     python ~/Downloads/lvgl/scripts/LVGLImage.py \
@@ -9,3 +10,11 @@ for f in anim_city_*.png; do
         --name "$base" \
         "$f"
 done
+
+# One file
+python "$HOME/Downloads/scripts/LVGLImage.py" \
+  --ofmt BIN \
+  --cf RGB565 \
+  --compress NONE \
+  -o ./qr_esp_rx_example.bin \
+  qr_esp_rx_example.png

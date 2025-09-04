@@ -86,6 +86,8 @@ static void lcd_task(void *pvParameters)
 	
 	
 	// Create common items
+	lcd_selection_index_nvs_load(&ui_menu); // Load selection menu previous index
+	
 	lcd_init_selection_labels(&ui_menu);
 
 

@@ -212,7 +212,6 @@
 
 /* QRS START */
 
-#define QR_ESP_ENC_RX_EX "A:/qr/qr_esp_enc_rx_example.bin"
 #define QR_ESP_RX_EX "A:/qr/qr_esp_rx_example.bin"
 
 #define QR_PC5_COM "A:/qr/qr_pc5_com.bin"

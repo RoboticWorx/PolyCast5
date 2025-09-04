@@ -2285,7 +2285,7 @@ void lcd_wifi_ota_updating_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_men
 
 		const char *instr_text =
 				"Please do not turn off your device.\n\n\n"
-				"If you get stuck at 0% for any reason, please restart the device by holding the HOME and RIGHT buttons at the same time.";
+				"If you get stuck at 0% for any reason, please restart your device by holding the HOME and RIGHT buttons at the same time.";
 
 		lv_label_set_text(instr_lbl, instr_text);
 

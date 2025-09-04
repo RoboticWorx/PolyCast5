@@ -392,7 +392,7 @@ void lcd_lora_add_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora
 		ui_menu->page = LORA_NAME_PAGE;
 	}
 	// Home or power off
-	else if ((ui_btns->home_btn || ui_btns->pwr_btn) && lora_menu_overwrite) {
+	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
 		// Delete objects
 		lv_obj_del(cont); // Deletes children
 		
