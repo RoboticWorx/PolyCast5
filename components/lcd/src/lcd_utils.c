@@ -2019,153 +2019,170 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 		connected = false;
 	}
 	
-	// Up button pressed
-	if (ui_btns->up_btn == 1) {
-		// Update selection
-		wifi_menu->index--;
-		lcd_wifi_update_menu(wifi_menu);
+	// If update is available
+	if (xSemaphoreTake(xWifiOtaAvailableSemaphore, 0) == pdTRUE) {
+		// Hide Wi-Fi menu
+		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+		// Reset static
+		do_once = false;
+
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = WIFI_OTA_CONFIRM_PAGE;
 	}
-	// Down button pressed
-	else if (ui_btns->down_btn == 1) {
-		// Update selection
-		wifi_menu->index++;
-		lcd_wifi_update_menu(wifi_menu);
-	}
-	// Connect to network
-	else if (ui_btns->select_btn == 1 && wifi_menu->index == 0) {
-		// If connected to a network
-		if (connected) {
-			xSemaphoreGive(xWifiDisconnectSemaphore);
+	// Else normal Wi-Fi page
+	else {
+		// Up button pressed
+		if (ui_btns->up_btn == 1) {
+			// Update selection
+			wifi_menu->index--;
+			lcd_wifi_update_menu(wifi_menu);
 		}
-		// Already disconnected
-		else {
+		// Down button pressed
+		else if (ui_btns->down_btn == 1) {
+			// Update selection
+			wifi_menu->index++;
+			lcd_wifi_update_menu(wifi_menu);
+		}
+		// Connect to network
+		else if (ui_btns->select_btn == 1 && wifi_menu->index == 0) {
+			// If connected to a network
+			if (connected) {
+				xSemaphoreGive(xWifiDisconnectSemaphore);
+			}
+			// Already disconnected
+			else {
+				// Hide Wi-Fi menu
+				lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+				
+				// Show scan menu
+				lv_obj_remove_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+				
+				// Reset static
+				do_once = false;
+				
+				ui_menu->page = WIFI_SCAN_PAGE;
+			}
+		}
+		// Monitor packets
+		else if (ui_btns->select_btn == 1 && wifi_menu->index == 1) {
 			// Hide Wi-Fi menu
 			lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-			
+				
 			// Show scan menu
 			lv_obj_remove_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
 			
 			// Reset static
 			do_once = false;
 			
+			monitoring_packets = true;
+			
 			ui_menu->page = WIFI_SCAN_PAGE;
 		}
-	}
-	// Monitor packets
-	else if (ui_btns->select_btn == 1 && wifi_menu->index == 1) {
-		// Hide Wi-Fi menu
-		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		// Sync with PolyPlug
+		else if (ui_btns->select_btn == 1 && wifi_menu->index == 2) {
+			// Hide Wi-Fi menu
+			lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 			
-		// Show scan menu
-		lv_obj_remove_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
-			
-		// Reset static
-		do_once = false;
-		
-		monitoring_packets = true;
-			
-		ui_menu->page = WIFI_SCAN_PAGE;
-	}
-	// Sync with PolyPlug
-	else if (ui_btns->select_btn == 1 && wifi_menu->index == 2) {
-		// Hide Wi-Fi menu
-		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			if (connected) {
+				// Reset static
+				do_once = false;
 				
-		if (connected) {
+				// Show right arrow
+				lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+				
+				ui_menu->page = WIFI_SYNC_PAGE;
+			}
+			else {
+				lbl_conf = lv_label_create(ACTIVE_SCR);
+				
+				lcd_format_label(lbl_conf, "Please connect to\n  a network first!", user_secondary_color,
+							 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+				
+				lv_timer_handler();
+				vTaskDelay(pdMS_TO_TICKS(1000));
+				
+				lv_obj_del(lbl_conf);
+				lbl_conf = NULL;
+				
+				lcd_clear_pending_inputs = true;
+				
+				// Show Wi-Fi menu
+				lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			}
+		}
+		// Send over Wi-Fi to specific
+		else if (ui_btns->select_btn == 1) {
+			// Hide Wi-Fi menu
+			lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			if (connected) {
+				// Reset static
+				do_once = false;
+				
+				// Hide top and bot arrows
+				lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+				lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+				
+				// Show Wi-Fi send page
+				lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_send_ins, LV_OBJ_FLAG_HIDDEN);
+				lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_send_cmd, LV_OBJ_FLAG_HIDDEN);
+				lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_send_box, LV_OBJ_FLAG_HIDDEN);
+				lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_send, LV_OBJ_FLAG_HIDDEN);
+				lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_edit, LV_OBJ_FLAG_HIDDEN);
+				lv_obj_remove_flag(wifi_menu->wifi_submenu.arrow_top, LV_OBJ_FLAG_HIDDEN);
+				lv_obj_remove_flag(wifi_menu->wifi_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
+				
+				// Show right arrow
+				lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+				
+				ui_menu->page = WIFI_SEND_PAGE;
+			}
+			else {
+				lbl_conf = lv_label_create(ACTIVE_SCR);
+				
+				lcd_format_label(lbl_conf, "Please connect to\n  a network first!", user_secondary_color,
+							 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+				
+				lv_timer_handler();
+				vTaskDelay(pdMS_TO_TICKS(1000));
+				
+				lv_obj_del(lbl_conf);
+				lbl_conf = NULL;
+				
+				lcd_clear_pending_inputs = true;
+				
+				// Show Wi-Fi menu
+				lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			}
+		}
+		// Back selected
+		else if (ui_btns->left_btn == 1) {
+			// Hide Wi-Fi menu
+			lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// Show selection labels
+			lcd_unhide_selection_widgets(ui_menu);
+			
 			// Reset static
 			do_once = false;
 			
-			// Show right arrow
-			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-			
-			ui_menu->page = WIFI_SYNC_PAGE;
+			// Switch pages
+			ui_menu->page = SELECTION_PAGE;
 		}
-		else {
-			lbl_conf = lv_label_create(ACTIVE_SCR);
+		// Home or power off selected
+		else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+			// Hide Wi-Fi menu
+			lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 			
-			lcd_format_label(lbl_conf, "Please connect to\n  a network first!", user_secondary_color,
-						 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
-			
-			lv_timer_handler();
-			vTaskDelay(pdMS_TO_TICKS(1000));
-			
-			lv_obj_del(lbl_conf);
-			lbl_conf = NULL;
-			
-			lcd_clear_pending_inputs = true;
-			
-			// Show Wi-Fi menu
-			lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		}
-	}
-	// Send over Wi-Fi to specific
-	else if (ui_btns->select_btn == 1) {
-		// Hide Wi-Fi menu
-		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-				
-		if (connected) {
 			// Reset static
 			do_once = false;
 			
-			// Hide top and bot arrows
-			lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-			
-			// Show Wi-Fi send page
-			lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_send_ins, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_send_cmd, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_send_box, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_send, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_edit, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_remove_flag(wifi_menu->wifi_submenu.arrow_top, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_remove_flag(wifi_menu->wifi_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
-			
-			// Show right arrow
-			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-			
-			ui_menu->page = WIFI_SEND_PAGE;
+			lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 		}
-		else {
-			lbl_conf = lv_label_create(ACTIVE_SCR);
-			
-			lcd_format_label(lbl_conf, "Please connect to\n  a network first!", user_secondary_color,
-						 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
-			
-			lv_timer_handler();
-			vTaskDelay(pdMS_TO_TICKS(1000));
-			
-			lv_obj_del(lbl_conf);
-			lbl_conf = NULL;
-			
-			lcd_clear_pending_inputs = true;
-			
-			// Show Wi-Fi menu
-			lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		}
-	}
-	// Back selected
-	else if (ui_btns->left_btn == 1) {
-		// Hide Wi-Fi menu
-		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Show selection labels
-		lcd_unhide_selection_widgets(ui_menu);
-		
-		// Reset static
-		do_once = false;
-		
-		// Switch pages
-		ui_menu->page = SELECTION_PAGE;
-	}
-	// Home or power off selected
-	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
-		// Hide Wi-Fi menu
-		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Reset static
-		do_once = false;
-		
-		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 

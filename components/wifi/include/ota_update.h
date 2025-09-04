@@ -6,6 +6,15 @@
 #include "esp_err.h"
 
 /**
+ * @brief Checks GitHub page to see if a new firmware update is available
+ *
+ * @param [in] manifest_url URL to the OTA manifest file for comparing versions and getting the .bin update URL
+ *
+ * @returns True if ota_check_task was created successfully
+ */
+bool ota_update_check_start(const char *manifest_url);
+
+/**
  * @brief Spawns OTA task to begin the update
  *
  * @param [in] url URL to the .bin update file
@@ -20,15 +29,6 @@ bool ota_update_start(const char *url);
  * @returns True if in progress
  */
 bool ota_update_in_progress(void);
-
-/**
- * @brief Checks GitHub page to see if a new firmware update is available
- *
- * @param [in] manifest_url URL to the OTA manifest file for comparing versions and getting the .bin update URL
- *
- * @returns True if ota_check_task was created successfully
- */
-bool ota_update_check_start(const char *manifest_url);
 
 /**
  * @brief Saves the firmware version to NVS

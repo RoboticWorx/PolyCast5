@@ -45,6 +45,10 @@ SemaphoreHandle_t xWifiMqttSuccessSemaphore;
 SemaphoreHandle_t xWifiMqttConnectedSemaphore;
 SemaphoreHandle_t xWifiMqttDisconnectedSemaphore;
 
+// OTA
+SemaphoreHandle_t xWifiOtaAvailableSemaphore; // Wi-Fi -> LCD
+QueueHandle_t xWifiOtaPctQueue;
+
 static void wifi_task(void *param)
 {
 	xWifiStartScanSemaphore = xSemaphoreCreateBinary();
@@ -67,6 +71,8 @@ static void wifi_task(void *param)
 	configASSERT(xWifiMqttConnectedSemaphore);
 	xWifiMqttDisconnectedSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xWifiMqttDisconnectedSemaphore);
+	xWifiOtaAvailableSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xWifiOtaAvailableSemaphore);
 	
 	xWifiScanQueue = xQueueCreate(WIFI_MAX_NETWORKS, sizeof(wifi_scan_t));
 	configASSERT(xWifiScanQueue);
@@ -80,6 +86,8 @@ static void wifi_task(void *param)
 	configASSERT(xWifiDataQueue);
 	xWifiMqttCmdQueue = xQueueCreate(1, sizeof(wifi_mqtt_t));
 	configASSERT(xWifiMqttCmdQueue);
+	xWifiOtaPctQueue = xQueueCreate(1, sizeof(int));
+	configASSERT(xWifiOtaPctQueue);
 	
 	uint8_t my_mac[6];
 	esp_read_mac(my_mac, ESP_MAC_WIFI_STA);

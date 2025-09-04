@@ -17,6 +17,9 @@
 #include "esp_app_desc.h"
 #include "esp_http_client.h"
 
+#include "portmacro.h"
+#include "wifi_funcs.h"
+#include "wifi_task.h"
 #include "ota_update.h"
 
 #define TAG "OTA"
@@ -25,6 +28,9 @@
 #define NVS_OTA_VERSION_KEY "version"
 
 //#define OTA_CHECK_PROJ_DESC 1 // Enables project_description.json version check (redundant)
+
+char ota_update_url[512] = {0};
+char ota_update_info[512] = {0};
 
 static char url_buf[1024]; // URL buffer
 static TaskHandle_t ota_task_handle = NULL;
@@ -35,167 +41,25 @@ static char manifest_url_buf[512]; // Manifest URL buffer
 static char pending_manifest_ver[64];
 static int manifest_size_bytes = -1;
 
-static bool http_get_small(const char *url, char *out, size_t out_sz)
-{
-	// Build HTTP client config
-	esp_http_client_config_t cfg = {
-		.url = url,
-		.timeout_ms = 15000,
-		.crt_bundle_attach = esp_crt_bundle_attach,
-		.buffer_size = 4096,
-		.buffer_size_tx = 4096,
-		.keep_alive_enable = true,
-	};
-
-	// Create the client
-	esp_http_client_handle_t h = esp_http_client_init(&cfg);
-	if (!h) { // Abort on failure
-		return false;
-	}
-	
-	// Opens the connection and sends a plain GET request
-	if (esp_http_client_open(h, 0) != ESP_OK) { // Abort on failure
-		esp_http_client_cleanup(h);
-		return false;
-	}
-
-	// Reads response headers and returns content length if present
-	int cl = esp_http_client_fetch_headers(h);
-	
-	// If the server does report a length and it won't fit, abort
-	if (cl > 0 && cl >= (int)out_sz) {
-		esp_http_client_close(h);
-		esp_http_client_cleanup(h);
-		return false;
-	}
-
-	// Read the response body in a loop
-	int n = 0, r;
-	while ((r = esp_http_client_read(h, out + n, out_sz - 1 - n)) > 0) { // Returns bytes read while there is data
-		n += r;
-	}
-	out[n] = '\0'; // NUL-terminator
-
-	// Clean up and return
-	esp_http_client_close(h);
-	esp_http_client_cleanup(h);
-	return n > 0; // True if bytes read
-}
-
-static void ota_check_task(void *_)
-{
-	char buf[2048];
-	
-	// Get the full, safe string for parsing
-	// (download manifest.json into buf)
-	if (!http_get_small(manifest_url_buf, buf, sizeof buf)) {
-		ESP_LOGE(TAG, "Manifest fetch failed");
-		goto done;
-	}
-	
-	#ifdef POLYCAST5_DEBUG
-	ESP_LOGI(TAG, "http_get_small string='%s'", buf);
-	#endif
-
-	// Parse the JSON text into a DOM
-	cJSON *root = cJSON_Parse(buf);
-	if (!root) { // Abort on fail
-		ESP_LOGE(TAG, "Manifest JSON parse failed");
-		goto done;
-	}
-
-	// Extract version and url fields
-	const cJSON *jver = cJSON_GetObjectItemCaseSensitive(root, "version");
-	const cJSON *jurl = cJSON_GetObjectItemCaseSensitive(root, "url");
-	const cJSON *jsize = cJSON_GetObjectItemCaseSensitive(root, "size");
-
-	// Get new OTA .bin size
-	manifest_size_bytes = (cJSON_IsNumber(jsize) && jsize->valuedouble > 0) ? (int)jsize->valuedouble : -1;
-	
-	// Validate both are JSON strings
-	if (!cJSON_IsString(jver) || !cJSON_IsString(jurl)) { // Abort on fail
-		ESP_LOGE(TAG, "Manifest missing version/url");
-		cJSON_Delete(root);
-		goto done;
-	}
-
-	// Read the current app's version
-	char current_ver[64] = {0};
-	esp_err_t err = ota_update_get_nvs_version(current_ver, sizeof(current_ver));
-	if (err != ESP_OK) {
-		ESP_LOGE(TAG, "ota_update_get_nvs_version failed: %s", esp_err_to_name(err));
-	}
-	const char *new_ver = jver->valuestring;
-	const char *url = jurl->valuestring;
-
-	#ifdef POLYCAST5_DEBUG
-	ESP_LOGI(TAG, "Current ver: %s | Available: %s", current_ver, new_ver);
-	#endif
-
-	// If different version -> update from extracted URL
-	if (strcmp(current_ver, new_ver) != 0) {
-		#ifdef POLYCAST5_DEBUG
-		ESP_LOGI(TAG, "New version found -> starting OTA from %s", url);
-		#endif
-
-		// Save the pending version to global buffer
-		strlcpy(pending_manifest_ver, new_ver, sizeof(pending_manifest_ver));
-		
-		// Start the update
-		ota_update_start(url);
-	}
-	else {
-		#ifdef POLYCAST5_DEBUG
-		ESP_LOGI(TAG, "Already up-to-date");
-		#endif
-
-		pending_manifest_ver[0] = '\0'; // Clear pending version
-	}
-
-	// Clean up and exit
-	cJSON_Delete(root);
-
-	done:
-	ota_check_task_handle = NULL;
-	vTaskDelete(NULL);
-}
-
-bool ota_update_check_start(const char *manifest_url)
-{	
-	// If already checked or in progress, exit
-	if (ota_check_task_handle || ota_update_in_progress()) {
-		return false;
-	}
-	
-	// Check manifest_url is valid
-	if (!manifest_url || !manifest_url[0]) {
-		return false;
-	}
-	
-	// Copy into global buffer
-	strlcpy(manifest_url_buf, manifest_url, sizeof(manifest_url_buf));
-	
-	// Create OTA check task
-	return xTaskCreate(ota_check_task, "ota_check_task", 5 * 1024, NULL, tskIDLE_PRIORITY + 1, &ota_check_task_handle) == pdPASS;
-}
-
-#ifdef OTA_CHECK_PROJ_DESC
-static void log_versions(const esp_app_desc_t *running, const esp_app_desc_t *incoming)
-{
-	// Avoid NULL deref if metadata fetch fails
-	if (!running || !incoming) {
-		return;
-	}
-	
-	#ifdef POLYCAST5_DEBUG
-	ESP_LOGI(TAG, "Running : %s (%s %s)", running->version, running->date, running->time);
-	ESP_LOGI(TAG, "Incoming : %s (%s %s)", incoming->version, incoming->date, incoming->time);
-	#endif
-}
-#endif
-
 static void ota_task(void *_)
 {
+	#ifdef POLYCAST5_DEBUG
+	ESP_LOGI(TAG, "Pre-OTA heap: free=%u, internal=%u, min=%u",
+    		esp_get_free_heap_size(),
+			heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+			esp_get_minimum_free_heap_size());
+	#endif
+
+	// Free some internal heap
+	wifi_funcs_mqtt_client_deinit();
+
+	#ifdef POLYCAST5_DEBUG
+	ESP_LOGI(TAG, "Pre-OTA heap after MQTT deinit: free=%u, internal=%u, min=%u",
+    		esp_get_free_heap_size(),
+			heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+			esp_get_minimum_free_heap_size());
+	#endif
+	
 	// Configure the HTTP(S) client
 	esp_http_client_config_t http_cfg = {
 		.url = url_buf,
@@ -278,6 +142,9 @@ static void ota_task(void *_)
 				ESP_LOGI(TAG, "Update %d%% (%u/%d)", pct, (unsigned)read, manifest_size_bytes);
 				#endif
 			}
+
+			// Send percentage to LCD
+			xQueueSend(xWifiOtaPctQueue, &pct, 0);
 		}
 		// Fallback when content length is unknown: every ~64KB
 		else {
@@ -324,6 +191,10 @@ static void ota_task(void *_)
 			}
 		}
 		
+		int done = -1;
+		// Send OTA success to LCD
+		xQueueSend(xWifiOtaPctQueue, &done, portMAX_DELAY);
+
 		vTaskDelay(pdMS_TO_TICKS(1000));
 		esp_restart(); // Restart
 	}
@@ -336,6 +207,168 @@ static void ota_task(void *_)
 	out:
 	ota_task_handle = NULL;
 	vTaskDelete(NULL);
+
+	ESP_LOGE(TAG, "OTA error! Restarting: %s", esp_err_to_name(err));
+
+	int fail = -2;
+	// Send OTA failed to LCD
+	xQueueSend(xWifiOtaPctQueue, &fail, pdMS_TO_TICKS(100));
+
+	vTaskDelay(pdMS_TO_TICKS(2000));
+	esp_restart(); // Restart
+}
+
+static bool http_get_small(const char *url, char *out, size_t out_sz)
+{
+	// Build HTTP client config
+	esp_http_client_config_t cfg = {
+		.url = url,
+		.timeout_ms = 15000,
+		.crt_bundle_attach = esp_crt_bundle_attach,
+		.buffer_size = 4096,
+		.buffer_size_tx = 4096,
+		.keep_alive_enable = true,
+	};
+
+	// Create the client
+	esp_http_client_handle_t h = esp_http_client_init(&cfg);
+	if (!h) { // Abort on failure
+		return false;
+	}
+	
+	// Opens the connection and sends a plain GET request
+	if (esp_http_client_open(h, 0) != ESP_OK) { // Abort on failure
+		esp_http_client_cleanup(h);
+		return false;
+	}
+
+	// Reads response headers and returns content length if present
+	int cl = esp_http_client_fetch_headers(h);
+	
+	// If the server does report a length and it won't fit, abort
+	if (cl > 0 && cl >= (int)out_sz) {
+		esp_http_client_close(h);
+		esp_http_client_cleanup(h);
+		return false;
+	}
+
+	// Read the response body in a loop
+	int n = 0, r;
+	while ((r = esp_http_client_read(h, out + n, out_sz - 1 - n)) > 0) { // Returns bytes read while there is data
+		n += r;
+	}
+	out[n] = '\0'; // NUL-terminator
+
+	// Clean up and return
+	esp_http_client_close(h);
+	esp_http_client_cleanup(h);
+	return n > 0; // True if bytes read
+}
+
+static void ota_check_task(void *_)
+{
+	char buf[2048];
+	
+	// Get the full, safe string for parsing
+	// (download manifest.json into buf)
+	if (!http_get_small(manifest_url_buf, buf, sizeof buf)) {
+		ESP_LOGE(TAG, "Manifest fetch failed");
+		goto done;
+	}
+	
+	#ifdef POLYCAST5_DEBUG
+	ESP_LOGI(TAG, "http_get_small string='%s'", buf);
+	#endif
+
+	// Parse the JSON text into a DOM
+	cJSON *root = cJSON_Parse(buf);
+	if (!root) { // Abort on fail
+		ESP_LOGE(TAG, "Manifest JSON parse failed");
+		goto done;
+	}
+
+	// Extract version and url fields
+	const cJSON *jver = cJSON_GetObjectItemCaseSensitive(root, "version");
+	const cJSON *jurl = cJSON_GetObjectItemCaseSensitive(root, "url");
+	const cJSON *jsize = cJSON_GetObjectItemCaseSensitive(root, "size");
+	const cJSON *jinfo = cJSON_GetObjectItemCaseSensitive(root, "info");
+
+	// Get new OTA .bin size
+	manifest_size_bytes = (cJSON_IsNumber(jsize) && jsize->valuedouble > 0) ? (int)jsize->valuedouble : -1;
+	
+	// Validate strings are JSON strings
+	if (!cJSON_IsString(jver) || !cJSON_IsString(jurl) || !cJSON_IsString(jinfo)) { // Abort on fail
+		ESP_LOGE(TAG, "Manifest missing version/url");
+		cJSON_Delete(root);
+		goto done;
+	}
+
+	// Read the current app's version
+	char current_ver[64] = {0};
+	esp_err_t err = ota_update_get_nvs_version(current_ver, sizeof(current_ver));
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "ota_update_get_nvs_version failed: %s", esp_err_to_name(err));
+	}
+	const char *new_ver = jver->valuestring;
+	strlcpy(ota_update_url, jurl->valuestring, sizeof(ota_update_url));
+
+	// Copy update info to global buffer
+	strlcpy(ota_update_info, jinfo->valuestring, sizeof(ota_update_info));
+	#ifdef POLYCAST5_DEBUG
+	ESP_LOGI(TAG, "ota_update_info: %s", ota_update_info);
+	#endif
+
+	#ifdef POLYCAST5_DEBUG
+	ESP_LOGI(TAG, "Current ver: %s | Available: %s", current_ver, new_ver);
+	#endif
+
+	// If different version -> update from extracted URL
+	if (strcmp(current_ver, new_ver) != 0) {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "New version found -> Considering OTA from %s", ota_update_url);
+		#endif
+
+		// Save the pending version to global buffer
+		strlcpy(pending_manifest_ver, new_ver, sizeof(pending_manifest_ver));
+		
+		// Notify user that an update is available via LCD
+		xSemaphoreGive(xWifiOtaAvailableSemaphore);
+	}
+	else {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Already up-to-date");
+		#endif
+
+		pending_manifest_ver[0] = '\0'; // Clear pending version
+		ota_update_url[0] = '\0';
+	    ota_update_info[0] = '\0';
+	}
+
+	// Clean up and exit
+	cJSON_Delete(root);
+
+	done:
+	ota_check_task_handle = NULL;
+	vTaskDelete(NULL);
+}
+
+bool ota_update_check_start(const char *manifest_url)
+{	
+	// If already checked or in progress, exit
+	if (ota_check_task_handle || ota_update_in_progress()) {
+		return false;
+	}
+	
+	// Check manifest_url is valid
+	if (!manifest_url || !manifest_url[0]) {
+		return false;
+	}
+	
+	// Copy into global buffer
+	strlcpy(manifest_url_buf, manifest_url, sizeof(manifest_url_buf));
+	
+	// Create OTA check task
+	return xTaskCreate(ota_check_task, "ota_check_task", 5 * 1024, NULL, tskIDLE_PRIORITY + 1, &ota_check_task_handle) == pdPASS;
 }
 
 bool ota_update_start(const char *url)
@@ -367,6 +400,21 @@ bool ota_update_start(const char *url)
 	#endif
 	return true;
 }
+
+#ifdef OTA_CHECK_PROJ_DESC
+static void log_versions(const esp_app_desc_t *running, const esp_app_desc_t *incoming)
+{
+	// Avoid NULL deref if metadata fetch fails
+	if (!running || !incoming) {
+		return;
+	}
+	
+	#ifdef POLYCAST5_DEBUG
+	ESP_LOGI(TAG, "Running : %s (%s %s)", running->version, running->date, running->time);
+	ESP_LOGI(TAG, "Incoming : %s (%s %s)", incoming->version, incoming->date, incoming->time);
+	#endif
+}
+#endif
 
 bool ota_update_in_progress(void)
 {

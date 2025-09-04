@@ -323,6 +323,12 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == WIFI_NAME_PAGE) {
 				lcd_wifi_create_custom_name(&ui_btns, &ui_menu, &wifi_menu);
 			}
+			else if (ui_menu.page == WIFI_OTA_CONFIRM_PAGE) {
+				lcd_wifi_ota_confirm_page(&ui_btns, &ui_menu, &wifi_menu);
+			}
+			else if (ui_menu.page == WIFI_OTA_UPDATING_PAGE) {
+				lcd_wifi_ota_updating_page(&ui_btns, &ui_menu, &wifi_menu);
+			}
 			// Tools page
 			else if (ui_menu.page == TOOLS_PAGE) {
 				lcd_tools_page(&ui_btns, &ui_menu, &tools_menu);

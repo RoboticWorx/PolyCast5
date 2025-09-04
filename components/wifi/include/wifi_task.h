@@ -21,6 +21,10 @@ extern SemaphoreHandle_t xWifiMqttSuccessSemaphore;
 extern SemaphoreHandle_t xWifiMqttConnectedSemaphore;
 extern SemaphoreHandle_t xWifiMqttDisconnectedSemaphore;
 
+// OTA
+extern QueueHandle_t xWifiOtaPctQueue;
+extern SemaphoreHandle_t xWifiOtaAvailableSemaphore;
+
 /**
  * @brief Create the Wi-Fi task
  */

@@ -109,9 +109,14 @@ esp_err_t wifi_funcs_radio_stop(void);
 void wifi_funcs_wifi_event_init(void);
 
 /**
- * @brief Initializes MQTT client
+ * @brief Initialize the MQTT client
  */
-void wifi_funcs_mqtt_client_init(void);\
+void wifi_funcs_mqtt_client_init(void);
+
+/**
+ * @brief Deinitialize the MQTT client
+ */
+void wifi_funcs_mqtt_client_deinit(void);
 
 /**
  * @brief Initializes Wi-Fi promiscuous mode to sniff packets

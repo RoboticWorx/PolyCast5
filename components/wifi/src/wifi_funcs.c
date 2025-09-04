@@ -215,7 +215,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 				
 		wifi_connected = true;
 		
-		// Check for new firmware version
+		// Check for new firmware version and update if so
 		ota_update_check_start("https://raw.githubusercontent.com/RoboticWorx/pc5-test/main/manifest.json");
 	}
 }
@@ -310,6 +310,11 @@ void wifi_funcs_mqtt_client_init(void)
 	};
 	mqtt_client = esp_mqtt_client_init(&cfg);
 	esp_mqtt_client_register_event(mqtt_client, MQTT_EVENT_ANY, mqtt_event_handler, NULL);
+}
+
+void wifi_funcs_mqtt_client_deinit(void)
+{
+	esp_mqtt_client_stop(mqtt_client);
 }
 
 void wifi_funcs_mqtt_client_publish(char *payload, const uint8_t key[16])
