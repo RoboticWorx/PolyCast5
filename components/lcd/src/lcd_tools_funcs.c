@@ -673,4 +673,211 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 	}
 }
 
+void lcd_tools_num_gen_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
+{	
+	#define NUM_GEN_X_POS 54
+	#define NUM_GEN_Y_POS 40
+	#define NUM_GEN_BUF_SIZE 8
+	#define NUM_GEN_X_OFFSET 110
+
+	// Statics
+	static bool do_once = false;
+	static uint8_t user_idx = 0; // 0 = Min, 1 = Max
+	static int16_t min_val = 1;
+	static int16_t max_val = 10;
+
+	static lv_obj_t *lbl_ins;
+	static lv_obj_t *lbl_min;
+	static lv_obj_t *lbl_max;
+	static lv_obj_t *lbl_val_min;
+	static lv_obj_t *lbl_val_max;
+	static lv_obj_t *lbl_pointer;
+	static lv_obj_t *lbl_result;
+
+	static lv_style_t style_box;
+
+	// Only execute once
+	if (!do_once) {
+		// Default values
+		user_idx = 0;
+		min_val = 1;
+		max_val = 100;
+
+		// Instruction label
+		lbl_ins = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_ins, "Press select to generate!", user_secondary_color,
+						 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
+
+		// Headings
+		lbl_min = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_min, "Min\n", user_secondary_color,
+						 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, NUM_GEN_X_POS - NUM_GEN_X_OFFSET, NUM_GEN_Y_POS);
+
+		lbl_max = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_max, "Max\n", user_secondary_color,
+						 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, NUM_GEN_X_POS, NUM_GEN_Y_POS);
+
+		// Values
+		char buf[NUM_GEN_BUF_SIZE];
+		snprintf(buf, sizeof(buf), "%d", min_val);
+		lbl_val_min = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_val_min, buf, user_secondary_color,
+				&lv_font_montserrat_24, LV_ALIGN_TOP_MID, NUM_GEN_X_POS - NUM_GEN_X_OFFSET, NUM_GEN_Y_POS + 25);
+
+		snprintf(buf, sizeof(buf), "%d", max_val);
+		lbl_val_max = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_val_max, buf, user_secondary_color,
+				&lv_font_montserrat_24, LV_ALIGN_TOP_MID, NUM_GEN_X_POS, NUM_GEN_Y_POS + 25);
+
+		// Pointer
+		lbl_pointer = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_pointer, LV_SYMBOL_EJECT, user_secondary_color,
+				&lv_font_montserrat_18, LV_ALIGN_TOP_MID, NUM_GEN_X_POS - NUM_GEN_X_OFFSET, NUM_GEN_Y_POS + 58);
+
+		// Result
+		lbl_result = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_result, "", user_secondary_color,
+				&lv_font_montserrat_22, LV_ALIGN_BOTTOM_MID, 0, -14);
+
+		// Box style for headings
+		lv_style_reset(&style_box);
+		lv_style_init(&style_box);
+		lv_style_set_radius(&style_box, 8);
+		lv_style_set_bg_color(&style_box, user_primary_color);
+		lv_style_set_border_width(&style_box, 2);
+		lv_style_set_border_color(&style_box, user_secondary_color);
+		lv_style_set_border_side(&style_box, LV_BORDER_SIDE_FULL);
+		lv_style_set_text_color(&style_box, user_secondary_color);
+		lv_style_set_pad_left(&style_box, 25);
+		lv_style_set_pad_right(&style_box, 25);
+		lv_style_set_pad_top(&style_box, 4);
+		lv_style_set_pad_bottom(&style_box, 4);
+
+		lv_obj_add_style(lbl_min, &style_box, 0);
+		lv_obj_add_style(lbl_max, &style_box, 0);
+
+		do_once = true;
+	}
+
+	// Generate number
+	if (ui_btns->select_btn == 1) {
+		// Ensure min <= max (swap if needed)
+		if (max_val < min_val) {
+			int16_t tmp = min_val;
+			min_val = max_val;
+			max_val = tmp;
+
+			char buf_a[NUM_GEN_BUF_SIZE], buf_b[NUM_GEN_BUF_SIZE];
+			snprintf(buf_a, sizeof(buf_a), "%d", min_val);
+			snprintf(buf_b, sizeof(buf_b), "%d", max_val);
+			lv_label_set_text(lbl_val_min, buf_a);
+			lv_label_set_text(lbl_val_max, buf_b);
+		}
+
+		uint32_t range = (uint32_t)(max_val - min_val + 1);
+		uint32_t r = esp_random() % range;
+		int32_t result = (int32_t)min_val + (int32_t)r;
+
+		char out[NUM_GEN_BUF_SIZE + 2];
+		snprintf(out, sizeof(out), "= %ld", (long)result);
+		lv_label_set_text(lbl_result, out);
+		lv_obj_align(lbl_result, LV_ALIGN_BOTTOM_MID, 0, -14);
+	}
+	// Move right (toggle Min/Max)
+	else if (ui_btns->right_btn == 1) {
+		// Point to max
+		if (user_idx == 0) {
+			lv_obj_set_x(lbl_pointer, NUM_GEN_X_POS);
+			user_idx = 1;
+		}
+		// Back to min
+		else {
+			lv_obj_set_x(lbl_pointer, NUM_GEN_X_POS - NUM_GEN_X_OFFSET);
+			user_idx = 0;
+		}
+	}
+	// Move left inside page (only if currently on Max)
+	else if (ui_btns->left_btn == 1 && user_idx != 0) {
+		lv_obj_set_x(lbl_pointer, NUM_GEN_X_POS - NUM_GEN_X_OFFSET);
+		user_idx = 0;
+	}
+	// Increment value
+	else if (ui_btns->up_btn == 1) {
+		if (user_idx == 0) {
+			min_val++;
+			char buf[NUM_GEN_BUF_SIZE];
+			snprintf(buf, sizeof(buf), "%d", min_val);
+			lv_label_set_text(lbl_val_min, buf);
+		}
+		else {
+			max_val++;
+			char buf[NUM_GEN_BUF_SIZE];
+			snprintf(buf, sizeof(buf), "%d", max_val);
+			lv_label_set_text(lbl_val_max, buf);
+		}
+	}
+	// Decrement value
+	else if (ui_btns->down_btn == 1) {
+		if (user_idx == 0) {
+			min_val--;	
+			char buf[NUM_GEN_BUF_SIZE];
+			snprintf(buf, sizeof(buf), "%d", min_val);
+			lv_label_set_text(lbl_val_min, buf);
+		}
+		else {
+			max_val--;
+			char buf[NUM_GEN_BUF_SIZE];
+			snprintf(buf, sizeof(buf), "%d", max_val);
+			lv_label_set_text(lbl_val_max, buf);
+		}
+	}
+	// Back selected and pointer is on min
+	else if (ui_btns->left_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_min);
+		lv_obj_delete(lbl_max);
+		lv_obj_delete(lbl_val_min);
+		lv_obj_delete(lbl_val_max);
+		lv_obj_delete(lbl_pointer);
+		lv_obj_delete(lbl_result);
+
+		// Remove styles
+		lv_obj_remove_style_all(lbl_min);
+		lv_obj_remove_style_all(lbl_max);
+
+		// Reset statics
+		do_once = false;
+		lbl_ins = lbl_min = lbl_max = lbl_val_min = lbl_val_max = lbl_pointer = lbl_result = NULL;
+
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+		// Show tools list and go back
+		lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		ui_menu->page = TOOLS_PAGE;
+	}
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_min);
+		lv_obj_delete(lbl_max);
+		lv_obj_delete(lbl_val_min);
+		lv_obj_delete(lbl_val_max);
+		lv_obj_delete(lbl_pointer);
+		lv_obj_delete(lbl_result);
+
+		// Remove styles
+		lv_obj_remove_style_all(lbl_min);
+		lv_obj_remove_style_all(lbl_max);
+
+		// Reset statics
+		do_once = false;
+		lbl_ins = lbl_min = lbl_max = lbl_val_min = lbl_val_max = lbl_pointer = lbl_result = NULL;
+
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+	}
+}
+
 

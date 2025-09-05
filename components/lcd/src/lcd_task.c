@@ -233,8 +233,8 @@ static void lcd_task(void *pvParameters)
 				lcd_clear_pending_inputs = false;
 			}
 			
+			// Base pages
 			if (ui_menu.page == HOME_PAGE) {
-				// Show cool two frame animation and allow user to change animation scrolling up/down				
 				lcd_home_page(&ui_btns, &ui_menu, &settings_menu);
 			} 
 			else if (ui_menu.page == UNLOCK_PAGE) {
@@ -249,7 +249,7 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == SELECTION_PAGE) {
 				lcd_selection_page(&ui_btns, &ui_menu, &ir_menu, &lora_menu, &espnow_menu, &wifi_menu, &tools_menu, &settings_menu, &bluetooth_menu);
 			}
-			// IR remotes page
+			// Infrared pages
 			else if (ui_menu.page == INFRARED_PAGE) {
 				lcd_infrared_page(&ui_btns, &ui_menu, &ir_menu);
 			}
@@ -259,7 +259,7 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == INFRARED_REMOTE_EDIT_PAGE) {
 				lcd_ir_edit_remotes(&ui_btns, &ui_menu, &ir_menu);
 			}
-			// LoRa page (PolyPlugs)
+			// LoRa pages (PolyPlugs)
 			else if (ui_menu.page == LORA_PAGE) {
 				lcd_lora_page(&ui_btns, &ui_menu, &lora_menu);
 			}
@@ -287,7 +287,7 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == LORA_PLAN_TIMES_SUBPAGE) {
 				lcd_lora_plan_times_subpage(&ui_btns, &ui_menu, &lora_menu, &lora_plan_menu);
 			}
-			// ESP-NOW page
+			// ESP-NOW pages
 			else if (ui_menu.page == ESPNOW_PAGE) {
 				lcd_espnow_page(&ui_btns, &ui_menu, &espnow_menu);
 			}
@@ -300,7 +300,7 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == ESPNOW_OPTION_PAGE) {
 				lcd_espnow_option(&ui_btns, &ui_menu, &espnow_menu);
 			}
-			// Wi-Fi page
+			// Wi-Fi pages
 			else if (ui_menu.page == WIFI_PAGE) {
 				lcd_wifi_page(&ui_btns, &ui_menu, &wifi_menu);
 			}
@@ -331,7 +331,7 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == WIFI_OTA_UPDATING_PAGE) {
 				lcd_wifi_ota_updating_page(&ui_btns, &ui_menu, &wifi_menu);
 			}
-			// Tools page
+			// Tools pages
 			else if (ui_menu.page == TOOLS_PAGE) {
 				lcd_tools_page(&ui_btns, &ui_menu, &tools_menu);
 			}
@@ -344,7 +344,10 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == TOOLS_DICE_PAGE) {
 				lcd_tools_dice_page(&ui_btns, &ui_menu, &tools_menu);
 			}
-			// Settings page
+			else if (ui_menu.page == TOOLS_NUM_GEN_PAGE) {
+				lcd_tools_num_gen_page(&ui_btns, &ui_menu, &tools_menu);
+			}
+			// Settings pages
 			else if (ui_menu.page == SETTINGS_PAGE) {
 				lcd_settings_page(&ui_btns, &ui_menu, &settings_menu);
 			}
@@ -372,7 +375,7 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == SETTINGS_FACTORY_RST_PAGE) {
 				lcd_settings_factory_rst_page(&ui_btns, &ui_menu, &settings_menu);
 			}
-			// Bluetooth page
+			// Bluetooth pages
 			else if (ui_menu.page == BLUETOOTH_PAGE) {
 				lcd_bluetooth_page(&ui_btns, &ui_menu, &bluetooth_menu);
 			}

@@ -249,13 +249,13 @@ static void st7789_flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_
 	while (remaining > 0) {
 		int16_t chunk = remaining > FLUSH_CHUNK ? FLUSH_CHUNK : remaining;
 
-		// 1) Window: columns = [x1..x2], rows = [y..y+chunk−1]
+		// Window: columns = [x1..x2], rows = [y..y + chunk − 1]
 		spi_master_write_command(&tft, 0x2A);
 		spi_master_write_addr(&tft, x1 + tft._offsetx, x2 + tft._offsetx);
 		spi_master_write_command(&tft, 0x2B);
 		spi_master_write_addr(&tft, y + tft._offsety, (y + chunk - 1) + tft._offsety);
 
-		// 2) Push chunk-worth of pixels
+		// Push chunk-worth of pixels
 		spi_master_write_command(&tft, 0x2C);
 		spi_master_write_colors(&tft, color_ptr, (uint32_t)width * chunk);
 
@@ -265,7 +265,7 @@ static void st7789_flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_
 		remaining -= chunk;
 	}
 
-	// 3) Tell LVGL we’re done
+	// Tell LVGL we’re done
 	lv_disp_flush_ready(d);
 	
 	xSemaphoreGive(xSPIBusMutex); // Release SPI bus
@@ -276,9 +276,9 @@ static void lcd_panel_sleep(void)
 	xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
 	
 	// Display off, sleep in
-	spi_master_write_command(&tft,0x28); // DISPOFF
+	spi_master_write_command(&tft, 0x28); // DISPOFF
 	vTaskDelay(pdMS_TO_TICKS(10));
-	spi_master_write_command(&tft,0x10); // SLPIN
+	spi_master_write_command(&tft, 0x10); // SLPIN
 	
 	xSemaphoreGive(xSPIBusMutex); // Release SPI bus
 }
@@ -298,7 +298,7 @@ static void lcd_panel_wake(void)
 	spi_master_write_command(&tft, 0x36); // MADCTL
 	spi_master_write_data_byte(&tft, 0x60); // MY=1, MV=1: 0xA0 for 270deg, 0xC0 for 180deg, 0x60 for 90deg
 	
-	spi_master_write_command(&tft, 0x21); // INVON  ()
+	spi_master_write_command(&tft, 0x21); // INVON
 	
 	spi_master_write_command(&tft,0x29); // DISPON
 		
@@ -2307,6 +2307,20 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
 		
 		// Switch pages
 		ui_menu->page = TOOLS_DICE_PAGE;
+	}
+	// Random number generator selected
+	else if (ui_btns->select_btn == 1 && tools_menu->index == 2) {
+		// Hide tools menu
+		lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = TOOLS_NUM_GEN_PAGE;
 	}
 	// Read the docs selected
 	else if (ui_btns->select_btn == 1 && tools_menu->index == 3) {

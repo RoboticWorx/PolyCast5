@@ -32,11 +32,6 @@ You can find some relevant links below:
 
 _PolyCast5 also comes with cool, customizable homescreen animations and hotkeys!_
 
-## Application
-PolyCast5 was developed on [ESP-IDF](https://github.com/espressif/esp-idf) with the [ESP32-C5](https://www.espressif.com/en/products/socs/esp32-c5) for its high-performance and dual-band wireless capabilities.
-
-Please check [ESP-IDF docs](https://docs.espressif.com/projects/esp-idf/en/v5.5.1/esp32c5/get-started/index.html) for getting started instructions if you'd like to develop and have any difficulties.
-
 ## Project Structure
 * `main` - Initialization code. The program runs from here.
 * `assets` - Media image files stored as `.bin` for SPIFFS access.
