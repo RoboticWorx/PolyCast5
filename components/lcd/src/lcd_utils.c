@@ -1,5 +1,3 @@
-#include "esp_err.h"
-#include "lcd_bluetooth_funcs.h"
 #include "polycast5_macros.h"
 
 #include <stdlib.h>
@@ -16,6 +14,7 @@
 #include "esp_timer.h"
 #include "esp_log.h"
 #include "esp_spiffs.h"
+#include "esp_err.h"
 
 #include "st7789.h"
 #include "tca9535.h"
@@ -29,6 +28,7 @@
 #include "misc/lv_timer.h"
 
 #include "lcd_asset_macros.h"
+#include "lcd_bluetooth_funcs.h"
 #include "lcd_utils.h"
 #include "wifi_funcs.h"
 #include "wifi_task.h"
