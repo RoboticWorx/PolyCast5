@@ -332,11 +332,6 @@ static void gpio_task(void *arg)
 			was_charging = is_charging;
 		}
 		
-		// Reset hotkey
-		if (gpio_read_input(USER_BUTTON_HOME) == 0 && gpio_read_input(USER_BUTTON_RIGHT) == 0) {
-			esp_restart();
-		}
-		
 		// RGB LED handling
 		if (xQueueReceive(xLEDQueue, &rgb_data, 0) == pdTRUE) {
 			gpio_rgb_indicate(rgb_data);
