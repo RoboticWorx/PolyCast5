@@ -39,10 +39,19 @@
 #define TX_TXT "Transmit: "
 #define RX_TXT "Received: "
 
+#define ESPNOW_NUM_CHAR_ROWS 4
+
 static const char *TAG = "LCD_ESPNOW_FUNCS";
 
 static bool espnow_menu_overwrite = false;
 static char name_buf[MAX_CUSTOM_NAME_LEN + 1] = {0};
+
+static const char *espnow_char_rows[ESPNOW_NUM_CHAR_ROWS] = {
+	"_ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+	"abcdefghijklmnopqrstuvwxyz",
+	"0123456789",
+	"!@#$%^&*()-_=+[]{};:'\",.<>/?\\|`~"
+};
 
 espnow_menu_t espnow_menu = {
 	.options = {"Add ESP32"},
@@ -235,10 +244,10 @@ static bool display_mac_and_lmk(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 			
-			lv_obj_del(lbl_ins);
-			lv_obj_del(lbl_my_mac);
-			lv_obj_del(lbl_lmk);
-			lv_obj_del(lbl_ok);
+			lv_obj_delete(lbl_ins);
+			lv_obj_delete(lbl_my_mac);
+			lv_obj_delete(lbl_lmk);
+			lv_obj_delete(lbl_ok);
 			
 			lcd_clear_pending_inputs = true; // Clear any false inputs
 			
@@ -277,9 +286,9 @@ static bool prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 		if (xSemaphoreTake(xLeftButtonSemaphore, 0) == pdTRUE) {
 			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 			
-			lv_obj_del(lbl_ask_enc);
-			lv_obj_del(lbl_enc_yes);
-			lv_obj_del(lbl_enc_no);
+			lv_obj_delete(lbl_ask_enc);
+			lv_obj_delete(lbl_enc_yes);
+			lv_obj_delete(lbl_enc_no);
 			
 			// Hide right arrow
 			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -299,9 +308,9 @@ static bool prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 		else if (xSemaphoreTake(xUpButtonSemaphore, 0) == pdTRUE) {
 			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 			
-			lv_obj_del(lbl_ask_enc);
-			lv_obj_del(lbl_enc_yes);
-			lv_obj_del(lbl_enc_no);
+			lv_obj_delete(lbl_ask_enc);
+			lv_obj_delete(lbl_enc_yes);
+			lv_obj_delete(lbl_enc_no);
 			
 			// Go back
 			return true;
@@ -310,9 +319,9 @@ static bool prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 		else if (xSemaphoreTake(xDownButtonSemaphore, 0) == pdTRUE) {
 			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 			
-			lv_obj_del(lbl_ask_enc);
-			lv_obj_del(lbl_enc_yes);
-			lv_obj_del(lbl_enc_no);
+			lv_obj_delete(lbl_ask_enc);
+			lv_obj_delete(lbl_enc_yes);
+			lv_obj_delete(lbl_enc_no);
 			
 			lcd_clear_pending_inputs = true; // Clear any false inputs
 						
@@ -457,13 +466,13 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 	else if (ui_btns->left_btn) {
 		// Clean all
 		for (int i = 0; i < 12; i++) {
-			lv_obj_del(lbl_sel_digit[i]);
+			lv_obj_delete(lbl_sel_digit[i]);
 			lbl_sel_digit[i] = NULL;
 		}
 
-		lv_obj_del(lbl_enter_mac);
-		lv_obj_del(lbl_how_to);
-		lv_obj_del(container);
+		lv_obj_delete(lbl_enter_mac);
+		lv_obj_delete(lbl_how_to);
+		lv_obj_delete(container);
 
 		lbl_enter_mac = NULL;
 		lbl_how_to = NULL;
@@ -485,13 +494,13 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Clean all
 		for (int i = 0; i < 12; i++) {
-			lv_obj_del(lbl_sel_digit[i]);
+			lv_obj_delete(lbl_sel_digit[i]);
 			lbl_sel_digit[i] = NULL;
 		}
 
-		lv_obj_del(lbl_enter_mac);
-		lv_obj_del(lbl_how_to);
-		lv_obj_del(container);
+		lv_obj_delete(lbl_enter_mac);
+		lv_obj_delete(lbl_how_to);
+		lv_obj_delete(container);
 
 		lbl_enter_mac = NULL;
 		lbl_how_to = NULL;
@@ -522,13 +531,13 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 		
 		// Clean all
 		for (int i = 0; i < 12; i++) {
-			lv_obj_del(lbl_sel_digit[i]);
+			lv_obj_delete(lbl_sel_digit[i]);
 			lbl_sel_digit[i] = NULL;
 		}
 
-		lv_obj_del(lbl_enter_mac);
-		lv_obj_del(lbl_how_to);
-		lv_obj_del(container);
+		lv_obj_delete(lbl_enter_mac);
+		lv_obj_delete(lbl_how_to);
+		lv_obj_delete(container);
 
 		lbl_enter_mac = NULL;
 		lbl_how_to = NULL;
@@ -580,9 +589,9 @@ static void prompt_upload_qr(ui_menu_t *ui_menu, bool encrypting)
 			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 			
 			// Delete used
-			lv_obj_del(lbl_ask_enc);
-			lv_obj_del(lbl_qr_ok);
-			lv_obj_del(qr_code);
+			lv_obj_delete(lbl_ask_enc);
+			lv_obj_delete(lbl_qr_ok);
+			lv_obj_delete(qr_code);
 			
 			lcd_clear_pending_inputs = true; // Clear any false inputs
 			
@@ -625,6 +634,8 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 	
 	// Declare statics
 	static int cur_pos = 0; // User position
+    static int row_idx = 0; // Which character row is active
+    static int char_idx = 0; // Index within that row
 	static char cur_char = '_';
 	static lv_obj_t *lbl_dirs = NULL;
 	static lv_obj_t *lbl_chars = NULL;
@@ -640,26 +651,28 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 
 			// Place cursor at the end
 			cur_pos = strlen(name_buf);
-			
-			// Start with '_'
-			cur_char = '_';
 		}
 		else { // Else blank slate
 			memset(name_buf, 0, sizeof name_buf);
 			cur_pos = 0;
-			cur_char = '_';
 		}
+		
+		// Starting char
+		row_idx = 0;
+		char_idx = 0;
+		cur_char = espnow_char_rows[row_idx][char_idx];
 		
 		lbl_user_in = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_user_in, "", user_secondary_color,
 						 &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
 						 
 		lbl_dirs = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_dirs, "Enter ESP32 name\nwith arrow buttons:", user_secondary_color,
-						 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, -30);
+		lcd_format_label(lbl_dirs, "       Enter ESP32 name:\nPress HOME to cycle chars.", user_secondary_color,
+						 &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -31);
 						 
-		if (espnow_menu_overwrite)
-			lv_label_set_text(lbl_dirs, "Enter new ESP32 name\n   with arrow buttons:");
+		if (espnow_menu_overwrite) {
+			lv_label_set_text(lbl_dirs, "  Enter new ESP32 name:\nPress HOME to cycle chars.");
+		}
 		
 		lbl_chars = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_chars, "(Up to 12 characters)", user_secondary_color,
@@ -668,20 +681,24 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
 	}
 
-	// Take user input
+	/* User input */
+	// Cycle chars
+	if (ui_btns->home_btn) {
+		// Cycle character row
+		row_idx = (row_idx + 1) % ESPNOW_NUM_CHAR_ROWS;
+		char_idx = 0; // Reset within row
+		
+		// New current char
+		cur_char = espnow_char_rows[row_idx][char_idx];
+		
+		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+	}
 	// If up, iterate up
-	if (ui_btns->up_btn) {
-		// Wrap
-		if (cur_char == '_') {
-			cur_char = 'A';
-		}
-		else if (cur_char == 'Z') {
-			cur_char = '_';
-		}
-		// Else iterate 1 char
-		else {
-			cur_char = (char)(cur_char + 1);
-		}
+	else if (ui_btns->up_btn) {
+		// Increment with wrap
+		size_t row_len = strlen(espnow_char_rows[row_idx]);
+		char_idx = (char_idx + 1) % (int)row_len;
+		cur_char = espnow_char_rows[row_idx][char_idx];
 		
 		// Save to array
 		name_buf[cur_pos] = cur_char;
@@ -690,17 +707,10 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 	}
 	// If down, iterate down
 	else if (ui_btns->down_btn) {
-		// Wrap
-		if (cur_char == '_') {
-			cur_char = 'Z';
-		}
-		else if (cur_char == 'A') {
-			cur_char = '_';
-		}
-		// Else iterate down 1 char
-		else {
-			cur_char = (char)(cur_char - 1);
-		}
+		// Decrement with wrap
+		size_t row_len = strlen(espnow_char_rows[row_idx]);
+		char_idx = (char_idx + (int)row_len - 1) % (int)row_len;
+		cur_char = espnow_char_rows[row_idx][char_idx];
 		
 		// Save to array
 		name_buf[cur_pos] = cur_char;
@@ -715,15 +725,18 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 		lv_obj_delete(lbl_chars);
 		
 		// Reset statics for next time
-		lbl_user_in = NULL;
-		lbl_dirs = NULL;
-		cur_pos = 0;
+		lbl_user_in = lbl_chars = lbl_dirs = NULL;
+		cur_pos = row_idx = char_idx = 0;
 		cur_char = '_';
 		memset(name_buf, 0, sizeof name_buf);
 		
-		espnow_menu_overwrite = false;
+		// Only clear the staged slot if we were adding a new peer
+		if (!espnow_menu_overwrite) {
+			memset(espnow_menu->lmk[espnow_menu->size], 0, LMK_LEN); // Zero out enc entry
+			memset(espnow_menu->rx_mac[espnow_menu->size], 0, LMK_LEN);
+		}
 		
-		memset(espnow_menu->lmk[espnow_menu->size], 0, LMK_LEN); // Zero out enc entry
+		espnow_menu_overwrite = false;
 		
 		// Show ESP-NOW list
 		lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -732,38 +745,51 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
  		ui_menu->page = ESPNOW_PAGE;
 		return;
 	}
- 	// Go home or power off
-	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+ 	// Power off
+	else if (ui_btns->pwr_btn == 1) {
 		// Delete labels since no longer used
 		lv_obj_delete(lbl_user_in);
 		lv_obj_delete(lbl_dirs);
 		lv_obj_delete(lbl_chars);
 		
 		// Reset statics for next time
-		lbl_user_in = NULL;
-		lbl_dirs = NULL;
-		cur_pos = 0;
+		lbl_user_in = lbl_chars = lbl_dirs = NULL;
+		cur_pos = row_idx = char_idx = 0;
 		cur_char = '_';
 		memset(name_buf, 0, sizeof name_buf);
 		
+		// Only clear the staged slot if we were adding a new peer
+		if (!espnow_menu_overwrite) {
+			memset(espnow_menu->lmk[espnow_menu->size], 0, LMK_LEN);
+			memset(espnow_menu->rx_mac[espnow_menu->size], 0, LMK_LEN);
+		}
+		
 		espnow_menu_overwrite = false;
 		
-		memset(espnow_menu->lmk[espnow_menu->size], 0, LMK_LEN); // Zero out enc entry
-		
-		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
 	}
 	// If left and not at start
 	else if (ui_btns->left_btn && cur_pos != 0) {
 		// Clear the current slot
 		name_buf[cur_pos] = '\0';
 	
-		// De-increment left
+		// Decrement left
 		if (cur_pos > 0) {
 			cur_pos--;
 		}
 	
-		// Reload cur_char from the new slot
-		cur_char = name_buf[cur_pos] ? name_buf[cur_pos] : '_';
+		// Reload row/idx from the new slot's char
+		char target = name_buf[cur_pos] ? name_buf[cur_pos] : '_';
+		for (row_idx = 0; row_idx < ESPNOW_NUM_CHAR_ROWS; row_idx++) {
+			const char *row = espnow_char_rows[row_idx];
+			const char *p = strchr(row, target);
+			
+			if (p) {
+				char_idx = (int)(p - row);
+				break;
+			}
+		}
+		cur_char = espnow_char_rows[row_idx][char_idx];
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
 	}
@@ -775,7 +801,12 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 		// If not yet at end
 		if (cur_pos < MAX_CUSTOM_NAME_LEN - 1) {
 			cur_pos++;
-			cur_char = '_';
+			name_buf[cur_pos] = '\0';
+			char_idx = 0;
+			cur_char = espnow_char_rows[row_idx][char_idx];
+		}
+		else {
+			name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
 		}
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
@@ -783,8 +814,17 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 	// If save button pressed
 	else if (ui_btns->select_btn) {
 		// Save final
+        if (cur_pos < MAX_CUSTOM_NAME_LEN) {
+			name_buf[cur_pos] = cur_char;
+
+			// Terminate one past the last written char if room, else clamp
+			size_t term = (cur_pos + 1 <= MAX_CUSTOM_NAME_LEN) ? (cur_pos + 1) : MAX_CUSTOM_NAME_LEN;
+			name_buf[term] = '\0';
+	    }
+        
 		name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
 		memcpy(saved_name, name_buf, MAX_CUSTOM_NAME_LEN + 1);
+		
 		#ifdef POLYCAST5_DEBUG
 			ESP_LOGI(TAG, "%s", saved_name);
 		#endif
@@ -795,9 +835,8 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 		lv_obj_delete(lbl_chars);
 		
 		// Reset statics for next time
-		lbl_user_in = NULL;
-		lbl_dirs = NULL;
-		cur_pos = 0;
+		lbl_user_in = lbl_chars = lbl_dirs = NULL;
+		cur_pos = row_idx = char_idx = 0;
 		cur_char = '_';
 		memset(name_buf, 0, sizeof name_buf);
 
@@ -988,10 +1027,10 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 		if (xSemaphoreTake(xLeftButtonSemaphore, 0) == pdTRUE) {
 			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 			
-			lv_obj_del(lbl_exit);
-			lv_obj_del(lbl_name);
-			lv_obj_del(lbl_del);
-			lv_obj_del(lbl_ins);
+			lv_obj_delete(lbl_exit);
+			lv_obj_delete(lbl_name);
+			lv_obj_delete(lbl_del);
+			lv_obj_delete(lbl_ins);
 			
 			// Show ESP-NOW submenu
 			lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send_tx, LV_OBJ_FLAG_HIDDEN);
@@ -1019,10 +1058,10 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 		else if (xSemaphoreTake(xUpButtonSemaphore, 0) == pdTRUE) {
 			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 			
-			lv_obj_del(lbl_exit);
-			lv_obj_del(lbl_name);
-			lv_obj_del(lbl_del);
-			lv_obj_del(lbl_ins);
+			lv_obj_delete(lbl_exit);
+			lv_obj_delete(lbl_name);
+			lv_obj_delete(lbl_del);
+			lv_obj_delete(lbl_ins);
 			
 			lcd_clear_pending_inputs = true; // Clear any false inputs
 			
@@ -1038,10 +1077,10 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 		else if (xSemaphoreTake(xDownButtonSemaphore, 0) == pdTRUE) {
 			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 			
-			lv_obj_del(lbl_exit);
-			lv_obj_del(lbl_name);
-			lv_obj_del(lbl_del);
-			lv_obj_del(lbl_ins);
+			lv_obj_delete(lbl_exit);
+			lv_obj_delete(lbl_name);
+			lv_obj_delete(lbl_del);
+			lv_obj_delete(lbl_ins);
 			
 			lcd_clear_pending_inputs = true; // Clear any false inputs
 			
@@ -1059,7 +1098,7 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 			
 			// Free any heap buffers allocated for that slot
 			free(espnow_menu->options[del_idx]); // Name string
-			lv_obj_del(espnow_menu->btns[del_idx]); // LVGL list button
+			lv_obj_delete(espnow_menu->btns[del_idx]); // LVGL list button
 		
 			// Shift everything above it down one
 			for (int i = del_idx; i < espnow_menu->size - 1; i++) {

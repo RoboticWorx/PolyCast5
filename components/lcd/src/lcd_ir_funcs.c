@@ -37,10 +37,10 @@ static int edit_idx = 0;
 static bool new_remote = false;
 
 static const char *ir_char_rows[IR_NUM_CHAR_ROWS] = {
-    "_ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-    "abcdefghijklmnopqrstuvwxyz",
-    "0123456789",
-    "!@#$%^&*()-_=+[]{};:'\",<>/?\\|`~"
+	"_ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+	"abcdefghijklmnopqrstuvwxyz",
+	"0123456789",
+	"!@#$%^&*()-_=+[]{};:'\",<>/?\\|`~"
 };
 
 void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_menu)
