@@ -56,6 +56,7 @@ static const char *INDEX_HTML =
 "<br>&lt;shift&gt; - Shift"
 "<br>&lt;alt&gt; - Alt/Option"
 "<br>&lt;win&gt; - Windows/Cmd"
+"<br>&lt;space&gt; - Space"
 "<br>&lt;bs&gt; - Backspace"
 "<br>&lt;del&gt; - Forward delete"
 "<br>&lt;up&gt; - Up arrow"
