@@ -26,7 +26,7 @@ typedef struct {
 
 typedef struct {
     char *options[MAX_LORA_OPTIONS];
-    uint8_t *keys[16];
+    uint8_t *keys[MAX_LORA_OPTIONS];
     lv_obj_t *btns[MAX_LORA_OPTIONS];
     int size;
     int index;

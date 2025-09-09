@@ -37,6 +37,8 @@
 
 #define LORA_PLAN_SEL_INS "Select day(s)"
 
+#define LORA_NUM_CHAR_ROWS 4
+
 lora_menu_t lora_menu = {
 	.options = {"Add PolyPlug"},
 	.keys = {},
@@ -64,6 +66,13 @@ static char plan_selected_days[8]; // Up to 7 days + NULL
 
 static char name_buf[MAX_CUSTOM_NAME_LEN + 1] = {0};
 static bool lora_menu_overwrite = false;
+
+static const char *lora_char_rows[LORA_NUM_CHAR_ROWS] = {
+	"_ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+	"abcdefghijklmnopqrstuvwxyz",
+	"0123456789",
+	"!@#$%^&*()-_=+[]{};:'\",.<>/?\\|`~"
+};
 
 
 void lcd_lora_setup_page(lora_menu_t *menu)
@@ -437,6 +446,8 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 	// Declare statics
 	static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
 	static int cur_pos = 0; // User position
+	static int row_idx = 0; // Which character row is active
+    static int char_idx = 0; // Index within that row
 	static char cur_char = '_';
 	static lv_obj_t *lbl_dirs = NULL;
 	static lv_obj_t *lbl_chars = NULL;
@@ -452,26 +463,28 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 
 			// Place cursor at the end
 			cur_pos = strlen(name_buf);
-			
-			// Start with '_'
-			cur_char = '_';
 		}
 		else { // Else blank slate
 			memset(name_buf, 0, sizeof name_buf);
 			cur_pos = 0;
-			cur_char = '_';
 		}
+		
+		// Starting char
+		row_idx = 0;
+		char_idx = 0;
+		cur_char = lora_char_rows[row_idx][char_idx];
 		
 		lbl_user_in = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_user_in, "", user_secondary_color,
 						 &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
 						 
 		lbl_dirs = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_dirs, "  Enter plug name\nwith arrow buttons:", user_secondary_color,
-						 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, -30);
+		lcd_format_label(lbl_dirs, "        Enter plug name:\nPress HOME to cycle chars.", user_secondary_color,
+						 &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -31);
 						 
-		if (lora_menu_overwrite)
-			lv_label_set_text(lbl_dirs, "Enter new plug name\n with arrow buttons:");
+		if (lora_menu_overwrite) {
+			lv_label_set_text(lbl_dirs, "    Enter new plug name:\nPress HOME to cycle chars.");
+		}
 		
 		lbl_chars = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_chars, "(Up to 12 characters)", user_secondary_color,
@@ -480,20 +493,24 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
 	}
 
-	// Take user input
+	/* User input */
+	// Cycle chars
+	if (ui_btns->home_btn) {
+		// Cycle character row
+		row_idx = (row_idx + 1) % LORA_NUM_CHAR_ROWS;
+		char_idx = 0; // Reset within row
+		
+		// New current char
+		cur_char = lora_char_rows[row_idx][char_idx];
+		
+		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+	}
 	// If up, iterate up
-	if (ui_btns->up_btn) {
-		// Wrap
-		if (cur_char == '_') {
-			cur_char = 'A';
-		}
-		else if (cur_char == 'Z') {
-			cur_char = '_';
-		}
-		// Else iterate 1 char
-		else {
-			cur_char = (char)(cur_char + 1);
-		}
+	else if (ui_btns->up_btn) {
+		// Increment with wrap
+		size_t row_len = strlen(lora_char_rows[row_idx]);
+		char_idx = (char_idx + 1) % (int)row_len;
+		cur_char = lora_char_rows[row_idx][char_idx];
 		
 		// Save to array
 		name_buf[cur_pos] = cur_char;
@@ -502,17 +519,10 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 	}
 	// If down, iterate down
 	else if (ui_btns->down_btn) {
-		// Wrap
-		if (cur_char == '_') {
-			cur_char = 'Z';
-		}
-		else if (cur_char == 'A') {
-			cur_char = '_';
-		}
-		// Else iterate down 1 char
-		else {
-			cur_char = (char)(cur_char - 1);
-		}
+		// Decrement with wrap
+		size_t row_len = strlen(lora_char_rows[row_idx]);
+		char_idx = (char_idx + (int)row_len - 1) % (int)row_len;
+		cur_char = lora_char_rows[row_idx][char_idx];
 		
 		// Save to array
 		name_buf[cur_pos] = cur_char;
@@ -527,9 +537,8 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		lv_obj_delete(lbl_chars);
 		
 		// Reset statics for next time
-		lbl_user_in = NULL;
-		lbl_dirs = NULL;
-		cur_pos = 0;
+		lbl_user_in = lbl_chars = lbl_dirs = NULL;
+		cur_pos = row_idx = char_idx = 0;
 		cur_char = '_';
 		memset(name_buf, 0, sizeof name_buf);
 		
@@ -543,16 +552,15 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		return;
 	}
 	// Go home or power off if ranaming
-	else if ((ui_btns->home_btn || ui_btns->pwr_btn) && lora_menu_overwrite) {
+	else if (ui_btns->pwr_btn && lora_menu_overwrite) {
 		// Delete labels since no longer used
 		lv_obj_delete(lbl_user_in);
 		lv_obj_delete(lbl_dirs);
 		lv_obj_delete(lbl_chars);
 		
 		// Reset statics for next time
-		lbl_user_in = NULL;
-		lbl_dirs = NULL;
-		cur_pos = 0;
+		lbl_user_in = lbl_chars = lbl_dirs = NULL;
+		cur_pos = row_idx = char_idx = 0;
 		cur_char = '_';
 		memset(name_buf, 0, sizeof name_buf);
 		
@@ -565,7 +573,7 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		// Hide
 		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 		
- 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+ 		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
 	}
 	// If left and not at start
 	else if (ui_btns->left_btn && cur_pos != 0) {
@@ -577,8 +585,18 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 			cur_pos--;
 		}
 	
-		// Reload cur_char from the new slot
-		cur_char = name_buf[cur_pos] ? name_buf[cur_pos] : '_';
+		// Reload row/idx from the new slot's char
+		char target = name_buf[cur_pos] ? name_buf[cur_pos] : '_';
+		for (row_idx = 0; row_idx < LORA_NUM_CHAR_ROWS; row_idx++) {
+			const char *row = lora_char_rows[row_idx];
+			const char *p = strchr(row, target);
+			
+			if (p) {
+				char_idx = (int)(p - row);
+				break;
+			}
+		}
+		cur_char = lora_char_rows[row_idx][char_idx];
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
 	}
@@ -590,7 +608,12 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		// If not yet at end
 		if (cur_pos < MAX_CUSTOM_NAME_LEN - 1) {
 			cur_pos++;
-			cur_char = '_';
+			name_buf[cur_pos] = '\0';
+			char_idx = 0;
+			cur_char = lora_char_rows[row_idx][char_idx];
+		}
+		else {
+			name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
 		}
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
@@ -598,8 +621,17 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 	// If save button pressed
 	else if (ui_btns->select_btn) {
 		// Save final
+        if (cur_pos < MAX_CUSTOM_NAME_LEN) {
+			name_buf[cur_pos] = cur_char;
+
+			// Terminate one past the last written char if room, else clamp
+			size_t term = (cur_pos + 1 <= MAX_CUSTOM_NAME_LEN) ? (cur_pos + 1) : MAX_CUSTOM_NAME_LEN;
+			name_buf[term] = '\0';
+	    }
+	    
 		name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
 		memcpy(saved_name, name_buf, MAX_CUSTOM_NAME_LEN + 1);
+		
 		#ifdef POLYCAST5_DEBUG
 			ESP_LOGI(TAG, "%s", saved_name);
 		#endif
@@ -610,9 +642,8 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		lv_obj_delete(lbl_chars);
 		
 		// Reset statics for next time
-		lbl_user_in = NULL;
-		lbl_dirs = NULL;
-		cur_pos = 0;
+		lbl_user_in = lbl_chars = lbl_dirs = NULL;
+		cur_pos = row_idx = char_idx = 0;
 		cur_char = '_';
 		memset(name_buf, 0, sizeof name_buf);
 
@@ -811,8 +842,9 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 		int del_idx = lora_menu->index;	 
 		
 		// Can't be "Add PolyPlug"	 
-		if (del_idx == 0)
+		if (del_idx == 0) {
 			return;
+		}
 		
 		// Free any heap buffers allocated for that slot
 		free(lora_menu->options[del_idx]); // Name string
@@ -840,8 +872,9 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 		lora_menu->btns[lora_menu->size] = NULL;
 		
 		// Adjust if was last
-		if (lora_menu->index >= lora_menu->size)
+		if (lora_menu->index >= lora_menu->size) {
 			lora_menu->index = lora_menu->size-1;
+		}
 			
 		// Remove entry from NVS
 		lcd_lora_menu_nvs_delete(del_idx);
@@ -929,7 +962,7 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 		// Hide submenu
 		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 		
-		// Don’t allow renaming the first index
+		// Don't allow renaming the first index
 		if (lora_menu->index == 0) {
 			return;
 		}
