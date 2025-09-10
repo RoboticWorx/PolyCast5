@@ -40,7 +40,7 @@ typedef struct ir_remote {
 
 extern ir_remote_t remotes[MAX_REMOTES];
 extern size_t num_remotes;
-extern size_t current_remote;
+extern size_t ir_current_remote;
 
 /** 
  * @brief Initialise RMT RX

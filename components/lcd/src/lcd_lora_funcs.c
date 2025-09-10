@@ -813,6 +813,7 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 			hotkey_cmd.has_lora[hotkey_cmd.active_idx] = true;
 			// Remove others
 			hotkey_cmd.has_espnow[hotkey_cmd.active_idx] = false;
+			hotkey_cmd.has_ir[hotkey_cmd.active_idx] = false;
 			
 			// Hide hotkey icon
 			lv_obj_add_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN);

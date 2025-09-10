@@ -20,11 +20,6 @@
 #define SIGNAL_MIN_NS 1000
 #define SIGNAL_MAX_NS 15000000 // 15ms
 
-// Globals
-extern ir_remote_t remotes[MAX_REMOTES];
-extern size_t num_remotes;
-extern size_t current_remote;
-
 extern rmt_symbol_word_t ir_signal[MAX_PULSES]; // The signal
 
 extern volatile bool restart_rx_pending;
@@ -250,7 +245,7 @@ void infrared_nvs_load_remotes(void)
 	// Default when namespace is missing
 	if (ret == ESP_ERR_NVS_NOT_FOUND) {
 		num_remotes = 1;
-		current_remote = 0;
+		ir_current_remote = 0;
 		remotes[0].name = strdup("REMOTE");
 		remotes[0].num_signals = 0;
 		remotes[0].signals = NULL;

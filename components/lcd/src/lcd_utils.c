@@ -1001,7 +1001,7 @@ static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t *ir_menu, lo
 		
 		// Build ir_list
 		xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
-		lcd_ir_build_current_menu(ir_menu, current_remote);
+		lcd_ir_build_current_menu(ir_menu, ir_current_remote);
 		xSemaphoreGive(xInfraredDataMutex); // Release IR
 		
 		// Show IR list
@@ -1206,6 +1206,7 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 			ui_menu->page = UNLOCK_PAGE;
 		}		
 	}
+	
 	/* HOTKEYS */
 	// Note: If you'd like it so you can only use hotkeys if the device is unlocked,
 	// simply add '&& (!settings_menu->pin_menu.pin_set || !settings_menu->pin_menu.prompt_pin)' to each hoykey 'else if'
@@ -1229,6 +1230,20 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 			
 			// Send the command
 			xQueueSend(xEspSendCmdQueue, &hotkey_cmd.espnow_cmd[HOTKEY_LONG_HOME_IDX], portMAX_DELAY);
+		}
+		// Else Infrared
+		else if (hotkey_cmd.has_ir[HOTKEY_LONG_HOME_IDX]) {
+			// RGB indicator
+			uint8_t rgb_state = RGB_BLINK_PURPLE;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+			
+			// Update current remote
+			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
+			ir_current_remote = hotkey_cmd.ir_cmd[HOTKEY_LONG_HOME_IDX].current_remote;
+			xSemaphoreGive(xInfraredDataMutex); // Release IR
+			
+			// Send the command
+			xQueueSend(xInfraredSignalToTxQueue, &hotkey_cmd.ir_cmd[HOTKEY_LONG_HOME_IDX].index, portMAX_DELAY);
 		}
 		else {
 			#ifdef POLYCAST5_DEBUG
@@ -1257,6 +1272,20 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 			// Send the command
 			xQueueSend(xEspSendCmdQueue, &hotkey_cmd.espnow_cmd[HOTKEY_LONG_LEFT_IDX], portMAX_DELAY);
 		}
+		// Else Infrared
+		else if (hotkey_cmd.has_ir[HOTKEY_LONG_LEFT_IDX]) {
+			// RGB indicator
+			uint8_t rgb_state = RGB_BLINK_PURPLE;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+			
+			// Update current remote
+			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
+			ir_current_remote = hotkey_cmd.ir_cmd[HOTKEY_LONG_LEFT_IDX].current_remote;
+			xSemaphoreGive(xInfraredDataMutex); // Release IR
+			
+			// Send the command
+			xQueueSend(xInfraredSignalToTxQueue, &hotkey_cmd.ir_cmd[HOTKEY_LONG_LEFT_IDX].index, portMAX_DELAY);
+		}
 		else {
 			#ifdef POLYCAST5_DEBUG
 			ESP_LOGW(TAG, "Long left hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_LEFT_IDX,
@@ -1283,6 +1312,20 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 			
 			// Send the command
 			xQueueSend(xEspSendCmdQueue, &hotkey_cmd.espnow_cmd[HOTKEY_LONG_RIGHT_IDX], portMAX_DELAY);
+		}
+		// Else Infrared
+		else if (hotkey_cmd.has_ir[HOTKEY_LONG_RIGHT_IDX]) {
+			// RGB indicator
+			uint8_t rgb_state = RGB_BLINK_PURPLE;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+			
+			// Update current remote
+			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
+			ir_current_remote = hotkey_cmd.ir_cmd[HOTKEY_LONG_RIGHT_IDX].current_remote;
+			xSemaphoreGive(xInfraredDataMutex); // Release IR
+			
+			// Send the command
+			xQueueSend(xInfraredSignalToTxQueue, &hotkey_cmd.ir_cmd[HOTKEY_LONG_RIGHT_IDX].index, portMAX_DELAY);
 		}
 		else {
 			#ifdef POLYCAST5_DEBUG
@@ -1311,6 +1354,20 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 			// Send the command
 			xQueueSend(xEspSendCmdQueue, &hotkey_cmd.espnow_cmd[HOTKEY_LONG_SELECT_IDX], portMAX_DELAY);
 		}
+		// Else Infrared
+		else if (hotkey_cmd.has_ir[HOTKEY_LONG_SELECT_IDX]) {
+			// RGB indicator
+			uint8_t rgb_state = RGB_BLINK_PURPLE;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+			
+			// Update current remote
+			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
+			ir_current_remote = hotkey_cmd.ir_cmd[HOTKEY_LONG_SELECT_IDX].current_remote;
+			xSemaphoreGive(xInfraredDataMutex); // Release IR
+			
+			// Send the command
+			xQueueSend(xInfraredSignalToTxQueue, &hotkey_cmd.ir_cmd[HOTKEY_LONG_SELECT_IDX].index, portMAX_DELAY);
+		}
 		else {
 			#ifdef POLYCAST5_DEBUG
 			ESP_LOGW(TAG, "Long select hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_SELECT_IDX,
@@ -1338,6 +1395,20 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 			// Send the command
 			xQueueSend(xEspSendCmdQueue, &hotkey_cmd.espnow_cmd[HOTKEY_SHORT_HOME_IDX], portMAX_DELAY);
 		}
+		// Else Infrared
+		else if (hotkey_cmd.has_ir[HOTKEY_SHORT_HOME_IDX]) {
+			// RGB indicator
+			uint8_t rgb_state = RGB_BLINK_PURPLE;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+				
+			// Update current remote
+			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
+			ir_current_remote = hotkey_cmd.ir_cmd[HOTKEY_SHORT_HOME_IDX].current_remote;
+			xSemaphoreGive(xInfraredDataMutex); // Release IR
+			
+			// Send the command
+			xQueueSend(xInfraredSignalToTxQueue, &hotkey_cmd.ir_cmd[HOTKEY_SHORT_HOME_IDX].index, portMAX_DELAY);
+		}
 		else {
 			#ifdef POLYCAST5_DEBUG
 			ESP_LOGW(TAG, "Short home hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_SHORT_HOME_IDX,
@@ -1364,6 +1435,20 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 			
 			// Send the command
 			xQueueSend(xEspSendCmdQueue, &hotkey_cmd.espnow_cmd[HOTKEY_SHORT_RIGHT_IDX], portMAX_DELAY);
+		}
+		// Else Infrared
+		else if (hotkey_cmd.has_ir[HOTKEY_SHORT_RIGHT_IDX]) {
+			// RGB indicator
+			uint8_t rgb_state = RGB_BLINK_PURPLE;
+			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+					
+			// Update current remote
+			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
+			ir_current_remote = hotkey_cmd.ir_cmd[HOTKEY_SHORT_RIGHT_IDX].current_remote;
+			xSemaphoreGive(xInfraredDataMutex); // Release IR
+			
+			// Send the command
+			xQueueSend(xInfraredSignalToTxQueue, &hotkey_cmd.ir_cmd[HOTKEY_SHORT_RIGHT_IDX].index, portMAX_DELAY);
 		}
 		else {
 			#ifdef POLYCAST5_DEBUG
@@ -1703,7 +1788,7 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
 	// Do once
 	if (!initalized) {
 		xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
-		lcd_ir_build_current_menu(ir_menu, current_remote);
+		lcd_ir_build_current_menu(ir_menu, ir_current_remote);
 		xSemaphoreGive(xInfraredDataMutex); // Release IR
 		lv_obj_remove_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);	
 		
@@ -1752,6 +1837,30 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
 	}
 	// Selected specific signal
 	else if (ui_btns->select_btn == 1 && ir_menu->index >= 3) {
+		// If recording command as hotkey
+		if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+			// Zero out at start
+			memset(&hotkey_cmd.ir_cmd[hotkey_cmd.active_idx], 0, sizeof(ir_cmd_t));
+			
+			// Save into hotkey struct under selected "Hotx"
+			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
+			hotkey_cmd.ir_cmd[hotkey_cmd.active_idx].index = ir_menu->index; // Save signal index
+			hotkey_cmd.ir_cmd[hotkey_cmd.active_idx].current_remote = ir_current_remote; // Save remote used
+			xSemaphoreGive(xInfraredDataMutex); // Release IR
+			
+			// Flag that command exists
+			hotkey_cmd.has_ir[hotkey_cmd.active_idx] = true;
+			// Remove others
+			hotkey_cmd.has_espnow[hotkey_cmd.active_idx] = false;
+			hotkey_cmd.has_lora[hotkey_cmd.active_idx] = false;
+			
+			// Hide hotkey icon
+			lv_obj_add_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN);
+			
+			// Persist to NVS
+			lcd_hotkey_nvs_save(&hotkey_cmd);
+		}
+		
 		// Transmit signal at index
 		xQueueSend(xInfraredSignalToTxQueue, &ir_menu->index, portMAX_DELAY);
 		
@@ -1764,7 +1873,7 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
 		xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 		
 		// If at first remote, go back
-		if (current_remote == 0) {
+		if (ir_current_remote == 0) {
 			// Hide IR menu
 			lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 					
@@ -1778,10 +1887,10 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
 		}
 		// Else go back a remote
 		else {
-			current_remote--;
+			ir_current_remote--;
 			
 			// Rebuild menu with new remote
-			lcd_ir_build_current_menu(ir_menu, current_remote);
+			lcd_ir_build_current_menu(ir_menu, ir_current_remote);
 		}
 		
 		xSemaphoreGive(xInfraredDataMutex); // Release IR
@@ -1797,10 +1906,10 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
 	else if (ui_btns->up_btn == 1) {
 		// Increment current_remote with wrap
 		xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
-		current_remote = (current_remote + 1) % num_remotes;
+		ir_current_remote = (ir_current_remote + 1) % num_remotes;
 		
 		// Rebuild menu with new remote
-		lcd_ir_build_current_menu(ir_menu, current_remote);
+		lcd_ir_build_current_menu(ir_menu, ir_current_remote);
 		xSemaphoreGive(xInfraredDataMutex); // Release IR
 		lcd_ir_update_menu(ir_menu);
 	}

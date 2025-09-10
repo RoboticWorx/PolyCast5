@@ -29,7 +29,7 @@ rmt_symbol_word_t ir_signal[MAX_PULSES]; // The active signal itself
 
 ir_remote_t remotes[MAX_REMOTES]; // Remotes array
 size_t num_remotes = 1; // 1 default
-size_t current_remote = 0;
+size_t ir_current_remote = 0;
 
 volatile bool restart_rx_pending = false; // Global restart flag
 
@@ -127,25 +127,25 @@ static void infrared_task(void *pvParameters) {
 			sig->length = ir_signal_length;
 			
 			// Append to the current remote
-			size_t ns = remotes[current_remote].num_signals; // Number of signals already in remote
+			size_t ns = remotes[ir_current_remote].num_signals; // Number of signals already in remote
 			
 			// Resize the dynamic array to hold another signal
-			remotes[current_remote].signals = realloc(remotes[current_remote].signals, (ns + 1) * sizeof(ir_signal_t *));
+			remotes[ir_current_remote].signals = realloc(remotes[ir_current_remote].signals, (ns + 1) * sizeof(ir_signal_t *));
 			
 			// Resize the dynamic array to hold another signal name
-			remotes[current_remote].signal_names = realloc(remotes[current_remote].signal_names, (ns + 1) * sizeof(char *));
+			remotes[ir_current_remote].signal_names = realloc(remotes[ir_current_remote].signal_names, (ns + 1) * sizeof(char *));
 			
 			// Save the signal to remote
-			remotes[current_remote].signals[ns] = sig;
-			remotes[current_remote].signal_names[ns] = strdup(""); // Temporary empty name
-			remotes[current_remote].num_signals++; // Now one more signal
+			remotes[ir_current_remote].signals[ns] = sig;
+			remotes[ir_current_remote].signal_names[ns] = strdup(""); // Temporary empty name
+			remotes[ir_current_remote].num_signals++; // Now one more signal
 			
 			// Save the signal blob and update num_signals in NVS
-			infrared_nvs_save_signal_to_remote(current_remote, ns, sig, ""); // Empty name for now
-			infrared_nvs_save_remote_nsig(current_remote);
+			infrared_nvs_save_signal_to_remote(ir_current_remote, ns, sig, ""); // Empty name for now
+			infrared_nvs_save_remote_nsig(ir_current_remote);
 			
 			#ifdef POLYCAST5_DEBUG
-				ESP_LOGI(TAG, "Saved signal index %zu for remote %zu (%zu pulses)", ns, current_remote, sig->length);
+				ESP_LOGI(TAG, "Saved signal index %zu for remote %zu (%zu pulses)", ns, ir_current_remote, sig->length);
 			#endif
 			
 			xSemaphoreGive(xInfraredDataMutex); // Release IR
@@ -162,17 +162,17 @@ static void infrared_task(void *pvParameters) {
 				menu_idx = -menu_idx; // Make positive
 				size_t sig_idx = (size_t) menu_idx - 3; // Offset for 0-based
 				
-				infrared_nvs_delete_signal_from_remote(current_remote, sig_idx);
+				infrared_nvs_delete_signal_from_remote(ir_current_remote, sig_idx);
 			}
 			// Else send the signal at that index
 			else {
 				size_t sig_idx = (size_t) menu_idx - 3; // Offset for 0-based
 			
 				// Get signal from current remote
-				ir_signal_t *sig = remotes[current_remote].signals[sig_idx];
+				ir_signal_t *sig = remotes[ir_current_remote].signals[sig_idx];
 				
 				#ifdef POLYCAST5_DEBUG
-					ESP_LOGI(TAG, "Replaying signal %zu for remote %zu (%zu pulses)", sig_idx, current_remote, sig->length);
+					ESP_LOGI(TAG, "Replaying signal %zu for remote %zu (%zu pulses)", sig_idx, ir_current_remote, sig->length);
 				#endif
 				
 				// Send

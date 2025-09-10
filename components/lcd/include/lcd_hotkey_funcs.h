@@ -22,11 +22,18 @@ typedef struct {
 } hotkey_menu_t;
 
 typedef struct {
+	size_t current_remote;
+	int index;
+} ir_cmd_t;
+
+typedef struct {
 	uint8_t active_idx;
 	bool has_lora[MAX_HOTKEY_OPTIONS]; // Hot0-Hot5
 	bool has_espnow[MAX_HOTKEY_OPTIONS];
+	bool has_ir[MAX_HOTKEY_OPTIONS];
 	lora_cmd_t lora_cmd[MAX_HOTKEY_OPTIONS];
 	espnow_cmd_t espnow_cmd[MAX_HOTKEY_OPTIONS];
+	ir_cmd_t ir_cmd[MAX_HOTKEY_OPTIONS];
 } hotkey_cmd_t;
 
 extern hotkey_menu_t hotkey_menu;
