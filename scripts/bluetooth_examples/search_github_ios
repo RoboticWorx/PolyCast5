@@ -1,6 +1,6 @@
 Script:
 
-<cmd+space><delay=500>safari<enter><delay=900><cmd+l>https://github.com/RoboticWorx/PolyCast5<enter>
+<cmd+space><delay=500>safari<enter><delay=900><cmd+l><delay=50>https://github.com/RoboticWorx/PolyCast5<enter>
 
 Explanation:
 
@@ -13,5 +13,6 @@ Steps:
 - Opens safari browser
 - Waits 900ms for it to open
 - Selects the active search bar
+- Waits 50ms for it to select
 - Types PolyCast5 GitHub URL into the browser
 - Hits enter
