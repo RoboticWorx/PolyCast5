@@ -37,4 +37,13 @@ void lcd_gpio_setup_page(gpio_menu_t *gpio_menu);
  */
 void lcd_gpio_update_menu(gpio_menu_t *gpio_menu);
 
+/**
+ * @brief Executes page to explain how connectible hardware works
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] gpio_menu GPIO menu structure
+ */
+void lcd_gpio_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu);
+
 #endif // LCD_GPIO_FUNCS_H

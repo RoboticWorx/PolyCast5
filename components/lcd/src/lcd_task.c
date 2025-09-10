@@ -405,6 +405,9 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == GPIO_PAGE) {
 				lcd_gpio_page(&ui_btns, &ui_menu, &gpio_menu);
 			}
+			else if (ui_menu.page == GPIO_HOW_PAGE) {
+				lcd_gpio_how_page(&ui_btns, &ui_menu, &gpio_menu);
+			}
 		}
 		
 		// Sleep condition

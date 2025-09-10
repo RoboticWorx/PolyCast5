@@ -85,6 +85,7 @@ enum {
     BLUETOOTH_SCRIPT_ADD_PAGE,
     
     GPIO_PAGE,
+    GPIO_HOW_PAGE,
 };
 
 extern uint32_t pin_attempts;

@@ -142,3 +142,96 @@ void lcd_gpio_update_menu(gpio_menu_t *menu)
 	// Enable scrolling if list gets too long
 	lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
 }
+
+void lcd_gpio_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu)
+{
+	#define HOW_Y_OFFSET 40
+	
+	// Statics
+	static bool init = false;
+	static lv_obj_t *cont = NULL;
+	static lv_obj_t *title_lbl = NULL;
+	static lv_obj_t *instr_lbl = NULL;
+	
+	if (!init) {
+		// Create a scrollable container for the instructions
+		cont = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(cont, 210, 106);
+		lv_obj_center(cont);
+		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
+
+		// Title label
+		title_lbl = lv_label_create(cont);
+		lv_label_set_text(title_lbl, "How It Works:");
+		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+		// Instructions label (scrollable if text is long)
+		instr_lbl = lv_label_create(cont);
+		lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+		lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
+		lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
+		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+
+		// Set custom text to explain to the user
+		const char *instr_text =
+								"PolyCast5 is expandable with external hardware to allow for infinite control possibilities.\n\n"
+								"This device will communicate with the external hardware via I2C through the 'Terminal' option.\n\n"
+								"In the terminal, simply enter a command for the connected hardware to receive and execute.\n\n"
+								"From there, PolyCast5 will also print any responses from the connected hardware for your convenience. "
+								"(e.g. status, errors, etc.)\n\n"
+								"To get started building your own connectible hardware, please visit:\n\n"
+								"polycast5.com/blogs /tutorials/create-external-hardware";
+		
+		lv_label_set_text(instr_lbl, instr_text);
+
+		lv_timer_handler();
+
+		init = true;
+	}
+	
+	if (ui_btns->up_btn == 1) {
+		lv_obj_scroll_by(cont, 0, HOW_Y_OFFSET, LV_ANIM_ON);
+	}
+	else if (ui_btns->down_btn == 1) {
+		lv_obj_scroll_by(cont, 0, -HOW_Y_OFFSET, LV_ANIM_ON);
+	}
+	// Go back
+	else if (ui_btns->left_btn) {
+		// Delete objects
+		lv_obj_delete(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+			
+		// Show GPIO menu
+		lv_obj_remove_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch back
+		ui_menu->page = GPIO_PAGE;
+	}
+	// Home or power off
+	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
+		// Delete objects
+		lv_obj_delete(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+		
+ 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+	}
+}
