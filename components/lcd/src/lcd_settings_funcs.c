@@ -1468,11 +1468,26 @@ static float get_mA(int brightness) {
 	
 	return 44.5f; // Fallback
 }
+static int mA_to_percent(float ma)
+{
+	float i_ref = get_mA(100);; // 100% brightness total current draw 
+	float i_now = get_mA(lcd_ledc_brightness); // Current total draw (mA)
+	
+	// Guard against near-zero
+	if (i_now < 0.5f) {
+		i_now = 0.5f;
+	}
+	
+	// +x% longer runtime
+	int pct_runtime = (int)(((i_ref / i_now) - 1.0f) * 100.0f + 0.5f);
+		
+	return pct_runtime;
+}
 void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
 	#define ADJ_LCD_INS_TXT "LCD brightness:"
 	#define ADJ_LCD_TXT "%d%%"
-	#define ADJ_LCD_SAVINGS_TXT "Saves ~%d mA"
+	#define ADJ_LCD_SAVINGS_TXT "+%d%% ON life"
 	
 	#define LCD_LEDC_MAX 100
 	#define LCD_LEDC_MIN 0
@@ -1489,21 +1504,21 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 	if (!init) {
 		lbl_ins = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_ins, ADJ_LCD_INS_TXT, user_secondary_color,
-					 &lv_font_montserrat_18, LV_ALIGN_CENTER, -25, -13);
+				&lv_font_montserrat_18, LV_ALIGN_CENTER, -25, -13);
 		
 		xSemaphoreTake(xLEDCMutex, portMAX_DELAY); // Lock LEDC
 		lbl_val = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_val, "", user_secondary_color,
-					 &lv_font_montserrat_24, LV_ALIGN_CENTER, -20, 13);
+				&lv_font_montserrat_24, LV_ALIGN_CENTER, -20, 13);
 		lv_label_set_text_fmt(lbl_val, ADJ_LCD_TXT, lcd_ledc_brightness);
 		
 		lbl_savings = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_savings, "", user_secondary_color,
-					&lv_font_montserrat_16, LV_ALIGN_CENTER, -20, 40);
-		float savings_f = 67.0f - get_mA(lcd_ledc_brightness); // Max - mA draw
-		int savings = (int)(savings_f + 0.5f); // Round to nearest int
-		if (savings > 0) {
-			lv_label_set_text_fmt(lbl_savings, ADJ_LCD_SAVINGS_TXT, savings);
+				&lv_font_montserrat_16, LV_ALIGN_CENTER, -20, 40);
+		
+		// Update savings text
+		if (mA_to_percent(get_mA(lcd_ledc_brightness)) > 0) {
+			lv_label_set_text_fmt(lbl_savings, ADJ_LCD_SAVINGS_TXT, mA_to_percent(get_mA(lcd_ledc_brightness)));
 		}
 		else { // Don't show if savings is 0mA
 			lv_label_set_text(lbl_savings, "");
@@ -1535,15 +1550,13 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 		lv_slider_set_value(slider, lcd_ledc_brightness, LV_ANIM_OFF);
 		
 		// Update savings text
-		float savings_f = 67.0f - get_mA(lcd_ledc_brightness);
-		int savings = (int)(savings_f + 0.5f);
-		if (savings > 0) {
-			lv_label_set_text_fmt(lbl_savings, ADJ_LCD_SAVINGS_TXT, savings);
+		if (mA_to_percent(get_mA(lcd_ledc_brightness)) > 0) {
+			lv_label_set_text_fmt(lbl_savings, ADJ_LCD_SAVINGS_TXT, mA_to_percent(get_mA(lcd_ledc_brightness)));
 		}
-		else {
+		else { // Don't show if savings is 0mA
 			lv_label_set_text(lbl_savings, "");
 		}
-				
+		
 		// Persist to NVS
 		lcd_settings_lcd_ledc_nvs_save();
 		xSemaphoreGive(xLEDCMutex); // Release LEDC
@@ -1565,12 +1578,10 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 		lv_slider_set_value(slider, lcd_ledc_brightness, LV_ANIM_OFF);
 		
 		// Update savings text
-		float savings_f = 67.0f - get_mA(lcd_ledc_brightness);
-		int savings = (int)(savings_f + 0.5f);
-		if (savings > 0) {
-			lv_label_set_text_fmt(lbl_savings, ADJ_LCD_SAVINGS_TXT, savings);
+		if (mA_to_percent(get_mA(lcd_ledc_brightness)) > 0) {
+			lv_label_set_text_fmt(lbl_savings, ADJ_LCD_SAVINGS_TXT, mA_to_percent(get_mA(lcd_ledc_brightness)));
 		}
-		else {
+		else { // Don't show if savings is 0mA
 			lv_label_set_text(lbl_savings, "");
 		}
 		

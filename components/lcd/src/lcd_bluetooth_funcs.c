@@ -29,7 +29,7 @@
 static char script_labels[MAX_KEYBOARD_SCRIPTS][BT_SCRIPT_LABEL_MAX_LEN + 1];
 
 bluetooth_menu_t bluetooth_menu = {
-	.options = {"How It Works", "Media Controller", "Auto Keyboard", "Page Scroller", "PowerPoint Clicker"},
+	.options = {"How It Works", "Auto Keyboard", "Media Controller", "Page Scroller", "PowerPoint Clicker"},
 	.size = NUM_BLUETOOTH_OPTIONS,
 	.index = 1,
 	.cont = NULL,
