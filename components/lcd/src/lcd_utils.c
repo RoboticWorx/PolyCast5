@@ -29,6 +29,7 @@
 
 #include "lcd_asset_macros.h"
 #include "lcd_bluetooth_funcs.h"
+#include "lcd_gpio_funcs.h"
 #include "lcd_utils.h"
 #include "wifi_funcs.h"
 #include "wifi_task.h"
@@ -983,7 +984,8 @@ void lcd_update_battery(ui_menu_t *ui_menu, uint8_t battery_percentage, bool cha
 	}
 }
 
-static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t *ir_menu, lora_menu_t *lora_menu, espnow_menu_t *espnow_menu, wifi_menu_t *wifi_menu, tools_menu_t *tools_menu, settings_menu_t *settings_menu, bluetooth_menu_t *bluetooth_menu)
+static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t *ir_menu, lora_menu_t *lora_menu, espnow_menu_t *espnow_menu,
+		wifi_menu_t *wifi_menu, tools_menu_t *tools_menu, settings_menu_t *settings_menu, bluetooth_menu_t *bluetooth_menu, gpio_menu_t *gpio_menu)
 {
 	// Hide selection labels
 	lv_obj_add_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
@@ -1035,6 +1037,11 @@ static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t *ir_menu, lo
 		// Show Wi-Fi list
 		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		ui_menu->page = WIFI_PAGE;
+	}
+	else if (strcmp(option, "GPIO") == 0) {
+		// Show GPIO list
+		lv_obj_remove_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		ui_menu->page = GPIO_PAGE;
 	}
 	else {
 		#ifdef POLYCAST5_DEBUG
@@ -1594,7 +1601,9 @@ void lcd_hotkey_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotk
 	}
 }
 
-void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_menu, lora_menu_t *lora_menu, espnow_menu_t *espnow_menu, wifi_menu_t *wifi_menu, tools_menu_t *tools_menu, settings_menu_t *settings_menu, bluetooth_menu_t *bluetooth_menu) 
+void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_menu, lora_menu_t *lora_menu,
+		espnow_menu_t *espnow_menu, wifi_menu_t *wifi_menu, tools_menu_t *tools_menu, settings_menu_t *settings_menu,
+		bluetooth_menu_t *bluetooth_menu, gpio_menu_t *gpio_menu) 
 {
 	if (ui_btns->up_btn == 1) {
 		scrolling_menu = true;
@@ -1605,7 +1614,7 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
 		scrolling_up = true;
 	}
 	else if (ui_btns->select_btn == 1) {
-		lcd_selection_btn_pressed(ui_menu, ir_menu, lora_menu, espnow_menu, wifi_menu, tools_menu, settings_menu, bluetooth_menu);
+		lcd_selection_btn_pressed(ui_menu, ir_menu, lora_menu, espnow_menu, wifi_menu, tools_menu, settings_menu, bluetooth_menu, gpio_menu);
 	}
 	// Go back
 	else if (ui_btns->left_btn == 1) {
@@ -2660,6 +2669,57 @@ void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t
 		
 		// Switch pages
 		ui_menu->page = BLUETOOTH_MEDIA_PRESENTATION_PAGE;
+	}
+}
+
+void lcd_gpio_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu)
+{
+	// Statics
+	static bool do_once = false;
+	
+	// Only execute once
+	if (!do_once) {
+		// Show bluetooth list
+		lv_obj_remove_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		do_once = true;
+	}
+	
+	// Up button pressed
+	if (ui_btns->up_btn == 1) {
+		// Update selection
+		gpio_menu->index--;
+		lcd_gpio_update_menu(gpio_menu);
+	}
+	// Down button pressed
+	else if (ui_btns->down_btn == 1) {
+		// Update selection
+		gpio_menu->index++;
+		lcd_gpio_update_menu(gpio_menu);
+	}
+	// Back selected
+	else if (ui_btns->left_btn == 1) {
+		// Hide GPIO menu
+		lv_obj_add_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show selection labels
+		lcd_unhide_selection_widgets(ui_menu);
+		
+		// Reset static
+		do_once = false;
+		
+		// Switch pages
+		ui_menu->page = SELECTION_PAGE;
+	}
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Hide GPIO menu
+		lv_obj_add_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 

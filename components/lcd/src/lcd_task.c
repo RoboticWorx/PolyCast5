@@ -7,6 +7,7 @@
 #include "gpio_task.h"
 #include "lcd_bluetooth_funcs.h"
 #include "lcd_hotkey_funcs.h"
+#include "lcd_gpio_funcs.h"
 #include "lcd_utils.h"
 #include "widgets/label/lv_label.h"
 
@@ -146,6 +147,8 @@ static void lcd_task(void *pvParameters)
 	
 	lcd_bluetooth_setup_page(&bluetooth_menu);
 	
+	lcd_gpio_setup_page(&gpio_menu);
+	
 	#ifdef POLYCAST5_ESPNOW_DUMP_NVS
 	lcd_espnow_dump_nvs();
 	#endif
@@ -247,7 +250,8 @@ static void lcd_task(void *pvParameters)
 				lcd_hotkey_option_page(&ui_btns, &ui_menu, &hotkey_menu);
 			}
 			else if (ui_menu.page == SELECTION_PAGE) {
-				lcd_selection_page(&ui_btns, &ui_menu, &ir_menu, &lora_menu, &espnow_menu, &wifi_menu, &tools_menu, &settings_menu, &bluetooth_menu);
+				lcd_selection_page(&ui_btns, &ui_menu, &ir_menu, &lora_menu, &espnow_menu, &wifi_menu,
+						&tools_menu, &settings_menu, &bluetooth_menu, &gpio_menu);
 			}
 			// Infrared pages
 			else if (ui_menu.page == INFRARED_PAGE) {
@@ -396,6 +400,10 @@ static void lcd_task(void *pvParameters)
 			}
 			else if (ui_menu.page == BLUETOOTH_SCRIPT_ADD_PAGE) {
 				lcd_bluetooth_add_script_page(&ui_btns, &ui_menu, &bluetooth_menu);
+			}
+			// GPIO pages
+			else if (ui_menu.page == GPIO_PAGE) {
+				lcd_gpio_page(&ui_btns, &ui_menu, &gpio_menu);
 			}
 		}
 		

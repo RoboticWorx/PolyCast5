@@ -1,0 +1,40 @@
+#ifndef LCD_GPIO_FUNCS_H
+#define LCD_GPIO_FUNCS_H
+
+#include "misc/lv_style.h"
+#include "misc/lv_types.h"
+
+#define MAX_GPIO_OPTIONS 3
+
+// Forward-declare structs (from lcd_utils.h)
+typedef struct ui_btns_t ui_btns_t;
+typedef struct ui_menu_t ui_menu_t;
+
+typedef struct {
+	char *options[MAX_GPIO_OPTIONS];
+	lv_obj_t *btns[MAX_GPIO_OPTIONS];
+	int size;
+	int index;
+	lv_obj_t *main_list;
+	lv_style_t btn_style;
+	lv_style_t sel_style;
+	lv_obj_t *cont;
+} gpio_menu_t;
+
+extern gpio_menu_t gpio_menu;
+
+/**
+ * @brief Pre-load GPIO page for quick access
+ *
+ * @param [in] gpio_menu GPIO menu structure
+ */
+void lcd_gpio_setup_page(gpio_menu_t *gpio_menu);
+
+/**
+ * @brief Update GPIO page based on user input
+ *
+ * @param [in] gpio_menu GPIO menu structure
+ */
+void lcd_gpio_update_menu(gpio_menu_t *gpio_menu);
+
+#endif // LCD_GPIO_FUNCS_H
