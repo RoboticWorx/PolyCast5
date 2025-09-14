@@ -27,7 +27,7 @@ You can find some relevant links below:
 * **Infrared remote** - Save and replay infrared signals for TVs, air conditioners, lamps, etc.
 * **ESP32 commander** - Use [ESP-NOW](https://www.espressif.com/en/solutions/low-power-solutions/esp-now) to send instant commands for controlling custom builds such as with Arduino. (It's really easy and Arduino IDE compatible.)
 * **Wi-Fi sender and sniffer** - Send commands over long distances via MQTT or sniff network data and beacon frames to view active users, RSSI, and tons of network information.
-* **Offline tools** - Dice roller, coin flipper, random number generator, Ohm's law calculator, and more.
+* **Offline tools** - Dice roller, coin flipper, random number generator, and more.
 * **Customizable settings** - Set a security pin, custom colors, haptics, RGB LED configuration, and more.
 
 _PolyCast5 also comes with cool, customizable homescreen animations and hotkeys!_

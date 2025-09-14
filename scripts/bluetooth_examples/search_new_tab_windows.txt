@@ -1,0 +1,13 @@
+Script:
+
+<ctrl+t><delay=100>https://youtu.be/dQw4w9WgXcQ?si=fCygLTFX4Usi2nlR<enter>
+
+Explanation:
+
+This script will create a new tab in your current browser then search for Rick Astley "Never Gonna Give You Up" video.
+
+Steps:
+- Creates a new tab
+- Waits 100ms for it to open
+- Types a URL address
+- Hits enter

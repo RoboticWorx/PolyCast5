@@ -201,10 +201,10 @@ void lcd_gpio_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio
 	}
 	
 	if (ui_btns->up_btn == 1) {
-		lv_obj_scroll_by(cont, 0, HOW_Y_OFFSET, LV_ANIM_ON);
+		lv_obj_scroll_by_bounded(cont, 0, HOW_Y_OFFSET, LV_ANIM_ON);
 	}
 	else if (ui_btns->down_btn == 1) {
-		lv_obj_scroll_by(cont, 0, -HOW_Y_OFFSET, LV_ANIM_ON);
+		lv_obj_scroll_by_bounded(cont, 0, -HOW_Y_OFFSET, LV_ANIM_ON);
 	}
 	// Go back
 	else if (ui_btns->left_btn) {

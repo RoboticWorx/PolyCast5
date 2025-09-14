@@ -218,11 +218,11 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
 	}
 	// Scroll up
 	else if (ui_btns->up_btn == 1) {
-		lv_obj_scroll_by(cont, 0, HOTKEY_Y_OFFSET, LV_ANIM_ON);
+		lv_obj_scroll_by_bounded(cont, 0, HOTKEY_Y_OFFSET, LV_ANIM_ON);
 	}
 	// Scroll down
 	else if (ui_btns->down_btn == 1) {
-		lv_obj_scroll_by(cont, 0, -HOTKEY_Y_OFFSET, LV_ANIM_ON);
+		lv_obj_scroll_by_bounded(cont, 0, -HOTKEY_Y_OFFSET, LV_ANIM_ON);
 	}
 	// Confirm and active viewer
 	else if (ui_btns->right_btn == 1) {

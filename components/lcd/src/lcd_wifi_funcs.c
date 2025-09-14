@@ -1038,11 +1038,11 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
 	
 	// Scroll down
 	if (ui_btns->down_btn) {
-		lv_obj_scroll_by(cont, 0, -SCROLL_STEP, true);
+		lv_obj_scroll_by_bounded(cont, 0, -SCROLL_STEP, true);
 	}
 	// Scroll up
 	else if (ui_btns->up_btn) {
-		lv_obj_scroll_by(cont, 0, SCROLL_STEP, true);
+		lv_obj_scroll_by_bounded(cont, 0, SCROLL_STEP, true);
 	}
 	// Back
 	else if (ui_btns->left_btn) {
@@ -1294,11 +1294,11 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 
 	// Scroll down
 	if (ui_btns->down_btn) {
-		lv_obj_scroll_by(cont, 0, -SCROLL_STEP, true);
+		lv_obj_scroll_by_bounded(cont, 0, -SCROLL_STEP, true);
 	}
 	// Scroll up
 	else if (ui_btns->up_btn) {
-		lv_obj_scroll_by(cont, 0,  SCROLL_STEP, true);
+		lv_obj_scroll_by_bounded(cont, 0,  SCROLL_STEP, true);
 	}
 	// Back to beacon
 	else if (ui_btns->left_btn) {
@@ -2183,10 +2183,10 @@ void lcd_wifi_ota_confirm_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu
 	}
 	
 	if (ui_btns->up_btn == 1) {
-		lv_obj_scroll_by(cont, 0, OTA_CONF_Y_OFFSET, LV_ANIM_ON);
+		lv_obj_scroll_by_bounded(cont, 0, OTA_CONF_Y_OFFSET, LV_ANIM_ON);
 	}
 	else if (ui_btns->down_btn == 1) {
-		lv_obj_scroll_by(cont, 0, -OTA_CONF_Y_OFFSET, LV_ANIM_ON);
+		lv_obj_scroll_by_bounded(cont, 0, -OTA_CONF_Y_OFFSET, LV_ANIM_ON);
 	}
 	// Dismiss
 	else if (ui_btns->left_btn) {
@@ -2357,10 +2357,10 @@ void lcd_wifi_ota_updating_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_men
 
 	// Scrolling
 	if (ui_btns->up_btn == 1) {
-		lv_obj_scroll_by(cont, 0, OTA_UPDATING_Y_OFFSET, LV_ANIM_ON);
+		lv_obj_scroll_by_bounded(cont, 0, OTA_UPDATING_Y_OFFSET, LV_ANIM_ON);
 	}
 	else if (ui_btns->down_btn == 1) {
-		lv_obj_scroll_by(cont, 0, -OTA_UPDATING_Y_OFFSET, LV_ANIM_ON);
+		lv_obj_scroll_by_bounded(cont, 0, -OTA_UPDATING_Y_OFFSET, LV_ANIM_ON);
 	}
 }
 

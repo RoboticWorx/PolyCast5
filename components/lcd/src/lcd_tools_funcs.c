@@ -581,7 +581,7 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 			lv_label_set_text(lbl_num_sides, buf);
 		}
 		else { // Log
-			lv_obj_scroll_by(cont_roll_log, 0, DICE_SCROLL_DIS, LV_ANIM_ON);
+			lv_obj_scroll_by_bounded(cont_roll_log, 0, DICE_SCROLL_DIS, LV_ANIM_ON);
 		}
 	}
 	else if (ui_btns->down_btn == 1) {
@@ -613,7 +613,7 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 			lv_label_set_text(lbl_num_sides, buf);
 		}
 		else { // Log
-			lv_obj_scroll_by(cont_roll_log, 0, -DICE_SCROLL_DIS, LV_ANIM_ON);
+			lv_obj_scroll_by_bounded(cont_roll_log, 0, -DICE_SCROLL_DIS, LV_ANIM_ON);
 		}
 	}
 	// Back selected

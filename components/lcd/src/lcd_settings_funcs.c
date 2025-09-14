@@ -1638,17 +1638,18 @@ void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
 	// Only execute once
 	if (!do_once) {
 		lbl_ins = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_ins, "Press select to factory reset.", user_secondary_color,
+		lcd_format_label(lbl_ins, "Press RIGHT to factory reset.", user_secondary_color,
 					 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 18);
 					 
 		lbl_note = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_note, "NOTE: This will erase\n	   all user data!", user_secondary_color,
+		lcd_format_label(lbl_note, "NOTE: This will erase\n       all user data!", user_secondary_color,
 					 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
 
 		do_once = true;
 	}
 	
-	if (ui_btns->select_btn == 1) {
+	// Factory reset
+	if (ui_btns->right_btn == 1) {
 		// Delete objects
 		lv_obj_delete(lbl_ins);
 		lv_obj_delete(lbl_note);

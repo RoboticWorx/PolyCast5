@@ -360,10 +360,10 @@ void lcd_lora_add_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora
 	}
 	
 	if (ui_btns->up_btn == 1) {
-		lv_obj_scroll_by(cont, 0, LORA_ADD_Y_OFFSET, LV_ANIM_ON);
+		lv_obj_scroll_by_bounded(cont, 0, LORA_ADD_Y_OFFSET, LV_ANIM_ON);
 	}
 	else if (ui_btns->down_btn == 1) {
-		lv_obj_scroll_by(cont, 0, -LORA_ADD_Y_OFFSET, LV_ANIM_ON);
+		lv_obj_scroll_by_bounded(cont, 0, -LORA_ADD_Y_OFFSET, LV_ANIM_ON);
 	}
 	// Go back
 	else if (ui_btns->left_btn) {
