@@ -908,7 +908,7 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 			uint8_t rgb_state = RGB_SET_BLUE;
 			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
 
-			bluetooth_set_battery_level(100);
+			bluetooth_set_battery_level(100); // Default start
 
 			break;
 		}

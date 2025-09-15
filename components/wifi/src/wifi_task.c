@@ -19,8 +19,6 @@
 
 #define TAG "WIFI_TASK"
 
-extern bool wifi_connected;
-
 static wifi_scan_t wifi_scan[WIFI_MAX_NETWORKS];
 static wifi_login_t selected_network;
 static wifi_sniff_t sniff_network;
@@ -173,11 +171,6 @@ static void wifi_task(void *param)
 			ESP_ERROR_CHECK(wifi_funcs_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password));
 							
 			ESP_ERROR_CHECK(wifi_funcs_connect());
-		}
-		
-		// Wi-Fi is actively connected
-		if (wifi_connected) {
-			//wifi_funcs_get_current_date_time();
 		}
 		
 		// Send data over MQTT

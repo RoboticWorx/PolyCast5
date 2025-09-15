@@ -12,10 +12,12 @@
 #include "esp_sntp.h"
 
 #include "wifi_funcs.h"
-#include "wifi_task.h"
-#include "gpio_task.h"
+#include "gpio_funcs.h"
 #include "espnow_funcs.h"
 #include "ota_update.h"
+
+#include "wifi_task.h"
+#include "gpio_task.h"
 
 #define TAG "WIFI_FUNCS"
 
@@ -39,8 +41,6 @@ static EventGroupHandle_t wifi_event_group;
 static wifi_data_t wifi_data;
 static char mqtt_active_ack_topic[80] = {0};
 static bool mqtt_connected = false;
-
-bool wifi_connected = false;
 
 esp_err_t wifi_funcs_scan(wifi_scan_t *wifi_scan)
 {
@@ -200,6 +200,10 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 		xSemaphoreGive(xWifiMqttDisconnectedSemaphore); // Notify LCD we disconnected
 
 		xEventGroupSetBits(wifi_event_group, WIFI_DISCONNECTED_BIT);
+		
+		// RGB indicator
+		uint8_t rgb_state = RGB_SET_OFF;
+		xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
 	}
 	// Connected event
 	else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
@@ -212,8 +216,10 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 		xSemaphoreGive(xWifiNetworkConnectedSemaphore); // Notify LCD we connected
 
 		xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
-				
-		wifi_connected = true;
+		
+		// RGB indicator
+		uint8_t rgb_state = RGB_SET_GREEN;
+		xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
 		
 		// Check for new firmware version and update if so
 		ota_update_check_start("https://raw.githubusercontent.com/RoboticWorx/pc5-test/main/manifest.json");
@@ -225,10 +231,10 @@ void wifi_funcs_wifi_event_init(void)
 	wifi_event_group = xEventGroupCreate();
 	
 	ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler,
-				 NULL, NULL));
+			 NULL, NULL));
 				 
 	ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, wifi_event_handler,
-				 NULL, NULL));
+			 NULL, NULL));
 }
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
@@ -362,8 +368,7 @@ void wifi_funcs_mqtt_client_publish(char *payload, const uint8_t key[16])
 static bool wait_for_connection(TickType_t timeout)
 {
 	// Wait for either bit
-	EventBits_t bits = xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_BIT | WIFI_DISCONNECTED_BIT, pdTRUE,
-				pdFALSE, timeout);
+	EventBits_t bits = xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_BIT | WIFI_DISCONNECTED_BIT, pdTRUE, pdFALSE, timeout);
 
 	// Got IP
 	if (bits & WIFI_CONNECTED_BIT) {
@@ -460,7 +465,7 @@ esp_err_t wifi_funcs_radio_stop(void)
 	}
 	
 	xSemaphoreGive(xWifiCanSleepSemaphore);
-	wifi_connected = false;
+
 	memset(&wifi_data, 0, sizeof(wifi_data)); // Zero out wifi_data if initialized
 	
 	return err;
