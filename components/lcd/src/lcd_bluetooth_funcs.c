@@ -29,7 +29,7 @@
 static char script_labels[MAX_KEYBOARD_SCRIPTS][BT_SCRIPT_LABEL_MAX_LEN + 1];
 
 bluetooth_menu_t bluetooth_menu = {
-	.options = {"How It Works", "Auto Keyboard", "Media Controller", "Page Scroller", "PowerPoint Clicker"},
+	.options = {"How It Works", "Auto Keyboard", "Media Controller", "Page Scroller", "PowerPoint Clicker", "Camera Clicker"},
 	.size = NUM_BLUETOOTH_OPTIONS,
 	.index = 1,
 	.cont = NULL,
@@ -539,6 +539,9 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 		else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
 			lv_label_set_text(lbl_up, LV_SYMBOL_UP); // Scroll up
 		}
+		else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) {
+			lv_label_set_text(lbl_up, "");
+		}
 		lv_obj_set_style_text_font(lbl_up, &lv_font_montserrat_18, 0);
 		lv_obj_set_style_text_color(lbl_up, user_secondary_color, 0);
 		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE || type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
@@ -562,6 +565,9 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 		}
 		else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
 			lv_label_set_text(lbl_right, LV_SYMBOL_RIGHT); // Next slide
+		}
+		else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) {
+			lv_label_set_text(lbl_right, "");
 		}
 		lv_obj_set_style_text_font(lbl_right, &lv_font_montserrat_18, 0);
 		lv_obj_set_style_text_color(lbl_right, user_secondary_color, 0);
@@ -606,6 +612,9 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 		else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
 			lv_label_set_text(lbl_down, LV_SYMBOL_DOWN); // Scroll down
 		}
+		else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) {
+			lv_label_set_text(lbl_down, "");
+		}
 		lv_obj_set_style_text_font(lbl_down, &lv_font_montserrat_18, 0);
 		lv_obj_set_style_text_color(lbl_down, user_secondary_color, 0);
 		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE || type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
@@ -629,6 +638,9 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 		}
 		else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
 			lv_label_set_text(lbl_left, LV_SYMBOL_LEFT); // Previous slide
+		}
+		else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) {
+			lv_label_set_text(lbl_left, "");
 		}
 		lv_obj_set_style_text_font(lbl_left, &lv_font_montserrat_18, 0);
 		lv_obj_set_style_text_color(lbl_left, user_secondary_color, 0);
@@ -676,6 +688,9 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 		else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
 			lv_label_set_text(lbl_center, LV_SYMBOL_MUTE); // Mute
 		}
+		else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) { // Take image/video
+			lv_label_set_text(lbl_center, LV_SYMBOL_IMAGE);
+		}
 		lv_obj_set_style_text_font(lbl_center, &lv_font_montserrat_18, 0);
 		lv_obj_set_style_text_color(lbl_center, user_secondary_color, 0);
 		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
@@ -687,8 +702,11 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 		else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
 			lv_obj_align(lbl_center, LV_ALIGN_CENTER, -1, 0);
 		}
+		else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) {
+			lv_obj_align(lbl_center, LV_ALIGN_CENTER, 0, 0);
+		}
 
-		lv_timer_handler();
+		lv_timer_handler(); // Show now
 
 		// Active bluetooth
 		uint16_t cmd = BLUETOOTH_CMD_INIT;
@@ -840,6 +858,10 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 		}
 		else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
 			uint16_t cmd = BLUETOOTH_CMD_MUTE;
+			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+		}
+		else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) {
+			uint16_t cmd = BLUETOOTH_CMD_VOLUME_UP;
 			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 		}
 	}

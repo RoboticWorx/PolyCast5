@@ -788,11 +788,11 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 				
 		lbl_ins = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_ins, "Use up/down to adjust.", user_secondary_color,
-					 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 18);
+				 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 18);
 					 
 		lbl_arr = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_arr, LV_SYMBOL_MINUS LV_SYMBOL_RIGHT, user_secondary_color,
-					 &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 10);
+				&lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 10);
 		
 		// Border color for contrast			 
 		lv_color_t darker_user_primary_color = lv_color_darken(user_primary_color, 100); // % darker 
@@ -881,17 +881,6 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 	}
 	// Confirm new color
 	else if (ui_btns->select_btn == 1) {
-		lv_color_t c = primary_color_selected ? primary_color_options[new_color_idx] : secondary_color_options[new_color_idx];
-		if (primary_color_selected) {
-			user_primary_color = c;
-		}
-		else {
-			user_secondary_color = c;
-		}
-		
-		// Save to NVS to load at boot
-		lcd_settings_color_nvs_save(new_color_idx, primary_color_selected);
-		
 		// Delete objects
 		lv_obj_delete(lbl_ins);
 		lv_obj_delete(lbl_arr);
@@ -909,7 +898,23 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 		lcd_format_label(lbl_rst, "Reloading with\nnew color...", user_secondary_color,
 				 &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
 		lv_timer_handler();
+		
+		// Set and save color
+		lv_color_t c = primary_color_selected ? primary_color_options[new_color_idx] : secondary_color_options[new_color_idx];
+		if (primary_color_selected) {
+			user_primary_color = c;
+		}
+		else {
+			user_secondary_color = c;
+		}
+		
+		// Save to NVS to load at boot
+		lcd_settings_color_nvs_save(new_color_idx, primary_color_selected);
+		
+		// Let user see
 		vTaskDelay(pdMS_TO_TICKS(1500));
+		
+		// Reboot
 		esp_restart();
 	}
 	// Back selected

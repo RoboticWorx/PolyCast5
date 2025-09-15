@@ -1,12 +1,10 @@
 Script:
 
-yourSuperLongSecurePassword123&%BasicallyUnhackableBwahahaha!!<enter>
+yourSuperLongSecurePassword123.!%*NoOneIsGuessingThisOne<enter>
 
 Explanation:
 
-This script will securely type your full password over encrypted Bluetooth then hit enter.
-
-Safe for all uses!
+This script will securely type your full password over encrypted Bluetooth with MITM protection then hit enter.
 
 Steps:
 - Types password text
