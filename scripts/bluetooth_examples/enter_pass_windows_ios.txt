@@ -1,0 +1,13 @@
+Script:
+
+yourSuperLongSecurePassword123&%BasicallyUnhackableBwahahaha!!<enter>
+
+Explanation:
+
+This script will securely type your full password over encrypted Bluetooth then hit enter.
+
+Safe for all uses!
+
+Steps:
+- Types password text
+- Hits enter
