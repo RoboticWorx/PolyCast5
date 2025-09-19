@@ -207,7 +207,7 @@ void lcd_settings_setup_page(settings_menu_t *menu)
 	}
 	
 	// Create button for each option
-	for (int i = 0; i < menu->size; i++) {
+	for (int i = 0; i < menu->size; ++i) {
 
 		menu->btns[i] = lv_list_add_btn(menu->main_list, NULL, menu->options[i]);
 		lv_obj_set_size(menu->btns[i], 200, 30);
@@ -251,7 +251,7 @@ void lcd_settings_update_menu(settings_menu_t *menu)
 	}
 
 	// Reset every button to unselected
-	for (int i = 0; i < menu->size; i++) {
+	for (int i = 0; i < menu->size; ++i) {
 		lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
 		lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
 	}
@@ -314,7 +314,7 @@ void lcd_settings_rebuild_pin_boxes(lv_obj_t *pin_container, lv_obj_t **pin_labe
 	}
 	else {
 		// Fill for each
-		for (int i = 0; i < num_filled; i++) {
+		for (int i = 0; i < num_filled; ++i) {
 			create_next_box(pin_container, pin_labels, num_boxes);
 			
 			// If signing in, hide input with asterisk
@@ -409,7 +409,7 @@ static void confirm_entered_pin(ui_menu_t *ui_menu, settings_menu_t *settings_me
 	int offset = 0;
 	
 	// Append each arrow symbol
-	for (int i = 0; i < strlen(settings_menu->pin_menu.unlock_pin); i++) {
+	for (int i = 0; i < strlen(settings_menu->pin_menu.unlock_pin); ++i) {
 		const char *sym = code_to_symbol(settings_menu->pin_menu.unlock_pin[i]);
 		
 		int written = snprintf(symbol_buf + offset, sizeof(symbol_buf) - offset, "%s  ", sym);
@@ -1006,7 +1006,7 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 		xSemaphoreGive(xHapticsMutex); // Release haptics
 		
 		// Six switch rows
-		for (int i = 0; i < 6; i++) {
+		for (int i = 0; i < 6; ++i) {
 			// Create a row container for each row
 			sw_row[i] = lv_obj_create(cont);
 			lv_obj_set_size(sw_row[i], 180, 30);
@@ -1109,7 +1109,7 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 		cont = slider = lbl_spin = pointer = NULL;
 		init = false;
 		selected = 0;
-		for (int i = 0; i < 6; i++) {
+		for (int i = 0; i < 6; ++i) {
 			sw_arr[i] = sw_row[i] = NULL;
 		}
 
@@ -1129,7 +1129,7 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 		cont = slider = lbl_spin = pointer = NULL;
 		init = false;
 		selected = 0;
-		for (int i = 0; i < 6; i++) {
+		for (int i = 0; i < 6; ++i) {
 			sw_arr[i] = sw_row[i] = NULL;
 		}
 
@@ -1457,7 +1457,7 @@ static float get_mA(int brightness) {
 	}
 
 	// Linearly interpolate actual based on points
-	for (int i = 0; i < num_intervals; i++) {
+	for (int i = 0; i < num_intervals; ++i) {
 		int b_hi = points[i].b;
 		float ma_hi = points[i].ma;
 		int b_lo = points[i + 1].b;
@@ -1945,7 +1945,7 @@ void lcd_settings_haptics_nvs_save(void)
 
 	// Pack the 6 bools into a single byte mask
 	uint8_t mask = 0;
-	for (int i = 0; i < 6; i++) {
+	for (int i = 0; i < 6; ++i) {
 		if (haptic_btns[i]) {
 			mask |= (1 << i);
 		}
@@ -1987,7 +1987,7 @@ void lcd_settings_haptics_nvs_load(void)
 	// Load haptic btn states
 	uint8_t mask;
 	if (nvs_get_u8(h, SETTINGS_HAPTIC_STATES_KEY, &mask) == ESP_OK) {
-		for (int i = 0; i < 6; i++) {
+		for (int i = 0; i < 6; ++i) {
 			haptic_btns[i] = !!(mask & (1 << i));
 		}
 	}

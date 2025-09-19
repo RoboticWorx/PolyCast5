@@ -68,7 +68,7 @@ void lcd_hotkey_setup_page(hotkey_menu_t *menu)
 	lv_style_set_text_align(&menu->sel_style, LV_TEXT_ALIGN_CENTER);
 
 	// Create button per option
-	for (int i = 0; i < menu->size; i++) {
+	for (int i = 0; i < menu->size; ++i) {
 		menu->btns[i] = lv_btn_create(menu->cont);
 		lv_obj_set_size(menu->btns[i], 58, 50);
 		
@@ -106,7 +106,7 @@ void lcd_hotkey_update_menu(hotkey_menu_t *menu)
 	}
 
 	// Reset every button to unselected
-	for (int i = 0; i < menu->size; i++) {
+	for (int i = 0; i < menu->size; ++i) {
 		lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
 		lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
 	}

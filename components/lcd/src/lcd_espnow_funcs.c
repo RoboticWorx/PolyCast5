@@ -123,7 +123,7 @@ void lcd_espnow_setup_page(espnow_menu_t *menu)
 	}
 	
 	// Create button for each option
-	for (int i = 0; i < menu->size; i++) {
+	for (int i = 0; i < menu->size; ++i) {
 
 		menu->btns[i] = lv_list_add_btn(menu->main_list, NULL, menu->options[i]);
 		lv_obj_set_size(menu->btns[i], 200, 30);
@@ -167,7 +167,7 @@ void lcd_espnow_update_menu(espnow_menu_t *menu)
 	}
 
 	// Reset every button to unselected
-	for (int i = 0; i < menu->size; i++) {
+	for (int i = 0; i < menu->size; ++i) {
 		lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
 		lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
 	}
@@ -204,7 +204,7 @@ static bool display_mac_and_lmk(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 	int written = snprintf(p, OUT_BUF_LEN, "Generated key:\n");
 	p += written;
 	// Append each byte as two‐digit hex + colon (except last)
-	for (int i = 0; i < LMK_LEN; i++) {
+	for (int i = 0; i < LMK_LEN; ++i) {
 		if (i == 8) {
 			*p++ = '\n';
 		}
@@ -363,7 +363,7 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 		lv_obj_set_scrollbar_mode(container, LV_SCROLLBAR_MODE_OFF);
 
 		// Create labels for container
-		for (int i = 0; i < 12; i++) {
+		for (int i = 0; i < 12; ++i) {
 			lbl_sel_digit[i] = lv_label_create(container);
 			
 			// Start all digits at 0
@@ -465,7 +465,7 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 	// Go back
 	else if (ui_btns->left_btn) {
 		// Clean all
-		for (int i = 0; i < 12; i++) {
+		for (int i = 0; i < 12; ++i) {
 			lv_obj_delete(lbl_sel_digit[i]);
 			lbl_sel_digit[i] = NULL;
 		}
@@ -493,7 +493,7 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 	// Go home or power off
 	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Clean all
-		for (int i = 0; i < 12; i++) {
+		for (int i = 0; i < 12; ++i) {
 			lv_obj_delete(lbl_sel_digit[i]);
 			lbl_sel_digit[i] = NULL;
 		}
@@ -530,7 +530,7 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 		}		
 		
 		// Clean all
-		for (int i = 0; i < 12; i++) {
+		for (int i = 0; i < 12; ++i) {
 			lv_obj_delete(lbl_sel_digit[i]);
 			lbl_sel_digit[i] = NULL;
 		}
@@ -1101,7 +1101,7 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 			lv_obj_delete(espnow_menu->btns[del_idx]); // LVGL list button
 		
 			// Shift everything above it down one
-			for (int i = del_idx; i < espnow_menu->size - 1; i++) {
+			for (int i = del_idx; i < espnow_menu->size - 1; ++i) {
 				// Change each to the one after
 				espnow_menu->options[i] = espnow_menu->options[i + 1];
 				espnow_menu->btns[i] = espnow_menu->btns[i + 1];
@@ -1360,7 +1360,7 @@ esp_err_t lcd_espnow_menu_nvs_save(const espnow_menu_t *menu)
 		goto out;
 
 	// Loop through all and number them: 00, 01, etc.
-	for (uint8_t i = 0; i < user_cnt; i++) {
+	for (uint8_t i = 0; i < user_cnt; ++i) {
 		char key[16];
 		snprintf(key, sizeof(key), ESPNOW_MENU_KEY_FMT, i);
 		
@@ -1402,7 +1402,7 @@ esp_err_t lcd_espnow_menu_nvs_load(espnow_menu_t *menu)
 	menu->index = 0;
 
 	// Loop through all keys
-	for (uint8_t i = 0; i < user_cnt; i++) {
+	for (uint8_t i = 0; i < user_cnt; ++i) {
 		
 		char key[16];
 		snprintf(key, sizeof(key), ESPNOW_MENU_KEY_FMT, i);
@@ -1457,7 +1457,7 @@ esp_err_t lcd_espnow_rx_mac_nvs_save(const espnow_menu_t *espnow_menu)
 	}
 
 	// Write each present MAC, erase any that were removed
-	for (int i = 0; i < MAX_ESPNOW_OPTIONS; i++) {
+	for (int i = 0; i < MAX_ESPNOW_OPTIONS; ++i) {
 		// Format key
 		char key[16];
 		snprintf(key, sizeof(key), ESPNOW_RX_MAC_KEY_FMT, i);
@@ -1507,7 +1507,7 @@ esp_err_t lcd_espnow_lmk_nvs_save(const espnow_menu_t *espnow_menu)
 	}
 
 	// Write each present LMK, erase any that were removed
-	for (int i = 0; i < MAX_ESPNOW_OPTIONS; i++) {
+	for (int i = 0; i < MAX_ESPNOW_OPTIONS; ++i) {
 		// Format key
 		char key[16];
 		snprintf(key, sizeof(key), ESPNOW_LMK_KEY_FMT, i);
@@ -1562,7 +1562,7 @@ esp_err_t lcd_espnow_rx_mac_nvs_load(espnow_menu_t *espnow_menu)
 	memset(espnow_menu->rx_mac, 0, sizeof(espnow_menu->rx_mac));
 
 	// Read each MAC into a blob
-	for (uint8_t i = 0; i < cnt; i++) {
+	for (uint8_t i = 0; i < cnt; ++i) {
 		// Format key
 		char key[16];
 		snprintf(key, sizeof(key), ESPNOW_RX_MAC_KEY_FMT, i);
@@ -1616,7 +1616,7 @@ esp_err_t lcd_espnow_lmk_nvs_load(espnow_menu_t *espnow_menu)
 	memset(espnow_menu->lmk, 0, sizeof(espnow_menu->lmk));
 
 	// Read each MAC into a blob
-	for (uint8_t i = 0; i < cnt; i++) {
+	for (uint8_t i = 0; i < cnt; ++i) {
 		// Format key
 		char key[16];
 		snprintf(key, sizeof(key), ESPNOW_LMK_KEY_FMT, i);
@@ -1660,7 +1660,7 @@ esp_err_t lcd_espnow_rx_mac_lmk_nvs_delete(espnow_menu_t *espnow_menu, uint8_t s
 		return ESP_ERR_INVALID_ARG;
 
 	// Shift everything after slot up one remove slot
-	for (uint8_t i = slot; i < user_cnt - 1; i++) {
+	for (uint8_t i = slot; i < user_cnt - 1; ++i) {
 		memcpy(espnow_menu->rx_mac[i + 1], espnow_menu->rx_mac[i + 2], ESPNOW_MAC_SIZE);
 		memcpy(espnow_menu->lmk[i + 1], espnow_menu->lmk[i + 2], LMK_LEN);
 	}
@@ -1694,7 +1694,7 @@ esp_err_t lcd_espnow_rx_mac_lmk_nvs_delete(espnow_menu_t *espnow_menu, uint8_t s
 		nvs_get_u8(h, ESPNOW_MENU_KEY_COUNT, &cnt);
 		ESP_LOGI(TAG, "=== ESP-NOW peer names (%u) ===", cnt);
 	
-		for (uint8_t i = 0; i < cnt; i++) {
+		for (uint8_t i = 0; i < cnt; ++i) {
 			char key[16];  snprintf(key, sizeof(key), ESPNOW_MENU_KEY_FMT, i);
 	
 			size_t len = 0;
@@ -1726,7 +1726,7 @@ esp_err_t lcd_espnow_rx_mac_lmk_nvs_delete(espnow_menu_t *espnow_menu, uint8_t s
 		nvs_get_u8(h, ESPNOW_RX_MAC_KEY_COUNT, &cnt);
 		ESP_LOGI(TAG, "=== ESP-NOW peer MACs (%u) ===", cnt);
 	
-		for (uint8_t i = 0; i < cnt; i++) {
+		for (uint8_t i = 0; i < cnt; ++i) {
 			char key[16];  snprintf(key, sizeof(key), ESPNOW_RX_MAC_KEY_FMT, i);
 			uint8_t mac[6]; size_t len = sizeof(mac);
 	
@@ -1754,7 +1754,7 @@ esp_err_t lcd_espnow_rx_mac_lmk_nvs_delete(espnow_menu_t *espnow_menu, uint8_t s
 		nvs_get_u8(h, ESPNOW_LMK_KEY_COUNT, &cnt);
 		ESP_LOGI(TAG, "=== ESP-NOW LMKs (%u) ===", cnt);
 	
-		for (uint8_t i = 0; i < cnt; i++) {
+		for (uint8_t i = 0; i < cnt; ++i) {
 			char key[16];
 			snprintf(key, sizeof(key), ESPNOW_LMK_KEY_FMT, i);
 	

@@ -834,7 +834,7 @@ void lcd_ir_build_current_menu(ir_menu_t *menu, size_t c)
 	lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
 
 	// Create signal buttons
-	for (size_t i = 0; i < remotes[c].num_signals; i++) {
+	for (size_t i = 0; i < remotes[c].num_signals; ++i) {
 		// Add button with signal name
 		menu->btns[3 + i] = lv_list_add_btn(menu->main_list, NULL, remotes[c].signal_names[i]); // Start after default options
 		
@@ -872,7 +872,7 @@ void lcd_ir_update_menu(ir_menu_t *ir_menu)
 	}
 
 	// Reset every button to unselected
-	for (int i = 0; i < ir_menu->size; i++) {
+	for (int i = 0; i < ir_menu->size; ++i) {
 		// If remote name
 		if (i == 0) {
 			lv_obj_remove_style(ir_menu->btns[i], &ir_menu->name_sel_style, 0);

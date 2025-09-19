@@ -14,20 +14,23 @@ LTP of synapses between neurons in the brain.
 #ifndef SRS_MEMORY_H
 #define SRS_MEMORY_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
+#define SRS_NS "srs"
+
 #define SRS_MAX_ENTRIES 2048 // Max number of entries
+#define SRS_NUM_STEPS 8
 
 typedef struct {
 	uint16_t page; // Notebook page number
-	uint16_t step; // 0...SRS_NUM_STEPS - 1
-	uint32_t last_day; // Days since epoch of last review/creation
+	uint16_t step; // 0...SRS_NUM_STEPS - 1: e.g. 1d > 3d > 7d ...
+	uint32_t start_day; // Day of creation relative to epoch
 } srs_entry_t;
 
 extern srs_entry_t srs_tbl[SRS_MAX_ENTRIES];
 
 extern const uint16_t srs_days[];
-#define SRS_NUM_STEPS (sizeof(srs_days)/sizeof(srs_days[0]))
 
 /** 
  * @brief Saves SRS struct to NVS
@@ -44,16 +47,15 @@ void srs_nvs_load(void);
  *
  * @returns Days since epoch
  */
-uint32_t srs_days_since_epoch_local(void);
+uint32_t srs_days_since_epoch(void);
 
 /** 
  * @brief Saves SRS struct to NVS
  *
  * @param [out] out_idx Due entries
- * @param [in] max_out Max number of entries
  * @param [in] today Current day
  *
- * @returns Total number due of entries
+ * @returns Total number of due entries
  */
 int srs_build_due_list(int *out_idx, int max_out, uint32_t today);
 
@@ -82,7 +84,9 @@ uint16_t srs_next_default_page(void);
 
 /** 
  * @brief Gets the current time and data over Wi-Fi to sync to RTC
+ *
+ * @returns True on success
  */
-void srs_sync_time_over_wifi(void);
+bool srs_sync_time_over_wifi(void);
 
 #endif // SRS_MEMORY_H

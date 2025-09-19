@@ -156,8 +156,8 @@ void wifi_funcs_get_current_date_time(void)
 	// Configure the timezone environment
 	setenv("TZ", "EST5EDT,M3.2.0/2,M11.1.0/2", 1);
 	tzset();
-	// • Standard time = UTC–5 (“EST”)
-	// • Daylight time = UTC–4 (“EDT”)
+	// • Standard time = UTC–5 ('EST')
+	// • Daylight time = UTC–4 ('EDT')
 	// • DST starts 2nd Sunday in March at 2 AM
 	// • DST ends 1st Sunday in November at 2 AM
 	// `tzset()` makes the library re-read that TZ rule now.

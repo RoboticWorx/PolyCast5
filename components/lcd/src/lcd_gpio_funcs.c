@@ -86,7 +86,7 @@ void lcd_gpio_setup_page(gpio_menu_t *menu)
 	}
 	
 	// Create button for each option
-	for (int i = 0; i < menu->size; i++) {
+	for (int i = 0; i < menu->size; ++i) {
 
 		menu->btns[i] = lv_list_add_btn(menu->main_list, NULL, menu->options[i]);
 		lv_obj_set_size(menu->btns[i], 200, 30);
@@ -130,7 +130,7 @@ void lcd_gpio_update_menu(gpio_menu_t *menu)
 	}
 
 	// Reset every button to unselected
-	for (int i = 0; i < menu->size; i++) {
+	for (int i = 0; i < menu->size; ++i) {
 		lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
 		lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
 	}

@@ -136,7 +136,7 @@ void lcd_wifi_setup_page(wifi_menu_t *menu)
 	}
 	
 	// Create button for each option
-	for (int i = 0; i < menu->size; i++) {
+	for (int i = 0; i < menu->size; ++i) {
 
 		menu->btns[i] = lv_list_add_btn(menu->main_list, NULL, menu->options[i]);
 		lv_obj_set_size(menu->btns[i], 200, 30);
@@ -180,7 +180,7 @@ void lcd_wifi_update_menu(wifi_menu_t *menu)
 	}
 
 	// Reset every button to unselected
-	for (int i = 0; i < menu->size; i++) {
+	for (int i = 0; i < menu->size; ++i) {
 		lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
 		lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
 	}
@@ -272,7 +272,7 @@ static void lcd_wifi_update_scan_menu(wifi_scan_menu_t *menu)
 	}
 
 	// Reset every button to unselected
-	for (int i = 0; i < menu->size; i++) {
+	for (int i = 0; i < menu->size; ++i) {
 		lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
 		lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
 	}
@@ -447,7 +447,7 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		monitoring_packets = false;
 		initialized = false;
 		scanned = false;
-		for (int i = 0; i < wifi_menu->scan_menu.size; i++) {
+		for (int i = 0; i < wifi_menu->scan_menu.size; ++i) {
 			locked[i] = false;
 			memset(bssids[i], 0, sizeof(bssids[i]));
 			channels[i] = 0;
@@ -479,7 +479,7 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		monitoring_packets = false;
 		initialized = false;
 		scanned = false;
-		for (int i = 0; i < wifi_menu->scan_menu.size; i++) {
+		for (int i = 0; i < wifi_menu->scan_menu.size; ++i) {
 			locked[i] = false;
 			memset(bssids[i], 0, sizeof(bssids[i]));
 			channels[i] = 0;
@@ -507,7 +507,7 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		monitoring_packets = false;
 		initialized = false;
 		scanned = false;
-		for (int i = 0; i < wifi_menu->scan_menu.size; i++) {
+		for (int i = 0; i < wifi_menu->scan_menu.size; ++i) {
 			locked[i] = false;
 			memset(bssids[i], 0, sizeof(bssids[i]));
 			channels[i] = 0;
@@ -542,7 +542,7 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		monitoring_packets = false;
 		initialized = false;
 		scanned = false;
-		for (int i = 0; i < wifi_menu->scan_menu.size; i++) {
+		for (int i = 0; i < wifi_menu->scan_menu.size; ++i) {
 			locked[i] = false;
 			memset(bssids[i], 0, sizeof(bssids[i]));
 			channels[i] = 0;
@@ -584,7 +584,7 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 				monitoring_packets = false;
 				initialized = false;
 				scanned = false;
-				for (int i = 0; i < wifi_menu->scan_menu.size; i++) {
+				for (int i = 0; i < wifi_menu->scan_menu.size; ++i) {
 					locked[i] = false;
 					memset(bssids[i], 0, sizeof(bssids[i]));
 					channels[i] = 0;
@@ -614,7 +614,7 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 				monitoring_packets = false;
 				initialized = false;
 				scanned = false;
-				for (int i = 0; i < wifi_menu->scan_menu.size; i++) {
+				for (int i = 0; i < wifi_menu->scan_menu.size; ++i) {
 					locked[i] = false;
 					memset(bssids[i], 0, sizeof(bssids[i]));
 					channels[i] = 0;
@@ -654,7 +654,7 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 			monitoring_packets = false;
 			initialized = false;
 			scanned = false;
-			for (int i = 0; i < wifi_menu->scan_menu.size; i++) {
+			for (int i = 0; i < wifi_menu->scan_menu.size; ++i) {
 				locked[i] = false;
 				memset(bssids[i], 0, sizeof(bssids[i]));
 				channels[i] = 0;
@@ -1270,7 +1270,7 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		int32_t *ya = lv_chart_get_y_array(chart, series);
 		
 		// Copy each client’s latest RSSI into that array in sorted order
-		for (uint32_t i = 0; i < bars; i++) {
+		for (uint32_t i = 0; i < bars; ++i) {
 			ya[i] = wifi_data->clients[i].rssi;
 		}
 
@@ -1283,7 +1283,7 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		
 		off += snprintf(buf, sizeof(buf), "Unique users (MACs):\n");
 
-		for (uint32_t i = 0; i < wifi_data->client_count && off < sizeof(buf); i++) {
+		for (uint32_t i = 0; i < wifi_data->client_count && off < sizeof(buf); ++i) {
 			const uint8_t *m = wifi_data->clients[i].mac;
 			off += snprintf(buf + off, sizeof(buf) - off, "%02X:%02X:%02X:%02X:%02X:%02X @%3d\n",
 							m[0],m[1],m[2],m[3],m[4],m[5],
@@ -1836,7 +1836,7 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 			uint8_t topic_slot = del_idx - WIFI_MENU_START_SIZE;
 		
 			// Shift all keys after topic_slot down one
-			for (uint8_t i = topic_slot; (i + 1) < (wifi_menu->size - WIFI_MENU_START_SIZE); i++) {
+			for (uint8_t i = topic_slot; (i + 1) < (wifi_menu->size - WIFI_MENU_START_SIZE); ++i) {
 				memcpy(wifi_menu->topic_keys[i], wifi_menu->topic_keys[i + 1], TOPIC_KEY_LEN);
 			}
 			
@@ -1848,7 +1848,7 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 			lv_obj_del(wifi_menu->btns[del_idx]);
 			
 			// Shift all the remaining options and buttons down one
-			for (uint8_t i = del_idx; (i + 1) < wifi_menu->size; i++) {
+			for (uint8_t i = del_idx; (i + 1) < wifi_menu->size; ++i) {
 				wifi_menu->options[i] = wifi_menu->options[i + 1];
 				wifi_menu->btns[i] = wifi_menu->btns[i + 1];
 			}
@@ -2384,7 +2384,7 @@ esp_err_t lcd_wifi_menu_nvs_save(const wifi_menu_t *menu)
 		goto out;
 
 	// Loop through all and number them: 00, 01, etc.
-	for (uint8_t i = 0; i < user_cnt + 1; i++) {
+	for (uint8_t i = 0; i < user_cnt + 1; ++i) {
 		// Format key
 		char key[16];
 		snprintf(key, sizeof(key), WIFI_MENU_KEY_FMT, i);
@@ -2437,7 +2437,7 @@ esp_err_t lcd_wifi_menu_nvs_load(wifi_menu_t *menu)
 	menu->index = 0;
 
 	// Loop through all keys
-	for (uint8_t i = 0; i < user_cnt; i++) {
+	for (uint8_t i = 0; i < user_cnt; ++i) {
 		// Format key
 		char key[16];
 		snprintf(key, sizeof(key), WIFI_MENU_KEY_FMT, i);
@@ -2492,7 +2492,7 @@ esp_err_t lcd_wifi_topic_keys_nvs_save(const wifi_menu_t *menu)
 	}
 
 	// For every user entry, add the key or erase
-	for (int i = 0; i < count + 1; i++) {
+	for (int i = 0; i < count + 1; ++i) {
 		// Format key
 		char key[16];
 		snprintf(key, sizeof(key), WIFI_TOPIC_KEY_FMT, i);
@@ -2555,7 +2555,7 @@ esp_err_t lcd_wifi_topic_keys_nvs_load(wifi_menu_t *menu)
 	memset(menu->topic_keys, 0, sizeof(menu->topic_keys));
 
 	// Pull out each topic key
-	for (uint8_t i = 0; i < count; i++) {
+	for (uint8_t i = 0; i < count; ++i) {
 		// Format key
 		char key[16];
 		snprintf(key, sizeof(key), WIFI_TOPIC_KEY_FMT, i);
@@ -2608,7 +2608,7 @@ esp_err_t lcd_wifi_topic_keys_nvs_load(wifi_menu_t *menu)
 		}
 	
 		// For every entry
-		for (int i = 0; i < user_cnt; i++) {
+		for (int i = 0; i < user_cnt; ++i) {
 			char key[16];
 			snprintf(key, sizeof(key), WIFI_MENU_KEY_FMT, i);
 	
@@ -2665,7 +2665,7 @@ esp_err_t lcd_wifi_topic_keys_nvs_load(wifi_menu_t *menu)
 		}
 	
 		// Loop every possible slot
-		for (int i = 0; i < MAX_WIFI_OPTIONS; i++) {
+		for (int i = 0; i < MAX_WIFI_OPTIONS; ++i) {
 			// Format key
 			char key[16];
 			snprintf(key, sizeof(key), WIFI_TOPIC_KEY_FMT, i);

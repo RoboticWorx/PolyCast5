@@ -138,7 +138,7 @@ void lcd_lora_setup_page(lora_menu_t *menu)
 	}
 	
 	// Create button for each option
-	for (int i = 0; i < menu->size; i++) {
+	for (int i = 0; i < menu->size; ++i) {
 
 		menu->btns[i] = lv_list_add_btn(menu->main_list, NULL, menu->options[i]);
 		lv_obj_set_size(menu->btns[i], 200, 30);
@@ -178,7 +178,7 @@ void lcd_lora_setup_subpage(lora_menu_t *menu)
 	// Initialize submenu struct
 	menu->submenu.size = submenu_count;
 	menu->submenu.index = 0;
-	for (int i = 0; i < submenu_count; i++) {
+	for (int i = 0; i < submenu_count; ++i) {
 		menu->submenu.options[i] = (char*)submenu_options[i];
 	}
 	
@@ -224,7 +224,7 @@ void lcd_lora_setup_subpage(lora_menu_t *menu)
 	lv_style_set_text_align(&menu->submenu.sel_style, LV_TEXT_ALIGN_CENTER);
 
 	// Create button per option
-	for (int i = 0; i < menu->submenu.size; i++) {
+	for (int i = 0; i < menu->submenu.size; ++i) {
 		menu->submenu.btns[i] = lv_btn_create(menu->submenu.cont);
 		lv_obj_set_size(menu->submenu.btns[i], 58, 50);
 		
@@ -263,7 +263,7 @@ void lcd_lora_update_menu(lora_menu_t *menu)
 	}
 
 	// Reset every button to unselected
-	for (int i = 0; i < menu->size; i++) {
+	for (int i = 0; i < menu->size; ++i) {
 		lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
 		lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
 	}
@@ -294,7 +294,7 @@ void lcd_lora_update_submenu(lora_menu_t *menu)
 	}
 
 	// Reset every button to unselected
-	for (int i = 0; i < menu->submenu.size; i++) {
+	for (int i = 0; i < menu->submenu.size; ++i) {
 		lv_obj_remove_style(menu->submenu.btns[i], &menu->submenu.sel_style, 0);
 		lv_obj_add_style(menu->submenu.btns[i], &menu->submenu.btn_style, 0);
 	}
@@ -853,7 +853,7 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 		lv_obj_del(lora_menu->btns[del_idx]); // LVGL list button
 	
 		// Shift everything above it down one
-		for (int i = del_idx; i < lora_menu->size - 1; i++) {
+		for (int i = del_idx; i < lora_menu->size - 1; ++i) {
 			// Change each to the one after
 			lora_menu->options[i] = lora_menu->options[i + 1];
 			lora_menu->keys[i] = lora_menu->keys[i + 1];
@@ -1184,7 +1184,7 @@ void lcd_lora_setup_plan_page(ui_menu_t *ui_menu, lora_plan_menu_t *lora_plan_me
 	};
 
 	// Assign options
-	for (int i = 0; i < LORA_PLAN_SUBMENU_COUNT; i++) {
+	for (int i = 0; i < LORA_PLAN_SUBMENU_COUNT; ++i) {
 		lora_plan_menu->plan_options[i] = options[i];
 	}
 
@@ -1236,7 +1236,7 @@ void lcd_lora_setup_plan_page(ui_menu_t *ui_menu, lora_plan_menu_t *lora_plan_me
 	lv_style_set_text_align(&lora_plan_menu->plan_sel_style, LV_TEXT_ALIGN_CENTER);
 
 	// Create button per option
-	for (int i = 0; i < LORA_PLAN_SUBMENU_COUNT; i++) {
+	for (int i = 0; i < LORA_PLAN_SUBMENU_COUNT; ++i) {
 		lora_plan_menu->plan_btns[i] = lv_btn_create(lora_plan_menu->plan_cont);
 		lv_obj_set_size(lora_plan_menu->plan_btns[i], 48, 43);
 		
@@ -1284,7 +1284,7 @@ void lcd_lora_plan_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 	if (ui_btns->right_btn == 1 && lora_plan_menu->plan_index == 7) {
 		// Save selected days into global
 		int pos = 0;
-		for (int i = 0; i < 7; i++) {
+		for (int i = 0; i < 7; ++i) {
 			// If day selected
 			if (days_selected[i]) {
 				// '1' + i gives '1' for Monday (i==0), '2' for Tuesday, ... '7' for Sunday
@@ -1298,7 +1298,7 @@ void lcd_lora_plan_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		#endif
 		
 		// Reset all labels and days
-		for (int i = 0; i < 7; i++) {
+		for (int i = 0; i < 7; ++i) {
 			days_selected[i] = false;
 			lv_obj_t *lbl = lv_obj_get_child(lora_plan_menu->plan_btns[i], 0);
 			char buf[20];
@@ -1334,7 +1334,7 @@ void lcd_lora_plan_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 	// Back
 	else if (ui_btns->left_btn == 1 && lora_plan_menu->plan_index == 0) {
 		// Reset all labels and days
-		for (int i = 0; i < 7; i++) {
+		for (int i = 0; i < 7; ++i) {
 			days_selected[i] = false;
 			lv_obj_t *lbl = lv_obj_get_child(lora_plan_menu->plan_btns[i], 0);
 			char buf[20];
@@ -1417,7 +1417,7 @@ void lcd_lora_plan_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		// Else "REM" selected (remove)
 		else {
 			// Reset all labels and days
-			for (int i = 0; i < 7; i++) {
+			for (int i = 0; i < 7; ++i) {
 				days_selected[i] = false;
 				lv_obj_t *lbl = lv_obj_get_child(lora_plan_menu->plan_btns[i], 0);
 				char buf[20];
@@ -1442,7 +1442,7 @@ void lcd_lora_plan_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 	// Home or power off
 	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Reset all labels and days
-		for (int i = 0; i < 7; i++) {
+		for (int i = 0; i < 7; ++i) {
 			days_selected[i] = false;
 			lv_obj_t *lbl = lv_obj_get_child(lora_plan_menu->plan_btns[i], 0);
 			char buf[20];
@@ -1548,7 +1548,7 @@ void lcd_lora_plan_confirm_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_
 // Helper to update the full time range label using individual char labels
 static void update_time_label(lv_obj_t *time_labels[], char *start_time, char *end_time) {
 	const char *full_str = "00:00:00-00:00:00";  // Template for positions
-	for (int i = 0; i < 17; i++) {  // Full string length without null
+	for (int i = 0; i < 17; ++i) {  // Full string length without null
 		char ch[2] = { full_str[i], '\0' };  // Single char
 		if (i < 8) {
 			ch[0] = start_time[i];  // Override with actual start
@@ -1604,7 +1604,7 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 				&lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -15);
 
 		// Create individual char label for each digit
-		for (int i = 0; i < 17; i++) {
+		for (int i = 0; i < 17; ++i) {
 			time_labels[i] = lv_label_create(ACTIVE_SCR);
 			lcd_format_label(time_labels[i], "0", user_secondary_color,
 					 &lv_font_montserrat_18, LV_ALIGN_CENTER, PLAN_TIME_X_BASE + (i * PLAN_TIME_DIGIT_WIDTH), 0);
@@ -1663,7 +1663,7 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		lv_obj_delete(lbl_subpage_times);
 		lv_obj_delete(lbl_selected_icon);
 		lv_obj_delete(lbl_ins);
-		for (int i = 0; i < 17; i++) {
+		for (int i = 0; i < 17; ++i) {
 			lv_obj_delete(time_labels[i]);
 		}
 
@@ -1695,7 +1695,7 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		lv_obj_delete(lbl_subpage_times);
 		lv_obj_delete(lbl_selected_icon);
 		lv_obj_delete(lbl_ins);
-		for (int i = 0; i < 17; i++) {
+		for (int i = 0; i < 17; ++i) {
 			lv_obj_delete(time_labels[i]);
 		}
 
@@ -1797,7 +1797,7 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		lv_obj_delete(lbl_subpage_times);
 		lv_obj_delete(lbl_selected_icon);
 		lv_obj_delete(lbl_ins);
-		for (int i = 0; i < 17; i++) {
+		for (int i = 0; i < 17; ++i) {
 			lv_obj_delete(time_labels[i]);
 		}
 
@@ -1824,7 +1824,7 @@ void lcd_lora_update_plan_menu(lora_plan_menu_t *lora_plan_menu)
 	}
 
 	// Reset every button to unselected
-	for (int i = 0; i < LORA_PLAN_SUBMENU_COUNT; i++) {
+	for (int i = 0; i < LORA_PLAN_SUBMENU_COUNT; ++i) {
 		lv_obj_remove_style(lora_plan_menu->plan_btns[i], &lora_plan_menu->plan_sel_style, 0);
 		lv_obj_add_style(lora_plan_menu->plan_btns[i], &lora_plan_menu->plan_btn_style, 0);
 	}
@@ -1986,7 +1986,7 @@ esp_err_t lcd_lora_menu_nvs_save(const lora_menu_t *menu)
 		goto out;
 
 	// Loop through all and number them: n00, n01, etc.
-	for (uint8_t i = 0; i < user_cnt; i++) {
+	for (uint8_t i = 0; i < user_cnt; ++i) {
 		char key[16];
 		snprintf(key, sizeof(key), LORA_OPTIONS_KEY_FMT, i);
 		
@@ -2026,7 +2026,7 @@ esp_err_t lcd_lora_key_nvs_save(const lora_menu_t *menu)
 		goto out;
 
 	// Loop through all and number them: n00, n01, etc.
-	for (uint8_t i = 0; i < user_cnt; i++) {
+	for (uint8_t i = 0; i < user_cnt; ++i) {
 		char key[16];
 		snprintf(key, sizeof(key), LORA_ENC_KEY_FMT, i);
 		
@@ -2068,7 +2068,7 @@ esp_err_t lcd_lora_menu_nvs_load(lora_menu_t *menu)
 	menu->index = 0;
 
 	// Loop through all keys
-	for (uint8_t i = 0; i < user_cnt; i++) {
+	for (uint8_t i = 0; i < user_cnt; ++i) {
 		
 		char key[16];
 		snprintf(key, sizeof(key), LORA_OPTIONS_KEY_FMT, i);
@@ -2125,7 +2125,7 @@ esp_err_t lcd_lora_key_nvs_load(lora_menu_t *menu)
 	menu->index = 0;
 
 	// Loop through all keys
-	for (uint8_t i = 0; i < user_cnt; i++) {
+	for (uint8_t i = 0; i < user_cnt; ++i) {
 		
 		char key[16];
 		snprintf(key, sizeof(key), LORA_ENC_KEY_FMT, i);
@@ -2189,7 +2189,7 @@ esp_err_t lcd_lora_menu_nvs_delete(uint8_t del_idx)
 	}
 
 	// Shift every key above del_idx down one slot
-	for (uint8_t i = del_idx; i < user_cnt; i++) {
+	for (uint8_t i = del_idx; i < user_cnt; ++i) {
 		char key_src[16], key_dst[16];
 		
 		// Format key
@@ -2265,7 +2265,7 @@ esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx)
 	uint8_t tmp[LORA_ENC_KEY_LEN];
 
 	// Shift all keys down one
-	for (uint8_t i = del_idx; i < user_cnt; i++) {
+	for (uint8_t i = del_idx; i < user_cnt; ++i) {
 		char src[16], dst[16];
 		
 		// Format key

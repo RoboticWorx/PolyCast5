@@ -69,10 +69,8 @@ static void lcd_task(void *pvParameters)
 	TickType_t sleep_timer_last = xTaskGetTickCount();
 	
 	uint8_t battery_percentage;
-	
-	//nvs_flash_erase(); // Factory reset
 
-	//lcd_ns_nvs_clear(ESPNOW_RX_MAC_NS);
+	//lcd_ns_nvs_clear("srs");
 	//lcd_ns_nvs_clear(ESPNOW_MENU_NS);
 	//lcd_ns_nvs_clear(ESPNOW_LMK_NS);
 	
@@ -351,8 +349,11 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == TOOLS_NUM_GEN_PAGE) {
 				lcd_tools_num_gen_page(&ui_btns, &ui_menu, &tools_menu);
 			}
-			else if (ui_menu.page == TOOLS_MEMORY_PAGE) {
-				lcd_tools_memory_page(&ui_btns, &ui_menu, &tools_menu);
+			else if (ui_menu.page == TOOLS_HOW_SRS_PAGE) {
+				lcd_tools_how_srs_page(&ui_btns, &ui_menu, &tools_menu);
+			}
+			else if (ui_menu.page == TOOLS_SRS_PAGE) {
+				lcd_tools_srs_page(&ui_btns, &ui_menu, &tools_menu);
 			}
 			// Settings pages
 			else if (ui_menu.page == SETTINGS_PAGE) {
@@ -422,7 +423,7 @@ static void lcd_task(void *pvParameters)
 			lcd_device_sleep();
 		}
 		#else
-		TickType_t sleep_timer_interval = pdMS_TO_TICKS(sleep_time_s * 1000);
+		TickType_t sleep_timer_interval = pdMS_TO_TICKS(sleep_time_s * 1000); // sleep_time_s is extern
 		
 		// If home and sleep_timer_interval has passed without intervention
 		if ((ui_menu.page == HOME_PAGE) && ((xTaskGetTickCount() - sleep_timer_last >= sleep_timer_interval) || go_to_sleep)) {

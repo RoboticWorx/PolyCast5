@@ -1,3 +1,4 @@
+#include "freertos/idf_additions.h"
 #include "polycast5_macros.h"
 
 #include <stdlib.h>
@@ -391,7 +392,7 @@ static void warm_img(const char *path) {
 
 static void warm_anim(const char **paths, int cnt) {
 	lv_image_decoder_dsc_t dsc;
-	for (int i = 0; i < cnt; i++) {
+	for (int i = 0; i < cnt; ++i) {
 		if (lv_image_decoder_open(&dsc, paths[i], NULL) == LV_RESULT_OK) {
 			lv_image_decoder_close(&dsc);
 		}
@@ -1591,7 +1592,7 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
 			
 			// Outline red
-			for (int i = 0; i < num_boxes; i++) {
+			for (int i = 0; i < num_boxes; ++i) {
 				lv_obj_set_style_border_color(lv_obj_get_parent(unlock_labels[i]), lv_palette_main(LV_PALETTE_RED), 0);
 			}
 			
@@ -1763,12 +1764,22 @@ void lcd_funcs_transition_back(bool home, ui_menu_t *ui_menu)
 	lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 	
-	if (home) { // Transition to home
+	// Transition to home
+	if (home) { 
+		// Reset long semaphores to avoid false triggers
+		xQueueReset(xSelectButtonLongSemaphore);
+		xQueueReset(xHomeButtonLongSemaphore);
+		xQueueReset(xUpButtonLongSemaphore);
+		xQueueReset(xDownButtonLongSemaphore);
+		xQueueReset(xLeftButtonLongSemaphore);
+		xQueueReset(xRightButtonLongSemaphore);
+		
 		start_animation();
 
 		ui_menu->page = HOME_PAGE;
 	}
-	else { // Transition to sleep
+	// Transition to sleep
+	else {
 		gpio_set_level(ST7789_LEDA_PIN, 0); // BL low so user doesn't see redraw
 	
 		start_animation();
@@ -2458,7 +2469,7 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
 		// Switch pages
 		ui_menu->page = TOOLS_NUM_GEN_PAGE;
 	}
-	// Memory assist selected
+	// SRS memory assist selected
 	else if (ui_btns->select_btn == 1 && tools_menu->index == 4) {
 		// Hide tools menu
 		lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -2466,15 +2477,11 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
 		// Reset static
 		do_once = false;
 		
-		// Hide up/down arrow
-		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-		
 		// Show right arrow
 		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Switch pages
-		ui_menu->page = TOOLS_MEMORY_PAGE;
+		ui_menu->page = TOOLS_HOW_SRS_PAGE;
 	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {

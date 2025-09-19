@@ -10,10 +10,15 @@ learned materials is better remembered by reviewing them at increasing intervals
 LTP of synapses between neurons in the brain.
 
 */
+#include "freertos/projdefs.h"
+#include "lcd_utils.h"
+#include "misc/lv_types.h"
+#include "polycast5_macros.h"
 
 #include <stdbool.h>
 #include <stdint.h>
 #include <time.h>
+#include <inttypes.h>
 
 #include "freertos/idf_additions.h"
 
@@ -27,7 +32,7 @@ LTP of synapses between neurons in the brain.
 #define TAG "SRS_MEMORY"
 
 // Namespace and keys
-#define SRS_NS "srs"
+#define SRS_FORMAT "e%04u"
 #define SRS_CNT_KEY "cnt" // Number of entries key
 #define SRS_LAST_PAGE_KEY "last" // Last page used (for auto-increment)
 
@@ -42,23 +47,24 @@ EXT_RAM_BSS_ATTR static int srs_tmp_idx[SRS_MAX_ENTRIES];
 static uint16_t srs_cnt = 0;
 static uint16_t srs_last_page = 0;
 
-/* Helpers */
+/* --------------- Helpers --------------- */
 
 // Check if RTC synced
-static bool rtc_likely_unsynced(void)
+static bool rtc_synced(void)
 {
 	// Treat anything before 2025 as "unsynced"
 	struct tm t; 
 	time_t now = time(NULL);
+
+	// If unsynced
 	if (now <= 0) {
-		return true;
+		return false;
 	}
 	
+	// Else synced
 	localtime_r(&now, &t);
-	return (t.tm_year < 125); // Years since 1900
+	return (t.tm_year >= 125); // Years since 1900
 }
-
-/* Core SRS logic */
 
 static int srs_find_by_page(uint16_t page)
 {
@@ -77,23 +83,39 @@ static int srs_find_by_page(uint16_t page)
 // Check if a page is due
 static bool srs_is_due(const srs_entry_t *e, uint32_t today)
 {
-	// Due when the number of days since last review (today - last_day) is >= the current step's interval
+	// Due if today is later than or on the day added + current step interval
 	uint16_t interval = srs_days[e->step];
-	return (today >= e->last_day + interval);
+	return (today >= e->start_day + interval);
 }
 
-void srs_sync_time_over_wifi(void)
+/* --------------- Core --------------- */
+
+bool srs_sync_time_over_wifi(void)
 {
 	// Check if RTC synced
-	if (!rtc_likely_unsynced()) {
-		return;
+	if (rtc_synced()) {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Time already synced");
+		#endif
+		return true; // No need for Wi-Fi if already synced
 	}
 
+	// Confirmation text
+	lv_obj_t *lbl_info = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_info, "Getting day via Wi-Fi...", user_secondary_color,
+			&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
+	lv_timer_handler();
+
+	#ifdef POLYCAST5_DEBUG
+	ESP_LOGI(TAG, "Getting day via Wi-Fi");
+	#endif
+
+	/* If not synced */
 	// Ask Wi-Fi to reconnect to the last used network
 	wifi_login_t selected_network = wifi_funcs_get_prev(); // Loads boot state saved network info
 	selected_network.prev = true; // Connecting to previous
 	if (xQueueSend(xWifiSelectedNetworkQueue, &selected_network, portMAX_DELAY) != pdPASS) {
-		ESP_LOGE(TAG, "Failed srs_sync_time_over_wifi: xWifiSelectedNetworkQueue previous_network");
+		ESP_LOGE(TAG, "Failed srs_sync_time_over_wifi: xWifiSelectedNetworkQueue");
 	}
 
 	// Wait up to 6s for connection
@@ -101,9 +123,34 @@ void srs_sync_time_over_wifi(void)
 		// Get time
 		wifi_funcs_get_current_date_time();
 		
-		// Done with Wi-Fi
+		// Done with Wi-Fi -> disconnect to save power
 		xSemaphoreGive(xWifiDisconnectSemaphore);
+
+		lcd_clear_pending_inputs = true; // Clear user inputs from wait
 	}
+	// If failed
+	else {
+		// Notify user
+		lcd_format_label(lbl_info, "Failed!\n\nPlease connect to a Wi-Fi\nnetwork at least once.\nYou can disconnect after.", user_secondary_color,
+				&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
+
+		// Show
+		lv_timer_handler();
+		vTaskDelay(pdMS_TO_TICKS(4000));
+
+		// Delete helper text
+		lv_obj_delete(lbl_info);
+		lbl_info = NULL;
+
+		lcd_clear_pending_inputs = true; // Clear user inputs from wait
+
+		return false;
+	}
+
+	// Delete helper text
+	lv_obj_delete(lbl_info);
+	lbl_info = NULL;
+	return true;
 }
 
 // Auto-increment page
@@ -132,13 +179,13 @@ void srs_add_or_reset(uint16_t page, uint32_t today)
 	if (idx >= 0) {
 		// Reset review cycle from today
 		srs_tbl[idx].step = 0;
-		srs_tbl[idx].last_day = today;
+		srs_tbl[idx].start_day = today;
 	}
 	// Else if there's room, append a new entry
 	else if (srs_cnt < SRS_MAX_ENTRIES) {
 		srs_tbl[srs_cnt].page = page;
 		srs_tbl[srs_cnt].step = 0;
-		srs_tbl[srs_cnt].last_day = today;
+		srs_tbl[srs_cnt].start_day = today;
 		srs_cnt++;
 	}
 	
@@ -163,9 +210,6 @@ void srs_mark_reviewed_index(int idx, uint32_t today)
 		srs_tbl[idx].step++;
 	}
 	
-	// Update last_day
-	srs_tbl[idx].last_day = today;
-	
 	// Persist to NVS
 	srs_nvs_save();
 }
@@ -173,39 +217,68 @@ void srs_mark_reviewed_index(int idx, uint32_t today)
 // Returns number of due entries; fills up to max_out indices of due order
 int srs_build_due_list(int *out_idx, int max_out, uint32_t today)
 {
-	// First collect
-	int n = 0;
-	
-	// Build the set of indices that are due today
+	const int cap = (int)(sizeof(srs_tmp_idx) / sizeof(srs_tmp_idx[0]));
+
+	int collected = 0; // How many we stored in srs_tmp_idx
+	int total_due = 0; // True number due
+
+	// Collect due indices up to temp buffer capacity
 	for (int i = 0; i < srs_cnt; ++i) {
+		// If due
 		if (srs_is_due(&srs_tbl[i], today)) {
-			srs_tmp_idx[n++] = i;
+			// And less than limit
+			if (collected < cap) {
+				// Append
+				srs_tmp_idx[collected++] = i;
+			}
+			total_due++; // Regardless
 		}
 	}
-	
-	// Most overdue appears first
-	for (int i = 0; i + 1 < n; ++i) {
-		for (int j = i + 1; j < n; ++j) {
-			int di = (int)(today - srs_tbl[srs_tmp_idx[i]].last_day) - (int)srs_days[srs_tbl[srs_tmp_idx[i]].step];
-			int dj = (int)(today - srs_tbl[srs_tmp_idx[j]].last_day) - (int)srs_days[srs_tbl[srs_tmp_idx[j]].step];
-			
-			// Swap if greater
-			if (dj > di) {
+
+	// Sort collected by most overdue using absolute schedule
+	// overdue = today - (start_day + interval(step))
+	for (int i = 0; i + 1 < collected; ++i) {
+		for (int j = i + 1; j < collected; ++j) {
+			const srs_entry_t *Ei = &srs_tbl[srs_tmp_idx[i]];
+			const srs_entry_t *Ej = &srs_tbl[srs_tmp_idx[j]];
+
+			int need_i = (int)srs_days[Ei->step];
+			int need_j = (int)srs_days[Ej->step];
+
+			int overdue_i = (int)today - (int)(Ei->start_day + (uint32_t)need_i);
+			int overdue_j = (int)today - (int)(Ej->start_day + (uint32_t)need_j);
+
+			// Swap handler
+			bool swap = false;
+			if (overdue_j > overdue_i) {
+				swap = true; // More overdue first
+			}
+			// Tie-breaker
+			else if (overdue_j == overdue_i) {
+				if (Ej->start_day < Ei->start_day) {
+					swap = true;
+				}
+				else if (Ej->start_day == Ei->start_day && Ej->page < Ei->page) {
+					swap = true;
+				}
+			}
+
+			// Swap places
+			if (swap) {
 				int t = srs_tmp_idx[i];
 				srs_tmp_idx[i] = srs_tmp_idx[j];
 				srs_tmp_idx[j] = t;
 			}
 		}
 	}
-	
-	// Emit
-	int out = (n < max_out) ? n : max_out;
+
+	// Emit up to max_out into caller's buffer
+	int out = (collected < max_out) ? collected : max_out;
 	for (int k = 0; k < out; ++k) {
 		out_idx[k] = srs_tmp_idx[k];
 	}
-	
-	// Return the total number due
-	return n;
+
+	return total_due;
 }
 
 void srs_nvs_load(void)
@@ -214,6 +287,11 @@ void srs_nvs_load(void)
 	
 	// Open NVS
 	if (nvs_open(SRS_NS, NVS_READONLY, &h) != ESP_OK) {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGW(TAG, "srs_nvs_load nvs_open failed");
+		#endif
+
+		// Set defaults
 		srs_cnt = 0;
 		srs_last_page = 0;
 		return;
@@ -221,26 +299,43 @@ void srs_nvs_load(void)
 
 	// Get number of entries
 	uint16_t cnt = 0;
-	nvs_get_u16(h, SRS_CNT_KEY, &cnt);
+	esp_err_t err = nvs_get_u16(h, SRS_CNT_KEY, &cnt);
+	if (err != ESP_OK) {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGE(TAG, "srs_nvs_load nvs_get_u16 CNT failed");
+		#endif
+	}
+
 	srs_cnt = 0;
 
 	// Get last used page (for +1 add)
 	uint16_t lastp = 0;
-	nvs_get_u16(h, SRS_LAST_PAGE_KEY, &lastp);
+	err = nvs_get_u16(h, SRS_LAST_PAGE_KEY, &lastp);
+	if (err != ESP_OK) {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGE(TAG, "srs_nvs_load nvs_get_u16 PAGE failed");
+		#endif
+	}
+
 	srs_last_page = lastp;
 
 	// Get all entries
-	for (uint16_t i = 0; i < cnt && i < SRS_MAX_ENTRIES; i++) {
+	for (uint16_t i = 0; i < cnt && i < SRS_MAX_ENTRIES; ++i) {
 		// Format key
-		char key[7]; // "e00" -> "eu16"
-		snprintf(key, sizeof(key), "e%04u", i); // e.g. "e0001"
+		char key[7];
+		snprintf(key, sizeof(key), SRS_FORMAT, i); // e.g. "e0001"
 		
 		// Get srs_entry_t blob
 		size_t len = sizeof(srs_entry_t);
 		srs_entry_t tmp;
 		if (nvs_get_blob(h, key, &tmp, &len) == ESP_OK && len == sizeof(srs_entry_t)) {
-			// If good srs_cnt++
+			// If good srs_cnt++ into srs_tbl
 			srs_tbl[srs_cnt++] = tmp;
+		}
+		else {
+			#ifdef POLYCAST5_DEBUG
+			ESP_LOGE(TAG, "srs_nvs_load nvs_get_blob failed at i=%d", i);
+			#endif
 		}
 	}
 	
@@ -254,21 +349,40 @@ void srs_nvs_save(void)
 	
 	// Open NVS
 	if (nvs_open(SRS_NS, NVS_READWRITE, &h) != ESP_OK) {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGW(TAG, "srs_nvs_save nvs_open failed");
+		#endif
 		return;
 	}
 
 	// Set count and last used page
-	nvs_set_u16(h, SRS_CNT_KEY, srs_cnt);
-	nvs_set_u16(h, SRS_LAST_PAGE_KEY, srs_last_page);
+	esp_err_t err = nvs_set_u16(h, SRS_CNT_KEY, srs_cnt);
+	if (err != ESP_OK) {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGE(TAG, "srs_nvs_load nvs_set_u16 CNT failed");
+		#endif
+	}
+
+	err = nvs_set_u16(h, SRS_LAST_PAGE_KEY, srs_last_page);
+	if (err != ESP_OK) {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGE(TAG, "srs_nvs_load nvs_set_u16 PAGE failed");
+		#endif
+	}
 
 	// Save each entry
-	for (uint16_t i = 0; i < srs_cnt; i++) {
+	for (uint16_t i = 0; i < srs_cnt; ++i) {
 		// Format key
 		char key[7];
-		snprintf(key, sizeof(key), "e%04u", i);
+		snprintf(key, sizeof(key), SRS_FORMAT, i);
 		
 		// Save srs_entry_t blob
-		nvs_set_blob(h, key, &srs_tbl[i], sizeof(srs_entry_t));
+		err = nvs_set_blob(h, key, &srs_tbl[i], sizeof(srs_entry_t));
+		if (err != ESP_OK) {
+			#ifdef POLYCAST5_DEBUG
+			ESP_LOGE(TAG, "srs_nvs_load nvs_set_blob failed");
+			#endif
+		}
 	}
 	
 	// Commit changes
@@ -279,13 +393,19 @@ void srs_nvs_save(void)
 }
 
 // Converts Unix seconds to whole days
-uint32_t srs_days_since_epoch_local(void)
+uint32_t srs_days_since_epoch(void)
 {
 	time_t now = time(NULL);
+
+	#ifdef POLYCAST5_DEBUG
+	ESP_LOGI(TAG, "srs_days_since_epoch now = %" PRId64 "s", (int64_t)now); // Seconds
+	ESP_LOGI(TAG, "srs_days_since_epoch now = %" PRIu32 "d", (uint32_t)(now / 86400)); // Days
+	#endif
+
 	if (now <= 0) {
 		return 0;
 	}
 	
 	// Round down by 86400 -> today index
-	return (uint32_t)(now / 86400);
+	return (uint32_t)(now / 86400); // 86400s per day
 }

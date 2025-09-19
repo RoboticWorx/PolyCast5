@@ -43,7 +43,7 @@ static void keyboard_menu_rebuild_lvlist(bluetooth_keyboard_menu_t *km)
 	}
 
 	// Create a button for each row we currently have
-	for (int i = 0; i < km->size; i++) {
+	for (int i = 0; i < km->size; ++i) {
 		km->btns[i] = lv_list_add_btn(km->main_list, NULL, km->options[i]);
 		lv_obj_set_size(km->btns[i], 200, 30);
 
@@ -95,7 +95,7 @@ static void keyboard_menu_refresh_from_nvs(bluetooth_keyboard_menu_t *km)
 	}
 
 	// Pull labels for each user script i -> row (i + NUM_KEYBOARD_BASE)
-	for (uint32_t i = 0; i < count; i++) {
+	for (uint32_t i = 0; i < count; ++i) {
 		// Fill default label first
 		script_labels[i][0] = '\0';
 
@@ -259,7 +259,7 @@ void lcd_bluetooth_setup_page(bluetooth_menu_t *menu)
 	}
 	
 	// Create button for each option
-	for (int i = 0; i < menu->size; i++) {
+	for (int i = 0; i < menu->size; ++i) {
 
 		menu->btns[i] = lv_list_add_btn(menu->main_list, NULL, menu->options[i]);
 		lv_obj_set_size(menu->btns[i], 200, 30);
@@ -303,7 +303,7 @@ void lcd_bluetooth_update_menu(bluetooth_menu_t *menu)
 	}
 
 	// Reset every button to unselected
-	for (int i = 0; i < menu->size; i++) {
+	for (int i = 0; i < menu->size; ++i) {
 		lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
 		lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
 	}
@@ -330,7 +330,7 @@ void lcd_bluetooth_update_keyboard_menu(bluetooth_keyboard_menu_t *menu)
 	}
 
 	// Reset every button to unselected
-	for (int i = 0; i < menu->size; i++) {
+	for (int i = 0; i < menu->size; ++i) {
 		lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
 		lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
 	}
