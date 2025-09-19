@@ -1,6 +1,6 @@
 Script:
 
-<ctrl+t><delay=100>https://youtu.be/dQw4w9WgXcQ?si=fCygLTFX4Usi2nlR<enter>
+<ctrl+t><delay=100>https://www.youtube.com/watch?v=dQw4w9WgXcQ<enter>
 
 Explanation:
 

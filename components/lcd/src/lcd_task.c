@@ -351,6 +351,9 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == TOOLS_NUM_GEN_PAGE) {
 				lcd_tools_num_gen_page(&ui_btns, &ui_menu, &tools_menu);
 			}
+			else if (ui_menu.page == TOOLS_MEMORY_PAGE) {
+				lcd_tools_memory_page(&ui_btns, &ui_menu, &tools_menu);
+			}
 			// Settings pages
 			else if (ui_menu.page == SETTINGS_PAGE) {
 				lcd_settings_page(&ui_btns, &ui_menu, &settings_menu);
@@ -420,7 +423,7 @@ static void lcd_task(void *pvParameters)
 		}
 		#else
 		TickType_t sleep_timer_interval = pdMS_TO_TICKS(sleep_time_s * 1000);
-			
+		
 		// If home and sleep_timer_interval has passed without intervention
 		if ((ui_menu.page == HOME_PAGE) && ((xTaskGetTickCount() - sleep_timer_last >= sleep_timer_interval) || go_to_sleep)) {
 			lcd_device_sleep();

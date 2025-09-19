@@ -1,6 +1,6 @@
 Script:
 
-<win+s><delay=500>browser<enter><delay=500>https://youtu.be/dQw4w9WgXcQ?si=fCygLTFX4Usi2nlR<enter>
+<win+s><delay=500>browser<enter><delay=500>https://www.youtube.com/watch?v=dQw4w9WgXcQ<enter>
 
 Explanation:
 

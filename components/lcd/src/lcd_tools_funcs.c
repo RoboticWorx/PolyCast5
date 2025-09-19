@@ -1,12 +1,15 @@
-#include "font/lv_symbol_def.h"
+#include <time.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
 
+#include "nvs.h"
 #include "esp_log.h"
 #include "esp_err.h"
 #include "esp_random.h"
 
 #include "core/lv_obj_pos.h"
+#include "font/lv_symbol_def.h"
 #include "core/lv_obj.h"
 #include "misc/lv_area.h"
 #include "misc/lv_timer.h"
@@ -15,12 +18,17 @@
 #include "lcd_asset_macros.h"
 #include "lcd_utils.h"
 
+#include "srs_memory.h"
+
 #include "img_coin_heads.h"
 #include "img_coin_tails.h"
 
+#define TAG "LCD_TOOLS_FUNCS"
+
+
 tools_menu_t tools_menu = {
-	.options = {"Coin flipper", "Dice roller", "Number generator", "Read the docs"},
-	.size = 4,
+	.options = {"Coin flipper", "Dice roller", "Read the docs", "Number generator", "Memory Assistant"},
+	.size = 5,
 	.index = 0,
 	.cont = NULL,
 };
@@ -880,4 +888,130 @@ void lcd_tools_num_gen_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
 	}
 }
 
+void lcd_tools_memory_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
+{
+	// Statics
+	static bool do_once = false;
+	static lv_obj_t *lbl_title, *lbl_help, *lbl_list[5], *lbl_hint;
+	static int sel = 0; // Selection cursor inside due list
+	static int due_total = 0; // Total due today (not just displayed)
+	static int due_vis = 0; // How many we're displaying (<= 5)
+	static int due_idx[8]; // Workspace of indices (store more than shown)
+	static uint32_t today = 0;
 
+	// Initialize
+	if (!do_once) {
+		// Check time and sync if needed
+		srs_sync_time_over_wifi();
+
+		// Load saved data
+		srs_nvs_load();
+
+		// Build UI
+		lbl_title = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_title, "Memory Assistant", user_secondary_color,
+				&lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 6);
+
+		lbl_help = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_help, "SELECT - Mark Done    RIGHT - Add" LV_SYMBOL_RIGHT, user_secondary_color, 
+				&lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, -6);
+
+		for (int i = 0; i < 5; ++i) {
+			lbl_list[i] = lv_label_create(ACTIVE_SCR);
+			lcd_format_label(lbl_list[i], "", user_secondary_color,
+					&lv_font_montserrat_16, LV_ALIGN_LEFT_MID, 10, -28 + (i * 18));
+		}
+
+		lbl_hint = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_hint, "", user_secondary_color,
+				&lv_font_montserrat_14, LV_ALIGN_BOTTOM_LEFT, 8, -24);
+
+		do_once = true;
+		sel = 0;
+	}
+
+	// Every tick: recompute "today" and the due queue
+	today = srs_days_since_epoch_local();
+	due_total = srs_build_due_list(due_idx, MAX(due_vis, 8), today);
+
+	// Render list (up to 5 rows)
+	due_vis = (due_total > 5) ? 5 : due_total;
+	for (int i = 0; i < 5; ++i) {
+		if (i < due_vis) {
+			int idx = due_idx[i];
+			int need = (int)srs_days[srs_tbl[idx].step];
+			int waited = (int)(today - srs_tbl[idx].last_day);
+			char line[48];
+			snprintf(line, sizeof(line), "%c Pg %u  (+%dd / need %dd)",
+					 (i == sel) ? '>' : ' ', srs_tbl[idx].page, waited, need);
+			lv_label_set_text(lbl_list[i], line);
+			lv_obj_clear_flag(lbl_list[i], LV_OBJ_FLAG_HIDDEN);
+		}
+		else {
+			lv_obj_add_flag(lbl_list[i], LV_OBJ_FLAG_HIDDEN);
+		}
+	}
+
+	if (due_total == 0) {
+		lv_label_set_text(lbl_hint, "Nothing due. Add today's page with >");
+	}
+	else {
+		char msg[48];
+		snprintf(msg, sizeof(msg), "%d due", due_total);
+		lv_label_set_text(lbl_hint, msg);
+	}
+
+	// ---------- Input handling ----------
+	if (ui_btns->up_btn == 1 && due_vis > 0) {
+		sel = (sel - 1 + due_vis) % due_vis;
+	}
+	else if (ui_btns->down_btn == 1 && due_vis > 0) {
+		sel = (sel + 1) % due_vis;
+	}
+	// Mark reviewed
+	else if (ui_btns->select_btn == 1 && due_vis > 0) {
+		srs_mark_reviewed_index(due_idx[sel], today);
+		// Keep selection sensible
+		if (sel >= due_vis - 1) sel = MAX(0, due_vis - 2);
+	}
+	// Add today’s page (auto-increment page number)
+	else if (ui_btns->right_btn == 1) {
+		uint16_t p = srs_next_default_page();
+		srs_add_or_reset(p, today);
+
+		char added[48];
+		snprintf(added, sizeof(added), "Added Pg %u", p);
+		lv_label_set_text(lbl_hint, added);
+	}
+	// Back out
+	else if (ui_btns->left_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_title);
+		lv_obj_delete(lbl_help);
+		lv_obj_delete(lbl_hint);
+		for (int i = 0; i < 5; ++i) lv_obj_delete(lbl_list[i]);
+
+		// Restore arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+		// Reveal tools menu
+		lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+		// Reset and return
+		do_once = false; sel = 0;
+		ui_menu->page = TOOLS_PAGE;
+	}
+	// Home / power → fall back to your common transition
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_title);
+		lv_obj_delete(lbl_help);
+		lv_obj_delete(lbl_hint);
+		for (int i = 0; i < 5; ++i) lv_obj_delete(lbl_list[i]);
+
+		do_once = false; sel = 0;
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);
+	}
+}

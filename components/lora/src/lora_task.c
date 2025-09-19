@@ -206,7 +206,7 @@ static void lora_task(void *pvParameters) {
 		// If retrying from no receipt
 		if (need_to_retry) {
 			#ifdef POLYCAST5_DEBUG
-	        	ESP_LOGI(TAG, "RETRYING: %s", payload);
+	        ESP_LOGI(TAG, "RETRYING: %s", payload);
 	        #endif
 	        
 			// Encrypt and send the same payload again
@@ -236,7 +236,7 @@ static void lora_task(void *pvParameters) {
 			snprintf(payload, sizeof(payload), "PolyCast_Command_Value:%" PRIu32 ":%d:%s", expected_rx_id, lora_cmd.index, lora_cmd.instr);
 			
 			#ifdef POLYCAST5_DEBUG
-	        	ESP_LOGI(TAG, "SENDING: %s", payload);
+	        ESP_LOGI(TAG, "SENDING: %s", payload);
 	        #endif
 			
 			// Encrypt and send over
@@ -258,7 +258,7 @@ static void lora_event_handler_task(void *pvParameters) {
 			// If transmission complete
 			if (irq_flags & SX126X_IRQ_TX_DONE) {
 				#ifdef POLYCAST5_DEBUG
-		        	ESP_LOGI(TAG, "Transmission completed");
+		        ESP_LOGI(TAG, "Transmission completed");
 		        #endif
 				
 				sx126x_clear_irq_status(NULL, SX126X_IRQ_TX_DONE);
@@ -284,7 +284,7 @@ static void lora_event_handler_task(void *pvParameters) {
 								   rx_buffer, rx_size);
 				
 				#ifdef POLYCAST5_DEBUG
-		        	ESP_LOGI(TAG, "Received packet of size %d", rx_size);
+		        ESP_LOGI(TAG, "Received packet of size %d", rx_size);
 		        #endif
 
 				// Process received
@@ -296,7 +296,7 @@ static void lora_event_handler_task(void *pvParameters) {
 
 			if (irq_flags & SX126X_IRQ_TIMEOUT) {
 				#ifdef POLYCAST5_DEBUG
-					ESP_LOGW(TAG, "RX timeout occurred");
+				ESP_LOGW(TAG, "RX timeout occurred");
 				#endif
 				
 				sx126x_clear_irq_status(NULL, SX126X_IRQ_TIMEOUT);
@@ -312,14 +312,14 @@ static void lora_event_handler_task(void *pvParameters) {
 					waiting_for_ack = false;
 					
 					#ifdef POLYCAST5_DEBUG
-						ESP_LOGW(TAG, "Hit max LoRa retires");
+					ESP_LOGW(TAG, "Hit max LoRa retires");
 					#endif
 				}
 			}
 
 			if (irq_flags & SX126X_IRQ_HEADER_ERROR) {
 				#ifdef POLYCAST5_DEBUG
-					ESP_LOGE(TAG, "Header error in received packet");
+				ESP_LOGE(TAG, "Header error in received packet");
 				#endif
 				
 				sx126x_clear_irq_status(NULL, SX126X_IRQ_HEADER_ERROR);
@@ -335,14 +335,14 @@ static void lora_event_handler_task(void *pvParameters) {
 					waiting_for_ack = false;
 					
 					#ifdef POLYCAST5_DEBUG
-						ESP_LOGW(TAG, "Hit max LoRa retires");
+					ESP_LOGW(TAG, "Hit max LoRa retires");
 					#endif
 				}
 			}
 
 			if (irq_flags & SX126X_IRQ_CRC_ERROR) {
 				#ifdef POLYCAST5_DEBUG
-					ESP_LOGE(TAG, "CRC error in received packet");
+				ESP_LOGE(TAG, "CRC error in received packet");
 				#endif
 				
 				sx126x_clear_irq_status(NULL, SX126X_IRQ_CRC_ERROR);
@@ -358,7 +358,7 @@ static void lora_event_handler_task(void *pvParameters) {
 					waiting_for_ack = false;
 					
 					#ifdef POLYCAST5_DEBUG
-						ESP_LOGW(TAG, "Hit max LoRa retires");
+					ESP_LOGW(TAG, "Hit max LoRa retires");
 					#endif
 				}
 			}
