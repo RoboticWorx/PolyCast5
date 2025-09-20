@@ -1090,7 +1090,7 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
 	}
 
 	// Recompute today and the due queue
-	today = srs_days_since_epoch();
+	today = srs_days_since_epoch(-420); // Offset: -7 hours (-7 * 60) -> New day at 3am EST
 	
 	// Build entries due
 	const int cap = (int)(sizeof(due_idx) / sizeof(due_idx[0]));

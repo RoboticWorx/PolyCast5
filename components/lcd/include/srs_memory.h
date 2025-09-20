@@ -45,9 +45,11 @@ void srs_nvs_load(void);
 /** 
  * @brief Saves SRS struct to NVS
  *
+ * @param [in] offset_min Time offset for UTC
+ *
  * @returns Days since epoch
  */
-uint32_t srs_days_since_epoch(void);
+uint32_t srs_days_since_epoch(int offset_min);
 
 /** 
  * @brief Saves SRS struct to NVS

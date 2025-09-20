@@ -16,7 +16,7 @@
 	//#define POLYCAST5_IR_NVS_CLEAR 1 // Clear all IR namespaces 
 	//#define POLYCAST5_WIFI_NVS_CLEAR 1 // Clear all Wi-Fi namespaces
 	
-	#define POLYCAST5_DIS_SLEEP_TIMER 1 // Disable sleep timer
+	//#define POLYCAST5_DIS_SLEEP_TIMER 1 // Disable sleep timer
 #endif
 
 //#define POLYCAST5_EN_PYRAMID_ANIM 1 // Enables pyramid-alien homescreen animation; as of now it doesn't fit with OTA partitions :(

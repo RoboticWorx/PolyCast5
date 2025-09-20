@@ -146,7 +146,7 @@ void wifi_funcs_get_current_date_time(void)
 
 	// Wait until the SNTP task clock has gone past 2025
 	while (timeinfo.tm_year < (2025 - 1900)) {
-		vTaskDelay(pdMS_TO_TICKS(100));
+		vTaskDelay(pdMS_TO_TICKS(1));
 		time(&now);
 		localtime_r(&now, &timeinfo);
 	}
@@ -160,17 +160,17 @@ void wifi_funcs_get_current_date_time(void)
 	// • Daylight time = UTC–4 ('EDT')
 	// • DST starts 2nd Sunday in March at 2 AM
 	// • DST ends 1st Sunday in November at 2 AM
-	// `tzset()` makes the library re-read that TZ rule now.
+	// 'tzset()' makes the library re-read that TZ rule now.
 
 	// Get the epoch time
 	time(&now);
 	
 	// Convert to a local broken-out form
 	localtime_r(&now, &timeinfo);
-	// `time()` returns seconds since Jan 1 1970 UTC,
-	// `localtime_r()` applies your TZ rules into a `struct tm`.
+	// 'time()' returns seconds since Jan 1 1970 UTC,
+	// 'localtime_r()' applies your TZ rules into a 'struct tm'.
 
-	// Render it as “YYYY-MM-DD HH:MM:SS” into our buffer
+	// Render it as 'YYYY-MM-DD HH:MM:SS' into our buffer
 	strftime(strftime_buf, sizeof(strftime_buf), "%Y-%m-%d %H:%M:%S", &timeinfo);
 
 	#ifdef POLYCAST5_DEBUG

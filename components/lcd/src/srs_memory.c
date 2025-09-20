@@ -36,6 +36,7 @@ LTP of synapses between neurons in the brain.
 #define SRS_CNT_KEY "cnt" // Number of entries key
 #define SRS_LAST_PAGE_KEY "last" // Last page used (for auto-increment)
 
+extern bool lcd_wifi_connected;
 
 // SRS intervals: 1d > 3d > 7d > 14d > 1m > 3m > 6m > 12m
 const uint16_t srs_days[] = {1, 3, 7, 14, 30, 90, 180, 365};
@@ -109,6 +110,22 @@ bool srs_sync_time_over_wifi(void)
 	#ifdef POLYCAST5_DEBUG
 	ESP_LOGI(TAG, "Getting day via Wi-Fi");
 	#endif
+
+	// If Wi-Fi already connected
+	if (lcd_wifi_connected) {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Wi-Fi already connected");
+		#endif
+
+		// Get time
+		wifi_funcs_get_current_date_time();
+
+		// Delete helper text
+		lv_obj_delete(lbl_info);
+		lbl_info = NULL;
+
+		return true;
+	}
 
 	/* If not synced */
 	// Ask Wi-Fi to reconnect to the last used network
@@ -281,6 +298,26 @@ int srs_build_due_list(int *out_idx, int max_out, uint32_t today)
 	return total_due;
 }
 
+// Converts Unix seconds to whole days
+uint32_t srs_days_since_epoch(int offset_min)
+{
+	time_t now = time(NULL);
+
+	#ifdef POLYCAST5_DEBUG
+	ESP_LOGI(TAG, "srs_days_since_epoch now = %" PRId64 "s", (int64_t)now); // Seconds
+	ESP_LOGI(TAG, "srs_days_since_epoch now = %" PRIu32 "d", (uint32_t)(now / 86400)); // Days
+	#endif
+
+	if (now <= 0) {
+		return 0;
+	}
+	
+	time_t adjusted = now + (time_t)offset_min * 60;
+
+	// Round down by 86400 -> today index
+    return (uint32_t)(adjusted / 86400);	
+}
+
 void srs_nvs_load(void)
 {
 	nvs_handle_t h;
@@ -390,22 +427,4 @@ void srs_nvs_save(void)
 	
 	// Close NVS
 	nvs_close(h);
-}
-
-// Converts Unix seconds to whole days
-uint32_t srs_days_since_epoch(void)
-{
-	time_t now = time(NULL);
-
-	#ifdef POLYCAST5_DEBUG
-	ESP_LOGI(TAG, "srs_days_since_epoch now = %" PRId64 "s", (int64_t)now); // Seconds
-	ESP_LOGI(TAG, "srs_days_since_epoch now = %" PRIu32 "d", (uint32_t)(now / 86400)); // Days
-	#endif
-
-	if (now <= 0) {
-		return 0;
-	}
-	
-	// Round down by 86400 -> today index
-	return (uint32_t)(now / 86400); // 86400s per day
 }

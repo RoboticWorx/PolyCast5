@@ -100,8 +100,12 @@ enum
 	#endif
 };
 
+extern wifi_login_t selected_network;
+extern bool monitoring_packets;
+
 uint32_t pin_attempts = 0;
 bool pin_signing_in = false;
+bool lcd_wifi_connected = false;
 
 static bool pin_to_selection_page = true; // Flag on if going to selection or hotkey page from pin
 
@@ -116,9 +120,6 @@ static lv_display_t *disp; // LVGL display handle
 static bool already_scrolling = false;
 static bool scrolling_menu = false;
 static bool scrolling_up = false;
-
-extern wifi_login_t selected_network;
-extern bool monitoring_packets;
 
 typedef struct {
 	lv_obj_t *top; // Label that sits at the top line
@@ -2183,7 +2184,7 @@ void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espn
 void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {
 	// Statics
-	static bool do_once, connected = false;
+	static bool do_once = false;
 	static lv_obj_t *lbl_conf;
 	
 	// Only execute once
@@ -2206,13 +2207,13 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 		lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
 		lv_label_set_text(lbl, buf);
 		
-		connected = true;
+		lcd_wifi_connected = true;
 	}
 	if (xSemaphoreTake(xWifiNetworkDisconnectedSemaphore, 0) == pdTRUE) {
 		lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
 		lv_label_set_text(lbl, "Connect to network");
 		
-		connected = false;
+		lcd_wifi_connected = false;
 	}
 	
 	// If update is available
@@ -2246,7 +2247,7 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 		// Connect to network
 		else if (ui_btns->select_btn == 1 && wifi_menu->index == 0) {
 			// If connected to a network
-			if (connected) {
+			if (lcd_wifi_connected) {
 				xSemaphoreGive(xWifiDisconnectSemaphore);
 			}
 			// Already disconnected
@@ -2283,7 +2284,7 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 			// Hide Wi-Fi menu
 			lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 			
-			if (connected) {
+			if (lcd_wifi_connected) {
 				// Reset static
 				do_once = false;
 				
@@ -2315,7 +2316,7 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 			// Hide Wi-Fi menu
 			lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 			
-			if (connected) {
+			if (lcd_wifi_connected) {
 				// Reset static
 				do_once = false;
 				
