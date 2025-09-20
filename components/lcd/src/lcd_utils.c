@@ -2858,6 +2858,17 @@ void lcd_gpio_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_men
 		// Switch pages
 		ui_menu->page = GPIO_HOW_PAGE;
 	}
+	// I2C scanner selected
+	else if (ui_btns->select_btn == 1 && gpio_menu->index == 2) {
+		// Hide GPIO menu
+		lv_obj_add_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		// Switch pages
+		ui_menu->page = GPIO_SCANNER_PAGE;
+	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {
 		// Hide GPIO menu

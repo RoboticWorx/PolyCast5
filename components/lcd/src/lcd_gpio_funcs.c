@@ -6,6 +6,7 @@
 #include "nvs.h"
 #include "esp_log.h"
 #include "esp_err.h"
+#include "driver/i2c.h"
 
 #include "core/lv_obj_scroll.h"
 #include "font/lv_symbol_def.h"
@@ -15,10 +16,15 @@
 #include "misc/lv_area.h"
 #include "widgets/label/lv_label.h"
 
+#include "tca9535.h"
+#include "gpio_task.h"
 #include "lcd_utils.h"
 #include "lcd_gpio_funcs.h"
 
 #define TAG "LCD_GPIO"
+
+#define I2C_MASTER_FREQ_HZ 100000  // Standard 100kHz; match your existing init
+#define TCA9535_ADDR 0x20  // Adjust to your TCA9535's actual address (exclude from scan if desired)
 
 gpio_menu_t gpio_menu = {
 	.options = {"How It Works", "Terminal", "I2C Scanner"},
@@ -235,3 +241,179 @@ void lcd_gpio_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio
  		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
+
+// Helper function to perform the I2C scan and return found addresses
+static void i2c_scan(uint8_t found_addrs[], int *found_count)
+{
+	*found_count = 0;
+	i2c_cmd_handle_t cmd = NULL;
+
+	// Wait for then lock I2C bus
+	if (xSemaphoreTake(xI2CBusMutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
+		ESP_LOGE(TAG, "Failed to take I2C mutex");
+		return;
+	}
+
+	// For all standard I2C addresses
+	for (uint8_t addr = 0x03; addr < 0x78; ++addr) {
+		/*
+		// Skip internal TCA9535 address
+		if (addr == TCA9535_ADDR) {
+			continue;
+		}
+		*/
+		
+		// Prepare a custom I2C transaction
+		cmd = i2c_cmd_link_create();
+		
+		i2c_master_start(cmd); // START command: begin a transaction and alert all slaves on the bus to listen
+		i2c_master_write_byte(cmd, (addr << 1) | I2C_MASTER_WRITE, true); // Probe the address, expect ACK
+		i2c_master_stop(cmd); // STOP command -> no further data
+
+		// Execute the entire command link
+		esp_err_t ret = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, pdMS_TO_TICKS(50));
+		i2c_cmd_link_delete(cmd); // Done
+
+		// If slave at addr ACKed the address byte
+		if (ret == ESP_OK) {
+			found_addrs[*found_count] = addr;
+			(*found_count)++;
+			
+			#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "I2C device found at 0x%02X", addr);
+			#endif
+		}
+	}
+
+	xSemaphoreGive(xI2CBusMutex); // Release I2C bus
+}
+
+void lcd_gpio_scanner_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu)
+{
+	#define I2C_MAX_DEVICES 32 // Max I2C devices
+	#define I2C_SCROLL_OFFSET 20 // Scroll per button press
+
+	// Statics
+	static bool init = false;
+	static lv_obj_t *cont = NULL;
+	static lv_obj_t *title_lbl = NULL;
+	static lv_obj_t *status_lbl = NULL;
+	static lv_obj_t *addrs_lbl = NULL;
+
+	if (!init) {
+		// Create a scrollable container for the instructions
+		cont = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(cont, 210, 106);
+		lv_obj_center(cont);
+		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
+
+		// Title label
+		title_lbl = lv_label_create(cont);
+		lv_label_set_text(title_lbl, "I2C Scanner");
+		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+		// Status label
+		status_lbl = lv_label_create(cont);
+		lv_label_set_long_mode(status_lbl, LV_LABEL_LONG_WRAP);
+		lv_obj_set_width(status_lbl, lv_pct(100));
+		lv_obj_set_style_text_font(status_lbl, &lv_font_montserrat_14, 0);
+		lv_obj_set_style_text_color(status_lbl, user_secondary_color, 0);
+		lv_obj_align_to(status_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+		lv_label_set_text(status_lbl, "Press SELECT to scan.\nNote: 0x20 is internal IO.");
+
+		// Addresses label: hidden initially
+		addrs_lbl = lv_label_create(cont);
+		lv_label_set_long_mode(addrs_lbl, LV_LABEL_LONG_WRAP);
+		lv_obj_set_width(addrs_lbl, lv_pct(100));
+		lv_obj_set_style_text_font(addrs_lbl, &lv_font_montserrat_14, 0);
+		lv_obj_set_style_text_color(addrs_lbl, user_secondary_color, 0);
+		lv_obj_align_to(addrs_lbl, status_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, -13);
+		lv_obj_add_flag(addrs_lbl, LV_OBJ_FLAG_HIDDEN); // Hide until scan complete
+
+		init = true;
+	}
+
+	/* User input */
+	if (ui_btns->up_btn == 1) {
+		lv_obj_scroll_by_bounded(cont, 0, I2C_SCROLL_OFFSET, LV_ANIM_ON); // Scroll up
+	}
+	else if (ui_btns->down_btn == 1) {
+		lv_obj_scroll_by_bounded(cont, 0, -I2C_SCROLL_OFFSET, LV_ANIM_ON); // Scroll down
+	}
+	else if (ui_btns->select_btn == 1) {
+		lv_label_set_text(status_lbl, "Scanning...");
+		lv_obj_add_flag(addrs_lbl, LV_OBJ_FLAG_HIDDEN);
+		
+		lv_timer_handler(); // Force update
+		
+		// Perform scan
+		uint8_t found_addrs[I2C_MAX_DEVICES];
+		int found_count = 0;
+		i2c_scan(found_addrs, &found_count);
+
+		// Build concatenated string of devices found
+		if (found_count > 0) { // If any
+			lv_label_set_text(status_lbl, "Found devices:");
+			lv_obj_remove_flag(addrs_lbl, LV_OBJ_FLAG_HIDDEN); // Show
+
+			// Build the comma-separated string
+			char addr_str[256] = {0}; // String buffer: 0-out
+			for (int i = 0; i < found_count; ++i) {
+				char buf[5];
+				snprintf(buf, sizeof(buf), "0x%02X", found_addrs[i]);
+				
+				// Append to addr_str
+				strcat(addr_str, buf);
+				
+				// If not last, add comma
+				if (i < found_count - 1) {
+					strcat(addr_str, ", ");
+				}
+			}
+			
+			// Update text
+			lv_label_set_text(addrs_lbl, addr_str);
+		}
+		// Else no devices found
+		else {
+			lv_label_set_text(status_lbl, "No devices found.");
+			lv_obj_add_flag(addrs_lbl, LV_OBJ_FLAG_HIDDEN); // Hide
+		}
+
+		lv_timer_handler(); // Force update
+	}
+	else if (ui_btns->left_btn == 1) {
+		// Clean up
+		lv_obj_delete(cont); // Deletes children
+		cont = title_lbl = status_lbl = addrs_lbl = NULL;
+		init = false;
+
+		// Show GPIO menu
+		lv_obj_remove_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+		// Switch back
+		ui_menu->page = GPIO_PAGE;
+	}
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Clean up
+		lv_obj_delete(cont);
+		cont = title_lbl = status_lbl = addrs_lbl = NULL;
+		init = false;
+
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);  // True = home, false = sleep
+	}
+}
+
+
+
+
