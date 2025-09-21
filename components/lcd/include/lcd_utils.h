@@ -90,6 +90,7 @@ enum {
     GPIO_PAGE,
     GPIO_HOW_PAGE,
     GPIO_SCANNER_PAGE,
+    GPIO_TERMINAL_PAGE,
 };
 
 extern uint32_t pin_attempts;

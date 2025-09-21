@@ -47,6 +47,15 @@ void lcd_gpio_update_menu(gpio_menu_t *gpio_menu);
 void lcd_gpio_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu);
 
 /**
+ * @brief I2C terminal page to communicate with external hardware
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] gpio_menu GPIO menu structure
+ */
+void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu);
+
+/**
  * @brief I2C scanner page to show connected I2C device addresses
  *
  * @param [in] ui_btns UI input structure
@@ -54,5 +63,6 @@ void lcd_gpio_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio
  * @param [in] gpio_menu GPIO menu structure
  */
 void lcd_gpio_scanner_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu);
+
 
 #endif // LCD_GPIO_FUNCS_H

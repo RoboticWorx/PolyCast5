@@ -415,6 +415,9 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == GPIO_HOW_PAGE) {
 				lcd_gpio_how_page(&ui_btns, &ui_menu, &gpio_menu);
 			}
+			else if (ui_menu.page == GPIO_TERMINAL_PAGE) {
+				lcd_gpio_terminal_page(&ui_btns, &ui_menu, &gpio_menu);
+			}
 			else if (ui_menu.page == GPIO_SCANNER_PAGE) {
 				lcd_gpio_scanner_page(&ui_btns, &ui_menu, &gpio_menu);
 			}

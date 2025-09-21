@@ -367,22 +367,22 @@ void lcd_gpio_scanner_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *
 			lv_obj_remove_flag(addrs_lbl, LV_OBJ_FLAG_HIDDEN); // Show
 
 			// Build the comma-separated string
-			char addr_str[256] = {0}; // String buffer: 0-out
+			char i2c_addr_str[256] = {0}; // String buffer: 0-out
 			for (int i = 0; i < found_count; ++i) {
 				char buf[5];
 				snprintf(buf, sizeof(buf), "0x%02X", found_addrs[i]);
 				
-				// Append to addr_str
-				strcat(addr_str, buf);
+				// Append to i2c_addr_str
+				strcat(i2c_addr_str, buf);
 				
 				// If not last, add comma
 				if (i < found_count - 1) {
-					strcat(addr_str, ", ");
+					strcat(i2c_addr_str, ", ");
 				}
 			}
 			
 			// Update text
-			lv_label_set_text(addrs_lbl, addr_str);
+			lv_label_set_text(addrs_lbl, i2c_addr_str);
 		}
 		// Else no devices found
 		else {
@@ -392,6 +392,7 @@ void lcd_gpio_scanner_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *
 
 		lv_timer_handler(); // Force update
 	}
+	// Exit
 	else if (ui_btns->left_btn == 1) {
 		// Clean up
 		lv_obj_delete(cont); // Deletes children
@@ -404,6 +405,7 @@ void lcd_gpio_scanner_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *
 		// Switch back
 		ui_menu->page = GPIO_PAGE;
 	}
+	// Home or power off
 	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Clean up
 		lv_obj_delete(cont);
@@ -414,6 +416,174 @@ void lcd_gpio_scanner_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *
 	}
 }
 
+// Safe log append
+static void term_log_append(char *dst, size_t cap, const char *line)
+{
+	// Exit early if bad
+    if (!dst || !line || cap == 0) {
+		return;
+	}
+	
+    strlcat(dst, line, cap);
+}
+
+void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu)
+{
+	#define TERMINAL_SLAVE_ADDR 0x08 // Assumed external slave address
+	#define TERMINAL_MAX_CMD 255 // Max command value (uint8_t)
+ 
+	// Statics
+	static bool init = false;
+	static lv_obj_t *cont = NULL;
+	static lv_obj_t *title_lbl = NULL;
+	static lv_obj_t *log_lbl = NULL;
+	static uint8_t current_cmd = 0; // Current command number (0-255)
+	static char log_buffer[2048] = {0}; // Buffer for terminal log (append-only)
+ 
+ 	// Do once
+	if (!init) {
+		// Create a scrollable container for the instructions
+		cont = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(cont, 210, 106);
+		lv_obj_center(cont);
+		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
+
+		// Title label
+		title_lbl = lv_label_create(cont);
+		lv_label_set_text(title_lbl, "I2C Terminal");
+		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+		// Instructions label (scrollable if text is long)
+		log_lbl = lv_label_create(cont);
+		lv_label_set_long_mode(log_lbl, LV_LABEL_LONG_WRAP);
+		lv_obj_set_width(log_lbl, lv_pct(100)); // Full width for wrapping
+		lv_obj_set_style_text_font(log_lbl, &lv_font_montserrat_14, 0);
+		lv_obj_set_style_text_color(log_lbl, user_secondary_color, 0);
+		lv_obj_align_to(log_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+		
+		lv_label_set_text(log_lbl, "Use up/down to adjust.\nPress select to send.");
+
+		lv_timer_handler();
+ 
+		init = true;
+	}
+ 
+	/* User input */
+	if (ui_btns->up_btn == 1) {
+		// Increment cmd with wrap
+		current_cmd = (current_cmd < TERMINAL_MAX_CMD) ? current_cmd + 1 : 0;
+		
+		// Show updated
+		char msg[64];
+		snprintf(msg, sizeof(msg), "Command: %d\n", current_cmd);
+		term_log_append(log_buffer, sizeof(log_buffer), msg);
+
+		lv_label_set_text(log_lbl, log_buffer);
+		lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
+	}
+	else if (ui_btns->down_btn == 1) {
+		// Decrement cmd with wrap
+		current_cmd = (current_cmd > 0) ? current_cmd - 1 : TERMINAL_MAX_CMD;
+		
+		// Show updated
+		char msg[64];
+		snprintf(msg, sizeof(msg), "Command: %d\n", current_cmd);
+		term_log_append(log_buffer, sizeof(log_buffer), msg);
+		
+		lv_label_set_text(log_lbl, log_buffer);
+
+		lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
+	}
+	else if (ui_btns->select_btn == 1) {
+		// Take mutex for I2C access
+		if (xSemaphoreTake(xI2CBusMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+			i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+ 
+			// Write the addr and cmd byte
+			i2c_master_start(cmd);
+			i2c_master_write_byte(cmd, (TERMINAL_SLAVE_ADDR << 1) | I2C_MASTER_WRITE, true);
+			i2c_master_write_byte(cmd, current_cmd, true); // Send the command number
+			
+			// Get response
+			i2c_master_start(cmd);
+			i2c_master_write_byte(cmd, (TERMINAL_SLAVE_ADDR << 1) | I2C_MASTER_READ, true);
+			uint8_t response = 0;
+			i2c_master_read_byte(cmd, &response, I2C_MASTER_NACK);
+			i2c_master_stop(cmd);
+
+			// Send all queued commands
+			esp_err_t ret = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, pdMS_TO_TICKS(150));
+			i2c_cmd_link_delete(cmd);
+
+			char msg[64]; // Buffer
+			
+			// Log send conf
+			snprintf(msg, sizeof(msg), "\nSent: %u (0x%02X)\n", current_cmd, current_cmd);
+			term_log_append(log_buffer, sizeof(log_buffer), msg);
+
+			// If ACK
+			if (ret == ESP_OK) {
+				snprintf(msg, sizeof(msg), "Response: 0x%02X\n\n", response);
+			}
+			else {
+				snprintf(msg, sizeof(msg), "No response: %s\n\n", esp_err_to_name(ret));
+			}
+			
+			// Append response to log
+			term_log_append(log_buffer, sizeof(log_buffer), msg);
+			
+			xSemaphoreGive(xI2CBusMutex); // Release I2C bus
+ 
+			// Show and scroll to bottom
+			lv_label_set_text(log_lbl, log_buffer);
+			lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
+		}
+		else {
+			// Mutex timeout - append error
+			term_log_append(log_buffer, sizeof(log_buffer), "\nI2C bus busy - timed out.\n\n");
+
+			// Show and scroll to bottom
+			lv_label_set_text(log_lbl, log_buffer);
+			lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
+		}
+	}
+	// Exit
+	else if (ui_btns->left_btn == 1) {
+		// Clean up
+		lv_obj_delete(cont); // Deletes children
+		cont = title_lbl = log_lbl = NULL;
+		init = false;
+		memset(log_buffer, 0, sizeof(log_buffer)); // Clear log for next entry
+		current_cmd = 0;
+ 
+		// Show GPIO menu
+		lv_obj_remove_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+ 
+		// Switch back
+		ui_menu->page = GPIO_PAGE;
+	}
+	// Home or power off
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Clean up
+		lv_obj_delete(cont); // Deletes children
+		cont = title_lbl = log_lbl = NULL;
+		init = false;
+		memset(log_buffer, 0, sizeof(log_buffer)); // Clear log for next entry
+		current_cmd = 0;
+ 
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+	}
+}
 
 
 
