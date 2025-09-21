@@ -429,7 +429,7 @@ static void term_log_append(char *dst, size_t cap, const char *line)
 
 void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu)
 {
-	#define TERMINAL_SLAVE_ADDR 0x08 // Assumed external slave address
+	#define TERMINAL_SLAVE_ADDR 0x2A // Assumed external slave address
 	#define TERMINAL_MAX_CMD 255 // Max command value (uint8_t)
  
 	// Statics
@@ -505,45 +505,85 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
 		lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
 	}
 	else if (ui_btns->select_btn == 1) {
+		#define TERMINAL_MAX_RESPONSE_LEN 126  // Match slave
+		#define TERMINAL_FIXED_LEN (1 + TERMINAL_MAX_RESPONSE_LEN)  // Fixed read size
+	
 		// Take mutex for I2C access
 		if (xSemaphoreTake(xI2CBusMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-			i2c_cmd_handle_t cmd = i2c_cmd_link_create();
- 
-			// Write the addr and cmd byte
-			i2c_master_start(cmd);
-			i2c_master_write_byte(cmd, (TERMINAL_SLAVE_ADDR << 1) | I2C_MASTER_WRITE, true);
-			i2c_master_write_byte(cmd, current_cmd, true); // Send the command number
-			
-			// Get response
-			i2c_master_start(cmd);
-			i2c_master_write_byte(cmd, (TERMINAL_SLAVE_ADDR << 1) | I2C_MASTER_READ, true);
-			uint8_t response = 0;
-			i2c_master_read_byte(cmd, &response, I2C_MASTER_NACK);
-			i2c_master_stop(cmd);
-
-			// Send all queued commands
-			esp_err_t ret = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, pdMS_TO_TICKS(150));
-			i2c_cmd_link_delete(cmd);
-
-			char msg[64]; // Buffer
-			
-			// Log send conf
-			snprintf(msg, sizeof(msg), "\nSent: %u (0x%02X)\n", current_cmd, current_cmd);
+			esp_err_t ret = ESP_OK;
+			char msg[256]; // Buffer for logging
+	
+			// WRITE transaction (send command, end with STOP)
+			i2c_cmd_handle_t cmd_write = i2c_cmd_link_create();
+			i2c_master_start(cmd_write);
+			i2c_master_write_byte(cmd_write, (TERMINAL_SLAVE_ADDR << 1) | I2C_MASTER_WRITE, true);
+			i2c_master_write_byte(cmd_write, current_cmd, true); // Send the command number
+			i2c_master_stop(cmd_write);
+	
+			// Execute write
+			ret = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd_write, pdMS_TO_TICKS(150));
+			i2c_cmd_link_delete(cmd_write);
+	
+			// Log confirmation
+			snprintf(msg, sizeof(msg), "\nSent: %u (0x%02X) to 0x%X\n", current_cmd, current_cmd, TERMINAL_SLAVE_ADDR);
 			term_log_append(log_buffer, sizeof(log_buffer), msg);
-
-			// If ACK
+	
+			if (ret != ESP_OK) {
+				snprintf(msg, sizeof(msg), "Write failed: %s\n\n", esp_err_to_name(ret));
+				term_log_append(log_buffer, sizeof(log_buffer), msg);
+				
+				// Early exit on write error
+				xSemaphoreGive(xI2CBusMutex); // Release I2C bus
+				lv_label_set_text(log_lbl, log_buffer);
+				lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
+				return;
+			}
+	
+			// Delay to allow slave processing time
+			vTaskDelay(pdMS_TO_TICKS(50));
+			
+			uint8_t response_buf[TERMINAL_FIXED_LEN] = {0};
+			
+			// Single READ transaction (exactly TERMINAL_FIXED_LEN bytes)
+			i2c_cmd_handle_t cmd_read = i2c_cmd_link_create();
+			i2c_master_start(cmd_read);
+			i2c_master_write_byte(cmd_read, (TERMINAL_SLAVE_ADDR << 1) | I2C_MASTER_READ, true);
+			i2c_master_read(cmd_read, response_buf, TERMINAL_FIXED_LEN, I2C_MASTER_LAST_NACK);
+			i2c_master_stop(cmd_read);
+	
+			// Execute read
+			ret = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd_read, pdMS_TO_TICKS(150));
+			i2c_cmd_link_delete(cmd_read);
+	
+			// If read something
 			if (ret == ESP_OK) {
-				snprintf(msg, sizeof(msg), "Response: 0x%02X\n\n", response);
+				uint8_t response_len = response_buf[0]; // First byte is length (from receiver example)
+				
+				// len == 0 -> empty
+				if (response_len == 0) {
+					snprintf(msg, sizeof(msg), "Empty response.\n\n");
+				}
+				// Response too big
+				else if (response_len > TERMINAL_MAX_RESPONSE_LEN) {
+					snprintf(msg, sizeof(msg), "Invalid response length: %u\n\n", response_len);
+				}
+				// Else valid response
+				else {
+					char response_str[TERMINAL_MAX_RESPONSE_LEN + 1] = {0};
+					memcpy(response_str, &response_buf[1], response_len); // Copy exactly len bytes
+					response_str[response_len] = '\0'; // NUL-terminate
+					snprintf(msg, sizeof(msg), "Response: %s\n\n", response_str);
+				}
 			}
 			else {
-				snprintf(msg, sizeof(msg), "No response: %s\n\n", esp_err_to_name(ret));
+				snprintf(msg, sizeof(msg), "Read failed: %s\n\n", esp_err_to_name(ret));
 			}
 			
-			// Append response to log
+			// Append to log
 			term_log_append(log_buffer, sizeof(log_buffer), msg);
-			
+	
 			xSemaphoreGive(xI2CBusMutex); // Release I2C bus
- 
+	
 			// Show and scroll to bottom
 			lv_label_set_text(log_lbl, log_buffer);
 			lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
@@ -551,7 +591,7 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
 		else {
 			// Mutex timeout - append error
 			term_log_append(log_buffer, sizeof(log_buffer), "\nI2C bus busy - timed out.\n\n");
-
+	
 			// Show and scroll to bottom
 			lv_label_set_text(log_lbl, log_buffer);
 			lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);

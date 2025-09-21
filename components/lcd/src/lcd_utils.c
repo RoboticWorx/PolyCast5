@@ -1705,6 +1705,14 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
 	}
 	// Go back
 	else if (ui_btns->left_btn == 1) {
+		// Reset long semaphores to avoid false triggers
+		xQueueReset(xSelectButtonLongSemaphore);
+		xQueueReset(xHomeButtonLongSemaphore);
+		xQueueReset(xUpButtonLongSemaphore);
+		xQueueReset(xDownButtonLongSemaphore);
+		xQueueReset(xLeftButtonLongSemaphore);
+		xQueueReset(xRightButtonLongSemaphore);
+
 		// Hide selection labels
 		lv_obj_add_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
@@ -1764,17 +1772,17 @@ void lcd_funcs_transition_back(bool home, ui_menu_t *ui_menu)
 	lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+	// Reset long semaphores to avoid false triggers
+	xQueueReset(xSelectButtonLongSemaphore);
+	xQueueReset(xHomeButtonLongSemaphore);
+	xQueueReset(xUpButtonLongSemaphore);
+	xQueueReset(xDownButtonLongSemaphore);
+	xQueueReset(xLeftButtonLongSemaphore);
+	xQueueReset(xRightButtonLongSemaphore);
 	
 	// Transition to home
-	if (home) { 
-		// Reset long semaphores to avoid false triggers
-		xQueueReset(xSelectButtonLongSemaphore);
-		xQueueReset(xHomeButtonLongSemaphore);
-		xQueueReset(xUpButtonLongSemaphore);
-		xQueueReset(xDownButtonLongSemaphore);
-		xQueueReset(xLeftButtonLongSemaphore);
-		xQueueReset(xRightButtonLongSemaphore);
-		
+	if (home) {		
 		start_animation();
 
 		ui_menu->page = HOME_PAGE;
