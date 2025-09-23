@@ -61,8 +61,8 @@
 #define SLEEP_TIMER_MAX_S 120 // 2 min
 
 settings_menu_t settings_menu = {
-	.options = {SETTINGS_SET_LOCK_TXT, "Change colors", "Adjust haptics", "Adjust sleep timer", "Adjust RBG LED", "LCD brightness", "Reboot", "Factory reset"},
-	.size = 8,
+	.options = {SETTINGS_SET_LOCK_TXT, "Change colors", "Adjust haptics", "Adjust sleep timer", "Adjust RBG LED", "LCD brightness", "Tips and Tricks", "Reboot", "Factory reset"},
+	.size = 9,
 	.index = 0,
 	.cont = NULL,
 	.pin_menu.pin_set = false,
@@ -1432,6 +1432,101 @@ void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 		init = false;
 		
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+	}
+}
+
+void lcd_settings_help_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
+{
+	#define HELP_Y_OFFSET 40
+	
+	// Statics
+	static bool init = false;
+	static lv_obj_t *cont = NULL;
+	static lv_obj_t *title_lbl = NULL;
+	static lv_obj_t *instr_lbl = NULL;
+	
+	if (!init) {
+		// Create a scrollable container for the instructions
+		cont = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(cont, 210, 106);
+		lv_obj_center(cont);
+		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
+
+		// Title label
+		title_lbl = lv_label_create(cont);
+		lv_label_set_text(title_lbl, "Tips and Tricks");
+		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+		// Instructions label (scrollable if text is long)
+		instr_lbl = lv_label_create(cont);
+		lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+		lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
+		lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
+		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+
+		// Set custom text
+		const char *instr_text =
+								"Some tips and tricks for using PolyCast5 like a pro!\n\n"
+								"First and foremost, PolyCast5 has a hardware level reset that can be triggered by pressing "
+								"the HOME and RIGHT buttons at the same time.\n\n"
+								"This will not erase any user data, so feel free to use it any time if something is being weird.\n\n"
+								"PolyCast5 also has OTA wireless updates so you can always be running the newest firmware.\n\n"
+								"To check if an update is available, simply connect to any Wi-Fi network using the Wi-Fi menu.\n\n"
+								"After connecting, you will be asked if you'd like to update automatically whenever a new firmware version is out.\n\n"
+								"Being open-source, you can also feel free to check out the code at:\n\ngithub.com/RoboticWo rx/PolyCast5\n\n"
+								"For additional information, docs, and guides, please visit polycast5.com!";
+		
+		lv_label_set_text(instr_lbl, instr_text);
+
+		lv_timer_handler();
+
+		init = true;
+	}
+	
+	if (ui_btns->up_btn == 1) {
+		lv_obj_scroll_by_bounded(cont, 0, HELP_Y_OFFSET, LV_ANIM_ON);
+	}
+	else if (ui_btns->down_btn == 1) {
+		lv_obj_scroll_by_bounded(cont, 0, -HELP_Y_OFFSET, LV_ANIM_ON);
+	}
+	// Go back
+	else if (ui_btns->left_btn) {
+		// Delete objects
+		lv_obj_del(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+			
+		// Show settings menu
+		lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch back
+		ui_menu->page = SETTINGS_PAGE;
+	}
+	// Home or power off
+	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
+		// Delete objects
+		lv_obj_del(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+		
+ 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 

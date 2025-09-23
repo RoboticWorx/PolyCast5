@@ -383,7 +383,7 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
 		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
 		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
-		// Set custom text based on hotkey index
+		// Set custom text
 		const char *instr_text = "Bluetooth is now advertising as 'PolyCast5'.\n\nClick the right arrow to forget all devices.\n\n"
 								 "To connect a new device, just go to settings on any Bluetooth device such as a phone or PC, "
 								 "click on 'PolyCast5', and enter '123456' as the pin.\n\nAfter connecting once, PolyCast5 "

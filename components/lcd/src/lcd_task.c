@@ -380,6 +380,9 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == SETTINGS_LCD_PAGE) {
 				lcd_settings_adjust_lcd_page(&ui_btns, &ui_menu, &settings_menu);
 			}
+			else if (ui_menu.page == SETTINGS_HELP_PAGE) {
+				lcd_settings_help_page(&ui_btns, &ui_menu, &settings_menu);
+			}
 			else if (ui_menu.page == SETTINGS_FACTORY_RST_PAGE) {
 				lcd_settings_factory_rst_page(&ui_btns, &ui_menu, &settings_menu);
 			}
