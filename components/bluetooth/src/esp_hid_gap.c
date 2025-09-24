@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
+#include "bluetooth_funcs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -889,7 +890,13 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
 
         if (event->passkey.params.action == BLE_SM_IOACT_DISP) {
             pkey.action = event->passkey.params.action;
-            pkey.passkey = 123456; // This is the passkey to be entered on peer
+            
+            // Load pairing key from NVS
+            uint32_t pairing_key;
+			bluetooth_pairing_key_load_nvs(&pairing_key);
+			
+            pkey.passkey = pairing_key; // This is the passkey to be entered on peer
+            
             ESP_LOGI(TAG, "Enter passkey %" PRIu32 " on the peer side", pkey.passkey);
             rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
             ESP_LOGI(TAG, "ble_sm_inject_io result: %d", rc);
@@ -910,7 +917,12 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
         } else if (event->passkey.params.action == BLE_SM_IOACT_INPUT) {
             ESP_LOGI(TAG, "Input not supported passing -> 123456");
             pkey.action = event->passkey.params.action;
-            pkey.passkey = 123456;
+            
+			// Load pairing key from NVS
+            uint32_t pairing_key;
+			bluetooth_pairing_key_load_nvs(&pairing_key);
+            pkey.passkey = pairing_key;
+
             rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
             ESP_LOGI(TAG, "ble_sm_inject_io result: %d", rc);
         }

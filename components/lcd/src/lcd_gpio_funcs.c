@@ -438,7 +438,7 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
 	static lv_obj_t *title_lbl = NULL;
 	static lv_obj_t *log_lbl = NULL;
 	static uint8_t current_cmd = 0; // Current command number (0-255)
-	static char log_buffer[2048] = {0}; // Buffer for terminal log (append-only)
+	static char log_buffer[4096] = {0}; // Buffer for terminal log (append-only)
  
  	// Do once
 	if (!init) {

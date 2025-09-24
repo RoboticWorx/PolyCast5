@@ -6,6 +6,7 @@
 #include "freertos/task.h"
 
 #include "esp_log.h"
+#include "esp_random.h"
 
 #include "bluetooth_funcs.h"
 #include "portmacro.h"
@@ -21,6 +22,8 @@ SemaphoreHandle_t xBluetoothScriptMutex;
 
 extern volatile bluetooth_state_t bluetooth_state;
 
+char bt_wifi_portal_pass[64];
+
 static uint16_t bluetooth_cmd = 0;
 static uint8_t battery_percentage = 100;
 static const TickType_t battery_timer_interval = pdMS_TO_TICKS(1000);
@@ -31,6 +34,55 @@ static void bluetooth_task(void *arg)
 	configASSERT(xBluetoothMediaCmdQueue);
 	
 	TickType_t battery_timer_last = xTaskGetTickCount();
+
+	// If Wi-Fi portal password NVS doesn't exist yet, set it
+	if (bluetooth_wifi_pass_load_nvs(bt_wifi_portal_pass, sizeof(bt_wifi_portal_pass)) != ESP_OK) {
+		// Random chars to pick from
+		static const char alphabet[] =
+				"ABCDEFGHJKLMNPQRSTUVWXYZ"
+				"abcdefghijkmnopqrstuvwxyz"
+				"0123456789";
+		
+		const size_t N = sizeof(alphabet) - 1;
+		const size_t PASS_LEN = 12;
+	
+		for (size_t i = 0; i < PASS_LEN; ++i) {
+			uint32_t r = esp_random();
+			bt_wifi_portal_pass[i] = alphabet[r % N];
+		}
+		bt_wifi_portal_pass[PASS_LEN] = '\0';
+		
+		// Save that version to NVS
+		bluetooth_wifi_pass_save_nvs(bt_wifi_portal_pass);
+		
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGW(TAG, "Setting first time BT Wi-Fi portal password: %s", bt_wifi_portal_pass);
+		#endif
+	}
+	else {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Using pre-set BT Wi-Fi portal password: '%s'", bt_wifi_portal_pass);
+		#endif
+	}
+
+	// Also create one random 6 digit BT pairing passkey in NVS
+	uint32_t pairing_key = 0; // Random 6 digit passkey
+	if (bluetooth_pairing_key_load_nvs(&pairing_key) != ESP_OK) {
+		// Create first time
+		pairing_key = esp_random() % 1000000;
+		
+		// Save that version to NVS
+		bluetooth_pairing_key_save_nvs(pairing_key);
+		
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGW(TAG, "Setting first time BT pairing key: %d", pairing_key);
+		#endif
+	}
+	else {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Using pre-set BT pairing key: '%d'", pairing_key);
+		#endif
+	}
 	
 	while (1) {
 		// If a bluetooth command is received

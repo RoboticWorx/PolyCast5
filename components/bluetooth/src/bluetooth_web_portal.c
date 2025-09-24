@@ -17,6 +17,9 @@
 
 #define TAG "BLUETOOTH_WEB_PORTAL"
 
+#define WIFI_PASS_NS "wifi_pass"
+#define WIFI_PASS_KEY "pass"
+
 #define BT_SCRIPT_NS "bt_portal"
 #define BT_SCRIPT_KEY_FMT "script_%02d"
 
@@ -25,6 +28,8 @@
 #define BT_SCRIPT_MENU_KEY_FMT "item_%02d"
 
 #define MAX_HTTP_BODY_TXT 2048
+
+extern char bt_wifi_portal_pass[];
 
 static httpd_handle_t s_server = NULL;
 static esp_netif_t *s_ap_netif = NULL;
@@ -806,7 +811,7 @@ esp_err_t bluetooth_web_portal_start(void)
  	wifi_config_t ap = {0};
  	strcpy((char *)ap.ap.ssid, PORTAL_SSID);
  	ap.ap.ssid_len = strlen(PORTAL_SSID);
- 	strcpy((char *)ap.ap.password, PORTAL_PASS);
+ 	strcpy((char *)ap.ap.password, bt_wifi_portal_pass);
  	ap.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
  	ap.ap.max_connection = 4;
  	ap.ap.channel = 1;
@@ -859,4 +864,49 @@ void bluetooth_web_portal_stop(void)
 const char *bluetooth_web_portal_get_ip(void)
 {
  	return s_ip;
+}
+
+esp_err_t bluetooth_wifi_pass_save_nvs(const char *val)
+{
+	nvs_handle_t h;
+	esp_err_t err;
+	
+	// Open NVS
+	err = nvs_open(WIFI_PASS_NS, NVS_READWRITE, &h);
+	if (err != ESP_OK) {
+		return err;
+	}
+	
+	// Set the version string
+	err = nvs_set_str(h, WIFI_PASS_KEY, val);
+	
+	// Persist changes if success
+	if (err == ESP_OK) {
+		err = nvs_commit(h);
+	}
+	
+	// Close and return
+	nvs_close(h);
+	return err;
+}
+
+esp_err_t bluetooth_wifi_pass_load_nvs(char *out, size_t out_sz)
+{
+	nvs_handle_t h;
+	esp_err_t err;
+	
+	// Open NVS
+	err = nvs_open(WIFI_PASS_NS, NVS_READONLY, &h);
+	if (err != ESP_OK) {
+		return err;
+	}
+	
+	size_t len = out_sz; // Must include room for '\0'
+	
+	// Get the saved version string
+	err = nvs_get_str(h, WIFI_PASS_KEY, out, &len);
+	
+	// Close and return
+	nvs_close(h);
+	return err;
 }

@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "esp_err.h"
+
 // Report IDs
 #define HID_RPT_ID_KB_IN 1 // Keyboard input
 #define HID_RPT_ID_CC_IN 3 // Consumer Control input
@@ -209,6 +211,24 @@ void bluetooth_send_script(const char *s, uint32_t tap_ms);
  * @param [in] percent The battery level percentage to send
  */
 void bluetooth_set_battery_level(uint8_t percent);
+
+/** 
+ * @brief Save the Bluetooth pairing key to NVS
+ *
+ * @param [in] key Pairing key to save
+ *
+ * @returns ESP error status
+ */
+esp_err_t bluetooth_pairing_key_save_nvs(uint32_t key);
+
+/** 
+ * @brief Load the Bluetooth pairing key from NVS
+ *
+ * @param [out] key Pairing key to load
+ *
+ * @returns ESP error status
+ */
+esp_err_t bluetooth_pairing_key_load_nvs(uint32_t *key);
 
 
 #endif // BLUETOOTH_FUNCS_H

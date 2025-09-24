@@ -7,8 +7,7 @@
 #define NUM_KEYBOARD_BASE 2
 #define BT_SCRIPT_LABEL_MAX_LEN 32
 
-#define PORTAL_SSID "PolyCast5-BT-Scripts"
-#define PORTAL_PASS "pc5script"
+#define PORTAL_SSID "PolyCast5-BT-Portal"
 
 /** 
  * @brief Starts SoftAP and HTTP server for web bluetooth script entry portal
@@ -58,5 +57,24 @@ esp_err_t bluetooth_script_label_get(uint8_t idx, char *buf, size_t buflen);
  * @returns ESP error status
  */
 esp_err_t bluetooth_script_body_get(uint8_t idx, char *buf, size_t buflen, size_t *outlen);
+
+/** 
+ * @brief Save a randomly generated Wi-Fi password to NVS
+ *
+ * @param [in] val Password string to save
+ *
+ * @returns ESP error status
+ */
+esp_err_t bluetooth_wifi_pass_save_nvs(const char *val);
+
+/** 
+ * @brief Load the randomly generated Wi-Fi password from NVS
+ *
+ * @param [out] out Pointer to the string to load the password in to
+ * @param [out] out_sz Size of password
+ *
+ * @returns ESP error status
+ */
+esp_err_t bluetooth_wifi_pass_load_nvs(char *out, size_t out_sz);
 
 #endif // BLUETOOTH_WEB_PORTAL_H

@@ -26,6 +26,8 @@
 #define KEYBOARD_SELECTED_IDX_NS "keyb_sel"
 #define KEYBOARD_SELECTED_IDX_KEY "selected"
 
+extern char bt_wifi_portal_pass[];
+
 static char script_labels[MAX_KEYBOARD_SCRIPTS][BT_SCRIPT_LABEL_MAX_LEN + 1];
 
 bluetooth_menu_t bluetooth_menu = {
@@ -386,12 +388,15 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
 		// Set custom text
 		const char *instr_text = "Bluetooth is now advertising as 'PolyCast5'.\n\nClick the right arrow to forget all devices.\n\n"
 								 "To connect a new device, just go to settings on any Bluetooth device such as a phone or PC, "
-								 "click on 'PolyCast5', and enter '123456' as the pin.\n\nAfter connecting once, PolyCast5 "
+								 "click on 'PolyCast5', and enter '%d' as the pin.\n\nAfter connecting once, PolyCast5 "
 								 "will automatically reconnect to the last known device after selecting an option from the Bluetooth menu.\n\nYou "
 								 "will also see the RGB LED turn blue to indicate PolyCast5 is currently connected to a device. If you don't wish to "
 								 "see this, it can be disabled in settings by setting 'Blink every' to 0 for 'Adjust RGB LED'.";
 		
-		lv_label_set_text(instr_lbl, instr_text);
+		// Load pairing key from NVS
+		uint32_t pairing_key;
+		bluetooth_pairing_key_load_nvs(&pairing_key);
+		lv_label_set_text_fmt(instr_lbl, instr_text, pairing_key);
 
 		lv_timer_handler();
 		// Active bluetooth
@@ -1072,11 +1077,12 @@ void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
 
 		// Set custom text based on hotkey index
 		const char *instr_text = "How to quickly add a new Bluetooth autotype text script:\n\nFirst, grab your phone or other device and navigate to Wi-Fi settings."
-				"\n\nThere, you should see a joinable Wi-Fi network named '" PORTAL_SSID "'. Click on it and enter the password '" PORTAL_PASS "'."
+				"\n\nThere, you should see a joinable Wi-Fi network named '" PORTAL_SSID "'. Click on it and enter the password '%s'."
+				"\n\nIf you don't see it, please wait a minute or try refreshing."
 				"\n\nOnce connected, open up your internet browser of choice and search:\n\n%s\n\nFrom there, follow the on-screen instructions. "
 				"DO NOT exit this page until you're done entering what you want into the web portal.";
 		
-		lv_label_set_text_fmt(instr_lbl, instr_text, msg);
+		lv_label_set_text_fmt(instr_lbl, instr_text, bt_wifi_portal_pass, msg);
 	
 		init = true;
 	}

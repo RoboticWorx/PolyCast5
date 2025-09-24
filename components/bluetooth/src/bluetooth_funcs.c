@@ -9,6 +9,7 @@
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
 
+#include "nvs.h"
 #include "host/ble_hs.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
@@ -26,6 +27,9 @@
 
 // Note: Security Level 2 in menuconfig 'BLE SM' required for iOS pairing!
 #define DEVICE_NAME "PolyCast5"
+
+#define PAIRING_KEY_NS "bt_key"
+#define PAIRING_KEY_KEY "key"
 
 /* Consumer-control report encoding (matches your sender) */
 #define HID_CC_RPT_MUTE 1
@@ -1016,4 +1020,47 @@ void bluetooth_deinit(void)
 	#endif
 
 	bluetooth_state = BT_STATE_OFF;
+}
+
+esp_err_t bluetooth_pairing_key_save_nvs(uint32_t key)
+{
+	nvs_handle_t h;
+	esp_err_t err;
+	
+	// Open NVS
+	err = nvs_open(PAIRING_KEY_NS, NVS_READWRITE, &h);
+	if (err != ESP_OK) {
+		return err;
+	}
+	
+	// Set the bt pairing key
+	err = nvs_set_u32(h, PAIRING_KEY_KEY, key);
+	
+	// Persist changes if success
+	if (err == ESP_OK) {
+		err = nvs_commit(h);
+	}
+	
+	// Close and return
+	nvs_close(h);
+	return err;
+}
+
+esp_err_t bluetooth_pairing_key_load_nvs(uint32_t *key)
+{
+	nvs_handle_t h;
+	esp_err_t err;
+	
+	// Open NVS
+	err = nvs_open(PAIRING_KEY_NS, NVS_READONLY, &h);
+	if (err != ESP_OK) {
+		return err;
+	}
+	
+	// Get the saved bt pairing key
+	err = nvs_get_u32(h, PAIRING_KEY_KEY, key);
+	
+	// Close and return
+	nvs_close(h);
+	return err;
 }
