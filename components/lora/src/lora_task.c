@@ -236,7 +236,8 @@ static void lora_task(void *pvParameters) {
 			snprintf(payload, sizeof(payload), "PolyCast_Command_Value:%" PRIu32 ":%d:%s", expected_rx_id, lora_cmd.index, lora_cmd.instr);
 			
 			#ifdef POLYCAST5_DEBUG
-	        ESP_LOGI(TAG, "SENDING: %s", payload);
+	        ESP_LOGI(TAG, "SENDING ACTUAL: %s", payload);
+	        ESP_LOG_BUFFER_HEX("LORA_TASK: Using encryption_key", encryption_key, LORA_ENC_KEY_LEN);
 	        #endif
 			
 			// Encrypt and send over

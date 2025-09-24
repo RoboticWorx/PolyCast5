@@ -717,16 +717,16 @@ void lcd_tools_num_gen_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
 		// Instruction label
 		lbl_ins = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_ins, "Press select to generate!", user_secondary_color,
-						 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
+				&lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
 
 		// Headings
 		lbl_min = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_min, "Min\n", user_secondary_color,
-						 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, NUM_GEN_X_POS - NUM_GEN_X_OFFSET, NUM_GEN_Y_POS);
+				&lv_font_montserrat_18, LV_ALIGN_TOP_MID, NUM_GEN_X_POS - NUM_GEN_X_OFFSET, NUM_GEN_Y_POS);
 
 		lbl_max = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_max, "Max\n", user_secondary_color,
-						 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, NUM_GEN_X_POS, NUM_GEN_Y_POS);
+				&lv_font_montserrat_18, LV_ALIGN_TOP_MID, NUM_GEN_X_POS, NUM_GEN_Y_POS);
 
 		// Values
 		char buf[NUM_GEN_BUF_SIZE];
@@ -844,6 +844,10 @@ void lcd_tools_num_gen_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
 	}
 	// Back selected and pointer is on min
 	else if (ui_btns->left_btn == 1) {
+		// Remove styles
+		lv_obj_remove_style_all(lbl_min);
+		lv_obj_remove_style_all(lbl_max);
+		
 		// Delete objects
 		lv_obj_delete(lbl_ins);
 		lv_obj_delete(lbl_min);
@@ -852,10 +856,6 @@ void lcd_tools_num_gen_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
 		lv_obj_delete(lbl_val_max);
 		lv_obj_delete(lbl_pointer);
 		lv_obj_delete(lbl_result);
-
-		// Remove styles
-		lv_obj_remove_style_all(lbl_min);
-		lv_obj_remove_style_all(lbl_max);
 
 		// Reset statics
 		do_once = false;
@@ -870,6 +870,10 @@ void lcd_tools_num_gen_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
 	}
 	// Home or power off selected
 	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Remove styles
+		lv_obj_remove_style_all(lbl_min);
+		lv_obj_remove_style_all(lbl_max);
+		
 		// Delete objects
 		lv_obj_delete(lbl_ins);
 		lv_obj_delete(lbl_min);
@@ -878,10 +882,6 @@ void lcd_tools_num_gen_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
 		lv_obj_delete(lbl_val_max);
 		lv_obj_delete(lbl_pointer);
 		lv_obj_delete(lbl_result);
-
-		// Remove styles
-		lv_obj_remove_style_all(lbl_min);
-		lv_obj_remove_style_all(lbl_max);
 
 		// Reset statics
 		do_once = false;

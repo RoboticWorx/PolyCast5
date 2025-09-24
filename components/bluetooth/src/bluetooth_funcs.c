@@ -1022,6 +1022,8 @@ void bluetooth_deinit(void)
 	bluetooth_state = BT_STATE_OFF;
 }
 
+/* --------------- NVS --------------- */
+
 esp_err_t bluetooth_pairing_key_save_nvs(uint32_t key)
 {
 	nvs_handle_t h;

@@ -866,6 +866,8 @@ const char *bluetooth_web_portal_get_ip(void)
  	return s_ip;
 }
 
+/* --------------- NVS --------------- */
+
 esp_err_t bluetooth_wifi_pass_save_nvs(const char *val)
 {
 	nvs_handle_t h;

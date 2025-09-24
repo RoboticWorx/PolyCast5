@@ -280,6 +280,9 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == LORA_AWAY_SUBPAGE) {
 				lcd_lora_away_subpage(&ui_btns, &ui_menu, &lora_menu);
 			}
+			else if (ui_menu.page == LORA_AWAY_CUSTOM_SUBPAGE) {
+				lcd_lora_away_custom_subpage(&ui_btns, &ui_menu, &lora_menu);
+			}
 			else if (ui_menu.page == LORA_PLAN_SUBPAGE) {
 				lcd_lora_plan_subpage(&ui_btns, &ui_menu, &lora_menu, &lora_plan_menu);
 			}

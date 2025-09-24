@@ -1530,7 +1530,10 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 			
 		#ifdef POLYCAST5_DEBUG
 		ESP_LOGI(TAG, "Got pin: %s", input_pin);
-		//ESP_LOGI(TAG, "Need pin: %s", settings_menu->pin_menu.unlock_pin);
+		#endif
+
+		#ifdef POLYCAST5_PASS_DEBUG
+		ESP_LOGI(TAG, "Need pin: %s", settings_menu->pin_menu.unlock_pin);
 		#endif
 		
 		// If PIN is correct

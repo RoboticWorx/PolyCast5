@@ -19,6 +19,8 @@
 	//#define POLYCAST5_DIS_SLEEP_TIMER 1 // Disable sleep timer
 #endif
 
+//#define POLYCAST5_PASS_DEBUG 1 // Show password logs for debugging
+
 //#define POLYCAST5_EN_PYRAMID_ANIM 1 // Enables pyramid-alien homescreen animation; as of now it doesn't fit with OTA partitions :(
 
 //#define POLYCAST5_CYCLE_RGB_ON_BOOT 1 // Cycle through the RGB LED to make sure it is working

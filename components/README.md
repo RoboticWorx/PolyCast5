@@ -6,7 +6,7 @@ First and foremost, Bluetooth!
 
 ## Bluetooth
 * PolyCast5 utilizes [NimBLE](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/bluetooth/nimble/index.html), which is a small yet highly configurable Bluetooth Low Energy (BLE) stack providing both host and controller functionalities. This makes it perfect for embedded devices that require full-functionality without taking up too much memory. 
-* Unlike other devices, PolyCast5 goes for full-functionality. For this reason, Bluetooth is **set to transmit at the maximum allowed power level (+20dBm)** so that you remain connected over longer distances than typical Bluetooth devices.
+* Unlike other devices, PolyCast5 goes for full-functionality. For this reason, Bluetooth is **set to transmit at a higher power level (+12dBm)** so that you remain connected over longer distances than typical Bluetooth devices.
   * Don't worry, the the power consumption difference isn't too high but if you need to, this can be easily changed under 'menuconfig > component config > bluetooth > controller options > default tx power level'.
 
 ## LoRa

@@ -106,6 +106,15 @@ void lcd_lora_update_submenu(lora_menu_t *lora_menu);
 void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu);
 
 /**
+ * @brief Allows user to enter custom away value
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] lora_menu LoRa menu structure
+ */
+void lcd_lora_away_custom_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu);
+
+/**
  * @brief Executes when user selects "LOOP" from LoRa subpage
  *
  * @param [in] ui_btns UI input structure
@@ -167,6 +176,8 @@ void lcd_lora_add_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora
  * @param [in] lora_menu LoRa menu structure
  */
 void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu);
+
+/* --------------- NVS --------------- */
 
 /**
  * @brief Saves new LoRa menu option and name to NVS

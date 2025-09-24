@@ -46,6 +46,7 @@ static void bluetooth_task(void *arg)
 		const size_t N = sizeof(alphabet) - 1;
 		const size_t PASS_LEN = 12;
 	
+		// Create random password
 		for (size_t i = 0; i < PASS_LEN; ++i) {
 			uint32_t r = esp_random();
 			bt_wifi_portal_pass[i] = alphabet[r % N];
@@ -55,18 +56,18 @@ static void bluetooth_task(void *arg)
 		// Save that version to NVS
 		bluetooth_wifi_pass_save_nvs(bt_wifi_portal_pass);
 		
-		#ifdef POLYCAST5_DEBUG
+		#ifdef POLYCAST5_PASS_DEBUG
 		ESP_LOGW(TAG, "Setting first time BT Wi-Fi portal password: %s", bt_wifi_portal_pass);
 		#endif
 	}
 	else {
-		#ifdef POLYCAST5_DEBUG
+		#ifdef POLYCAST5_PASS_DEBUG
 		ESP_LOGI(TAG, "Using pre-set BT Wi-Fi portal password: '%s'", bt_wifi_portal_pass);
 		#endif
 	}
 
-	// Also create one random 6 digit BT pairing passkey in NVS
-	uint32_t pairing_key = 0; // Random 6 digit passkey
+	// If 6 digit BT pairing passkey NVS doesn't exist yet, set that too
+	uint32_t pairing_key = 0; // To be random 6 digit passkey
 	if (bluetooth_pairing_key_load_nvs(&pairing_key) != ESP_OK) {
 		// Create first time
 		pairing_key = esp_random() % 1000000;
@@ -74,12 +75,12 @@ static void bluetooth_task(void *arg)
 		// Save that version to NVS
 		bluetooth_pairing_key_save_nvs(pairing_key);
 		
-		#ifdef POLYCAST5_DEBUG
+		#ifdef POLYCAST5_PASS_DEBUG
 		ESP_LOGW(TAG, "Setting first time BT pairing key: %d", pairing_key);
 		#endif
 	}
 	else {
-		#ifdef POLYCAST5_DEBUG
+		#ifdef POLYCAST5_PASS_DEBUG
 		ESP_LOGI(TAG, "Using pre-set BT pairing key: '%d'", pairing_key);
 		#endif
 	}

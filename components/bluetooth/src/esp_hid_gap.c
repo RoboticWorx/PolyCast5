@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: Unlicense OR CC0-1.0
  */
-
+#include "polycast5_macros.h"
 
 #include <string.h>
 #include <stdbool.h>
@@ -894,10 +894,11 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
             // Load pairing key from NVS
             uint32_t pairing_key;
 			bluetooth_pairing_key_load_nvs(&pairing_key);
-			
             pkey.passkey = pairing_key; // This is the passkey to be entered on peer
             
+            #ifdef POLYCAST5_PASS_DEBUG
             ESP_LOGI(TAG, "Enter passkey %" PRIu32 " on the peer side", pkey.passkey);
+            #endif
             rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
             ESP_LOGI(TAG, "ble_sm_inject_io result: %d", rc);
         } else if (event->passkey.params.action == BLE_SM_IOACT_NUMCMP) {
@@ -915,13 +916,16 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
             rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
             ESP_LOGI(TAG, "ble_sm_inject_io result: %d", rc);
         } else if (event->passkey.params.action == BLE_SM_IOACT_INPUT) {
-            ESP_LOGI(TAG, "Input not supported passing -> 123456");
-            pkey.action = event->passkey.params.action;
-            
+			pkey.action = event->passkey.params.action;
+			
 			// Load pairing key from NVS
             uint32_t pairing_key;
 			bluetooth_pairing_key_load_nvs(&pairing_key);
             pkey.passkey = pairing_key;
+            
+            #ifdef POLYCAST5_PASS_DEBUG
+            ESP_LOGI(TAG, "Input not supported passing -> %d", pairing_key);
+            #endif
 
             rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
             ESP_LOGI(TAG, "ble_sm_inject_io result: %d", rc);

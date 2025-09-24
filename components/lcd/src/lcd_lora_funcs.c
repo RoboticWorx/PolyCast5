@@ -1925,6 +1925,27 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		away_menu->index++;
 		lcd_lora_update_menu(away_menu);
 	}
+	// Custom selected
+	else if (ui_btns->select_btn == 1 && away_menu->index == 0) {
+		// Delete away_menu lv_obj
+		lv_obj_del(away_menu->main_list);
+		
+		// Free the styles
+		lv_style_reset(&away_menu->btn_style);
+		lv_style_reset(&away_menu->sel_style);
+		
+		// Free what was allocated
+		free(away_menu);
+		
+		// Reset statics
+		do_once = false;
+		away_menu = NULL;
+		
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		ui_menu->page = LORA_AWAY_CUSTOM_SUBPAGE;
+	}
 	// Specific option selected
 	else if (ui_btns->select_btn == 1 && away_menu->index != 0) {
 		// Hide away_menu
@@ -1935,14 +1956,20 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		lora_cmd.index = lora_menu->submenu.index;
 		memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
 		snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "away %s", away_menu->options[away_menu->index]);
-		xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY);
+		
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Sending LoRa AWAY cmd instr '%s'", lora_cmd.instr);
+		#endif
 
 		// Confirmation text
 		lv_obj_t *lbl_send_conf = lv_label_create(ACTIVE_SCR); // Create and format label
 		lcd_format_label(lbl_send_conf, "Sending to PolyPlug...", user_secondary_color,
-				 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+				&lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
 		lv_timer_handler();
-		vTaskDelay(pdMS_TO_TICKS(500)); // Wait 500ms
+		
+		xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY); // Send
+		vTaskDelay(pdMS_TO_TICKS(500)); // Wait additional 500ms
+		
 		lv_obj_del(lbl_send_conf); // Delete label
 		lcd_clear_pending_inputs = true;
 		
@@ -1964,6 +1991,256 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 
 		ui_menu->page = LORA_SUBPAGE;
+	}
+}
+
+void lcd_lora_away_custom_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu)
+{	
+	#define AWAY_CUSTOM_X_POS 54
+	#define AWAY_CUSTOM_Y_POS 40
+	#define AWAY_CUSTOM_BUF_SIZE 8
+	#define AWAY_CUSTOM_X_OFFSET 110
+
+	// Statics
+	static bool do_once = false;
+	static uint8_t user_idx = 0; // 0 = Min, 1 = Max
+	static int16_t min_val = 1;
+	static int16_t max_val = 10;
+
+	static lv_obj_t *lbl_unit;
+	static lv_obj_t *lbl_ins;
+	static lv_obj_t *lbl_min;
+	static lv_obj_t *lbl_max;
+	static lv_obj_t *lbl_val_min;
+	static lv_obj_t *lbl_val_max;
+	static lv_obj_t *lbl_pointer;
+
+	static lv_style_t style_box;
+
+	// Only execute once
+	if (!do_once) {
+		// Default values
+		user_idx = 0;
+		min_val = 1;
+		max_val = 10;
+		
+		// Instruction label
+		lbl_ins = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_ins, "Press select to send!", user_secondary_color,
+				&lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
+
+		// Headings
+		lbl_min = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_min, "Min\n", user_secondary_color,
+				&lv_font_montserrat_18, LV_ALIGN_TOP_MID, AWAY_CUSTOM_X_POS - AWAY_CUSTOM_X_OFFSET, AWAY_CUSTOM_Y_POS);
+
+		lbl_max = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_max, "Max\n", user_secondary_color,
+				&lv_font_montserrat_18, LV_ALIGN_TOP_MID, AWAY_CUSTOM_X_POS, AWAY_CUSTOM_Y_POS);
+
+		// Values
+		char buf[AWAY_CUSTOM_BUF_SIZE];
+		snprintf(buf, sizeof(buf), "%d", min_val);
+		lbl_val_min = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_val_min, buf, user_secondary_color,
+				&lv_font_montserrat_24, LV_ALIGN_TOP_MID, AWAY_CUSTOM_X_POS - AWAY_CUSTOM_X_OFFSET, AWAY_CUSTOM_Y_POS + 25);
+
+		snprintf(buf, sizeof(buf), "%d", max_val);
+		lbl_val_max = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_val_max, buf, user_secondary_color,
+				&lv_font_montserrat_24, LV_ALIGN_TOP_MID, AWAY_CUSTOM_X_POS, AWAY_CUSTOM_Y_POS + 25);
+
+		// Pointer
+		lbl_pointer = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_pointer, LV_SYMBOL_EJECT, user_secondary_color,
+				&lv_font_montserrat_18, LV_ALIGN_TOP_MID, AWAY_CUSTOM_X_POS - AWAY_CUSTOM_X_OFFSET, AWAY_CUSTOM_Y_POS + 58);
+		
+		// Result
+		lbl_unit = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_unit, "(minutes)", user_secondary_color,
+				&lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -17);
+		
+		// Box style for headings
+		lv_style_reset(&style_box);
+		lv_style_init(&style_box);
+		lv_style_set_radius(&style_box, 8);
+		lv_style_set_bg_color(&style_box, user_primary_color);
+		lv_style_set_border_width(&style_box, 2);
+		lv_style_set_border_color(&style_box, user_secondary_color);
+		lv_style_set_border_side(&style_box, LV_BORDER_SIDE_FULL);
+		lv_style_set_text_color(&style_box, user_secondary_color);
+		lv_style_set_pad_left(&style_box, 25);
+		lv_style_set_pad_right(&style_box, 25);
+		lv_style_set_pad_top(&style_box, 4);
+		lv_style_set_pad_bottom(&style_box, 4);
+
+		lv_obj_add_style(lbl_min, &style_box, 0);
+		lv_obj_add_style(lbl_max, &style_box, 0);
+
+		do_once = true;
+	}
+
+	// Send
+	if (ui_btns->select_btn == 1) {
+		// Ensure min <= max (swap if needed)
+		if (max_val < min_val) {
+			int16_t tmp = min_val;
+			min_val = max_val;
+			max_val = tmp;
+
+			char buf_a[AWAY_CUSTOM_BUF_SIZE], buf_b[AWAY_CUSTOM_BUF_SIZE];
+			snprintf(buf_a, sizeof(buf_a), "%d", min_val);
+			snprintf(buf_b, sizeof(buf_b), "%d", max_val);
+			lv_label_set_text(lbl_val_min, buf_a);
+			lv_label_set_text(lbl_val_max, buf_b);
+		}
+		
+		/* Send the data */
+		
+		// Remove styles
+		lv_obj_remove_style_all(lbl_min);
+		lv_obj_remove_style_all(lbl_max);
+		
+		// Delete objects
+		lv_obj_delete(lbl_unit);
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_min);
+		lv_obj_delete(lbl_max);
+		lv_obj_delete(lbl_val_min);
+		lv_obj_delete(lbl_val_max);
+		lv_obj_delete(lbl_pointer);
+		
+		// Reset statics
+		do_once = false;
+		lbl_unit = lbl_ins = lbl_min = lbl_max = lbl_val_min = lbl_val_max = lbl_pointer = NULL;
+		
+		// Send the data to lora_task
+		lora_cmd_t lora_cmd = {}; // Zero out
+		lora_cmd.index = lora_menu->submenu.index;
+		memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
+		snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "away %d-%dm ON/OFF", min_val, max_val); // Keep formatting
+		
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Sending LoRa AWAY cmd instr '%s'", lora_cmd.instr);
+		#endif
+
+		// Confirmation text
+		lv_obj_t *lbl_send_conf = lv_label_create(ACTIVE_SCR); // Create and format label
+		lcd_format_label(lbl_send_conf, "Sending to PolyPlug...", user_secondary_color,
+				&lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+		lv_timer_handler();
+		
+		xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY); // Send
+		vTaskDelay(pdMS_TO_TICKS(500)); // Wait additional 500ms
+		lcd_clear_pending_inputs = true;
+		
+		lv_obj_del(lbl_send_conf); // Delete label
+		
+		// Show LoRa submenu cont
+		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+
+		ui_menu->page = LORA_SUBPAGE;
+	}
+	// Move right (toggle min/max)
+	else if (ui_btns->right_btn == 1) {
+		// Point to max
+		if (user_idx == 0) {
+			lv_obj_set_x(lbl_pointer, AWAY_CUSTOM_X_POS);
+			user_idx = 1;
+		}
+		// Back to min
+		else {
+			lv_obj_set_x(lbl_pointer, AWAY_CUSTOM_X_POS - AWAY_CUSTOM_X_OFFSET);
+			user_idx = 0;
+		}
+	}
+	// Move left inside page (only if currently on max)
+	else if (ui_btns->left_btn == 1 && user_idx != 0) {
+		lv_obj_set_x(lbl_pointer, AWAY_CUSTOM_X_POS - AWAY_CUSTOM_X_OFFSET);
+		user_idx = 0;
+	}
+	// Increment value
+	else if (ui_btns->up_btn == 1) {
+		if (user_idx == 0) {
+			min_val++;
+			char buf[AWAY_CUSTOM_BUF_SIZE];
+			snprintf(buf, sizeof(buf), "%d", min_val);
+			lv_label_set_text(lbl_val_min, buf);
+		}
+		else {
+			max_val++;
+			char buf[AWAY_CUSTOM_BUF_SIZE];
+			snprintf(buf, sizeof(buf), "%d", max_val);
+			lv_label_set_text(lbl_val_max, buf);
+		}
+	}
+	// Decrement value
+	else if (ui_btns->down_btn == 1) {
+		if (user_idx == 0) {
+			min_val--;
+			if (min_val < 0) {
+				min_val = 0;
+			}
+			
+			char buf[AWAY_CUSTOM_BUF_SIZE];
+			snprintf(buf, sizeof(buf), "%d", min_val);
+			lv_label_set_text(lbl_val_min, buf);
+		}
+		else {
+			max_val--;
+			if (max_val < 0) {
+				max_val = 0;
+			}
+			
+			char buf[AWAY_CUSTOM_BUF_SIZE];
+			snprintf(buf, sizeof(buf), "%d", max_val);
+			lv_label_set_text(lbl_val_max, buf);
+		}
+	}
+	// Back selected and pointer is on min
+	else if (ui_btns->left_btn == 1) {
+		// Remove styles
+		lv_obj_remove_style_all(lbl_min);
+		lv_obj_remove_style_all(lbl_max);
+		
+		// Delete objects
+		lv_obj_delete(lbl_unit);
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_min);
+		lv_obj_delete(lbl_max);
+		lv_obj_delete(lbl_val_min);
+		lv_obj_delete(lbl_val_max);
+		lv_obj_delete(lbl_pointer);
+
+		// Reset statics
+		do_once = false;
+		lbl_unit = lbl_ins = lbl_min = lbl_max = lbl_val_min = lbl_val_max = lbl_pointer = NULL;
+
+		// Show LoRa submenu cont
+		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+
+		ui_menu->page = LORA_SUBPAGE;
+	}
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Remove styles
+		lv_obj_remove_style_all(lbl_min);
+		lv_obj_remove_style_all(lbl_max);
+		
+		// Delete objects
+		lv_obj_delete(lbl_unit);
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_min);
+		lv_obj_delete(lbl_max);
+		lv_obj_delete(lbl_val_min);
+		lv_obj_delete(lbl_val_max);
+		lv_obj_delete(lbl_pointer);
+
+		// Reset statics
+		do_once = false;
+		lbl_unit = lbl_ins = lbl_min = lbl_max = lbl_val_min = lbl_val_max = lbl_pointer = NULL;
+
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 
