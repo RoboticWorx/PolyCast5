@@ -89,7 +89,8 @@ static void wifi_task(void *param)
 	
 	uint8_t my_mac[6];
 	esp_read_mac(my_mac, ESP_MAC_WIFI_STA);
-	
+
+	// Initialize MQTT client
 	wifi_funcs_wifi_event_init();
 	wifi_funcs_mqtt_client_init();
 

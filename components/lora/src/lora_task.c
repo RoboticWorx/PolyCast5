@@ -237,7 +237,7 @@ static void lora_task(void *pvParameters) {
 			
 			#ifdef POLYCAST5_DEBUG
 	        ESP_LOGI(TAG, "SENDING ACTUAL: %s", payload);
-	        ESP_LOG_BUFFER_HEX("LORA_TASK: Using encryption_key", encryption_key, LORA_ENC_KEY_LEN);
+	        ESP_LOG_BUFFER_HEX("LORA_TASK: Using encryption_key", encryption_key, LORA_ENC_KEY_LEN); // Format appends ": "
 	        #endif
 			
 			// Encrypt and send over

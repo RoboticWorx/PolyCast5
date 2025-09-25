@@ -35,7 +35,7 @@ First and foremost, Bluetooth!
 ## Offline
 I've covered all 5 wireless technologioes now (thus the name PolyCast**5**), but we've got some awesome offline stuff too!
 
-This includes a ton of customizable settings such as changing colors, sleep time, brightness, haptics, and even being able to set a security pin so only you can use your PolyCast5 with included notices when someone tries to sign in. Some other useful tools include a complete dice roller, coin flipper, random number generator, some calculators, and doc QRs should you ever have questions.
+This includes a ton of customizable settings such as changing colors, sleep time, brightness, haptics, and even being able to set a security pin so only you can use your PolyCast5 with included notices when someone tries to sign in. Some other useful tools include a complete dice roller, coin flipper, random number generator, SRS planner, and doc QRs should you ever have questions.
 
 Of course, PolyCast5 also has many cool homescreen animations to give you something cool to look at when you wake it up. You can also add your own should you want to being open-source and all.
 

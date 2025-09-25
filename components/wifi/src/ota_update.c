@@ -51,7 +51,7 @@ static void ota_task(void *_)
 	#endif
 
 	// Free some internal heap
-	wifi_funcs_mqtt_client_deinit();
+	wifi_funcs_mqtt_client_destroy();
 
 	#ifdef POLYCAST5_DEBUG
 	ESP_LOGI(TAG, "Pre-OTA heap after MQTT deinit: free=%u, internal=%u, min=%u",
@@ -66,9 +66,9 @@ static void ota_task(void *_)
 		.timeout_ms = 30000, // Timeout
 		.crt_bundle_attach = esp_crt_bundle_attach,
 		.skip_cert_common_name_check = false,
-		.buffer_size = 4096, // Header RX buffer
-		.buffer_size_tx = 4096, // Request TX buffer
-		.keep_alive_enable = true,
+		.buffer_size = 2048, // Header RX buffer
+		.buffer_size_tx = 2048, // Request TX buffer
+		.keep_alive_enable = false,
 		//.user_agent = "esp-idf-ota/1.0",
 	};
 	
@@ -225,9 +225,9 @@ static bool http_get_small(const char *url, char *out, size_t out_sz)
 		.url = url,
 		.timeout_ms = 15000,
 		.crt_bundle_attach = esp_crt_bundle_attach,
-		.buffer_size = 4096,
-		.buffer_size_tx = 4096,
-		.keep_alive_enable = true,
+		.buffer_size = 1024,
+		.buffer_size_tx = 1024,
+		.keep_alive_enable = false, // One fetch
 	};
 
 	// Create the client
@@ -267,6 +267,9 @@ static bool http_get_small(const char *url, char *out, size_t out_sz)
 
 static void ota_check_task(void *_)
 {
+	// Free heap before HTTPS manifest fetch
+	wifi_funcs_mqtt_client_stop();
+
 	char buf[2048];
 	
 	// Get the full, safe string for parsing
@@ -345,6 +348,7 @@ static void ota_check_task(void *_)
 	cJSON_Delete(root);
 
 	done:
+    wifi_funcs_mqtt_client_start(); // Bring back MQTT for normal operation
 	ota_check_task_handle = NULL;
 	vTaskDelete(NULL);
 }

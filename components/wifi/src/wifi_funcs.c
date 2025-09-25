@@ -32,7 +32,6 @@
 
 #define EXPECTED_MQTT_RX "PolyCast5MQTTRxSuccess"
 
-
 static esp_mqtt_client_handle_t mqtt_client;
 
 static uint8_t target_bssid[6] = { 0x60, 0x55, 0xF9, 0xFC, 0xDE, 0xA8 };
@@ -318,9 +317,23 @@ void wifi_funcs_mqtt_client_init(void)
 	esp_mqtt_client_register_event(mqtt_client, MQTT_EVENT_ANY, mqtt_event_handler, NULL);
 }
 
-void wifi_funcs_mqtt_client_deinit(void)
+void wifi_funcs_mqtt_client_destroy(void)
+{
+	if (mqtt_client) {
+		esp_mqtt_client_stop(mqtt_client);
+		esp_mqtt_client_destroy(mqtt_client);
+		mqtt_client = NULL;
+	}
+}
+
+void wifi_funcs_mqtt_client_stop(void)
 {
 	esp_mqtt_client_stop(mqtt_client);
+}
+
+void wifi_funcs_mqtt_client_start(void)
+{
+	esp_mqtt_client_start(mqtt_client);
 }
 
 void wifi_funcs_mqtt_client_publish(char *payload, const uint8_t key[16])
@@ -395,7 +408,8 @@ esp_err_t wifi_funcs_connect(void)
 		#ifdef POLYCAST5_DEBUG
 		ESP_LOGI(TAG, "Wi-Fi connected and got IP!");
 		#endif
-		esp_mqtt_client_start(mqtt_client); // Start mqtt client
+		
+		// wifi_funcs_mqtt_client_start() called after checking for OTA update
 	}
 	else {
 		ESP_LOGE(TAG, "Failed to connect");

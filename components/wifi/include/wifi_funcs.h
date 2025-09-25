@@ -114,9 +114,19 @@ void wifi_funcs_wifi_event_init(void);
 void wifi_funcs_mqtt_client_init(void);
 
 /**
- * @brief Deinitialize the MQTT client
+ * @brief Destroy/deinitialize the MQTT client
  */
-void wifi_funcs_mqtt_client_deinit(void);
+void wifi_funcs_mqtt_client_destroy(void);
+
+/**
+ * @brief Stop the MQTT client
+ */
+void wifi_funcs_mqtt_client_stop(void);
+
+/**
+ * @brief Start the MQTT client
+ */
+void wifi_funcs_mqtt_client_start(void);
 
 /**
  * @brief Initializes Wi-Fi promiscuous mode to sniff packets

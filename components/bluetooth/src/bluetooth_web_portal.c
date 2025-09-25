@@ -858,6 +858,9 @@ void bluetooth_web_portal_stop(void)
  	
  	// Leave the netif allocated for now
  	(void)esp_wifi_stop();
+
+	// Everything else needs station mode
+	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 }
 
 // Return the AP IP string for on-screen instructions
