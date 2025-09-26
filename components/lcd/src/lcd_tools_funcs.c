@@ -387,7 +387,7 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 	
 	static lv_obj_t *cont_roll_log;
 	static lv_obj_t *lbl_roll_log;
-	static char roll_log_buf[2048];
+	EXT_RAM_BSS_ATTR static char roll_log_buf[2048];
 	
 	static lv_style_t style_dice;
 	
@@ -1286,6 +1286,8 @@ static lv_obj_t *canvas = NULL;
 static lv_obj_t *score_label = NULL;
 static lv_obj_t *game_over_label = NULL;
 
+static void *canvas_pixels = NULL; // Raw pixel buffer in PSRAM
+
 // Helper: Check if piece collides at given pos/rot
 static bool check_collision(int x, int y, int rotation)
 {
@@ -1464,69 +1466,86 @@ static void draw_board()
 void lcd_tools_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
 {
 	static bool init = false;
-	LV_DRAW_BUF_DEFINE_STATIC(canvas_buf, VISIBLE_FALL * CELL_SIZE, ORTHO_SIZE * CELL_SIZE, LV_COLOR_FORMAT_RGB565);
+    static lv_draw_buf_t canvas_buf; // Metadata struct (small, internal SRAM)
 
-	if (!init) {
-		// Reset game state
-		memset(board, 0, sizeof(board));
-		score = 0;
-		game_over = false;
-		next_piece.type = esp_random() % 7;
-		spawn_piece();
-		last_fall_time = xTaskGetTickCount();
+    if (!init) {
+        // Reset game state
+        memset(board, 0, sizeof(board));
+        score = 0;
+        game_over = false;
+        next_piece.type = esp_random() % 7;
+        spawn_piece();
+        last_fall_time = xTaskGetTickCount();
 
-		// Create canvas (wide horizontally for fall left->right)
-		canvas = lv_canvas_create(ACTIVE_SCR);
-		lv_canvas_set_draw_buf(canvas, &canvas_buf);
-		lv_obj_align(canvas, LV_ALIGN_CENTER, 0, 0); // Center, adjust if needed for 210x100
+        // Allocate pixel buffer in PSRAM
+        size_t buf_size = VISIBLE_FALL * CELL_SIZE * ORTHO_SIZE * CELL_SIZE * 2; // RGB565: 2 bytes/pixel
+        canvas_pixels = heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!canvas_pixels) {
+            ESP_LOGE("TETRIS", "Failed to alloc PSRAM for canvas");
+            
+            // Fallback or exit to menu
+            ui_menu->page = TOOLS_PAGE;
+            return;
+        }
 
-		// Score label (position adjusted for layout)
-		score_label = lv_label_create(ACTIVE_SCR);
-		lv_label_set_text(score_label, "Score: 0");
-		lv_obj_set_style_text_color(score_label, user_secondary_color, 0);
-		lv_obj_align(score_label, LV_ALIGN_TOP_MID, 0, -20); // Above canvas, adjust
+        // Init draw buf metadata (small struct in internal SRAM)
+        lv_draw_buf_init(&canvas_buf, VISIBLE_FALL * CELL_SIZE, ORTHO_SIZE * CELL_SIZE, LV_COLOR_FORMAT_RGB565, LV_STRIDE_AUTO, canvas_pixels, buf_size);
 
-		// Game over label (hidden initially)
-		game_over_label = lv_label_create(ACTIVE_SCR);
-		lv_label_set_text(game_over_label, "");
-		lv_obj_set_style_text_color(game_over_label, user_secondary_color, 0);
-		lv_obj_align(game_over_label, LV_ALIGN_CENTER, 0, 0);
-		lv_obj_set_style_text_font(game_over_label, &lv_font_montserrat_20, 0);
-		lv_obj_add_flag(game_over_label, LV_OBJ_FLAG_HIDDEN);
+        // Create canvas (wide horizontally for fall left->right)
+        canvas = lv_canvas_create(ACTIVE_SCR);
+        lv_canvas_set_draw_buf(canvas, &canvas_buf);
+        lv_obj_set_size(canvas, VISIBLE_FALL * CELL_SIZE, ORTHO_SIZE * CELL_SIZE);
+        lv_obj_align(canvas, LV_ALIGN_CENTER, 0, 0); // Center, adjust if needed for 210x100
 
-		draw_board();
-		init = true;
-	}
+        // Score label (position adjusted for layout)
+        score_label = lv_label_create(ACTIVE_SCR);
+        lv_label_set_text(score_label, "Score: 0");
+        lv_obj_set_style_text_color(score_label, user_secondary_color, 0);
+        lv_obj_align(score_label, LV_ALIGN_TOP_MID, 0, -20); // Above canvas, adjust
 
-	// Handle game over
-	if (game_over) {
-		// Clear the board visually
-		lv_canvas_fill_bg(canvas, user_primary_color, LV_OPA_COVER);
-		lv_obj_invalidate(canvas);
+        // Game over label (hidden initially)
+        game_over_label = lv_label_create(ACTIVE_SCR);
+        lv_label_set_text(game_over_label, "");
+        lv_obj_set_style_text_font(game_over_label, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_color(game_over_label, user_secondary_color, 0);
+        lv_obj_align(game_over_label, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_add_flag(game_over_label, LV_OBJ_FLAG_HIDDEN);
 
-		char buf[32];
-		snprintf(buf, sizeof(buf), "Game Over\nScore: %" PRIu32, score);
-		lv_label_set_text(game_over_label, buf);
-		lv_obj_remove_flag(game_over_label, LV_OBJ_FLAG_HIDDEN);
+        draw_board();
+        init = true;
+    }
 
-		// Any button to exit
-		if (ui_btns->up_btn || ui_btns->down_btn || ui_btns->left_btn || ui_btns->right_btn || ui_btns->select_btn || ui_btns->home_btn) {
-			// Cleanup
-			lv_obj_del(canvas);
-			lv_obj_del(score_label);
-			lv_obj_del(game_over_label);
-			canvas = score_label = game_over_label = NULL;
-			init = false;
+    // Handle game over
+    if (game_over) {
+        // Clear the board visually
+        lv_canvas_fill_bg(canvas, user_primary_color, LV_OPA_COVER);
+        lv_obj_invalidate(canvas);
 
-			// Back to tools menu
-			lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-			ui_menu->page = TOOLS_PAGE;
-		}
-		
-		return;
-	}
+        char buf[32];
+        snprintf(buf, sizeof(buf), "Game Over\nScore: %" PRIu32, score);
+        lv_label_set_text(game_over_label, buf);
+        lv_obj_remove_flag(game_over_label, LV_OBJ_FLAG_HIDDEN);
+
+        // Any button to exit
+        if (ui_btns->up_btn || ui_btns->down_btn || ui_btns->left_btn || ui_btns->right_btn || ui_btns->select_btn || ui_btns->home_btn) {
+            // Cleanup
+            lv_obj_del(canvas);
+            lv_obj_del(score_label);
+            lv_obj_del(game_over_label);
+            heap_caps_free(canvas_pixels); // Free PSRAM
+            
+            canvas = score_label = game_over_label = NULL;
+            canvas_pixels = NULL;
+            init = false;
+
+            // Back to tools menu
+            lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+            ui_menu->page = TOOLS_PAGE;
+        }
+        return;
+    }
 
 	/* Input handling */
 	bool moved = false;
@@ -1568,8 +1587,9 @@ void lcd_tools_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t 
 		lv_obj_del(canvas);
 		lv_obj_del(score_label);
 		lv_obj_del(game_over_label);
+		heap_caps_free(canvas_pixels); // Free PSRAM
 		
-		canvas = score_label = game_over_label = NULL;
+		canvas = score_label = game_over_label = canvas_pixels = NULL;
 		init = false;
 		
 		lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -1583,8 +1603,9 @@ void lcd_tools_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t 
 		lv_obj_del(canvas);
 		lv_obj_del(score_label);
 		lv_obj_del(game_over_label);
+		heap_caps_free(canvas_pixels); // Free PSRAM
 		
-		canvas = score_label = game_over_label = NULL;
+		canvas = score_label = game_over_label = canvas_pixels = NULL;
 		init = false;
 		
 		lcd_funcs_transition_back(false, ui_menu);  // False = sleep

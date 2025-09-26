@@ -29,7 +29,7 @@
 
 extern char bt_wifi_portal_pass[];
 
-static char script_labels[MAX_KEYBOARD_SCRIPTS][BT_SCRIPT_LABEL_MAX_LEN + 1];
+EXT_RAM_BSS_ATTR static char script_labels[MAX_KEYBOARD_SCRIPTS][BT_SCRIPT_LABEL_MAX_LEN + 1];
 
 bluetooth_menu_t bluetooth_menu = {
 	.options = {"How It Works", "Auto Keyboard", "Media Controller", "Page Scroller", "PowerPoint Clicker", "Camera Clicker"},
