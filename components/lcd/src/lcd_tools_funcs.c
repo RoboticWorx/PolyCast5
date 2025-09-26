@@ -1,15 +1,18 @@
 #include <time.h>
 #include <sys/param.h>
 
+#include "font/lv_font.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
 
 #include "gpio_task.h"
+#include "misc/lv_color.h"
 #include "nvs.h"
 #include "esp_log.h"
 #include "esp_err.h"
 #include "esp_random.h"
+#include "esp_timer.h"
 
 #include "core/lv_obj_pos.h"
 #include "font/lv_symbol_def.h"
@@ -30,8 +33,8 @@
 
 
 tools_menu_t tools_menu = {
-	.options = {"Coin flipper", "Dice roller", "Read the docs", "Number generator", "SRS Planner"},
-	.size = 5,
+	.options = {"Coin flipper", "Dice roller", "Read the docs", "Number generator", "Tetris", "SRS Planner"},
+	.size = 6,
 	.index = 0,
 	.cont = NULL,
 };
@@ -1210,5 +1213,418 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
 		sel = 0;
 
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);
+	}
+}
+
+/* =============== TETRIS IMPLEMENTATION =============== */
+
+// Macros for game config
+#define ORTHO_SIZE 10 // Number of rows (vertical when held sideways)
+#define FALL_SIZE 25 // Total fall length (horizontal on screen)
+#define VISIBLE_FALL 21	// Visible fall length
+#define HIDDEN_FALL 4 // Hidden start columns (left on screen)
+#define CELL_SIZE 10 // Pixel size per cell (210/21 ≈10, 106/10=10.6 ≈10)
+#define FALL_DELAY_MS 500 // Base fall speed (decreases with level)
+#define SOFT_DROP_MULTIPLIER 5 // Faster fall when down pressed
+#define LEVEL_SPEED_INCREASE 50 // MS decrease per level (every 1000 points)
+
+// Tetromino shapes (4 rotations each, 4x4 grid). Rotations assume standard, but game is transposed.
+static const int tetrominoes[7][4][16] = {
+	// I
+	{{0,0,0,0, 1,1,1,1, 0,0,0,0, 0,0,0,0},
+	 {0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0},
+	 {0,0,0,0, 1,1,1,1, 0,0,0,0, 0,0,0,0},
+	 {0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0}},
+	// O
+	{{0,0,0,0, 0,1,1,0, 0,1,1,0, 0,0,0,0},
+	 {0,0,0,0, 0,1,1,0, 0,1,1,0, 0,0,0,0},
+	 {0,0,0,0, 0,1,1,0, 0,1,1,0, 0,0,0,0},
+	 {0,0,0,0, 0,1,1,0, 0,1,1,0, 0,0,0,0}},
+	// T
+	{{0,0,0,0, 0,1,0,0, 1,1,1,0, 0,0,0,0},
+	 {0,0,1,0, 0,1,1,0, 0,0,1,0, 0,0,0,0},
+	 {0,0,0,0, 1,1,1,0, 0,1,0,0, 0,0,0,0},
+	 {0,1,0,0, 0,1,1,0, 0,1,0,0, 0,0,0,0}},
+	// S
+	{{0,0,0,0, 0,1,1,0, 1,1,0,0, 0,0,0,0},
+	 {0,1,0,0, 0,1,1,0, 0,0,1,0, 0,0,0,0},
+	 {0,0,0,0, 0,1,1,0, 1,1,0,0, 0,0,0,0},
+	 {0,1,0,0, 0,1,1,0, 0,0,1,0, 0,0,0,0}},
+	// Z
+	{{0,0,0,0, 1,1,0,0, 0,1,1,0, 0,0,0,0},
+	 {0,0,1,0, 0,1,1,0, 0,1,0,0, 0,0,0,0},
+	 {0,0,0,0, 1,1,0,0, 0,1,1,0, 0,0,0,0},
+	 {0,0,1,0, 0,1,1,0, 0,1,0,0, 0,0,0,0}},
+	// J
+	{{0,0,0,0, 1,0,0,0, 1,1,1,0, 0,0,0,0},
+	 {0,1,1,0, 0,1,0,0, 0,1,0,0, 0,0,0,0},
+	 {0,0,0,0, 1,1,1,0, 0,0,1,0, 0,0,0,0},
+	 {0,0,1,0, 0,0,1,0, 0,1,1,0, 0,0,0,0}},
+	// L
+	{{0,0,0,0, 0,0,1,0, 1,1,1,0, 0,0,0,0},
+	 {0,1,0,0, 0,1,0,0, 0,1,1,0, 0,0,0,0},
+	 {0,0,0,0, 1,1,1,0, 1,0,0,0, 0,0,0,0},
+	 {0,1,1,0, 0,0,1,0, 0,0,1,0, 0,0,0,0}}
+};
+
+typedef struct {
+	int x, y; // x: fall position (horizontal), y: orthogonal position (vertical)
+	int type; // 0-6
+	int rotation; // 0-3
+} tetris_piece_t;
+
+// Game state
+static int board[ORTHO_SIZE][FALL_SIZE] = {0}; // board[row][col], col increases right (fall dir)
+static tetris_piece_t current_piece;
+static tetris_piece_t next_piece;
+static uint32_t score = 0;
+static bool game_over = false;
+static TickType_t last_fall_time = 0;
+
+// LVGL elements
+static lv_obj_t *canvas = NULL;
+static lv_obj_t *score_label = NULL;
+static lv_obj_t *game_over_label = NULL;
+
+// Helper: Check if piece collides at given pos/rot
+static bool check_collision(int x, int y, int rotation)
+{
+	const int *shape = tetrominoes[current_piece.type][rotation];
+	
+	for (int i = 0; i < 4; i++) { // i: ortho (row)
+		for (int j = 0; j < 4; j++) { // j: fall (col)
+			if (shape[i * 4 + j]) {
+				int board_col = x + j;
+				int board_row = y + i;
+				
+				if (board_col < 0 || board_col >= FALL_SIZE || board_row < 0 || board_row >= ORTHO_SIZE || board[board_row][board_col]) {
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+// Helper: Place piece on board
+static void place_piece()
+{
+	const int *shape = tetrominoes[current_piece.type][current_piece.rotation];
+	
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 4; j++) {
+			if (shape[i * 4 + j]) {
+				board[current_piece.y + i][current_piece.x + j] = 1;
+			}
+		}
+	}
+}
+
+// Helper: Clear full lines (now full columns in fall dir), return lines cleared
+static int clear_lines()
+{
+	int lines = 0;
+	
+	for (int col = FALL_SIZE - 1; col >= 0; col--) {
+		bool full = true;
+		
+		for (int row = 0; row < ORTHO_SIZE; row++) {
+			if (!board[row][col]) {
+				full = false;
+				break;
+			}
+		}
+		
+		if (full) {
+			lines++;
+			
+			// Shift left (decrease col)
+			for (int c = col; c > 0; c--) {
+				for (int r = 0; r < ORTHO_SIZE; r++) {
+					board[r][c] = board[r][c - 1];
+				}
+			}
+			
+			// Clear leftmost col
+			for (int r = 0; r < ORTHO_SIZE; r++) {
+				board[r][0] = 0;
+			}
+			
+			col++; // Re-check this col after shift
+		}
+	}
+	
+	return lines;
+}
+
+// Helper: Spawn new piece
+static void spawn_piece()
+{
+	current_piece = next_piece;
+	current_piece.x = 0; // Start at left (hidden)
+	current_piece.y = ORTHO_SIZE / 2 - 2;
+	next_piece.type = esp_random() % 7;
+	next_piece.rotation = 0;
+	
+	if (check_collision(current_piece.x, current_piece.y, current_piece.rotation)) {
+		game_over = true;
+	}
+}
+
+// Helper: Draw board on canvas (only visible cols)
+static void draw_board()
+{
+	lv_canvas_fill_bg(canvas, lv_color_black(), LV_OPA_COVER); // Clear background
+
+	lv_layer_t layer;
+	lv_canvas_init_layer(canvas, &layer);
+
+	// Draw board cells
+	for (int col = HIDDEN_FALL; col < HIDDEN_FALL + VISIBLE_FALL; col++) { // Visible only
+		for (int row = 0; row < ORTHO_SIZE; row++) {
+			if (board[row][col]) {
+				int px = (col - HIDDEN_FALL) * CELL_SIZE; // x increases right (fall)
+				int py = row * CELL_SIZE; // y increases down
+
+				// Fill
+				lv_draw_rect_dsc_t fill_dsc;
+				lv_draw_rect_dsc_init(&fill_dsc);
+				fill_dsc.bg_color = user_primary_color;
+				fill_dsc.bg_opa = LV_OPA_COVER;
+				fill_dsc.radius = 0;
+				lv_area_t fill_area;
+				lv_area_set(&fill_area, px, py, px + CELL_SIZE - 1, py + CELL_SIZE - 1);
+				lv_draw_rect(&layer, &fill_dsc, &fill_area);
+
+				// Border
+				lv_draw_rect_dsc_t border_dsc;
+				lv_draw_rect_dsc_init(&border_dsc);
+				border_dsc.border_color = user_secondary_color;
+				border_dsc.border_width = 1;
+				border_dsc.border_opa = LV_OPA_COVER;
+				border_dsc.bg_opa = LV_OPA_TRANSP; // Transparent fill for border only
+				border_dsc.radius = 0;
+				lv_draw_rect(&layer, &border_dsc, &fill_area);
+			}
+		}
+	}
+
+	// Draw current piece
+	const int *shape = tetrominoes[current_piece.type][current_piece.rotation];
+	for (int i = 0; i < 4; i++) { // i: ortho offset
+		for (int j = 0; j < 4; j++) { // j: fall offset
+			if (shape[i*4 + j]) {
+				int board_col = current_piece.x + j;
+				int board_row = current_piece.y + i;
+				
+				if (board_col >= HIDDEN_FALL && board_col < HIDDEN_FALL + VISIBLE_FALL) { // Visible
+					int px = (board_col - HIDDEN_FALL) * CELL_SIZE;
+					int py = board_row * CELL_SIZE;
+
+					// Fill
+					lv_draw_rect_dsc_t fill_dsc;
+					lv_draw_rect_dsc_init(&fill_dsc);
+					fill_dsc.bg_color = user_primary_color;
+					fill_dsc.bg_opa = LV_OPA_COVER;
+					fill_dsc.radius = 0;
+					lv_area_t fill_area;
+					lv_area_set(&fill_area, px, py, px + CELL_SIZE - 1, py + CELL_SIZE - 1);
+					lv_draw_rect(&layer, &fill_dsc, &fill_area);
+
+					// Border
+					lv_draw_rect_dsc_t border_dsc;
+					lv_draw_rect_dsc_init(&border_dsc);
+					border_dsc.border_color = user_secondary_color;
+					border_dsc.border_width = 1;
+					border_dsc.border_opa = LV_OPA_COVER;
+					border_dsc.bg_opa = LV_OPA_TRANSP;
+					border_dsc.radius = 0;
+					lv_draw_rect(&layer, &border_dsc, &fill_area);
+				}
+			}
+		}
+	}
+
+	// Draw whole board outline
+	lv_draw_rect_dsc_t board_border_dsc;
+	lv_draw_rect_dsc_init(&board_border_dsc);
+	board_border_dsc.border_color = user_secondary_color;
+	board_border_dsc.border_width = 1;
+	board_border_dsc.border_opa = LV_OPA_COVER;
+	board_border_dsc.bg_opa = LV_OPA_TRANSP;
+	board_border_dsc.radius = 0;
+	lv_area_t board_area;
+	lv_area_set(&board_area, 0, 0, VISIBLE_FALL * CELL_SIZE - 1, ORTHO_SIZE * CELL_SIZE - 1);
+	lv_draw_rect(&layer, &board_border_dsc, &board_area);
+
+	lv_canvas_finish_layer(canvas, &layer);
+	lv_obj_invalidate(canvas); // Refresh
+}
+
+void lcd_tools_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
+{
+	static bool init = false;
+	LV_DRAW_BUF_DEFINE_STATIC(canvas_buf, VISIBLE_FALL * CELL_SIZE, ORTHO_SIZE * CELL_SIZE, LV_COLOR_FORMAT_RGB565);
+
+	if (!init) {
+		// Reset game state
+		memset(board, 0, sizeof(board));
+		score = 0;
+		game_over = false;
+		next_piece.type = esp_random() % 7;
+		spawn_piece();
+		last_fall_time = xTaskGetTickCount();
+
+		// Create canvas (wide horizontally for fall left->right)
+		canvas = lv_canvas_create(ACTIVE_SCR);
+		lv_canvas_set_draw_buf(canvas, &canvas_buf);
+		lv_obj_align(canvas, LV_ALIGN_CENTER, 0, 0); // Center, adjust if needed for 210x100
+
+		// Score label (position adjusted for layout)
+		score_label = lv_label_create(ACTIVE_SCR);
+		lv_label_set_text(score_label, "Score: 0");
+		lv_obj_set_style_text_color(score_label, user_secondary_color, 0);
+		lv_obj_align(score_label, LV_ALIGN_TOP_MID, 0, -20); // Above canvas, adjust
+
+		// Game over label (hidden initially)
+		game_over_label = lv_label_create(ACTIVE_SCR);
+		lv_label_set_text(game_over_label, "");
+		lv_obj_set_style_text_color(game_over_label, user_secondary_color, 0);
+		lv_obj_align(game_over_label, LV_ALIGN_CENTER, 0, 0);
+		lv_obj_set_style_text_font(game_over_label, &lv_font_montserrat_20, 0);
+		lv_obj_add_flag(game_over_label, LV_OBJ_FLAG_HIDDEN);
+
+		draw_board();
+		init = true;
+	}
+
+	// Handle game over
+	if (game_over) {
+		// Clear the board visually
+		lv_canvas_fill_bg(canvas, user_primary_color, LV_OPA_COVER);
+		lv_obj_invalidate(canvas);
+
+		char buf[32];
+		snprintf(buf, sizeof(buf), "Game Over\nScore: %" PRIu32, score);
+		lv_label_set_text(game_over_label, buf);
+		lv_obj_remove_flag(game_over_label, LV_OBJ_FLAG_HIDDEN);
+
+		// Any button to exit
+		if (ui_btns->up_btn || ui_btns->down_btn || ui_btns->left_btn || ui_btns->right_btn || ui_btns->select_btn || ui_btns->home_btn) {
+			// Cleanup
+			lv_obj_del(canvas);
+			lv_obj_del(score_label);
+			lv_obj_del(game_over_label);
+			canvas = score_label = game_over_label = NULL;
+			init = false;
+
+			// Back to tools menu
+			lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+			ui_menu->page = TOOLS_PAGE;
+		}
+		
+		return;
+	}
+
+	/* Input handling */
+	bool moved = false;
+	// Move piece right
+	if (ui_btns->up_btn) {
+		if (!check_collision(current_piece.x, current_piece.y - 1, current_piece.rotation)) {
+			current_piece.y--;
+			moved = true;
+		}
+	}
+	// Move piece left
+	else if (ui_btns->down_btn) {
+		if (!check_collision(current_piece.x, current_piece.y + 1, current_piece.rotation)) {
+			current_piece.y++;
+			moved = true;
+		}
+	}
+	// Rotate piece
+	else if (ui_btns->left_btn) {
+		int new_rot = (current_piece.rotation + 1) % 4;
+		if (!check_collision(current_piece.x, current_piece.y, new_rot)) {
+			current_piece.rotation = new_rot;
+			moved = true;
+		}
+	}
+	// Hard drop (fast forward x)
+	else if (ui_btns->select_btn) {
+		while (!check_collision(current_piece.x + 1, current_piece.y, current_piece.rotation)) {
+			current_piece.x++;
+		}
+		place_piece();
+		int lines = clear_lines();
+		score += 100 * lines * lines; // Bonus for multi-lines
+		spawn_piece();
+		moved = true;
+	}
+	// Exit to menu
+	else if (ui_btns->home_btn) {
+		lv_obj_del(canvas);
+		lv_obj_del(score_label);
+		lv_obj_del(game_over_label);
+		
+		canvas = score_label = game_over_label = NULL;
+		init = false;
+		
+		lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		ui_menu->page = TOOLS_PAGE;
+		return;
+	}
+	// Sleep
+	else if (ui_btns->pwr_btn) {
+		lv_obj_del(canvas);
+		lv_obj_del(score_label);
+		lv_obj_del(game_over_label);
+		
+		canvas = score_label = game_over_label = NULL;
+		init = false;
+		
+		lcd_funcs_transition_back(false, ui_menu);  // False = sleep
+		return;
+	}
+
+	// Time-based fall (increase x)
+	TickType_t now = xTaskGetTickCount();
+	uint32_t fall_delay = FALL_DELAY_MS - (score / 1000) * LEVEL_SPEED_INCREASE; // Speed up with level
+	
+	if (fall_delay < 100) {
+		fall_delay = 100; // Min speed
+	}
+	
+	// Soft drop with right button
+	if (ui_btns->right_btn) {
+		fall_delay /= SOFT_DROP_MULTIPLIER;
+	}
+
+	if (now - last_fall_time >= pdMS_TO_TICKS(fall_delay)) {
+		if (!check_collision(current_piece.x + 1, current_piece.y, current_piece.rotation)) {
+			current_piece.x++;
+			moved = true;
+		}
+		else {
+			place_piece();
+			int lines = clear_lines();
+			score += 100 * lines * lines;
+			spawn_piece();
+			moved = true;
+		}
+		
+		last_fall_time = now;
+	}
+
+	// Update UI if changed
+	if (moved) {
+		draw_board();
+		char buf[16];
+		snprintf(buf, sizeof(buf), "Score: %" PRIu32, score);
+		lv_label_set_text(score_label, buf);
 	}
 }
