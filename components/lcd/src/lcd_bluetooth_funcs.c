@@ -1,4 +1,5 @@
 #include "font/lv_symbol_def.h"
+#include "gpio_task.h"
 #include "misc/lv_timer.h"
 #include "polycast5_macros.h"
 
@@ -933,6 +934,9 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 	
 	// Only execute once
 	if (!do_once) {
+		// Reset long semaphore to avoid false triggers
+		xQueueReset(xRightButtonLongSemaphore);
+
 		// Ensure updated based on NVS
 		keyboard_menu_refresh_from_nvs(&bluetooth_menu->bluetooth_keyboard_menu);
 
@@ -961,6 +965,24 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 	else if (ui_btns->down_btn == 1) {
 		// Update selection
 		bluetooth_menu->bluetooth_keyboard_menu.index++;
+		lcd_bluetooth_update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
+
+		// Save to NVS
+		lcd_bluetooth_script_selected_set(bluetooth_menu->bluetooth_keyboard_menu.index);
+	}
+	// Right button pressed (+5)
+	else if (ui_btns->right_btn == 1) {
+		// Update selection
+		bluetooth_menu->bluetooth_keyboard_menu.index = bluetooth_menu->bluetooth_keyboard_menu.index + 5;
+		lcd_bluetooth_update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
+
+		// Save to NVS
+		lcd_bluetooth_script_selected_set(bluetooth_menu->bluetooth_keyboard_menu.index);
+	}
+	// Long right -> go to index 2 (first user index)
+	else if (xSemaphoreTake(xRightButtonLongSemaphore, 0) == pdTRUE) {
+		// Update selection
+		bluetooth_menu->bluetooth_keyboard_menu.index = 2;
 		lcd_bluetooth_update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
 
 		// Save to NVS

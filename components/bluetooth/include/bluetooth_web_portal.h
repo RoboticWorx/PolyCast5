@@ -3,7 +3,7 @@
 
 #include "esp_err.h"
 
-#define MAX_KEYBOARD_SCRIPTS 16
+#define MAX_KEYBOARD_SCRIPTS 100
 #define NUM_KEYBOARD_BASE 2
 #define BT_SCRIPT_LABEL_MAX_LEN 32
 
