@@ -4,6 +4,8 @@
 
 #define POLYCAST5_DEBUG 1 // If debugging
 
+// EXT_RAM_BSS_ATTR
+
 #ifdef POLYCAST5_DEBUG
 	//#define POLYCAST5_DEBUG_GPIO 1 // If debugging user buttons
 	//#define POLYCAST5_DEBUG_ADC 1 // If debugging battery ADC

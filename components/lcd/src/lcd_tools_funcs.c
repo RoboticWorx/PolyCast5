@@ -31,6 +31,8 @@
 
 #define TAG "LCD_TOOLS_FUNCS"
 
+#define HIGH_SCORE_NS "tetris"
+#define HIGH_SCORE_KEY "score"
 
 tools_menu_t tools_menu = {
 	.options = {"Coin flipper", "Dice roller", "Read the docs", "Number generator", "Tetris", "SRS Planner"},
@@ -1228,10 +1230,16 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
 #define SOFT_DROP_MULTIPLIER 5 // Faster fall when down pressed
 #define LEVEL_SPEED_INCREASE 50 // MS decrease per level (every 1000 points)
 
-// Tetromino shapes (4 rotations each, 4x4 grid). Rotations assume standard, but game is transposed.
+// Game colors
+#define COLOR_PIECE_FALLING (lv_color_make(0, 139, 0)) // 8B Green #008B00
+#define COLOR_PIECE_RESTING (lv_color_make(0, 71, 171)) // Cobalt blue #0047AB
+#define COLOR_PIECE_OUTLINE (lv_color_white())
+#define COLOR_BOARD_FILL (lv_color_black())
+
+// Tetromino shapes: 4 rotations each per shape, 4x4 grid
 static const int tetrominoes[7][4][16] = {
 	// I
-	{{0,0,0,0, 1,1,1,1, 0,0,0,0, 0,0,0,0},
+ {{0,0,0,0, 1,1,1,1, 0,0,0,0, 0,0,0,0},
 	 {0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0},
 	 {0,0,0,0, 1,1,1,1, 0,0,0,0, 0,0,0,0},
 	 {0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0}},
@@ -1274,32 +1282,100 @@ typedef struct {
 } tetris_piece_t;
 
 // Game state
-static int board[ORTHO_SIZE][FALL_SIZE] = {0}; // board[row][col], col increases right (fall dir)
-static tetris_piece_t current_piece;
-static tetris_piece_t next_piece;
-static uint32_t score = 0;
-static bool game_over = false;
-static TickType_t last_fall_time = 0;
+static int tetris_board[ORTHO_SIZE][FALL_SIZE] = {0}; // board[row][col], col increases right (fall dir)
+static tetris_piece_t tetris_current_piece;
+static tetris_piece_t tetris_next_piece;
+static uint32_t tetris_score = 0;
+static bool tetris_game_over = false;
+static TickType_t tetris_last_fall_time = 0;
 
 // LVGL elements
-static lv_obj_t *canvas = NULL;
-static lv_obj_t *score_label = NULL;
-static lv_obj_t *game_over_label = NULL;
+static lv_obj_t *tetris_canvas = NULL;
+static lv_obj_t *tetris_score_label = NULL;
+static lv_obj_t *tetris_game_over_label = NULL;
 
-static void *canvas_pixels = NULL; // Raw pixel buffer in PSRAM
+static void *tetris_canvas_pixels = NULL; // Raw pixel buffer in PSRAM
+
+// Save score as high score
+static void tetris_high_score_nvs_save(uint32_t score)
+{
+	nvs_handle_t h;
+	
+	// Open NVS
+	esp_err_t err = nvs_open(HIGH_SCORE_NS, NVS_READWRITE, &h);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "tetris_high_score_nvs_save nvs_open failed");
+		goto out;
+	}
+
+	// Store pin_attempts as a uint32
+	err = nvs_set_u32(h, HIGH_SCORE_KEY, score);
+	if (err == ESP_OK) {
+		// Commit to flash
+		err = nvs_commit(h);
+		
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Saved Tetris high score: %" PRIu32, score);
+		#endif
+	}
+	else {
+		ESP_LOGE(TAG, "Failed to tetris_high_score_nvs_save nvs_set_u32: %" PRIu32, score);
+	}
+	
+	// Close NVS
+	out:
+	nvs_close(h);
+}
+
+// Load Tetris high score
+static uint32_t tetris_high_score_nvs_load(void)
+{
+	nvs_handle_t h;
+	
+	// Open NVS
+	esp_err_t err = nvs_open(HIGH_SCORE_NS, NVS_READONLY, &h);
+	if (err != ESP_OK) {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGW(TAG, "tetris_high_score_nvs_load NS DNE");
+		#endif
+	}
+	
+	// Get the uint32
+	uint32_t score = 0;
+	err = nvs_get_u32(h, HIGH_SCORE_KEY, &score);
+	if (err != ESP_OK) {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGE(TAG, "Failed tetris_high_score_nvs_load nvs_get_u32");
+		#endif
+	}
+	else {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Loaded Tetris high score: %" PRIu32, score);
+		#endif
+	}
+	
+	// Close NVS
+	nvs_close(h);
+	
+	return score;
+}
 
 // Helper: Check if piece collides at given pos/rot
 static bool check_collision(int x, int y, int rotation)
 {
-	const int *shape = tetrominoes[current_piece.type][rotation];
+	// Get shape and given rotation
+	const int *shape = tetrominoes[tetris_current_piece.type][rotation];
 	
+	// Loops over 4x4: If cell occupied, calculates board position
 	for (int i = 0; i < 4; i++) { // i: ortho (row)
 		for (int j = 0; j < 4; j++) { // j: fall (col)
-			if (shape[i * 4 + j]) {
+			// Checks out-of-bounds or overlap with existing board cell
+			if (shape[i * 4 + j]) { // i * 4 + j converts 2D coordinates (row i, col j) to a 1D index in the flattened array
 				int board_col = x + j;
 				int board_row = y + i;
 				
-				if (board_col < 0 || board_col >= FALL_SIZE || board_row < 0 || board_row >= ORTHO_SIZE || board[board_row][board_col]) {
+				// Returns true if collision
+				if (board_col < 0 || board_col >= FALL_SIZE || board_row < 0 || board_row >= ORTHO_SIZE || tetris_board[board_row][board_col]) {
 					return true;
 				}
 			}
@@ -1311,12 +1387,14 @@ static bool check_collision(int x, int y, int rotation)
 // Helper: Place piece on board
 static void place_piece()
 {
-	const int *shape = tetrominoes[current_piece.type][current_piece.rotation];
+	// Get shape and given rotation
+	const int *shape = tetrominoes[tetris_current_piece.type][tetris_current_piece.rotation];
 	
+	// Loops over 4x4: If occupied, sets board cell at piece position to 1 (locked)
 	for (int i = 0; i < 4; i++) {
 		for (int j = 0; j < 4; j++) {
-			if (shape[i * 4 + j]) {
-				board[current_piece.y + i][current_piece.x + j] = 1;
+			if (shape[i * 4 + j]) { // i * 4 + j converts 2D coordinates (row i, col j) to a 1D index in the flattened array
+				tetris_board[tetris_current_piece.y + i][tetris_current_piece.x + j] = 1;
 			}
 		}
 	}
@@ -1327,32 +1405,37 @@ static int clear_lines()
 {
 	int lines = 0;
 	
+	// Scans columns from right (bottom in rotated view) to left
 	for (int col = FALL_SIZE - 1; col >= 0; col--) {
+		// For each column: Check if all rows occupied (full=true)
+		
 		bool full = true;
 		
 		for (int row = 0; row < ORTHO_SIZE; row++) {
-			if (!board[row][col]) {
+			if (!tetris_board[row][col]) {
 				full = false;
 				break;
 			}
 		}
 		
+		// If full: Increment lines, shift all columns left (copy from c-1 to c), clear leftmost (new empty)
 		if (full) {
 			lines++;
 			
 			// Shift left (decrease col)
 			for (int c = col; c > 0; c--) {
 				for (int r = 0; r < ORTHO_SIZE; r++) {
-					board[r][c] = board[r][c - 1];
+					tetris_board[r][c] = tetris_board[r][c - 1];
 				}
 			}
 			
 			// Clear leftmost col
 			for (int r = 0; r < ORTHO_SIZE; r++) {
-				board[r][0] = 0;
+				tetris_board[r][0] = 0;
 			}
 			
-			col++; // Re-check this col after shift
+			// Re-scan the now-shifted column (might be full again after multi-clear)
+			col++;
 		}
 	}
 	
@@ -1362,36 +1445,43 @@ static int clear_lines()
 // Helper: Spawn new piece
 static void spawn_piece()
 {
-	current_piece = next_piece;
-	current_piece.x = 0; // Start at left (hidden)
-	current_piece.y = ORTHO_SIZE / 2 - 2;
-	next_piece.type = esp_random() % 7;
-	next_piece.rotation = 0;
+	// Copies next to current
+	tetris_current_piece = tetris_next_piece;
 	
-	if (check_collision(current_piece.x, current_piece.y, current_piece.rotation)) {
-		game_over = true;
+	// Sets spawn: x=0 (hidden left), y=3 (middle of 10 rows, centered for 4-cell height)
+	tetris_current_piece.x = 0;
+	tetris_current_piece.y = ORTHO_SIZE / 2 - 2;
+	
+	// Random next type (0-6), rotation=0
+	tetris_next_piece.type = esp_random() % 7;
+	tetris_next_piece.rotation = 0;
+	
+	// If collides at spawn (stack too high), set game_over
+	if (check_collision(tetris_current_piece.x, tetris_current_piece.y, tetris_current_piece.rotation)) {
+		tetris_game_over = true;
 	}
 }
 
 // Helper: Draw board on canvas (only visible cols)
 static void draw_board()
 {
-	lv_canvas_fill_bg(canvas, lv_color_black(), LV_OPA_COVER); // Clear background
+	lv_canvas_fill_bg(tetris_canvas, COLOR_BOARD_FILL, LV_OPA_COVER); // Clear background
 
+	// Inits a draw layer for batched rendering
 	lv_layer_t layer;
-	lv_canvas_init_layer(canvas, &layer);
+	lv_canvas_init_layer(tetris_canvas, &layer);
 
-	// Draw board cells
+	// Draw board cells: For each occupied cell, draw filled rect (primary color) + border (secondary color)
 	for (int col = HIDDEN_FALL; col < HIDDEN_FALL + VISIBLE_FALL; col++) { // Visible only
 		for (int row = 0; row < ORTHO_SIZE; row++) {
-			if (board[row][col]) {
+			if (tetris_board[row][col]) {
 				int px = (col - HIDDEN_FALL) * CELL_SIZE; // x increases right (fall)
 				int py = row * CELL_SIZE; // y increases down
 
 				// Fill
 				lv_draw_rect_dsc_t fill_dsc;
 				lv_draw_rect_dsc_init(&fill_dsc);
-				fill_dsc.bg_color = user_primary_color;
+				fill_dsc.bg_color = COLOR_PIECE_RESTING;
 				fill_dsc.bg_opa = LV_OPA_COVER;
 				fill_dsc.radius = 0;
 				lv_area_t fill_area;
@@ -1401,7 +1491,7 @@ static void draw_board()
 				// Border
 				lv_draw_rect_dsc_t border_dsc;
 				lv_draw_rect_dsc_init(&border_dsc);
-				border_dsc.border_color = user_secondary_color;
+				border_dsc.border_color = COLOR_PIECE_OUTLINE;
 				border_dsc.border_width = 1;
 				border_dsc.border_opa = LV_OPA_COVER;
 				border_dsc.bg_opa = LV_OPA_TRANSP; // Transparent fill for border only
@@ -1411,13 +1501,13 @@ static void draw_board()
 		}
 	}
 
-	// Draw current piece
-	const int *shape = tetrominoes[current_piece.type][current_piece.rotation];
+	// Draws current piece similarly
+	const int *shape = tetrominoes[tetris_current_piece.type][tetris_current_piece.rotation];
 	for (int i = 0; i < 4; i++) { // i: ortho offset
 		for (int j = 0; j < 4; j++) { // j: fall offset
-			if (shape[i*4 + j]) {
-				int board_col = current_piece.x + j;
-				int board_row = current_piece.y + i;
+			if (shape[i * 4 + j]) { // i * 4 + j converts 2D coordinates (row i, col j) to a 1D index in the flattened array
+				int board_col = tetris_current_piece.x + j;
+				int board_row = tetris_current_piece.y + i;
 				
 				if (board_col >= HIDDEN_FALL && board_col < HIDDEN_FALL + VISIBLE_FALL) { // Visible
 					int px = (board_col - HIDDEN_FALL) * CELL_SIZE;
@@ -1426,7 +1516,7 @@ static void draw_board()
 					// Fill
 					lv_draw_rect_dsc_t fill_dsc;
 					lv_draw_rect_dsc_init(&fill_dsc);
-					fill_dsc.bg_color = user_primary_color;
+					fill_dsc.bg_color = COLOR_PIECE_FALLING;
 					fill_dsc.bg_opa = LV_OPA_COVER;
 					fill_dsc.radius = 0;
 					lv_area_t fill_area;
@@ -1436,7 +1526,7 @@ static void draw_board()
 					// Border
 					lv_draw_rect_dsc_t border_dsc;
 					lv_draw_rect_dsc_init(&border_dsc);
-					border_dsc.border_color = user_secondary_color;
+					border_dsc.border_color = COLOR_PIECE_OUTLINE;
 					border_dsc.border_width = 1;
 					border_dsc.border_opa = LV_OPA_COVER;
 					border_dsc.bg_opa = LV_OPA_TRANSP;
@@ -1450,7 +1540,7 @@ static void draw_board()
 	// Draw whole board outline
 	lv_draw_rect_dsc_t board_border_dsc;
 	lv_draw_rect_dsc_init(&board_border_dsc);
-	board_border_dsc.border_color = user_secondary_color;
+	board_border_dsc.border_color = COLOR_PIECE_OUTLINE;
 	board_border_dsc.border_width = 1;
 	board_border_dsc.border_opa = LV_OPA_COVER;
 	board_border_dsc.bg_opa = LV_OPA_TRANSP;
@@ -1459,8 +1549,9 @@ static void draw_board()
 	lv_area_set(&board_area, 0, 0, VISIBLE_FALL * CELL_SIZE - 1, ORTHO_SIZE * CELL_SIZE - 1);
 	lv_draw_rect(&layer, &board_border_dsc, &board_area);
 
-	lv_canvas_finish_layer(canvas, &layer);
-	lv_obj_invalidate(canvas); // Refresh
+	// Finishes layer, invalidates canvas to trigger screen update
+	lv_canvas_finish_layer(tetris_canvas, &layer);
+	lv_obj_invalidate(tetris_canvas); // Refresh
 }
 
 void lcd_tools_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
@@ -1470,17 +1561,17 @@ void lcd_tools_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t 
 
     if (!init) {
         // Reset game state
-        memset(board, 0, sizeof(board));
-        score = 0;
-        game_over = false;
-        next_piece.type = esp_random() % 7;
+        memset(tetris_board, 0, sizeof(tetris_board));
+        tetris_score = 0;
+        tetris_game_over = false;
+        tetris_next_piece.type = esp_random() % 7;
         spawn_piece();
-        last_fall_time = xTaskGetTickCount();
+        tetris_last_fall_time = xTaskGetTickCount();
 
         // Allocate pixel buffer in PSRAM
         size_t buf_size = VISIBLE_FALL * CELL_SIZE * ORTHO_SIZE * CELL_SIZE * 2; // RGB565: 2 bytes/pixel
-        canvas_pixels = heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-        if (!canvas_pixels) {
+        tetris_canvas_pixels = heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!tetris_canvas_pixels) {
             ESP_LOGE("TETRIS", "Failed to alloc PSRAM for canvas");
             
             // Fallback or exit to menu
@@ -1489,53 +1580,61 @@ void lcd_tools_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t 
         }
 
         // Init draw buf metadata (small struct in internal SRAM)
-        lv_draw_buf_init(&canvas_buf, VISIBLE_FALL * CELL_SIZE, ORTHO_SIZE * CELL_SIZE, LV_COLOR_FORMAT_RGB565, LV_STRIDE_AUTO, canvas_pixels, buf_size);
+        lv_draw_buf_init(&canvas_buf, VISIBLE_FALL * CELL_SIZE, ORTHO_SIZE * CELL_SIZE, LV_COLOR_FORMAT_RGB565, LV_STRIDE_AUTO, tetris_canvas_pixels, buf_size);
 
         // Create canvas (wide horizontally for fall left->right)
-        canvas = lv_canvas_create(ACTIVE_SCR);
-        lv_canvas_set_draw_buf(canvas, &canvas_buf);
-        lv_obj_set_size(canvas, VISIBLE_FALL * CELL_SIZE, ORTHO_SIZE * CELL_SIZE);
-        lv_obj_align(canvas, LV_ALIGN_CENTER, 0, 0); // Center, adjust if needed for 210x100
+        tetris_canvas = lv_canvas_create(ACTIVE_SCR);
+        lv_canvas_set_draw_buf(tetris_canvas, &canvas_buf);
+        lv_obj_set_size(tetris_canvas, VISIBLE_FALL * CELL_SIZE, ORTHO_SIZE * CELL_SIZE);
+        lv_obj_align(tetris_canvas, LV_ALIGN_CENTER, 0, 0); // Center, adjust if needed for 210x100
 
         // Score label (position adjusted for layout)
-        score_label = lv_label_create(ACTIVE_SCR);
-        lv_label_set_text(score_label, "Score: 0");
-        lv_obj_set_style_text_color(score_label, user_secondary_color, 0);
-        lv_obj_align(score_label, LV_ALIGN_TOP_MID, 0, -20); // Above canvas, adjust
+        tetris_score_label = lv_label_create(ACTIVE_SCR);
+        lv_label_set_text(tetris_score_label, "Score: 0");
+        lv_obj_set_style_text_color(tetris_score_label, user_secondary_color, 0);
+        lv_obj_align(tetris_score_label, LV_ALIGN_TOP_MID, 0, -20); // Above canvas, adjust
 
         // Game over label (hidden initially)
-        game_over_label = lv_label_create(ACTIVE_SCR);
-        lv_label_set_text(game_over_label, "");
-        lv_obj_set_style_text_font(game_over_label, &lv_font_montserrat_20, 0);
-        lv_obj_set_style_text_color(game_over_label, user_secondary_color, 0);
-        lv_obj_align(game_over_label, LV_ALIGN_CENTER, 0, 0);
-        lv_obj_add_flag(game_over_label, LV_OBJ_FLAG_HIDDEN);
+        tetris_game_over_label = lv_label_create(ACTIVE_SCR);
+        lv_label_set_text(tetris_game_over_label, "");
+        lv_obj_set_style_text_font(tetris_game_over_label, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_color(tetris_game_over_label, user_secondary_color, 0);
+        lv_obj_align(tetris_game_over_label, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_add_flag(tetris_game_over_label, LV_OBJ_FLAG_HIDDEN);
 
         draw_board();
         init = true;
     }
 
     // Handle game over
-    if (game_over) {
+    if (tetris_game_over) {
         // Clear the board visually
-        lv_canvas_fill_bg(canvas, user_primary_color, LV_OPA_COVER);
-        lv_obj_invalidate(canvas);
+        lv_canvas_fill_bg(tetris_canvas, user_primary_color, LV_OPA_COVER);
+        lv_obj_invalidate(tetris_canvas);
+        
+        // Get old high score and compare to current
+        uint32_t high_score = tetris_high_score_nvs_load();
+        if (tetris_score > high_score) {
+			// If new high score, save
+			high_score = tetris_score;
+			tetris_high_score_nvs_save(high_score);
+		}
 
-        char buf[32];
-        snprintf(buf, sizeof(buf), "Game Over\nScore: %" PRIu32, score);
-        lv_label_set_text(game_over_label, buf);
-        lv_obj_remove_flag(game_over_label, LV_OBJ_FLAG_HIDDEN);
+        char buf[41];
+        snprintf(buf, sizeof(buf), "Game Over!\nScore: %" PRIu32 "\nHigh Score: %" PRIu32, tetris_score, high_score);
+        lv_label_set_text(tetris_game_over_label, buf);
+        lv_obj_remove_flag(tetris_game_over_label, LV_OBJ_FLAG_HIDDEN);
 
         // Any button to exit
         if (ui_btns->up_btn || ui_btns->down_btn || ui_btns->left_btn || ui_btns->right_btn || ui_btns->select_btn || ui_btns->home_btn) {
             // Cleanup
-            lv_obj_del(canvas);
-            lv_obj_del(score_label);
-            lv_obj_del(game_over_label);
-            heap_caps_free(canvas_pixels); // Free PSRAM
+            lv_obj_del(tetris_canvas);
+            lv_obj_del(tetris_score_label);
+            lv_obj_del(tetris_game_over_label);
+            heap_caps_free(tetris_canvas_pixels); // Free PSRAM
             
-            canvas = score_label = game_over_label = NULL;
-            canvas_pixels = NULL;
+            tetris_canvas = tetris_score_label = tetris_game_over_label = NULL;
+            tetris_canvas_pixels = NULL;
             init = false;
 
             // Back to tools menu
@@ -1551,70 +1650,78 @@ void lcd_tools_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t 
 	bool moved = false;
 	// Move piece right
 	if (ui_btns->up_btn) {
-		if (!check_collision(current_piece.x, current_piece.y - 1, current_piece.rotation)) {
-			current_piece.y--;
+		if (!check_collision(tetris_current_piece.x, tetris_current_piece.y - 1, tetris_current_piece.rotation)) {
+			tetris_current_piece.y--;
 			moved = true;
 		}
 	}
 	// Move piece left
 	else if (ui_btns->down_btn) {
-		if (!check_collision(current_piece.x, current_piece.y + 1, current_piece.rotation)) {
-			current_piece.y++;
+		if (!check_collision(tetris_current_piece.x, tetris_current_piece.y + 1, tetris_current_piece.rotation)) {
+			tetris_current_piece.y++;
 			moved = true;
 		}
 	}
 	// Rotate piece
 	else if (ui_btns->left_btn) {
-		int new_rot = (current_piece.rotation + 1) % 4;
-		if (!check_collision(current_piece.x, current_piece.y, new_rot)) {
-			current_piece.rotation = new_rot;
+		int new_rot = (tetris_current_piece.rotation + 1) % 4;
+		if (!check_collision(tetris_current_piece.x, tetris_current_piece.y, new_rot)) {
+			tetris_current_piece.rotation = new_rot;
 			moved = true;
 		}
 	}
 	// Hard drop (fast forward x)
 	else if (ui_btns->select_btn) {
-		while (!check_collision(current_piece.x + 1, current_piece.y, current_piece.rotation)) {
-			current_piece.x++;
+		while (!check_collision(tetris_current_piece.x + 1, tetris_current_piece.y, tetris_current_piece.rotation)) {
+			tetris_current_piece.x++;
 		}
+		
 		place_piece();
 		int lines = clear_lines();
-		score += 100 * lines * lines; // Bonus for multi-lines
+		tetris_score += 100 * lines * lines; // Bonus for multi-lines
 		spawn_piece();
 		moved = true;
 	}
 	// Exit to menu
 	else if (ui_btns->home_btn) {
-		lv_obj_del(canvas);
-		lv_obj_del(score_label);
-		lv_obj_del(game_over_label);
-		heap_caps_free(canvas_pixels); // Free PSRAM
+		// Delete objects
+		lv_obj_del(tetris_canvas);
+		lv_obj_del(tetris_score_label);
+		lv_obj_del(tetris_game_over_label);
+		heap_caps_free(tetris_canvas_pixels); // Free PSRAM
 		
-		canvas = score_label = game_over_label = canvas_pixels = NULL;
+		// Reset statics
+		tetris_canvas = tetris_score_label = tetris_game_over_label = tetris_canvas_pixels = NULL;
 		init = false;
 		
+		// Show tools menu
 		lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		ui_menu->page = TOOLS_PAGE;
 		return;
 	}
 	// Sleep
 	else if (ui_btns->pwr_btn) {
-		lv_obj_del(canvas);
-		lv_obj_del(score_label);
-		lv_obj_del(game_over_label);
-		heap_caps_free(canvas_pixels); // Free PSRAM
+		// Delete objects
+		lv_obj_del(tetris_canvas);
+		lv_obj_del(tetris_score_label);
+		lv_obj_del(tetris_game_over_label);
+		heap_caps_free(tetris_canvas_pixels); // Free PSRAM
 		
-		canvas = score_label = game_over_label = canvas_pixels = NULL;
+		// Reset statics
+		tetris_canvas = tetris_score_label = tetris_game_over_label = tetris_canvas_pixels = NULL;
 		init = false;
 		
-		lcd_funcs_transition_back(false, ui_menu);  // False = sleep
+		lcd_funcs_transition_back(false, ui_menu); // False = sleep
 		return;
 	}
 
 	// Time-based fall (increase x)
 	TickType_t now = xTaskGetTickCount();
-	uint32_t fall_delay = FALL_DELAY_MS - (score / 1000) * LEVEL_SPEED_INCREASE; // Speed up with level
+	uint32_t fall_delay = FALL_DELAY_MS - (tetris_score / 1000) * LEVEL_SPEED_INCREASE; // Speed up with level
 	
 	if (fall_delay < 100) {
 		fall_delay = 100; // Min speed
@@ -1625,27 +1732,27 @@ void lcd_tools_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t 
 		fall_delay /= SOFT_DROP_MULTIPLIER;
 	}
 
-	if (now - last_fall_time >= pdMS_TO_TICKS(fall_delay)) {
-		if (!check_collision(current_piece.x + 1, current_piece.y, current_piece.rotation)) {
-			current_piece.x++;
+	if (now - tetris_last_fall_time >= pdMS_TO_TICKS(fall_delay)) {
+		if (!check_collision(tetris_current_piece.x + 1, tetris_current_piece.y, tetris_current_piece.rotation)) {
+			tetris_current_piece.x++;
 			moved = true;
 		}
 		else {
 			place_piece();
 			int lines = clear_lines();
-			score += 100 * lines * lines;
+			tetris_score += 100 * lines * lines;
 			spawn_piece();
 			moved = true;
 		}
 		
-		last_fall_time = now;
+		tetris_last_fall_time = now;
 	}
 
 	// Update UI if changed
 	if (moved) {
 		draw_board();
 		char buf[16];
-		snprintf(buf, sizeof(buf), "Score: %" PRIu32, score);
-		lv_label_set_text(score_label, buf);
+		snprintf(buf, sizeof(buf), "Score: %" PRIu32, tetris_score);
+		lv_label_set_text(tetris_score_label, buf);
 	}
 }
