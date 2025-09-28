@@ -339,7 +339,7 @@ float gpio_get_battery_voltage(void)
 	int avg_raw = sum / NUM_ADC_SAMPLES;
 	
 	#ifdef POLYCAST5_DEBUG_ADC
-		ESP_LOGI(TAG, "Raw battery reading: %d", avg_raw);
+	ESP_LOGI(TAG, "Raw battery reading: %d", avg_raw);
 	#endif
 	
 	// Get pin mV
@@ -349,7 +349,7 @@ float gpio_get_battery_voltage(void)
 	float Vadc = pin_mv / 1000.0f; // Convert to volts
 	
 	#ifdef POLYCAST5_DEBUG_ADC
-		ESP_LOGI(TAG, "Raw voltage reading: %f", Vadc);
+	ESP_LOGI(TAG, "Raw voltage reading: %f", Vadc);
 	#endif
 	
 	//return Vadc;
@@ -367,6 +367,8 @@ float gpio_get_battery_voltage(void)
 
 uint8_t gpio_volts_to_soc(float voltage)
 {
+	voltage = voltage + 0.09; // Add expected offset (users want to see it at 100%): Actual ~ +.04
+
 	// Clamp at max
 	if (voltage >= soc_table[0].volt) {
 		return 100;

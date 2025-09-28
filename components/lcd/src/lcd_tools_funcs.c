@@ -35,7 +35,7 @@
 #define HIGH_SCORE_KEY "score"
 
 tools_menu_t tools_menu = {
-	.options = {"Coin flipper", "Dice roller", "Read the docs", "Number generator", "Tetris", "SRS Planner"},
+	.options = {"Coin flipper", "Dice roller", "Tetris", "Number generator", "Read the docs", "SRS Planner"},
 	.size = 6,
 	.index = 0,
 	.cont = NULL,

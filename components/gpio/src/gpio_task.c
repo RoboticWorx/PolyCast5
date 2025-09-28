@@ -111,18 +111,18 @@ static inline void give_long(size_t i) {
 static void adc_task(void *arg)
 {
 	static uint8_t last_percentage = 100;
-		
+	
 	// Get battery charge on start
 	gpio_init_battery_adc();
 	float v = gpio_get_battery_voltage();
 	#ifdef POLYCAST5_DEBUG_ADC
-		ESP_LOGI(TAG, "Startup voltage: %f", v);
+	ESP_LOGI(TAG, "Startup voltage: %f", v);
 	#endif
 	gpio_deinit_battery_adc();
 		
 	uint8_t percentage = gpio_volts_to_soc(v);
 	#ifdef POLYCAST5_DEBUG_ADC
-		ESP_LOGI(TAG, "Startup percentage: %u%%", percentage);
+	ESP_LOGI(TAG, "Startup percentage: %u%%", percentage);
 	#endif
 	
 	last_percentage = percentage;
@@ -146,8 +146,8 @@ static void adc_task(void *arg)
 			uint8_t percentage = gpio_volts_to_soc(v);
 			
 			#ifdef POLYCAST5_DEBUG_ADC
-				ESP_LOGI(TAG, "Battery voltage: %f", v);
-				ESP_LOGI(TAG, "Battery percentage: %u%%", percentage);
+			ESP_LOGI(TAG, "Battery voltage: %f", v);
+			ESP_LOGI(TAG, "Battery percentage: %u%%", percentage);
 			#endif
 			
 			// If fluctuating by one, ignore
@@ -159,7 +159,7 @@ static void adc_task(void *arg)
 			}
 			
 			#ifdef POLYCAST5_DEBUG_ADC
-				ESP_LOGI(TAG, "NEW battery percentage: %u%%", percentage);
+			ESP_LOGI(TAG, "NEW battery percentage: %u%%", percentage);
 			#endif
 			
 			// Send value to LCD
@@ -276,7 +276,7 @@ static void gpio_task(void *arg)
 							b->long_press_fired = true;
 							give_long(i);
 							#ifdef POLYCAST5_DEBUG_GPIO
-								ESP_LOGI(TAG, "Long press fired");
+							ESP_LOGI(TAG, "Long press fired");
 							#endif
 						}
 					}
@@ -285,7 +285,7 @@ static void gpio_task(void *arg)
 						give_short(i);
 						b->ticks = REPEAT_NEXT_MS / POLL_MS;
 						#ifdef POLYCAST5_DEBUG_GPIO
-							ESP_LOGI(TAG, "Auto repeat give short");
+						ESP_LOGI(TAG, "Auto repeat give short");
 						#endif
 					}
 					else {
@@ -302,7 +302,7 @@ static void gpio_task(void *arg)
 				if (!b->long_press_fired) {
 					give_short(i);
 					#ifdef POLYCAST5_DEBUG_GPIO
-						ESP_LOGI(TAG, "Btn release give short");
+					ESP_LOGI(TAG, "Btn release give short");
 					#endif
 				}
 			}
@@ -356,7 +356,7 @@ static void gpio_task(void *arg)
 			ledc_update_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CHANNEL);
 			
 			#ifdef POLYCAST5_DEBUG
-				ESP_LOGI(TAG, "Brightness set to %u%% (duty: %u)\n", lcd_ledc_brightness, duty);
+			ESP_LOGI(TAG, "Brightness set to %u%% (duty: %u)\n", lcd_ledc_brightness, duty);
 			#endif
 			xSemaphoreGive(xLEDCMutex); // Release LEDC
 		}

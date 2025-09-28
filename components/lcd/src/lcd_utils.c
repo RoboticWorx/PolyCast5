@@ -2449,7 +2449,7 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
 		// Switch pages
 		ui_menu->page = TOOLS_DICE_PAGE;
 	}
-	// Read the docs selected
+	// Tetris selected
 	else if (ui_btns->select_btn == 1 && tools_menu->index == 2) {
 		// Hide tools menu
 		lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -2457,15 +2457,11 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
 		// Reset static
 		do_once = false;
 		
-		// Hide up/down arrow
-		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-		
 		// Show right arrow
 		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Switch pages
-		ui_menu->page = TOOLS_DOCS_PAGE;
+		ui_menu->page = TOOLS_TETRIS_PAGE;
 	}
 	// Random number generator selected
 	else if (ui_btns->select_btn == 1 && tools_menu->index == 3) {
@@ -2481,7 +2477,7 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
 		// Switch pages
 		ui_menu->page = TOOLS_NUM_GEN_PAGE;
 	}
-	// Tetris selected
+	// Read the docs selected
 	else if (ui_btns->select_btn == 1 && tools_menu->index == 4) {
 		// Hide tools menu
 		lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -2489,11 +2485,15 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
 		// Reset static
 		do_once = false;
 		
+		// Hide up/down arrow
+		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
 		// Show right arrow
 		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Switch pages
-		ui_menu->page = TOOLS_TETRIS_PAGE;
+		ui_menu->page = TOOLS_DOCS_PAGE;
 	}
 	// SRS memory assist selected
 	else if (ui_btns->select_btn == 1 && tools_menu->index == 5) {

@@ -140,7 +140,7 @@ static void espnow_task(void *param)
 			
 			// Build a text payload from the cmd (more secure)
 			char tx_payload[ESP_NOW_MAX_DATA_LEN];
-			int tx_payload_len = snprintf(tx_payload, sizeof(tx_payload), "PolyCast_Command_Value: %u", espnow_cmd.cmd_to_send); // Send only number of bytes needed
+			int tx_payload_len = snprintf(tx_payload, sizeof(tx_payload), "PolyCast5_Command_Value: %u", espnow_cmd.cmd_to_send); // Send only number of bytes needed
 			// Check payload
 			if (tx_payload_len < 0 || tx_payload_len >= sizeof(tx_payload)) {
 				ESP_LOGE(TAG, "Payload snprintf failed or too long.");
