@@ -149,12 +149,14 @@ void lcd_init_driver(void);
  */
 void lcd_lvgl_init(void);
 
+#ifdef POLYCAST5_PERSIST_SELECTION_INDEX
 /**
  * @brief Load the previous selection index from NVS
  *
  * @param [in] ui_menu UI menu structure
  */
 void lcd_selection_index_nvs_load(ui_menu_t *ui_menu);
+#endif
 
 /**
  * @brief Initialize and create selection labels

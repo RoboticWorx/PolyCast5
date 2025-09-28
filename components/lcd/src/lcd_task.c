@@ -85,7 +85,9 @@ static void lcd_task(void *pvParameters)
 	
 	
 	// Create common items
+	#ifdef POLYCAST5_PERSIST_SELECTION_INDEX
 	lcd_selection_index_nvs_load(&ui_menu); // Load selection menu previous index
+	#endif
 	
 	lcd_init_selection_labels(&ui_menu);
 

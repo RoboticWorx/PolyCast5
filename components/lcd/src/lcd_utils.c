@@ -561,7 +561,7 @@ void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32
 	}
 	already_scrolling = true;
 	
-	// Decide start/end Y
+	/* Decide start/end Y */
 	// Bottom element
 	const lv_coord_t start_b = scrolling_up ? -15 : -25;
 	const lv_coord_t end_b = scrolling_up ? -25 : -15;
@@ -569,11 +569,9 @@ void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32
 	const lv_coord_t start_t = scrolling_up ? 25 : 15;
 	const lv_coord_t end_t = scrolling_up ? 15 : 35;
 
-
 	// Compute how long the move should take (ms)
 	const uint32_t dist = LV_ABS(end_b - start_b);
 	const uint32_t dur  = (dist * 1000U) / speed_px_s;
-
 
 	// Allocate and populate callback context
 	scroll_ctx_t *ctx = malloc(sizeof(*ctx));
@@ -585,8 +583,7 @@ void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32
 	  .up  = scrolling_up
 	};
 
-
-	// Build the LVGL animation object
+	/* Build the LVGL animation object */
 	// Bottom animation
 	lv_anim_t a1;
 	lv_anim_init(&a1);
@@ -611,13 +608,11 @@ void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32
 	lv_anim_set_values(&a2, start_t, end_t);
 	lv_anim_set_time(&a2, dur);
 
-
 	// Hook up the ready callback
 	lv_anim_set_ready_cb(&a1,  scroll_ready_cb);
 	lv_anim_set_user_data(&a1, ctx);
  
 	lv_anim_set_user_data(&a2, ctx);
-
 
 	// Enqueue it
 	lv_anim_start(&a1);
@@ -814,6 +809,7 @@ void lcd_init_images()
 	#endif
 }
 
+#ifdef POLYCAST5_PERSIST_SELECTION_INDEX
 static void lcd_selection_index_nvs_save(const ui_menu_t *ui_menu)
 {
 	nvs_handle_t h;
@@ -867,6 +863,20 @@ void lcd_selection_index_nvs_load(ui_menu_t *ui_menu)
 		ESP_LOGW(TAG, "lcd_selection_index_nvs_load nvs_open failed: %s", esp_err_to_name(err));
 	}
 }
+#else
+static inline void lcd_selection_sync_labels(ui_menu_t *m)
+{
+	// Update top and bottom labels based on middle index
+    int mid = m->index;
+    int top = (mid + m->size - 1) % m->size;
+    int bot = (mid + 1) % m->size;
+
+	// Set new text
+    lv_label_set_text(m->lbl_top, m->options[top]);
+    lv_label_set_text(m->lbl_mid, m->options[mid]); // "PolyPlug" when index == 1
+    lv_label_set_text(m->lbl_bot, m->options[bot]);
+}
+#endif
 
 void lcd_init_selection_labels(ui_menu_t *ui_menu)
 {
@@ -1121,8 +1131,15 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 		
 		// Go to selection page if pin not set
 		if (!settings_menu->pin_menu.pin_set || !settings_menu->pin_menu.prompt_pin) {
+			#ifndef POLYCAST5_PERSIST_SELECTION_INDEX
+			ui_menu->index = 1; // Start selection menu from 'PolyPlug'
+			lcd_selection_sync_labels(ui_menu); // Sync menu from here
+			#endif
+
+			// Show selection page
 			lcd_unhide_selection_widgets(ui_menu);
-			
+				
+			// Switch execution to selection page
 			ui_menu->page = SELECTION_PAGE;
 		}
 		// Else prompt pin
@@ -1569,11 +1586,16 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 			if (pin_to_selection_page) {
 				// Hide right
 				lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-		
-				// Go to selection page
+
+				#ifndef POLYCAST5_PERSIST_SELECTION_INDEX
+				ui_menu->index = 1; // Start selection menu from 'PolyPlug'
+				lcd_selection_sync_labels(ui_menu); // Sync menu from here
+				#endif
+
+				// Show selection page
 				lcd_unhide_selection_widgets(ui_menu);
 				
-				// Switch to selection page
+				// Switch execution to selection page
 				ui_menu->page = SELECTION_PAGE;
 			}
 			// Else going to hotkey page
@@ -1754,13 +1776,21 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
 	if (scrolling_menu) {
 		if (scrolling_up) {
 			ui_menu->index = (ui_menu->index + 1) % ui_menu->size;
+
+			#ifdef POLYCAST5_PERSIST_SELECTION_INDEX
 			lcd_selection_index_nvs_save(ui_menu); // Save the index
+			#endif
+
 			const char *next_bottom = ui_menu->options[(ui_menu->index + 1) % ui_menu->size];
 			lcd_scroll_anim(ui_menu, next_bottom, scrolling_up, SCROLL_SPEED);
 		}
 		else {
 			ui_menu->index = (ui_menu->index + ui_menu->size - 1) % ui_menu->size;
+
+			#ifdef POLYCAST5_PERSIST_SELECTION_INDEX
 			lcd_selection_index_nvs_save(ui_menu); // Save the index
+			#endif
+
 			const char *next_top = ui_menu->options[(ui_menu->index + ui_menu->size - 1) % ui_menu->size];
 			lcd_scroll_anim(ui_menu, next_top, scrolling_up, SCROLL_SPEED);
 		}

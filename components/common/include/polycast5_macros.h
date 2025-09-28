@@ -8,7 +8,7 @@
 
 #ifdef POLYCAST5_DEBUG
 	//#define POLYCAST5_DEBUG_GPIO 1 // If debugging user buttons
-	#define POLYCAST5_DEBUG_ADC 1 // If debugging battery ADC
+	//#define POLYCAST5_DEBUG_ADC 1 // If debugging battery ADC
 	//#define POLYCAST5_DEBUG_RAM 1 // Print RAM heap state on boot
 	//#define POLYCAST5_DEBUG_SPIFFS 1 // Print SPIFFS assets size on boot
 	
@@ -20,6 +20,8 @@
 	
 	//#define POLYCAST5_DIS_SLEEP_TIMER 1 // Disable sleep timer
 #endif
+
+//#define POLYCAST5_PERSIST_SELECTION_INDEX 1 // Persist selected menu option across NVS and home
 
 //#define POLYCAST5_PASS_DEBUG 1 // Show password logs for debugging
 
