@@ -3,6 +3,8 @@
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
+#include <string.h>
+#include <stdlib.h>
 
 #include "mqtt_client.h"
 #include "esp_log.h"
@@ -10,6 +12,9 @@
 #include "esp_netif.h"
 #include "esp_err.h"
 #include "esp_sntp.h"
+#include "esp_http_client.h"
+#include "esp_crt_bundle.h"
+#include "cJSON.h"
 
 #include "wifi_funcs.h"
 #include "gpio_funcs.h"
@@ -31,6 +36,8 @@
 #define SUBTYPE_BEACON 0x08
 
 #define EXPECTED_MQTT_RX "PolyCast5MQTTRxSuccess"
+
+bool wifi_getting_time = false;
 
 static esp_mqtt_client_handle_t mqtt_client;
 
@@ -123,6 +130,430 @@ esp_err_t wifi_funcs_scan(wifi_scan_t *wifi_scan)
 	return ESP_OK;
 }
 
+static const struct { const char *iana; const char *posix; } TZ_MAP[] = {
+	// Majors
+	{"America/New_York", "EST5EDT,M3.2.0/2,M11.1.0/2"},
+	{"America/Chicago", "CST6CDT,M3.2.0/2,M11.1.0/2"},
+	{"America/Denver", "MST7MDT,M3.2.0/2,M11.1.0/2"},
+	{"America/Phoenix", "MST7"}, // No DST
+	{"America/Los_Angeles", "PST8PDT,M3.2.0/2,M11.1.0/2"},
+	{"America/Anchorage", "AKST9AKDT,M3.2.0/2,M11.1.0/2"},
+	{"America/Adak", "HAST10HADT,M3.2.0/2,M11.1.0/2"}, // Aleutian (has DST)
+	{"Pacific/Honolulu", "HST10"}, // No DST
+
+	// Territories
+	{"America/Puerto_Rico", "AST4"}, // No DST
+	{"America/St_Thomas", "AST4"}, // USVI, no DST
+	{"Pacific/Guam", "ChST-10"}, // UTC+10, no DST
+	{"Pacific/Saipan", "ChST-10"}, // Same
+	{"Pacific/Pago_Pago", "SST11"}, // UTC-11, no DST
+
+	// Useful aliases (map to their major rules)
+	{"America/Detroit", "EST5EDT,M3.2.0/2,M11.1.0/2"},
+	{"America/Kentucky/Louisville", "EST5EDT,M3.2.0/2,M11.1.0/2"},
+	{"America/Kentucky/Monticello", "EST5EDT,M3.2.0/2,M11.1.0/2"},
+	{"America/Indiana/Indianapolis", "EST5EDT,M3.2.0/2,M11.1.0/2"},
+	{"America/Indiana/Marengo", "EST5EDT,M3.2.0/2,M11.1.0/2"},
+	{"America/Indiana/Vevay", "EST5EDT,M3.2.0/2,M11.1.0/2"},
+	{"America/Indiana/Vincennes", "EST5EDT,M3.2.0/2,M11.1.0/2"},
+	{"America/Indiana/Winamac", "EST5EDT,M3.2.0/2,M11.1.0/2"},
+	{"America/Indiana/Petersburg", "EST5EDT,M3.2.0/2,M11.1.0/2"},
+	{"America/Indiana/Knox", "CST6CDT,M3.2.0/2,M11.1.0/2"},
+	{"America/Indiana/Tell_City", "CST6CDT,M3.2.0/2,M11.1.0/2"},
+	{"America/North_Dakota/Center", "CST6CDT,M3.2.0/2,M11.1.0/2"},
+	{"America/North_Dakota/New_Salem", "CST6CDT,M3.2.0/2,M11.1.0/2"},
+	{"America/North_Dakota/Beulah", "CST6CDT,M3.2.0/2,M11.1.0/2"},
+	{"America/Boise", "MST7MDT,M3.2.0/2,M11.1.0/2"},
+};
+
+// Find a POSIX rule for a given IANA ID (exact match); returns NULL if unmapped
+static const char* iana_to_posix(const char *iana)
+{
+	// Iterate the table
+	for (size_t i = 0; i < sizeof(TZ_MAP) / sizeof(TZ_MAP[0]); ++i) {
+		// Compare IANA strings
+		if (strcmp(iana, TZ_MAP[i].iana) == 0) {
+			// Return mapped POSIX rule
+			return TZ_MAP[i].posix;
+		}
+	}
+	// Not found in our compact table
+	return NULL;
+}
+
+// Apply a fixed-offset POSIX TZ built from API offsets (correct "now", no future DST rules)
+static void tz_apply_fixed_posix_from_offsets(int raw_offset_s, int dst_offset_s, bool dst_now)
+{
+	// Combine base UTC offset and DST add-on (seconds east of UTC, negative for the Americas)
+	int total = raw_offset_s + (dst_now ? dst_offset_s : 0);
+
+	// POSIX sign is inverted relative to UTC (UTC-4 → "UTC+4")
+	int sec = -total;
+
+	// Capture sign and make value positive for formatting
+	int sign = (sec < 0) ? -1 : 1;
+	sec = (sec < 0) ? -sec : sec;
+
+	// Split into hours and minutes
+	int h = sec / 3600;
+	int m = (sec % 3600) / 60;
+
+	// Format buffer
+	char tzbuf[32];
+
+	// Render "UTC±H" or "UTC±H:MM"
+	if (m == 0) {
+		// Whole-hour offset
+		snprintf(tzbuf, sizeof(tzbuf), "UTC%+d", sign * h);
+	}
+	else {
+		// Sub-hour offset (e.g., :30, :45)
+		snprintf(tzbuf, sizeof(tzbuf), "UTC%+d:%02d", sign * h, m);
+	}
+
+	// Set the TZ environment variable
+	setenv("TZ", tzbuf, 1);
+
+	// Apply the TZ immediately
+	tzset();
+
+	// Log the applied fixed-offset TZ
+	#ifdef POLYCAST5_DEBUG
+	ESP_LOGI("AUTO_TZ", "Applied fixed-offset TZ: %s", tzbuf);
+	#endif
+}
+
+// Simple retrying HTTP GET (chunk-safe). Returns true with malloc'd body on HTTP 200
+static bool http_get_body_retry(const char *url, char **out_body, size_t *out_len)
+{
+	// Attempt count
+	const int attempts = 3;
+
+	// Try multiple times with short backoff
+	for (int i = 0; i < attempts; ++i) {
+		// Configure HTTP client (HTTP, short timeout)
+		esp_http_client_config_t cfg = {
+			.url = url,
+			.timeout_ms = 5000,
+		};
+
+		// Create client handle
+		esp_http_client_handle_t cli = esp_http_client_init(&cfg);
+
+		// If init failed, retry
+		if (!cli) {
+			continue;
+		}
+
+		// Some middleboxes dislike keep-alive; request connection close
+		esp_http_client_set_header(cli, "Connection", "close");
+
+		// Identify ourselves
+		esp_http_client_set_header(cli, "User-Agent", "esp32");
+
+		// Open the connection (sends GET)
+		esp_err_t err = esp_http_client_open(cli, 0);
+
+		// If open failed, cleanup and retry
+		if (err != ESP_OK) {
+			esp_http_client_cleanup(cli);
+			vTaskDelay(pdMS_TO_TICKS(300));
+			continue;
+		}
+
+		// Parse headers (content length may be unknown/chunked)
+		(void)esp_http_client_fetch_headers(cli);
+
+		// Initial buffer capacity and current length
+		size_t cap = 1024;
+		size_t len = 0;
+
+		// Allocate body buffer
+		char *body = (char*)malloc(cap);
+
+		// If malloc failed, cleanup and abort
+		if (!body) {
+			esp_http_client_cleanup(cli);
+			return false;
+		}
+
+		// Read until EOF or error
+		while (1) {
+			// Temporary read chunk
+			char buf[512];
+
+			// Read from socket
+			int r = esp_http_client_read(cli, buf, sizeof(buf));
+
+			// On read error, free and mark as failed
+			if (r < 0) {
+				free(body);
+				body = NULL;
+				break;
+			}
+
+			// r == 0 means EOF (server closed after sending body)
+			if (r == 0) {
+				break;
+			}
+
+			// Grow the buffer if needed (+1 for terminating NUL)
+			if (len + (size_t)r + 1 > cap) {
+				// Double the capacity to amortize reallocs
+				size_t nc = (cap + (size_t)r + 1) * 2;
+
+				// Attempt to grow the buffer
+				char *nb = (char*)realloc(body, nc);
+
+				// If realloc fails, free and mark as failed
+				if (!nb) {
+					free(body);
+					body = NULL;
+					break;
+				}
+
+				// Accept the grown buffer
+				body = nb;
+				cap = nc;
+			}
+
+			// Append chunk into the body buffer
+			memcpy(body + len, buf, (size_t)r);
+
+			// Advance total written
+			len += (size_t)r;
+		}
+
+		// Capture HTTP status
+		int status = esp_http_client_get_status_code(cli);
+
+		// Cleanup the client object
+		esp_http_client_cleanup(cli);
+
+		// If we have a body and HTTP 200 OK, return success
+		if (body && status == 200) {
+			// NUL-terminate the body
+			body[len] = '\0';
+
+			// Return body pointer to caller
+			*out_body = body;
+
+			// Optionally output length
+			if (out_len) {
+				*out_len = len;
+			}
+
+			// Indicate success
+			return true;
+		}
+
+		// If body was allocated but status was not OK, free it
+		if (body) {
+			free(body);
+		}
+
+		// Small backoff before retrying
+		vTaskDelay(pdMS_TO_TICKS(300));
+	}
+
+	// All attempts failed
+	return false;
+}
+
+// Trim ASCII whitespace in-place (both ends) on a mutable C string
+static void strtrim_inplace(char *s)
+{
+	// Null guard
+	if (!s) {
+		return;
+	}
+
+	// Find first non-space
+	char *start = s;
+	while (*start && isspace((unsigned char)*start)) {
+		++start;
+	}
+
+	// Move content to the front if needed
+	if (start != s) {
+		memmove(s, start, strlen(start) + 1);
+	}
+
+	// Find new end
+	char *end = s + strlen(s);
+
+	// Walk back over trailing spaces
+	while (end > s && isspace((unsigned char)*(end - 1))) {
+		--end;
+	}
+
+	// Terminate after last non-space
+	*end = '\0';
+}
+
+// Fetch IANA timezone over HTTP, map to POSIX or apply fixed-offset; returns ESP_OK on success
+esp_err_t wifi_funcs_apply_timezone_auto(void)
+{
+	// Response body buffer
+	char *body = NULL;
+
+	// Default result is failure (caller may set TZ=UTC0 on failure)
+	esp_err_t ret = ESP_FAIL;
+
+	// Try #1: worldtimeapi.org (JSON: timezone + raw_offset/dst_offset/dst)
+	if (http_get_body_retry("http://worldtimeapi.org/api/ip", &body, NULL)) {
+		// Parse JSON
+		cJSON *root = cJSON_Parse(body);
+
+		// Free body buffer now that it's parsed
+		free(body);
+		body = NULL;
+
+		// If JSON parsed
+		if (root) {
+			// Extract fields
+			const cJSON *tz = cJSON_GetObjectItemCaseSensitive(root, "timezone");
+			const cJSON *raw = cJSON_GetObjectItemCaseSensitive(root, "raw_offset");
+			const cJSON *dst_off = cJSON_GetObjectItemCaseSensitive(root, "dst_offset");
+			const cJSON *dst_now = cJSON_GetObjectItemCaseSensitive(root, "dst");
+
+			// Read IANA string if present
+			const char *iana = (cJSON_IsString(tz) && tz->valuestring) ? tz->valuestring : NULL;
+
+			// If IANA available
+			if (iana) {
+				// Try mapping to a full POSIX rule
+				const char *posix = iana_to_posix(iana);
+
+				// If mapping found, apply it
+				if (posix) {
+					// Set POSIX TZ
+					setenv("TZ", posix, 1);
+
+					// Apply immediately
+					tzset();
+
+					// Log success
+					#ifdef POLYCAST5_DEBUG
+					ESP_LOGI("AUTO_TZ", "Applied TZ: IANA='%s' -> POSIX='%s'", iana, posix);
+					#endif
+
+					// Mark success
+					ret = ESP_OK;
+				}
+				// If unmapped but we have offsets, apply fixed-offset POSIX
+				else if (cJSON_IsNumber(raw) && cJSON_IsNumber(dst_off) && cJSON_IsBool(dst_now)) {
+					// Apply fixed-offset TZ that is correct "now"
+					tz_apply_fixed_posix_from_offsets(raw->valueint, dst_off->valueint, cJSON_IsTrue(dst_now));
+
+					// Mark success
+					ret = ESP_OK;
+				}
+			}
+
+			// Free JSON object
+			cJSON_Delete(root);
+
+			// If success, return immediately
+			if (ret == ESP_OK) {
+				return ret;
+			}
+		}
+	}
+
+	// Try #2: ip-api.com (JSON with "timezone" only; no offsets)
+	if (http_get_body_retry("http://ip-api.com/json", &body, NULL)) {
+		// Parse JSON
+		cJSON *root = cJSON_Parse(body);
+
+		// Free body buffer
+		free(body);
+		body = NULL;
+
+		// If JSON parsed
+		if (root) {
+			// Extract "timezone" (IANA)
+			const cJSON *tz = cJSON_GetObjectItemCaseSensitive(root, "timezone");
+
+			// Pull C string if present
+			const char *iana = (cJSON_IsString(tz) && tz->valuestring) ? tz->valuestring : NULL;
+
+			// If IANA present
+			if (iana) {
+				// Map to POSIX (table only; no offsets on this endpoint)
+				const char *posix = iana_to_posix(iana);
+
+				// If mapped, apply and succeed
+				if (posix) {
+					// Set POSIX TZ
+					setenv("TZ", posix, 1);
+
+					// Apply immediately
+					tzset();
+
+					// Log success (ip-api path)
+					#ifdef POLYCAST5_DEBUG
+					ESP_LOGI("AUTO_TZ", "Applied TZ: IANA='%s' -> POSIX='%s' (ip-api)", iana, posix);
+					#endif
+
+					// Mark success
+					ret = ESP_OK;
+				}
+			}
+
+			// Free JSON object
+			cJSON_Delete(root);
+
+			// If success, return immediately
+			if (ret == ESP_OK) {
+				return ret;
+			}
+		}
+	}
+
+	// Try #3: ipapi.co/timezone (plain text IANA string)
+	if (http_get_body_retry("http://ipapi.co/timezone", &body, NULL)) {
+		// Trim whitespace/newlines
+		strtrim_inplace(body);
+
+		// If non-empty string
+		if (body[0]) {
+			// Map to POSIX
+			const char *posix = iana_to_posix(body);
+
+			// If mapped, apply and succeed
+			if (posix) {
+				// Set POSIX TZ
+				setenv("TZ", posix, 1);
+
+				// Apply immediately
+				tzset();
+
+				// Log success (ipapi path)
+				#ifdef POLYCAST5_DEBUG
+				ESP_LOGI("AUTO_TZ", "Applied TZ: IANA='%s' -> POSIX='%s' (ipapi)", body, posix);
+				#endif
+
+				// Mark success
+				ret = ESP_OK;
+			}
+		}
+
+		// Free body buffer
+		free(body);
+		body = NULL;
+
+		// If success, return immediately
+		if (ret == ESP_OK) {
+			return ret;
+		}
+	}
+
+	// All providers failed or we couldn't map; let caller fall back to UTC0
+	return ESP_FAIL;
+}
+
+
 void wifi_funcs_get_current_date_time(void)
 {
 	static bool initialized = false;
@@ -139,7 +570,7 @@ void wifi_funcs_get_current_date_time(void)
 		
 		initialized = true;
 	}
-		
+	
 	time_t now = 0;
 	struct tm timeinfo = {0};
 
@@ -150,16 +581,16 @@ void wifi_funcs_get_current_date_time(void)
 		localtime_r(&now, &timeinfo);
 	}
 	
-	char strftime_buf[64];
+	// Get local time zone over http
+	if (wifi_funcs_apply_timezone_auto() != ESP_OK) {
+		// Fallback
+		setenv("TZ", "UTC0", 1);
+		tzset();
+		
+		ESP_LOGE(TAG, "wifi_funcs_apply_timezone_auto FAILED: Falling back to UTC0");
+	}
 	
-	// Configure the timezone environment
-	setenv("TZ", "EST5EDT,M3.2.0/2,M11.1.0/2", 1);
-	tzset();
-	// • Standard time = UTC–5 ('EST')
-	// • Daylight time = UTC–4 ('EDT')
-	// • DST starts 2nd Sunday in March at 2 AM
-	// • DST ends 1st Sunday in November at 2 AM
-	// 'tzset()' makes the library re-read that TZ rule now.
+	char strftime_buf[64];
 
 	// Get the epoch time
 	time(&now);
@@ -220,8 +651,11 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 		uint8_t rgb_state = RGB_SET_GREEN;
 		xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
 		
-		// Check for new firmware version and update if so
-		ota_update_check_start("https://raw.githubusercontent.com/RoboticWorx/pc5-test/main/manifest.json");
+		// If not just grabing local time -> OTA
+		if (!wifi_getting_time) {
+			// Check for new firmware version and update if so
+			ota_update_check_start("https://raw.githubusercontent.com/RoboticWorx/pc5-test/main/manifest.json");
+		}
 	}
 }
 
