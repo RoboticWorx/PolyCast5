@@ -915,35 +915,35 @@ void lcd_espnow_setup_send_page(espnow_menu_t *espnow_menu)
 	// Create labels
 	espnow_menu->espnow_submenu.lbl_send_tx = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT, user_secondary_color,
-					 &lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS, 39);
+			&lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS, 39);
 					 
 	espnow_menu->espnow_submenu.lbl_send_rx = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(espnow_menu->espnow_submenu.lbl_send_rx, RX_TXT, user_secondary_color,
-					 &lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS, 57);
+			&lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS, 57);
 
 	espnow_menu->espnow_submenu.lbl_send_cmd = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(espnow_menu->espnow_submenu.lbl_send_cmd, "1", user_secondary_color,
-					 &lv_font_montserrat_30, LV_ALIGN_CENTER, X_POS, -20);
+			&lv_font_montserrat_30, LV_ALIGN_CENTER, X_POS, -20);
 
 	espnow_menu->espnow_submenu.lbl_send_box = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(espnow_menu->espnow_submenu.lbl_send_box, "", user_secondary_color,
-					 &lv_font_montserrat_24, LV_ALIGN_CENTER, X_POS, -20);
+			&lv_font_montserrat_24, LV_ALIGN_CENTER, X_POS, -20);
 					 
 	espnow_menu->espnow_submenu.lbl_send = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(espnow_menu->espnow_submenu.lbl_send, "SEND", user_secondary_color,
-					 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
+			&lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
 					 
 	espnow_menu->espnow_submenu.lbl_edit = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(espnow_menu->espnow_submenu.lbl_edit, LV_SYMBOL_HOME " EDIT", user_secondary_color,
-					 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_RIGHT, -5, -4);
+			&lv_font_montserrat_18, LV_ALIGN_BOTTOM_RIGHT, -5, -4);
 					 
 	espnow_menu->espnow_submenu.arrow_top = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(espnow_menu->espnow_submenu.arrow_top, LV_SYMBOL_UP, user_secondary_color,
-					 &lv_font_montserrat_14, LV_ALIGN_CENTER, X_POS, -50);
+			&lv_font_montserrat_14, LV_ALIGN_CENTER, X_POS, -50);
 					 
 	espnow_menu->espnow_submenu.arrow_bot = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(espnow_menu->espnow_submenu.arrow_bot, LV_SYMBOL_DOWN, user_secondary_color,
-					 &lv_font_montserrat_14, LV_ALIGN_CENTER, X_POS, 10);
+			&lv_font_montserrat_14, LV_ALIGN_CENTER, X_POS, 10);
 
 	// Create a style for the send cmd box
 	static lv_style_t style_cmd;

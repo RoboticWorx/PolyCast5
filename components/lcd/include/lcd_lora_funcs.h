@@ -153,6 +153,15 @@ void lcd_lora_plan_confirm_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_
 void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu);
 
 /**
+ * @brief Allows user to send a specific value to PolyPlug GPIOs
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] lora_menu LoRa menu structure
+ */
+void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu);
+
+/**
  * @brief Updates plan menu based on user selection
  *
  * @param [in] lora_plan_menu LoRa plan menu structure

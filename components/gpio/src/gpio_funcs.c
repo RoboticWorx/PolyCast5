@@ -331,7 +331,7 @@ float gpio_get_battery_voltage(void)
 		esp_rom_delay_us(5);
 
 		// Yield to task_wdt
-		if (i % 100 == 0) {
+		if (i % 50 == 0) {
 			vTaskDelay(pdMS_TO_TICKS(1));
 		}
 	}

@@ -2050,35 +2050,35 @@ void lcd_wifi_setup_send_page(wifi_menu_t *wifi_menu)
 	// Create labels
 	wifi_menu->wifi_submenu.lbl_send_ins = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(wifi_menu->wifi_submenu.lbl_send_ins, MQTT_CONNECTING_TXT, user_secondary_color,
-					 &lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS - 10, 48);
+			&lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS - 10, 48);
 
 	wifi_menu->wifi_submenu.lbl_send_cmd = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(wifi_menu->wifi_submenu.lbl_send_cmd, "1", user_secondary_color,
-					 &lv_font_montserrat_30, LV_ALIGN_CENTER, X_POS, -20);
+			 &lv_font_montserrat_30, LV_ALIGN_CENTER, X_POS, -20);
 
 	wifi_menu->wifi_submenu.lbl_send_box = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(wifi_menu->wifi_submenu.lbl_send_box, "", user_secondary_color,
-					 &lv_font_montserrat_24, LV_ALIGN_CENTER, X_POS, -20);
+			&lv_font_montserrat_24, LV_ALIGN_CENTER, X_POS, -20);
 					 
 	wifi_menu->wifi_submenu.lbl_send = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(wifi_menu->wifi_submenu.lbl_send, "SEND", user_secondary_color,
-					 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
+			&lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
 	
 	wifi_menu->wifi_submenu.lbl_edit = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(wifi_menu->wifi_submenu.lbl_edit, LV_SYMBOL_HOME " EDIT", user_secondary_color,
-					 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_RIGHT, -5, -4);
+			&lv_font_montserrat_18, LV_ALIGN_BOTTOM_RIGHT, -5, -4);
 					 
 	wifi_menu->wifi_submenu.arrow_top = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(wifi_menu->wifi_submenu.arrow_top, LV_SYMBOL_UP, user_secondary_color,
-					 &lv_font_montserrat_14, LV_ALIGN_CENTER, X_POS, -50);
+			&lv_font_montserrat_14, LV_ALIGN_CENTER, X_POS, -50);
 					 
 	wifi_menu->wifi_submenu.arrow_bot = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(wifi_menu->wifi_submenu.arrow_bot, LV_SYMBOL_DOWN, user_secondary_color,
-					 &lv_font_montserrat_14, LV_ALIGN_CENTER, X_POS, 10);
+			&lv_font_montserrat_14, LV_ALIGN_CENTER, X_POS, 10);
 					 
 	wifi_menu->wifi_submenu.lbl_receipt = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(wifi_menu->wifi_submenu.lbl_receipt, LV_SYMBOL_OK, user_secondary_color,
-					 &lv_font_montserrat_30, LV_ALIGN_TOP_RIGHT, -32, 21);
+			&lv_font_montserrat_30, LV_ALIGN_TOP_RIGHT, -32, 21);
 
 	// Create a style for the send cmd box
 	static lv_style_t style_cmd;

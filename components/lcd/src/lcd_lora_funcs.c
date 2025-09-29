@@ -54,8 +54,8 @@ static const char *submenu_options[] = {
 	LV_SYMBOL_LOOP "\nLOOP",
 	LV_SYMBOL_HOME "\nPLAN",
 	LV_SYMBOL_WARNING "\nAWAY",
+	LV_SYMBOL_USB "\nGPIO",
 	LV_SYMBOL_SETTINGS "\nEDIT",
-	LV_SYMBOL_TRASH "\nDEL",
 };
 
 static const char* TAG = "LCD_LORA_FUNCS";
@@ -455,7 +455,6 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 	
 	// Create initial label
 	if (!lbl_user_in) {
-		
 		// If renaming, autofill what was there previously
 		if (lora_menu_overwrite) {
 			// Copy the old name into buffer
@@ -725,6 +724,172 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 	}
 }
 
+static void prompt_name_or_del(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
+{	
+	// Create and format ins labels
+	lv_obj_t *lbl_ins = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_ins, LV_SYMBOL_SETTINGS, user_secondary_color,
+				 &lv_font_montserrat_30, LV_ALIGN_CENTER, 0, 0);
+				 
+	lv_obj_t *lbl_exit = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_exit, "BACK", user_secondary_color,
+				 &lv_font_montserrat_18, LV_ALIGN_LEFT_MID, 16, -1);
+				 
+	lv_obj_t *lbl_name = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_name, "RENAME", user_secondary_color,
+				 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 13);
+				 
+	lv_obj_t *lbl_del = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_del, "DELETE", user_secondary_color,
+				 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
+					
+	while (1) {
+		lv_timer_handler(); // Show
+		
+		// User hit cancel
+		if (xSemaphoreTake(xLeftButtonSemaphore, 0) == pdTRUE) {			
+			// Delete objects
+			lv_obj_delete(lbl_exit);
+			lv_obj_delete(lbl_name);
+			lv_obj_delete(lbl_del);
+			lv_obj_delete(lbl_ins);
+			
+			// Show right arrow
+			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+			
+			// Show submenu
+			lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+			
+			lcd_clear_pending_inputs = true; // Clear any false inputs
+				
+			// Switch pages
+			ui_menu->page = LORA_SUBPAGE;
+			
+			// Go back
+			return;
+		}
+		// Rename
+		else if (xSemaphoreTake(xUpButtonSemaphore, 0) == pdTRUE) {
+			// Delete objects
+			lv_obj_delete(lbl_exit);
+			lv_obj_delete(lbl_name);
+			lv_obj_delete(lbl_del);
+			lv_obj_delete(lbl_ins);
+						
+			// Don't allow renaming the first index
+			if (lora_menu->index == 0) {
+				// Show right arrow
+				lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+				
+				// Show submenu
+				lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+				
+				lcd_clear_pending_inputs = true; // Clear any false inputs
+					
+				// Switch pages
+				ui_menu->page = LORA_SUBPAGE;
+			
+				return;
+			}
+		
+			// Trigger overwrite 
+			lora_menu_overwrite = true;
+		
+			// Prompt rename
+			ui_menu->page = LORA_NAME_PAGE;
+			
+			// Go back
+			return;
+		}
+		// Delete
+		else if (xSemaphoreTake(xDownButtonSemaphore, 0) == pdTRUE) {			
+			// Delete objects
+			lv_obj_delete(lbl_exit);
+			lv_obj_delete(lbl_name);
+			lv_obj_delete(lbl_del);
+			lv_obj_delete(lbl_ins);
+			
+			lcd_clear_pending_inputs = true; // Clear any false inputs
+			
+			// Get user entry to remove
+			int del_idx = lora_menu->index;	 
+			
+			// Can't be "Add PolyPlug"	 
+			if (del_idx == 0) {
+				// Show right arrow
+				lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+				
+				// Show submenu
+				lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+				
+				lcd_clear_pending_inputs = true; // Clear any false inputs
+					
+				// Switch pages
+				ui_menu->page = LORA_SUBPAGE;
+				
+				return;
+			}
+			
+			// Free any heap buffers allocated for that slot
+			free(lora_menu->options[del_idx]); // Name string
+			free(lora_menu->keys[del_idx]); // Key blob
+			lv_obj_del(lora_menu->btns[del_idx]); // LVGL list button
+		
+			// Shift everything above it down one
+			for (int i = del_idx; i < lora_menu->size - 1; ++i) {
+				// Change each to the one after
+				lora_menu->options[i] = lora_menu->options[i + 1];
+				lora_menu->keys[i] = lora_menu->keys[i + 1];
+				lora_menu->btns[i] = lora_menu->btns[i + 1];
+		
+				// Update the label inside the button
+				lv_obj_t *lbl = lv_obj_get_child(lora_menu->btns[i], 0);
+				lv_label_set_text(lbl, lora_menu->options[i]);
+			}
+		
+			// List is now one shorter
+			lora_menu->size--;
+			
+			// Null out dangling index
+			lora_menu->options[lora_menu->size] = NULL;
+			lora_menu->keys[lora_menu->size] = NULL;
+			lora_menu->btns[lora_menu->size] = NULL;
+			
+			// Adjust if was last
+			if (lora_menu->index >= lora_menu->size) {
+				lora_menu->index = lora_menu->size-1;
+			}
+				
+			// Remove entry from NVS
+			lcd_lora_menu_nvs_delete(del_idx);
+			lcd_lora_key_nvs_delete(del_idx);
+		
+			// Refresh the list UI
+			lcd_lora_update_menu(lora_menu);
+			
+			// Reset submenu index
+			lora_menu->submenu.index = 0;
+			// Refresh the submenu UI
+			lcd_lora_update_submenu(lora_menu);
+			lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN); // Hide submenu
+			
+			// Show LoRa page
+			lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// Hide right arrow
+			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+			
+			// Switch pages
+			ui_menu->page = LORA_PAGE;
+			
+			// Go back
+			return;
+		}
+		
+		vTaskDelay(pdMS_TO_TICKS(10));
+	}
+}
+
 void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu) 
 {	
 	// If received a valid receipt from the receiver
@@ -830,69 +995,11 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 		xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
 		
 		#ifdef POLYCAST5_DEBUG
-			//ESP_LOG_BUFFER_HEX("SENDING WITH KEY", lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
+		//ESP_LOG_BUFFER_HEX("SENDING WITH KEY", lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
 		#endif
 		
 		// Reset receipt label
 		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
-	}
-	// Delete selected
-	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 5) {
-		
-		// Get user entry to remove
-		int del_idx = lora_menu->index;	 
-		
-		// Can't be "Add PolyPlug"	 
-		if (del_idx == 0) {
-			return;
-		}
-		
-		// Free any heap buffers allocated for that slot
-		free(lora_menu->options[del_idx]); // Name string
-		free(lora_menu->keys[del_idx]); // Key blob
-		lv_obj_del(lora_menu->btns[del_idx]); // LVGL list button
-	
-		// Shift everything above it down one
-		for (int i = del_idx; i < lora_menu->size - 1; ++i) {
-			// Change each to the one after
-			lora_menu->options[i] = lora_menu->options[i + 1];
-			lora_menu->keys[i] = lora_menu->keys[i + 1];
-			lora_menu->btns[i] = lora_menu->btns[i + 1];
-	
-			// Update the label inside the button
-			lv_obj_t *lbl = lv_obj_get_child(lora_menu->btns[i], 0);
-			lv_label_set_text(lbl, lora_menu->options[i]);
-		}
-	
-		// List is now one shorter
-		lora_menu->size--;
-		
-		// Null out dangling index
-		lora_menu->options[lora_menu->size] = NULL;
-		lora_menu->keys[lora_menu->size] = NULL;
-		lora_menu->btns[lora_menu->size] = NULL;
-		
-		// Adjust if was last
-		if (lora_menu->index >= lora_menu->size) {
-			lora_menu->index = lora_menu->size-1;
-		}
-			
-		// Remove entry from NVS
-		lcd_lora_menu_nvs_delete(del_idx);
-		lcd_lora_key_nvs_delete(del_idx);
-	
-		// Refresh the list UI
-		lcd_lora_update_menu(lora_menu);
-		
-		// Reset submenu index
-		lora_menu->submenu.index = 0;
-		// Refresh the submenu UI
-		lcd_lora_update_submenu(lora_menu);
-		
-		// Go back to LoRa page
-		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		ui_menu->page = LORA_PAGE;
 	}
 	// Scroll down
 	else if (ui_btns->down_btn == 1) {
@@ -907,30 +1014,15 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 	}
 	// Loop selected
 	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 1) {
+		// Hide cont
+		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+		
 		// Hide and reset receipt label
 		lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
 		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
 		
-		// Hide submenu
-		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
-		
-		// Go to subpage options page
+		// Go to subpage loop page
 		ui_menu->page = LORA_LOOP_SUBPAGE;
-	}
-	// Away selected
-	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 3) {
-		// Hide and reset receipt label
-		lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
-		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
-		
-		// Hide submenu
-		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
-		
-		// Hide right arrow
-		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-		
-		// Go to subpage options page
-		ui_menu->page = LORA_AWAY_SUBPAGE;
 	}
 	// Plan selected
 	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 2) {
@@ -951,11 +1043,11 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 		// Update plan menu
 		lcd_lora_update_plan_menu(lora_plan_menu);
 		
-		// Go to subpage options page
+		// Go to subpage plan page
 		ui_menu->page = LORA_PLAN_SUBPAGE;
 	}
-	// Edit selected
-	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 4) {
+	// Away selected
+	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 3) {
 		// Hide and reset receipt label
 		lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
 		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
@@ -963,16 +1055,42 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 		// Hide submenu
 		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 		
-		// Don't allow renaming the first index
-		if (lora_menu->index == 0) {
-			return;
-		}
-	
-		// Trigger overwrite 
-		lora_menu_overwrite = true;
-	
-		// Prompt rename
-		ui_menu->page = LORA_NAME_PAGE;
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		// Go to subpage away page
+		ui_menu->page = LORA_AWAY_SUBPAGE;
+	}
+	// GPIO selected
+	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 4) {
+		// Hide cont
+		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+		
+		// Hide and reset receipt label
+		lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
+		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
+		
+		// Hide up and down arrows
+		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Go to subpage gpio page
+		ui_menu->page = LORA_GPIO_SUBPAGE;
+	}
+	// Edit selected
+	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 5) {
+		// Hide cont
+		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+		
+		// Hide and reset receipt label
+		lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
+		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
+		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		// Rename or delete entry
+		prompt_name_or_del(ui_menu, lora_menu);
 	}
 }
 
@@ -1099,12 +1217,13 @@ void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		lora_cmd.index = lora_menu->submenu.index;
 		memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
 		snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "on %s off %s", time_opts[on_idx], time_opts[off_idx]);
-		xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY);
 
 		// Confirmation text
 		lcd_format_label(lbl_subpage_ins, "Sending to PolyPlug...", user_secondary_color,
 				 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
 		lv_timer_handler();
+		
+		xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY); // Send the command
 		vTaskDelay(pdMS_TO_TICKS(500));
 		
 		// Reset confirmation lbl
@@ -1165,6 +1284,208 @@ void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		selected_index = 1;
 		on_idx = 0;
 		off_idx = 0;
+			
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+	}
+}
+
+void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu)
+{
+	#define GPIO_X_POS -38
+	#define GPIO_TX_TXT "Transmit: "
+	#define GPIO_RX_TXT "Received: "
+	#define GPIO_BUF_SIZE 4
+	
+	// Create statics
+	static uint8_t cmd_to_send = 1; // Set default
+	static bool tx_success = false;
+	static bool init = false;
+	
+	static lv_obj_t *lbl_send_tx = NULL;
+	static lv_obj_t *lbl_send_rx = NULL;
+	static lv_obj_t *lbl_send_cmd = NULL;
+	static lv_obj_t *lbl_send_box = NULL;
+	static lv_obj_t *lbl_send = NULL;
+	static lv_obj_t *arrow_top = NULL;
+	static lv_obj_t *arrow_bot = NULL;
+	static lv_style_t style_cmd;
+	
+	// Do once
+	if (!init) {
+		tx_success = false;
+		cmd_to_send = 1;
+		
+		// Create labels
+		lbl_send_tx = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_send_tx, GPIO_TX_TXT, user_secondary_color,
+				&lv_font_montserrat_16, LV_ALIGN_CENTER, GPIO_X_POS, 39);
+						 
+		lbl_send_rx = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_send_rx, GPIO_RX_TXT, user_secondary_color,
+				&lv_font_montserrat_16, LV_ALIGN_CENTER, GPIO_X_POS, 57);
+	
+		lbl_send_cmd = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_send_cmd, "1", user_secondary_color,
+				&lv_font_montserrat_30, LV_ALIGN_CENTER, GPIO_X_POS, -20);
+		lv_label_set_text_fmt(lbl_send_cmd, "%d", cmd_to_send);
+	
+		lbl_send_box = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_send_box, "", user_secondary_color,
+				&lv_font_montserrat_24, LV_ALIGN_CENTER, GPIO_X_POS, -20);
+						 
+		lbl_send = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_send, "SEND", user_secondary_color,
+				&lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
+						 
+		arrow_top = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(arrow_top, LV_SYMBOL_UP, user_secondary_color,
+				&lv_font_montserrat_14, LV_ALIGN_CENTER, GPIO_X_POS, -50);
+						 
+		arrow_bot = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(arrow_bot, LV_SYMBOL_DOWN, user_secondary_color,
+				&lv_font_montserrat_14, LV_ALIGN_CENTER, GPIO_X_POS, 10);
+	
+		// Create a style for the send cmd box
+		lv_style_init(&style_cmd);
+	
+		lv_style_set_radius(&style_cmd, 8);
+		lv_style_set_bg_color(&style_cmd, user_primary_color);
+		lv_style_set_border_width(&style_cmd, 2);
+		lv_style_set_border_color(&style_cmd, user_secondary_color);
+		lv_style_set_border_side(&style_cmd, LV_BORDER_SIDE_FULL);
+		lv_style_set_text_color(&style_cmd, user_secondary_color);
+		
+		lv_color_t darker_user_primary_color = lv_color_darken(user_primary_color, 100); // % darker 
+		lv_style_set_shadow_spread(&style_cmd, 3);
+		lv_style_set_shadow_width(&style_cmd, 6);
+		lv_style_set_shadow_offset_x(&style_cmd, 3);
+		lv_style_set_shadow_offset_y(&style_cmd, 3);
+		lv_style_set_shadow_color(&style_cmd, darker_user_primary_color);
+			
+		lv_style_set_pad_left(&style_cmd, 55);
+		lv_style_set_pad_right(&style_cmd, 55);
+		lv_style_set_pad_top(&style_cmd, 25);
+		lv_style_set_pad_bottom(&style_cmd, 25);
+			
+		lv_obj_add_style(lbl_send_box, &style_cmd, 0);
+		
+		// Show
+		lv_timer_handler();
+		
+		// Done initializing
+		init = true;
+	}
+	
+	/* Status updates */
+	// If transmission successful
+	if (tx_success) {
+		lv_label_set_text(lbl_send_tx, GPIO_TX_TXT LV_SYMBOL_OK);
+		tx_success = false; // Update once
+	}
+	// If got a receipt
+	if (xSemaphoreTake(xLoraReceiptValidSemaphore, 0) == pdTRUE) {
+		lv_label_set_text(lbl_send_rx, GPIO_RX_TXT LV_SYMBOL_OK);
+	}
+	
+	/* User input */
+	// Increment command
+	if (ui_btns->up_btn == 1) {
+		// Reset receipts
+		lv_label_set_text(lbl_send_tx, GPIO_TX_TXT);
+		lv_label_set_text(lbl_send_rx, GPIO_RX_TXT);
+		
+		cmd_to_send++;
+		
+		char buf[GPIO_BUF_SIZE];
+		snprintf(buf, sizeof(buf), "%u", cmd_to_send);
+		lv_label_set_text(lbl_send_cmd, buf);
+	}
+	// Decrement command
+	else if (ui_btns->down_btn == 1) {
+		// Reset receipts
+		lv_label_set_text(lbl_send_tx, GPIO_TX_TXT);
+		lv_label_set_text(lbl_send_rx, GPIO_RX_TXT);
+		
+		cmd_to_send--;
+		
+		char buf[GPIO_BUF_SIZE];
+		snprintf(buf, sizeof(buf), "%u", cmd_to_send);
+		lv_label_set_text(lbl_send_cmd, buf);
+	}
+	// Increment command by 3
+	else if (ui_btns->select_btn == 1) {
+		// Reset receipts
+		lv_label_set_text(lbl_send_tx, GPIO_TX_TXT);
+		lv_label_set_text(lbl_send_rx, GPIO_RX_TXT);
+		
+		cmd_to_send += 3;
+		
+		char buf[GPIO_BUF_SIZE];
+		snprintf(buf, sizeof(buf), "%u", cmd_to_send);
+		lv_label_set_text(lbl_send_cmd, buf);
+	}
+	// Send to PolyPlug
+	else if (ui_btns->right_btn == 1) {
+		// Reset receipts
+		lv_label_set_text(lbl_send_tx, GPIO_TX_TXT);
+		lv_label_set_text(lbl_send_rx, GPIO_RX_TXT);
+		
+		// Send the data to lora_task
+		lora_cmd_t lora_cmd = {}; // Zero out
+		lora_cmd.index = lora_menu->submenu.index;
+		memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
+		snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "gpio %d", cmd_to_send);
+		
+		xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY); // Send the command
+		
+		// TX confirmation
+		tx_success = true;
+	}
+	// Back
+	else if (ui_btns->left_btn == 1) {
+		// Reset objects
+		lv_obj_delete(lbl_send_tx);
+		lv_obj_delete(lbl_send_rx);
+		lv_obj_delete(lbl_send_cmd);
+		lv_obj_delete(lbl_send_box);
+		lv_obj_delete(lbl_send);
+		lv_obj_delete(arrow_top);
+		lv_obj_delete(arrow_bot);
+		
+		// Free the style
+		lv_style_reset(&style_cmd);
+		
+		// Reset statics
+		lbl_send_tx = lbl_send_rx = lbl_send_cmd = lbl_send_box = lbl_send = arrow_top = arrow_bot = NULL;
+		init = false;
+		
+		// Show up and down arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show LoRa submenu cont
+		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+			
+		// Go back
+		ui_menu->page = LORA_SUBPAGE;
+	}
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {			
+		// Reset objects
+		lv_obj_delete(lbl_send_tx);
+		lv_obj_delete(lbl_send_rx);
+		lv_obj_delete(lbl_send_cmd);
+		lv_obj_delete(lbl_send_box);
+		lv_obj_delete(lbl_send);
+		lv_obj_delete(arrow_top);
+		lv_obj_delete(arrow_bot);
+		
+		// Free the style
+		lv_style_reset(&style_cmd);
+		
+		// Reset statics
+		lbl_send_tx = lbl_send_rx = lbl_send_cmd = lbl_send_box = lbl_send = arrow_top = arrow_bot = NULL;
+		init = false;
 			
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
@@ -1657,7 +1978,13 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		sscanf(end_time, "%2d:%2d:%2d", &h2,&m2,&s2);
 		snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "d %s o %02d%02d%02d f %02d%02d%02d",
 				plan_selected_days, h1, m1, s1, h2, m2, s2);
-		xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY);
+				
+		// Confirmation text
+		lv_obj_t *lbl_send_conf = lv_label_create(ACTIVE_SCR); // Create and format label
+		lcd_format_label(lbl_send_conf, "Sending to PolyPlug...", user_secondary_color,
+				 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+		lv_timer_handler();
+		xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY); // Send the command
 		
 		// Reset objects
 		lv_obj_delete(lbl_subpage_times);
@@ -1674,11 +2001,6 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		strcpy(end_time, "00:00:00");
 		init = false;
 		
-		// Confirmation text
-		lv_obj_t *lbl_send_conf = lv_label_create(ACTIVE_SCR); // Create and format label
-		lcd_format_label(lbl_send_conf, "Sending to PolyPlug...", user_secondary_color,
-				 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
-		lv_timer_handler();
 		vTaskDelay(pdMS_TO_TICKS(1000)); // Wait 1000ms
 		lv_obj_del(lbl_send_conf); // Delete label
 		lcd_clear_pending_inputs = true;
@@ -1986,6 +2308,9 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		// Reset statics
 		do_once = false;
 		away_menu = NULL;
+		
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
 		// Show LoRa submenu cont
 		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
@@ -2525,8 +2850,9 @@ esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx)
 	esp_err_t err = nvs_open(LORA_ENC_NS, NVS_READWRITE, &h);
 	
 	// Error check
-	if (err != ESP_OK)
+	if (err != ESP_OK) {
 		return err;
+	}
 
 	// Get number of keys
 	uint8_t user_cnt = 0;
@@ -2552,11 +2878,15 @@ esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx)
 		size_t len = LORA_ENC_KEY_LEN;
 		// Get key from src
 		err = nvs_get_blob(h, src, tmp, &len);
-		if (err != ESP_OK || len != LORA_ENC_KEY_LEN) break;
+		if (err != ESP_OK || len != LORA_ENC_KEY_LEN) {
+			break;
+		}
 
 		// Set key to new dst
 		err = nvs_set_blob(h, dst, tmp, LORA_ENC_KEY_LEN);
-		if (err != ESP_OK) break;
+		if (err != ESP_OK) {
+			break;
+		}
 	}
 
 	// Erase dangling key
@@ -2569,7 +2899,9 @@ esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx)
 	// Set new count
 	if (err == ESP_OK) {
 		err = nvs_set_u8(h, LORA_ENC_KEY_COUNT, user_cnt - 1);
-		if (err == ESP_OK) err = nvs_commit(h);
+		if (err == ESP_OK) {
+			err = nvs_commit(h);
+		}
 	}
 	
 	// Close NVS
