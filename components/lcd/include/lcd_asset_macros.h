@@ -217,6 +217,8 @@
 #define QR_PC5_COM "A:/qr/qr_pc5_com.bin"
 #define QR_PC5_DOCS "A:/qr/qr_pc5_docs.bin"
 
+#define QR_PC5_BOOT "A:/qr/qr_pc5_boot.bin"
+
 /* QRS END */
 
 

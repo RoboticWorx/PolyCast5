@@ -1895,14 +1895,14 @@ void lcd_settings_pin_nvs_load(settings_menu_t *menu)
 		menu->pin_menu.pin_set = false;
 		menu->pin_menu.unlock_pin[0] = '\0';
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGW(TAG, "lcd_settings_pin_nvs_load NVS DNE");
+		ESP_LOGW(TAG, "lcd_settings_pin_nvs_load nvs_open failed: %s", esp_err_to_name(err));
 		#endif
 		
 		return;
 	}
 	
 	if (err != ESP_OK) {
-		ESP_LOGE(TAG, "lcd_settings_pin_nvs_load NVS open error");
+		ESP_LOGE(TAG, "lcd_settings_pin_nvs_load nvs_open 2 failed: %s", esp_err_to_name(err));
 	}
 
 	// Read pin_set
@@ -1915,7 +1915,7 @@ void lcd_settings_pin_nvs_load(settings_menu_t *menu)
 	else if (err == ESP_ERR_NVS_NOT_FOUND) {
 		menu->pin_menu.pin_set = false;
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGW(TAG, "lcd_settings_pin_nvs_load nvs_get_u8 ESP_ERR_NVS_NOT_FOUND");
+		ESP_LOGW(TAG, "lcd_settings_pin_nvs_load nvs_get_u8 ESP_ERR_NVS_NOT_FOUND");
 		#endif
 	}
 	else {
@@ -1960,7 +1960,7 @@ void lcd_settings_pin_attempts_nvs_save(void)
 	// Open NVS
 	esp_err_t err = nvs_open(SETTINGS_ATTEMPTS_NS, NVS_READWRITE, &h);
 	if (err != ESP_OK) {
-		ESP_LOGE(TAG, "Pin attempts NVS open error");
+		ESP_LOGE(TAG, "Pin attempts NVS open error: %s", esp_err_to_name(err));
 		goto out;
 	}
 
@@ -1971,11 +1971,11 @@ void lcd_settings_pin_attempts_nvs_save(void)
 		err = nvs_commit(h);
 		
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGI(TAG, "Saved pin attempts: %" PRIu32, pin_attempts);
+		ESP_LOGI(TAG, "Saved pin attempts: %" PRIu32, pin_attempts);
 		#endif
 	}
 	else {
-		ESP_LOGE(TAG, "Failed to save pin attempts: %" PRIu32, pin_attempts);
+		ESP_LOGE(TAG, "Failed to save pin attempts: %s", esp_err_to_name(err));
 	}
 	
 	// Close NVS
@@ -1991,7 +1991,7 @@ void lcd_settings_pin_attempts_nvs_load(void)
 	esp_err_t err = nvs_open(SETTINGS_ATTEMPTS_NS, NVS_READONLY, &h);
 	if (err != ESP_OK) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGW(TAG, "Pin attempts NS DNE");
+		ESP_LOGW(TAG, "Pin attempts nvs_open failed: %s", esp_err_to_name(err));
 		#endif
 		
 		goto out;
@@ -2013,7 +2013,7 @@ void lcd_settings_pin_attempts_nvs_load(void)
 	}
 	
 	#ifdef POLYCAST5_DEBUG
-		ESP_LOGI(TAG, "Loaded pin attempts: %" PRIu32, stored);
+	ESP_LOGI(TAG, "Loaded pin attempts: %" PRIu32, stored);
 	#endif
 	
 	// Close NVS

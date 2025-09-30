@@ -1305,6 +1305,7 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 	static lv_obj_t *lbl_send_rx = NULL;
 	static lv_obj_t *lbl_send_cmd = NULL;
 	static lv_obj_t *lbl_send_box = NULL;
+	static lv_obj_t *lbl_link = NULL;
 	static lv_obj_t *lbl_send = NULL;
 	static lv_obj_t *arrow_top = NULL;
 	static lv_obj_t *arrow_bot = NULL;
@@ -1336,7 +1337,11 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		lbl_send = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_send, "SEND", user_secondary_color,
 				&lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
-						 
+		
+		lbl_link = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_link, "polycast5.com\n/blogs/docs\n/polyplug-gpio", user_secondary_color,
+				&lv_font_montserrat_12, LV_ALIGN_BOTTOM_RIGHT, -3, -3);
+		
 		arrow_top = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(arrow_top, LV_SYMBOL_UP, user_secondary_color,
 				&lv_font_montserrat_14, LV_ALIGN_CENTER, GPIO_X_POS, -50);
@@ -1449,6 +1454,7 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		lv_obj_delete(lbl_send_cmd);
 		lv_obj_delete(lbl_send_box);
 		lv_obj_delete(lbl_send);
+		lv_obj_delete(lbl_link);
 		lv_obj_delete(arrow_top);
 		lv_obj_delete(arrow_bot);
 		
@@ -1456,7 +1462,7 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		lv_style_reset(&style_cmd);
 		
 		// Reset statics
-		lbl_send_tx = lbl_send_rx = lbl_send_cmd = lbl_send_box = lbl_send = arrow_top = arrow_bot = NULL;
+		lbl_send_tx = lbl_send_rx = lbl_send_cmd = lbl_send_box = lbl_send = arrow_top = arrow_bot = lbl_link = NULL;
 		init = false;
 		
 		// Show up and down arrows
@@ -1477,6 +1483,7 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		lv_obj_delete(lbl_send_cmd);
 		lv_obj_delete(lbl_send_box);
 		lv_obj_delete(lbl_send);
+		lv_obj_delete(lbl_link);
 		lv_obj_delete(arrow_top);
 		lv_obj_delete(arrow_bot);
 		
@@ -1484,7 +1491,7 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		lv_style_reset(&style_cmd);
 		
 		// Reset statics
-		lbl_send_tx = lbl_send_rx = lbl_send_cmd = lbl_send_box = lbl_send = arrow_top = arrow_bot = NULL;
+		lbl_send_tx = lbl_send_rx = lbl_send_cmd = lbl_send_box = lbl_send = arrow_top = arrow_bot = lbl_link = NULL;
 		init = false;
 			
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep

@@ -1,3 +1,4 @@
+#include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -158,6 +159,27 @@ static void lcd_task(void *pvParameters)
 	lcd_wifi_dump_wifi_topic_nvs();
 	#endif
 	
+	/* Check if first boot */
+	// If yes, show BOOT_PAGE first (some starter info)
+	if (lcd_is_first_boot()) {
+		// Show BOOT_PAGE first
+		ui_menu.page = BOOT_PAGE;
+
+		// Save first boot
+		esp_err_t err = lcd_save_first_boot();
+		if (err != ESP_OK) {
+			ESP_LOGE(TAG, "lcd_save_first_boot failed: %s", esp_err_to_name(err));
+		}
+	}
+	else {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "NOT First boot, setting to HOME_PAGE");
+		#endif
+
+		// Redundant
+		ui_menu.page = HOME_PAGE;
+	}
+	
 	while (1)
 	{
 		if (xTaskGetTickCount() - btn_timer_last >= btn_timer_interval) {
@@ -237,7 +259,10 @@ static void lcd_task(void *pvParameters)
 			}
 			
 			// Base pages
-			if (ui_menu.page == HOME_PAGE) {
+			if (ui_menu.page == BOOT_PAGE) {
+				lcd_boot_page(&ui_btns, &ui_menu);
+			} 
+			else if (ui_menu.page == HOME_PAGE) {
 				lcd_home_page(&ui_btns, &ui_menu, &settings_menu);
 			} 
 			else if (ui_menu.page == UNLOCK_PAGE) {

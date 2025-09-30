@@ -22,6 +22,7 @@
 
 // Define each sequentially (0, 1, 2, ...)
 enum {
+	BOOT_PAGE,
     HOME_PAGE,
     UNLOCK_PAGE,
     HOTKEY_PAGE,
@@ -265,6 +266,28 @@ void lcd_clear_user_in();
  * @param [in] charging If the battery is charging or not
 */
 void lcd_update_battery(ui_menu_t *ui_menu, uint8_t battery_percentage, bool charging);
+
+/**
+ * @brief Mark that first boot has happened via NVS
+ *
+ * @returns ESP error status 
+ */
+esp_err_t lcd_save_first_boot(void);
+
+/**
+ * @brief Check if first boot has happened via NVS
+ *
+ * @returns True if first boot
+ */
+bool lcd_is_first_boot(void);
+
+/**
+ * @brief Show one time boot up page with some starter info
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ */
+void lcd_boot_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu);
 
 /**
  * @brief Display/scroll through home page animations

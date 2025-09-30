@@ -54,6 +54,9 @@
 #define SEL_MENU_NS "sel_menu"
 #define SEL_MENU_INDEX_KEY "sel_idx"
 
+#define LCD_FIRST_BOOT_NS "first_boot"
+#define LCD_FIRST_BOOT_KEY "exists"
+
 
 /* Hotkey macros */
 #define HOTKEY_SHORT_HOME_IDX 0
@@ -678,7 +681,7 @@ static esp_err_t lcd_anim_nvs_load(void)
 	
 	// Open NVS
 	esp_err_t err = nvs_open(LCD_ANIM_NS, NVS_READONLY, &h);
-	if (err != ESP_OK) {
+	if (err != ESP_OK) {		
 		return err;
 	}
 	
@@ -1062,6 +1065,77 @@ static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t *ir_menu, lo
 	}
 }
 
+// Mark that first boot did happen
+esp_err_t lcd_save_first_boot(void)
+{
+	nvs_handle_t h;
+	
+	// Open NVS
+	esp_err_t err = nvs_open(LCD_FIRST_BOOT_NS, NVS_READWRITE, &h);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_save_first_boot nvs_open failed: %s", esp_err_to_name(err));
+
+		return err;
+	}
+
+	// Store anim_active as a single byte
+	err = nvs_set_u8(h, LCD_FIRST_BOOT_KEY, 1);
+	if (err == ESP_OK) {
+		// Commit to flash
+		err = nvs_commit(h);
+		
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Saved first boot ESP_OK");
+		#endif
+	}
+	else {
+		ESP_LOGE(TAG, "lcd_save_first_boot nvs_set_u8 failed: %s", esp_err_to_name(err));
+	}
+	
+	// Close NVS
+	nvs_close(h);
+	return err;
+}
+
+// Check if first boot has happened
+bool lcd_is_first_boot(void)
+{
+	nvs_handle_t h;
+	
+	// Open NVS
+	esp_err_t err = nvs_open(LCD_FIRST_BOOT_NS, NVS_READONLY, &h);
+	if (err != ESP_OK) {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGW(TAG, "lcd_is_first_boot nvs_open failed: %s", esp_err_to_name(err));
+		#endif
+
+		// Failed to open -> DNE
+		return true;
+	}
+	
+	// Get the uint8
+	uint8_t stored = 0;
+	err = nvs_get_u8(h, LCD_FIRST_BOOT_KEY, &stored);
+	if (err != ESP_OK) {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGW(TAG, "lcd_is_first_boot nvs_get_u8 failed: %s", esp_err_to_name(err));
+		#endif
+
+		// Close NVS
+		nvs_close(h);
+
+		return true;
+	}
+	
+	#ifdef POLYCAST5_DEBUG
+	ESP_LOGI(TAG, "Loaded lcd_is_first_boot: %d", stored);
+	#endif
+	
+	// Close NVS
+	nvs_close(h);
+	return false;
+}
+
 static void start_animation(void)
 {
 	// Start the active
@@ -1084,7 +1158,8 @@ static void start_animation(void)
 	}
 	#endif
 }
-static void stop_animations(void)
+
+static void pause_animations(void)
 {
 	// Halt all animations
 	lv_timer_pause(city_anim.timer);
@@ -1093,7 +1168,13 @@ static void stop_animations(void)
 	#ifdef POLYCAST5_EN_PYRAMID_ANIM
 	lv_timer_pause(pyramid_anim.timer);
 	#endif
+}
 
+static void stop_animations(void)
+{
+	pause_animations();
+
+	// Hide paused animations
 	lv_obj_add_flag(city_anim.img, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(black_hole_anim.img, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(matrix_rain_anim.img, LV_OBJ_FLAG_HIDDEN);
@@ -1101,6 +1182,7 @@ static void stop_animations(void)
 	lv_obj_add_flag(pyramid_anim.img, LV_OBJ_FLAG_HIDDEN);
 	#endif
 }
+
 static void transition_animation(bool dir)
 {	
 	stop_animations();
@@ -1117,8 +1199,98 @@ static void transition_animation(bool dir)
 	// Save choice to NVS
 	lcd_anim_nvs_save();
 }
+
+void lcd_boot_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu)
+{
+	#define BOOT_PAGE_Y_OFFSET 40
+	
+	// Statics
+	static bool init = false;
+	static lv_obj_t *cont = NULL;
+	static lv_obj_t *title_lbl = NULL;
+	static lv_obj_t *instr_lbl = NULL;
+	static lv_obj_t *qr_active;
+	
+	if (!init) {
+		pause_animations();
+
+		// Create a scrollable container for the instructions
+		cont = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(cont, 210, 106);
+		lv_obj_center(cont);
+		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
+
+		// Title label
+		title_lbl = lv_label_create(cont);
+		lv_label_set_text(title_lbl, "READ ME");
+		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+		// Instructions label (scrollable if text is long)
+		instr_lbl = lv_label_create(cont);
+		lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+		lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
+		lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_16, 0);
+		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+
+		// Create QR (Artboard = 60x60)
+		qr_active = lv_img_create(cont);
+		lv_img_set_src(qr_active, QR_PC5_BOOT);
+		lv_obj_align_to(qr_active, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 233);
+
+		// Set instruction text
+		const char *instr_text = 
+								"Hello, welcome to PolyCast5! Press the down arrow to scroll.\n\n"
+								"Below is some quick info to help you get started!\n\n"
+								"To get the most out of your PolyCast5, I'd recommend checking out polycast5.com:\n\n"
+								"\n\n\n"
+								"It has a lot of docs and tutorials to help you unleash this device's full potential.\n\n"
+								"Also, in the unlikely case that anything should ever be glitchy, you can do a safe hardware reboot by pressing "
+								"the home and right buttons at the same time.\n\n"
+								"To continue, please push the right arrow button. This menu will not appear again."
+								"";
+		
+		lv_label_set_text(instr_lbl, instr_text);
+	
+		init = true;
+	}
+	
+	if (ui_btns->up_btn == 1) {
+		lv_obj_scroll_by_bounded(cont, 0, BOOT_PAGE_Y_OFFSET, LV_ANIM_ON);
+	}
+	else if (ui_btns->down_btn == 1) {
+		lv_obj_scroll_by_bounded(cont, 0, -BOOT_PAGE_Y_OFFSET, LV_ANIM_ON);
+	}
+	// Confirm
+	else if (ui_btns->right_btn == 1) {
+		// Delete objects
+		lv_obj_del(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		qr_active = NULL;
+		init = false;
+		
+		start_animation();
+		
+		// Go home
+		ui_menu->page = HOME_PAGE;
+	}
+}
+
 void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
-{	
+{
 	if (ui_btns->up_btn == 1) {
 		transition_animation(true);
 	}
