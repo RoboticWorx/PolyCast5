@@ -133,7 +133,7 @@ static void adc_task(void *arg)
 	}
 	
 	TickType_t adc_timer_last = xTaskGetTickCount();
-		
+	
 	while (1) {
 		// Update battery status every adc_timer_interval
 		if ((xTaskGetTickCount() - adc_timer_last >= adc_timer_interval) || (xSemaphoreTake(xStartAdcBatSemaphore, 0) == pdTRUE)) {

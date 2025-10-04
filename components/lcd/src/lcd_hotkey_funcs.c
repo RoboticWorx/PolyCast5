@@ -4,6 +4,7 @@
 #include "core/lv_obj.h"
 #include "core/lv_obj_pos.h"
 #include "misc/lv_area.h"
+#include "polycast5_macros.h"
 #include "widgets/label/lv_label.h"
 #include "font/lv_symbol_def.h"
 
@@ -273,9 +274,7 @@ void lcd_hotkey_nvs_save(const hotkey_cmd_t *src)
 	// Open NVS
  	esp_err_t err = nvs_open(HOTKEY_NS, NVS_READWRITE, &h);
  	if (err != ESP_OK) {
-		ESP_LOGE(TAG, "lcd_hotkey_nvs_save nvs_open failed");
-
-		nvs_close(h);
+		ESP_LOGW(TAG, "lcd_hotkey_nvs_save nvs_open failed: %s", esp_err_to_name(err));
 		return;
 	}
 
@@ -286,7 +285,7 @@ void lcd_hotkey_nvs_save(const hotkey_cmd_t *src)
 		err = nvs_commit(h);
 	}
 	else {
-		ESP_LOGE(TAG, "lcd_hotkey_nvs_save set_blob failed");
+		ESP_LOGE(TAG, "lcd_hotkey_nvs_save set_blob failed: %s", esp_err_to_name(err));
 	}
 
 	// Close NVS
@@ -301,10 +300,10 @@ void lcd_hotkey_nvs_load(hotkey_cmd_t *dst)
  	esp_err_t err = nvs_open(HOTKEY_NS, NVS_READONLY, &h);
  	if (err != ESP_OK) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGW(TAG, "lcd_hotkey_nvs_load nvs_open failed: probably DNE");
+		ESP_LOGW(TAG, "lcd_hotkey_nvs_load nvs_open failed: %s", esp_err_to_name(err));
 		#endif
 
-		nvs_close(h);
+		memset(dst, 0, sizeof(*dst)); // Make state deterministic
 		return;
 	}
 
@@ -315,11 +314,12 @@ void lcd_hotkey_nvs_load(hotkey_cmd_t *dst)
 
 	// Check if first boot
 	if (err == ESP_ERR_NVS_NOT_FOUND) {
-		memset(dst, 0, sizeof(*dst)); // Zero out
+		memset(dst, 0, sizeof(*dst)); // Zero out for first-boot default
 	}
 	// Other error
 	else if (err != ESP_OK) {
-		ESP_LOGE(TAG, "lcd_hotkey_nvs_load get_blob failed");
+		ESP_LOGE(TAG, "lcd_hotkey_nvs_load get_blob failed: %s", esp_err_to_name(err));
+		memset(dst, 0, sizeof(*dst));
 	}
 
 	// Close NVS

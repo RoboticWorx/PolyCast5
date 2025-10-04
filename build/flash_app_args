@@ -1,2 +1,2 @@
 --flash_mode dio --flash_freq 80m --flash_size 16MB
-0x20000 PolyCast5.bin
+0x50000 PolyCast5.bin
