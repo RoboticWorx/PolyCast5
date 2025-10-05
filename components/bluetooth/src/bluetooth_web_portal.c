@@ -38,11 +38,11 @@ static char s_ip[16] = "192.168.4.1";
 // Web page HTML (UI: pick index, name, and payload)
 static const char *INDEX_HTML =
 "<!doctype html><html><head><meta charset='utf-8'><meta name=viewport content='width=device-width,initial-scale=1'>"
-"<title>PolyCast5 BT Scripts</title>"
+"<title>PolyCast5 BT Portal</title>"
 "<style>body{font-family:system-ui,Arial,sans-serif;margin:16px}label{display:block;margin:8px 0 4px}"
 "input,textarea,select{width:100%;box-sizing:border-box}textarea{height:180px}</style>"
 "</head><body>"
-"<h2>PolyCast5 BT Scripts</h2>"
+"<h2>PolyCast5 BT Portal</h2>"
 "<header>Script index (0-based)</header>"
 "<small>So the first one you add is 0, next is 1, etc.</small>"
 "<div><label>Script index</label><input id=idx type=number min=0 max=15 value=0> <button id=load>Load</button></div>"

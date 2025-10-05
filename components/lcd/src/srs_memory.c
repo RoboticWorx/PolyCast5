@@ -307,7 +307,7 @@ int srs_build_due_list(int *out_idx, int max_out, uint32_t today)
 }
 
 // Converts Unix seconds to whole days
-uint32_t srs_days_since_epoch_local()
+uint32_t srs_days_since_epoch_local(int calibrate)
 {
 	time_t now = time(NULL);
 
@@ -329,7 +329,7 @@ uint32_t srs_days_since_epoch_local()
 	#endif
 
 	// Round down by 86400 -> today index
-	return (uint32_t)(local_midnight_epoch / 86400);
+	return (uint32_t)((local_midnight_epoch / 86400) + calibrate);
 }
 
 void srs_nvs_load(void)

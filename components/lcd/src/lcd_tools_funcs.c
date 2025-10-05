@@ -1036,6 +1036,14 @@ void lcd_tools_how_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
 void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
 {
 	#define SRS_MAX_TO_SHOW 3
+	//#define SRS_CALIBRATING 1
+	
+	#ifdef SRS_CALIBRATING // To easily add days to retrieve notebook entries
+	static int calibrate = -21; // Initial offset (days since start date - 1)
+	// Add first then go to next and start clear cycle
+	#else
+	static int calibrate = 0; // No offset - present day
+	#endif
 	
 	// Statics
 	static bool do_once = false;
@@ -1095,7 +1103,7 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
 	}
 
 	// Recompute today and the due queue
-	today = srs_days_since_epoch_local();
+	today = srs_days_since_epoch_local(calibrate);
 	
 	// Build entries due
 	const int cap = (int)(sizeof(due_idx) / sizeof(due_idx[0]));
@@ -1135,6 +1143,12 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
 		snprintf(msg, sizeof(msg), "%d Page(s) to review", due_total);
 		lv_label_set_text(lbl_hint, msg);
 	}
+	
+	#ifdef SRS_CALIBRATING
+	if (ui_btns->up_btn == 1) {
+		calibrate++; // Move day up to speed run entries
+	}
+	#endif
 
 	/* User input */
 	// Increment selected

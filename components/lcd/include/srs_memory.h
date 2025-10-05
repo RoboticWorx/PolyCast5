@@ -45,9 +45,11 @@ void srs_nvs_load(void);
 /** 
  * @brief Gets days since local time epoch
  *
+ * @param [in] calibrate Offset to add days in the case that the user isn't starting from scratch
+ *
  * @returns Days since epoch
  */
-uint32_t srs_days_since_epoch_local(void);
+uint32_t srs_days_since_epoch_local(int calibrate);
 
 /** 
  * @brief Build list of due SRS pages

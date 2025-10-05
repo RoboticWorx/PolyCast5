@@ -1972,8 +1972,16 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 	// Confirm
 	if (ui_btns->right_btn == 1 && selected_digit == 11) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGI(TAG, "Confirmed: start_time = '%s', end_time = '%s'", start_time, end_time);
+		ESP_LOGI(TAG, "Confirmed: start_time = '%s', end_time = '%s'", start_time, end_time);
 		#endif
+		
+		// Reset objects
+		lv_obj_delete(lbl_subpage_times);
+		lv_obj_delete(lbl_selected_icon);
+		lv_obj_delete(lbl_ins);
+		for (int i = 0; i < 17; ++i) {
+			lv_obj_delete(time_labels[i]);
+		}
 		
 		// Send the data to lora_task
 		lora_cmd_t lora_cmd = {}; // Zero out
@@ -1989,28 +1997,20 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		// Confirmation text
 		lv_obj_t *lbl_send_conf = lv_label_create(ACTIVE_SCR); // Create and format label
 		lcd_format_label(lbl_send_conf, "Sending to PolyPlug...", user_secondary_color,
-				 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+				&lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
 		lv_timer_handler();
 		xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY); // Send the command
 		
-		// Reset objects
-		lv_obj_delete(lbl_subpage_times);
-		lv_obj_delete(lbl_selected_icon);
-		lv_obj_delete(lbl_ins);
-		for (int i = 0; i < 17; ++i) {
-			lv_obj_delete(time_labels[i]);
-		}
-
+		vTaskDelay(pdMS_TO_TICKS(1000)); // Wait 1000ms
+		lv_obj_del(lbl_send_conf); // Delete label
+		lcd_clear_pending_inputs = true;
+		
 		// Reset statics
 		lbl_subpage_times = lbl_selected_icon = lbl_ins = NULL;
 		selected_digit = 0;
 		strcpy(start_time, "00:00:00");
 		strcpy(end_time, "00:00:00");
 		init = false;
-		
-		vTaskDelay(pdMS_TO_TICKS(1000)); // Wait 1000ms
-		lv_obj_del(lbl_send_conf); // Delete label
-		lcd_clear_pending_inputs = true;
 
 		// Show LoRa submenu cont
 		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
