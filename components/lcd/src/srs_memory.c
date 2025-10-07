@@ -309,6 +309,8 @@ int srs_build_due_list(int *out_idx, int max_out, uint32_t today)
 // Converts Unix seconds to whole days
 uint32_t srs_days_since_epoch_local(int calibrate)
 {
+	tzset(); // Redundant
+
 	time_t now = time(NULL);
 
 	if (now <= 0) {
@@ -320,16 +322,17 @@ uint32_t srs_days_since_epoch_local(int calibrate)
 	lt.tm_hour = 0;
 	lt.tm_min = 0;
 	lt.tm_sec = 0;
+	lt.tm_isdst = -1; // Let mktime() decide DST
 
 	time_t local_midnight_epoch = mktime(&lt);
 
 	#ifdef POLYCAST5_DEBUG
-	ESP_LOGI(TAG, "srs_days_since_epoch now = %" PRId64 "s", (int64_t)local_midnight_epoch); // Seconds
-	ESP_LOGI(TAG, "srs_days_since_epoch now = %" PRIu32 "d", (uint32_t)(local_midnight_epoch / 86400)); // Days
+	ESP_LOGI(TAG, "0-based srs_days_since_epoch now = %" PRId64 "s", (int64_t)local_midnight_epoch); // Seconds
+	ESP_LOGI(TAG, "0-based srs_days_since_epoch now = %" PRIu32 "d", (uint32_t)(local_midnight_epoch / 86400)); // Days
 	#endif
 
 	// Round down by 86400 -> today index
-	return (uint32_t)((local_midnight_epoch / 86400) + calibrate);
+	return (uint32_t)((local_midnight_epoch / 86400) + calibrate); // 0-based
 }
 
 void srs_nvs_load(void)

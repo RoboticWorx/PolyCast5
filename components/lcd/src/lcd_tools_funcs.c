@@ -1039,8 +1039,8 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
 	//#define SRS_CALIBRATING 1
 	
 	#ifdef SRS_CALIBRATING // To easily add days to retrieve notebook entries
-	static int calibrate = -21; // Initial offset (days since start date - 1)
-	// Add first then go to next and start clear cycle
+	static int calibrate = -24; // Initial offset (days since start date)
+	// Add first then go to next and start clear cycle - make sure to disconnect from port and restart the device first for fresh Wi-Fi fetch
 	#else
 	static int calibrate = 0; // No offset - present day
 	#endif

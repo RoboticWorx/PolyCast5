@@ -584,7 +584,8 @@ void wifi_funcs_get_current_date_time(void)
 	// Get local time zone over http
 	if (wifi_funcs_apply_timezone_auto() != ESP_OK) {
 		// Fallback
-		setenv("TZ", "UTC0", 1);
+		//setenv("TZ", "UTC0", 1); // UTC
+		setenv("TZ", "EST5EDT,M3.2.0/2,M11.1.0/2", 1); // Fallback to EST
 		tzset();
 		
 		ESP_LOGE(TAG, "wifi_funcs_apply_timezone_auto FAILED: Falling back to UTC0");
