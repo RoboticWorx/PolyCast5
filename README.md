@@ -63,4 +63,4 @@ All donations will be spent on adding new features and making PolyCast5 even coo
 
 | Service | Remark | QR Code | Link / Wallet |
 |:--|:--|:--:|:--|
-| **BTC** | Bitcoin | <img src="bc1q464mpgpc9sn2lz53mge75mqjrk96p0few53j38" width="18" /> | bc1q464mpgpc9sn2lz53mge75mqjrk96p0few53j38 |
+| **BTC** | Bitcoin | <img src="https://github.com/user-attachments/assets/3f555e1b-4370-4bd9-ad64-b2fbbf3d0540" width="18" /> | bc1q464mpgpc9sn2lz53mge75mqjrk96p0few53j38 |
