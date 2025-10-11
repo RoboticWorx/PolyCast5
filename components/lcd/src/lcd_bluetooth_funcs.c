@@ -1099,7 +1099,7 @@ void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
 
 		// Set custom text based on hotkey index
 		const char *instr_text = "How to quickly add a new Bluetooth autotype text script:\n\nFirst, grab your phone or other device and navigate to Wi-Fi settings."
-				"\n\nThere, you should see a joinable Wi-Fi network named '" PORTAL_SSID "'. Click on it and enter the password '%s'."
+				"\n\nThere, you should see a joinable Wi-Fi network named '" BT_PORTAL_SSID "'. Click on it and enter the password '%s'."
 				"\n\nIf you don't see it, please wait a minute or try refreshing."
 				"\n\nOnce connected, open up your internet browser of choice and search:\n\n%s\n\nFrom there, follow the on-screen instructions. "
 				"DO NOT exit this page until you're done entering what you want into the web portal.";

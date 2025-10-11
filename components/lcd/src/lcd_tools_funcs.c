@@ -21,6 +21,8 @@
 #include "misc/lv_timer.h"
 #include "widgets/label/lv_label.h"
 
+#include "btc_web_portal.h"
+#include "qrcodegen.h" // QR encoder
 #include "lcd_asset_macros.h"
 #include "lcd_utils.h"
 
@@ -35,8 +37,8 @@
 #define HIGH_SCORE_KEY "score"
 
 tools_menu_t tools_menu = {
-	.options = {"Coin flipper", "Dice roller", "Tetris", "Number generator", "Read the docs", "SRS Planner"},
-	.size = 6,
+	.options = {"Coin flipper", "Dice roller", "Tetris", "Number generator", "Read the docs", "BTC address", "SRS Planner"},
+	.size = 7,
 	.index = 0,
 	.cont = NULL,
 };
@@ -1229,6 +1231,443 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
 		sel = 0;
 
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);
+	}
+}
+
+/* =============== BTC Public Address Page =============== */
+
+// Draw text as QR into an LVGL canvas (RGB565) -> returns 0 on success
+static int btc_draw_qr(lv_obj_t *canvas, const char *text, int size_px, uint8_t **pbuf)
+{
+	// Validate args
+	if (!canvas || !text || !*text || size_px <= 0 || !pbuf) {
+		return -1;
+	}
+
+	// Allocate work buffers (heap, prefer PSRAM)
+	uint8_t *tmp = (uint8_t*)heap_caps_malloc(qrcodegen_BUFFER_LEN_MAX, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
+	if (!tmp) {
+		tmp = (uint8_t*)malloc(qrcodegen_BUFFER_LEN_MAX);
+	}
+	
+	uint8_t *qr = (uint8_t*)heap_caps_malloc(qrcodegen_BUFFER_LEN_MAX, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
+	if (!qr) {
+		qr = (uint8_t*)malloc(qrcodegen_BUFFER_LEN_MAX);
+	}
+	
+	if (!tmp || !qr) {
+		free(tmp);
+		free(qr);
+		return -2;
+	}
+
+	// Encode QR
+	bool ok = qrcodegen_encodeText(text, tmp, qr, qrcodegen_Ecc_MEDIUM, qrcodegen_VERSION_MIN,
+			qrcodegen_VERSION_MAX, qrcodegen_Mask_AUTO, true);
+			
+	// Free tmp buffer after encode
+	free(tmp);
+	if (!ok) {
+		free(qr);
+		return -3;
+	}
+
+	// Recreate canvas buffer every call (simple & safe)
+	size_t bytes = (size_t)size_px * (size_px) * 2; // RGB565
+	if (*pbuf) {
+		// Free old buffer
+		free(*pbuf);
+		*pbuf = NULL;
+	}
+	
+	*pbuf = (uint8_t*)heap_caps_malloc(bytes, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
+	
+	if (!*pbuf) {
+		*pbuf = (uint8_t*)malloc(bytes);
+	}
+	
+	if (!*pbuf) {
+		free(qr);
+		return -4;
+	}
+
+	// Bind buffer to canvas
+	lv_canvas_set_buffer(canvas, *pbuf, size_px, size_px, LV_COLOR_FORMAT_RGB565);
+
+	// Paint white background (0xFFFF)
+	memset(*pbuf, 0xFF, bytes);
+
+	// Compute scale (QR modules -> pixels)
+	int qr_sz = qrcodegen_getSize(qr);
+	int border = 2;
+	int mods = qr_sz + border * 2;
+	float scale = (float)size_px / (float)mods;
+
+	// Draw black modules
+	for (int my = 0; my < mods; ++my) {
+		for (int mx = 0; mx < mods; ++mx) {
+			// Get module
+			bool dark = false;
+			
+			int qx = mx - border, qy = my - border;
+			
+			if (qx >= 0 && qx < qr_sz && qy >= 0 && qy < qr_sz) {
+				dark = qrcodegen_getModule(qr, qx, qy);
+			}
+			
+			if (!dark) {
+				continue;
+			}
+
+			// Module -> pixel box
+			int x0 = (int)(mx * scale);
+			int y0 = (int)(my * scale);
+			
+			int x1 = (int)((mx + 1) * scale);
+			if (x1 <= x0) {
+				x1 = x0 + 1;
+			}
+			
+			int y1 = (int)((my + 1) * scale);
+			if (y1 <= y0) {
+				y1 = y0 + 1;
+			}
+
+			// Fill box black (0x0000)
+			for (int y = y0; y < y1 && y < size_px; ++y) {
+				uint16_t *row = (uint16_t*)(*pbuf + (size_t)y * (size_px * 2));
+				for (int x = x0; x < x1 && x < size_px; ++x) {
+					row[x] = 0x0000;
+				}
+			}
+		}
+	}
+
+	// Free QR map
+	free(qr);
+	return 0;
+}
+// Shorten address for on-screen preview ("bc1qxxxx…yyyy")
+static void btc_shorten_addr_preview(const char *addr, char *out, size_t out_sz)
+{
+	// Handle empty pointer or buffer
+	if (!out || out_sz == 0) {
+		return;
+	}
+
+	// Empty string -> write "" and return
+	if (!addr || !*addr) {
+		out[0] = '\0';
+		return;
+	}
+
+	// Shorten if long, else copy as-is
+	size_t L = strlen(addr);
+	if (L > 16) {
+		snprintf(out, out_sz, "%.*s…%.*s", 8, addr, 8, addr + (int)L - 8);
+	}
+	else {
+		snprintf(out, out_sz, "%s", addr);
+	}
+}
+
+// Redraw address label + 80x80 QR on the canvas
+static void btc_redraw_qr(lv_obj_t *canvas, uint8_t **pbuf)
+{
+	char addr[128] = "";
+
+	// Get stored address
+	esp_err_t err = btc_addr_get_nvs(addr, sizeof(addr));
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "btc_redraw_qr btc_addr_get failed: %s", esp_err_to_name(err));
+	}
+
+	// Update preview label
+	char preview[64];
+	btc_shorten_addr_preview(addr, preview, sizeof(preview));
+
+	// Draw address-only QR at 80x80
+	btc_draw_qr(canvas, addr, 90, pbuf);
+}
+
+void lcd_tools_btc_addr_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
+{
+	#define BTC_ADDR_Y_OFFSET 40
+	
+	// Statics
+	static bool init = false;
+	static uint8_t *qr_buf = NULL; // Canvas backing buffer
+	
+	static lv_obj_t *cont = NULL;
+	static lv_obj_t *instr_lbl = NULL;
+	static lv_obj_t *canvas	= NULL;
+	
+	if (!init) {		
+		// Create a scrollable container for the instructions
+		cont = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(cont, 210, 106);
+		lv_obj_center(cont);
+		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
+		
+		// Get stored address
+		char btc_addr[128] = ""; // Public address buffer
+		esp_err_t err = btc_addr_get_nvs(btc_addr, sizeof(btc_addr));
+		
+		// If previous address exists
+		if (err == ESP_OK) {
+			// Create QR canvas
+			canvas = lv_canvas_create(cont);
+			lv_obj_set_size(canvas, 90, 90); // Fixed size: also change in btc_redraw_qr
+			lv_obj_align(canvas, LV_ALIGN_CENTER, 0, 0);
+			// Initial QR draw
+			btc_redraw_qr(canvas, &qr_buf);
+	
+			// Instructions label (scrollable if text is long)
+			instr_lbl = lv_label_create(cont);
+			lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+			lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
+			lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
+			lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+			lv_obj_align_to(instr_lbl, canvas, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+	
+			// Set custom text based on hotkey index
+			const char *instr_text =
+									"Current address:\n%s\n\n"
+									"This option will allow you to display your public Bitcoin address as a QR code so others can send you "
+									"on-chain payments directly.\n\n"
+									"Don't worry, the only thing you ever need to show PolyCast5 is your public address which can't be used "
+									"to sign transactions. Think of it like a house address to receive mail.\n\n"
+									"To get started, click the right arrow button."
+									;
+	
+			lv_label_set_text_fmt(instr_lbl, instr_text, btc_addr);
+		}
+		else {
+			#ifdef POLYCAST5_DEBUG
+			ESP_LOGE(TAG, "btc_addr_get failed: %s", esp_err_to_name(err));
+			#endif
+	
+			// Instructions label (scrollable if text is long)
+			instr_lbl = lv_label_create(cont);
+			lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+			lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
+			lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
+			lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+			lv_obj_align(instr_lbl, LV_ALIGN_TOP_MID, 0, -2);
+	
+			// Set custom text based on hotkey index
+			const char *instr_text =
+									"This option will allow you to display your public Bitcoin address as a QR code so others can send you "
+									"on-chain payments directly.\n\n"
+									"Don't worry, the only thing you ever need to show PolyCast5 is your public address which can't be used "
+									"to sign transactions. Think of it like a house address to receive mail.\n\n"
+									"To get started, click the right arrow button."
+									;
+	
+			lv_label_set_text(instr_lbl, instr_text);
+		}
+		
+		lv_timer_handler();
+
+		init = true;
+	}
+	
+	// Scroll up
+	if (ui_btns->up_btn == 1) {
+		lv_obj_scroll_by_bounded(cont, 0, BTC_ADDR_Y_OFFSET, LV_ANIM_ON);
+	}
+	// Scroll down
+	else if (ui_btns->down_btn == 1) {
+		lv_obj_scroll_by_bounded(cont, 0, -BTC_ADDR_Y_OFFSET, LV_ANIM_ON);
+	}
+	// Go to setup
+	else if (ui_btns->right_btn == 1) {
+		// Free canvas buffer
+		if (qr_buf) {
+			free(qr_buf);
+			qr_buf = NULL;
+		}
+		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+		// Delete objects
+		lv_obj_del(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		instr_lbl = canvas = NULL;
+		init = false;
+		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch back
+		ui_menu->page = TOOLS_BTC_ADDR_SETUP_PAGE;
+	}
+	// Go back
+	else if (ui_btns->left_btn) {
+		// Free canvas buffer
+		if (qr_buf) {
+			free(qr_buf);
+			qr_buf = NULL;
+		}
+		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+		// Delete objects
+		lv_obj_del(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		instr_lbl = canvas = NULL;
+		init = false;
+		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show tools menu
+		lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch back
+		ui_menu->page = TOOLS_PAGE;
+	}
+	// Home or power off
+	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
+		// Free canvas buffer
+		if (qr_buf) {
+			free(qr_buf);
+			qr_buf = NULL;
+		}
+		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+		// Delete objects
+		lv_obj_del(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		instr_lbl = canvas = NULL;
+		init = false;
+		
+ 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+	}
+}
+
+void lcd_tools_btc_addr_setup_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
+{
+	#define BTC_ADDR_SETUP_Y_OFFSET 40
+	
+	// Statics
+	static bool init = false;
+	
+	static lv_obj_t *cont = NULL;
+	static lv_obj_t *title_lbl = NULL;
+	static lv_obj_t *instr_lbl = NULL;
+	
+	if (!init) {
+		// Create a scrollable container for the instructions
+		cont = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(cont, 210, 106);
+		lv_obj_center(cont);
+		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
+
+		// Title label
+		title_lbl = lv_label_create(cont);
+		lv_label_set_text(title_lbl, "How It Works:");
+		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+		// Instructions label (scrollable if text is long)
+		instr_lbl = lv_label_create(cont);
+		lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+		lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
+		lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
+		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+
+		// Set custom text based on hotkey index
+		const char *instr_text = 
+				"How to add your public Bitcoin address:\n\nFirst, grab your phone or other device and navigate to Wi-Fi settings."
+				"\n\nThere, you should see a joinable Wi-Fi network named '%s'. Click on it and enter the password '%s'."
+				"\n\nIf you don't see it, please wait a minute or try refreshing."
+				"\n\nOnce connected, open up your internet browser of choice and search:\n\n%s\n\nFrom there, follow the on-screen instructions. "
+				"DO NOT exit this page until you're done entering what you want into the web portal.";
+		
+		lv_label_set_text_fmt(instr_lbl, instr_text, btc_portal_get_ssid(), btc_portal_get_pass(), btc_portal_get_ip());
+
+		lv_timer_handler();
+		
+		// Start portal
+		esp_err_t err = btc_portal_start();
+			
+		if (err != ESP_OK) {
+			ESP_LOGE(TAG, "btc_portal_start failed: %s", esp_err_to_name(err));
+		}
+
+		init = true;
+	}
+	
+	// Scroll up
+	if (ui_btns->up_btn == 1) {
+		lv_obj_scroll_by_bounded(cont, 0, BTC_ADDR_SETUP_Y_OFFSET, LV_ANIM_ON);
+	}
+	// Scroll down
+	else if (ui_btns->down_btn == 1) {
+		lv_obj_scroll_by_bounded(cont, 0, -BTC_ADDR_SETUP_Y_OFFSET, LV_ANIM_ON);
+	}
+	// Go back
+	else if (ui_btns->left_btn) {
+		// Delete objects
+		lv_obj_del(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+		
+		// Stop portal
+		btc_portal_stop();
+		
+		// Show tools menu
+		lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch back
+		ui_menu->page = TOOLS_PAGE;
+	}
+	// Home or power off
+	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
+		// Delete objects
+		lv_obj_del(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+		
+		// Stop portal
+		btc_portal_stop();
+		
+ 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 

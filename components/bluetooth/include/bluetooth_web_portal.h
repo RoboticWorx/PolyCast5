@@ -7,7 +7,7 @@
 #define NUM_KEYBOARD_BASE 2
 #define BT_SCRIPT_LABEL_MAX_LEN 32
 
-#define PORTAL_SSID "PolyCast5-BT-Portal"
+#define BT_PORTAL_SSID "PolyCast5-BT-Portal"
 
 /** 
  * @brief Starts SoftAP and HTTP server for web bluetooth script entry portal

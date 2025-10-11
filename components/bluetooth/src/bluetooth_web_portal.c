@@ -31,8 +31,8 @@
 
 extern char bt_wifi_portal_pass[];
 
-static httpd_handle_t s_server = NULL;
-static esp_netif_t *s_ap_netif = NULL;
+static httpd_handle_t bt_server = NULL;
+static esp_netif_t *bt_ap_netif = NULL;
 static char s_ip[16] = "192.168.4.1";
 
 // Web page HTML (UI: pick index, name, and payload)
@@ -777,7 +777,7 @@ static httpd_handle_t start_http(void)
 esp_err_t bluetooth_web_portal_start(void)
 {
  	// If already running, do nothing
- 	if (s_server != NULL) {
+ 	if (bt_server != NULL) {
  	 	#ifdef POLYCAST5_DEBUG
  	 	ESP_LOGW(TAG, "Portal already running at http://%s", s_ip);
  	 	#endif
@@ -786,9 +786,9 @@ esp_err_t bluetooth_web_portal_start(void)
  	}
 
  	// Create default AP netif if needed
- 	if (s_ap_netif == NULL) {
- 	 	s_ap_netif = esp_netif_create_default_wifi_ap();
- 	 	if (s_ap_netif == NULL) {
+ 	if (bt_ap_netif == NULL) {
+ 	 	bt_ap_netif = esp_netif_create_default_wifi_ap();
+ 	 	if (bt_ap_netif == NULL) {
  	 	 	return ESP_FAIL;
  	 	}
  	}
@@ -809,8 +809,8 @@ esp_err_t bluetooth_web_portal_start(void)
 
  	// Configure SoftAP using project macros for SSID/PASS
  	wifi_config_t ap = {0};
- 	strcpy((char *)ap.ap.ssid, PORTAL_SSID);
- 	ap.ap.ssid_len = strlen(PORTAL_SSID);
+ 	strcpy((char *)ap.ap.ssid, BT_PORTAL_SSID);
+ 	ap.ap.ssid_len = strlen(BT_PORTAL_SSID);
  	strcpy((char *)ap.ap.password, bt_wifi_portal_pass);
  	ap.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
  	ap.ap.max_connection = 4;
@@ -827,13 +827,13 @@ esp_err_t bluetooth_web_portal_start(void)
 
  	// Cache AP IP (usually 192.168.4.1)
  	esp_netif_ip_info_t ip;
- 	if (esp_netif_get_ip_info(s_ap_netif, &ip) == ESP_OK) {
+ 	if (esp_netif_get_ip_info(bt_ap_netif, &ip) == ESP_OK) {
  	 	snprintf(s_ip, sizeof(s_ip), IPSTR, IP2STR(&ip.ip));
  	}
 
  	// Bring up HTTP server and register endpoints.
- 	s_server = start_http();
- 	if (s_server == NULL) {
+ 	bt_server = start_http();
+ 	if (bt_server == NULL) {
  	 	#ifdef POLYCAST5_DEBUG
  	 	ESP_LOGE(TAG, "start_http failed");
  	 	#endif
@@ -842,7 +842,7 @@ esp_err_t bluetooth_web_portal_start(void)
  	}
 
  	#ifdef POLYCAST5_DEBUG
- 	ESP_LOGI(TAG, "Portal running at http://%s (SSID: " PORTAL_SSID ")", s_ip);
+ 	ESP_LOGI(TAG, "Portal running at http://%s (SSID: " BT_PORTAL_SSID ")", s_ip);
  	#endif
  	
  	return ESP_OK;
@@ -851,13 +851,20 @@ esp_err_t bluetooth_web_portal_start(void)
 // Stop the web server and SoftAP
 void bluetooth_web_portal_stop(void)
 {
- 	if (s_server != NULL) {
- 	 	httpd_stop(s_server);
- 	 	s_server = NULL;
+ 	if (bt_server != NULL) {
+ 	 	httpd_stop(bt_server);
+ 	 	bt_server = NULL;
  	}
  	
- 	// Leave the netif allocated for now
  	(void)esp_wifi_stop();
+
+	// Fully detach Wi-Fi from any interface
+	(void)esp_wifi_set_mode(WIFI_MODE_NULL);
+	
+	if (bt_ap_netif) {
+		esp_netif_destroy_default_wifi(bt_ap_netif); // Destroys handlers and netif
+		bt_ap_netif = NULL;
+	}
 
 	// Everything else needs station mode
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));

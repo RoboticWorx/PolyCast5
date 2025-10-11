@@ -71,7 +71,7 @@ static void lcd_task(void *pvParameters)
 	
 	uint8_t battery_percentage;
 
-	//lcd_ns_nvs_clear("srs");
+	//lcd_ns_nvs_clear("btc_recv");
 	//lcd_ns_nvs_clear("first_boot");
 	//lcd_ns_nvs_clear(ESPNOW_LMK_NS);
 	
@@ -387,6 +387,12 @@ static void lcd_task(void *pvParameters)
 			}
 			else if (ui_menu.page == TOOLS_HOW_SRS_PAGE) {
 				lcd_tools_how_srs_page(&ui_btns, &ui_menu, &tools_menu);
+			}
+			else if (ui_menu.page == TOOLS_BTC_ADDR_PAGE) {
+				lcd_tools_btc_addr_page(&ui_btns, &ui_menu, &tools_menu);
+			}
+			else if (ui_menu.page == TOOLS_BTC_ADDR_SETUP_PAGE) {
+				lcd_tools_btc_addr_setup_page(&ui_btns, &ui_menu, &tools_menu);
 			}
 			else if (ui_menu.page == TOOLS_SRS_PAGE) {
 				lcd_tools_srs_page(&ui_btns, &ui_menu, &tools_menu);

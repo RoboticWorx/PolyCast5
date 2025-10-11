@@ -11,13 +11,17 @@
 #include "esp_mac.h"
 #include "esp_log.h"
 #include "esp_wifi.h"
+#include "esp_random.h"
 
 #include "wifi_funcs.h"
 #include "wifi_task.h"
 #include "ota_update.h"
 #include "esp_app_desc.h"
+#include "btc_web_portal.h"
 
 #define TAG "WIFI_TASK"
+
+char btc_wifi_portal_pass[64];
 
 static wifi_scan_t wifi_scan[WIFI_MAX_NETWORKS];
 static wifi_login_t selected_network;
@@ -93,6 +97,37 @@ static void wifi_task(void *param)
 	// Initialize MQTT client
 	wifi_funcs_wifi_event_init();
 	wifi_funcs_mqtt_client_init();
+
+	// If Wi-Fi BTC portal password NVS doesn't exist yet, set it
+	if (btc_wifi_pass_load_nvs(btc_wifi_portal_pass, sizeof(btc_wifi_portal_pass)) != ESP_OK) {
+		// Random chars to pick from
+		static const char alphabet[] =
+				"ABCDEFGHJKLMNPQRSTUVWXYZ"
+				"abcdefghijkmnopqrstuvwxyz"
+				"0123456789";
+		
+		const size_t N = sizeof(alphabet) - 1;
+		const size_t PASS_LEN = 12;
+	
+		// Create random password
+		for (size_t i = 0; i < PASS_LEN; ++i) {
+			uint32_t r = esp_random();
+			btc_wifi_portal_pass[i] = alphabet[r % N];
+		}
+		btc_wifi_portal_pass[PASS_LEN] = '\0';
+		
+		// Save that version to NVS
+		btc_wifi_pass_save_nvs(btc_wifi_portal_pass);
+		
+		#ifdef POLYCAST5_PASS_DEBUG
+		ESP_LOGW(TAG, "Setting first time BT Wi-Fi portal password: %s", bt_wifi_portal_pass);
+		#endif
+	}
+	else {
+		#ifdef POLYCAST5_PASS_DEBUG
+		ESP_LOGI(TAG, "Using pre-set BT Wi-Fi portal password: '%s'", bt_wifi_portal_pass);
+		#endif
+	}
 
 	// Let everything else initialize
 	vTaskDelay(pdMS_TO_TICKS(2000));
