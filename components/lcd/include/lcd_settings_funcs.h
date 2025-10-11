@@ -146,7 +146,7 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
 
 /**
- * @brief Shows some system information such as heap, temperature, etc.
+ * @brief Show system information such as heap, FW version, etc.
  *
  * @param [in] ui_btns User input structure
  * @param [in] ui_menu UI menu structure

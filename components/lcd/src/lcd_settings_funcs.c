@@ -10,6 +10,7 @@
 #include "esp_log.h"
 #include "esp_err.h"
 
+// System info
 #include <inttypes.h>
 #include "esp_chip_info.h"
 #include "esp_mac.h"
@@ -1534,6 +1535,28 @@ static void system_build_info(char *buf, size_t n)
 	snprintf(chip_line, sizeof(chip_line), "Chip: %s\n%u core(s), rev %u.%u.%u",
 			system_chip_model_to_str(ci.model), (unsigned)ci.cores, rev_major, rev_minor, rev_sub);
 
+	// NVS stats
+	nvs_stats_t st = {0};
+	const esp_partition_t *nvs_part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS, NULL);
+	char nvs_line[96] = "NVS: (not found)\n\n";
+	if (nvs_part) {
+		err = nvs_get_stats(nvs_part->label, &st);
+		if (err == ESP_OK) {
+			size_t used_est_bytes = st.used_entries * 32;
+		    size_t free_est_bytes = st.free_entries * 32;
+	
+			// Show physical NVS partition size (KB) + logical entries used/free
+			snprintf(nvs_line, sizeof(nvs_line), "NVS (user data):\n%u KB partition\n%.1f of %.1f KB used\n\n",
+					(unsigned)(nvs_part->size / 1000U), (double)used_est_bytes / 1000.0, (double)((free_est_bytes + used_est_bytes) / 1000.0));
+		}
+		else {
+			ESP_LOGE(TAG, "nvs_get_stats failed: %s", esp_err_to_name(err));
+		}
+	}
+	else {
+		ESP_LOGE(TAG, "esp_partition_find_first failed");
+	}
+
 	// Compose buffer text
 	snprintf(buf, n,
 		"Uptime: %02u:%02u:%02u\n\n"
@@ -1542,6 +1565,8 @@ static void system_build_info(char *buf, size_t n)
 		"ESP-IDF: %s\n\n"
 
 		"%s\n\n" // Chip info
+
+		"%s" // NVS info
 		
 		"Heap free: %.1f KB\n"
 		"(Min reached: %.1f KB)\n\n"
@@ -1567,6 +1592,8 @@ static void system_build_info(char *buf, size_t n)
 		idf,
 
 		chip_line,
+
+		nvs_line,
 		
 		(float)(heap_free_total / 1000.0f),
 		(float)(heap_min_free_total / 1000.0f),
