@@ -146,6 +146,15 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
 
 /**
+ * @brief Shows some system information such as heap, temperature, etc.
+ *
+ * @param [in] ui_btns User input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] settings_menu Settings menu structure
+ */
+void lcd_settings_system_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
+
+/**
  * @brief Shows some basic help info like how to reset the device
  *
  * @param [in] ui_btns User input structure
@@ -154,7 +163,7 @@ void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
  */
 void lcd_settings_help_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
 
-/* NVS functions */
+/* =============== NVS Functions =============== */
 
 /**
  * @brief Saves the current primary and secondary colors to NVS

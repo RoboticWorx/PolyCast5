@@ -1,3 +1,4 @@
+#include "ota_update.h"
 #include "polycast5_macros.h"
 
 #include "freertos/FreeRTOS.h"
@@ -8,6 +9,14 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "esp_err.h"
+
+#include <inttypes.h>
+#include "esp_chip_info.h"
+#include "esp_mac.h"
+#include "esp_timer.h"
+#include "esp_heap_caps.h"
+#include "esp_system.h"
+#include "esp_idf_version.h"
 
 #include "core/lv_obj_scroll.h"
 #include "font/lv_symbol_def.h"
@@ -61,8 +70,9 @@
 #define SLEEP_TIMER_MAX_S 120 // 2 min
 
 settings_menu_t settings_menu = {
-	.options = {SETTINGS_SET_LOCK_TXT, "Change colors", "Adjust haptics", "Adjust sleep timer", "Adjust RBG LED", "LCD brightness", "Tips and Tricks", "Reboot", "Factory reset"},
-	.size = 9,
+	.options = {SETTINGS_SET_LOCK_TXT, "Change colors", "Adjust haptics", "Adjust sleep timer",
+			"Adjust RBG LED", "LCD brightness", "Tips and Tricks", "System info", "Reboot", "Factory reset"},
+	.size = 10,
 	.index = 0,
 	.cont = NULL,
 	.pin_menu.pin_set = false,
@@ -1431,6 +1441,256 @@ void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 		slider_every = slider_for = NULL;
 		init = false;
 		
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+	}
+}
+
+static const char *system_chip_model_to_str(esp_chip_model_t m)
+{
+	#define SYSTEM_MODEL_WARNING "\nWARNING: You may have a knock-off! This should be ESP32-C5."
+	
+	switch (m) {
+		case CHIP_ESP32:
+			return "ESP32" SYSTEM_MODEL_WARNING;
+		case CHIP_ESP32S2:
+			return "ESP32-S2" SYSTEM_MODEL_WARNING;
+		case CHIP_ESP32S3:
+			return "ESP32-S3" SYSTEM_MODEL_WARNING;
+		case CHIP_ESP32C3:
+			return "ESP32-C3" SYSTEM_MODEL_WARNING;
+		case CHIP_ESP32C2:
+			return "ESP32-C2" SYSTEM_MODEL_WARNING;
+		case CHIP_ESP32C6:
+			return "ESP32-C6" SYSTEM_MODEL_WARNING;
+		case CHIP_ESP32H2:
+			return "ESP32-H2" SYSTEM_MODEL_WARNING;
+		case CHIP_ESP32C5:
+			return "ESP32-C5";
+		default:
+			return "Unknown" SYSTEM_MODEL_WARNING;
+	}
+}
+
+static void system_fmt_mac(char *out, size_t n, const uint8_t mac[6])
+{
+	snprintf(out, n, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
+
+static void system_build_info(char *buf, size_t n)
+{
+	// Heap totals
+	size_t heap_free_total = esp_get_free_heap_size(); // Total free bytes malloc-able now
+	size_t heap_min_free_total = esp_get_minimum_free_heap_size(); // Lowest value heap_free_total has ever reached since boot (watermark)
+	
+	size_t heap_free_int = heap_caps_get_free_size(MALLOC_CAP_INTERNAL); // Internal (on-chip) RAM only
+	size_t heap_largest_int	= heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL); // Size of the largest single contiguous free block in internal RAM
+
+	size_t heap_free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM); // External PSRAM only
+	size_t heap_largest_psram = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM); // Largest contiguous PSRAM block
+
+	// Uptime
+	uint64_t us = esp_timer_get_time();
+	uint32_t total_s = (uint32_t)(us / 1000000ULL);
+	unsigned h = (unsigned)(total_s / 3600U);
+	
+	total_s %= 3600U;
+	unsigned m = (unsigned)(total_s / 60U);
+	unsigned s = (unsigned)(total_s % 60U);
+
+	// Chip / IDF
+	esp_chip_info_t ci;
+	esp_chip_info(&ci);
+
+	// MACs
+	uint8_t mac_sta[6] = {0}, mac_ap[6] = {0}, mac_bt[6] = {0};
+	(void)esp_read_mac(mac_sta, ESP_MAC_WIFI_STA);
+	(void)esp_read_mac(mac_ap,  ESP_MAC_WIFI_SOFTAP);
+	(void)esp_read_mac(mac_bt,  ESP_MAC_BT);
+
+	char mac_sta_str[18], mac_ap_str[18], mac_bt_str[18];
+	system_fmt_mac(mac_sta_str, sizeof(mac_sta_str), mac_sta);
+	system_fmt_mac(mac_ap_str,  sizeof(mac_ap_str),  mac_ap);
+	system_fmt_mac(mac_bt_str,  sizeof(mac_bt_str),  mac_bt);
+
+	// Stack watermark (this task)
+	UBaseType_t watermark = uxTaskGetStackHighWaterMark(NULL); // Minimum free stack your task has had since it started
+
+	const char *idf = esp_get_idf_version();
+	
+	// Get this firmware version
+	char pc5_fw_version[64];
+	esp_err_t err = ota_update_get_nvs_version(pc5_fw_version, sizeof(pc5_fw_version));
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "ota_update_get_nvs_version failed: %s", esp_err_to_name(err));
+	}
+
+	// Format chip revision and cores
+	unsigned rev = (unsigned)ci.revision;
+	unsigned rev_major = rev / 100; // X
+	unsigned rev_minor = (rev / 10) % 10; // Y
+	unsigned rev_sub = rev % 10; // Z
+	
+	char chip_line[96];
+	snprintf(chip_line, sizeof(chip_line), "Chip: %s\n%u core(s), rev %u.%u.%u",
+			system_chip_model_to_str(ci.model), (unsigned)ci.cores, rev_major, rev_minor, rev_sub);
+
+	// Compose buffer text
+	snprintf(buf, n,
+		"Uptime: %02u:%02u:%02u\n\n"
+
+		"Firmware: v%s\n"
+		"ESP-IDF: %s\n\n"
+
+		"%s\n\n" // Chip info
+		
+		"Heap free: %.1f KB\n"
+		"(Min reached: %.1f KB)\n\n"
+		
+		"SRAM free: %.1f KB\n"
+		"(Max block: %.1f KB)\n\n"
+		
+		"PSRAM free: %.1f KB\n"
+		"(Max block: %.1f KB)\n\n"
+		
+		"Stack high-water mark:\n"
+		"%u words\n\n"
+		
+		"WiFi:\n"
+		"STA: %s\n"
+		"AP: %s\n\n"
+		"BT:\n"
+		"MAC: %s",
+		
+		h, m, s,
+
+		pc5_fw_version,
+		idf,
+
+		chip_line,
+		
+		(float)(heap_free_total / 1000.0f),
+		(float)(heap_min_free_total / 1000.0f),
+		
+		(float)(heap_free_int / 1000.0f),
+		(float)(heap_largest_int / 1000.0f),
+		
+		(float)(heap_free_psram / 1000.0f),
+		(float)(heap_largest_psram / 1000.0f),
+		
+		(unsigned)watermark,
+		
+		mac_sta_str,
+		mac_ap_str,
+		mac_bt_str
+	);
+}
+
+static void system_refresh_cb(lv_timer_t *t)
+{
+	lv_obj_t *label = (lv_obj_t *)lv_timer_get_user_data(t);
+	
+	static char text[512];
+	system_build_info(text, sizeof(text));
+	
+	lv_label_set_text(label, text);
+	lv_timer_handler();
+}
+
+void lcd_settings_system_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
+{
+	#define SYSTEM_Y_OFFSET 40
+
+	static bool init = false;
+	static lv_obj_t *cont = NULL;
+	static lv_obj_t *title_lbl = NULL;
+	static lv_obj_t *instr_lbl = NULL;
+	static lv_timer_t *refresh_timer = NULL;
+
+	// Init once
+	if (!init) {
+		// Main container
+		cont = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(cont, 210, 106);
+		lv_obj_center(cont);
+		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+		// Title label
+		title_lbl = lv_label_create(cont);
+		lv_label_set_text(title_lbl, "System Info");
+		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+		// System text
+		instr_lbl = lv_label_create(cont);
+		lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+		lv_obj_set_width(instr_lbl, lv_pct(100));
+		lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
+		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+
+		static char boot_text[512]; // instr_lbl buffer
+		system_build_info(boot_text, sizeof(boot_text));
+		lv_label_set_text(instr_lbl, boot_text);
+
+		// Refresh data every second
+		refresh_timer = lv_timer_create(system_refresh_cb, 1000, instr_lbl);
+
+		// Show initial
+		lv_timer_handler();
+		init = true;
+	}
+	
+	// Scroll up
+	if (ui_btns->up_btn == 1) {
+		lv_obj_scroll_by_bounded(cont, 0, SYSTEM_Y_OFFSET, LV_ANIM_ON);
+	}
+	// Scroll down
+	else if (ui_btns->down_btn == 1) {
+		lv_obj_scroll_by_bounded(cont, 0, -SYSTEM_Y_OFFSET, LV_ANIM_ON);
+	}
+	// Back selected
+	else if (ui_btns->left_btn) {
+		// Delete objects
+		if (refresh_timer) {
+			lv_timer_del(refresh_timer);
+			refresh_timer = NULL;
+		}
+		lv_obj_del(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+
+		// Show settings page
+		lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch
+		ui_menu->page = SETTINGS_PAGE;
+	}
+	// Home or power off selected
+	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
+		// Delete objects
+		if (refresh_timer) {
+			lv_timer_del(refresh_timer);
+			refresh_timer = NULL;
+		}
+		lv_obj_del(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
