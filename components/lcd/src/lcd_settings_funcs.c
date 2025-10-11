@@ -1,4 +1,3 @@
-#include "ota_update.h"
 #include "polycast5_macros.h"
 
 #include "freertos/FreeRTOS.h"
@@ -30,6 +29,7 @@
 #include "gpio_task.h"
 #include "lcd_utils.h"
 #include "lcd_settings_funcs.h"
+#include "ota_update.h"
 
 #define TAG "LCD_SETTINGS"
 

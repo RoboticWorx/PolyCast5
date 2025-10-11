@@ -55,3 +55,12 @@ _PolyCast5 also comes with cool, customizable homescreen animations and hotkeys!
 *Unless required by applicable law or agreed to in writing, this
 software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
 CONDITIONS OF ANY KIND, either express or implied.*
+
+## Donations
+If you love the open-source nature of PolyCast5, please consider donating to boost development and fuel a coffee run :)
+
+All donations will be spent on adding new features and making PolyCast5 even cooler!
+
+| Service | Remark | QR Code | Link / Wallet |
+|:--|:--|:--:|:--|
+| **BTC** | Bitcoin | <img src="bc1q464mpgpc9sn2lz53mge75mqjrk96p0few53j38" width="18" /> | bc1q464mpgpc9sn2lz53mge75mqjrk96p0few53j38 |
