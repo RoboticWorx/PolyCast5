@@ -71,7 +71,9 @@ static void lcd_task(void *pvParameters)
 	
 	uint8_t battery_percentage;
 
-	//lcd_ns_nvs_clear("btc_recv");
+	//lcd_ns_nvs_clear("keyb_menu");
+	//lcd_ns_nvs_clear("bt_portal");
+	//lcd_ns_nvs_clear("keyb_sel");
 	//lcd_ns_nvs_clear("first_boot");
 	//lcd_ns_nvs_clear(ESPNOW_LMK_NS);
 	
@@ -452,6 +454,9 @@ static void lcd_task(void *pvParameters)
 			}
 			else if (ui_menu.page == BLUETOOTH_KEYBOARD_PAGE) {
 				lcd_bluetooth_keyboard_page(&ui_btns, &ui_menu, &bluetooth_menu);
+			}
+			else if (ui_menu.page == BLUETOOTH_KEYBOARD_SUB_PAGE) {
+				lcd_bluetooth_keyboard_sub_page(&ui_btns, &ui_menu, &bluetooth_menu);
 			}
 			else if (ui_menu.page == BLUETOOTH_SCRIPT_ADD_PAGE) {
 				lcd_bluetooth_add_script_page(&ui_btns, &ui_menu, &bluetooth_menu);

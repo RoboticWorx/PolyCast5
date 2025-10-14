@@ -18,8 +18,6 @@
 
 QueueHandle_t xBluetoothMediaCmdQueue;
 
-SemaphoreHandle_t xBluetoothScriptMutex;
-
 extern volatile bluetooth_state_t bluetooth_state;
 
 char bt_wifi_portal_pass[64];
@@ -209,22 +207,28 @@ static void bluetooth_task(void *arg)
 					char buf[512];
 					size_t blen = 0;
 
-					// Ask NVS for the stored body. Pass full sizeof(buf) so there's room for the NUL.
-					esp_err_t err = bluetooth_script_body_get(script_idx, buf, sizeof(buf), &blen);
+					// Ask NVS for the stored body - Pass full sizeof(buf) so there's room for the NUL-terminator
+					esp_err_t err = bluetooth_script_body_get_nvs(script_idx, buf, sizeof(buf), &blen);
 					if (err == ESP_OK && blen > 0 && buf[0] != '\0') {
-						// NVS returns a C-string (blen typically includes the NUL). Just send it.
+						// NVS returns a C-string: Just send it
 						#ifdef POLYCAST5_DEBUG
 						ESP_LOGI(TAG, "Sending script: %s", buf);
 						#endif
+
+						// Send the script
 						bluetooth_send_script(buf, 1);
 					}
 					else {
+						#ifdef POLYCAST5_DEBUG
 						ESP_LOGW(TAG, "No script body at idx=%u (err=%s, blen=%u)",
-								 (unsigned)script_idx, esp_err_to_name(err), (unsigned)blen);
+								(unsigned)script_idx, esp_err_to_name(err), (unsigned)blen);
+						#endif
 					}
 				}
 				else {
+					#ifdef POLYCAST5_DEBUG
 					ESP_LOGW(TAG, "Unhandled menu_idx=%u for BLUETOOTH_SCRIPT_OFFSET", (unsigned)menu_idx);
+					#endif
 				}
 			}
 		}

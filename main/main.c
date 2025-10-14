@@ -112,9 +112,6 @@ void app_main(void) {
 	xLEDCMutex = xSemaphoreCreateMutex();
 	configASSERT(xLEDCMutex);
 	
-	xBluetoothScriptMutex = xSemaphoreCreateMutex();
-	configASSERT(xBluetoothScriptMutex);
-	
 	xPowerButtonSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xPowerButtonSemaphore);
 	

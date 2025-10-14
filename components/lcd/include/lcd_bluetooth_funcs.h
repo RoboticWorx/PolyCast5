@@ -22,6 +22,8 @@ typedef struct {
 	lv_style_t btn_style;
 	lv_style_t sel_style;
 	lv_obj_t *cont;
+	char cat_labels[MAX_CATEGORIES][BT_CAT_LABEL_MAX_LEN + 1]; // For dynamic category names
+	uint8_t script_indices[MAX_KEYBOARD_SCRIPTS]; // For mapping submenu positions to script indices
 } bluetooth_keyboard_menu_t;
 
 typedef struct {
@@ -86,6 +88,15 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
  * @param [in] bluetooth_menu Bluetooth menu structure
  */
 void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
+
+/**
+ * @brief Keyboard subpage to show scripts of a specific category
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] bluetooth_menu Bluetooth menu structure
+ */
+void lcd_bluetooth_keyboard_sub_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
 
 /**
  * @brief Scrollable instructions to add a script as well as starts the http web portal
