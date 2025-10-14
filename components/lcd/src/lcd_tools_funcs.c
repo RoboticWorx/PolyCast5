@@ -37,7 +37,7 @@
 #define HIGH_SCORE_KEY "score"
 
 tools_menu_t tools_menu = {
-	.options = {"Coin flipper", "Dice roller", "Tetris", "Number generator", "Read the docs", "BTC address", "SRS Planner"},
+	.options = {"Coin flipper", "Dice roller", "Tetris", "Number generator", "Read the docs", "Bitcoin QR", "SRS Planner"},
 	.size = 7,
 	.index = 0,
 	.cont = NULL,
@@ -1347,29 +1347,6 @@ static int btc_draw_qr(lv_obj_t *canvas, const char *text, int size_px, uint8_t 
 	free(qr);
 	return 0;
 }
-// Shorten address for on-screen preview ("bc1qxxxx…yyyy")
-static void btc_shorten_addr_preview(const char *addr, char *out, size_t out_sz)
-{
-	// Handle empty pointer or buffer
-	if (!out || out_sz == 0) {
-		return;
-	}
-
-	// Empty string -> write "" and return
-	if (!addr || !*addr) {
-		out[0] = '\0';
-		return;
-	}
-
-	// Shorten if long, else copy as-is
-	size_t L = strlen(addr);
-	if (L > 16) {
-		snprintf(out, out_sz, "%.*s…%.*s", 8, addr, 8, addr + (int)L - 8);
-	}
-	else {
-		snprintf(out, out_sz, "%s", addr);
-	}
-}
 
 // Redraw address label + 80x80 QR on the canvas
 static void btc_redraw_qr(lv_obj_t *canvas, uint8_t **pbuf)
@@ -1381,10 +1358,6 @@ static void btc_redraw_qr(lv_obj_t *canvas, uint8_t **pbuf)
 	if (err != ESP_OK) {
 		ESP_LOGE(TAG, "btc_redraw_qr btc_addr_get failed: %s", esp_err_to_name(err));
 	}
-
-	// Update preview label
-	char preview[64];
-	btc_shorten_addr_preview(addr, preview, sizeof(preview));
 
 	// Draw address-only QR at 80x80
 	btc_draw_qr(canvas, addr, 90, pbuf);

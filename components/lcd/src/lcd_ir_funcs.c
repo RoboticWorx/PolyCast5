@@ -94,7 +94,7 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 	}
 
 	// Rename
-	if (ui_btns->right_btn) {
+	if (ui_btns->right_btn && edit_idx != 1 && edit_idx != 2) { // Can't edit "Add New" or "Delete"
 		// Pass index to edit then switch to name page
 		ir_index_overwrite = edit_idx;
 		ir_menu_overwrite = true;
@@ -177,6 +177,9 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 		lv_obj_delete(lbl_select);
 		lbl_title = lbl_name = lbl_back = lbl_edit = lbl_select = NULL;
 		
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
 		// Switch pages
 		ui_menu->page = INFRARED_PAGE;
 	}
@@ -203,6 +206,9 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 		
 		// Remote name
 		if (edit_idx == 0) {
+			lv_label_set_text(lbl_edit, "EDIT"); // Can edit
+			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Show right arrow
+			
 			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 			lv_label_set_text(lbl_name, remotes[ir_current_remote].name);
 			xSemaphoreGive(xInfraredDataMutex); // Release IR
@@ -210,13 +216,20 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 		// New remote
 		else if (edit_idx == 1) {
 			lv_label_set_text(lbl_name, ADD_NEW_LABEL);
+			lv_label_set_text(lbl_edit, ""); // Can't edit "Add New"
+			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Hide right arrow
 		}
 		// Delete remote
 		else if (edit_idx == 2) {
 			lv_label_set_text(lbl_name, DELETE_LABEL);
+			lv_label_set_text(lbl_edit, ""); // Can't edit "Delete"
+			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Hide right arrow
 		}
 		// Editing signal
 		else {
+			lv_label_set_text(lbl_edit, "EDIT"); // Can edit
+			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Show right arrow
+			
 			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 			lv_label_set_text(lbl_name, remotes[ir_current_remote].signal_names[edit_idx - 3]); // Default option offset
 			xSemaphoreGive(xInfraredDataMutex); // Release IR
@@ -254,6 +267,9 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 		
 		// Remote name
 		if (edit_idx == 0) {
+			lv_label_set_text(lbl_edit, "EDIT"); // Can edit
+			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Show right arrow
+			
 			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 			lv_label_set_text(lbl_name, remotes[ir_current_remote].name);
 			xSemaphoreGive(xInfraredDataMutex); // Release IR
@@ -261,13 +277,20 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 		// New remote
 		else if (edit_idx == 1) {
 			lv_label_set_text(lbl_name, ADD_NEW_LABEL);
+			lv_label_set_text(lbl_edit, ""); // Can't edit "Add New"
+			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Hide right arrow
 		}
 		// Delete remote
 		else if (edit_idx == 2) {
 			lv_label_set_text(lbl_name, DELETE_LABEL);
+			lv_label_set_text(lbl_edit, ""); // Can't edit "Delete"
+			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Hide right arrow
 		}
 		// Editing signal
 		else {
+			lv_label_set_text(lbl_edit, "EDIT"); // Can edit
+			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Show right arrow
+			
 			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 			lv_label_set_text(lbl_name, remotes[ir_current_remote].signal_names[edit_idx - 3]); // Default option offset
 			xSemaphoreGive(xInfraredDataMutex); // Release IR
