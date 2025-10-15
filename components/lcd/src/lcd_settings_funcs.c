@@ -71,8 +71,8 @@
 #define SLEEP_TIMER_MAX_S 120 // 2 min
 
 settings_menu_t settings_menu = {
-	.options = {SETTINGS_SET_LOCK_TXT, "Change colors", "Adjust haptics", "Adjust sleep timer",
-			"Adjust RBG LED", "LCD brightness", "Tips and Tricks", "System info", "Reboot", "Factory reset"},
+	.options = {SETTINGS_SET_LOCK_TXT, "Change Colors", "Adjust Haptics", "Adjust Sleep Timer",
+			"Adjust RBG LED", "LCD Brightness", "Tips and Tricks", "System Info", "Reboot", "Factory Reset"},
 	.size = 10,
 	.index = 0,
 	.cont = NULL,

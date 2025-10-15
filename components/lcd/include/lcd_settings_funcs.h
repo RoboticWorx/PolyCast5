@@ -8,8 +8,8 @@
 
 #define SETTINGS_MAX_PIN_LEN 5
 
-#define SETTINGS_REMOVE_LOCK_TXT "Remove unlock PIN"
-#define SETTINGS_SET_LOCK_TXT "Set unlock PIN"
+#define SETTINGS_REMOVE_LOCK_TXT "Remove Unlock PIN"
+#define SETTINGS_SET_LOCK_TXT "Set Unlock PIN"
 
 #define MAX_SETTINGS_OPTIONS 20
 

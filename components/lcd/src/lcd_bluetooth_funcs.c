@@ -1288,8 +1288,12 @@ void lcd_bluetooth_keyboard_sub_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blu
 		uint16_t cmd = BLUETOOTH_SCRIPT_OFFSET + NUM_KEYBOARD_BASE + script_idx;
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, 0);
 	}
-	// Back (left)
+	// Back
 	else if (ui_btns->left_btn == 1) {
+		// Deactivate bluetooth
+		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+
 		// Hide submenu
 		lv_obj_add_flag(submenu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -1307,6 +1311,10 @@ void lcd_bluetooth_keyboard_sub_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blu
 	}
 	// Home or power off
 	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Deactivate bluetooth
+		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+
 		// Hide submenu
 		lv_obj_add_flag(submenu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
