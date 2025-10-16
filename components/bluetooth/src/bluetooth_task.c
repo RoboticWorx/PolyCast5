@@ -1,4 +1,5 @@
 #include "bluetooth_web_portal.h"
+#include "esp_err.h"
 #include "polycast5_macros.h"
 
 #include "freertos/FreeRTOS.h"
@@ -98,6 +99,13 @@ static void bluetooth_task(void *arg)
 			// Unpair all devices command received
 			else if (bluetooth_cmd == BLUETOOTH_CMD_UNPAIR_ALL) {
 				bluetooth_forget_all_peers();
+
+				// Clear remembered NVS
+				esp_err_t err = bluetooth_clear_peers_list_nvs(false); // Clear all
+				if (err != ESP_OK) {
+					ESP_LOGE(TAG, "bluetooth_clear_peers_list_nvs error: %s", esp_err_to_name(err));
+				}
+
 				bluetooth_deinit();
 				bluetooth_init();
 			}

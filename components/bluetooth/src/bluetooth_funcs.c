@@ -31,6 +31,14 @@
 #define PAIRING_KEY_NS "bt_key"
 #define PAIRING_KEY_KEY "key"
 
+// Bond index (NVS-only; UI uses this while BT is OFF)
+#define BT_IDX_NS "bt_index"
+#define BT_IDX_KEY "peers"
+
+#define BT_PEERS_NS "bt_peers"
+#define BT_PEERS_KEY "peers"
+#define BT_PEERS_PERF_KEY "pref_peer"
+
 /* Consumer-control report encoding (matches your sender) */
 #define HID_CC_RPT_MUTE 1
 #define HID_CC_RPT_POWER 2
@@ -58,9 +66,9 @@
 
 #define HID_CC_RPT_SET_NUMERIC(s, x)   (s)[0] &= HID_CC_RPT_NUMERIC_BITS;   (s)[0] = (x)
 #define HID_CC_RPT_SET_CHANNEL(s, x)   (s)[0] &= HID_CC_RPT_CHANNEL_BITS;   (s)[0] |= ((x) & 0x03) << 4
-#define HID_CC_RPT_SET_VOLUME_UP(s)	   (s)[0] &= HID_CC_RPT_VOLUME_BITS;    (s)[0] |= HID_CC_RPT_VOLUME_UP
-#define HID_CC_RPT_SET_VOLUME_DOWN(s)  (s)[0] &= HID_CC_RPT_VOLUME_BITS;    (s)[0] |= HID_CC_RPT_VOLUME_DOWN
-#define HID_CC_RPT_SET_BUTTON(s, x)	   (s)[1] &= HID_CC_RPT_BUTTON_BITS;    (s)[1] |= (x)
+#define HID_CC_RPT_SET_VOLUME_UP(s)	   (s)[0] &= HID_CC_RPT_VOLUME_BITS;	(s)[0] |= HID_CC_RPT_VOLUME_UP
+#define HID_CC_RPT_SET_VOLUME_DOWN(s)  (s)[0] &= HID_CC_RPT_VOLUME_BITS;	(s)[0] |= HID_CC_RPT_VOLUME_DOWN
+#define HID_CC_RPT_SET_BUTTON(s, x)	   (s)[1] &= HID_CC_RPT_BUTTON_BITS;	(s)[1] |= (x)
 #define HID_CC_RPT_SET_SELECTION(s, x) (s)[1] &= HID_CC_RPT_SELECTION_BITS; (s)[1] |= ((x) & 0x03) << 4
 
 #define HID_CC_IN_RPT_LEN 2 // 2-byte CC report
@@ -903,8 +911,8 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 	switch (event) {
 		case ESP_HIDD_START_EVENT:
 			if (bluetooth_state == BT_STATE_RUNNING || bluetooth_state == BT_STATE_INITING) {
-		        esp_hid_ble_gap_adv_start();
-		    }
+				esp_hid_ble_gap_adv_start();
+			}
 
 			break;
 		case ESP_HIDD_CONNECT_EVENT: {
@@ -922,8 +930,8 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
 
 			if (bluetooth_state == BT_STATE_RUNNING || bluetooth_state == BT_STATE_INITING) {
-		        esp_hid_ble_gap_adv_start();
-		    }
+				esp_hid_ble_gap_adv_start();
+			}
 
 			break;
 		}
@@ -1022,7 +1030,230 @@ void bluetooth_deinit(void)
 	bluetooth_state = BT_STATE_OFF;
 }
 
-/* --------------- NVS --------------- */
+/* =============== Known devices =============== */
+
+// List bonded peers (NimBLE store -> our array)
+int bluetooth_list_bonded_peers(bt_peer_info_t *out, int max)
+{
+	// Guard
+	if (!out || max <= 0) {
+		return 0;
+	}
+
+	// Query NimBLE store
+	ble_addr_t peers[16];
+	int count = 0;
+	if (ble_store_util_bonded_peers(peers, &count, (int)(sizeof(peers) / sizeof(peers[0]))) != 0) {
+		return 0;
+	}
+
+	// Clamp and copy
+	if (count > max) {
+		count = max;
+	}
+	for (int i = 0; i < count; i++) {
+		out[i].addr = peers[i];
+		out[i].label[0] = '\0';
+	}
+
+	// Done
+	return count;
+}
+
+// Load cached peers
+int bluetooth_get_peers_list_nvs(bt_peer_info_t *out, int max)
+{
+	// Guard
+	if (!out || max <= 0) {
+		return 0;
+	}
+
+	// Open NVS
+	nvs_handle_t h;
+	esp_err_t err = nvs_open(BT_IDX_NS, NVS_READONLY, &h);
+	if (err != ESP_OK) {
+		return 0;
+	}
+
+	// Read blob
+	ble_addr_t tmp[BT_MAX_PEERS] = {0};
+	size_t sz = sizeof(tmp);
+	err = nvs_get_blob(h, BT_IDX_KEY, tmp, &sz);
+	nvs_close(h);
+
+	// No data
+	if (err != ESP_OK || sz == 0) {
+		return 0;
+	}
+
+	// Parse
+	int n = (int)(sz / sizeof(ble_addr_t));
+	if (n > max) {
+		n = max;
+	}
+	for (int i = 0; i < n; i++) {
+		out[i].addr = tmp[i];
+		out[i].label[0] = '\0';
+	}
+
+	// Done
+	return n;
+}
+
+// Add peer to cache (idempotent; ring if full)
+void bluetooth_add_to_peers_list_nvs(const ble_addr_t *peer)
+{
+	// Guard
+	if (!peer) {
+		return;
+	}
+
+	// Open NVS
+	nvs_handle_t h;
+	if (nvs_open(BT_IDX_NS, NVS_READWRITE, &h) != ESP_OK) {
+		return;
+	}
+
+	// Read existing
+	ble_addr_t tmp[BT_MAX_PEERS] = {0};
+	size_t sz = sizeof(tmp);
+	if (nvs_get_blob(h, BT_IDX_KEY, tmp, &sz) != ESP_OK) {
+		sz = 0;
+	}
+
+	// Current count
+	int n = (int)(sz / sizeof(ble_addr_t));
+
+	// De-dup
+	for (int i = 0; i < n; i++) {
+		if (tmp[i].type == peer->type && memcmp(tmp[i].val, peer->val, 6) == 0) {
+			nvs_close(h);
+			return;
+		}
+	}
+
+	// Append or rotate
+	if (n < BT_MAX_PEERS) {
+		tmp[n++] = *peer;
+	}
+	else {
+		memmove(&tmp[0], &tmp[1], (BT_MAX_PEERS - 1) * sizeof(ble_addr_t));
+		tmp[BT_MAX_PEERS - 1] = *peer;
+	}
+
+	// Write back
+	if (nvs_set_blob(h, BT_IDX_KEY, tmp, n * sizeof(ble_addr_t)) == ESP_OK) {
+		(void)nvs_commit(h);
+	}
+	nvs_close(h);
+}
+
+// Clear all nvs peers
+esp_err_t bluetooth_clear_peers_list_nvs(bool preferred_only)
+{
+	nvs_handle_t h;
+	esp_err_t err;
+
+	// If clearing both
+	if (!preferred_only) {
+		// Open BT_IDX_NS NVS
+		err = nvs_open(BT_IDX_NS, NVS_READWRITE, &h);
+		if (err != ESP_OK) {
+			return err;
+		}
+	
+		// Erase key
+		err = nvs_erase_key(h, BT_IDX_KEY);
+	
+		// Commit 
+		if (err == ESP_OK) {
+			err = nvs_commit(h);
+		}
+	
+		nvs_close(h);
+	}
+
+	// Else only preferred peer
+	// Open BT_PEERS_NS NVS
+	err = nvs_open(BT_PEERS_NS, NVS_READWRITE, &h);
+	if (err != ESP_OK) {
+		return err;
+	}
+
+	// Erase key
+	err = nvs_erase_key(h, BT_PEERS_KEY);
+	err = nvs_erase_key(h, BT_PEERS_PERF_KEY);
+
+	// Commit and close
+	if (err == ESP_OK) {
+		err = nvs_commit(h);
+	}
+
+	nvs_close(h);
+
+	// Done
+	return err;
+}
+
+// Save preferred peer (type + 6 bytes) to NVS
+esp_err_t bluetooth_set_preferred_peer_nvs(const ble_addr_t *peer)
+{
+	// Open NVS
+	nvs_handle_t h;
+	esp_err_t err = nvs_open(BT_PEERS_NS, NVS_READWRITE, &h);
+	if (err != ESP_OK) {
+		return err;
+	}
+
+	// Write blob
+	uint8_t blob[7] = { peer->type, peer->val[0], peer->val[1], peer->val[2], peer->val[3], peer->val[4], peer->val[5] };
+	err = nvs_set_blob(h, BT_PEERS_PERF_KEY, blob, sizeof(blob));
+
+	// Commit and close
+	if (err == ESP_OK) {
+		err = nvs_commit(h);
+	}
+	nvs_close(h);
+
+	// Done
+	return err;
+}
+
+// Load preferred peer from NVS
+esp_err_t bluetooth_get_preferred_peer_nvs(ble_addr_t *out, bool *found)
+{
+	// Default
+	if (found) {
+		*found = false;
+	}
+
+	// Open NVS
+	nvs_handle_t h;
+	size_t sz = 7;
+	uint8_t blob[7] = {0};
+	esp_err_t err = nvs_open(BT_PEERS_NS, NVS_READONLY, &h);
+	if (err != ESP_OK) {
+		return err;
+	}
+
+	// Read
+	err = nvs_get_blob(h, BT_PEERS_PERF_KEY, blob, &sz);
+	nvs_close(h);
+
+	// Parse blob
+	if (err == ESP_OK && sz == 7) {
+		out->type = blob[0];
+		memcpy(out->val, &blob[1], 6);
+		if (found) {
+			*found = true;
+		}
+	}
+
+	// Done
+	return err;
+}
+
+/* =============== Pairing key =============== */
 
 esp_err_t bluetooth_pairing_key_save_nvs(uint32_t key)
 {

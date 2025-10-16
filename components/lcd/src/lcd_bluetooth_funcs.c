@@ -295,7 +295,7 @@ static void lcd_bluetooth_setup_keyboard_page(bluetooth_keyboard_menu_t *menu)
 	lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
 }
 
-static void lcd_bluetooth_setup_keyboard_submenu(bluetooth_keyboard_menu_t *submenu)
+static void setup_keyboard_submenu_page(bluetooth_keyboard_menu_t *submenu)
 {
 	// Create list
 	submenu->main_list = lv_list_create(ACTIVE_SCR);
@@ -352,7 +352,7 @@ static void lcd_bluetooth_setup_keyboard_submenu(bluetooth_keyboard_menu_t *subm
 	}
 }
 
-static void lcd_bluetooth_setup_known_devices_page(bluetooth_peer_menu_t *menu)
+static void setup_known_devices_page(bluetooth_peer_menu_t *menu)
 {
 	// Create list
 	menu->main_list = lv_list_create(ACTIVE_SCR);
@@ -400,13 +400,8 @@ static void lcd_bluetooth_setup_known_devices_page(bluetooth_peer_menu_t *menu)
 	lv_style_set_text_color(&menu->sel_style, user_primary_color);
 	lv_style_set_text_align(&menu->sel_style, LV_TEXT_ALIGN_CENTER);
 	
-	// Wrap index
-	if (menu->index >= menu->size) {
-		menu->index = 1;
-	}
-	else if (menu->index < 0) {
-		menu->index = menu->size - 1;
-	}
+	// Set index
+	menu->index = 0;
 }
 
 void lcd_bluetooth_setup_page(bluetooth_menu_t *menu)
@@ -536,7 +531,7 @@ void lcd_bluetooth_update_menu(bluetooth_menu_t *menu)
 	}
 }
 
-static void lcd_bluetooth_update_keyboard_menu(bluetooth_keyboard_menu_t *menu)
+static void update_keyboard_menu(bluetooth_keyboard_menu_t *menu)
 {
 	// Reveal
 	lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -565,7 +560,7 @@ static void lcd_bluetooth_update_keyboard_menu(bluetooth_keyboard_menu_t *menu)
 	}
 }
 
-static void lcd_bluetooth_update_keyboard_submenu(bluetooth_keyboard_menu_t *submenu)
+static void update_keyboard_submenu(bluetooth_keyboard_menu_t *submenu)
 {
 	// Reveal
 	lv_obj_remove_flag(submenu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -594,7 +589,7 @@ static void lcd_bluetooth_update_keyboard_submenu(bluetooth_keyboard_menu_t *sub
 	}
 }
 
-static void lcd_bluetooth_update_known_devices_menu(bluetooth_peer_menu_t *menu)
+static void update_known_devices_menu(bluetooth_peer_menu_t *menu)
 {
 	// Reveal
 	lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -1233,7 +1228,7 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 	if (ui_btns->up_btn == 1) {
 		// Update selection
 		bluetooth_menu->bluetooth_keyboard_menu.index--;
-		lcd_bluetooth_update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
+		update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
 
 		// Save to NVS
 		lcd_bluetooth_script_selected_set(bluetooth_menu->bluetooth_keyboard_menu.index);
@@ -1242,7 +1237,7 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 	else if (ui_btns->down_btn == 1) {
 		// Update selection
 		bluetooth_menu->bluetooth_keyboard_menu.index++;
-		lcd_bluetooth_update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
+		update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
 
 		// Save to NVS
 		lcd_bluetooth_script_selected_set(bluetooth_menu->bluetooth_keyboard_menu.index);
@@ -1251,7 +1246,7 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 	else if (ui_btns->right_btn == 1) {
 		// Update selection
 		bluetooth_menu->bluetooth_keyboard_menu.index = bluetooth_menu->bluetooth_keyboard_menu.index + 5;
-		lcd_bluetooth_update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
+		update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
 
 		// Save to NVS
 		lcd_bluetooth_script_selected_set(bluetooth_menu->bluetooth_keyboard_menu.index);
@@ -1260,7 +1255,7 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 	else if (xSemaphoreTake(xRightButtonLongSemaphore, 0) == pdTRUE) {
 		// Update selection
 		bluetooth_menu->bluetooth_keyboard_menu.index = 2;
-		lcd_bluetooth_update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
+		update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
 
 		// Save to NVS
 		lcd_bluetooth_script_selected_set(bluetooth_menu->bluetooth_keyboard_menu.index);
@@ -1348,7 +1343,7 @@ void lcd_bluetooth_keyboard_sub_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blu
 	// Init once
 	if (!init) {
 		// Fetch menu
-		lcd_bluetooth_setup_keyboard_submenu(submenu);
+		setup_keyboard_submenu_page(submenu);
 		keyboard_submenu_refresh_from_nvs(submenu, current_category);
 
 		// Show
@@ -1360,12 +1355,12 @@ void lcd_bluetooth_keyboard_sub_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blu
 	// Up button
 	if (ui_btns->up_btn == 1) {
 		submenu->index--;
-		lcd_bluetooth_update_keyboard_submenu(submenu);
+		update_keyboard_submenu(submenu);
 	}
 	// Down button
 	else if (ui_btns->down_btn == 1) {
 		submenu->index++;
-		lcd_bluetooth_update_keyboard_submenu(submenu);
+		update_keyboard_submenu(submenu);
 	}
 	// Select script
 	else if (ui_btns->select_btn == 1) {
@@ -1526,42 +1521,82 @@ void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
 
 static void peer_menu_build(bluetooth_peer_menu_t *pm)
 {
-/*	// Fill from bonded peers
-	bt_peer_info_t tmp[10];
-	int n = bluetooth_list_bonded_peers(tmp, 10);
-	pm->size = (n > 0) ? n : 1;
+	// Read cached peers (BT stays OFF)
+	bt_peer_info_t tmp[BT_MAX_PEERS];
+	int n = bluetooth_get_peers_list_nvs(tmp, BT_MAX_PEERS);
 
-	for (int i = 0; i < pm->size; ++i) {
-		if (n > 0) {
-			// address label
-			snprintf(pm->labels[i], sizeof(pm->labels[i]),
-					"%02X:%02X:%02X:%02X:%02X:%02X",
-					tmp[i].addr.val[5], tmp[i].addr.val[4], tmp[i].addr.val[3],
-					tmp[i].addr.val[2], tmp[i].addr.val[1], tmp[i].addr.val[0]);
-			pm->peers[i] = tmp[i].addr;
-		} else {
-			strncpy(pm->labels[0], "No paired devices", sizeof(pm->labels[0]));
+	// Size (+1 for the "Allow new devices" row)
+	pm->size = (n > 0) ? (n + 1) : 1;
+
+	// Row 0
+	strncpy(pm->labels[0], "Pair New Device", sizeof(pm->labels[0]));
+	pm->btns[0] = lv_list_add_btn(pm->main_list, NULL, pm->labels[0]);
+	lv_obj_set_size(pm->btns[0], 200, 30);
+
+	// Style selected
+	if (0 == pm->index) {
+		lv_obj_add_style(pm->btns[0], &pm->sel_style, 0);
+	}
+	else {
+		lv_obj_add_style(pm->btns[0], &pm->btn_style, 0);
+	}
+
+	// Label center
+	lv_obj_t *lbl0 = lv_obj_get_child(pm->btns[0], 0);
+	lv_label_set_long_mode(lbl0, LV_LABEL_LONG_SCROLL);
+	lv_obj_set_style_text_align(lbl0, LV_TEXT_ALIGN_CENTER, 0);
+	lv_obj_align(lbl0, LV_ALIGN_CENTER, 0, 0);
+
+	// Rows 1..n: saved peers (shifted by +1)
+	for (int i = 0; i < n; ++i) {
+		const int row = i + 1;
+
+		// Label text
+		snprintf(pm->labels[row], sizeof(pm->labels[row]),
+				"%02X:%02X:%02X:%02X:%02X:%02X",
+				tmp[i].addr.val[5], tmp[i].addr.val[4], tmp[i].addr.val[3],
+				tmp[i].addr.val[2], tmp[i].addr.val[1], tmp[i].addr.val[0]);
+
+		// Store
+		pm->peers[row] = tmp[i].addr;
+
+		// Style button
+		pm->btns[row] = lv_list_add_btn(pm->main_list, NULL, pm->labels[row]);
+		lv_obj_set_size(pm->btns[row], 200, 30);
+
+		// Style selected
+		if (row == pm->index) {
+			lv_obj_add_style(pm->btns[row], &pm->sel_style, 0);
+		}
+		else {
+			lv_obj_add_style(pm->btns[row], &pm->btn_style, 0);
 		}
 
-		pm->btns[i] = lv_list_add_btn(pm->main_list, NULL, pm->labels[i]);
-		lv_obj_set_size(pm->btns[i], 200, 30);
-		lv_obj_add_style(pm->btns[i], (i == pm->index) ? &pm->sel_style : &pm->btn_style, 0);
-
-		lv_obj_t *lbl = lv_obj_get_child(pm->btns[i], 0);
+		// Format label
+		lv_obj_t *lbl = lv_obj_get_child(pm->btns[row], 0);
 		lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
 		lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
 		lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
 	}
 
+	// Layout
 	pm->cont = (pm->size > 0) ? lv_obj_get_parent(pm->btns[0]) : pm->main_list;
-	lv_obj_set_flex_flow (pm->cont, LV_FLEX_FLOW_COLUMN);
+	lv_obj_set_flex_flow(pm->cont,  LV_FLEX_FLOW_COLUMN);
 	lv_obj_set_flex_align(pm->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 	lv_obj_set_style_pad_gap(pm->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-	if (pm->index >= pm->size) pm->index = pm->size - 1;
-	if (pm->index < 0) pm->index = 0;
+	// Clamp
+	if (pm->index >= pm->size) {
+		pm->index = pm->size - 1;
+	}
+	if (pm->index < 0) {
+		pm->index = 0;
+	}
 
-	if (pm->size > 0) lv_obj_scroll_to_view(pm->btns[pm->index], LV_ANIM_OFF);*/
+	// Scroll
+	if (pm->size > 0) {
+		lv_obj_scroll_to_view(pm->btns[pm->index], LV_ANIM_OFF);
+	}
 }
 
 void lcd_bluetooth_known_devices_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
@@ -1572,7 +1607,7 @@ void lcd_bluetooth_known_devices_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bl
 	// Init once
 	if (!init) {
 		// Fetch menu
-		lcd_bluetooth_setup_known_devices_page(peer_menu);
+		setup_known_devices_page(peer_menu);
 		peer_menu_build(peer_menu);
 
 		// Show
@@ -1584,24 +1619,44 @@ void lcd_bluetooth_known_devices_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bl
 	// Up button
 	if (ui_btns->up_btn == 1) {
 		peer_menu->index--;
-		lcd_bluetooth_update_known_devices_menu(peer_menu);
+		update_known_devices_menu(peer_menu);
 	}
 	// Down button
 	else if (ui_btns->down_btn == 1) {
 		peer_menu->index++;
-		lcd_bluetooth_update_known_devices_menu(peer_menu);
+		update_known_devices_menu(peer_menu);
 	}
-	// Select script
-	else if (ui_btns->select_btn == 1 && peer_menu->size > 0 &&
-			strncmp(peer_menu->labels[0], "No paired", 10) != 0) {
-
-		// SELECT = make this the preferred peer and restart advertising
-		//bluetooth_set_preferred_peer_nvs(&peer_menu->peers[peer_menu->index]);
-		// Restart advertising path you already have:
-		esp_hid_ble_gap_adv_start(); // will try directed to preferred first
+	// Selected peer
+	else if (ui_btns->select_btn == 1 && peer_menu->size > 0) {
+		// No whitelist: anyone can pair
+		if (peer_menu->index == 0) {
+			bluetooth_clear_peers_list_nvs(true); // Clear preferred peer
+	
+			// Active bluetooth
+			uint16_t cmd = BLUETOOTH_CMD_INIT;
+			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+		}
+		// Yes whitelist: set specific peer only
+		else {
+			// Save preferred peer to whitelist
+			esp_err_t err = bluetooth_set_preferred_peer_nvs(&peer_menu->peers[peer_menu->index]);
+			#ifdef POLYCAST5_DEBUG
+			if (err != ESP_OK) {
+				ESP_LOGE(TAG, "bluetooth_set_preferred_peer_nvs failed: %s", esp_err_to_name(err));
+			}
+			#endif
+	
+			// Active bluetooth
+			uint16_t cmd = BLUETOOTH_CMD_INIT;
+			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+		}
 	}
 	// Back
 	else if (ui_btns->left_btn == 1) {
+		// Deactivate bluetooth
+		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+
 		// Hide peer menu
 		lv_obj_add_flag(peer_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		

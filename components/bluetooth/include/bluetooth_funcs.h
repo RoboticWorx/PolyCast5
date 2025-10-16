@@ -7,6 +7,17 @@
 
 #include "esp_err.h"
 
+#include "host/ble_hs.h"
+
+#include "host/ble_hs.h"
+
+typedef struct {
+	ble_addr_t addr; // Identity address
+	char label[32]; // Name
+} bt_peer_info_t;
+
+#define BT_MAX_PEERS 10
+
 // Report IDs
 #define HID_RPT_ID_KB_IN 1 // Keyboard input
 #define HID_RPT_ID_CC_IN 3 // Consumer Control input
@@ -211,6 +222,51 @@ void bluetooth_send_script(const char *s, uint32_t tap_ms);
  * @param [in] percent The battery level percentage to send
  */
 void bluetooth_set_battery_level(uint8_t percent);
+
+/** 
+ * @brief Sets a given bluetooth peer as the preferred in NVS
+ *
+ * @param [in] peer Peer to set
+ *
+ * @returns ESP error status
+ */
+esp_err_t bluetooth_set_preferred_peer_nvs(const ble_addr_t *peer);
+
+/** 
+ * @brief Gets the preferred bluetooth peer from NVS
+ *
+ * @param [out] out Peer retrieved
+ * @param [out] found True if peer was found
+ *
+ * @returns ESP error status
+ */
+esp_err_t bluetooth_get_preferred_peer_nvs(ble_addr_t *out, bool *found);
+
+/** 
+ * @brief Load all bluetooth peers from NVS
+ *
+ * @param [out] out Peers retrieved
+ * @param [in] max Max peers to consider
+ *
+ * @returns Number of peers found
+ */
+int bluetooth_get_peers_list_nvs(bt_peer_info_t *out, int max);
+
+/** 
+ * @brief Add a peer to the main peer list in NVS
+ *
+ * @param [in] peer Peer to add
+ */
+void bluetooth_add_to_peers_list_nvs(const ble_addr_t *peer);
+
+/** 
+ * @brief Clears all bluetooth peers in NVS
+ *
+ * @param [in] preferred_only If true, only erase the preferred peer
+ *
+ * @returns ESP error status
+ */
+esp_err_t bluetooth_clear_peers_list_nvs(bool preferred_only);
 
 /** 
  * @brief Save the Bluetooth pairing key to NVS

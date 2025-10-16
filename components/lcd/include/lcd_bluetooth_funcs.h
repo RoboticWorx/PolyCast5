@@ -1,12 +1,14 @@
 #ifndef LCD_BLUETOOTH_FUNCS_H
 #define LCD_BLUETOOTH_FUNCS_H
 
-#include "bluetooth_web_portal.h"
 #include "esp_err.h"
+#include "nimble/ble.h"
 
 #include "misc/lv_style.h"
 #include "misc/lv_types.h"
-#include "nimble/ble.h"
+
+#include "bluetooth_funcs.h"
+#include "bluetooth_web_portal.h"
 
 #define NUM_BLUETOOTH_OPTIONS 7
 
@@ -16,13 +18,13 @@ typedef struct ui_menu_t ui_menu_t;
 
 // Simple “known devices” list
 typedef struct {
-    char labels[10][18];     // "AA:BB:CC:DD:EE:FF"
-    ble_addr_t peers[10];    // identity addresses
+    char labels[BT_MAX_PEERS][18]; // "AA:BB:CC:DD:EE:FF"
+    ble_addr_t peers[BT_MAX_PEERS]; // Identity addresses
     int size;
     int index;
     lv_obj_t *main_list;
     lv_style_t btn_style, sel_style;
-    lv_obj_t *btns[10], *cont;
+    lv_obj_t *btns[BT_MAX_PEERS], *cont;
 } bluetooth_peer_menu_t;
 
 typedef struct {
@@ -52,10 +54,6 @@ typedef struct {
 } bluetooth_menu_t;
 
 extern bluetooth_menu_t bluetooth_menu;
-
-void lcd_bluetooth_known_devices_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
-void lcd_bluetooth_known_devices_update(bluetooth_peer_menu_t *pm);
-void lcd_bluetooth_save_current_device(void);  // “Save current” action
 
 /**
  * @brief Pre-load Bluetooth page for quick access
@@ -107,6 +105,15 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
  * @param [in] bluetooth_menu Bluetooth menu structure
  */
 void lcd_bluetooth_keyboard_sub_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
+
+/**
+ * @brief Known devices page so you can pick a given device to connect to specifically
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] bluetooth_menu Bluetooth menu structure
+ */
+void lcd_bluetooth_known_devices_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
 
 /**
  * @brief Scrollable instructions to add a script as well as starts the http web portal
