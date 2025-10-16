@@ -6,12 +6,24 @@
 
 #include "misc/lv_style.h"
 #include "misc/lv_types.h"
+#include "nimble/ble.h"
 
-#define NUM_BLUETOOTH_OPTIONS 6
+#define NUM_BLUETOOTH_OPTIONS 7
 
 // Forward-declare structs (from lcd_utils.h)
 typedef struct ui_btns_t ui_btns_t;
 typedef struct ui_menu_t ui_menu_t;
+
+// Simple “known devices” list
+typedef struct {
+    char labels[10][18];     // "AA:BB:CC:DD:EE:FF"
+    ble_addr_t peers[10];    // identity addresses
+    int size;
+    int index;
+    lv_obj_t *main_list;
+    lv_style_t btn_style, sel_style;
+    lv_obj_t *btns[10], *cont;
+} bluetooth_peer_menu_t;
 
 typedef struct {
 	char *options[NUM_KEYBOARD_BASE + MAX_KEYBOARD_SCRIPTS];
@@ -36,9 +48,14 @@ typedef struct {
 	lv_style_t sel_style;
 	lv_obj_t *cont;
 	bluetooth_keyboard_menu_t bluetooth_keyboard_menu;
+	bluetooth_peer_menu_t bluetooth_peer_menu;
 } bluetooth_menu_t;
 
 extern bluetooth_menu_t bluetooth_menu;
+
+void lcd_bluetooth_known_devices_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
+void lcd_bluetooth_known_devices_update(bluetooth_peer_menu_t *pm);
+void lcd_bluetooth_save_current_device(void);  // “Save current” action
 
 /**
  * @brief Pre-load Bluetooth page for quick access
@@ -53,13 +70,6 @@ void lcd_bluetooth_setup_page(bluetooth_menu_t *bluetooth_menu);
  * @param [in] bluetooth_menu Bluetooth menu structure
  */
 void lcd_bluetooth_update_menu(bluetooth_menu_t *bluetooth_menu);
-
-/**
- * @brief Update bluetooth keyboard page based on user input
- *
- * @param [in] bluetooth_keyboard_menu Bluetooth keyboard menu structure
- */
-void lcd_bluetooth_update_keyboard_menu(bluetooth_keyboard_menu_t *bluetooth_keyboard_menu);
 
 /**
  * @brief Explains bluetooth autoconnect and what the connection pin is
