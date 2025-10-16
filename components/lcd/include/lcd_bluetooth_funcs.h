@@ -116,6 +116,15 @@ void lcd_bluetooth_keyboard_sub_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blu
 void lcd_bluetooth_known_devices_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
 
 /**
+ * @brief Explains how the known devices page works and turns off the bluetooth whitelist
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] bluetooth_menu Bluetooth menu structure
+ */
+void lcd_bluetooth_pair_new_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
+
+/**
  * @brief Scrollable instructions to add a script as well as starts the http web portal
  *
  * @param [in] ui_btns UI input structure

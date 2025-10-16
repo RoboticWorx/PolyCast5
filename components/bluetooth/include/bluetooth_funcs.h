@@ -16,7 +16,7 @@ typedef struct {
 	char label[32]; // Name
 } bt_peer_info_t;
 
-#define BT_MAX_PEERS 10
+#define BT_MAX_PEERS 20
 
 // Report IDs
 #define HID_RPT_ID_KB_IN 1 // Keyboard input

@@ -1628,13 +1628,19 @@ void lcd_bluetooth_known_devices_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bl
 	}
 	// Selected peer
 	else if (ui_btns->select_btn == 1 && peer_menu->size > 0) {
-		// No whitelist: anyone can pair
+		// Go to 'pair new' page
 		if (peer_menu->index == 0) {
-			bluetooth_clear_peers_list_nvs(true); // Clear preferred peer
-	
-			// Active bluetooth
-			uint16_t cmd = BLUETOOTH_CMD_INIT;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+			// Hide peer menu
+			lv_obj_add_flag(peer_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// Clean up
+			lv_obj_clean(peer_menu->main_list);
+			
+			// Reset init
+			init = false;
+			
+			// Switch page
+			ui_menu->page = BLUETOOTH_PAIR_NEW_PAGE;
 		}
 		// Yes whitelist: set specific peer only
 		else {
@@ -1687,6 +1693,111 @@ void lcd_bluetooth_known_devices_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bl
 		init = false;
 		
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);  // True = home, false = sleep
+	}
+}
+
+void lcd_bluetooth_pair_new_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
+{
+	#define PAIR_NEW_Y_OFFSET 40
+	
+	// Statics
+	static bool init = false;
+	static lv_obj_t *cont = NULL;
+	static lv_obj_t *title_lbl = NULL;
+	static lv_obj_t *instr_lbl = NULL;
+	
+	if (!init) {
+		// Create a scrollable container for the instructions
+		cont = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(cont, 210, 106);
+		lv_obj_center(cont);
+		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
+
+		// Title label
+		title_lbl = lv_label_create(cont);
+		lv_label_set_text(title_lbl, "Known Devices:");
+		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+		// Instructions label (scrollable if text is long)
+		instr_lbl = lv_label_create(cont);
+		lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+		lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
+		lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
+		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+
+		// Set custom text
+		const char *instr_text =
+				"The known devices page (prior) allows you to select a specific device to pair to from any of the devices you've paired to in the past.\n\n"
+				"This can be great for pranks or just switching between various devices such as PC or phone without having to re-pair every time.\n\n"
+				"Right now the Bluetooth whitelist has been cleared, allowing PolyCast5 to connect to a new device like normal.\n\n"
+				"Please press the left arrow button and scroll up to 'How It Works' further instructions.";
+		
+		lv_label_set_text(instr_lbl, instr_text);
+
+		lv_timer_handler();
+		
+		// No whitelist: anyone can pair
+		bluetooth_clear_peers_list_nvs(true); // Clear preferred peer
+	
+		// Active bluetooth
+		uint16_t cmd = BLUETOOTH_CMD_INIT;
+		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+
+		init = true;
+	}
+	
+	if (ui_btns->up_btn == 1) {
+		lv_obj_scroll_by_bounded(cont, 0, PAIR_NEW_Y_OFFSET, LV_ANIM_ON);
+	}
+	else if (ui_btns->down_btn == 1) {
+		lv_obj_scroll_by_bounded(cont, 0, -PAIR_NEW_Y_OFFSET, LV_ANIM_ON);
+	}
+	// Go back
+	else if (ui_btns->left_btn) {
+		// Deactivate bluetooth
+		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+
+		// Delete objects
+		lv_obj_del(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+			
+		// Show bluetooth menu
+		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch back
+		ui_menu->page = BLUETOOTH_PAGE;
+	}
+	// Home or power off
+	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
+		// Deactivate bluetooth
+		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+
+		// Delete objects
+		lv_obj_del(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+		
+ 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 
