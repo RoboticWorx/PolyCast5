@@ -4,7 +4,7 @@ Script:
 
 Explanation:
 
-This script will automatically search for the PolyCast5 GitHub repository online for iPhone.
+This script will search for the PolyCast5 GitHub repository online for iPhone.
 
 Steps:
 - Opens global search ('cmd' is same as 'win')

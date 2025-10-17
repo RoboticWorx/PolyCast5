@@ -860,12 +860,29 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
 		// Added:
 		// If a valid peer -> save
 		if (rc == 0) {
-			// Cache this bonded peer
+			// Save this as a bonded peer
 			bluetooth_add_to_peers_list_nvs(&desc.peer_id_addr);
 			
 			#ifdef POLYCAST5_DEBUG
 			ESP_LOGI(TAG, "Saving a valid peer");
 			#endif
+			
+			// If no preferred peer exists, set this one by default
+			bool found = false;
+			ble_addr_t pref;
+			if (bluetooth_get_preferred_peer_nvs(&pref, &found) != ESP_OK || !found) {
+				#ifdef POLYCAST5_DEBUG
+				ESP_LOGI(TAG, "Saving as preferred peer");
+				#endif
+			
+				// Save preferred peer to whitelist
+				esp_err_t err = bluetooth_set_preferred_peer_nvs(&desc.peer_id_addr);
+				#ifdef POLYCAST5_DEBUG
+				if (err != ESP_OK) {
+					ESP_LOGE(TAG, "bluetooth_set_preferred_peer_nvs failed: %s", esp_err_to_name(err));
+				}
+				#endif
+			}
 		}
 		
 		//ble_hid_task_start_up();

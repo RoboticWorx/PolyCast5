@@ -1,0 +1,12 @@
+Script:
+
+<cmd+space><delay=500>any text you want
+
+Explanation:
+
+This script will open the iPhone global search bar then type "any text you want".
+
+Steps:
+- Open global search
+- Wait 500ms for it to open
+- Types "any text you want"

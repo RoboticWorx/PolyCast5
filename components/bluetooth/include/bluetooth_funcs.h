@@ -14,7 +14,7 @@
 typedef struct {
 	ble_addr_t addr; // Identity address
 	char label[32]; // Name
-} bt_peer_info_t;
+} bluetooth_peer_info_t;
 
 #define BT_MAX_PEERS 20
 
@@ -134,6 +134,7 @@ typedef struct {
 #define BLUETOOTH_CMD_INIT 0
 #define BLUETOOTH_CMD_DEINIT 1
 #define BLUETOOTH_CMD_UNPAIR_ALL 2
+#define BLUETOOTH_CMD_UNPAIR_ALL_NO_REINIT 3
 
 #define BLUETOOTH_SCRIPT_OFFSET 1000
 
@@ -250,7 +251,7 @@ esp_err_t bluetooth_get_preferred_peer_nvs(ble_addr_t *out, bool *found);
  *
  * @returns Number of peers found
  */
-int bluetooth_get_peers_list_nvs(bt_peer_info_t *out, int max);
+int bluetooth_get_peers_list_nvs(bluetooth_peer_info_t *out, int max);
 
 /** 
  * @brief Add a peer to the main peer list in NVS
@@ -285,6 +286,38 @@ esp_err_t bluetooth_pairing_key_save_nvs(uint32_t key);
  * @returns ESP error status
  */
 esp_err_t bluetooth_pairing_key_load_nvs(uint32_t *key);
+
+/* =============== For naming labels =============== */
+
+/** 
+ * @brief Gets peer name label from NVS
+ *
+ * @param [in] addr Address the label is saved under
+ * @param [out] out Output to write the label into
+ * @param [in] out_sz Desired size of the output
+ *
+ * @returns True on success
+ */
+bool bluetooth_get_peer_label_nvs(const ble_addr_t *addr, char *out, size_t out_sz);
+
+/** 
+ * @brief Sets peer name label to NVS
+ *
+ * @param [in] addr Address the label is to be saved under
+ * @param [out] label Label to save
+ *
+ * @returns ESP error status
+ */
+esp_err_t bluetooth_set_peer_label_nvs(const ble_addr_t *addr, const char *label);
+
+/** 
+ * @brief Remove a peer from NVS
+ *
+ * @param [in] addr Address of peer to delete
+ *
+ * @returns ESP error status
+ */
+esp_err_t bluetooth_remove_peer_nvs(const ble_addr_t *addr);
 
 
 #endif // BLUETOOTH_FUNCS_H

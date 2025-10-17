@@ -1,0 +1,10 @@
+Script:
+
+<cmd+h>
+
+Explanation:
+
+This script will send you to the home screen on iPhone.
+
+Steps:
+- Home hotkey

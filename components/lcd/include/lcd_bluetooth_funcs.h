@@ -133,6 +133,15 @@ void lcd_bluetooth_pair_new_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
  */
 void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
 
+/**
+ * @brief Allow renaming a given bluetooth peer
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] bluetooth_menu Bluetooth menu structure
+ */
+void lcd_bluetooth_rename_peer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
+
 /** 
  * @brief Sets the last selected script
  *

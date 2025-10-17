@@ -27,10 +27,14 @@
 
 #define KEYBOARD_SELECTED_IDX_NS "keyb_sel"
 #define KEYBOARD_SELECTED_IDX_KEY "selected"
+#define BT_NUM_CHAR_ROWS 4
+#define MAX_BT_NAME_LEN 12
 
 extern char bt_wifi_portal_pass[];
 
 static uint8_t current_category = 0;
+
+static char bt_name_buf[MAX_BT_NAME_LEN + 1] = {0};
 
 EXT_RAM_BSS_ATTR static char script_labels[MAX_KEYBOARD_SCRIPTS][BT_SCRIPT_LABEL_MAX_LEN + 1];
 
@@ -659,12 +663,14 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
 		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
 		// Set custom text
-		const char *instr_text = "Bluetooth is now advertising as 'PolyCast5'.\n\nClick the right arrow to forget all devices.\n\n"
-								 "To connect a new device, just go to settings on any Bluetooth device such as a phone or PC, "
-								 "click on 'PolyCast5', and enter '%d' as the pin.\n\nAfter connecting once, PolyCast5 "
-								 "will automatically reconnect to the last known device after selecting an option from the Bluetooth menu.\n\nYou "
-								 "will also see the RGB LED turn blue to indicate PolyCast5 is currently connected to a device. If you don't wish to "
-								 "see this, it can be disabled in settings by setting 'Blink every' to 0 for 'Adjust RGB LED'.";
+		const char *instr_text =
+				"Bluetooth is now advertising as 'PolyCast5'.\n\n"
+				"Click the right arrow if you want to forget all devices.\n\n"
+				"To connect a new device, just go to settings on any Bluetooth device such as a phone or PC, "
+				"click on 'PolyCast5', and enter '%d' as the pin.\n\nAfter connecting once, PolyCast5 "
+				"will automatically reconnect to the last known device after selecting an option from the Bluetooth menu.\n\nYou "
+				"will also see the RGB LED turn blue to indicate PolyCast5 is currently connected to a device. If you don't wish to "
+				"see this, it can be disabled in settings by setting 'Blink every' to 0 for 'Adjust RGB LED'.";
 		
 		// Load pairing key from NVS
 		uint32_t pairing_key;
@@ -1519,10 +1525,138 @@ void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
 	}
 }
 
+static void fmt_addr_str(const ble_addr_t *a, char *out, size_t out_sz)
+{
+	snprintf(out, out_sz, "%02X:%02X:%02X:%02X:%02X:%02X",
+			a->val[5], a->val[4], a->val[3], a->val[2], a->val[1], a->val[0]);
+}
+
+static void prompt_rename_or_del(ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
+{
+	// Show right and hide left arrow
+	lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+	
+	// Create and format ins labels
+	lv_obj_t *lbl_ins = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_ins, "", user_secondary_color,
+				 &lv_font_montserrat_30, LV_ALIGN_CENTER, 0, 0);
+				 
+	lv_obj_t *lbl_exit = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_exit, "DEFAULT", user_secondary_color,
+				 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -16, -1);
+				 
+	lv_obj_t *lbl_name = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_name, "RENAME", user_secondary_color,
+				 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 13);
+				 
+	lv_obj_t *lbl_del = lv_label_create(ACTIVE_SCR);
+	lcd_format_label(lbl_del, "DELETE", user_secondary_color,
+				 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
+	
+	while (1) {
+		lv_timer_handler();
+		
+		// Done
+		if (xSemaphoreTake(xRightButtonSemaphore, 0) == pdTRUE) {			
+			// Save preferred peer to whitelist
+			esp_err_t err = bluetooth_set_preferred_peer_nvs(&bluetooth_menu->bluetooth_peer_menu.peers[bluetooth_menu->bluetooth_peer_menu.index]);
+			#ifdef POLYCAST5_DEBUG
+			if (err != ESP_OK) {
+				ESP_LOGE(TAG, "bluetooth_set_preferred_peer_nvs failed: %s", esp_err_to_name(err));
+			}
+			#endif
+			
+			lv_obj_delete(lbl_exit);
+			lv_obj_delete(lbl_name);
+			lv_obj_delete(lbl_del);
+			lv_obj_delete(lbl_ins);
+
+			lcd_clear_pending_inputs = true; // Clear any false inputs
+			
+			// Show left and hide right arrow
+			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+
+			// Show bluetooth menu
+			lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// Switch pages
+			ui_menu->page = BLUETOOTH_PAGE;
+			
+			// Go back
+			return;
+		}
+		// Rename
+		else if (xSemaphoreTake(xUpButtonSemaphore, 0) == pdTRUE) {
+			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+			
+			lv_obj_delete(lbl_exit);
+			lv_obj_delete(lbl_name);
+			lv_obj_delete(lbl_del);
+			lv_obj_delete(lbl_ins);
+			
+			lcd_clear_pending_inputs = true; // Clear any false inputs
+
+			// Show left and hide right arrow
+			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+			
+			// Prompt to enter name
+			ui_menu->page = BLUETOOTH_RENAME_PEER_PAGE;
+			
+			// Go back
+			return;
+		}
+		// Delete
+		else if (xSemaphoreTake(xDownButtonSemaphore, 0) == pdTRUE) {			
+			lv_obj_delete(lbl_exit);
+			lv_obj_delete(lbl_name);
+			lv_obj_delete(lbl_del);
+			lv_obj_delete(lbl_ins);
+			
+			lcd_clear_pending_inputs = true; // Clear any false inputs
+
+			// Delete selected peer from NVS
+			ble_addr_t addr = bluetooth_menu->bluetooth_peer_menu.peers[bluetooth_menu->bluetooth_peer_menu.index];
+			bluetooth_remove_peer_nvs(&addr);
+
+			// Check size
+			bluetooth_peer_info_t tmp[BT_MAX_PEERS];
+			int n = bluetooth_get_peers_list_nvs(tmp, BT_MAX_PEERS);
+			// If empty now, forget all
+			if (n == 0) {
+				// Active bluetooth
+				uint16_t cmd = BLUETOOTH_CMD_INIT;
+				xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+
+				// Forget all bluetooth bonding keys
+				cmd = BLUETOOTH_CMD_UNPAIR_ALL_NO_REINIT;
+				xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+			}
+			
+			// Show left and hide right arrow
+			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+
+			// Force next rebuild of the known-devices list
+			lv_obj_clean(bluetooth_menu->bluetooth_peer_menu.main_list);
+			
+	 		// Switch pages
+			ui_menu->page = BLUETOOTH_KNOWN_DEVICES_PAGE;
+			
+			// Go back
+			return;
+		}
+		
+		vTaskDelay(pdMS_TO_TICKS(10));
+	}
+}
+
 static void peer_menu_build(bluetooth_peer_menu_t *pm)
 {
 	// Read cached peers (BT stays OFF)
-	bt_peer_info_t tmp[BT_MAX_PEERS];
+	bluetooth_peer_info_t tmp[BT_MAX_PEERS];
 	int n = bluetooth_get_peers_list_nvs(tmp, BT_MAX_PEERS);
 
 	// Size (+1 for the "Allow new devices" row)
@@ -1551,14 +1685,18 @@ static void peer_menu_build(bluetooth_peer_menu_t *pm)
 	for (int i = 0; i < n; ++i) {
 		const int row = i + 1;
 
-		// Label text
-		snprintf(pm->labels[row], sizeof(pm->labels[row]),
-				"%02X:%02X:%02X:%02X:%02X:%02X",
-				tmp[i].addr.val[5], tmp[i].addr.val[4], tmp[i].addr.val[3],
-				tmp[i].addr.val[2], tmp[i].addr.val[1], tmp[i].addr.val[0]);
-
 		// Store
 		pm->peers[row] = tmp[i].addr;
+
+		// Label text
+		char label[32] = {0};
+		// Use name if it exists, else use address
+		if (!bluetooth_get_peer_label_nvs(&pm->peers[row], label, sizeof(label)) || label[0] == '\0') {
+			fmt_addr_str(&pm->peers[row], label, sizeof(label));
+		}
+
+		strncpy(pm->labels[row], label, sizeof(pm->labels[row]) - 1);
+		pm->labels[row][sizeof(pm->labels[row]) - 1] = '\0';
 
 		// Style button
 		pm->btns[row] = lv_list_add_btn(pm->main_list, NULL, pm->labels[row]);
@@ -1610,9 +1748,6 @@ void lcd_bluetooth_known_devices_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bl
 		setup_known_devices_page(peer_menu);
 		peer_menu_build(peer_menu);
 
-		// Show
-		lv_obj_remove_flag(peer_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-
 		init = true;
 	}
 	
@@ -1642,27 +1777,22 @@ void lcd_bluetooth_known_devices_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bl
 			// Switch page
 			ui_menu->page = BLUETOOTH_PAIR_NEW_PAGE;
 		}
-		// Yes whitelist: set specific peer only
+		// Yes whitelist: set specific peer only (in prompt_rename_or_del 'done')
 		else {
-			// Save preferred peer to whitelist
-			esp_err_t err = bluetooth_set_preferred_peer_nvs(&peer_menu->peers[peer_menu->index]);
-			#ifdef POLYCAST5_DEBUG
-			if (err != ESP_OK) {
-				ESP_LOGE(TAG, "bluetooth_set_preferred_peer_nvs failed: %s", esp_err_to_name(err));
-			}
-			#endif
-	
-			// Active bluetooth
-			uint16_t cmd = BLUETOOTH_CMD_INIT;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+			// Hide peer menu
+			lv_obj_add_flag(peer_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// Clean up
+			lv_obj_clean(peer_menu->main_list);
+			
+			// Reset init
+			init = false;
+			
+			prompt_rename_or_del(ui_menu, bluetooth_menu);
 		}
 	}
 	// Back
 	else if (ui_btns->left_btn == 1) {
-		// Deactivate bluetooth
-		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-
 		// Hide peer menu
 		lv_obj_add_flag(peer_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -1741,8 +1871,8 @@ void lcd_bluetooth_pair_new_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 				"The known devices page (prior) allows you to select a specific device to pair to from any of the devices you've paired to in the past.\n\n"
 				"This can be great for pranks or just switching between various devices such as PC or phone without having to re-pair every time.\n\n"
 				"Right now the Bluetooth whitelist has been cleared, allowing PolyCast5 to connect to a new device like normal.\n\n"
-				"Please press the left arrow button and scroll up to 'How It Works' further instructions.";
-		
+				"For this to work, please also walk out of range or turn off Bluetooth on any previously known devices.\n\n"
+				"Afterwards, press the left arrow button and scroll up to 'How It Works' further instructions if needed.";		
 		lv_label_set_text(instr_lbl, instr_text);
 
 		lv_timer_handler();
@@ -1798,6 +1928,250 @@ void lcd_bluetooth_pair_new_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 		init = false;
 		
  		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+	}
+}
+
+static void update_name_label_lcd(lv_obj_t *lbl_display, char cur_char, int cur_pos)
+{
+	char display[MAX_CUSTOM_NAME_LEN + 2]; // Buffer
+	
+	int len = cur_pos + 1; // Current length of name
+	
+	// Cap
+	if (len > MAX_CUSTOM_NAME_LEN + 1) {
+		len = MAX_CUSTOM_NAME_LEN + 1;
+	}
+	
+	// Copy name into display buffer
+	if (cur_pos > 0) {
+		memcpy(display, bt_name_buf, cur_pos);
+	}
+	
+	// Get current
+	display[cur_pos] = cur_char;
+	display[len] = '\0';
+	
+	// Set text and re-center
+	lv_label_set_text(lbl_display, display);
+	lv_obj_align(lbl_display, LV_ALIGN_CENTER, 0, 30);
+}
+
+void lcd_bluetooth_rename_peer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
+{
+	#define BT_NUM_CHAR_ROWS 4
+
+	static const char *bt_char_rows[BT_NUM_CHAR_ROWS] = {
+		"_ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+		"abcdefghijklmnopqrstuvwxyz",
+		"0123456789",
+		"!@#$%^&*()-_=+[]{};:'\",<>/?\\|`~"
+	};
+	
+	// Declare statics
+	static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
+	static int cur_pos = 0; // User position
+	static int row_idx = 0; // Which character row is active
+    static int char_idx = 0; // Index within that row
+	static char cur_char = '_';
+	static lv_obj_t *lbl_dirs = NULL;
+	static lv_obj_t *lbl_chars = NULL;
+	static lv_obj_t *lbl_user_in = NULL;
+	
+	// Create initial label
+	if (!lbl_user_in) {
+		// Auto-fill previous
+		ble_addr_t peer_addr = bluetooth_menu->bluetooth_peer_menu.peers[bluetooth_menu->bluetooth_peer_menu.index];
+		char prefill[MAX_BT_NAME_LEN + 1] = {0}; // Buffer
+		bluetooth_get_peer_label_nvs(&peer_addr, prefill, sizeof(prefill));
+
+		// Copy the old name into buffer
+		strncpy(bt_name_buf, prefill, MAX_CUSTOM_NAME_LEN);
+
+		// Place cursor at the end
+		cur_pos = strlen(bt_name_buf);
+		
+		// Starting char
+		row_idx = 0;
+		char_idx = 0;
+		cur_char = bt_char_rows[row_idx][char_idx];
+		
+		lbl_user_in = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_user_in, "", user_secondary_color,
+						 &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
+						 
+		lbl_dirs = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_dirs, "      Enter device name:\nPress HOME to cycle chars.", user_secondary_color,
+						 &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -31);
+						 
+		lbl_chars = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_chars, "(Up to 12 characters)", user_secondary_color,
+						 &lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0);
+						 
+		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+	}
+
+	/* User input */
+	// Cycle chars
+	if (ui_btns->home_btn) {
+		// Cycle character row
+		row_idx = (row_idx + 1) % BT_NUM_CHAR_ROWS;
+		char_idx = 0; // Reset within row
+		
+		// New current char
+		cur_char = bt_char_rows[row_idx][char_idx];
+		
+		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+	}
+	// If up, iterate up
+	else if (ui_btns->up_btn) {
+		// Increment with wrap
+		size_t row_len = strlen(bt_char_rows[row_idx]);
+		char_idx = (char_idx + 1) % (int)row_len;
+		cur_char = bt_char_rows[row_idx][char_idx];
+		
+		// Save to array
+		bt_name_buf[cur_pos] = cur_char;
+		
+		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+	}
+	// If down, iterate down
+	else if (ui_btns->down_btn) {
+		// Decrement with wrap
+		size_t row_len = strlen(bt_char_rows[row_idx]);
+		char_idx = (char_idx + (int)row_len - 1) % (int)row_len;
+		cur_char = bt_char_rows[row_idx][char_idx];
+		
+		// Save to array
+		bt_name_buf[cur_pos] = cur_char;
+		
+		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+	}
+	// Can back out if at start
+	else if (ui_btns->left_btn && cur_pos == 0) {
+		// Delete labels since no longer used
+		lv_obj_delete(lbl_user_in);
+		lv_obj_delete(lbl_dirs);
+		lv_obj_delete(lbl_chars);
+		
+		// Reset statics for next time
+		lbl_user_in = lbl_chars = lbl_dirs = NULL;
+		cur_pos = row_idx = char_idx = 0;
+		cur_char = '_';
+		memset(bt_name_buf, 0, sizeof bt_name_buf);
+
+		// Force next rebuild of the known-devices list
+		lv_obj_clean(bluetooth_menu->bluetooth_peer_menu.main_list);
+		
+ 		// Switch to previous page
+		ui_menu->page = BLUETOOTH_KNOWN_DEVICES_PAGE;
+		return;
+	}
+	// Power off
+	else if (ui_btns->pwr_btn) {
+		// Delete labels since no longer used
+		lv_obj_delete(lbl_user_in);
+		lv_obj_delete(lbl_dirs);
+		lv_obj_delete(lbl_chars);
+		
+		// Reset statics for next time
+		lbl_user_in = lbl_chars = lbl_dirs = NULL;
+		cur_pos = row_idx = char_idx = 0;
+		cur_char = '_';
+		memset(bt_name_buf, 0, sizeof bt_name_buf);
+				
+		// Force next rebuild of the known-devices list
+		lv_obj_clean(bluetooth_menu->bluetooth_peer_menu.main_list);
+		
+ 		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+	}
+	// If left and not at start
+	else if (ui_btns->left_btn && cur_pos != 0) {
+		// Clear the current slot
+		bt_name_buf[cur_pos] = '\0';
+	
+		// De-increment left
+		if (cur_pos > 0) {
+			cur_pos--;
+		}
+	
+		// Reload row/idx from the new slot's char
+		char target = bt_name_buf[cur_pos] ? bt_name_buf[cur_pos] : '_';
+		for (row_idx = 0; row_idx < BT_NUM_CHAR_ROWS; row_idx++) {
+			const char *row = bt_char_rows[row_idx];
+			const char *p = strchr(row, target);
+			
+			if (p) {
+				char_idx = (int)(p - row);
+				break;
+			}
+		}
+		cur_char = bt_char_rows[row_idx][char_idx];
+		
+		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+	}
+	// If right
+	else if (ui_btns->right_btn) {
+		// Handle case where up/down wasn't pressed
+		bt_name_buf[cur_pos] = cur_char;
+		
+		// If not yet at end
+		if (cur_pos < MAX_CUSTOM_NAME_LEN - 1) {
+			cur_pos++;
+			bt_name_buf[cur_pos] = '\0';
+			char_idx = 0;
+			cur_char = bt_char_rows[row_idx][char_idx];
+		}
+		else {
+			bt_name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
+		}
+		
+		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+	}
+	// If save button pressed
+	else if (ui_btns->select_btn) {
+		// Save final
+        if (cur_pos < MAX_CUSTOM_NAME_LEN) {
+			bt_name_buf[cur_pos] = cur_char;
+
+			// Terminate one past the last written char if room, else clamp
+			size_t term = (cur_pos + 1 <= MAX_CUSTOM_NAME_LEN) ? (cur_pos + 1) : MAX_CUSTOM_NAME_LEN;
+			bt_name_buf[term] = '\0';
+	    }
+	    
+		bt_name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
+		memcpy(saved_name, bt_name_buf, MAX_CUSTOM_NAME_LEN + 1);
+		
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Device name: %s", saved_name);
+		#endif
+		
+		// Delete labels since no longer used
+		lv_obj_delete(lbl_user_in);
+		lv_obj_delete(lbl_dirs);
+		lv_obj_delete(lbl_chars);
+		
+		// Reset statics for next time
+		lbl_user_in = lbl_chars = lbl_dirs = NULL;
+		cur_pos = row_idx = char_idx = 0;
+		cur_char = '_';
+		
+		// Clamp to MAX_BT_NAME_LEN to match storage buffer
+		saved_name[MAX_BT_NAME_LEN] = '\0';
+		
+		// Save the chosen label for the selected peer
+		int idx = bluetooth_menu->bluetooth_peer_menu.index;
+		bluetooth_set_peer_label_nvs(&bluetooth_menu->bluetooth_peer_menu.peers[idx], saved_name);
+		
+		// Update in-memory copy so the UI shows it after rebuild
+		strncpy(bluetooth_menu->bluetooth_peer_menu.labels[idx], saved_name, sizeof(bluetooth_menu->bluetooth_peer_menu.labels[idx]) - 1);
+		bluetooth_menu->bluetooth_peer_menu.labels[idx][sizeof(bluetooth_menu->bluetooth_peer_menu.labels[idx]) - 1] = '\0';
+		
+		// Force next rebuild of the known-devices list
+		lv_obj_clean(bluetooth_menu->bluetooth_peer_menu.main_list);
+		
+		// Go back to list page
+		ui_menu->page = BLUETOOTH_KNOWN_DEVICES_PAGE;
+		return;
 	}
 }
 

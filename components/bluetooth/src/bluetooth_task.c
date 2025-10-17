@@ -109,6 +109,18 @@ static void bluetooth_task(void *arg)
 				bluetooth_deinit();
 				bluetooth_init();
 			}
+			// Unpair all devices no reinit command received
+			else if (bluetooth_cmd == BLUETOOTH_CMD_UNPAIR_ALL_NO_REINIT) {
+				bluetooth_forget_all_peers();
+
+				// Clear remembered NVS
+				esp_err_t err = bluetooth_clear_peers_list_nvs(false); // Clear all
+				if (err != ESP_OK) {
+					ESP_LOGE(TAG, "bluetooth_clear_peers_list_nvs error: %s", esp_err_to_name(err));
+				}
+
+				bluetooth_deinit();
+			}
 			/* Media commands */
 			// Vol-up command received
 			else if (bluetooth_cmd == BLUETOOTH_CMD_VOLUME_UP && bluetooth_state == BT_STATE_RUNNING) {

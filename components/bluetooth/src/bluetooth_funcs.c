@@ -1033,7 +1033,7 @@ void bluetooth_deinit(void)
 /* =============== Known devices =============== */
 
 // List bonded peers (NimBLE store -> our array)
-int bluetooth_list_bonded_peers(bt_peer_info_t *out, int max)
+int bluetooth_list_bonded_peers(bluetooth_peer_info_t *out, int max)
 {
 	// Guard
 	if (!out || max <= 0) {
@@ -1061,7 +1061,7 @@ int bluetooth_list_bonded_peers(bt_peer_info_t *out, int max)
 }
 
 // Load cached peers
-int bluetooth_get_peers_list_nvs(bt_peer_info_t *out, int max)
+int bluetooth_get_peers_list_nvs(bluetooth_peer_info_t *out, int max)
 {
 	// Guard
 	if (!out || max <= 0) {
@@ -1296,4 +1296,168 @@ esp_err_t bluetooth_pairing_key_load_nvs(uint32_t *key)
 	// Close and return
 	nvs_close(h);
 	return err;
+}
+
+/* =============== Get name label =============== */
+
+static void bt_label_key_from_addr(const ble_addr_t *a, char *out, size_t out_sz)
+{
+	snprintf(out, out_sz, "%02X%02X%02X%02X%02X%02X",
+			a->val[5], a->val[4], a->val[3], a->val[2], a->val[1], a->val[0]);
+}
+
+esp_err_t bluetooth_set_peer_label_nvs(const ble_addr_t *addr, const char *label)
+{
+	// Guard
+	if (!addr) {
+		return ESP_ERR_INVALID_ARG;
+	}
+
+	nvs_handle_t h;
+	esp_err_t err;
+
+	// Open NVS
+	err = nvs_open(BT_PEERS_NS, NVS_READWRITE, &h);
+	if (err != ESP_OK) {
+		return err;
+	}
+
+	// Write or erase
+	char key[20];
+	bt_label_key_from_addr(addr, key, sizeof(key));
+	if (label && label[0]) {
+		// Write label into address key
+		err = nvs_set_str(h, key, label);
+	}
+	else {
+		// Erase if DNE
+		err = nvs_erase_key(h, key);
+		if (err == ESP_ERR_NVS_NOT_FOUND) {
+			err = ESP_OK;
+		}
+	}
+
+	// Commit on success
+	if (err == ESP_OK) {
+		err = nvs_commit(h);
+	}
+
+	// Close and return
+	nvs_close(h);
+	return err;
+}
+
+bool bluetooth_get_peer_label_nvs(const ble_addr_t *addr, char *out, size_t out_sz)
+{
+	// Guard
+	if (!addr || !out || out_sz == 0) {
+		return false;
+	}
+
+	nvs_handle_t h;
+
+	// Open NVS
+	if (nvs_open(BT_PEERS_NS, NVS_READONLY, &h) != ESP_OK) {
+		return false;
+	}
+
+	// Read address into label
+	char key[20];
+	bt_label_key_from_addr(addr, key, sizeof(key));
+
+	// Use address key to get string
+	size_t sz = out_sz;
+	esp_err_t err = nvs_get_str(h, key, out, &sz);
+
+	// Close
+	nvs_close(h);
+
+	// Normalize result
+	if (err == ESP_OK) {
+		out[out_sz - 1] = '\0';
+		return true;
+	}
+
+	out[0] = '\0';
+	return false;
+}
+
+esp_err_t bluetooth_remove_peer_nvs(const ble_addr_t *addr)
+{
+	// Guard
+	if (!addr) {
+		return ESP_ERR_INVALID_ARG;
+	}
+
+	// Remove from index cache (BT_IDX_NS / BT_IDX_KEY)
+	nvs_handle_t h;
+	esp_err_t err = nvs_open(BT_IDX_NS, NVS_READWRITE, &h);
+	if (err != ESP_OK) {
+		return err;
+	}
+
+	ble_addr_t tmp[BT_MAX_PEERS] = {0};
+	size_t sz = sizeof(tmp);
+	if (nvs_get_blob(h, BT_IDX_KEY, tmp, &sz) != ESP_OK) {
+		sz = 0; // Treat as empty list
+	}
+
+	// Number of valid entries currently stored in the blob
+	int n = (int)(sz / sizeof(ble_addr_t));
+	
+	// Write index for our compacted array after removing the target addr
+	int out = 0;
+	
+	// Walk the current list and copy forward every entry that is NOT the one we're deleting
+	for (int i = 0; i < n; ++i) {
+		// Match if both address type (public/random) and 6-byte MAC are identical
+		bool same = (tmp[i].type == addr->type) && (memcmp(tmp[i].val, addr->val, 6) == 0);
+	
+		// Keep only non-matching entries
+		if (!same) {
+			tmp[out++] = tmp[i];
+		}
+	}
+	
+	// Write the compacted list back to NVS
+	// If there are still entries, overwrite the blob with the first 'out' elements
+	if (out > 0) {
+		err = nvs_set_blob(h, BT_IDX_KEY, tmp, out * sizeof(ble_addr_t));
+	}
+	// Otherwise, no entries remain: erase the key entirely to avoid empty blobs
+	else {
+		err = nvs_erase_key(h, BT_IDX_KEY);
+		// Erasing a non-existent key isn't an error
+		if (err == ESP_ERR_NVS_NOT_FOUND) {
+			err = ESP_OK;
+		}
+	}
+
+	// Commit on success
+	if (err == ESP_OK) {
+		err = nvs_commit(h);
+	}
+
+	// Close
+	nvs_close(h);
+
+	if (err != ESP_OK) {
+		return err;
+	}
+
+	// Drop per-address label
+	bluetooth_set_peer_label_nvs(addr, NULL); // Passing NULL erases the label key
+
+	// Clear preferred if it matches the removed peer
+	ble_addr_t pref = {0};
+	bool found = false;
+	bluetooth_get_preferred_peer_nvs(&pref, &found);
+	if (found && pref.type == addr->type && memcmp(pref.val, addr->val, 6) == 0) {
+		bluetooth_clear_peers_list_nvs(true); // Only delete BT_PEERS_KEY
+	}
+
+	// Unpair from NimBLE so it won't auto-reconnect
+	ble_gap_unpair((ble_addr_t *)addr);
+
+	return ESP_OK;
 }
