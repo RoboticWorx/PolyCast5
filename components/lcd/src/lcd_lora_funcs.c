@@ -371,7 +371,7 @@ void lcd_lora_add_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -387,7 +387,7 @@ void lcd_lora_add_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora
 	// Confirm
 	else if (ui_btns->right_btn == 1) {
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -403,7 +403,7 @@ void lcd_lora_add_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora
 	// Home or power off
 	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -833,7 +833,7 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
 			// Free any heap buffers allocated for that slot
 			free(lora_menu->options[del_idx]); // Name string
 			free(lora_menu->keys[del_idx]); // Key blob
-			lv_obj_del(lora_menu->btns[del_idx]); // LVGL list button
+			lv_obj_delete(lora_menu->btns[del_idx]); // LVGL list button
 		
 			// Shift everything above it down one
 			for (int i = del_idx; i < lora_menu->size - 1; ++i) {
@@ -1816,9 +1816,9 @@ void lcd_lora_plan_confirm_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_
 	// Back
 	if (ui_btns->left_btn == 1) {
 		// Reset objects
-		lv_obj_del(lbl_ins_top);
-		lv_obj_del(lbl_ins_bot);
-		lv_obj_del(lbl_conf);
+		lv_obj_delete(lbl_ins_top);
+		lv_obj_delete(lbl_ins_bot);
+		lv_obj_delete(lbl_conf);
 		
 		// Reset statics
 		lbl_ins_top = lbl_ins_bot = lbl_conf = NULL;
@@ -1841,9 +1841,9 @@ void lcd_lora_plan_confirm_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_
 	// Home or power off
 	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Reset objects
-		lv_obj_del(lbl_ins_top);
-		lv_obj_del(lbl_ins_bot);
-		lv_obj_del(lbl_conf);
+		lv_obj_delete(lbl_ins_top);
+		lv_obj_delete(lbl_ins_bot);
+		lv_obj_delete(lbl_conf);
 		
 		// Reset statics
 		lbl_ins_top = lbl_ins_bot = lbl_conf = NULL;
@@ -1854,9 +1854,9 @@ void lcd_lora_plan_confirm_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_
 	// Confirm
 	else if (ui_btns->select_btn == 1) {
 		// Reset objects
-		lv_obj_del(lbl_ins_top);
-		lv_obj_del(lbl_ins_bot);
-		lv_obj_del(lbl_conf);
+		lv_obj_delete(lbl_ins_top);
+		lv_obj_delete(lbl_ins_bot);
+		lv_obj_delete(lbl_conf);
 		
 		// Reset statics
 		lbl_ins_top = lbl_ins_bot = lbl_conf = NULL;
@@ -2002,7 +2002,7 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY); // Send the command
 		
 		vTaskDelay(pdMS_TO_TICKS(1000)); // Wait 1000ms
-		lv_obj_del(lbl_send_conf); // Delete label
+		lv_obj_delete(lbl_send_conf); // Delete label
 		lcd_clear_pending_inputs = true;
 		
 		// Reset statics
@@ -2203,7 +2203,7 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 	// Back selected
 	if (ui_btns->left_btn == 1) {
 		// Delete away_menu lv_obj
-		lv_obj_del(away_menu->main_list);
+		lv_obj_delete(away_menu->main_list);
 		
 		// Free the styles
 		lv_style_reset(&away_menu->btn_style);
@@ -2227,7 +2227,7 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 	// Home or power off selected
 	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Delete away_menu lv_obj
-		lv_obj_del(away_menu->main_list);
+		lv_obj_delete(away_menu->main_list);
 		
 		// Free the styles
 		lv_style_reset(&away_menu->btn_style);
@@ -2257,7 +2257,7 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 	// Custom selected
 	else if (ui_btns->select_btn == 1 && away_menu->index == 0) {
 		// Delete away_menu lv_obj
-		lv_obj_del(away_menu->main_list);
+		lv_obj_delete(away_menu->main_list);
 		
 		// Free the styles
 		lv_style_reset(&away_menu->btn_style);
@@ -2299,11 +2299,11 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY); // Send
 		vTaskDelay(pdMS_TO_TICKS(500)); // Wait additional 500ms
 		
-		lv_obj_del(lbl_send_conf); // Delete label
+		lv_obj_delete(lbl_send_conf); // Delete label
 		lcd_clear_pending_inputs = true;
 		
 		// Delete away_menu lv_obj
-		lv_obj_del(away_menu->main_list);
+		lv_obj_delete(away_menu->main_list);
 
 		// Free the styles
 		lv_style_reset(&away_menu->btn_style);
@@ -2466,7 +2466,7 @@ void lcd_lora_away_custom_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_m
 		vTaskDelay(pdMS_TO_TICKS(500)); // Wait additional 500ms
 		lcd_clear_pending_inputs = true;
 		
-		lv_obj_del(lbl_send_conf); // Delete label
+		lv_obj_delete(lbl_send_conf); // Delete label
 		
 		// Show LoRa submenu cont
 		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);

@@ -212,11 +212,7 @@
 
 /* QRS START */
 
-#define QR_ESP_RX_EX "A:/qr/qr_esp_rx_example.bin"
-
-#define QR_PC5_COM "A:/qr/qr_pc5_com.bin"
-#define QR_PC5_DOCS "A:/qr/qr_pc5_docs.bin"
-
+// ONLY BOOT QR: Others are now generated dynamically
 #define QR_PC5_BOOT "A:/qr/qr_pc5_boot.bin"
 
 /* QRS END */

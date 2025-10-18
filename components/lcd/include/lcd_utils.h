@@ -290,6 +290,18 @@ esp_err_t lcd_save_first_boot(void);
 bool lcd_is_first_boot(void);
 
 /**
+ * @brief Draw text as a QR into an LVGL canvas (RGB565)
+ *
+ * @param [out] canvas Canvas to draw the QR in to
+ * @param [in] text Text to encode
+ * @param [in] size_px Size of QR canvas
+ * @param [in] pbuf Canvas backing buffer
+ *
+ * @returns 0 on success
+ */
+int lcd_draw_qr(lv_obj_t *canvas, const char *text, int size_px, uint8_t **pbuf);
+
+/**
  * @brief Show one time boot up page with some starter info
  *
  * @param [in] ui_btns UI input structure

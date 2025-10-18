@@ -557,8 +557,11 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 	}
 }
 
-static void prompt_upload_qr(ui_menu_t *ui_menu, bool encrypting)
+static void prompt_upload_qr(ui_menu_t *ui_menu)
 {
+	static lv_obj_t *qr_canvas = NULL;
+	static uint8_t *qr_buf = NULL; // Canvas backing buffer
+	
 	// Hide arrows
 	lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
@@ -567,17 +570,24 @@ static void prompt_upload_qr(ui_menu_t *ui_menu, bool encrypting)
 	// Create and format ins labels
 	lv_obj_t *lbl_ask_enc = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_ask_enc, "Example receiver\ncode:", user_secondary_color,
-				 &lv_font_montserrat_18, LV_ALIGN_TOP_LEFT, 5, 5);
+			&lv_font_montserrat_18, LV_ALIGN_TOP_LEFT, 5, 5);
 				 
 	lv_obj_t *lbl_qr_ok = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_qr_ok, "OK", user_secondary_color,
-				 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
+			&lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
 				 
-	// Create QR code (100x100px)
-	lv_obj_t *qr_code = lv_img_create(ACTIVE_SCR);
-	lv_img_set_src(qr_code, QR_ESP_RX_EX);
-	lv_obj_align(qr_code, LV_ALIGN_CENTER, 0, 12);
-					
+	// Create QR canvas
+	qr_canvas = lv_canvas_create(ACTIVE_SCR);
+	lv_obj_set_size(qr_canvas, 100, 100);
+	lv_obj_align(qr_canvas, LV_ALIGN_CENTER, 0, 12);
+	
+	// Draw the URL as a QR
+	const char *url = "https://polycast5.com/blogs/tutorials/arduino-esp-now-receiver-examples";
+	int n = lcd_draw_qr(qr_canvas, url, 100, &qr_buf);
+	if (n != 0) {
+		ESP_LOGE(TAG, "prompt_upload_qr lcd_draw_qr failed: %d", n);
+	}
+	
 	while (1) {
 		lv_timer_handler();
 		
@@ -591,7 +601,15 @@ static void prompt_upload_qr(ui_menu_t *ui_menu, bool encrypting)
 			// Delete used
 			lv_obj_delete(lbl_ask_enc);
 			lv_obj_delete(lbl_qr_ok);
-			lv_obj_delete(qr_code);
+			lv_obj_delete(qr_canvas);
+		
+			// Free QR buffer
+			if (qr_buf) {
+				free(qr_buf);
+				qr_buf = NULL;
+			}
+			
+			qr_canvas = NULL;
 			
 			lcd_clear_pending_inputs = true; // Clear any false inputs
 			
@@ -733,7 +751,7 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 		// Only clear the staged slot if we were adding a new peer
 		if (!espnow_menu_overwrite) {
 			memset(espnow_menu->lmk[espnow_menu->size], 0, LMK_LEN); // Zero out enc entry
-			memset(espnow_menu->rx_mac[espnow_menu->size], 0, LMK_LEN);
+			memset(espnow_menu->rx_mac[espnow_menu->size], 0, ESPNOW_MAC_SIZE);
 		}
 		
 		espnow_menu_overwrite = false;
@@ -761,7 +779,7 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 		// Only clear the staged slot if we were adding a new peer
 		if (!espnow_menu_overwrite) {
 			memset(espnow_menu->lmk[espnow_menu->size], 0, LMK_LEN);
-			memset(espnow_menu->rx_mac[espnow_menu->size], 0, LMK_LEN);
+			memset(espnow_menu->rx_mac[espnow_menu->size], 0, ESPNOW_MAC_SIZE);
 		}
 		
 		espnow_menu_overwrite = false;
@@ -886,13 +904,7 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 			// Save LMK if it exists
 			lcd_espnow_lmk_nvs_save(espnow_menu);
 			
-			// If lmk
-			if (memcmp(espnow_menu->lmk[espnow_menu->size - 1], (uint8_t[LMK_LEN]){0}, LMK_LEN) != 0) {
-				prompt_upload_qr(ui_menu, true); // Show encryption example QR
-			}
-			else {
-				prompt_upload_qr(ui_menu, false); // Show regular example QR
-			}
+			prompt_upload_qr(ui_menu); // Show example QR
 		}
 		
 		// Hide right arrow

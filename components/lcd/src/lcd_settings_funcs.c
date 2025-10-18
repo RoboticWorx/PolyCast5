@@ -448,10 +448,10 @@ static void confirm_entered_pin(ui_menu_t *ui_menu, settings_menu_t *settings_me
 			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 			
-			lv_obj_del(lbl_ins);
-			lv_obj_del(lbl_pin);
-			lv_obj_del(lbl_ok);
-			lv_obj_del(lbl_write);
+			lv_obj_delete(lbl_ins);
+			lv_obj_delete(lbl_pin);
+			lv_obj_delete(lbl_ok);
+			lv_obj_delete(lbl_write);
 			
 			lcd_clear_pending_inputs = true; // Clear any false inputs
 			
@@ -1112,8 +1112,8 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 	// Back
 	else if (ui_btns->left_btn == 1) {
 		// Delete objects
-		lv_obj_del(cont); // Deletes all children
-		lv_obj_del(pointer);
+		lv_obj_delete(cont); // Deletes all children
+		lv_obj_delete(pointer);
 		lv_style_reset(&row_style);
 		
 		// Reset statics
@@ -1132,8 +1132,8 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 	// Home or power off
 	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Delete objects
-		lv_obj_del(cont); // Deletes all children
-		lv_obj_del(pointer);
+		lv_obj_delete(cont); // Deletes all children
+		lv_obj_delete(pointer);
 		lv_style_reset(&row_style);
 		
 		// Reset statics
@@ -1691,7 +1691,7 @@ void lcd_settings_system_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_m
 			lv_timer_del(refresh_timer);
 			refresh_timer = NULL;
 		}
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -1711,7 +1711,7 @@ void lcd_settings_system_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_m
 			lv_timer_del(refresh_timer);
 			refresh_timer = NULL;
 		}
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -1790,7 +1790,7 @@ void lcd_settings_help_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_men
 	// Go back
 	else if (ui_btns->left_btn) {
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -1806,7 +1806,7 @@ void lcd_settings_help_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_men
 	// Home or power off
 	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;

@@ -22,7 +22,6 @@
 #include "widgets/label/lv_label.h"
 
 #include "btc_web_portal.h"
-#include "qrcodegen.h" // QR encoder
 #include "lcd_asset_macros.h"
 #include "lcd_utils.h"
 
@@ -270,31 +269,66 @@ void lcd_tools_coin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 	}
 }
 
+static void read_the_docs_redraw(lv_obj_t *label, lv_obj_t *canvas, uint8_t **pbuf, uint8_t idx)
+{	
+	// Assign the correct URL and text to the given index
+	const char *text = NULL;
+	const char *url = NULL;
+	if (idx == 0) {
+		text = "Homepage:";
+		url = "https://polycast5.com/";
+	}
+	else if (idx == 1) {
+		text = "How to docs:";
+		url = "https://polycast5.com/docs/";
+	}
+	else if (idx == 2) {
+		text = "Join the Discord:";
+		url = "https://discord.gg/7RqJTnUE";
+	}
+	else if (idx == 3) {
+		text = "Source code:";
+		url = "https://github.com/RoboticWorx/PolyCast5";
+	}
+	
+	// Set the index text
+	lv_label_set_text(label, text);
+	
+	// Draw the URL as a QR
+	int n = lcd_draw_qr(canvas, url, 100, pbuf);
+	if (n != 0) {
+		ESP_LOGE(TAG, "read_the_docs_redraw lcd_draw_qr failed: %d", n);
+	}
+}
+
 void lcd_tools_docs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
 {
-	#define MAX_QRS 2
-	#define QR_COM_TXT "Homepage:"
-	#define QR_DOCS_TXT "How to docs:"
+	#define MAX_QRS 4
 	
 	// Statics
 	static bool do_once = false;
 	static uint8_t qr_idx = 0;
 	
 	static lv_obj_t *lbl_ins;
-	static lv_obj_t *qr_active;
+	
+	static lv_obj_t *qr_canvas = NULL;
+	static uint8_t *qr_buf = NULL; // Canvas backing buffer
 	
 	// Only execute once
 	if (!do_once) {
 		qr_idx = 0;
 		
 		lbl_ins = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_ins, QR_COM_TXT, user_secondary_color,
-					 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 7);
+		lcd_format_label(lbl_ins, "", user_secondary_color,
+				&lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 7);
 		
 		// Create QR
-		qr_active = lv_img_create(ACTIVE_SCR);
-		lv_img_set_src(qr_active, QR_PC5_COM);
-		lv_obj_align(qr_active, LV_ALIGN_CENTER, 0, 13);
+		qr_canvas = lv_canvas_create(ACTIVE_SCR);
+		lv_obj_set_size(qr_canvas, 100, 100);
+		lv_obj_align(qr_canvas, LV_ALIGN_CENTER, 0, 13);
+		
+		// Show the corresponding QR and text
+		read_the_docs_redraw(lbl_ins, qr_canvas, &qr_buf, qr_idx);
 		
 		do_once = true;
 	}
@@ -304,39 +338,33 @@ void lcd_tools_docs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 		// Increment with wrap
 		qr_idx = (qr_idx + 1) % MAX_QRS;
 		
-		if (qr_idx == 0) {
-			lv_label_set_text(lbl_ins, QR_COM_TXT);
-			lv_img_set_src(qr_active, QR_PC5_COM);
-		}
-		else if (qr_idx == 1) {
-			lv_label_set_text(lbl_ins, QR_DOCS_TXT);
-			lv_img_set_src(qr_active, QR_PC5_DOCS);
-		}
+		// Show the corresponding QR and text
+		read_the_docs_redraw(lbl_ins, qr_canvas, &qr_buf, qr_idx);
 	}
 	// Go left a QR
 	else if (ui_btns->left_btn == 1 && qr_idx != 0) {	
 		// De-increment with wrap
 		qr_idx = (qr_idx + MAX_QRS - 1) % MAX_QRS;
 		
-		if (qr_idx == 0) {
-			lv_label_set_text(lbl_ins, QR_COM_TXT);
-			lv_img_set_src(qr_active, QR_PC5_COM);
-		}
-		else if (qr_idx == 1) {
-			lv_label_set_text(lbl_ins, QR_DOCS_TXT);
-			lv_img_set_src(qr_active, QR_PC5_DOCS);
-		}
+		// Show the corresponding QR and text
+		read_the_docs_redraw(lbl_ins, qr_canvas, &qr_buf, qr_idx);
 	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {
 		// Delete objects
 		lv_obj_delete(lbl_ins);
-		lv_obj_delete(qr_active);
+		lv_obj_delete(qr_canvas);
+		
+		// Free QR buffer
+		if (qr_buf) {
+			free(qr_buf);
+			qr_buf = NULL;
+		}
 		
 		// Reset statics
 		do_once = false;
 		lbl_ins = NULL;
-		qr_active = NULL;
+		qr_canvas = NULL;
 		
 		// Show tools list
 		lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -355,12 +383,18 @@ void lcd_tools_docs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Delete objects
 		lv_obj_delete(lbl_ins);
-		lv_obj_delete(qr_active);
+		lv_obj_delete(qr_canvas);
+		
+		// Free QR buffer
+		if (qr_buf) {
+			free(qr_buf);
+			qr_buf = NULL;
+		}
 		
 		// Reset statics
 		do_once = false;
 		lbl_ins = NULL;
-		qr_active = NULL;
+		qr_canvas = NULL;
 		
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
@@ -967,7 +1001,7 @@ void lcd_tools_how_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
 	// Skip to TOOLS_SRS_PAGE
 	else if (ui_btns->right_btn == 1) {
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -990,7 +1024,7 @@ void lcd_tools_how_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -1009,7 +1043,7 @@ void lcd_tools_how_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -1025,7 +1059,7 @@ void lcd_tools_how_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
 	// Home or power off
 	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -1484,118 +1518,6 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
 
 /* =============== BTC Public Address Page =============== */
 
-// Draw text as QR into an LVGL canvas (RGB565) -> returns 0 on success
-static int btc_draw_qr(lv_obj_t *canvas, const char *text, int size_px, uint8_t **pbuf)
-{
-	// Validate args
-	if (!canvas || !text || !*text || size_px <= 0 || !pbuf) {
-		return -1;
-	}
-
-	// Allocate work buffers (heap, prefer PSRAM)
-	uint8_t *tmp = (uint8_t*)heap_caps_malloc(qrcodegen_BUFFER_LEN_MAX, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
-	if (!tmp) {
-		tmp = (uint8_t*)malloc(qrcodegen_BUFFER_LEN_MAX);
-	}
-	
-	uint8_t *qr = (uint8_t*)heap_caps_malloc(qrcodegen_BUFFER_LEN_MAX, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
-	if (!qr) {
-		qr = (uint8_t*)malloc(qrcodegen_BUFFER_LEN_MAX);
-	}
-	
-	if (!tmp || !qr) {
-		free(tmp);
-		free(qr);
-		return -2;
-	}
-
-	// Encode QR
-	bool ok = qrcodegen_encodeText(text, tmp, qr, qrcodegen_Ecc_MEDIUM, qrcodegen_VERSION_MIN,
-			qrcodegen_VERSION_MAX, qrcodegen_Mask_AUTO, true);
-			
-	// Free tmp buffer after encode
-	free(tmp);
-	if (!ok) {
-		free(qr);
-		return -3;
-	}
-
-	// Recreate canvas buffer every call (simple & safe)
-	size_t bytes = (size_t)size_px * (size_px) * 2; // RGB565
-	if (*pbuf) {
-		// Free old buffer
-		free(*pbuf);
-		*pbuf = NULL;
-	}
-	
-	*pbuf = (uint8_t*)heap_caps_malloc(bytes, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
-	
-	if (!*pbuf) {
-		*pbuf = (uint8_t*)malloc(bytes);
-	}
-	
-	if (!*pbuf) {
-		free(qr);
-		return -4;
-	}
-
-	// Bind buffer to canvas
-	lv_canvas_set_buffer(canvas, *pbuf, size_px, size_px, LV_COLOR_FORMAT_RGB565);
-
-	// Paint white background (0xFFFF)
-	memset(*pbuf, 0xFF, bytes);
-
-	// Compute scale (QR modules -> pixels)
-	int qr_sz = qrcodegen_getSize(qr);
-	int border = 2;
-	int mods = qr_sz + border * 2;
-	float scale = (float)size_px / (float)mods;
-
-	// Draw black modules
-	for (int my = 0; my < mods; ++my) {
-		for (int mx = 0; mx < mods; ++mx) {
-			// Get module
-			bool dark = false;
-			
-			int qx = mx - border, qy = my - border;
-			
-			if (qx >= 0 && qx < qr_sz && qy >= 0 && qy < qr_sz) {
-				dark = qrcodegen_getModule(qr, qx, qy);
-			}
-			
-			if (!dark) {
-				continue;
-			}
-
-			// Module -> pixel box
-			int x0 = (int)(mx * scale);
-			int y0 = (int)(my * scale);
-			
-			int x1 = (int)((mx + 1) * scale);
-			if (x1 <= x0) {
-				x1 = x0 + 1;
-			}
-			
-			int y1 = (int)((my + 1) * scale);
-			if (y1 <= y0) {
-				y1 = y0 + 1;
-			}
-
-			// Fill box black (0x0000)
-			for (int y = y0; y < y1 && y < size_px; ++y) {
-				uint16_t *row = (uint16_t*)(*pbuf + (size_t)y * (size_px * 2));
-				for (int x = x0; x < x1 && x < size_px; ++x) {
-					row[x] = 0x0000;
-				}
-			}
-		}
-	}
-
-	// Free QR map
-	free(qr);
-	return 0;
-}
-
 // Redraw address label + 80x80 QR on the canvas
 static void btc_redraw_qr(lv_obj_t *canvas, uint8_t **pbuf)
 {
@@ -1608,7 +1530,7 @@ static void btc_redraw_qr(lv_obj_t *canvas, uint8_t **pbuf)
 	}
 
 	// Draw address-only QR at 80x80
-	btc_draw_qr(canvas, addr, 90, pbuf);
+	lcd_draw_qr(canvas, addr, 90, pbuf);
 }
 
 void lcd_tools_btc_addr_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
@@ -1621,7 +1543,7 @@ void lcd_tools_btc_addr_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
 	
 	static lv_obj_t *cont = NULL;
 	static lv_obj_t *instr_lbl = NULL;
-	static lv_obj_t *canvas	= NULL;
+	static lv_obj_t *qr_canvas	= NULL;
 	
 	if (!init) {		
 		// Create a scrollable container for the instructions
@@ -1645,11 +1567,11 @@ void lcd_tools_btc_addr_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
 		// If previous address exists
 		if (err == ESP_OK) {
 			// Create QR canvas
-			canvas = lv_canvas_create(cont);
-			lv_obj_set_size(canvas, 90, 90); // Fixed size: also change in btc_redraw_qr
-			lv_obj_align(canvas, LV_ALIGN_CENTER, 0, 0);
+			qr_canvas = lv_canvas_create(cont);
+			lv_obj_set_size(qr_canvas, 90, 90); // Fixed size: also change in btc_redraw_qr
+			lv_obj_align(qr_canvas, LV_ALIGN_CENTER, 0, 0);
 			// Initial QR draw
-			btc_redraw_qr(canvas, &qr_buf);
+			btc_redraw_qr(qr_canvas, &qr_buf);
 	
 			// Instructions label (scrollable if text is long)
 			instr_lbl = lv_label_create(cont);
@@ -1657,7 +1579,7 @@ void lcd_tools_btc_addr_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
 			lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
 			lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
 			lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
-			lv_obj_align_to(instr_lbl, canvas, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+			lv_obj_align_to(instr_lbl, qr_canvas, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 	
 			// Set custom text based on hotkey index
 			const char *instr_text =
@@ -1721,11 +1643,11 @@ void lcd_tools_btc_addr_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
-		instr_lbl = canvas = NULL;
+		instr_lbl = qr_canvas = NULL;
 		init = false;
 		
 		// Hide right arrow
@@ -1746,11 +1668,11 @@ void lcd_tools_btc_addr_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
-		instr_lbl = canvas = NULL;
+		instr_lbl = qr_canvas = NULL;
 		init = false;
 		
 		// Hide right arrow
@@ -1774,11 +1696,11 @@ void lcd_tools_btc_addr_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
-		instr_lbl = canvas = NULL;
+		instr_lbl = qr_canvas = NULL;
 		init = false;
 		
  		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
@@ -1859,7 +1781,7 @@ void lcd_tools_btc_addr_setup_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools
 	// Go back
 	else if (ui_btns->left_btn) {
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -1878,7 +1800,7 @@ void lcd_tools_btc_addr_setup_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools
 	// Home or power off
 	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -2302,9 +2224,9 @@ void lcd_tools_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t 
         // Any button to exit
         if (ui_btns->up_btn || ui_btns->down_btn || ui_btns->left_btn || ui_btns->right_btn || ui_btns->select_btn || ui_btns->home_btn) {
             // Cleanup
-            lv_obj_del(tetris_canvas);
-            lv_obj_del(tetris_score_label);
-            lv_obj_del(tetris_game_over_label);
+            lv_obj_delete(tetris_canvas);
+            lv_obj_delete(tetris_score_label);
+            lv_obj_delete(tetris_game_over_label);
             heap_caps_free(tetris_canvas_pixels); // Free PSRAM
             
             tetris_canvas = tetris_score_label = tetris_game_over_label = NULL;
@@ -2359,9 +2281,9 @@ void lcd_tools_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t 
 	// Exit to menu
 	else if (ui_btns->home_btn) {
 		// Delete objects
-		lv_obj_del(tetris_canvas);
-		lv_obj_del(tetris_score_label);
-		lv_obj_del(tetris_game_over_label);
+		lv_obj_delete(tetris_canvas);
+		lv_obj_delete(tetris_score_label);
+		lv_obj_delete(tetris_game_over_label);
 		heap_caps_free(tetris_canvas_pixels); // Free PSRAM
 		
 		// Reset statics
@@ -2380,9 +2302,9 @@ void lcd_tools_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t 
 	// Sleep
 	else if (ui_btns->pwr_btn) {
 		// Delete objects
-		lv_obj_del(tetris_canvas);
-		lv_obj_del(tetris_score_label);
-		lv_obj_del(tetris_game_over_label);
+		lv_obj_delete(tetris_canvas);
+		lv_obj_delete(tetris_score_label);
+		lv_obj_delete(tetris_game_over_label);
 		heap_caps_free(tetris_canvas_pixels); // Free PSRAM
 		
 		// Reset statics

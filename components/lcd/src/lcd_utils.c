@@ -1,4 +1,3 @@
-#include "freertos/idf_additions.h"
 #include "polycast5_macros.h"
 
 #include <stdlib.h>
@@ -7,6 +6,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/projdefs.h"
+#include "freertos/idf_additions.h"
 #include "portmacro.h"
 
 #include "nvs.h"
@@ -17,6 +17,7 @@
 #include "esp_spiffs.h"
 #include "esp_err.h"
 
+#include "qrcodegen.h"
 #include "st7789.h"
 #include "tca9535.h"
 
@@ -433,12 +434,12 @@ void lcd_lvgl_init(void)
 	// Draw‐buffer: HOR_RES x DRAW_LINES lines
 	// Allocate space for 20 lines of 240 px each (≈9.6 kB), DMA-capable in DRAM
 	static DRAM_ATTR lv_color_t buf[HOR_RES * DRAW_LINES * 2]
-		__attribute__((aligned(4)));
+			__attribute__((aligned(4)));
 		
 	static lv_draw_buf_t draw_buf;
 	lv_draw_buf_init(&draw_buf, HOR_RES, DRAW_LINES, LV_COLOR_FORMAT_NATIVE, 0, buf, sizeof(buf));
 					 
-	// Create the “display” object
+	// Create the display object
 	disp = lv_display_create(HOR_RES, VER_RES); // 240x135 logical
 	lv_display_set_flush_cb(disp, st7789_flush_cb);
 	lv_display_set_draw_buffers(disp, &draw_buf, NULL);
@@ -470,9 +471,8 @@ void lcd_lvgl_init(void)
 	warm_img(IMG_DICE_6);
 	
 	// And QRs
-	warm_img(QR_ESP_RX_EX);
-	warm_img(QR_PC5_COM);
-	warm_img(QR_PC5_DOCS);
+	warm_img(QR_PC5_BOOT);
+	// Other QRs are generated dynamically
 }
 
 void lcd_ns_nvs_clear(const char* ns)
@@ -1200,6 +1200,118 @@ static void transition_animation(bool dir)
 	lcd_anim_nvs_save();
 }
 
+// Draw text as QR into an LVGL canvas (RGB565) -> returns 0 on success
+int lcd_draw_qr(lv_obj_t *canvas, const char *text, int size_px, uint8_t **pbuf)
+{
+	// Validate args
+	if (!canvas || !text || !*text || size_px <= 0 || !pbuf) {
+		return -1;
+	}
+
+	// Allocate work buffers (heap, prefer PSRAM)
+	uint8_t *tmp = (uint8_t*)heap_caps_malloc(qrcodegen_BUFFER_LEN_MAX, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
+	if (!tmp) {
+		tmp = (uint8_t*)malloc(qrcodegen_BUFFER_LEN_MAX);
+	}
+	
+	uint8_t *qr = (uint8_t*)heap_caps_malloc(qrcodegen_BUFFER_LEN_MAX, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
+	if (!qr) {
+		qr = (uint8_t*)malloc(qrcodegen_BUFFER_LEN_MAX);
+	}
+	
+	if (!tmp || !qr) {
+		free(tmp);
+		free(qr);
+		return -2;
+	}
+
+	// Encode QR
+	bool ok = qrcodegen_encodeText(text, tmp, qr, qrcodegen_Ecc_MEDIUM, qrcodegen_VERSION_MIN,
+			qrcodegen_VERSION_MAX, qrcodegen_Mask_AUTO, true);
+			
+	// Free tmp buffer after encode
+	free(tmp);
+	if (!ok) {
+		free(qr);
+		return -3;
+	}
+
+	// Recreate canvas buffer every call (simple & safe)
+	size_t bytes = (size_t)size_px * (size_px) * 2; // RGB565
+	if (*pbuf) {
+		// Free old buffer
+		free(*pbuf);
+		*pbuf = NULL;
+	}
+	
+	*pbuf = (uint8_t*)heap_caps_malloc(bytes, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
+	
+	if (!*pbuf) {
+		*pbuf = (uint8_t*)malloc(bytes);
+	}
+	
+	if (!*pbuf) {
+		free(qr);
+		return -4;
+	}
+
+	// Bind buffer to canvas
+	lv_canvas_set_buffer(canvas, *pbuf, size_px, size_px, LV_COLOR_FORMAT_RGB565);
+
+	// Paint white background (0xFFFF)
+	memset(*pbuf, 0xFF, bytes);
+
+	// Compute scale (QR modules -> pixels)
+	int qr_sz = qrcodegen_getSize(qr);
+	int border = 2;
+	int mods = qr_sz + border * 2;
+	float scale = (float)size_px / (float)mods;
+
+	// Draw black modules
+	for (int my = 0; my < mods; ++my) {
+		for (int mx = 0; mx < mods; ++mx) {
+			// Get module
+			bool dark = false;
+			
+			int qx = mx - border, qy = my - border;
+			
+			if (qx >= 0 && qx < qr_sz && qy >= 0 && qy < qr_sz) {
+				dark = qrcodegen_getModule(qr, qx, qy);
+			}
+			
+			if (!dark) {
+				continue;
+			}
+
+			// Module -> pixel box
+			int x0 = (int)(mx * scale);
+			int y0 = (int)(my * scale);
+			
+			int x1 = (int)((mx + 1) * scale);
+			if (x1 <= x0) {
+				x1 = x0 + 1;
+			}
+			
+			int y1 = (int)((my + 1) * scale);
+			if (y1 <= y0) {
+				y1 = y0 + 1;
+			}
+
+			// Fill box black (0x0000)
+			for (int y = y0; y < y1 && y < size_px; ++y) {
+				uint16_t *row = (uint16_t*)(*pbuf + (size_t)y * (size_px * 2));
+				for (int x = x0; x < x1 && x < size_px; ++x) {
+					row[x] = 0x0000;
+				}
+			}
+		}
+	}
+
+	// Free QR map
+	free(qr);
+	return 0;
+}
+
 void lcd_boot_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu)
 {
 	#define BOOT_PAGE_Y_OFFSET 40
@@ -1274,7 +1386,7 @@ void lcd_boot_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu)
 	// Confirm
 	else if (ui_btns->right_btn == 1) {
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -2045,7 +2157,7 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
 					 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
 			lv_timer_handler();
 			vTaskDelay(pdMS_TO_TICKS(1000));
-			lv_obj_del(lbl_rst);
+			lv_obj_delete(lbl_rst);
 			lcd_clear_pending_inputs = true;
 			
 			// Show IR menu
@@ -2193,7 +2305,7 @@ void lcd_lora_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_men
 					 &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
 			lv_timer_handler();
 			vTaskDelay(pdMS_TO_TICKS(1000));
-			lv_obj_del(lbl_rst);
+			lv_obj_delete(lbl_rst);
 			lcd_clear_pending_inputs = true;
 			
 			// Show LoRa menu
@@ -2307,7 +2419,7 @@ void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espn
 					 &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
 			lv_timer_handler();
 			vTaskDelay(pdMS_TO_TICKS(1000));
-			lv_obj_del(lbl_rst);
+			lv_obj_delete(lbl_rst);
 			lcd_clear_pending_inputs = true;
 			
 			// Show ESP-NOW menu
@@ -2515,7 +2627,7 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 				lv_timer_handler();
 				vTaskDelay(pdMS_TO_TICKS(1000));
 				
-				lv_obj_del(lbl_conf);
+				lv_obj_delete(lbl_conf);
 				lbl_conf = NULL;
 				
 				lcd_clear_pending_inputs = true;
@@ -2560,7 +2672,7 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 				lv_timer_handler();
 				vTaskDelay(pdMS_TO_TICKS(1000));
 				
-				lv_obj_del(lbl_conf);
+				lv_obj_delete(lbl_conf);
 				lbl_conf = NULL;
 				
 				lcd_clear_pending_inputs = true;

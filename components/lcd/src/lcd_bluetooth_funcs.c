@@ -706,7 +706,7 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -726,7 +726,7 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -1495,7 +1495,7 @@ void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -1514,7 +1514,7 @@ void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
 		bluetooth_web_portal_stop();
 
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -1900,7 +1900,7 @@ void lcd_bluetooth_pair_new_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -1920,7 +1920,7 @@ void lcd_bluetooth_pair_new_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;

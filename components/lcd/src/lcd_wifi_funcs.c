@@ -775,8 +775,8 @@ void lcd_wifi_get_password(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t 
 	// Back
 	else if (ui_btns->left_btn && cur_pos == 0) {
 		// Delete objects
-		lv_obj_del(lbl_user_in);
-		lv_obj_del(lbl_dirs);
+		lv_obj_delete(lbl_user_in);
+		lv_obj_delete(lbl_dirs);
 		
 		// Reset statics
 		lbl_user_in = lbl_dirs = NULL;
@@ -794,8 +794,8 @@ void lcd_wifi_get_password(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t 
 	// Power off
 	else if (ui_btns->pwr_btn) {
 		// Delete objects
-		lv_obj_del(lbl_user_in);
-		lv_obj_del(lbl_dirs);
+		lv_obj_delete(lbl_user_in);
+		lv_obj_delete(lbl_dirs);
 		
 		// Reset statics
 		lbl_user_in = lbl_dirs = NULL;
@@ -848,8 +848,8 @@ void lcd_wifi_get_password(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t 
 		}
 
 		// Delete objects
-		lv_obj_del(lbl_user_in);
-		lv_obj_del(lbl_dirs);
+		lv_obj_delete(lbl_user_in);
+		lv_obj_delete(lbl_dirs);
 		
 		// Reset statics
 		lbl_user_in = lbl_dirs = NULL;
@@ -1766,10 +1766,10 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 		if (xSemaphoreTake(xLeftButtonSemaphore, 0) == pdTRUE) {
 			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 			
-			lv_obj_del(lbl_exit);
-			lv_obj_del(lbl_name);
-			lv_obj_del(lbl_del);
-			lv_obj_del(lbl_ins);
+			lv_obj_delete(lbl_exit);
+			lv_obj_delete(lbl_name);
+			lv_obj_delete(lbl_del);
+			lv_obj_delete(lbl_ins);
 			
 			// Hide up and down arrows
 			lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
@@ -1796,10 +1796,10 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 		else if (xSemaphoreTake(xUpButtonSemaphore, 0) == pdTRUE) {
 			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 			
-			lv_obj_del(lbl_exit);
-			lv_obj_del(lbl_name);
-			lv_obj_del(lbl_del);
-			lv_obj_del(lbl_ins);
+			lv_obj_delete(lbl_exit);
+			lv_obj_delete(lbl_name);
+			lv_obj_delete(lbl_del);
+			lv_obj_delete(lbl_ins);
 			
 			lcd_clear_pending_inputs = true; // Clear any false inputs
 			
@@ -1815,10 +1815,10 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 		else if (xSemaphoreTake(xDownButtonSemaphore, 0) == pdTRUE) {
 			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 			
-			lv_obj_del(lbl_exit);
-			lv_obj_del(lbl_name);
-			lv_obj_del(lbl_del);
-			lv_obj_del(lbl_ins);
+			lv_obj_delete(lbl_exit);
+			lv_obj_delete(lbl_name);
+			lv_obj_delete(lbl_del);
+			lv_obj_delete(lbl_ins);
 			
 			lcd_clear_pending_inputs = true; // Clear any false inputs
 			
@@ -1845,7 +1845,7 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 		
 			// Also free the deleted option and associated button
 			free(wifi_menu->options[del_idx]);
-			lv_obj_del(wifi_menu->btns[del_idx]);
+			lv_obj_delete(wifi_menu->btns[del_idx]);
 			
 			// Shift all the remaining options and buttons down one
 			for (uint8_t i = del_idx; (i + 1) < wifi_menu->size; ++i) {
@@ -2194,7 +2194,7 @@ void lcd_wifi_ota_confirm_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -2209,7 +2209,7 @@ void lcd_wifi_ota_confirm_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu
 	// Start the update selected
 	else if (ui_btns->right_btn == 1) {
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
@@ -2226,7 +2226,7 @@ void lcd_wifi_ota_confirm_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu
 	// Home or power off
 	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
 		// Delete objects
-		lv_obj_del(cont); // Deletes children
+		lv_obj_delete(cont); // Deletes children
 		
 		// Reset statics
 		cont = NULL;
