@@ -158,6 +158,9 @@ void app_main(void) {
 	#endif
 	
 	#ifdef POLYCAST5_DEBUG_SPIFFS
+	// Wait for tasks to allocate
+	vTaskDelay(pdMS_TO_TICKS(2000));
+	
 	size_t total_bytes, used_bytes;
 	esp_err_t ret = esp_spiffs_info("assets", &total_bytes, &used_bytes);
 

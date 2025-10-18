@@ -500,7 +500,7 @@ build esp-idf/esp_system/ld/sections.ld | ${cmake_ninja_workdir}esp-idf/esp_syst
 # Custom command for CMakeFiles\spiffs_assets_bin
 
 build CMakeFiles/spiffs_assets_bin | ${cmake_ninja_workdir}CMakeFiles/spiffs_assets_bin: CUSTOM_COMMAND
-  COMMAND = C:\Windows\system32\cmd.exe /C "cd /D C:\Projects\ESP\PolyCast5\build && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-v5.5.1/components/spiffs/spiffsgen.py 0x8d0000 C:/Projects/ESP/PolyCast5/assets C:/Projects/ESP/PolyCast5/build/assets.bin --page-size=256 --obj-name-len=64 --meta-len=4 --use-magic --use-magic-len"
+  COMMAND = C:\Windows\system32\cmd.exe /C "cd /D C:\Projects\ESP\PolyCast5\build && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-v5.5.1/components/spiffs/spiffsgen.py 0x870000 C:/Projects/ESP/PolyCast5/assets C:/Projects/ESP/PolyCast5/build/assets.bin --page-size=256 --obj-name-len=32 --meta-len=4 --use-magic --use-magic-len"
 
 
 #############################################

@@ -1,7 +1,8 @@
-# Name,   Type, SubType, Offset,   Size,     Flags ----- (256KB NVS + 3.6MB OTA slots + 9.26MB SPIFFS)
+# Sizes: 256KB NVS, 3.8MB OTA slots, 8.85MB SPIFFS
+# Name,   Type, SubType, Offset,   Size,     Flags
 nvs,      data, nvs,     0x009000, 0x040000,
 otadata,  data, ota,     0x049000, 0x002000,
 phy_init, data, phy,     0x04B000, 0x001000,
-ota_0,    app,  ota_0,   0x050000, 0x370000,
-ota_1,    app,  ota_1,   0x3C0000, 0x370000,
-assets,   data, spiffs,  0x730000, 0x08D0000,
+ota_0,    app,  ota_0,   0x050000, 0x3A0000,
+ota_1,    app,  ota_1,   0x3F0000, 0x3A0000,
+assets,   data, spiffs,  0x790000, 0x0870000,

@@ -3,4 +3,4 @@
 0x50000 PolyCast5.bin
 0x8000 partition_table/partition-table.bin
 0x49000 ota_data_initial.bin
-0x730000 assets.bin
+0x790000 assets.bin
