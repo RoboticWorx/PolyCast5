@@ -1160,7 +1160,12 @@ void lcd_tools_pomodoro_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
 				// Update time text
 				char buf[16];
 				snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned)(remaining / 60U), (unsigned)(remaining % 60U));
-				lv_label_set_text(lbl_time, buf);			
+				lv_label_set_text(lbl_time, buf);	
+				
+				// Haptic buzz to indicate switch
+				xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics
+				gpio_spin_haptic(500);
+				xSemaphoreGive(xHapticsMutex); // Release haptics		
 			}
 		}
 	}

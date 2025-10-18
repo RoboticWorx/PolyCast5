@@ -409,9 +409,9 @@ void gpio_spin_haptic(uint32_t ms)
 	if (ms < HAPTIC_MIN_MS) {
 		ms = HAPTIC_MIN_MS;
 	}
-	else if (ms > HAPTIC_MAX_MS) {
-		ms = HAPTIC_MAX_MS;
-	}
+	//else if (ms > HAPTIC_MAX_MS) {
+	//	ms = HAPTIC_MAX_MS;
+	//}
 	
 	TickType_t ticks = pdMS_TO_TICKS(ms);
 	if (ticks == 0) {
