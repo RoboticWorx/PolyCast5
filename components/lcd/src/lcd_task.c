@@ -396,6 +396,9 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == TOOLS_BTC_ADDR_SETUP_PAGE) {
 				lcd_tools_btc_addr_setup_page(&ui_btns, &ui_menu, &tools_menu);
 			}
+			else if (ui_menu.page == TOOLS_POMODORO_PAGE) {
+				lcd_tools_pomodoro_page(&ui_btns, &ui_menu, &tools_menu);
+			}
 			else if (ui_menu.page == TOOLS_SRS_PAGE) {
 				lcd_tools_srs_page(&ui_btns, &ui_menu, &tools_menu);
 			}

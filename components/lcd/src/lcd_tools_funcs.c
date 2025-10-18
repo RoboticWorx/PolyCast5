@@ -37,8 +37,9 @@
 #define HIGH_SCORE_KEY "score"
 
 tools_menu_t tools_menu = {
-	.options = {"Coin Flipper", "Dice Roller", "Tetris", "Number Generator", "Read the Docs", "Bitcoin QR", "SRS Planner"},
-	.size = 7,
+	.options = {"Coin Flipper", "Dice Roller", "Tetris", "Number Generator", "Read the Docs", "Bitcoin QR",
+			"Pomodoro Timer", "SRS Planner"},
+	.size = 8,
 	.index = 0,
 	.cont = NULL,
 };
@@ -1034,6 +1035,248 @@ void lcd_tools_how_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
  		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
+
+void lcd_tools_pomodoro_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
+{
+	#define POMODORO_MODE_TXT "%dm work,\n%dm break"
+	
+	// Enums
+	enum { POMODORO_25_5, POMODORO_50_10 };
+	enum { POMODORO_PHASE_WORK, POMODORO_PHASE_BREAK };
+
+	// Statics
+	static bool init = false;
+	static int mode = POMODORO_25_5;
+	static int phase = POMODORO_PHASE_WORK;
+	static bool running = false;
+
+	static uint32_t work_time = 25 * 60; // sec
+	static uint32_t break_time = 5 * 60; // sec
+	static uint32_t remaining = 0; // Seconds remaining in current phase
+	static TickType_t last_tick = 0;
+
+	static lv_obj_t *lbl_mode = NULL;
+	static lv_obj_t *lbl_phase = NULL;
+	static lv_obj_t *lbl_time = NULL;
+	static lv_obj_t *arc = NULL;
+
+	// Do once
+	if (!init) {
+		// Arc (full -> empty)
+		arc = lv_arc_create(ACTIVE_SCR);
+		lv_obj_set_size(arc, 110, 110);
+		lv_obj_align(arc, LV_ALIGN_CENTER, -44, 0);
+		lv_arc_set_rotation(arc, 270); // Start at top
+		lv_arc_set_bg_angles(arc, 0, 360);
+		lv_arc_set_mode(arc, LV_ARC_MODE_NORMAL); // Clockwise
+		lv_obj_remove_style(arc, NULL, LV_PART_KNOB);
+		lv_obj_remove_flag(arc, LV_OBJ_FLAG_CLICKABLE);
+
+		// Hide track, show only indicator
+		lv_obj_set_style_arc_width(arc, 0, LV_PART_MAIN);
+		lv_obj_set_style_arc_opa(arc, LV_OPA_TRANSP, LV_PART_MAIN);
+		lv_obj_set_style_arc_width(arc, 8, LV_PART_INDICATOR);
+		lv_obj_set_style_arc_color(arc, user_secondary_color, LV_PART_INDICATOR);
+		lv_obj_set_style_arc_opa(arc, LV_OPA_COVER, LV_PART_INDICATOR);
+
+		// Percent range
+		lv_arc_set_range(arc, 0, 100);
+		lv_arc_set_value(arc, 100); // Start full
+		
+		// Set defaults
+		mode = POMODORO_25_5;
+		work_time = 25 * 60;
+		break_time = 5 * 60;
+		phase = POMODORO_PHASE_WORK;
+		remaining = work_time;
+
+		// Mode
+		lbl_mode = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_mode, POMODORO_MODE_TXT, user_secondary_color,
+				&lv_font_montserrat_16, LV_ALIGN_RIGHT_MID, -18, 0);
+		
+		// Set current work/break time
+		lv_label_set_text_fmt(lbl_mode, POMODORO_MODE_TXT, (int)(work_time / 60U), (int)(break_time / 60U));
+
+		// Phase label
+		lbl_phase = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_phase, "Work", user_secondary_color,
+				&lv_font_montserrat_16, LV_ALIGN_CENTER, -44, -20);
+
+		// Time label
+		lbl_time = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_time, "25:00", user_secondary_color,
+				&lv_font_montserrat_24, LV_ALIGN_CENTER, -44, 12);
+
+		last_tick = xTaskGetTickCount();
+		init = true;
+	}
+
+	// If running
+	if (running) {
+		TickType_t now = xTaskGetTickCount();
+		
+		// Update every second
+		if ((now - last_tick) >= pdMS_TO_TICKS(1000)) {
+			last_tick = now;
+
+			// If ticking down
+			if (remaining > 0U) {
+				remaining--;
+
+				// Update time text
+				char buf[16];
+				snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned)(remaining / 60U), (unsigned)(remaining % 60U));
+				lv_label_set_text(lbl_time, buf);
+
+				// Update arc as remaining percent (100 -> 0)
+				uint32_t total = (phase == POMODORO_PHASE_WORK) ? work_time : break_time;
+				uint32_t pct = (total > 0U) ? (remaining * 100U) / total : 0U;
+				if (pct > 100U) {
+					pct = 100U;
+				}
+				
+				// Set value
+				lv_arc_set_value(arc, (int32_t)pct);
+			}
+			// Else at 0
+			else {
+				// Auto-advance: flip phase and keep running
+				phase = (phase == POMODORO_PHASE_WORK) ? POMODORO_PHASE_BREAK : POMODORO_PHASE_WORK;
+
+				// Update phase
+				lv_label_set_text(lbl_phase, (phase == POMODORO_PHASE_WORK) ? "Work" : "Break");
+				
+				// Set current work/break time
+				lv_label_set_text_fmt(lbl_mode, POMODORO_MODE_TXT, (int)(work_time / 60U), (int)(break_time / 60U));
+
+				// Reset timers for new phase and keep going
+				uint32_t total = (phase == POMODORO_PHASE_WORK) ? work_time : break_time;
+				remaining = total;
+
+				// Arc back to full
+				lv_arc_set_value(arc, 100);
+				
+				// Update time text
+				char buf[16];
+				snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned)(remaining / 60U), (unsigned)(remaining % 60U));
+				lv_label_set_text(lbl_time, buf);			
+			}
+		}
+	}
+
+	/* User input */
+	
+	// Start or pause
+	if (ui_btns->select_btn) {
+		running = !running;
+		
+		if (running) {
+			last_tick = xTaskGetTickCount();
+		}
+	}
+	// Toggle 25/5 <-> 50/10 (if paused)
+	else if (ui_btns->right_btn && !running) {
+		// Switch to 50 if 25
+		if (mode == POMODORO_25_5) {
+			mode = POMODORO_50_10;
+			work_time = 50 * 60;
+			break_time = 10 * 60;
+		}
+		// Else switch 25 if 50
+		else {
+			mode = POMODORO_25_5;
+			work_time = 25 * 60;
+			break_time =  5 * 60;
+		}
+		
+		// Always reset to work when switching presets
+		phase = POMODORO_PHASE_WORK;
+		remaining = work_time;
+
+		// Update phase
+		lv_label_set_text(lbl_phase, "Work");
+		
+		// Set current work/break time
+		lv_label_set_text_fmt(lbl_mode, POMODORO_MODE_TXT, (int)(work_time / 60U), (int)(break_time / 60U));
+
+		// Reset arc
+		lv_arc_set_value(arc, 100);
+		
+		// Update time text
+		char buf[16];
+		snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned)(remaining / 60U), (unsigned)(remaining % 60U));
+		lv_label_set_text(lbl_time, buf);
+	}
+	// Adjust current phase by +-1 min (if paused)
+	else if ((ui_btns->up_btn || ui_btns->down_btn) && !running) {
+		// If up +60s, else -60s
+		int32_t delta = ui_btns->up_btn ? +60 : -60;
+		
+		// Pick which phase length to edit
+		uint32_t *phase_ptr = (phase == POMODORO_PHASE_WORK) ? &work_time : &break_time;
+		
+		// Compute new duration for active phase
+		int32_t next = (int32_t)(*phase_ptr) + delta;
+		
+		// Clamp
+		if (next < 60) {
+			next = 60;
+		}
+		if (next > 600 * 60) {
+			next = 600 * 60;
+		}
+
+		// Commit the new phase length and reset countdown
+		*phase_ptr = (uint32_t)next;
+		remaining = (uint32_t)next;
+
+		// Reset arc
+		lv_arc_set_value(arc, 100);
+		
+		// Update time text
+		char buf[16];
+		snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned)(remaining / 60U), (unsigned)(remaining % 60U));
+		lv_label_set_text(lbl_time, buf);
+		
+		// Set current work/break time
+		lv_label_set_text_fmt(lbl_mode, POMODORO_MODE_TXT, (int)(work_time / 60U), (int)(break_time / 60U));
+	}
+	// Go back
+	else if (ui_btns->left_btn) {
+		// Delete objects
+		lv_obj_delete(lbl_mode);
+		lv_obj_delete(lbl_phase);
+		lv_obj_delete(lbl_time);
+		lv_obj_delete(arc);
+
+		// Reset statics
+		lbl_mode = lbl_phase = lbl_time = arc = NULL;
+		init = false;
+		running = false;
+
+		// Show tools menu
+		lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+		ui_menu->page = TOOLS_PAGE;
+	}
+	// Home or power off
+	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
+		// Delete objects
+		lv_obj_delete(lbl_mode);
+		lv_obj_delete(lbl_phase);
+		lv_obj_delete(lbl_time);
+		lv_obj_delete(arc);
+
+		// Reset statics
+		lbl_mode = lbl_phase = lbl_time = arc = NULL;
+		init = false;
+		running = false;
+
+ 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+	}
+}
+
 
 void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
 {

@@ -2711,8 +2711,22 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
 		// Switch pages
 		ui_menu->page = TOOLS_BTC_ADDR_PAGE;
 	}
-	// SRS memory assist selected
+	// Pomodoro timer selected
 	else if (ui_btns->select_btn == 1 && tools_menu->index == 6) {
+		// Hide tools menu
+		lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = TOOLS_POMODORO_PAGE;
+	}
+	// SRS memory assist selected
+	else if (ui_btns->select_btn == 1 && tools_menu->index == 7) {
 		// Hide tools menu
 		lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
