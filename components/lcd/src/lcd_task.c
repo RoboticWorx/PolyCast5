@@ -455,6 +455,9 @@ static void lcd_task(void *pvParameters)
 			else if (ui_menu.page == BLUETOOTH_MEDIA_CAMERA_PAGE) {
 				lcd_bluetooth_media_page(&ui_btns, &ui_menu, &bluetooth_menu, BLUETOOTH_MEDIA_CAMERA_PAGE);
 			}
+			else if (ui_menu.page == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
+				lcd_bluetooth_media_page(&ui_btns, &ui_menu, &bluetooth_menu, BLUETOOTH_MEDIA_SOCIALS_PAGE);
+			}
 			else if (ui_menu.page == BLUETOOTH_KEYBOARD_PAGE) {
 				lcd_bluetooth_keyboard_page(&ui_btns, &ui_menu, &bluetooth_menu);
 			}
