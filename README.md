@@ -21,7 +21,7 @@ You can find some relevant links below:
   * Button pusher
   * and more!
 
-## Functionality
+# Functionality
 * **Outlet actuator**  - Turn on and off outlets/applicances wirelessly and set schedules, timers, and modes.
 * **Bluetooth controller** - Send media and autotype commands to instantly type out repetitive text, control volume, etc.
 * **Infrared remote** - Save and replay infrared signals for TVs, air conditioners, lamps, etc.
@@ -32,7 +32,7 @@ You can find some relevant links below:
 
 _PolyCast5 also comes with cool, customizable homescreen animations and hotkeys!_
 
-## Project Structure
+# Project Structure
 * `main` - Initialization code. The program runs from here.
 * `assets` - Media image files stored as `.bin` for SPIFFS access.
 * `scripts` - Bluetooth keystroke injection (autotype) examples as well as a few miscellaneous developement scripts.
@@ -49,9 +49,38 @@ _PolyCast5 also comes with cool, customizable homescreen animations and hotkeys!
   * `sx126x` - Driver for the SX1262 LoRa radio chip.
   * `wifi` - Connects to networks, monitors packets, and sends data over long distances via MQTT.
 
-## Licensing
+# Licensing
 *Code in this repository is licensed under [CC Attribution-NonCommercial-ShareAlike 4.0 International](https://github.com/RoboticWorx/PolyCast5/blob/main/LICENSE.md) ([canonical](https://creativecommons.org/licenses/by-nc-sa/4.0/)).*
 
 *Unless required by applicable law or agreed to in writing, this
 software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
 CONDITIONS OF ANY KIND, either express or implied.*
+
+# Development
+PolyCast5 is written in C. An intermediate level of C knowledge/ESP-IDF is recommended for comfortable programming.
+
+## Cloning
+The repository can be cloned with the following git command:
+```
+git clone --recursive https://github.com/RoboticWorx/PolyCast5.git
+```
+## Target
+Set the target:
+```
+idf.py set-target esp32c5
+```
+## Config
+Change the device configuration:
+```
+idf.py menuconfig
+```
+## Build
+Build the code:
+```
+idf.py build
+```
+## Flashing
+Flash the full code:
+```
+idf.py -p COMx flash
+```
