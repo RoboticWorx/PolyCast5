@@ -23,6 +23,8 @@ extern volatile bluetooth_state_t bluetooth_state;
 
 char bt_wifi_portal_pass[64];
 
+EXT_RAM_BSS_ATTR static char send_buf[2048];
+
 static uint16_t bluetooth_cmd = 0;
 static uint8_t battery_percentage = 100;
 static const TickType_t battery_timer_interval = pdMS_TO_TICKS(1000);
@@ -168,7 +170,7 @@ static void bluetooth_task(void *arg)
 				uint16_t menu_idx = (uint16_t)(bluetooth_cmd - BLUETOOTH_SCRIPT_OFFSET);
 
 				#ifdef POLYCAST5_DEBUG
-				ESP_LOGI(TAG, "Received cmd index: %d -> menu index: ", bluetooth_cmd, menu_idx);
+				ESP_LOGI(TAG, "Received cmd index: %u -> menu index: %u", (unsigned)bluetooth_cmd, (unsigned)menu_idx);
 				#endif
 			
 				// "Test" at menu index 1, handle it specially
@@ -220,11 +222,11 @@ static void bluetooth_task(void *arg)
 				}
 				/* If social media scroller command */
 				else if (bluetooth_cmd == BLUETOOTH_SCRIPT_SOCIALS_UP) {
-					bluetooth_send_script("k", 1);
+					bluetooth_send_script("<up><delay=150>k", 1); // Try both
 					continue;
 				}
 				else if (bluetooth_cmd == BLUETOOTH_SCRIPT_SOCIALS_DOWN) {
-					bluetooth_send_script("j", 1);
+					bluetooth_send_script("<down><delay=150>j", 1); // Try both
 					continue;
 				}
 				else if (bluetooth_cmd == BLUETOOTH_SCRIPT_SOCIALS_LIKE) {
@@ -237,23 +239,22 @@ static void bluetooth_task(void *arg)
 				if (menu_idx >= NUM_KEYBOARD_BASE) {
 					uint8_t script_idx = (uint8_t)(menu_idx - NUM_KEYBOARD_BASE); // 0-based NVS slot
 
-					char buf[512];
 					size_t blen = 0;
 
 					// Ask NVS for the stored body - Pass full sizeof(buf) so there's room for the NUL-terminator
-					esp_err_t err = bluetooth_script_body_get_nvs(script_idx, buf, sizeof(buf), &blen);
-					if (err == ESP_OK && blen > 0 && buf[0] != '\0') {
+					esp_err_t err = bluetooth_script_body_get_nvs(script_idx, send_buf, sizeof(send_buf), &blen);
+					if (err == ESP_OK && blen > 0 && send_buf[0] != '\0') {
 						// NVS returns a C-string: Just send it
 						#ifdef POLYCAST5_DEBUG
-						ESP_LOGI(TAG, "Sending script: %s", buf);
+						ESP_LOGI(TAG, "Sending script: %s", send_buf);
 						#endif
 
 						// Send the script
-						bluetooth_send_script(buf, 1);
+						bluetooth_send_script(send_buf, 1);
 					}
 					else {
 						#ifdef POLYCAST5_DEBUG
-						ESP_LOGW(TAG, "No script body at idx=%u (err=%s, blen=%u)",
+						ESP_LOGW(TAG, "Failed/no script body at idx=%u (err=%s, blen=%u)",
 								(unsigned)script_idx, esp_err_to_name(err), (unsigned)blen);
 						#endif
 					}

@@ -860,7 +860,7 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 		else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) {
 			lv_label_set_text(lbl_right, "");
 		}
-		else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) { // Vol down
+		else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) { // Vol up
 			lv_label_set_text(lbl_right, LV_SYMBOL_VOLUME_MAX);
 		}
 		lv_obj_set_style_text_font(lbl_right, &lv_font_montserrat_18, 0);
@@ -870,7 +870,7 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE || type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
 			lv_obj_align(lbl_right, LV_ALIGN_CENTER, 1, 0);
 		}
-		else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) { // Vol down
+		else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
 			lv_obj_align(lbl_right, LV_ALIGN_CENTER, 0, 0);
 		}
 		else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
