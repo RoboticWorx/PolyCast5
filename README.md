@@ -57,24 +57,22 @@ software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
 CONDITIONS OF ANY KIND, either express or implied.*
 
 # Development
-PolyCast5 is written in C. An intermediate level of C knowledge/ESP-IDF is recommended for comfortable programming.
+PolyCast5 is written in C and built on [ESP-IDF](https://github.com/espressif/esp-idf).
 
 ## Cloning
 The repository can be cloned with the following git command:
 ```
 git clone --recursive https://github.com/RoboticWorx/PolyCast5.git
 ```
-## Target
-Set the target:
+## Build
+Set the microcontroller target:
 ```
 idf.py set-target esp32c5
 ```
-## Config
-Change the device configuration:
+Change the device configuration (if needed):
 ```
 idf.py menuconfig
 ```
-## Build
 Build the code:
 ```
 idf.py build

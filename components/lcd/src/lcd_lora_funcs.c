@@ -1301,15 +1301,19 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 	static bool tx_success = false;
 	static bool init = false;
 	
+	static lv_obj_t *qr_canvas = NULL;
+	static uint8_t *qr_buf = NULL; // Canvas backing buffer
+	
 	static lv_obj_t *lbl_send_tx = NULL;
 	static lv_obj_t *lbl_send_rx = NULL;
 	static lv_obj_t *lbl_send_cmd = NULL;
 	static lv_obj_t *lbl_send_box = NULL;
-	static lv_obj_t *lbl_link = NULL;
+	static lv_obj_t *lbl_info = NULL;
 	static lv_obj_t *lbl_send = NULL;
 	static lv_obj_t *arrow_top = NULL;
 	static lv_obj_t *arrow_bot = NULL;
 	static lv_style_t style_cmd;
+	static lv_style_t style_info;
 	
 	// Do once
 	if (!init) {
@@ -1338,9 +1342,9 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		lcd_format_label(lbl_send, "SEND", user_secondary_color,
 				&lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
 		
-		lbl_link = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_link, "polycast5.com\n/blogs/docs\n/polyplug-gpio", user_secondary_color,
-				&lv_font_montserrat_12, LV_ALIGN_BOTTOM_RIGHT, -3, -3);
+		lbl_info = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_info, LV_SYMBOL_HOME " INFO", user_secondary_color,
+				&lv_font_montserrat_18, LV_ALIGN_BOTTOM_RIGHT, -5, -4);
 		
 		arrow_top = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(arrow_top, LV_SYMBOL_UP, user_secondary_color,
@@ -1371,8 +1375,24 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		lv_style_set_pad_right(&style_cmd, 55);
 		lv_style_set_pad_top(&style_cmd, 25);
 		lv_style_set_pad_bottom(&style_cmd, 25);
+		
+		// Create a style for the edit box
+		lv_style_init(&style_info);
+	
+		lv_style_set_radius(&style_info, 8);
+		lv_style_set_bg_color(&style_info, user_primary_color);
+		lv_style_set_border_width(&style_info, 2);
+		lv_style_set_border_color(&style_info, user_secondary_color);
+		lv_style_set_border_side(&style_info, LV_BORDER_SIDE_FULL);
+		lv_style_set_text_color(&style_info, user_secondary_color);
+		
+		lv_style_set_pad_left(&style_info, 10);
+		lv_style_set_pad_right(&style_info, 10);
+		lv_style_set_pad_top(&style_info, 6);
+		lv_style_set_pad_bottom(&style_info, 6);
 			
 		lv_obj_add_style(lbl_send_box, &style_cmd, 0);
+		lv_obj_add_style(lbl_info, &style_info, 0);
 		
 		// Show
 		lv_timer_handler();
@@ -1454,15 +1474,16 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		lv_obj_delete(lbl_send_cmd);
 		lv_obj_delete(lbl_send_box);
 		lv_obj_delete(lbl_send);
-		lv_obj_delete(lbl_link);
+		lv_obj_delete(lbl_info);
 		lv_obj_delete(arrow_top);
 		lv_obj_delete(arrow_bot);
 		
 		// Free the style
 		lv_style_reset(&style_cmd);
+		lv_style_reset(&style_info);
 		
 		// Reset statics
-		lbl_send_tx = lbl_send_rx = lbl_send_cmd = lbl_send_box = lbl_send = arrow_top = arrow_bot = lbl_link = NULL;
+		lbl_send_tx = lbl_send_rx = lbl_send_cmd = lbl_send_box = lbl_send = arrow_top = arrow_bot = lbl_info = NULL;
 		init = false;
 		
 		// Show up and down arrows
@@ -1475,23 +1496,90 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		// Go back
 		ui_menu->page = LORA_SUBPAGE;
 	}
-	// Home or power off selected
-	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {			
+	// Home selected
+	else if (ui_btns->home_btn == 1) {			
 		// Reset objects
 		lv_obj_delete(lbl_send_tx);
 		lv_obj_delete(lbl_send_rx);
 		lv_obj_delete(lbl_send_cmd);
 		lv_obj_delete(lbl_send_box);
 		lv_obj_delete(lbl_send);
-		lv_obj_delete(lbl_link);
+		lv_obj_delete(lbl_info);
 		lv_obj_delete(arrow_top);
 		lv_obj_delete(arrow_bot);
 		
 		// Free the style
 		lv_style_reset(&style_cmd);
+		lv_style_reset(&style_info);
 		
 		// Reset statics
-		lbl_send_tx = lbl_send_rx = lbl_send_cmd = lbl_send_box = lbl_send = arrow_top = arrow_bot = lbl_link = NULL;
+		lbl_send_tx = lbl_send_rx = lbl_send_cmd = lbl_send_box = lbl_send = arrow_top = arrow_bot = lbl_info = NULL;
+		init = false;
+		
+		/* Show 'How to Use PolyCast5 LoRa' link */
+		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+	
+		// Create QR
+		qr_canvas = lv_canvas_create(ACTIVE_SCR);
+		lv_obj_set_size(qr_canvas, 110, 110);
+		lv_obj_align(qr_canvas, LV_ALIGN_CENTER, 0, 0);
+		const char *url = "https://polycast5.com/blogs/docs/use-polycast5-lora-in-your-own-projects/";
+		
+		// Draw the URL as a QR
+		int n = lcd_draw_qr(qr_canvas, url, 110, &qr_buf);
+		if (n != 0) {
+			ESP_LOGE(TAG, "lcd_lora_gpio_subpage lcd_draw_qr failed: %d", n);
+		}
+		
+		// Show until back selected
+		while (xSemaphoreTake(xLeftButtonSemaphore, 0) != pdTRUE) {
+			lv_timer_handler();
+			vTaskDelay(pdMS_TO_TICKS(10));
+		}
+		
+		// Free QR buffer
+		if (qr_buf) {
+			free(qr_buf);
+			qr_buf = NULL;
+		}
+		lv_obj_delete(qr_canvas);
+		qr_canvas = NULL;
+		
+		/* Exit */
+		
+		lcd_clear_pending_inputs = true;
+		
+		// Show arrows
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show LoRa submenu cont
+		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+			
+		// Go back
+		ui_menu->page = LORA_SUBPAGE;
+	}
+	// Power off selected
+	else if (ui_btns->pwr_btn == 1) {			
+		// Reset objects
+		lv_obj_delete(lbl_send_tx);
+		lv_obj_delete(lbl_send_rx);
+		lv_obj_delete(lbl_send_cmd);
+		lv_obj_delete(lbl_send_box);
+		lv_obj_delete(lbl_send);
+		lv_obj_delete(lbl_info);
+		lv_obj_delete(arrow_top);
+		lv_obj_delete(arrow_bot);
+		
+		// Free the style
+		lv_style_reset(&style_cmd);
+		lv_style_reset(&style_info);
+		
+		// Reset statics
+		lbl_send_tx = lbl_send_rx = lbl_send_cmd = lbl_send_box = lbl_send = arrow_top = arrow_bot = lbl_info = NULL;
 		init = false;
 			
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep

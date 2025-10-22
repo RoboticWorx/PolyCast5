@@ -1547,7 +1547,7 @@ void lcd_tools_btc_addr_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
 	
 	static lv_obj_t *cont = NULL;
 	static lv_obj_t *instr_lbl = NULL;
-	static lv_obj_t *qr_canvas	= NULL;
+	static lv_obj_t *qr_canvas = NULL;
 	
 	if (!init) {		
 		// Create a scrollable container for the instructions
