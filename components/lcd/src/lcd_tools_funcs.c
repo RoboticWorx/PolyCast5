@@ -987,7 +987,7 @@ void lcd_tools_how_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
 								 "better you remember them at increasingly impressive intervals.\n\n"
 								 "This option will help you keep track of what you need to review on which days to "
 								 "optimize your long-term memory retention.\n\nFor more info on how to get started, please see:\n\n"
-								 "polycast5.com/blogs /tutorials/srs-memory-planner";
+								 "polycast5.com/blogs /docs/srs-memory-planner";
 		
 		lv_label_set_text(instr_lbl, instr_text);
 

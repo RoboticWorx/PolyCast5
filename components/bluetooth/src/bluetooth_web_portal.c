@@ -45,11 +45,11 @@ static const char *INDEX_HTML =
 "input,textarea,select{width:100%;box-sizing:border-box}textarea{height:180px}</style>"
 "</head><body>"
 "<h2>PolyCast5 BT Portal</h2>"
-
 "<hr><h3>Manage Categories</h3>"
 "<p>Bluetooth scripts are organized into categories to help make finding them easier.</p>"
 "<p>For example, if I want all my passwords in one place, I'd create a category probably named 'Passwords' to save them under.</p>"
 "<p>Category indexes are 0-based, so the first one you add will be index 0, then 1, etc.</p>"
+"<p>A tutorial is also available here if needed: https://polycast5.com/blogs/docs/using-the-bluetooth-auto-keyboard/</p>"
 "<div><label>Category index</label><input id=cat_idx type=number min=0 value=0> <button id=cat_load>Load</button></div>"
 "<div><label>Category Name</label><input id=cat_name maxlength=32 placeholder='Group name'></div>"
 "<div><button id=cat_save>Save (add/edit)</button> <button id=cat_del>Delete</button> <span id=cat_msg></span></div>"

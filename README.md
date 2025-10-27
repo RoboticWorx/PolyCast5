@@ -62,7 +62,7 @@ PolyCast5 is written in C and built on [ESP-IDF](https://github.com/espressif/es
 ## Cloning
 The repository can be cloned with the following git command:
 ```
-git clone --recursive https://github.com/RoboticWorx/PolyCast5.git
+git clone https://github.com/RoboticWorx/PolyCast5.git
 ```
 ## Build
 Set the microcontroller target:
@@ -80,5 +80,5 @@ idf.py build
 ## Flashing
 Flash the full code:
 ```
-idf.py -p COMx flash
+idf.py -p PORT flash
 ```
