@@ -649,6 +649,12 @@ void lcd_unhide_selection_widgets(ui_menu_t *ui_menu)
 	lv_obj_set_x(btn_mid, 0);
 	lv_obj_set_x(ui_menu->lbl_bot, 0);
 	
+	// Update scrollbar thumb y (reversed direction, precise double, no jump)
+	int max_y = SELECTION_SCROLLBAR_CONT_HEIGHT - SELECTION_SCROLLBAR_THUMB_HEIGHT;
+	double fraction = (double)ui_menu->index / (ui_menu->size - 1); // Double for smooth/no jump
+	int y = (int)(fraction * max_y + 0.5); // Round for consistency
+	lv_obj_set_y(ui_menu->scroll_bar, y + SELECTION_SCROLLBAR_OFFSET);
+	
 	// Show scrollbar
 	lv_obj_remove_flag(ui_menu->scroll_bar, LV_OBJ_FLAG_HIDDEN);
 }

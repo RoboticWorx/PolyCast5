@@ -4586,3 +4586,14 @@
 11568	11637	7835578409028045	C:/Projects/ESP/PolyCast5/build/esp-idf/esptool_py/CMakeFiles/app_check_size	7e58fd6d0e25f79f
 11638	29135	7835578409727759	esp-idf/esptool_py/CMakeFiles/app-flash	fe5c39c78fe39b56
 11638	29135	7835578409727759	C:/Projects/ESP/PolyCast5/build/esp-idf/esptool_py/CMakeFiles/app-flash	fe5c39c78fe39b56
+149	1464	7835588414685395	esp-idf/lcd/CMakeFiles/__idf_lcd.dir/src/lcd_utils.c.obj	d09e3592b7b5c377
+1464	1589	7835588427836163	esp-idf/lcd/liblcd.a	cdf669153bfc3efb
+1589	10332	7835588516188415	esp-idf/esp_system/ld/sections.ld	eb2481e725d80e0
+1589	10332	7835588516188415	C:/Projects/ESP/PolyCast5/build/esp-idf/esp_system/ld/sections.ld	eb2481e725d80e0
+10333	11716	7835588516528126	PolyCast5.elf	9a62faf65edac7aa
+11716	11999	7835588533136773	.bin_timestamp	6dee815496822dd
+11716	11999	7835588533136773	C:/Projects/ESP/PolyCast5/build/.bin_timestamp	6dee815496822dd
+12000	12074	7835588533197150	esp-idf/esptool_py/CMakeFiles/app_check_size	7e58fd6d0e25f79f
+12000	12074	7835588533197150	C:/Projects/ESP/PolyCast5/build/esp-idf/esptool_py/CMakeFiles/app_check_size	7e58fd6d0e25f79f
+12074	29556	7835588533940560	esp-idf/esptool_py/CMakeFiles/app-flash	fe5c39c78fe39b56
+12074	29556	7835588533940560	C:/Projects/ESP/PolyCast5/build/esp-idf/esptool_py/CMakeFiles/app-flash	fe5c39c78fe39b56
