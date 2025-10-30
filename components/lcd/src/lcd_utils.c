@@ -1200,6 +1200,43 @@ static void transition_animation(bool dir)
 	lcd_anim_nvs_save();
 }
 
+void lcd_apply_scrollbar_style(lv_obj_t *obj)
+{
+	// Show the bar only when the content is scrollable
+	lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_AUTO);
+
+	// Add extra padding to the main part to reserve space for the scrollbar=
+	static lv_style_t main_style;
+	static bool main_inited = false;
+	if (!main_inited) {
+		lv_style_init(&main_style);
+		lv_style_set_pad_right(&main_style, 24); // Scrollbar thickness: (4px) + gap (8px) + extra 
+		main_inited = true;
+	}
+	lv_obj_add_style(obj, &main_style, LV_PART_MAIN);
+	lv_obj_set_x(obj, lv_obj_get_x(obj) + 6); // Realign to center after padding offset
+
+	// Style the scrollbar track/indicator
+	static lv_style_t sb_style;
+	static bool sb_inited = false;
+	if (!sb_inited) {
+		lv_style_init(&sb_style);
+		
+		// Narrow bar on the right side
+		lv_style_set_width(&sb_style, 4); // Scrollbar thickness
+		lv_style_set_bg_opa(&sb_style, LV_OPA_80); // Make it clearly visible
+		lv_style_set_bg_color(&sb_style, user_secondary_color);
+		lv_style_set_radius(&sb_style, 3); // Slightly rounded ends
+		
+		// Position: pad_right = 0 keeps it flush against the right edge; pad_left adds gap from content
+		lv_style_set_pad_left(&sb_style, 12); // Small gap from content
+		lv_style_set_pad_right(&sb_style, 0); // Keep it to the right
+		sb_inited = true;
+	}
+	// Apply to the scrollbar part of this object
+	lv_obj_add_style(obj, &sb_style, LV_PART_SCROLLBAR);
+}
+
 // Draw text as QR into an LVGL canvas (RGB565) -> returns 0 on success
 int lcd_draw_qr(lv_obj_t *canvas, const char *text, int size_px, uint8_t **pbuf)
 {

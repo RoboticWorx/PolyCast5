@@ -243,11 +243,10 @@ static void lcd_bluetooth_setup_keyboard_page(bluetooth_keyboard_menu_t *menu)
 	lv_obj_set_size(menu->main_list, 210, 106);
 	
 	// Format
-	lv_obj_set_scrollbar_mode(menu->main_list, LV_SCROLLBAR_MODE_OFF); // Never draw bars
 	lv_obj_set_style_bg_color(menu->main_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_align(menu->main_list, LV_ALIGN_CENTER, 0, 0);
 	lv_obj_set_style_border_width(menu->main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_set_scrollbar_mode(menu->main_list, LV_SCROLLBAR_MODE_OFF);
+	lcd_apply_scrollbar_style(menu->main_list);
 	lv_obj_set_scroll_dir(menu->main_list, LV_DIR_VER);
 
 	// Create button style
@@ -364,11 +363,10 @@ static void setup_known_devices_page(bluetooth_peer_menu_t *menu)
 	lv_obj_set_size(menu->main_list, 210, 106);
 	
 	// Format
-	lv_obj_set_scrollbar_mode(menu->main_list, LV_SCROLLBAR_MODE_OFF); // Never draw bars
 	lv_obj_set_style_bg_color(menu->main_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_align(menu->main_list, LV_ALIGN_CENTER, 0, 0);
 	lv_obj_set_style_border_width(menu->main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_set_scrollbar_mode(menu->main_list, LV_SCROLLBAR_MODE_OFF);
+	lcd_apply_scrollbar_style(menu->main_list);
 	lv_obj_set_scroll_dir(menu->main_list, LV_DIR_VER);
 
 	// Create button style
@@ -426,11 +424,10 @@ void lcd_bluetooth_setup_page(bluetooth_menu_t *menu)
 	lv_obj_set_size(menu->main_list, 210, 106);
 	
 	// Format
-	lv_obj_set_scrollbar_mode(menu->main_list, LV_SCROLLBAR_MODE_OFF); // Never draw bars
 	lv_obj_set_style_bg_color(menu->main_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_align(menu->main_list, LV_ALIGN_CENTER, 0, 0);
 	lv_obj_set_style_border_width(menu->main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_set_scrollbar_mode(menu->main_list, LV_SCROLLBAR_MODE_OFF);
+	lcd_apply_scrollbar_style(menu->main_list);
 	lv_obj_set_scroll_dir(menu->main_list, LV_DIR_VER);
 
 	// Create button style

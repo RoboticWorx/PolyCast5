@@ -291,6 +291,13 @@ esp_err_t lcd_save_first_boot(void);
 bool lcd_is_first_boot(void);
 
 /**
+ * @brief Format a clean scrollbar indicator
+ *
+ * @param [in] obj Object to apply the scrollbar to
+ */
+void lcd_apply_scrollbar_style(lv_obj_t *obj);
+
+/**
  * @brief Draw text as a QR into an LVGL canvas (RGB565)
  *
  * @param [out] canvas Canvas to draw the QR in to
