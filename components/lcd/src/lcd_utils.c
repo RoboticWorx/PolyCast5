@@ -49,6 +49,12 @@
 #define SCROLL_SPEED 400
 #define IR_LABELS_OFFSET 20
 
+#define SELECTION_DEFAULT_IDX 3 // Default starting selection menu index
+
+#define SELECTION_SCROLLBAR_OFFSET -36
+#define SELECTION_SCROLLBAR_CONT_HEIGHT 106
+#define SELECTION_SCROLLBAR_THUMB_HEIGHT 20
+
 #define LCD_ANIM_NS "anim_data"
 #define LCD_ANIM_KEY "selected"
 
@@ -642,6 +648,9 @@ void lcd_unhide_selection_widgets(ui_menu_t *ui_menu)
 	lv_obj_set_x(ui_menu->lbl_top, 0);
 	lv_obj_set_x(btn_mid, 0);
 	lv_obj_set_x(ui_menu->lbl_bot, 0);
+	
+	// Show scrollbar
+	lv_obj_remove_flag(ui_menu->scroll_bar, LV_OBJ_FLAG_HIDDEN);
 }
 
 /* Write the current anim_active into flash */
@@ -845,7 +854,7 @@ void lcd_selection_index_nvs_load(ui_menu_t *ui_menu)
 	// Open NVS
 	err = nvs_open(SEL_MENU_NS, NVS_READONLY, &h);
 	if (err == ESP_OK) {
-		uint8_t idx = 0;
+		uint8_t idx = SELECTION_DEFAULT_IDX;
 
 		// Get index on success
 		err = nvs_get_u8(h, SEL_MENU_INDEX_KEY, &idx);
@@ -876,13 +885,34 @@ static inline void lcd_selection_sync_labels(ui_menu_t *m)
 
 	// Set new text
     lv_label_set_text(m->lbl_top, m->options[top]);
-    lv_label_set_text(m->lbl_mid, m->options[mid]); // "PolyPlug" when index == 1
+    lv_label_set_text(m->lbl_mid, m->options[mid]);
     lv_label_set_text(m->lbl_bot, m->options[bot]);
 }
 #endif
 
 void lcd_init_selection_labels(ui_menu_t *ui_menu)
 {
+	// Create selection scrollbar thumb (movable obj)
+	ui_menu->scroll_bar = lv_obj_create(ACTIVE_SCR); // Thumb obj
+	lv_obj_set_size(ui_menu->scroll_bar, 4, SELECTION_SCROLLBAR_THUMB_HEIGHT);
+	lv_obj_align(ui_menu->scroll_bar, LV_ALIGN_RIGHT_MID, -12, 0);
+	
+	// Style to match main scrollbar
+	static lv_style_t bar_style;
+	lv_style_init(&bar_style);
+	lv_style_set_bg_opa(&bar_style, LV_OPA_60);
+	lv_style_set_bg_color(&bar_style, user_secondary_color);
+	lv_style_set_radius(&bar_style, 3); // Rounded
+	lv_style_set_border_width(&bar_style, 0); // No border
+
+	lv_obj_add_style(ui_menu->scroll_bar, &bar_style, LV_PART_MAIN);
+	
+	// Update thumb y (reversed direction, precise double, no jump)
+	int max_y = SELECTION_SCROLLBAR_CONT_HEIGHT - SELECTION_SCROLLBAR_THUMB_HEIGHT;
+	double fraction = (double)ui_menu->index / (ui_menu->size - 1); // Double for smooth/no jump
+	int y = (int)(fraction * max_y + 0.5); // Round for consistency
+	lv_obj_set_y(ui_menu->scroll_bar, y + SELECTION_SCROLLBAR_OFFSET);
+	
 	// Create and format center button
 	ui_menu->btn_mid = lv_btn_create(ACTIVE_SCR);
 	lcd_format_center_button(ui_menu->btn_mid, user_primary_color, user_secondary_color);
@@ -949,6 +979,7 @@ void lcd_init_selection_labels(ui_menu_t *ui_menu)
 	lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 	
 	lv_obj_add_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->scroll_bar, LV_OBJ_FLAG_HIDDEN);
 }
 
 void lcd_clear_user_in()
@@ -1224,7 +1255,7 @@ void lcd_apply_scrollbar_style(lv_obj_t *obj)
 		
 		// Narrow bar on the right side
 		lv_style_set_width(&sb_style, 4); // Scrollbar thickness
-		lv_style_set_bg_opa(&sb_style, LV_OPA_80); // Make it clearly visible
+		lv_style_set_bg_opa(&sb_style, LV_OPA_60); // Make it clearly visible
 		lv_style_set_bg_color(&sb_style, user_secondary_color);
 		lv_style_set_radius(&sb_style, 3); // Slightly rounded ends
 		
@@ -1453,7 +1484,7 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
 		// Go to selection page if pin not set
 		if (!settings_menu->pin_menu.pin_set || !settings_menu->pin_menu.prompt_pin) {
 			#ifndef POLYCAST5_PERSIST_SELECTION_INDEX
-			ui_menu->index = 1; // Start selection menu from 'PolyPlug'
+			ui_menu->index = SELECTION_DEFAULT_IDX; // Default start
 			lcd_selection_sync_labels(ui_menu); // Sync menu from here
 			#endif
 
@@ -1909,7 +1940,7 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 				lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
 				#ifndef POLYCAST5_PERSIST_SELECTION_INDEX
-				ui_menu->index = 1; // Start selection menu from 'PolyPlug'
+				ui_menu->index = SELECTION_DEFAULT_IDX; // Default start
 				lcd_selection_sync_labels(ui_menu); // Sync menu from here
 				#endif
 
@@ -2068,6 +2099,7 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
 		lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->scroll_bar, LV_OBJ_FLAG_HIDDEN);
 				
 		start_animation();
 
@@ -2080,6 +2112,7 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
 		lv_obj_add_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->lbl_mid, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->lbl_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->scroll_bar, LV_OBJ_FLAG_HIDDEN);
 				
 		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
 	}
@@ -2090,6 +2123,7 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
 		lv_obj_add_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->lbl_mid, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->lbl_bot, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->scroll_bar, LV_OBJ_FLAG_HIDDEN);
 		
 		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
 	}
@@ -2104,6 +2138,12 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
 
 			const char *next_bottom = ui_menu->options[(ui_menu->index + 1) % ui_menu->size];
 			lcd_scroll_anim(ui_menu, next_bottom, scrolling_up, SCROLL_SPEED);
+			
+			// Update thumb y (reversed direction, precise double, no jump)
+			int max_y = SELECTION_SCROLLBAR_CONT_HEIGHT - SELECTION_SCROLLBAR_THUMB_HEIGHT;
+			double fraction = (double)ui_menu->index / (ui_menu->size - 1); // Double for smooth/no jump
+			int y = (int)(fraction * max_y + 0.5); // Round for consistency
+			lv_obj_set_y(ui_menu->scroll_bar, y + SELECTION_SCROLLBAR_OFFSET);
 		}
 		else {
 			ui_menu->index = (ui_menu->index + ui_menu->size - 1) % ui_menu->size;
@@ -2114,6 +2154,12 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
 
 			const char *next_top = ui_menu->options[(ui_menu->index + ui_menu->size - 1) % ui_menu->size];
 			lcd_scroll_anim(ui_menu, next_top, scrolling_up, SCROLL_SPEED);
+			
+			// Update thumb y (reversed direction, precise double, no jump)
+			int max_y = SELECTION_SCROLLBAR_CONT_HEIGHT - SELECTION_SCROLLBAR_THUMB_HEIGHT;
+			double fraction = (double)ui_menu->index / (ui_menu->size - 1); // Double for smooth/no jump
+			int y = (int)(fraction * max_y + 0.5); // Round for consistency
+			lv_obj_set_y(ui_menu->scroll_bar, y + SELECTION_SCROLLBAR_OFFSET);
 		}
 		scrolling_menu = false;
 	}

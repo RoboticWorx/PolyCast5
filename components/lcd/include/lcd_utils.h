@@ -120,6 +120,7 @@ typedef struct ui_menu_t {
     int size; // how many entries
     int index; // the one that’s currently in the middle
     int page;
+    lv_obj_t *scroll_bar;
     lv_obj_t *btn_mid;
     lv_obj_t *lbl_top; // The three labels on screen
     lv_obj_t *lbl_mid;
