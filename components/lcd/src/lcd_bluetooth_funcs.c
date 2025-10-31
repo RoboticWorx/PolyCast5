@@ -306,11 +306,10 @@ static void setup_keyboard_submenu_page(bluetooth_keyboard_menu_t *submenu)
 	lv_obj_set_size(submenu->main_list, 210, 106);
 	
 	// Format
-	lv_obj_set_scrollbar_mode(submenu->main_list, LV_SCROLLBAR_MODE_OFF); // Never draw bars
 	lv_obj_set_style_bg_color(submenu->main_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_align(submenu->main_list, LV_ALIGN_CENTER, 0, 0);
 	lv_obj_set_style_border_width(submenu->main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_set_scrollbar_mode(submenu->main_list, LV_SCROLLBAR_MODE_OFF);
+	lcd_apply_scrollbar_style(submenu->main_list);
 	lv_obj_set_scroll_dir(submenu->main_list, LV_DIR_VER);
 
 	// Create button style

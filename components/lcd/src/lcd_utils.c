@@ -2084,6 +2084,10 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
 		scrolling_up = true;
 	}
 	else if (ui_btns->select_btn == 1) {
+		// Hide selection menu scrollbar
+		lv_obj_add_flag(ui_menu->scroll_bar, LV_OBJ_FLAG_HIDDEN);
+
+		// Switch to the selected page
 		lcd_selection_btn_pressed(ui_menu, ir_menu, lora_menu, espnow_menu, wifi_menu, tools_menu, settings_menu, bluetooth_menu, gpio_menu);
 	}
 	// Go back
