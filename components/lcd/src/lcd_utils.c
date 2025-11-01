@@ -657,6 +657,7 @@ void lcd_unhide_selection_widgets(ui_menu_t *ui_menu)
 	
 	// Show scrollbar
 	lv_obj_remove_flag(ui_menu->scroll_bar, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_remove_flag(ui_menu->scroll_track, LV_OBJ_FLAG_HIDDEN);
 }
 
 /* Write the current anim_active into flash */
@@ -899,6 +900,21 @@ static inline void lcd_selection_sync_labels(ui_menu_t *m)
 void lcd_init_selection_labels(ui_menu_t *ui_menu)
 {
 	// Create selection scrollbar thumb (movable obj)
+	ui_menu->scroll_track = lv_obj_create(ACTIVE_SCR);
+	lv_obj_set_size(ui_menu->scroll_track, 4, SELECTION_SCROLLBAR_CONT_HEIGHT);
+	lv_obj_align(ui_menu->scroll_track, LV_ALIGN_RIGHT_MID, -12, 0);
+	
+	// Track style
+	static lv_style_t track_style;
+	lv_style_init(&track_style);
+	lv_style_set_bg_opa(&track_style, LV_OPA_100);
+	lv_style_set_bg_color(&track_style, lv_color_darken(user_primary_color, 100));
+	lv_style_set_radius(&track_style, 3); // Rounded
+	lv_style_set_border_width(&track_style, 0); // No border
+
+	lv_obj_add_style(ui_menu->scroll_track, &track_style, LV_PART_MAIN);
+	
+	// Create selection scrollbar thumb (movable obj)
 	ui_menu->scroll_bar = lv_obj_create(ACTIVE_SCR); // Thumb obj
 	lv_obj_set_size(ui_menu->scroll_bar, 4, SELECTION_SCROLLBAR_THUMB_HEIGHT);
 	lv_obj_align(ui_menu->scroll_bar, LV_ALIGN_RIGHT_MID, -12, 0);
@@ -906,7 +922,7 @@ void lcd_init_selection_labels(ui_menu_t *ui_menu)
 	// Style to match main scrollbar
 	static lv_style_t bar_style;
 	lv_style_init(&bar_style);
-	lv_style_set_bg_opa(&bar_style, LV_OPA_60);
+	lv_style_set_bg_opa(&bar_style, LV_OPA_80);
 	lv_style_set_bg_color(&bar_style, user_secondary_color);
 	lv_style_set_radius(&bar_style, 3); // Rounded
 	lv_style_set_border_width(&bar_style, 0); // No border
@@ -918,6 +934,9 @@ void lcd_init_selection_labels(ui_menu_t *ui_menu)
 	double fraction = (double)ui_menu->index / (ui_menu->size - 1); // Double for smooth/no jump
 	int y = (int)(fraction * max_y + 0.5); // Round for consistency
 	lv_obj_set_y(ui_menu->scroll_bar, y + SELECTION_SCROLLBAR_OFFSET);
+	
+	// Align track
+	lv_obj_set_y(ui_menu->scroll_track, y + SELECTION_SCROLLBAR_OFFSET + 7);
 	
 	// Create and format center button
 	ui_menu->btn_mid = lv_btn_create(ACTIVE_SCR);
@@ -986,6 +1005,7 @@ void lcd_init_selection_labels(ui_menu_t *ui_menu)
 	
 	lv_obj_add_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->scroll_bar, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->scroll_track, LV_OBJ_FLAG_HIDDEN);
 }
 
 void lcd_clear_user_in()
@@ -1039,6 +1059,10 @@ void lcd_update_battery(ui_menu_t *ui_menu, uint8_t battery_percentage, bool cha
 static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t *ir_menu, lora_menu_t *lora_menu, espnow_menu_t *espnow_menu,
 		wifi_menu_t *wifi_menu, tools_menu_t *tools_menu, settings_menu_t *settings_menu, bluetooth_menu_t *bluetooth_menu, gpio_menu_t *gpio_menu)
 {
+	// Hide selection menu scrollbar
+	lv_obj_add_flag(ui_menu->scroll_bar, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->scroll_track, LV_OBJ_FLAG_HIDDEN);
+	
 	// Hide selection labels
 	lv_obj_add_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
@@ -2084,9 +2108,6 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
 		scrolling_up = true;
 	}
 	else if (ui_btns->select_btn == 1) {
-		// Hide selection menu scrollbar
-		lv_obj_add_flag(ui_menu->scroll_bar, LV_OBJ_FLAG_HIDDEN);
-
 		// Switch to the selected page
 		lcd_selection_btn_pressed(ui_menu, ir_menu, lora_menu, espnow_menu, wifi_menu, tools_menu, settings_menu, bluetooth_menu, gpio_menu);
 	}
@@ -2110,6 +2131,7 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->scroll_bar, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->scroll_track, LV_OBJ_FLAG_HIDDEN);
 				
 		start_animation();
 
@@ -2123,6 +2145,7 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
 		lv_obj_add_flag(ui_menu->lbl_mid, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->lbl_bot, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->scroll_bar, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->scroll_track, LV_OBJ_FLAG_HIDDEN);
 				
 		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
 	}
@@ -2134,6 +2157,7 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
 		lv_obj_add_flag(ui_menu->lbl_mid, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->lbl_bot, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(ui_menu->scroll_bar, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->scroll_track, LV_OBJ_FLAG_HIDDEN);
 		
 		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
 	}
