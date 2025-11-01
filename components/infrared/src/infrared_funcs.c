@@ -4,6 +4,7 @@
 
 #include "nvs_flash.h"
 
+#include "driver/gpio.h"
 #include "esp_log.h"
 
 #include "infrared_funcs.h"
@@ -58,9 +59,9 @@ static bool IRAM_ATTR infrared_rx_callback(rmt_channel_handle_t channel, const r
 	ir_signal_length = len;
 
 	/*#ifdef POLYCAST5_DEBUG
-		ESP_LOGD(TAG, "RX last symbol: level0=%d, duration0=%d, level1=%d, duration1=%d",
-			 ir_signal[len - 1].level0, ir_signal[len - 1].duration0,
-			 ir_signal[len - 1].level1, ir_signal[len - 1].duration1);
+	ESP_LOGD(TAG, "RX last symbol: level0=%d, duration0=%d, level1=%d, duration1=%d",
+			ir_signal[len - 1].level0, ir_signal[len - 1].duration0,
+			ir_signal[len - 1].level1, ir_signal[len - 1].duration1);
 	#endif*/
 
 	// Notify semaphore that a signal was received
@@ -86,6 +87,9 @@ void infrared_init_rx(void)
 		rx_channel = NULL;
 		return;
 	}
+	
+	// Set RX pin (TSOP OUT) as pull-up resistor to lower the source impedance for sharper edges
+	ESP_ERROR_CHECK(gpio_set_pull_mode(RMT_RX_GPIO, GPIO_PULLUP_ONLY));
 
 	// Initialize RX callback
 	rmt_rx_event_callbacks_t callbacks = {
@@ -136,7 +140,7 @@ void infrared_restart_rx(void)
 	// Ensure initialized
 	if (rx_channel == NULL) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "Cannot restart RX: channel not initialized");
+		ESP_LOGE(TAG, "Cannot restart RX: channel not initialized");
 		#endif
 		
 		return;
@@ -161,7 +165,7 @@ void infrared_disable_rx(void)
 	// Ensure initialized
 	if (rx_channel == NULL) {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "Cannot disable RX: channel not initialized");
+		ESP_LOGE(TAG, "Cannot disable RX: channel not initialized");
 		#endif
 		
 		return;
@@ -184,9 +188,9 @@ void infrared_transmit_ir(rmt_symbol_word_t *signal, size_t length)
 	}
 	
 	#ifdef POLYCAST5_DEBUG
-		ESP_LOGI(TAG, "TX symbol: level0=%d, duration0=%d, level1=%d, duration1=%d",
-			 signal[length - 1].level0, signal[length - 1].duration0,
-			 signal[length - 1].level1, signal[length - 1].duration1);
+	ESP_LOGI(TAG, "TX symbol: level0=%d, duration0=%d, level1=%d, duration1=%d",
+			signal[length - 1].level0, signal[length - 1].duration0,
+			signal[length - 1].level1, signal[length - 1].duration1);
 	#endif
 
 	// Make sure not to pick up our own transmission
@@ -195,7 +199,7 @@ void infrared_transmit_ir(rmt_symbol_word_t *signal, size_t length)
 	// TX once
 	rmt_transmit_config_t tx_config = {.loop_count = 1};
 	esp_err_t ret = rmt_transmit(tx_channel, tx_encoder, signal,
-				 length * sizeof(rmt_symbol_word_t), &tx_config);
+			length * sizeof(rmt_symbol_word_t), &tx_config);
 	
 	// Allow time for transmisison to finish
 	rmt_tx_wait_all_done(tx_channel, portMAX_DELAY);
@@ -206,7 +210,7 @@ void infrared_transmit_ir(rmt_symbol_word_t *signal, size_t length)
 	} 
 	else {
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGI(TAG, "Transmission complete (%d pulses)", length);
+		ESP_LOGI(TAG, "Transmission complete (%d pulses)", length);
 		#endif
 	}
 
@@ -229,7 +233,7 @@ bool infrared_ensure_capacity(void)
 	}
 	
 	#ifdef POLYCAST5_DEBUG
-		ESP_LOGW(TAG, "Storage full (%zu signals)", total);
+	ESP_LOGW(TAG, "Storage full (%zu signals)", total);
 	#endif
 	
 	return false;
@@ -558,7 +562,7 @@ void infrared_nvs_delete_signal_from_remote(size_t remote_idx, size_t sig_idx)
 	nvs_close(h);
 
 	#ifdef POLYCAST5_DEBUG
-		ESP_LOGI(TAG, "Deleted signal %zu from remote %zu", sig_idx, remote_idx);
+	ESP_LOGI(TAG, "Deleted signal %zu from remote %zu", sig_idx, remote_idx);
 	#endif
 }
 

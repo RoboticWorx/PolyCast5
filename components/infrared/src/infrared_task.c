@@ -55,7 +55,7 @@ static void infrared_task(void *pvParameters) {
 	configASSERT(xInfraredSignalToTxQueue);
 		
 	#ifdef POLYCAST5_DEBUG
-		ESP_LOGI(TAG, "Initializing IR system...");
+	ESP_LOGI(TAG, "Initializing IR system...");
 	#endif
 	
 	infrared_init_rx();
@@ -63,34 +63,35 @@ static void infrared_task(void *pvParameters) {
 	
 	// Load remotes from NVS
 	#ifdef POLYCAST5_IR_NVS_CLEAR
-		infrared_clear_nvs();
+	infrared_clear_nvs();
 	#endif	
 	
 	// Load remotes and signals from NVS (includes names)
 	infrared_nvs_load_remotes();
 	
 	#ifdef POLYCAST5_DEBUG
-		ESP_LOGI(TAG, "Loaded %zu remotes from NVS", num_remotes);
+	ESP_LOGI(TAG, "Loaded %zu remotes from NVS", num_remotes);
 	#endif
 	
-	while (1) {
-		if (xSemaphoreTake(xInfraredDisableSemaphore, 0) == pdTRUE) {
-			infrared_disable_rx();
-		}	
-		
+	while (1) {		
+		// When user selects to add new signal
 		if (xSemaphoreTake(xInfraredStartRxSemaphore, 0) == pdTRUE) {
 			infrared_restart_rx();
 		}
 		
-		// Wait for IR signal
-		if (xSemaphoreTake(xInfraredRxEventSemaphore, 0) == pdTRUE) {
-			// If received garbage, restart
-			if (restart_rx_pending) {
-				infrared_restart_rx(); // len < MIN_VALID_PULSES
-				restart_rx_pending = false;
-				continue;
-			}
-			
+		// When user canceled adding new signal
+		if (xSemaphoreTake(xInfraredDisableSemaphore, 0) == pdTRUE) {
+			infrared_disable_rx();
+		}
+		
+		// If received garbage in cb, restart
+		if (restart_rx_pending) { // When len < MIN_VALID_PULSES
+			infrared_restart_rx();
+			restart_rx_pending = false;
+		}
+		
+		// Wait for valid IR signal
+		if (xSemaphoreTake(xInfraredRxEventSemaphore, 0) == pdTRUE) {			
 			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 			
 			// Check if space available
@@ -107,7 +108,7 @@ static void infrared_task(void *pvParameters) {
 				ir_signal[ir_signal_length - 1].duration1 = FINAL_GAP_US;
 				
 				#ifdef POLYCAST5_DEBUG
-					ESP_LOGI(TAG, "Padded final gap to %dus", FINAL_GAP_US);
+				ESP_LOGI(TAG, "Padded final gap to %dus", FINAL_GAP_US);
 				#endif
 			}
 			
@@ -120,6 +121,9 @@ static void infrared_task(void *pvParameters) {
 			if (!sig) {
 				ESP_LOGE(TAG, "Out of heap for new signal");
 				infrared_restart_rx();
+				
+				xSemaphoreGive(xInfraredDataMutex); // Release IR
+				continue;
 			}
 			
 			// Save signal to data structure
@@ -145,7 +149,7 @@ static void infrared_task(void *pvParameters) {
 			infrared_nvs_save_remote_nsig(ir_current_remote);
 			
 			#ifdef POLYCAST5_DEBUG
-				ESP_LOGI(TAG, "Saved signal index %zu for remote %zu (%zu pulses)", ns, ir_current_remote, sig->length);
+			ESP_LOGI(TAG, "Saved signal index %zu for remote %zu (%zu pulses)", ns, ir_current_remote, sig->length);
 			#endif
 			
 			xSemaphoreGive(xInfraredDataMutex); // Release IR
@@ -172,7 +176,7 @@ static void infrared_task(void *pvParameters) {
 				ir_signal_t *sig = remotes[ir_current_remote].signals[sig_idx];
 				
 				#ifdef POLYCAST5_DEBUG
-					ESP_LOGI(TAG, "Replaying signal %zu for remote %zu (%zu pulses)", sig_idx, ir_current_remote, sig->length);
+				ESP_LOGI(TAG, "Replaying signal %zu for remote %zu (%zu pulses)", sig_idx, ir_current_remote, sig->length);
 				#endif
 				
 				// Send

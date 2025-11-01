@@ -362,6 +362,8 @@ static void gpio_task(void *arg)
 		}
 		
 		vTaskDelay(pdMS_TO_TICKS(POLL_MS));
+		
+		//gpio_cycle_rgb(); // Test RGB LED
 	}
 }
 

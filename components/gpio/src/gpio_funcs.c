@@ -66,7 +66,7 @@ void gpio_init_nvs(void)
 	ESP_ERROR_CHECK(ret);
 	
 	#ifdef POLYCAST5_DEBUG
-		ESP_LOGI(TAG, "NVS initialized");
+	ESP_LOGI(TAG, "NVS initialized");
 	#endif
 	
 }
