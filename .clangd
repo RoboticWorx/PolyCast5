@@ -1,3 +1,2 @@
 CompileFlags:
-  CompilationDatabase: C:\Projects\ESP\PolyCast5\build
-  Remove: [-m*, -f*]
+    Remove: [-f*, -m*]
