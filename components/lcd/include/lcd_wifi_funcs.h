@@ -6,7 +6,7 @@
 #include "esp_err.h"
 
 #define MAX_WIFI_OPTIONS 20
-#define MAX_WIFI_SUBOPTIONS 20
+#define MAX_WIFI_SUBOPTIONS 40 // WIFI_MAX_NETWORKS
 #define TOPIC_KEY_LEN 16
 
 // Forward-declare structs (from lcd_funcs.h)

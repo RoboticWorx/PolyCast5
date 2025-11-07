@@ -5,7 +5,7 @@
 
 #include "esp_err.h"
 
-#define WIFI_MAX_NETWORKS 20
+#define WIFI_MAX_NETWORKS 40
 
 #define MAX_MAC_CLIENTS 100
 

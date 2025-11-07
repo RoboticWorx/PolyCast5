@@ -1071,7 +1071,7 @@ static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t *ir_menu, lo
 	
 	const char *option = lv_label_get_text(ui_menu->lbl_mid);
 	
-	if (strcmp(option, "Infrared") == 0) {	
+	if (strcmp(option, OPTION_INFRARED) == 0) {	
 		// Show right arrow
 		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
@@ -1084,37 +1084,37 @@ static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t *ir_menu, lo
 		lv_obj_remove_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);	
 		ui_menu->page = INFRARED_PAGE;
 	}
-	else if (strcmp(option, "Bluetooth") == 0) {
+	else if (strcmp(option, OPTION_BLUETOOTH) == 0) {
 		// Show bluetooth list
 		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		ui_menu->page = BLUETOOTH_PAGE;
 	}
-	else if (strcmp(option, "PolyPlug") == 0) {
+	else if (strcmp(option, OPTION_LORA) == 0) {
 		// Show LoRa list
 		lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);	
 		ui_menu->page = LORA_PAGE;
 	}
-	else if (strcmp(option, "ESP32") == 0) {
+	else if (strcmp(option, OPTION_ESPNOW) == 0) {
 		// Show ESP-NOW list
 		lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		ui_menu->page = ESPNOW_PAGE;
 	}
-	else if (strcmp(option, "Tools") == 0) {
+	else if (strcmp(option, OPTION_TOOLS) == 0) {
 		// Show tools list
 		lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		ui_menu->page = TOOLS_PAGE;
 	}
-	else if (strcmp(option, "Settings") == 0) {
+	else if (strcmp(option, OPTION_SETTINGS) == 0) {
 		// Show settings list
 		lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		ui_menu->page = SETTINGS_PAGE;
 	}
-	else if (strcmp(option, "Wi-Fi") == 0) {
+	else if (strcmp(option, OPTION_WIFI) == 0) {
 		// Show Wi-Fi list
 		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		ui_menu->page = WIFI_PAGE;
 	}
-	else if (strcmp(option, "GPIO") == 0) {
+	else if (strcmp(option, OPTION_GPIO) == 0) {
 		// Show GPIO list
 		lv_obj_remove_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		ui_menu->page = GPIO_PAGE;

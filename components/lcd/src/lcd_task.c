@@ -23,9 +23,10 @@ static const TickType_t btn_timer_interval = pdMS_TO_TICKS(200);
 uint8_t sleep_time_s = 30; // Default 30s
 
 ui_menu_t ui_menu = {
-	.options = (const char *[]) {"GPIO", "Wi-Fi", "Bluetooth", "PolyPlug", "ESP32", "Infrared", "Tools", "Settings"},
+	.options = (const char *[]) {OPTION_GPIO, OPTION_WIFI, OPTION_BLUETOOTH, OPTION_LORA, OPTION_ESPNOW,
+			OPTION_INFRARED, OPTION_TOOLS, OPTION_SETTINGS},
 	.size = 8,
-	.index = 3, // Starts on "PolyPlug"
+	.index = 3, // Starts on OPTION_LORA
 	.page = HOME_PAGE,
 	.lbl_top = NULL,
 	.lbl_mid = NULL,

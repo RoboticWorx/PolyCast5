@@ -20,6 +20,15 @@
 #define HOR_RES 240
 #define VER_RES 135
 
+#define OPTION_GPIO "GPIO"
+#define OPTION_WIFI "Wi-Fi"
+#define OPTION_BLUETOOTH "Bluetooth"
+#define OPTION_LORA "PolyPlug"
+#define OPTION_ESPNOW "ESP32"
+#define OPTION_INFRARED "Infrared"
+#define OPTION_TOOLS "Tools"
+#define OPTION_SETTINGS "Settings"
+
 // Define each sequentially (0, 1, 2, ...)
 enum {
 	BOOT_PAGE,
