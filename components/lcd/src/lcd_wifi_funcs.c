@@ -66,10 +66,8 @@ static wifi_sniff_t sniff_network;
 static uint8_t mqtt_key[16];
 static bool wifi_menu_overwrite = false;
 
-static char mqtt_name_buf[MAX_PASSWORD_LEN + 1] = {0};
-
 // Character vars for user input
-static char name_buf[MAX_PASSWORD_LEN + 1] = {0};
+static char mqtt_name_buf[MAX_PASSWORD_LEN + 1] = {0};
 static const char* char_rows[NUM_CHAR_ROWS] = {
 	"_ABCDEFGHIJKLMNOPQRSTUVWXYZ",
 	"abcdefghijklmnopqrstuvwxyz",
@@ -682,7 +680,7 @@ static void update_password_label_lcd(lv_obj_t *lbl_display, char cur_char, int 
 	size_t len = cur_pos + 1;
 	if (len > MAX_PASSWORD_LEN) len = MAX_PASSWORD_LEN;
 	// copy existing
-	memcpy(display, name_buf, cur_pos);
+	memcpy(display, mqtt_name_buf, cur_pos);
 	// show current selection
 	display[cur_pos] = cur_char;
 	display[cur_pos + 1] = '\0';
@@ -703,7 +701,7 @@ void lcd_wifi_get_password(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t 
 	// Do once
 	if (!initialized) {
 		// Everything is zero'd out to start
-		memset(name_buf, 0, sizeof name_buf);
+		memset(mqtt_name_buf, 0, sizeof mqtt_name_buf);
 		row_idx = 0;
 		char_idx = 0;
 		cur_char = char_rows[0][0]; // Start at 0, 0
@@ -756,7 +754,7 @@ void lcd_wifi_get_password(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t 
 	// Move character position
 	else if (ui_btns->right_btn) {
 		// Save current char to name buffer
-		name_buf[cur_pos] = cur_char;
+		mqtt_name_buf[cur_pos] = cur_char;
 		
 		// Increment position
 		if (cur_pos < MAX_PASSWORD_LEN) {
@@ -805,7 +803,7 @@ void lcd_wifi_get_password(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t 
 	// Backspace
 	else if (ui_btns->left_btn) {
 		// Save change to name buffer
-		name_buf[cur_pos] = '\0';
+		mqtt_name_buf[cur_pos] = '\0';
 		
 		// Decrement position
 		if (cur_pos > 0) {
@@ -813,7 +811,7 @@ void lcd_wifi_get_password(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t 
 		}
 
 		// Reload cur_char from the new slot
-		char target = name_buf[cur_pos] ? name_buf[cur_pos] : '_';
+		char target = mqtt_name_buf[cur_pos] ? mqtt_name_buf[cur_pos] : '_';
 		// Search each row for that character
 		for (row_idx = 0; row_idx < NUM_CHAR_ROWS; row_idx++) {
 			const char *row = char_rows[row_idx]; // Get active row
@@ -832,15 +830,15 @@ void lcd_wifi_get_password(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t 
 	// Save
 	else if (ui_btns->select_btn) {
 		// Commit the current character
-		if (cur_pos < MAX_PASSWORD_LEN && name_buf[cur_pos] == '\0') {
-			name_buf[cur_pos++] = cur_char;
+		if (cur_pos < MAX_PASSWORD_LEN && mqtt_name_buf[cur_pos] == '\0') {
+			mqtt_name_buf[cur_pos++] = cur_char;
 		}
 	
-		name_buf[cur_pos] = '\0'; // Null-terminate
+		mqtt_name_buf[cur_pos] = '\0'; // Null-terminate
 		
 		// Send to Wi-Fi task
 		selected_network.locked = true; // Requires password
-		strlcpy((char*)selected_network.password, name_buf, sizeof(selected_network.password));
+		strlcpy((char*)selected_network.password, mqtt_name_buf, sizeof(selected_network.password));
 		if (xQueueSend(xWifiSelectedNetworkQueue, &selected_network, portMAX_DELAY) != pdPASS) { // SSID was copied earlier
 			ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue PASSWORD");
 		}
@@ -1224,16 +1222,16 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		// Top text
 		lbl_clients = lv_label_create(cont);
 		lcd_format_label(lbl_clients, "", user_secondary_color,
-						 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, -10);
+				&lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, -10);
 		
 		// Helper texts
 		lbl_scroll = lv_label_create(cont);
 		lcd_format_label(lbl_scroll, "SCROLL", user_secondary_color,
-						 &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, 15);
+				&lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, 15);
 						 
 		lbl_beacon = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_beacon, LV_SYMBOL_LEFT " BEACON", user_secondary_color,
-						 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_LEFT, 3, 0);
+				&lv_font_montserrat_14, LV_ALIGN_BOTTOM_LEFT, 3, 0);
 
 		// MACs text
 		lbl_info = lv_label_create(cont);
@@ -1284,8 +1282,8 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		for (uint32_t i = 0; i < wifi_data->client_count && off < sizeof(buf); ++i) {
 			const uint8_t *m = wifi_data->clients[i].mac;
 			off += snprintf(buf + off, sizeof(buf) - off, "%02X:%02X:%02X:%02X:%02X:%02X @%3d\n",
-							m[0],m[1],m[2],m[3],m[4],m[5],
-							wifi_data->clients[i].rssi);
+					m[0],m[1],m[2],m[3],m[4],m[5],
+					wifi_data->clients[i].rssi);
 		}
 		lv_label_set_text(lbl_info, buf);
 	}
@@ -1483,10 +1481,11 @@ static void update_name_label_lcd(lv_obj_t *lbl_display, char cur_char, int cur_
 
 void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {
-	static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
-	
 	// Declare statics
+	static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
 	static int cur_pos = 0; // User position
+	static int row_idx = 0; // Which character row is active
+    static int char_idx = 0; // Index within that row
 	static char cur_char = '_';
 	static lv_obj_t *lbl_dirs = NULL;
 	static lv_obj_t *lbl_chars = NULL;
@@ -1494,7 +1493,6 @@ void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_m
 	
 	// Create initial label
 	if (!lbl_user_in) {
-		
 		// If renaming, autofill what was there previously
 		if (wifi_menu_overwrite) {
 			// Copy the old name into buffer
@@ -1502,48 +1500,54 @@ void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_m
 
 			// Place cursor at the end
 			cur_pos = strlen(mqtt_name_buf);
-			
-			// Start with '_'
-			cur_char = '_';
 		}
 		else { // Else blank slate
 			memset(mqtt_name_buf, 0, sizeof mqtt_name_buf);
 			cur_pos = 0;
-			cur_char = '_';
 		}
+		
+		// Starting char
+		row_idx = 0;
+		char_idx = 0;
+		cur_char = char_rows[row_idx][char_idx];
 		
 		lbl_user_in = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_user_in, "", user_secondary_color,
-						 &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
+				&lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
 						 
 		lbl_dirs = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_dirs, "Enter PolyPlug name\n  with arrow buttons:", user_secondary_color,
-						 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, -30);
+		lcd_format_label(lbl_dirs, "        Enter plug name:\nPress HOME to cycle chars.", user_secondary_color,
+				&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -31);
 						 
-		if (wifi_menu_overwrite)
-			lv_label_set_text(lbl_dirs, "Enter new plug name\n  with arrow buttons:");
+		if (wifi_menu_overwrite) {
+			lv_label_set_text(lbl_dirs, "    Enter new plug name:\nPress HOME to cycle chars.");
+		}
 		
 		lbl_chars = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_chars, "(Up to 12 characters)", user_secondary_color,
-						 &lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0);
+				&lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0);
 						 
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
 	}
 
-	// Take user input
+	/* User input */
+	// Cycle chars
+	if (ui_btns->home_btn) {
+		// Cycle character row
+		row_idx = (row_idx + 1) % NUM_CHAR_ROWS;
+		char_idx = 0; // Reset within row
+		
+		// New current char
+		cur_char = char_rows[row_idx][char_idx];
+		
+		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+	}
 	// If up, iterate up
-	if (ui_btns->up_btn) {
-		// Wrap
-		if (cur_char == '_') {
-			cur_char = 'A';
-		}
-		else if (cur_char == 'Z') {
-			cur_char = '_';
-		}
-		// Else iterate 1 char
-		else {
-			cur_char = (char)(cur_char + 1);
-		}
+	else if (ui_btns->up_btn) {
+		// Increment with wrap
+		size_t row_len = strlen(char_rows[row_idx]);
+		char_idx = (char_idx + 1) % (int)row_len;
+		cur_char = char_rows[row_idx][char_idx];
 		
 		// Save to array
 		mqtt_name_buf[cur_pos] = cur_char;
@@ -1552,24 +1556,17 @@ void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_m
 	}
 	// If down, iterate down
 	else if (ui_btns->down_btn) {
-		// Wrap
-		if (cur_char == '_') {
-			cur_char = 'Z';
-		}
-		else if (cur_char == 'A') {
-			cur_char = '_';
-		}
-		// Else iterate down 1 char
-		else {
-			cur_char = (char)(cur_char - 1);
-		}
+		// Decrement with wrap
+		size_t row_len = strlen(char_rows[row_idx]);
+		char_idx = (char_idx + (int)row_len - 1) % (int)row_len;
+		cur_char = char_rows[row_idx][char_idx];
 		
 		// Save to array
 		mqtt_name_buf[cur_pos] = cur_char;
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
 	}
-	// Can back out if at start and overwriting
+	// Can back out if at start and renaming
 	else if (ui_btns->left_btn && cur_pos == 0 && wifi_menu_overwrite) {
 		// Delete labels since no longer used
 		lv_obj_delete(lbl_user_in);
@@ -1577,13 +1574,12 @@ void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_m
 		lv_obj_delete(lbl_chars);
 		
 		// Reset statics for next time
-		lbl_user_in = NULL;
-		lbl_dirs = NULL;
-		cur_pos = 0;
+		lbl_user_in = lbl_chars = lbl_dirs = NULL;
+		cur_pos = row_idx = char_idx = 0;
 		cur_char = '_';
 		memset(mqtt_name_buf, 0, sizeof mqtt_name_buf);
 		
-		wifi_menu_overwrite = false;
+		wifi_menu_overwrite = false; // Switch back
 		
 		// Hide right arrow
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -1593,19 +1589,19 @@ void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_m
 		
 		// Switch pages
  		ui_menu->page = WIFI_PAGE;
+
 		return;
 	}
- 	// Go home or power off selected and overwrite
-	else if ((ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) && wifi_menu_overwrite) {
+	// Go home or power off if ranaming
+	else if (ui_btns->pwr_btn && wifi_menu_overwrite) {
 		// Delete labels since no longer used
 		lv_obj_delete(lbl_user_in);
 		lv_obj_delete(lbl_dirs);
 		lv_obj_delete(lbl_chars);
 		
 		// Reset statics for next time
-		lbl_user_in = NULL;
-		lbl_dirs = NULL;
-		cur_pos = 0;
+		lbl_user_in = lbl_chars = lbl_dirs = NULL;
+		cur_pos = row_idx = char_idx = 0;
 		cur_char = '_';
 		memset(mqtt_name_buf, 0, sizeof mqtt_name_buf);
 		
@@ -1626,8 +1622,18 @@ void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_m
 			cur_pos--;
 		}
 	
-		// Reload cur_char from the new slot
-		cur_char = mqtt_name_buf[cur_pos] ? mqtt_name_buf[cur_pos] : '_';
+		// Reload row/idx from the new slot's char
+		char target = mqtt_name_buf[cur_pos] ? mqtt_name_buf[cur_pos] : '_';
+		for (row_idx = 0; row_idx < NUM_CHAR_ROWS; row_idx++) {
+			const char *row = char_rows[row_idx];
+			const char *p = strchr(row, target);
+			
+			if (p) {
+				char_idx = (int)(p - row);
+				break;
+			}
+		}
+		cur_char = char_rows[row_idx][char_idx];
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
 	}
@@ -1639,7 +1645,12 @@ void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_m
 		// If not yet at end
 		if (cur_pos < MAX_CUSTOM_NAME_LEN - 1) {
 			cur_pos++;
-			cur_char = '_';
+			mqtt_name_buf[cur_pos] = '\0';
+			char_idx = 0;
+			cur_char = char_rows[row_idx][char_idx];
+		}
+		else {
+			mqtt_name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
 		}
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
@@ -1647,10 +1658,19 @@ void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_m
 	// If save button pressed
 	else if (ui_btns->select_btn) {
 		// Save final
+        if (cur_pos < MAX_CUSTOM_NAME_LEN) {
+			mqtt_name_buf[cur_pos] = cur_char;
+
+			// Terminate one past the last written char if room, else clamp
+			size_t term = (cur_pos + 1 <= MAX_CUSTOM_NAME_LEN) ? (cur_pos + 1) : MAX_CUSTOM_NAME_LEN;
+			mqtt_name_buf[term] = '\0';
+	    }
+	    
 		mqtt_name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
 		memcpy(saved_name, mqtt_name_buf, MAX_CUSTOM_NAME_LEN + 1);
+		
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGI(TAG, "%s", saved_name);
+		ESP_LOGI(TAG, "%s", saved_name);
 		#endif
 		
 		// Delete labels since no longer used
@@ -1659,9 +1679,8 @@ void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_m
 		lv_obj_delete(lbl_chars);
 		
 		// Reset statics for next time
-		lbl_user_in = NULL;
-		lbl_dirs = NULL;
-		cur_pos = 0;
+		lbl_user_in = lbl_chars = lbl_dirs = NULL;
+		cur_pos = row_idx = char_idx = 0;
 		cur_char = '_';
 		memset(mqtt_name_buf, 0, sizeof mqtt_name_buf);
 

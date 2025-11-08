@@ -474,11 +474,11 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		
 		lbl_user_in = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_user_in, "", user_secondary_color,
-						 &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
+				&lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
 						 
 		lbl_dirs = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_dirs, "        Enter plug name:\nPress HOME to cycle chars.", user_secondary_color,
-						 &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -31);
+				&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -31);
 						 
 		if (lora_menu_overwrite) {
 			lv_label_set_text(lbl_dirs, "    Enter new plug name:\nPress HOME to cycle chars.");
@@ -631,7 +631,7 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		memcpy(saved_name, name_buf, MAX_CUSTOM_NAME_LEN + 1);
 		
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGI(TAG, "%s", saved_name);
+		ESP_LOGI(TAG, "%s", saved_name);
 		#endif
 		
 		// Delete labels since no longer used
@@ -692,8 +692,8 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 				lora_menu->keys[lora_menu->size - 1] = slot;
 				
 				#ifdef POLYCAST5_DEBUG
-					ESP_LOGI(TAG, "Key saved at slot %d:", lora_menu->size - 1);
-					ESP_LOG_BUFFER_HEX("SAVED IN QUEUE", lora_menu->keys[lora_menu->size - 1], LORA_ENC_KEY_LEN);
+				ESP_LOGI(TAG, "Key saved at slot %d:", lora_menu->size - 1);
+				ESP_LOG_BUFFER_HEX("SAVED IN QUEUE", lora_menu->keys[lora_menu->size - 1], LORA_ENC_KEY_LEN);
 				#endif
 				
 				lcd_lora_key_nvs_save(lora_menu);
