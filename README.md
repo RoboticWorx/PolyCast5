@@ -36,7 +36,6 @@ _PolyCast5 also comes with cool, customizable homescreen animations and hotkeys!
 * `main` - Initialization code. The program runs from here.
 * `assets` - Media image files stored as `.bin` for SPIFFS access.
 * `scripts` - Bluetooth keystroke injection (autotype) examples as well as a few miscellaneous developement scripts.
-* `build` - Generated program build files. Contains ESP-IDF as well as the compiled code.
 * `components` - The various pieces of the application code broken into folders.
   * `bluetooth` - Communicates with a connected BLE device as a Human Interface Device (HID) to behave as a media controller and autotype keyboard.
   * `common` - Shared macros across the entirety of the program used for build and debugging.
