@@ -35,6 +35,7 @@ QueueHandle_t xWifiSniffQueue;
 QueueHandle_t xWifiBeaconQueue;
 QueueHandle_t xWifiDataQueue;
 QueueHandle_t xWifiMqttCmdQueue;
+QueueHandle_t xWifiPingQueue;
 
 SemaphoreHandle_t xWifiStartScanSemaphore;
 SemaphoreHandle_t xWifiNetworkConnectedSemaphore;
@@ -90,6 +91,8 @@ static void wifi_task(void *param)
 	configASSERT(xWifiMqttCmdQueue);
 	xWifiOtaPctQueue = xQueueCreate(1, sizeof(int));
 	configASSERT(xWifiOtaPctQueue);
+	xWifiPingQueue = xQueueCreate(1, sizeof(wifi_ping_t));
+	configASSERT(xWifiPingQueue);
 	
 	uint8_t my_mac[6];
 	esp_read_mac(my_mac, ESP_MAC_WIFI_STA);

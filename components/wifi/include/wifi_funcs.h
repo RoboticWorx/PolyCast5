@@ -62,6 +62,11 @@ typedef struct {
     char payload[4];
 } wifi_mqtt_t;
 
+typedef struct {
+    int32_t rtt_gateway;
+    int32_t rtt_dns;
+} wifi_ping_t;
+
 /**
  * @brief Gets previous Wi-Fi config from NVS
  *
@@ -134,6 +139,25 @@ void wifi_funcs_mqtt_client_start(void);
  * @param [in] network Network to sniff
  */
 void wifi_funcs_init_promiscuous(wifi_sniff_t *network);
+
+/**
+ * @brief Ping the current gateway to get RTT
+ *
+ * @param [out] rtt_ms Round-trip time in milliseconds
+ * 
+ * @returns ESP error status
+ */
+esp_err_t wifi_funcs_ping_gateway(int32_t *rtt_ms);
+
+/**
+ * @brief Ping a given host to get RTT
+ *
+ * @param [in] host Hostname or IP address to ping
+ * @param [out] rtt_ms Round-trip time in milliseconds
+ * 
+ * @returns ESP error status
+ */
+esp_err_t wifi_funcs_ping(const char *host, int32_t *rtt_ms);
 
 /**
  * @brief Gets the current date and time from pool.ntp

@@ -264,7 +264,8 @@ esp_err_t gpio_write_output(uint8_t pin, bool level)
 	
 	if (level) {
 		out |= (1 << pin);
-	} else {
+	}
+	else {
 		out &= ~(1 << pin);
 	}
 	
@@ -292,7 +293,7 @@ void gpio_init_battery_adc(void)
 	ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CH, &chan_cfg));
 
 	#ifdef POLYCAST5_DEBUG_ADC
-		ESP_LOGI(TAG, "ADC initialized");
+	ESP_LOGI(TAG, "ADC initialized");
 	#endif
 	
 	// Configure curve fitting

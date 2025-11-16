@@ -438,7 +438,7 @@ void lcd_lvgl_init(void)
 	lv_image_cache_init((CITY_FRAME_CNT + BLACK_HOLE_FRAME_CNT + MATRIX_RAIN_FRAME_CNT + PYRAMID_FRAME_CNT) * 3);
 
 	// Draw‐buffer: HOR_RES x DRAW_LINES lines
-	// Allocate space for 20 lines of 240 px each (≈9.6 kB), DMA-capable in DRAM
+	// Allocate space for 20 lines of 240 px each (~9.6 kB), DMA-capable in DRAM
 	static DRAM_ATTR lv_color_t buf[HOR_RES * DRAW_LINES * 2]
 			__attribute__((aligned(4)));
 		
@@ -453,7 +453,7 @@ void lcd_lvgl_init(void)
 	// 1 ms tick timer feeding lv_tick_inc()
 	const esp_timer_create_args_t tick_args = {
 		.callback = lv_tick_cb,
-		.name	 = "lv_tick",
+		.name = "lv_tick",
 		.skip_unhandled_events = true,
 	};
 	esp_timer_handle_t tick_timer;
@@ -500,7 +500,6 @@ void lcd_format_label(lv_obj_t *label, const char *text, lv_color_t color, const
 	lv_obj_set_style_text_font(label, font, 0);
 	lv_obj_align(label, alignment, x_offset, y_offset);
 }
-
 
 void lcd_scroll_up(lv_obj_t *lbl_top, lv_obj_t *lbl_mid, lv_obj_t *lbl_bot, const char *new_bot_text)
 {	
@@ -2533,7 +2532,7 @@ void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espn
 			// User notice
 			lv_obj_t *lbl_rst = lv_label_create(ACTIVE_SCR);
 			lcd_format_label(lbl_rst, "Max ESP32s added!", user_secondary_color,
-					 &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
+					&lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
 			lv_timer_handler();
 			vTaskDelay(pdMS_TO_TICKS(1000));
 			lv_obj_delete(lbl_rst);
@@ -2628,13 +2627,38 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 	// Statics
 	static bool do_once = false;
 	static lv_obj_t *lbl_conf;
+	static wifi_ping_t wifi_ping = {0};
+	static lv_obj_t *gateway_ping_lbl = NULL;
+	static lv_obj_t *dns_ping_lbl = NULL;
 	
 	// Only execute once
 	if (!do_once) {
 		// Show Wi-Fi list
 		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+		// Reset ping struct
+		memset(&wifi_ping, 0, sizeof(wifi_ping_t));
+
+		// Create ping labels
+		gateway_ping_lbl = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(gateway_ping_lbl, "", user_secondary_color,
+				&lv_font_montserrat_14, LV_ALIGN_BOTTOM_LEFT, 2, 2);
+		dns_ping_lbl = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(dns_ping_lbl, "", user_secondary_color,
+				&lv_font_montserrat_14, LV_ALIGN_BOTTOM_RIGHT, -2, 2);
 		
 		do_once = true;
+	}
+
+	// Check for network ping results
+	if (xQueueReceive(xWifiPingQueue, &wifi_ping, 0) == pdTRUE) {
+		// Set text
+		lv_label_set_text_fmt(gateway_ping_lbl, "Router: %" PRId32 " ms", wifi_ping.rtt_gateway);
+		lv_label_set_text_fmt(dns_ping_lbl, "DNS: %" PRId32 " ms", wifi_ping.rtt_dns);
+
+		// Realign labels
+		lv_obj_align(gateway_ping_lbl, LV_ALIGN_BOTTOM_LEFT, 2, 2);
+		lv_obj_align(dns_ping_lbl, LV_ALIGN_BOTTOM_RIGHT, -2, 2);
 	}
 	
 	// Update label based on connection
@@ -2663,8 +2687,13 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 		// Hide Wi-Fi menu
 		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
-		// Reset static
+		// Delete ping labels
+		lv_obj_delete(gateway_ping_lbl);
+		lv_obj_delete(dns_ping_lbl);
+
+		// Reset statics
 		do_once = false;
+		gateway_ping_lbl = dns_ping_lbl = NULL;
 
 		// Show right arrow
 		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -2699,9 +2728,14 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 				
 				// Show scan menu
 				lv_obj_remove_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
-				
-				// Reset static
+
+				// Delete ping labels
+				lv_obj_delete(gateway_ping_lbl);
+				lv_obj_delete(dns_ping_lbl);
+
+				// Reset statics
 				do_once = false;
+				gateway_ping_lbl = dns_ping_lbl = NULL;
 				
 				ui_menu->page = WIFI_SCAN_PAGE;
 			}
@@ -2714,8 +2748,13 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 			// Show scan menu
 			lv_obj_remove_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
 			
-			// Reset static
+			// Delete ping labels
+			lv_obj_delete(gateway_ping_lbl);
+			lv_obj_delete(dns_ping_lbl);
+
+			// Reset statics
 			do_once = false;
+			gateway_ping_lbl = dns_ping_lbl = NULL;
 			
 			monitoring_packets = true;
 			
@@ -2727,8 +2766,13 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 			lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 			
 			if (lcd_wifi_connected) {
-				// Reset static
+				// Delete ping labels
+				lv_obj_delete(gateway_ping_lbl);
+				lv_obj_delete(dns_ping_lbl);
+
+				// Reset statics
 				do_once = false;
+				gateway_ping_lbl = dns_ping_lbl = NULL;
 				
 				// Show right arrow
 				lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -2739,7 +2783,7 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 				lbl_conf = lv_label_create(ACTIVE_SCR);
 				
 				lcd_format_label(lbl_conf, "Please connect to\n  a network first!", user_secondary_color,
-							 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+							&lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
 				
 				lv_timer_handler();
 				vTaskDelay(pdMS_TO_TICKS(1000));
@@ -2759,8 +2803,13 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 			lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 			
 			if (lcd_wifi_connected) {
-				// Reset static
+				// Delete ping labels
+				lv_obj_delete(gateway_ping_lbl);
+				lv_obj_delete(dns_ping_lbl);
+
+				// Reset statics
 				do_once = false;
+				gateway_ping_lbl = dns_ping_lbl = NULL;
 				
 				// Hide top and bot arrows
 				lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
@@ -2784,7 +2833,7 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 				lbl_conf = lv_label_create(ACTIVE_SCR);
 				
 				lcd_format_label(lbl_conf, "Please connect to\n  a network first!", user_secondary_color,
-							 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+							&lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
 				
 				lv_timer_handler();
 				vTaskDelay(pdMS_TO_TICKS(1000));
@@ -2806,8 +2855,13 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 			// Show selection labels
 			lcd_unhide_selection_widgets(ui_menu);
 			
-			// Reset static
+			// Delete ping labels
+			lv_obj_delete(gateway_ping_lbl);
+			lv_obj_delete(dns_ping_lbl);
+
+			// Reset statics
 			do_once = false;
+			gateway_ping_lbl = dns_ping_lbl = NULL;
 			
 			// Switch pages
 			ui_menu->page = SELECTION_PAGE;
@@ -2817,8 +2871,13 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 			// Hide Wi-Fi menu
 			lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 			
-			// Reset static
+			// Delete ping labels
+			lv_obj_delete(gateway_ping_lbl);
+			lv_obj_delete(dns_ping_lbl);
+
+			// Reset statics
 			do_once = false;
+			gateway_ping_lbl = dns_ping_lbl = NULL;
 			
 			lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 		}

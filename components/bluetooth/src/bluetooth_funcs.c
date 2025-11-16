@@ -958,6 +958,12 @@ void ble_store_config_init(void);
 
 void bluetooth_init(void)
 {
+	#ifdef POLYCAST5_DEBUG
+	ESP_LOGI(TAG, "bluetooth_init() starting, state=%d", bluetooth_state);
+    ESP_LOGI(TAG, "BT controller status before init: %d",
+			esp_bt_controller_get_status()); // IDLE, INITED, ENABLED, NUM
+	#endif
+
 	// If already on or initing, exit
 	if (bluetooth_state == BT_STATE_INITING || bluetooth_state == BT_STATE_RUNNING) {
 		return;
@@ -987,6 +993,11 @@ void bluetooth_init(void)
 		ESP_LOGE(TAG, "esp_nimble_enable failed: %d", ret);
 	}
 
+	#ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "BT controller status after init: %d",
+			esp_bt_controller_get_status()); // IDLE, INITED, ENABLED, NUM
+	#endif
+
 	bluetooth_state = BT_STATE_RUNNING;
 }
 
@@ -995,6 +1006,12 @@ extern esp_err_t esp_hid_gap_deinit(void);
 
 void bluetooth_deinit(void)
 {
+	#ifdef POLYCAST5_DEBUG
+	ESP_LOGI(TAG, "bluetooth_deinit() starting, state=%d", bluetooth_state);
+	ESP_LOGI(TAG, "BT controller status before deinit: %d",
+			esp_bt_controller_get_status()); // IDLE, INITED, ENABLED, NUM
+	#endif
+
 	// If already off or deiniting, exit
 	if (bluetooth_state == BT_STATE_OFF || bluetooth_state == BT_STATE_DEINITING) {
 		return;
@@ -1008,23 +1025,23 @@ void bluetooth_deinit(void)
 
 	ble_gatts_reset();
 
-   if (nimble_port_stop()) {
-		   ESP_LOGE(TAG, "nimble_port_stop failed");
-		   return;
-   }
+	if (nimble_port_stop()) {
+		ESP_LOGE(TAG, "nimble_port_stop failed");
+	}
 
-   if (nimble_port_deinit() != ESP_OK) {
-		   ESP_LOGE(TAG, "nimble_port_deinit failed");
-		   return;
-   }
+	if (nimble_port_deinit() != ESP_OK) {
+		ESP_LOGE(TAG, "nimble_port_deinit failed");
+	}
 
-   if (ble_hid_param.hid_dev) {
-		   esp_hidd_dev_deinit(ble_hid_param.hid_dev);
-		   ble_hid_param.hid_dev = NULL;
-   }
+	if (ble_hid_param.hid_dev) {
+		esp_hidd_dev_deinit(ble_hid_param.hid_dev);
+		ble_hid_param.hid_dev = NULL;
+	}
 
 	#ifdef POLYCAST5_DEBUG
 	ESP_LOGI(TAG, "Bluetooth fully disabled");
+	ESP_LOGI(TAG, "BT controller status after deinit: %d",
+			esp_bt_controller_get_status()); // IDLE, INITED, ENABLED, NUM
 	#endif
 
 	bluetooth_state = BT_STATE_OFF;
