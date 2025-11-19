@@ -16,6 +16,7 @@
 #include "esp_log.h"
 #include "esp_spiffs.h"
 #include "esp_err.h"
+#include "esp_wifi.h" // esp_wifi_restore
 
 #include "qrcodegen.h"
 #include "st7789.h"
@@ -358,13 +359,16 @@ void lcd_device_sleep(void)
 		lv_timer_handler();
 	}
 
-	xQueueReset(xPowerButtonSemaphore); // Clear xPowerButtonSemaphore	
+	xQueueReset(xPowerButtonSemaphore); // Clear xPowerButtonSemaphore
 	
 	go_to_sleep = false; // Clear sleep flag
 	lcd_clear_pending_inputs = true; // Clear if action button pressed to wake
 	
 	// Require pin re-entry
 	settings_menu.pin_menu.prompt_pin = true;
+
+	// TODO: Noticable delay on LCD
+	//xSemaphoreGive(xWifiCycleSemaphore); // Cycle Wi-Fi radio on wake
 }
 
 void lcd_init_driver(void)
@@ -2846,6 +2850,14 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 				// Show Wi-Fi menu
 				lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 			}
+		}
+		// Ping network
+		else if (ui_btns->right_btn == 1) {
+			#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "Requesting Wi-Fi ping");
+			#endif
+
+			xSemaphoreGive(xWifiPingSemaphore);
 		}
 		// Back selected
 		else if (ui_btns->left_btn == 1) {

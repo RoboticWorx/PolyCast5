@@ -232,7 +232,7 @@ static void gpio_task(void *arg)
 	gpio_write_output(7, 0); // NC
 	
 	#ifdef POLYCAST5_CYCLE_RGB_ON_BOOT
-		gpio_cycle_rgb();
+	gpio_cycle_rgb();
 	#endif
 	
 	if (xTaskCreate(adc_task, "adc_task", 1024 * 2, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {

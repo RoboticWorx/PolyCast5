@@ -21,6 +21,8 @@ extern SemaphoreHandle_t xWifiCanSleepSemaphore;
 extern SemaphoreHandle_t xWifiMqttSuccessSemaphore;
 extern SemaphoreHandle_t xWifiMqttConnectedSemaphore;
 extern SemaphoreHandle_t xWifiMqttDisconnectedSemaphore;
+extern SemaphoreHandle_t xWifiCycleSemaphore;
+extern SemaphoreHandle_t xWifiPingSemaphore;
 
 // OTA
 extern QueueHandle_t xWifiOtaPctQueue;

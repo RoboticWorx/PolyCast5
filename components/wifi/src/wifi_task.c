@@ -21,6 +21,8 @@
 
 #define TAG "WIFI_TASK"
 
+extern bool wifi_connected;
+
 char btc_wifi_portal_pass[64];
 
 static wifi_scan_t wifi_scan[WIFI_MAX_NETWORKS];
@@ -47,6 +49,8 @@ SemaphoreHandle_t xWifiCanSleepSemaphore;
 SemaphoreHandle_t xWifiMqttSuccessSemaphore;
 SemaphoreHandle_t xWifiMqttConnectedSemaphore;
 SemaphoreHandle_t xWifiMqttDisconnectedSemaphore;
+SemaphoreHandle_t xWifiCycleSemaphore;
+SemaphoreHandle_t xWifiPingSemaphore;
 
 // OTA
 SemaphoreHandle_t xWifiOtaAvailableSemaphore; // Wi-Fi -> LCD
@@ -76,6 +80,10 @@ static void wifi_task(void *param)
 	configASSERT(xWifiMqttDisconnectedSemaphore);
 	xWifiOtaAvailableSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xWifiOtaAvailableSemaphore);
+	xWifiCycleSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xWifiCycleSemaphore);
+	xWifiPingSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xWifiPingSemaphore);
 	
 	xWifiScanQueue = xQueueCreate(WIFI_MAX_NETWORKS, sizeof(wifi_scan_t));
 	configASSERT(xWifiScanQueue);
@@ -160,6 +168,14 @@ static void wifi_task(void *param)
 	}
 	
 	while (1) {
+		// Check if need to cycle Wi-Fi radio (BT edge case)
+		if (xSemaphoreTake(xWifiCycleSemaphore, 0) == pdTRUE) {
+			esp_err_t err = wifi_funcs_radio_cycle();
+			if (err != ESP_OK) {
+				ESP_LOGW(TAG, "wifi_funcs_radio_cycle failed: %s", esp_err_to_name(err));
+			}
+		}
+		
 		// Start a Wi-Fi scan
 		if (xSemaphoreTake(xWifiStartScanSemaphore, 0) == pdTRUE) {
 			ESP_ERROR_CHECK(esp_wifi_start());
@@ -239,6 +255,46 @@ static void wifi_task(void *param)
 			#endif
 			
 			wifi_funcs_init_promiscuous(&sniff_network);
+		}
+
+		// Ping the network
+		if (xSemaphoreTake(xWifiPingSemaphore, 0) == pdTRUE) {
+			if (!wifi_connected) {
+				#ifdef POLYCAST5_DEBUG
+				ESP_LOGW(TAG, "xWifiPingSemaphore: Skipping ping, not connected to Wi-Fi");
+				#endif
+				continue;
+			}
+
+			// Initial pings
+			wifi_ping_t wifi_ping = {0};
+
+			// Ping the gateway
+			esp_err_t err = wifi_funcs_ping_gateway(&wifi_ping.rtt_gateway);
+			if (err != ESP_OK) {
+				ESP_LOGW(TAG, "Initial gateway ping failed: %s", esp_err_to_name(err));
+			}
+			else {
+				#ifdef POLYCAST5_DEBUG
+				ESP_LOGI(TAG, "Initial gateway ping RTT: %d ms", wifi_ping.rtt_gateway);
+				#endif
+			}
+
+			// Ping a public DNS server
+			err = wifi_funcs_ping("8.8.8.8", &wifi_ping.rtt_dns); // Google Public DNS
+			if (err == ESP_OK) {
+				#ifdef POLYCAST5_DEBUG
+				ESP_LOGI(TAG, "Ping 8.8.8.8: %ld ms", (long)wifi_ping.rtt_dns);
+				#endif
+			}
+			else {
+				ESP_LOGW(TAG, "Ping to 8.8.8.8 failed : %s", esp_err_to_name(err));
+			}
+
+			// Send the ping results
+			if (xQueueSend(xWifiPingQueue, &wifi_ping, pdMS_TO_TICKS(1000)) != pdTRUE) {
+				ESP_LOGE(TAG, "xWifiPingQueue: Failed to enqueue ping results");
+			}
 		}
     
 		vTaskDelay(pdMS_TO_TICKS(10));

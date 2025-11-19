@@ -109,6 +109,13 @@ esp_err_t wifi_funcs_radio_start(const char *ssid, const uint8_t* bssid, const c
 esp_err_t wifi_funcs_radio_stop(void);
 
 /**
+ * @brief Turn on/off Wi-Fi radio to nudge driver
+ *
+ * @returns ESP error status
+ */
+esp_err_t wifi_funcs_radio_cycle(void);
+
+/**
  * @brief Creates MQTT ESP event group
  */
 void wifi_funcs_wifi_event_init(void);
