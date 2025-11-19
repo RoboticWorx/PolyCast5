@@ -335,7 +335,7 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 			
 			lbl_wait = lv_label_create(ACTIVE_SCR);
 			lcd_format_label(lbl_wait, "Scanning for networks...\nPlease wait, then select\na network to monitor.", user_secondary_color,
-						 &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
+					&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
 						 						 
 			lv_timer_handler(); // Show
 							 
@@ -419,7 +419,7 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 			// Wait label
 			lbl_wait = lv_label_create(ACTIVE_SCR);
 			lcd_format_label(lbl_wait, "Scanning for networks...\nPlease wait...", user_secondary_color,
-						 &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 20);
+					&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 20);
 							 
 			// Start scan
 			xSemaphoreGive(xWifiStartScanSemaphore);
@@ -678,12 +678,18 @@ static void update_password_label_lcd(lv_obj_t *lbl_display, char cur_char, int 
 {
 	char display[MAX_PASSWORD_LEN + 2];
 	size_t len = cur_pos + 1;
-	if (len > MAX_PASSWORD_LEN) len = MAX_PASSWORD_LEN;
-	// copy existing
+
+	if (len > MAX_PASSWORD_LEN) {
+		len = MAX_PASSWORD_LEN;
+	}
+
+	// Copy existing
 	memcpy(display, mqtt_name_buf, cur_pos);
-	// show current selection
+
+	// Show current selection
 	display[cur_pos] = cur_char;
 	display[cur_pos + 1] = '\0';
+
 	lv_label_set_text(lbl_display, display);
 	lv_obj_align(lbl_display, LV_ALIGN_CENTER, 0, 30);
 }
@@ -709,11 +715,11 @@ void lcd_wifi_get_password(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t 
 		// Helper labels
 		lbl_user_in = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_user_in, "", user_secondary_color,
-						 &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
+				&lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
 						 
 		lbl_dirs = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_dirs, "Enter Wi-Fi password: Press\n  home to cycle characters.", user_secondary_color,
-						 &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -30);
+				&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -30);
 
 		update_password_label_lcd(lbl_user_in, cur_char, cur_pos);
 		
@@ -957,24 +963,25 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
 		// Small text
 		lbl_rssi = lv_label_create(cont);
 		lcd_format_label(lbl_rssi, "RSSI: ", user_secondary_color,
-						 &lv_font_montserrat_16, LV_ALIGN_TOP_LEFT, 0, -10);
+				&lv_font_montserrat_16, LV_ALIGN_TOP_LEFT, 0, -10);
 						 
 		lbl_snr = lv_label_create(cont);
 		lcd_format_label(lbl_snr, "SNR: ", user_secondary_color,
-						 &lv_font_montserrat_16, LV_ALIGN_TOP_RIGHT, -5, -10);
+				&lv_font_montserrat_16, LV_ALIGN_TOP_RIGHT, -5, -10);
 						 
 		lbl_scroll = lv_label_create(cont);
 		lcd_format_label(lbl_scroll, "SCROLL", user_secondary_color,
-						 &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, 15);
+				&lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, 15);
 						 
 		lbl_data = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_data, "DATA " LV_SYMBOL_RIGHT, user_secondary_color,
-						 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_RIGHT, -3, 0);
+				&lv_font_montserrat_14, LV_ALIGN_BOTTOM_RIGHT, -3, 0);
 
 		// Main info
 		lbl_info = lv_label_create(cont);
 		lcd_format_label(lbl_info, "", user_secondary_color,
-						 &lv_font_montserrat_16, LV_ALIGN_BOTTOM_LEFT, 0, 265);
+				&lv_font_montserrat_16, LV_ALIGN_BOTTOM_LEFT, 0, 285);
+
 		lv_label_set_long_mode(lbl_info, LV_LABEL_LONG_WRAP);
 		lv_label_set_text(lbl_info, "Configuring...");
 
@@ -1000,7 +1007,28 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
 		
 		// Update other text
 		char txt_buf[256];
-		const char *sec = (beacon.rsn && beacon.wpa) ? "WPA/RSN" : (beacon.rsn) ? "RSN" : (beacon.wpa) ? "WPA" : "Open";
+
+		// Capability bit 4 = Privacy
+		bool privacy = (beacon.cap_info & 0x0010) != 0;
+
+		const char *sec;
+		if (!privacy && !beacon.rsn && !beacon.wpa) { // No privacy bit, no RSN/WPA IEs
+			sec = "Open\n - No encryption";
+		}
+		else if (privacy && !beacon.rsn && !beacon.wpa) { // Privacy set but no modern RSN/WPA IEs
+			sec = "WEP/legacy\n - Encryption";
+		}
+		else if (beacon.rsn && beacon.wpa) { // Both legacy WPA and RSN present
+			sec = "WPA/WPA2\n - Mixed mode";
+		}
+		else if (beacon.rsn) { // RSN IE -> WPA2/3 family
+			// Most modern APs here are WPA2-Personal (AES)
+			sec = "WPA2/WPA3\n - RSN network";
+		}
+		else { // beacon.wpa only
+			sec = "WPA\n - Legacy";
+		}
+
 		// beacon.timestamp is in seconds
 		uint64_t timestamp_mins = beacon.timestamp / 60; 
 		uint64_t timestamp_days = beacon.timestamp / (24 * 60 * 60); 
@@ -1140,7 +1168,7 @@ static void data_chart_draw_cb(lv_event_t * e)
 	
 	int32_t  rssi_db = y_array[logical];	   // e.g. –40
 
-	if(rssi_db == LV_CHART_POINT_NONE) {
+	if (rssi_db == LV_CHART_POINT_NONE) {
 		return;
 	}
 
@@ -1377,7 +1405,7 @@ void lcd_wifi_sync_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		lbl_ins = lv_label_create(ACTIVE_SCR);
 		
 		lcd_format_label(lbl_ins, "1. Bring near desired PolyPlug.\n2. Press the top right button\non the PolyPlug.\n3. Confirm LED is showing\nblue on the PolyPlug.\n4. On this device, hit the\nright arrow to confirm.", user_secondary_color,
-						 &lv_font_montserrat_14, LV_ALIGN_CENTER, 6, 6);
+				&lv_font_montserrat_14, LV_ALIGN_CENTER, 6, 6);
 		
 		init = true;
 	}

@@ -62,7 +62,8 @@ static bool sta_gw_valid = false;
 esp_err_t wifi_funcs_scan(wifi_scan_t *wifi_scan)
 {
 	esp_err_t err;
-	// Scan all SSIDs, all channels, include hidden networks
+
+	// Scan all SSIDs and channels
 	wifi_scan_config_t scan_config = {
 		.ssid = NULL,
 		.bssid = NULL,
@@ -102,38 +103,77 @@ esp_err_t wifi_funcs_scan(wifi_scan_t *wifi_scan)
 	
 	#ifdef POLYCAST5_DEBUG
 	ESP_LOGI(TAG, "Found %d access point(s):", ap_num);
-	for (int i = 0; i < ap_num; i++) {
+	for (int i = 0; i < ap_num; ++i) {
 		ESP_LOGI(TAG,
-			"[%d] SSID: %-32s BSSID: %02x:%02x:%02x:%02x:%02x:%02x RSSI: %3d  CH:%2d  AUTH:%d",
-			i,
-			(char*)ap_list[i].ssid,
-			ap_list[i].bssid[0], ap_list[i].bssid[1],
-			ap_list[i].bssid[2], ap_list[i].bssid[3],
-			ap_list[i].bssid[4], ap_list[i].bssid[5],
-			ap_list[i].rssi,
-			ap_list[i].primary,
-			ap_list[i].authmode
+				"[%d] SSID: %-32s BSSID: %02x:%02x:%02x:%02x:%02x:%02x RSSI: %3d  CH:%2d  AUTH:%d",
+				i,
+				(char*)ap_list[i].ssid,
+				ap_list[i].bssid[0], ap_list[i].bssid[1],
+				ap_list[i].bssid[2], ap_list[i].bssid[3],
+				ap_list[i].bssid[4], ap_list[i].bssid[5],
+				ap_list[i].rssi,
+				ap_list[i].primary,
+				ap_list[i].authmode
 		);
 	}
 	#endif
-	
-	// Fill wifi_scan_t struct
-	size_t count = MIN(ap_num, WIFI_MAX_NETWORKS);
-	for (size_t i = 0; i < count; i++) {
-		// Copy the SSID
-		strlcpy((char*)wifi_scan[i].ssid, (char*)ap_list[i].ssid, sizeof(wifi_scan[i].ssid));
-		
-		// Copy the BSSID
-		memcpy(wifi_scan[i].bssid, ap_list[i].bssid, sizeof(ap_list[i].bssid));
-	
-		// Fill the rest
-		wifi_scan[i].rssi = ap_list[i].rssi;
-		wifi_scan[i].channel = ap_list[i].primary;
-		wifi_scan[i].auth = ap_list[i].authmode;
-	
-		// Send to LCD
+
+	// Build a list of unique SSIDs, keeping the strongest RSSI for each
+	size_t unique_count = 0;
+
+	for (uint16_t i = 0; i < ap_num && unique_count < WIFI_MAX_NETWORKS; ++i) {
+		const char *ssid = (char *)ap_list[i].ssid;
+
+		// Skip blank SSIDs
+		if (ssid[0] == '\0') {
+			continue;
+		}
+
+		bool found = false;
+		size_t existing_idx = 0;
+
+		// See if we've already recorded this SSID
+		for (size_t j = 0; j < unique_count; ++j) {
+			if (strncmp((char *)wifi_scan[j].ssid, ssid, sizeof(wifi_scan[j].ssid)) == 0) {
+				found = true;
+				existing_idx = j;
+				break;
+			}
+		}
+
+		// New SSID: add a fresh entry
+		if (!found) {
+			// Copy the SSID
+			strlcpy((char *)wifi_scan[unique_count].ssid, ssid, sizeof(wifi_scan[unique_count].ssid));
+
+			// Copy the BSSID
+			memcpy(wifi_scan[unique_count].bssid, ap_list[i].bssid, sizeof(ap_list[i].bssid));
+
+			// Fill the rest
+			wifi_scan[unique_count].rssi = ap_list[i].rssi;
+			wifi_scan[unique_count].channel = ap_list[i].primary;
+			wifi_scan[unique_count].auth = ap_list[i].authmode;
+
+			unique_count++;
+		}
+		// Same SSID as an existing one
+		else {
+			// Keep the stronger AP
+			if (ap_list[i].rssi > wifi_scan[existing_idx].rssi) {
+				// Copy over since larger RSSI
+				memcpy(wifi_scan[existing_idx].bssid, ap_list[i].bssid, sizeof(ap_list[i].bssid));
+
+				wifi_scan[existing_idx].rssi = ap_list[i].rssi;
+				wifi_scan[existing_idx].channel = ap_list[i].primary;
+				wifi_scan[existing_idx].auth = ap_list[i].authmode;
+			}
+		}
+	}
+
+	// Push the unique SSIDs to the LCD queue
+	for (size_t i = 0; i < unique_count; ++i) {
 		if (xQueueSend(xWifiScanQueue, &wifi_scan[i], portMAX_DELAY) != pdPASS) {
-			ESP_LOGE(TAG, "xWifiScanQueue: Failed to enqueue #%u", i);
+			ESP_LOGE(TAG, "xWifiScanQueue: Failed to enqueue #%u", (unsigned)i);
 		}
 	}
 
@@ -1171,7 +1211,7 @@ static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 static void record_client(const uint8_t *mac, int8_t rssi) {
 	
 	// Check if exists
-	for (int i = 0; i < wifi_data.client_count; i++) {
+	for (int i = 0; i < wifi_data.client_count; ++i) {
 		if (memcmp(wifi_data.clients[i].mac, mac, 6) == 0) { // If it does, update the rssi then exit
 			wifi_data.clients[i].rssi = rssi;
 			
