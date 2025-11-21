@@ -86,6 +86,26 @@ esp_err_t wifi_funcs_scan(wifi_scan_t *wifi_scan)
 		return err;
 	}
 
+	// If no networks found
+	if (ap_num == 0) {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "esp_wifi_scan_get_ap_num: No access points found");
+		#endif
+
+		wifi_scan_t sentinel = {0};
+
+		// Use an impossible auth value as a sentinel marker
+		sentinel.auth = 0xFF;
+
+		// Signal LCD no APs found
+		if (xQueueSend(xWifiScanQueue, &sentinel, portMAX_DELAY) != pdPASS) {
+			ESP_LOGE(TAG, "xWifiScanQueue: Failed to enqueue 'no APs' sentinel");
+		}
+
+		// Exit without error
+		return ESP_OK;
+	}
+
 	// Allocate array to hold results
 	wifi_ap_record_t *ap_list = malloc(sizeof(wifi_ap_record_t) * ap_num);
 	if (!ap_list) {

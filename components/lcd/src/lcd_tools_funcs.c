@@ -279,17 +279,21 @@ static void read_the_docs_redraw(lv_obj_t *label, lv_obj_t *canvas, uint8_t **pb
 	}
 	else if (idx == 1) {
 		text = "How to Docs:";
-		url = "https://polycast5.com/docs/";
+		url = "https://polycast5.com/pages/docs";
 	}
 	else if (idx == 2) {
+		text = "Tutorials:";
+		url = "https://polycast5.com/pages/tutorials";
+	}
+	else if (idx == 3) {
 		text = "Join Discord:";
 		url = "https://discord.gg/7RqJTnUE";
 	}
-	else if (idx == 3) {
+	else if (idx == 4) {
 		text = "Source Code:";
 		url = "https://github.com/RoboticWorx/PolyCast5";
 	}
-	else if (idx == 4) {
+	else if (idx == 5) {
 		text = "Code Flasher:";
 		url = "https://polycast5.com/pages/firmware-updater";
 	}
@@ -306,7 +310,7 @@ static void read_the_docs_redraw(lv_obj_t *label, lv_obj_t *canvas, uint8_t **pb
 
 void lcd_tools_docs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
 {
-	#define MAX_QRS 5
+	#define MAX_QRS 6
 	
 	// Statics
 	static bool do_once = false;

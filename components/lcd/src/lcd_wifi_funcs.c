@@ -299,7 +299,7 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 			// Option label
 			lbl_option = lv_label_create(ACTIVE_SCR);
 			lcd_format_label(lbl_option, "or press down to scan", user_secondary_color,
-					 &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -10);
+					&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -10);
 					 		
 		
 			/* Add prev button */
@@ -351,6 +351,24 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 	// When networks have been scanned
 	wifi_scan_t result;
 	while (xQueueReceive(xWifiScanQueue, &result, 0) == pdPASS) {
+		// If no networks found
+		if (result.auth == 0xFF) { // (Impossible auth type)
+			#ifdef POLYCAST5_DEBUG
+			// This needs to be tested as an edge case!
+			ESP_LOGW(TAG, "xWifiScanQueue: Received impossible auth type (%d): TEST EDGE CASE.", result.auth);
+			#endif
+
+			// Done scanning
+			scanning = false;
+			scanned = false;
+
+			lv_label_set_text(lbl_wait, "No networks found.\nPress LEFT to go back.");
+			lv_obj_align(lbl_wait, LV_ALIGN_CENTER, 0, 20);
+			
+			// Don't create any buttons for this sentinel
+			continue;
+		}
+
 		// Skip any blanks
 		if ((result.ssid[0] == '\0') || (strlen((char*)result.ssid) == 0)) {
 			continue;
