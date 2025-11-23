@@ -16,7 +16,6 @@
 #include "esp_log.h"
 #include "esp_spiffs.h"
 #include "esp_err.h"
-#include "esp_wifi.h" // esp_wifi_restore
 
 #include "qrcodegen.h"
 #include "st7789.h"
@@ -1486,6 +1485,12 @@ void lcd_boot_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu)
 	}
 	// Confirm
 	else if (ui_btns->right_btn == 1) {
+		// Save first boot
+		esp_err_t err = lcd_save_first_boot();
+		if (err != ESP_OK) {
+			ESP_LOGE(TAG, "lcd_save_first_boot failed: %s", esp_err_to_name(err));
+		}
+
 		// Delete objects
 		lv_obj_delete(cont); // Deletes children
 		
@@ -1499,6 +1504,13 @@ void lcd_boot_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu)
 		
 		// Go home
 		ui_menu->page = HOME_PAGE;
+	}
+	// Power off without switching pages (stay on BOOT_PAGE)
+	else if (ui_btns->pwr_btn == 1) {		
+		// Transition to sleep
+		gpio_set_level(ST7789_LEDA_PIN, 0); // BL low so user doesn't see redraw
+		
+		go_to_sleep = true;
 	}
 }
 

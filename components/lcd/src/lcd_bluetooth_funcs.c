@@ -1597,19 +1597,19 @@ static void prompt_rename_or_del(ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth
 	// Create and format ins labels
 	lv_obj_t *lbl_ins = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_ins, "", user_secondary_color,
-				 &lv_font_montserrat_30, LV_ALIGN_CENTER, 0, 0);
+			&lv_font_montserrat_30, LV_ALIGN_CENTER, 0, 0);
 				 
 	lv_obj_t *lbl_exit = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_exit, "DEFAULT", user_secondary_color,
-				 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -16, -1);
+			&lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -16, -1);
 				 
 	lv_obj_t *lbl_name = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_name, "RENAME", user_secondary_color,
-				 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 13);
+			&lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 13);
 				 
 	lv_obj_t *lbl_del = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_del, "DELETE", user_secondary_color,
-				 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
+			&lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
 	
 	while (1) {
 		lv_timer_handler();
@@ -1686,7 +1686,7 @@ static void prompt_rename_or_del(ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth
 				// Active bluetooth
 				uint16_t cmd = BLUETOOTH_CMD_INIT;
 				xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-
+				
 				// Forget all bluetooth bonding keys
 				cmd = BLUETOOTH_CMD_UNPAIR_ALL_NO_REINIT;
 				xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
@@ -1929,8 +1929,12 @@ void lcd_bluetooth_pair_new_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 				"This can be great for pranks or just switching between various devices such as PC or phone without having to re-pair every time.\n\n"
 				"Right now the Bluetooth whitelist has been cleared, allowing PolyCast5 to connect to a new device like normal.\n\n"
 				"For this to work, please also walk out of range or turn off Bluetooth on any previously known devices.\n\n"
-				"Afterwards, press the left arrow button and scroll up to 'How It Works' further instructions if needed.";		
-		lv_label_set_text(instr_lbl, instr_text);
+				"Afterwards, you can repair normally using '%d' as the pin.";		
+		
+		// Load pairing key from NVS
+		uint32_t pairing_key;
+		bluetooth_pairing_key_load_nvs(&pairing_key);
+		lv_label_set_text_fmt(instr_lbl, instr_text, pairing_key);
 
 		lv_timer_handler();
 		
@@ -2054,15 +2058,15 @@ void lcd_bluetooth_rename_peer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 		
 		lbl_user_in = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_user_in, "", user_secondary_color,
-						 &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
+				&lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
 						 
 		lbl_dirs = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_dirs, "      Enter device name:\nPress HOME to cycle chars.", user_secondary_color,
-						 &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -31);
+				&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -31);
 						 
 		lbl_chars = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_chars, "(Up to 12 characters)", user_secondary_color,
-						 &lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0);
+				&lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0);
 						 
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
 	}

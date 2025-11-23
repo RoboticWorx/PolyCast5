@@ -20,6 +20,7 @@
   "files.associations": {
     "esp_crt_bundle.h": "c",
     "esp_http_client.h": "c",
-    "netdb.h": "c"
+    "netdb.h": "c",
+    "*.inc": "c"
   }
 }

@@ -168,11 +168,7 @@ static void lcd_task(void *pvParameters)
 		// Show BOOT_PAGE first
 		ui_menu.page = BOOT_PAGE;
 
-		// Save first boot
-		esp_err_t err = lcd_save_first_boot();
-		if (err != ESP_OK) {
-			ESP_LOGE(TAG, "lcd_save_first_boot failed: %s", esp_err_to_name(err));
-		}
+		// Save first boot only if right arrow pressed
 	}
 	else {
 		#ifdef POLYCAST5_DEBUG
@@ -501,7 +497,7 @@ static void lcd_task(void *pvParameters)
 		TickType_t sleep_timer_interval = pdMS_TO_TICKS(sleep_time_s * 1000); // sleep_time_s is extern
 		
 		// If home and sleep_timer_interval has passed without intervention
-		if ((ui_menu.page == HOME_PAGE) && ((xTaskGetTickCount() - sleep_timer_last >= sleep_timer_interval) || go_to_sleep)) {
+		if (((ui_menu.page == HOME_PAGE) || (ui_menu.page == BOOT_PAGE)) && ((xTaskGetTickCount() - sleep_timer_last >= sleep_timer_interval) || go_to_sleep)) {
 			lcd_device_sleep();
 				
 			sleep_timer_last = xTaskGetTickCount();
