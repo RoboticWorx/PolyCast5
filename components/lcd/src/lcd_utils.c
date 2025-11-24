@@ -1464,7 +1464,7 @@ void lcd_boot_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu)
 		const char *instr_text = 
 								"Hello, welcome to PolyCast5! Press the down arrow to scroll.\n\n"
 								"Below is some quick info to help you get started!\n\n"
-								"To get the most out of your PolyCast5, I'd recommend checking out polycast5.com:\n\n"
+								"To get the most out of your PolyCast5, check out polycast5.com:\n\n"
 								"\n\n\n"
 								"It has a lot of docs and tutorials to help you unleash this device's full potential.\n\n"
 								"Also, in the unlikely case that anything should ever be glitchy, you can do a safe hardware reboot by pressing "

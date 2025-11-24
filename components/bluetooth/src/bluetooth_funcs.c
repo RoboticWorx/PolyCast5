@@ -171,6 +171,9 @@ static esp_hid_device_config_t ble_hid_config = {
 	.report_maps_len = 1
 };
 
+static uint8_t bt_mod_state = 0;
+static uint8_t bt_keys_state[6] = {0};
+
 // Sends a single Consumer Control usage (press or release)
 static inline void cc_send_usage(uint16_t usage, bool key_pressed)
 {
@@ -278,6 +281,72 @@ static void kbd_release_all(void)
 {
 	uint8_t rpt[HID_KB_IN_RPT_LEN] = {0};
 	hid_input_send(HID_RPT_ID_KB_IN, rpt, sizeof(rpt));
+}
+
+static void kbd_state_clear(void)
+{
+	bt_mod_state = 0;
+	memset(bt_keys_state, 0, sizeof(bt_keys_state));
+	kbd_release_all(); // Aends an all-zero report
+}
+
+// Add modifiers + keys into the current state and send
+static void kbd_state_add(uint8_t mods, const uint8_t *keys, size_t nkeys)
+{
+	bt_mod_state |= mods;
+
+	for (size_t i = 0; i < nkeys; ++i) {
+		uint8_t kc = keys[i];
+		if (!kc) {
+			continue;
+		}
+
+		// Skip if already present
+		bool already = false;
+		for (int j = 0; j < 6; ++j) {
+			if (bt_keys_state[j] == kc) {
+				already = true;
+				break;
+			}
+		}
+		if (already) {
+			continue;
+		}
+
+		// Insert into first empty slot if available
+		for (int j = 0; j < 6; ++j) {
+			if (bt_keys_state[j] == 0) {
+				bt_keys_state[j] = kc;
+				break;
+			}
+		}
+	}
+
+	// Send the current state as one HID report
+	kbd_send_raw(bt_mod_state, bt_keys_state);
+}
+
+// Remove modifiers + keys from the current state and send
+static void kbd_state_remove(uint8_t mods, const uint8_t *keys, size_t nkeys)
+{
+	bt_mod_state &= (uint8_t)~mods;
+
+	for (size_t i = 0; i < nkeys; ++i) {
+		uint8_t kc = keys[i];
+		if (!kc) {
+			continue;
+		}
+
+		for (int j = 0; j < 6; ++j) {
+			if (bt_keys_state[j] == kc) {
+				bt_keys_state[j] = 0;
+				break;
+			}
+		}
+	}
+
+	// Send the current state as one HID report
+	kbd_send_raw(bt_mod_state, bt_keys_state);
 }
 
 static bool ascii_to_hid(char c, uint8_t *mod, uint8_t *kc)
@@ -695,6 +764,10 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
 	uint32_t hold_ms = DEFAULT_HOLD_MS;
 	char *payload = tmp; // Points to the chord text that we'll parse into modifiers/keys
 
+	// Flags for key up/down
+	bool is_down = false;
+	bool is_up = false;
+
 	// If is <hold:chord=ms>
 	if (!strncasecmp(tmp, "hold:", 5)) {
 		is_hold = true; // Use hold_ms
@@ -734,6 +807,16 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
 				*e = '\0'; // NUL-terminate payload
 			}
 		}
+	}
+	// If is <down:chord>
+	else if (!strncasecmp(tmp, "down:", 5)) {
+		is_down = true;
+		payload = tmp + 5;
+	}
+	// If is <up:chord>
+	else if (!strncasecmp(tmp, "up:", 3)) {
+		is_up = true;
+		payload = tmp + 3;
 	}
 
 	/* IF NEEDED LATER:
@@ -799,7 +882,20 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
 	}
 
 	// If we collected at least one key
-	if (nkeys > 0) {
+	if (nkeys > 0 || mods != 0) {
+		// If permanent down/up events
+		if (is_down) {
+			kbd_state_add(mods, keys, nkeys);
+			*consumed_end = gt;
+			return true;
+		}
+
+		if (is_up) {
+			kbd_state_remove(mods, keys, nkeys);
+			*consumed_end = gt;
+			return true;
+		}
+
 		// For non-hold tags: use tap_ms as the brief hold
 		// For hold tags: use hold_ms
 		uint32_t use_hold = is_hold ? hold_ms : tap_ms;
@@ -841,6 +937,9 @@ void bluetooth_send_script(const char *script, uint32_t tap_ms)
 		// Ordinary text path, keep typing
 		kbd_type_char(*s++, tap_ms);
 	}
+
+	// Safety: release anything left down by <down:...> tags
+	kbd_state_clear();
 }
 
 void bluetooth_set_battery_level(uint8_t percent)
@@ -960,7 +1059,7 @@ void bluetooth_init(void)
 {
 	#ifdef POLYCAST5_DEBUG
 	ESP_LOGI(TAG, "bluetooth_init() starting, state=%d", bluetooth_state);
-    ESP_LOGI(TAG, "BT controller status before init: %d",
+	ESP_LOGI(TAG, "BT controller status before init: %d",
 			esp_bt_controller_get_status()); // IDLE, INITED, ENABLED, NUM
 	#endif
 
@@ -994,7 +1093,7 @@ void bluetooth_init(void)
 	}
 
 	#ifdef POLYCAST5_DEBUG
-    ESP_LOGI(TAG, "BT controller status after init: %d",
+	ESP_LOGI(TAG, "BT controller status after init: %d",
 			esp_bt_controller_get_status()); // IDLE, INITED, ENABLED, NUM
 	#endif
 
