@@ -3,6 +3,8 @@ PolyCast5 Bluetooth Script Examples
 
 These are some example Bluetooth web portal scripts that you can use in the 'Bluetooth > Keyboard > Add/Edit Script' online web portal for various purposes.
 
+It is also recommended to check out [this tutorial](https://polycast5.com/blogs/docs/using-the-bluetooth-auto-keyboard/) to better use this functionality.
+
 ## Naming structure:
 
 Naming structure will follow a few word summary of what the script does then the operating system it has been tested on. This is not to say it wouldn't work on other operating systems, but the keyboard configuration for each is slightly different which may provoke some subtle differences.

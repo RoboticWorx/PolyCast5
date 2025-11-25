@@ -89,13 +89,13 @@ static ble_hid_param_t ble_hid_param = {0};
 // 	- Consumer Control on Report ID 3 (2-byte payload: bits + 4-bit array)
 const uint8_t data_report_map[] = {
 	/* Keyboard (Report ID 1) */
-	0x05, 0x01,					// Usage Page (Generic Desktop)
-	0x09, 0x06,					// Usage (Keyboard)
-	0xA1, 0x01,					// Collection (Application)
-	0x85, HID_RPT_ID_KB_IN,		// Report ID (1)
+	0x05, 0x01,				// Usage Page (Generic Desktop)
+	0x09, 0x06,				// Usage (Keyboard)
+	0xA1, 0x01,				// Collection (Application)
+	0x85, HID_RPT_ID_KB_IN,	// Report ID (1)
 
 	// Modifier bits (8 x 1-bit)
-	0x05, 0x07,					// Usage Page (Key Codes)
+	0x05, 0x07,				// Usage Page (Key Codes)
 	0x19, 0xE0,				// Usage Minimum (LeftControl)
 	0x29, 0xE7,				// Usage Maximum (Right GUI)
 	0x15, 0x00,				// Logical Minimum (0)
@@ -132,7 +132,7 @@ const uint8_t data_report_map[] = {
 	0x95, 0x01,				// Report Count (1)
 	0x91, 0x01,				// Output (Const,Array,Abs)
 
-	0xC0,							// End Collection (Keyboard)
+	0xC0,					// End Collection (Keyboard)
 
 	/* Consumer Control (Report ID 3) */
 	// Canonical single 16-bit Consumer usage report
@@ -143,16 +143,16 @@ const uint8_t data_report_map[] = {
 
 	// Declare selectable usage range (and match value range)
 	0x19, 0x00,				// Usage Minimum (0)
-	0x2A, 0x9C, 0x02,	// Usage Maximum (0x029C)
+	0x2A, 0x9C, 0x02,		// Usage Maximum (0x029C)
 	0x15, 0x00,				// Logical Minimum (0)
-	0x26, 0x9C, 0x02,	// Logical Maximum (0x029C)
+	0x26, 0x9C, 0x02,		// Logical Maximum (0x029C)
 
 	// One 16-bit array entry = one Consumer usage (e.g., 0x00E9 for Vol+)
 	0x75, 0x10,				// Report Size (16)
 	0x95, 0x01,				// Report Count (1)
 	0x81, 0x00,				// Input (Data,Array,Abs)
 
-	0xC0							// End Collection (Consumer Control)
+	0xC0					// End Collection (Consumer Control)
 };
 
 // One combined raw map

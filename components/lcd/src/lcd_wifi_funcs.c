@@ -929,9 +929,93 @@ static void beacon_chart_draw_cb(lv_event_t * e)
 	fill->color = lv_color_mix(lv_palette_main(LV_PALETTE_GREEN), lv_palette_main(LV_PALETTE_RED), mix);
 }
 
+static const char* rsn_cipher_str(const wifi_beacon_t *b)
+{
+	if (!b) {
+		return "?";
+	}
+
+	// Prefer modern ciphers if multiple present
+	if (b->rsn_pairwise_ciphers & (1u << RSN_CIPHER_GCMP_256)) {
+		return "GCMP-256";
+	}
+	if (b->rsn_pairwise_ciphers & (1u << RSN_CIPHER_CCMP_256)) {
+		return "CCMP-256";
+	}
+	if (b->rsn_pairwise_ciphers & (1u << RSN_CIPHER_GCMP_128)) {
+		return "GCMP";
+	}
+	if (b->rsn_pairwise_ciphers & (1u << RSN_CIPHER_CCMP_128)) {
+		return "AES (CCMP)";
+	}
+	if (b->rsn_pairwise_ciphers & (1u << RSN_CIPHER_TKIP))	 {
+		return "TKIP";
+	}
+
+	return "?";
+}
+
+static const char* pmf_str(const wifi_beacon_t *b)
+{
+	if (!b) {
+		return "PMF: ?";
+	}
+	if (b->pmf_required) {
+		return "PMF: Required";
+	}
+	if (b->pmf_capable)  {
+		return "PMF: Optional";
+	}
+
+	return "PMF: No";
+}
+
+static const char* akm_str(const wifi_beacon_t *b)
+{
+	if (!b) {
+		return "?";
+	}
+
+	bool has_sae  = (b->rsn_akm_suites & (1u << RSN_AKM_SAE))   != 0;
+	bool has_psk  = (b->rsn_akm_suites & (1u << RSN_AKM_PSK))   != 0;
+	bool has_1x   = (b->rsn_akm_suites & (1u << RSN_AKM_8021X)) != 0;
+	bool has_owe  = (b->rsn_akm_suites & (1u << RSN_AKM_OWE))   != 0;
+
+	if (has_owe) {
+		return "OWE (Enhanced Open)";
+	}
+	if (has_sae && has_psk) {
+		return "WPA2/WPA3 Transition";
+	}
+	if (has_sae) {
+		return "WPA3-Personal (SAE)";
+	}
+	if (has_1x) {
+		return "WPA2-Enterprise (802.1X)";
+	}
+	if (has_psk) {
+		return "WPA2-Personal (PSK)";
+	}
+
+	return "WPA2/WPA3 (RSN)";
+}
+
+static const char* phy_str(const wifi_beacon_t *b)
+{
+	switch (b->phy) {
+		case WIFI_PHY_11AX: return "802.11ax (Wi-Fi 6)";
+		case WIFI_PHY_11AC: return "802.11ac (Wi-Fi 5)";
+		case WIFI_PHY_11N:  return "802.11n (Wi-Fi 4)";
+		case WIFI_PHY_11A:  return "802.11a";
+		case WIFI_PHY_11G:  return "802.11g";
+		case WIFI_PHY_11B:  return "802.11b";
+		default:			return "Unknown";
+	}
+}
+
 void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {
-	#define SCROLL_STEP 53  // Pixels per button-press
+	#define BEACON_SCROLL_STEP 55  // Pixels per button-press
 	
 	static bool init = false;
 	static lv_obj_t *cont;
@@ -998,7 +1082,9 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
 		// Main info
 		lbl_info = lv_label_create(cont);
 		lcd_format_label(lbl_info, "", user_secondary_color,
-				&lv_font_montserrat_16, LV_ALIGN_BOTTOM_LEFT, 0, 285);
+				&lv_font_montserrat_16, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+
+		lv_obj_align_to(lbl_info, chart, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 25);
 
 		lv_label_set_long_mode(lbl_info, LV_LABEL_LONG_WRAP);
 		lv_label_set_text(lbl_info, "Configuring...");
@@ -1008,7 +1094,7 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
 
 	// On each new beacon
 	wifi_beacon_t beacon;
-	if(xQueueReceive(xWifiBeaconQueue, &beacon, 0) == pdTRUE) {
+	if (xQueueReceive(xWifiBeaconQueue, &beacon, 0) == pdTRUE) {
 		//ESP_LOGI(TAG, "RX REC %d", current_snr);
 		lv_chart_set_next_value(chart, series, beacon.snr);
 		lv_chart_refresh(chart);
@@ -1029,23 +1115,27 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
 		// Capability bit 4 = Privacy
 		bool privacy = (beacon.cap_info & 0x0010) != 0;
 
-		const char *sec;
-		if (!privacy && !beacon.rsn && !beacon.wpa) { // No privacy bit, no RSN/WPA IEs
-			sec = "Open\n - No encryption";
+		char sec_line[96] = {0};
+
+		if (!privacy && !beacon.rsn && !beacon.wpa) {
+			snprintf(sec_line, sizeof(sec_line), "Open (no encryption)");
 		}
-		else if (privacy && !beacon.rsn && !beacon.wpa) { // Privacy set but no modern RSN/WPA IEs
-			sec = "WEP/legacy\n - Encryption";
+		else if (privacy && !beacon.rsn && !beacon.wpa) {
+			snprintf(sec_line, sizeof(sec_line), "WEP / legacy encryption");
 		}
-		else if (beacon.rsn && beacon.wpa) { // Both legacy WPA and RSN present
-			sec = "WPA/WPA2\n - Mixed mode";
+		else if (beacon.rsn) {
+			// RSN network: show AKM + cipher + PMF
+			snprintf(sec_line, sizeof(sec_line), "%s\n - %s\n - %s",
+					akm_str(&beacon), rsn_cipher_str(&beacon), pmf_str(&beacon));
 		}
-		else if (beacon.rsn) { // RSN IE -> WPA2/3 family
-			// Most modern APs here are WPA2-Personal (AES)
-			sec = "WPA2/WPA3\n - RSN network";
+		else if (beacon.wpa) {
+			snprintf(sec_line, sizeof(sec_line), "WPA (legacy)");
 		}
-		else { // beacon.wpa only
-			sec = "WPA\n - Legacy";
+		else {
+			snprintf(sec_line, sizeof(sec_line), "Encrypted (unknown)");
 		}
+
+		const char *wps = beacon.wps ? "Yes" : "No";
 
 		// beacon.timestamp is in seconds
 		uint64_t timestamp_mins = beacon.timestamp / 60; 
@@ -1054,16 +1144,18 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
 		int len = snprintf(txt_buf, sizeof(txt_buf),
 			"SSID:\n - %.16s...\n"
 			"Channel:\n - %d\n"
-			"Freq:\n - %d MHz / %.3f GHz\n"
+			"Type:\n - %s\n - %.3f GHz\n"
 			"Security:\n - %s\n"
+			" - WPS: %s\n"
 			"Compatibility Code:\n - 0x%04X\n"
 			"Beacon Interval:\n - %u ms\n"
 			"Time since reboot:\n - %" PRIu64 "m / %" PRIu64 " days",
 			beacon.ssid,
 			beacon.channel,
-			beacon.freq,
+			phy_str(&beacon),
 			beacon.freq / 1000.0f,
-			sec,
+			sec_line,
+			wps,
 			beacon.cap_info,
 			beacon.interval,
 			timestamp_mins, // Minutes
@@ -1080,11 +1172,11 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
 	
 	// Scroll down
 	if (ui_btns->down_btn) {
-		lv_obj_scroll_by_bounded(cont, 0, -SCROLL_STEP, true);
+		lv_obj_scroll_by_bounded(cont, 0, -BEACON_SCROLL_STEP, true);
 	}
 	// Scroll up
 	else if (ui_btns->up_btn) {
-		lv_obj_scroll_by_bounded(cont, 0, SCROLL_STEP, true);
+		lv_obj_scroll_by_bounded(cont, 0, BEACON_SCROLL_STEP, true);
 	}
 	// Back
 	else if (ui_btns->left_btn) {

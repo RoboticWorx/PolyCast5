@@ -9,6 +9,19 @@
 
 #define MAX_MAC_CLIENTS 100
 
+// RSN cipher types (store as 1u<<type)
+#define RSN_CIPHER_TKIP 2
+#define RSN_CIPHER_CCMP_128 4 // AES/CCMP
+#define RSN_CIPHER_GCMP_128 8
+#define RSN_CIPHER_CCMP_256 10
+#define RSN_CIPHER_GCMP_256 9
+
+// RSN AKM types (store as 1u<<type)
+#define RSN_AKM_8021X 1
+#define RSN_AKM_PSK 2
+#define RSN_AKM_SAE 8 // WPA3-Personal
+#define RSN_AKM_OWE 18 // Enhanced Open (OWE)
+
 typedef struct {
     uint8_t ssid[33];
     uint8_t bssid[6];
@@ -32,17 +45,43 @@ typedef struct {
     uint8_t target_bssid[6];
 } wifi_sniff_t;
 
+typedef enum {
+	WIFI_PHY_UNKNOWN = 0,
+	WIFI_PHY_11B,
+	WIFI_PHY_11G,
+	WIFI_PHY_11A,
+	WIFI_PHY_11N,  // Wi-Fi 4
+	WIFI_PHY_11AC, // Wi-Fi 5
+	WIFI_PHY_11AX, // Wi-Fi 6
+} wifi_phy_t;
+
 typedef struct {
 	char ssid[33];
-    int channel;
-    int freq;
-    int rssi;
-    int snr;
-    bool rsn;
-    bool wpa;
-    uint16_t cap_info;
-    uint16_t interval;
-    uint64_t timestamp;
+	int channel;
+	int freq;
+	int rssi;
+	int snr;
+
+	uint16_t cap_info;
+	uint16_t interval;
+	uint64_t timestamp;
+
+	bool rsn; // RSN IE present
+	bool wpa; // WPA IE present (vendor 221: 00:50:F2:01)
+	bool wps; // WPS IE present (vendor 221: 00:50:F2:04)
+
+	// RSN details
+	uint8_t  rsn_group_cipher; // Cipher type (e.g. 2 TKIP, 4 CCMP, 8 GCMP)
+	uint32_t rsn_pairwise_ciphers; // Bitmask: (1u<<cipher_type)
+	uint32_t rsn_akm_suites; // Bitmask: (1u<<akm_type)
+	bool pmf_capable; // MFPC
+	bool pmf_required; // MFPR
+
+    // Wi-Fi PHY type
+	wifi_phy_t phy;
+	bool ht;
+	bool vht;
+	bool he;
 } wifi_beacon_t;
 
 typedef struct {

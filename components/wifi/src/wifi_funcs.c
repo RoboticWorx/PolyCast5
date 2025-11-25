@@ -1061,6 +1061,147 @@ wifi_login_t wifi_funcs_get_prev(void)
 	return prev;
 }
 
+// Read a uint16 from a byte array in little-endian order (LSB first)
+static inline uint16_t rd_le16(const uint8_t *p)
+{
+	return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
+}
+
+// Check suite selector OUI bytes (e.g., 00:0F:AC for RSN)
+static inline bool is_oui(const uint8_t *p, uint8_t a, uint8_t b, uint8_t c)
+{
+	// Checks if the first 3 bytes at p match an OUI (Organizationally Unique Identifier)
+	return (p[0] == a && p[1] == b && p[2] == c);
+}
+
+// Parses the body of the RSN IE
+// (not including the id and len bytes of the IE wrapper)
+static void parse_rsn_ie(const uint8_t *rsn, size_t rsn_len, wifi_beacon_t *out)
+{
+	// RSN IE simplified layout:
+	// 	version (2) +
+	// 	group_cipher_suite (4) +
+	// 	pairwise_cipher_count (2) +
+	// 	pairwise_cipher_list (4 * N) +
+	// 	akm_count (2) +
+	// 	akm_list (4 * M) +
+	// 	rsn_capabilities (2) +
+	// 	optional extras (PMKID list, group mgmt cipher, etc.)
+
+	// Validate inputs
+	if (!rsn || !out || rsn_len < 2) {
+		return;
+	}
+
+	// Read the RSN version
+	size_t off = 0;
+	uint16_t ver = rd_le16(&rsn[off]);
+	off += 2;
+	if (ver != 1) {
+		// Still try to parse, but version 1 is expected.
+	}
+
+	// Ensure there are 4 bytes to read
+	if (off + 4 > rsn_len) {
+		return;
+	}
+
+	// grp points to the 4-byte "suite selector"
+	const uint8_t *grp = &rsn[off];
+	off += 4;
+
+	// If OUI matches RSN (00:0F:AC), store the suite type
+	if (is_oui(grp, 0x00, 0x0F, 0xAC)) {
+		out->rsn_group_cipher = grp[3];
+	}
+
+	// Common types:
+	//  2 = TKIP (legacy)
+	//  4 = CCMP-128 (AES/CCMP, typical WPA2)
+	//  8 = GCMP-128 (newer)
+
+	// Read pairwise cipher suites
+	if (off + 2 > rsn_len) {
+		return;
+	}
+	uint16_t pairwise_cnt = rd_le16(&rsn[off]);
+	off += 2;
+
+	// For each cipher
+	for (uint16_t i = 0; i < pairwise_cnt; ++i) {
+		// Bounds check
+		if (off + 4 > rsn_len) {
+			return;
+		}
+
+		const uint8_t *pcs = &rsn[off];
+		off += 4;
+
+		// Verify OUI
+		if (is_oui(pcs, 0x00, 0x0F, 0xAC)) {
+			// Read suite type
+			uint8_t ctype = pcs[3];
+
+			// Store it into a bitmask: 1u << ctype
+
+			// 1u << ctype on a 32-bit int becomes undefined /
+			// wrong if ctype is 32 or more. This is a safety guard
+			if (ctype < 32) {
+				out->rsn_pairwise_ciphers |= (1u << ctype);
+			}
+		}
+	}
+
+	// AKM suites
+	if (off + 2 > rsn_len) {
+		return;
+	}
+
+	// Read AKM Suites (auth/key-management)
+	uint16_t akm_cnt = rd_le16(&rsn[off]);
+	off += 2;
+
+	// Grabs how the keys are negotiated / what auth scheme is used
+	// Common suite types:
+	//  2 = PSK (WPA2-Personal)
+	//  1 = 802.1X (WPA2-Enterprise)
+	//  8 = SAE (WPA3-Personal)
+	//  18 = OWE (Enhanced Open)
+
+	for (uint16_t i = 0; i < akm_cnt; ++i) {
+		if (off + 4 > rsn_len) {
+			return;
+		}
+
+		const uint8_t *akm = &rsn[off];
+		off += 4;
+
+		// Check if OUI bytes
+		if (is_oui(akm, 0x00, 0x0F, 0xAC)) {
+			uint8_t atype = akm[3];
+			if (atype < 32) {
+				out->rsn_akm_suites |= (1u << atype);
+			}
+		}
+	}
+
+	// Reads the 2-byte RSN Capabilities field and grabs the
+	// two bits relevant to Protected Management Frames:
+	// 	bit 6: MFPC (capable)
+	// 	bit 7: MFPR (required)
+
+	// RSN capabilities (PMF bits live here)
+	if (off + 2 > rsn_len) {
+		return;
+	}
+	uint16_t caps = rd_le16(&rsn[off]);
+
+	// 802.11w / PMF bits:
+	// bit 6 = MFPC (capable), bit 7 = MFPR (required)
+	out->pmf_capable  = (caps & (1u << 6)) != 0;
+	out->pmf_required = (caps & (1u << 7)) != 0;
+}
+
 static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 {
 	static volatile uint32_t frames_seen = 0;
@@ -1118,6 +1259,24 @@ static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 	int channel = pkt->rx_ctrl.channel; // Works on both 2.4GHz and 5GHz
 	bool has_rsn = false, has_wpa = false; // Flags to see if they exist
 	char ssid[33] = {0}; // SSID buffer
+
+	wifi_beacon_t beacon = {0};
+
+	// For Wi-Fi security
+	beacon.rsn_group_cipher = 0;
+	beacon.rsn_pairwise_ciphers = 0;
+	beacon.rsn_akm_suites = 0;
+	beacon.pmf_capable = false;
+	beacon.pmf_required = false;
+	beacon.wps = false;
+
+	// For Wi-Fi PHY
+	bool has_ht = false;
+	bool has_vht = false;
+	bool has_he = false;
+	// For b vs g inference on 2.4 GHz
+	bool has_ofdm_rates = false;
+	bool has_cck_rates = false;
 	
 	// Walk through bytes
 	while (rem >= 2) {
@@ -1145,11 +1304,58 @@ static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 				
 			case 48: // RSN (WPA2/WPA3) IE
 				has_rsn = true;
+				parse_rsn_ie(data, len, &beacon);
 				break;
-				
-			case 221: // Catch-all for vendor-specific IEs
-				if (len >= 4 && data[0] == 0x00 && data[1] == 0x50 && data[2] == 0xF2 && data[3] == 0x01) {
-					has_wpa = true;
+
+			case 1: // case 1 or 50: Supported Rates
+			case 50:
+				// Extended Supported Rates
+				for (int i = 0; i < len; i++) {
+					uint8_t r = data[i] & 0x7F; // 500 kbps units
+					// CCK rates (1,2,5.5,11 Mbps) -> 2, 4, 11, 22
+					if (r == 2 || r == 4 || r == 11 || r == 22) {
+						has_cck_rates = true;
+					}
+					// OFDM rates (6..54 Mbps) -> 12, 18, 24, 36, 48, 72, 96, 108
+					if (r == 12 || r == 18 || r == 24 || r == 36 ||
+							r == 48 || r == 72 || r == 96 || r == 108) {
+						has_ofdm_rates = true;
+					}
+				}
+				break;
+
+			case 45: // HT Capabilities (11n)
+			case 61: // HT Operation (11n)
+				has_ht = true;
+				break;
+
+			case 191: // VHT Capabilities (11ac)
+			case 192: // VHT Operation (11ac)
+				has_vht = true;
+				break;
+
+			case 221: // Vendor specific IEs
+				if (len >= 4) {
+					// WPA: 00:50:F2:01
+					if (data[0]==0x00 && data[1]==0x50 && data[2]==0xF2 && data[3]==0x01) {
+						has_wpa = true;
+						beacon.wpa = true;
+					}
+					// WPS: 00:50:F2:04
+					if (data[0]==0x00 && data[1]==0x50 && data[2]==0xF2 && data[3]==0x04) {
+						beacon.wps = true;
+					}
+				}
+				break;
+
+			case 255: // HE Capabilities (11ax)
+				if (len >= 1) {
+					uint8_t ext_id = data[0];
+
+					// HE Capabilities / HE Operation
+					if (ext_id == 35 || ext_id == 36) {
+						has_he = true;
+					}
 				}
 				break;
 		}
@@ -1159,13 +1365,42 @@ static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 		rem -= len + 2;
 	}
 	
-	// Get frequency
+	// Calculate network frequency
 	int freq_mhz = 0;
-	if (channel >= 1  && channel <= 14) {
+	if (channel >= 1  && channel < 14) {
 		freq_mhz = 2412 + 5 * (channel - 1);
+	}
+	else if (channel == 14) {
+		freq_mhz = 2484; // Special case
 	}
 	else if (channel >= 36 && channel <= 165) {
 		freq_mhz = 5000 + (5 * channel);
+	}
+
+	// Decide Wi-Fi PHY type
+	beacon.he = has_he;
+	beacon.vht = has_vht;
+	beacon.ht = has_ht;
+	if (has_he) {
+		beacon.phy = WIFI_PHY_11AX;
+	}
+	else if (has_vht) {
+		beacon.phy = WIFI_PHY_11AC;
+	}
+	else if (has_ht) {
+		beacon.phy = WIFI_PHY_11N;
+	}
+	else if (freq_mhz >= 4900) {
+		beacon.phy = WIFI_PHY_11A; // Legacy 5 GHz
+	}
+	else if (has_ofdm_rates) {
+		beacon.phy = WIFI_PHY_11G; // Legacy 2.4 GHz OFDM
+	}
+	else if (has_cck_rates) {
+		beacon.phy = WIFI_PHY_11B; // Legacy 2.4 GHz CCK
+	}
+	else {
+		beacon.phy = WIFI_PHY_UNKNOWN;
 	}
 	
 	// Get SNR
@@ -1179,7 +1414,6 @@ static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 	#endif
 	
 	// Populate and send
-	wifi_beacon_t beacon;
 	strlcpy((char*)beacon.ssid, ssid, sizeof(beacon.ssid));
 	beacon.channel = channel;
 	beacon.freq = freq_mhz;
