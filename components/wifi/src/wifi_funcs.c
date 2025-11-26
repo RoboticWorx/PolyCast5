@@ -1232,7 +1232,7 @@ static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 		return;
 	}
 	
-	// Addresses: bytes 4–9 = SA, 10–15 = DA, 16–21 = BSSID (for beacon)
+	// Addresses: bytes 4–9 = DA, 10–15 = SA, 16–21 = BSSID (for beacon)
 	uint8_t *bssid = &frame[16];
 	
 	// Filter for target BSSID
@@ -1312,7 +1312,7 @@ static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 				// Extended Supported Rates
 				for (int i = 0; i < len; i++) {
 					uint8_t r = data[i] & 0x7F; // 500 kbps units
-					// CCK rates (1,2,5.5,11 Mbps) -> 2, 4, 11, 22
+					// CCK rates (1, 2, 5.5, 11 Mbps) -> 2, 4, 11, 22
 					if (r == 2 || r == 4 || r == 11 || r == 22) {
 						has_cck_rates = true;
 					}
@@ -1337,12 +1337,12 @@ static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 			case 221: // Vendor specific IEs
 				if (len >= 4) {
 					// WPA: 00:50:F2:01
-					if (data[0]==0x00 && data[1]==0x50 && data[2]==0xF2 && data[3]==0x01) {
+					if (data[0] == 0x00 && data[1] == 0x50 && data[2] == 0xF2 && data[3] == 0x01) {
 						has_wpa = true;
 						beacon.wpa = true;
 					}
 					// WPS: 00:50:F2:04
-					if (data[0]==0x00 && data[1]==0x50 && data[2]==0xF2 && data[3]==0x04) {
+					if (data[0] == 0x00 && data[1] == 0x50 && data[2] == 0xF2 && data[3] == 0x04) {
 						beacon.wps = true;
 					}
 				}

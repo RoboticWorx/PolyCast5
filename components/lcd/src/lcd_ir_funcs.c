@@ -27,6 +27,8 @@ ir_menu_t ir_menu = {
 	.cont = NULL,
 };
 
+extern size_t ir_signal_length;
+
 static const char* TAG = "LCD_IR_FUNCS";
 
 static char name_buf[MAX_CUSTOM_NAME_LEN + 1] = {0};
@@ -339,7 +341,7 @@ static void update_name_label_lcd(lv_obj_t *lbl_display, char cur_char, int cur_
 	
 	// Set text and re-center
 	lv_label_set_text(lbl_display, display);
-	lv_obj_align(lbl_display, LV_ALIGN_CENTER, 0, 30);
+	lv_obj_align(lbl_display, LV_ALIGN_CENTER, 0, 22);
 }
 
 void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_menu)
@@ -348,11 +350,13 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 	static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
 	static int cur_pos = 0; // User position
 	static char cur_char = '_';
-	static int row_idx  = 0; // Active character row
+	static int row_idx = 0; // Active character row
 	static int char_idx = 0; // Index within that row
+
 	static lv_obj_t *lbl_dirs = NULL;
 	static lv_obj_t *lbl_chars = NULL;
 	static lv_obj_t *lbl_user_in = NULL;
+	static lv_obj_t *lbl_sig_len = NULL;
 	
 	// Do once
 	if (!lbl_user_in) {
@@ -389,6 +393,15 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 			
 			// Hide left arrow: can't go back if adding signal
 			lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+
+			// Show signal pulse length
+			lbl_sig_len = lv_label_create(ACTIVE_SCR);
+			lcd_format_label(lbl_sig_len, "Signal Length: — pulses", user_secondary_color,
+					&lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, -16);
+			
+			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
+			lv_label_set_text_fmt(lbl_sig_len, "Signal Length: %zu pulses", ir_signal_length);
+			xSemaphoreGive(xInfraredDataMutex); // Release IR
 		}
 		
 		// Start at first char of first row (underscore row)
@@ -399,11 +412,11 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 		// Create labels
 		lbl_user_in = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_user_in, "", user_secondary_color,
-					&lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
+				&lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
 		
 		lbl_dirs = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_dirs, "       Enter signal name:\nPress HOME to cycle chars.", user_secondary_color,
-					&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -31);
+				&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -31);
 		
 		// Adjust label
 		if (ir_menu_overwrite) {
@@ -423,8 +436,8 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 		
 		lbl_chars = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_chars, "(Up to 12 characters)", user_secondary_color,
-					 &lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0);
-						 
+				&lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0);
+		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
 	}
 
@@ -491,6 +504,12 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 		lv_obj_delete(lbl_user_in);
 		lv_obj_delete(lbl_dirs);
 		lv_obj_delete(lbl_chars);
+
+		// Guard: Only created if new signal
+		if (lbl_sig_len) {
+			lv_obj_delete(lbl_sig_len);
+			lbl_sig_len = NULL;
+		}
 		
 		// Reset statics
 		lbl_user_in = lbl_dirs = lbl_chars = NULL;
@@ -509,6 +528,12 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 		lv_obj_delete(lbl_user_in);
 		lv_obj_delete(lbl_dirs);
 		lv_obj_delete(lbl_chars);
+
+		// Guard: Only created if new signal
+		if (lbl_sig_len) {
+			lv_obj_delete(lbl_sig_len);
+			lbl_sig_len = NULL;
+		}
 		
 		// Reset statics
 		lbl_user_in = lbl_dirs = lbl_chars = NULL;
@@ -590,13 +615,19 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 		memcpy(saved_name, name_buf, MAX_CUSTOM_NAME_LEN + 1);
 		
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGI(TAG, "%s", saved_name);
+		ESP_LOGI(TAG, "%s", saved_name);
 		#endif
 		
 		// Delete objects
 		lv_obj_delete(lbl_user_in);
 		lv_obj_delete(lbl_dirs);
 		lv_obj_delete(lbl_chars);
+
+		// Guard: Only created if new signal
+		if (lbl_sig_len) {
+			lv_obj_delete(lbl_sig_len);
+			lbl_sig_len = NULL;
+		}
 		
 		// Reset statics
 		lbl_user_in = lbl_dirs = lbl_chars = NULL;
@@ -933,14 +964,14 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *ir_menu)
 	lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-		
+	
 	// Restart infrared RX
 	xSemaphoreGive(xInfraredStartRxSemaphore);
 	
 	// Create label
 	lv_obj_t *lbl_ins = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(lbl_ins, "Point your device at the\nIR lens and send the signal.", user_secondary_color,
-			 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 13);
+			&lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 13);
 				 
 	// Create present signal img
 	lv_obj_t *img_save_remote = lv_img_create(ACTIVE_SCR);

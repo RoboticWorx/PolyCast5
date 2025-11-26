@@ -14,7 +14,7 @@
 
 #define MAX_PULSES 128
 #define PULSE_BLOCK 96
-#define MIN_VALID_PULSES 30
+#define MIN_VALID_PULSES 10
 
 #define FINAL_GAP_US 10000 // 10ms for final gap
 

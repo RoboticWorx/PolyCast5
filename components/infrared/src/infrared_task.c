@@ -86,6 +86,9 @@ static void infrared_task(void *pvParameters) {
 		
 		// If received garbage in cb, restart
 		if (restart_rx_pending) { // When len < MIN_VALID_PULSES
+			#ifdef POLYCAST5_DEBUG
+			ESP_LOGW(TAG, "Invalid IR signal, restarting RX");
+			#endif
 			infrared_restart_rx();
 			restart_rx_pending = false;
 		}
@@ -93,6 +96,10 @@ static void infrared_task(void *pvParameters) {
 		// Wait for valid IR signal
 		if (xSemaphoreTake(xInfraredRxEventSemaphore, 0) == pdTRUE) {			
 			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
+
+			#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "Received IR signal (%zu pulses)", ir_signal_length);
+			#endif
 			
 			// Check if space available
 			if (!infrared_ensure_capacity()) {
@@ -155,6 +162,9 @@ static void infrared_task(void *pvParameters) {
 			xSemaphoreGive(xInfraredDataMutex); // Release IR
 			
 			xSemaphoreGive(xInfraredSignalSavedSemaphore); // Notify LCD we got and saved a valid signal
+
+			// Disable until next signal
+			infrared_disable_rx();
 		}
 		
 		// Transmit a specific signal (index menu_idx)
