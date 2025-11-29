@@ -31,6 +31,25 @@ esp_err_t openai_save_api_key_nvs(const char *api_key);
 esp_err_t openai_load_api_key_nvs(char *out, size_t out_sz);
 
 /** 
+ * @brief Save xAI API key to NVS
+ *
+ * @param [in] api_key The API key string to save
+ *
+ * @returns ESP error status
+ */
+esp_err_t xai_save_api_key_nvs(const char *api_key);
+
+/** 
+ * @brief Save xAI API key to NVS
+ *
+ * @param [out] out Buffer to store the loaded API key
+ * @param [in] out_sz Size of the output buffer
+ *
+ * @returns ESP error status
+ */
+esp_err_t xai_load_api_key_nvs(char *out, size_t out_sz);
+
+/** 
  * @brief Send command to ChatGPT and get keyboard script response
  *
  * @param [in] command The user command string to send
@@ -40,6 +59,17 @@ esp_err_t openai_load_api_key_nvs(char *out, size_t out_sz);
  * @returns ESP error status
  */
 esp_err_t openai_send_command(const char *command, char *response_buf, size_t buf_sz);
+
+/** 
+ * @brief Send command to xAI Grok and get keyboard script response
+ *
+ * @param [in] command The user command string to send
+ * @param [out] response_buf Buffer to store the Grok response script
+ * @param [in] buf_sz Size of the response buffer
+ *
+ * @returns ESP error status
+ */
+esp_err_t xai_send_command(const char *command, char *response_buf, size_t buf_sz);
 
 
 #endif // AI_FUNCS_H

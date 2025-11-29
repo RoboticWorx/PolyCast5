@@ -17,10 +17,12 @@
 
 #define TAG "AI_TASK"
 
+#define USING_GROK 1 // Else using ChatGPT
+
 QueueHandle_t xAiCmdQueue;
 
 EXT_RAM_BSS_ATTR static ai_cmd_t msg;
-EXT_RAM_BSS_ATTR static char script[AI_RESPONSE_MAX_LEN] = {0};
+EXT_RAM_BSS_ATTR static char ai_response[AI_RESPONSE_MAX_LEN] = {0};
 
 static void ai_task(void *pvParameters)
 {
@@ -29,10 +31,18 @@ static void ai_task(void *pvParameters)
 	configASSERT(xAiCmdQueue);
 
 	esp_err_t err;
+
+	#ifdef USING_GROK
+	err = xai_save_api_key_nvs("xai-7hrSSKPvjhZ19QK5IW3Ab7byKQYfBlCVHAlAGsR8FIQkE0BaE7eaeG98O27xqMf0XW4Vrcz71Qdp5dzp");
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "Failed to save xAI API key to NVS: %s", esp_err_to_name(err));
+	}
+	#else
 	err = openai_save_api_key_nvs("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");
 	if (err != ESP_OK) {
 		ESP_LOGE(TAG, "Failed to save OpenAI API key to NVS: %s", esp_err_to_name(err));
 	}
+	#endif
 
 	while (1) {
 		// Clear message buffer
@@ -44,15 +54,23 @@ static void ai_task(void *pvParameters)
 		}
 
 		// Clear script buffer
-		memset(script, 0, sizeof(script));
+		memset(ai_response, 0, sizeof(ai_response));
 
-		// Send command to OpenAI
-		esp_err_t err = openai_send_command(msg.cmd, script, sizeof(script));
+		// Send cmd to the AI
+		// 'script' output
+		#ifdef USING_GROK
+		err = xai_send_command(msg.cmd, ai_response, sizeof(ai_response));
+		#else
+		err = openai_send_command(msg.cmd, ai_response, sizeof(ai_response));
+		#endif
 
 		if (err == ESP_OK) {
-			ESP_LOGI(TAG, "AI script: %s", script);
+			#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "AI script: %s", ai_response);
+			#endif
 
-			char *ai_script_ptr = script;
+			// Send pointer to script to execute as BLE keyboard sequence
+			char *ai_script_ptr = ai_response;
 			xQueueSend(xBluetoothAiCmdQueue, &ai_script_ptr, portMAX_DELAY);
 		}
 		else {

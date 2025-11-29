@@ -1342,7 +1342,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 		angle = (angle + 450) % 3600; // 45 degrees per frame
         lv_obj_set_style_transform_angle(lbl_loading, angle, 0);
 
-		xQueueSend(xAiCmdQueue, "please open chrome and search for purrple cat then open spotify and search for purrple cat", pdMS_TO_TICKS(100));
+		xQueueSend(xAiCmdQueue, "please open chrome and search for high quality cow pictures. Then open notepad and explain how LTP in the brain works in detail for beginners", pdMS_TO_TICKS(100));
 	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {

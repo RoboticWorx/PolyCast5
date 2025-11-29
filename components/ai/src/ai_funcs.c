@@ -26,8 +26,13 @@
 #define TAG "AI_FUNCS"
 
 // NVS keys for OpenAI API key
-#define OPENAI_NS  "openai"
+#define OPENAI_NS "openai"
 #define OPENAI_KEY "api_key"
+
+// NVS keys for xAI (Grok) API key
+// Keep these separate so you can store both keys without conflicts.
+#define XAI_NS "xai"
+#define XAI_KEY "api_key"
 
 // Hard ceiling so a bad response doesn't eat all RAM
 #define AI_HTTP_BODY_MAX_CAP (48 * 1024)
@@ -88,6 +93,49 @@ esp_err_t openai_load_api_key_nvs(char *out, size_t out_sz)
 	// Close handle
 	nvs_close(h);
 
+	return err;
+}
+
+// Save xAI API key string to NVS
+esp_err_t xai_save_api_key_nvs(const char *api_key)
+{
+	nvs_handle_t h;
+
+	// Open NVS namespace dedicated to xAI
+	esp_err_t err = nvs_open(XAI_NS, NVS_READWRITE, &h);
+	if (err != ESP_OK) {
+		return err;
+	}
+
+	// Save the API key string
+	err = nvs_set_str(h, XAI_KEY, api_key);
+	if (err == ESP_OK) {
+		// Commit only on success
+		err = nvs_commit(h);
+	}
+
+	// Close handle
+	nvs_close(h);
+	return err;
+}
+
+// Load xAI API key string from NVS
+esp_err_t xai_load_api_key_nvs(char *out, size_t out_sz)
+{
+	nvs_handle_t h;
+
+	// Open NVS namespace dedicated to xAI
+	esp_err_t err = nvs_open(XAI_NS, NVS_READONLY, &h);
+	if (err != ESP_OK) {
+		return err;
+	}
+
+	// Read the API key string
+	size_t sz = out_sz;
+	err = nvs_get_str(h, XAI_KEY, out, &sz);
+
+	// Close handle
+	nvs_close(h);
 	return err;
 }
 
@@ -200,7 +248,7 @@ static const char *json_text_string_or_value_obj(cJSON *text_item)
 }
 
 // Extract assistant output text from a /v1/responses JSON payload
-static const char *responses_extract_text(cJSON *json)
+static const char *openai_extract_text(cJSON *json)
 {
 	if (!json) {
 		return NULL;
@@ -250,6 +298,41 @@ static const char *responses_extract_text(cJSON *json)
 	return NULL;
 }
 
+// xAI (Grok) chat-completions parsing helper
+static const char *xai_extract_text(cJSON *json)
+{
+	// Basic sanity check on root JSON
+	if (!json) {
+		return NULL;
+	}
+
+	// Top-level "choices" array (OpenAI-compatible schema)
+	cJSON *choices = cJSON_GetObjectItem(json, "choices");
+	if (!cJSON_IsArray(choices)) {
+		return NULL;
+	}
+
+	// We only look at the first choice for now
+	cJSON *first_choice = cJSON_GetArrayItem(choices, 0);
+	if (!cJSON_IsObject(first_choice)) {
+		return NULL;
+	}
+
+	// Each choice has a "message" object (role + content [+ tools, etc.])
+	cJSON *msg = cJSON_GetObjectItem(first_choice, "message");
+	if (!cJSON_IsObject(msg)) {
+		return NULL;
+	}
+
+	// We only care about the assistant's natural-language "content"
+	cJSON *content = cJSON_GetObjectItem(msg, "content");
+	if (!cJSON_IsString(content) || !content->valuestring) {
+		return NULL;
+	}
+
+	// Return pointer into the cJSON-managed string (do not free)
+	return content->valuestring;
+}
 
 /* HTTP accumulator (safe alloc/realloc/free)  */
 
@@ -589,7 +672,7 @@ esp_err_t openai_send_command(const char *command, char *response_buf, size_t bu
 	}
 
 	// Extract output text from Responses API payload
-	const char *extracted_text = responses_extract_text(json);
+	const char *extracted_text = openai_extract_text(json);
 
 	// Handle no-output cases with better logging
 	if (!extracted_text || !extracted_text[0]) {
@@ -619,6 +702,214 @@ esp_err_t openai_send_command(const char *command, char *response_buf, size_t bu
 	strip_wrappers_inplace(response_buf);
 
 	// If we ended up empty after stripping, treat as error
+	if (response_buf[0] == '\0') {
+		return ESP_FAIL;
+	}
+
+	return ESP_OK;
+}
+
+// xAI (Grok) request (Chat Completions API)
+esp_err_t xai_send_command(const char *command, char *response_buf, size_t buf_sz)
+{
+	// Validate args
+	if (!command || !response_buf || buf_sz == 0) {
+		return ESP_ERR_INVALID_ARG;
+	}
+
+	// Default output to empty
+	response_buf[0] = '\0';
+
+	// Load xAI API key from NVS
+	char api_key[AI_API_KEY_MAX_LEN] = {0};
+	if (xai_load_api_key_nvs(api_key, sizeof(api_key)) != ESP_OK || api_key[0] == '\0') {
+		ESP_LOGE(TAG, "Failed to load xAI API key from NVS");
+		return ESP_FAIL;
+	}
+
+	// Build JSON payload for /v1/chat/completions
+	// Minimal shape:
+	//   {
+	//     "model": "grok-4-1-fast-non-reasoning",
+	//     "messages": [
+	//       {"role":"system","content": "... instructions ..."},
+	//       {"role":"user","content": "... command ..."},
+	//     ]
+	//   }
+	// Reuse AI_PROMPT as the "system" content so the same behavior
+	// applies to both OpenAI and Grok models.
+
+	cJSON *root = cJSON_CreateObject();
+	if (!root) {
+		return ESP_ERR_NO_MEM;
+	}
+
+	// Fastest grok model
+	cJSON_AddStringToObject(root, "model", "grok-4-1-fast-non-reasoning");
+
+	// Messages array
+	cJSON *messages = cJSON_AddArrayToObject(root, "messages");
+	if (!messages) {
+		cJSON_Delete(root);
+		return ESP_ERR_NO_MEM;
+	}
+
+	// System / developer instructions
+	cJSON *sys = cJSON_CreateObject();
+	cJSON_AddStringToObject(sys, "role", "system");
+	cJSON_AddStringToObject(sys, "content", AI_PROMPT);
+	cJSON_AddItemToArray(messages, sys);
+
+	// User message
+	cJSON *usr = cJSON_CreateObject();
+	cJSON_AddStringToObject(usr, "role", "user");
+	cJSON_AddStringToObject(usr, "content", command);
+	cJSON_AddItemToArray(messages, usr);
+
+	// Reasonable token limit – similar scale to the OpenAI call
+	cJSON_AddNumberToObject(root, "max_tokens", 2048);
+
+	// Serialize JSON payload
+	char *payload = cJSON_PrintUnformatted(root);
+	cJSON_Delete(root);
+
+	if (!payload) {
+		return ESP_ERR_NO_MEM;
+	}
+
+	// Initialize HTTP body accumulator
+	http_accum_t acc;
+	if (!acc_init(&acc, 2048)) {
+		free(payload);
+		return ESP_ERR_NO_MEM;
+	}
+
+	// Configure HTTPS request for xAI endpoint
+	esp_http_client_config_t config = {
+		.url = "https://api.x.ai/v1/chat/completions",
+		.method = HTTP_METHOD_POST,
+
+		// Use ESP-IDF CA bundle for TLS verification
+		.crt_bundle_attach = esp_crt_bundle_attach,
+
+		// A bit of headroom for network hiccups
+		.timeout_ms = 20000,
+
+		// Capture response body via callback
+		.event_handler = http_evt,
+		.user_data = &acc,
+	};
+
+	esp_http_client_handle_t client = esp_http_client_init(&config);
+	if (!client) {
+		free(payload);
+		acc_free(&acc);
+		return ESP_FAIL;
+	}
+
+	// Build Authorization header: "Bearer <xai_key>"
+	char auth_header[512];
+	snprintf(auth_header, sizeof(auth_header), "Bearer %s", api_key);
+
+	// Set headers
+	esp_http_client_set_header(client, "Authorization", auth_header);
+	esp_http_client_set_header(client, "Content-Type", "application/json");
+	esp_http_client_set_header(client, "Accept", "application/json");
+
+	// Attach POST body
+	esp_http_client_set_post_field(client, payload, strlen(payload));
+
+	// Perform the request
+	esp_err_t err = esp_http_client_perform(client);
+
+	// Read HTTP status code
+	int status = esp_http_client_get_status_code(client);
+
+	// Cleanup request resources
+	free(payload);
+	esp_http_client_cleanup(client);
+
+	// Network/TLS/HTTP failure
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "xAI HTTP POST failed: %s", esp_err_to_name(err));
+		acc_free(&acc);
+		return err;
+	}
+
+	// Empty body means something went wrong upstream
+	if (acc.len == 0 || !acc.buf) {
+		ESP_LOGE(TAG, "Empty HTTP body (len=0) from xAI");
+		acc_free(&acc);
+		return ESP_FAIL;
+	}
+
+	// Log a safe snippet for debugging
+	const int snip = (acc.len > 300) ? 300 : (int)acc.len;
+	ESP_LOGI(TAG, "xAI HTTP %d body[0:%d]=%.*s%s",
+			status,
+			snip,
+			snip,
+			acc.buf,
+			(acc.len > (size_t)snip) ? "..." : "");
+
+	// Non-200 still might include useful error JSON in body (already logged)
+	if (status != 200) {
+		acc_free(&acc);
+		return ESP_FAIL;
+	}
+
+	// If we ran out of memory or hit the cap, don't try to parse partial JSON
+	if (acc.oom || acc.truncated) {
+		ESP_LOGE(TAG, "xAI HTTP body too large/failed to grow (len=%u cap=%u) oom=%d trunc=%d",
+				(unsigned)acc.len,
+				(unsigned)acc.cap,
+				acc.oom,
+				acc.truncated);
+
+		acc_free(&acc);
+		return ESP_ERR_NO_MEM;
+	}
+
+	// Parse JSON response
+	cJSON *json = cJSON_ParseWithLength(acc.buf, acc.len);
+	if (!json) {
+		ESP_LOGE(TAG, "xAI JSON parse failed (body_len=%u)", (unsigned)acc.len);
+		acc_free(&acc);
+		return ESP_FAIL;
+	}
+
+	// Extract assistant output text from xAI payload
+	const char *extracted_text = xai_extract_text(json);
+
+	if (!extracted_text || !extracted_text[0]) {
+		// Rrror logging
+		cJSON *err_obj = cJSON_GetObjectItem(json, "error");
+		if (cJSON_IsObject(err_obj)) {
+			cJSON *msg = cJSON_GetObjectItem(err_obj, "message");
+			if (cJSON_IsString(msg)) {
+				ESP_LOGE(TAG, "xAI error: %s", msg->valuestring);
+			}
+		}
+		else {
+			ESP_LOGE(TAG, "xAI: no output text in response");
+		}
+
+		cJSON_Delete(json);
+		acc_free(&acc);
+		return ESP_FAIL;
+	}
+
+	// Copy extracted text to user buffer
+	strncpy(response_buf, extracted_text, buf_sz - 1);
+	response_buf[buf_sz - 1] = '\0';
+
+	// Cleanup JSON + HTTP body
+	cJSON_Delete(json);
+	acc_free(&acc);
+
+	// Strip quotes/fences and trim whitespace (same helper as OpenAI path)
+	strip_wrappers_inplace(response_buf);
+
 	if (response_buf[0] == '\0') {
 		return ESP_FAIL;
 	}
