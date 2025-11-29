@@ -18,6 +18,7 @@ idf_component_register(
         espnow
         wifi
         bluetooth
+        ai
         lvgl
         driver
         freertos

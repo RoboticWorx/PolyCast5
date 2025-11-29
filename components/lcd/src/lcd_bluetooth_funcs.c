@@ -50,7 +50,7 @@ bluetooth_keyboard_menu_t bluetooth_keyboard_submenu = {
 };
 
 bluetooth_menu_t bluetooth_menu = {
-	.options = {"How It Works", "Auto Keyboard", "Media Controller", "Page Scroller",
+	.options = {"How It Works", "Auto Keyboard", "AI Keyboard", "Media Controller", "Page Scroller",
 			"PowerPoint Clicker", "Camera Clicker", "Socials Scroller", "Known Devices"},
 	.size = NUM_BLUETOOTH_OPTIONS,
 	.index = 1,

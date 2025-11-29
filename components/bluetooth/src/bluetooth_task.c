@@ -14,16 +14,21 @@
 #include "bluetooth_task.h"
 #include "gpio_task.h"
 #include "gpio_funcs.h"
+#include "ai_funcs.h"
 
 #define TAG "BLUETOOTH_TASK"
 
+SemaphoreHandle_t xBleConnectedSemaphore;
+
 QueueHandle_t xBluetoothMediaCmdQueue;
+QueueHandle_t xBluetoothAiCmdQueue;
 
 extern volatile bluetooth_state_t bluetooth_state;
 
 char bt_wifi_portal_pass[64];
 
 EXT_RAM_BSS_ATTR static char send_buf[2048];
+static char *ai_script;
 
 static uint16_t bluetooth_cmd = 0;
 static uint8_t battery_percentage = 100;
@@ -31,8 +36,13 @@ static const TickType_t battery_timer_interval = pdMS_TO_TICKS(1000);
 
 static void bluetooth_task(void *arg)
 {
+	xBleConnectedSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xBleConnectedSemaphore);
+
 	xBluetoothMediaCmdQueue = xQueueCreate(1, sizeof(uint16_t));
 	configASSERT(xBluetoothMediaCmdQueue);
+	xBluetoothAiCmdQueue = xQueueCreate(1, sizeof(char *));
+	configASSERT(xBluetoothAiCmdQueue);
 	
 	TickType_t battery_timer_last = xTaskGetTickCount();
 
@@ -265,6 +275,12 @@ static void bluetooth_task(void *arg)
 					#endif
 				}
 			}
+		}
+
+		// If a AI is typing (this is a cool comment lol)
+		if (xQueueReceive(xBluetoothAiCmdQueue, &ai_script, 0) == pdTRUE) {
+			// Send the script
+			bluetooth_send_script(ai_script, 2);
 		}
 		
 		// Get device battery level

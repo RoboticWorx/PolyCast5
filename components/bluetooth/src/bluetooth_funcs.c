@@ -22,6 +22,7 @@
 #include "bluetooth_funcs.h"
 #include "gpio_funcs.h"
 #include "gpio_task.h"
+#include "bluetooth_task.h"
 
 #define TAG "BLUETOOTH_FUNCS"
 
@@ -1098,6 +1099,8 @@ void bluetooth_init(void)
 	#endif
 
 	bluetooth_state = BT_STATE_RUNNING;
+
+	xSemaphoreGive(xBleConnectedSemaphore); // Signal Bluetooth is connected
 }
 
 // Declare self-implemented function

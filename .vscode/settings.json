@@ -21,6 +21,9 @@
     "esp_crt_bundle.h": "c",
     "esp_http_client.h": "c",
     "netdb.h": "c",
-    "*.inc": "c"
+    "*.inc": "c",
+    "polycast5_macros.h": "c",
+    "string": "cpp",
+    "format": "cpp"
   }
 }

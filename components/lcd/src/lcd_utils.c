@@ -41,6 +41,7 @@
 #include "gpio_task.h"
 #include "lora_task.h"
 #include "espnow_task.h"
+#include "ai_task.h"
 
 #define DRAW_LINES 20
 #define FLUSH_CHUNK 2
@@ -3335,7 +3336,7 @@ void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t
 		// Switch pages
 		ui_menu->page = BLUETOOTH_HOW_PAGE;
 	}
-	// Keyboard selected
+	// Auto keyboard selected
 	else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 1) {
 		// Hide bluetooth menu
 		lv_obj_add_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -3349,8 +3350,12 @@ void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t
 		// Switch pages
 		ui_menu->page = BLUETOOTH_KEYBOARD_PAGE;
 	}
-	// Media controller selected
+	// AI keyboard selected
 	else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 2) {
+		xQueueSend(xAiCmdQueue, "please open notepad and write some pseudocode explaining how dijkstras algorithm works in detail", pdMS_TO_TICKS(100));
+	}
+	// Media controller selected
+	else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 3) {
 		// Hide bluetooth menu
 		lv_obj_add_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
@@ -3365,7 +3370,7 @@ void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t
 		ui_menu->page = BLUETOOTH_MEDIA_CLASSIC_PAGE;
 	}
 	// Page scroll selected
-	else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 3) {
+	else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 4) {
 		// Hide bluetooth menu
 		lv_obj_add_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
@@ -3380,7 +3385,7 @@ void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t
 		ui_menu->page = BLUETOOTH_MEDIA_SCROLL_PAGE;
 	}
 	// Presentation mode selected
-	else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 4) {
+	else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 5) {
 		// Hide bluetooth menu
 		lv_obj_add_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
@@ -3395,7 +3400,7 @@ void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t
 		ui_menu->page = BLUETOOTH_MEDIA_PRESENTATION_PAGE;
 	}
 	// Camera clicker selected
-	else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 5) {
+	else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 6) {
 		// Hide bluetooth menu
 		lv_obj_add_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
@@ -3410,7 +3415,7 @@ void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t
 		ui_menu->page = BLUETOOTH_MEDIA_CAMERA_PAGE;
 	}
 	// Socials scroller selected
-	else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 6) {
+	else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 7) {
 		// Hide bluetooth menu
 		lv_obj_add_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
@@ -3425,7 +3430,7 @@ void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t
 		ui_menu->page = BLUETOOTH_MEDIA_SOCIALS_PAGE;
 	}
 	// Known devices selected
-	else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 7) {
+	else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 8) {
 		// Hide bluetooth menu
 		lv_obj_add_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 

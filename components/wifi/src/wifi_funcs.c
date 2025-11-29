@@ -59,6 +59,8 @@ static volatile int32_t ping_avg_ms = -1;
 static esp_ip4_addr_t sta_gw = {0};
 static bool sta_gw_valid = false;
 
+bool wifi_ai_req = false;
+
 esp_err_t wifi_funcs_scan(wifi_scan_t *wifi_scan)
 {
 	esp_err_t err;
@@ -624,7 +626,6 @@ esp_err_t wifi_funcs_apply_timezone_auto(void)
 	return ESP_FAIL;
 }
 
-
 void wifi_funcs_get_current_date_time(void)
 {
 	static bool initialized = false;
@@ -734,7 +735,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 		wifi_connected = true;
 		
 		// If not just grabing local time -> OTA
-		if (!wifi_getting_time) {
+		if (!wifi_getting_time && !wifi_ai_req) {
 			// Check for new firmware version and update if so
 			ota_update_check_start("https://raw.githubusercontent.com/RoboticWorx/pc5-test/main/manifest.json");
 		}

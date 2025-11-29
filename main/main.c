@@ -30,6 +30,7 @@
 #include "espnow_task.h"
 #include "espnow_funcs.h"
 #include "wifi_task.h"
+#include "ai_task.h"
 
 // Logging tag
 static const char *TAG = "MAIN";
@@ -142,6 +143,7 @@ void app_main(void) {
 	espnow_task_create();
 	wifi_task_create();
 	bluetooth_task_create();
+	ai_task_create();
 	
 	#ifdef POLYCAST5_DEBUG_RAM
 	// Wait for tasks to allocate

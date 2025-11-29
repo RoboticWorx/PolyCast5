@@ -5,13 +5,13 @@ file(GLOB_RECURSE SRCS
 
 idf_component_register(
     SRCS ${SRCS}
-        
+     
     INCLUDE_DIRS 
     	"include"
     
     REQUIRES
-    	common esp_hid bt
+    	common
     
     PRIV_REQUIRES
-    	gpio ai nvs_flash esp_http_server esp_wifi esp_netif json
+    gpio wifi bluetooth espnow nvs_flash esp_http_server esp_wifi esp_netif json esp_http_client mbedtls
 )

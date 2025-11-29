@@ -10,7 +10,7 @@
 #include "bluetooth_funcs.h"
 #include "bluetooth_web_portal.h"
 
-#define NUM_BLUETOOTH_OPTIONS 8
+#define NUM_BLUETOOTH_OPTIONS 9
 
 // Forward-declare structs (from lcd_utils.h)
 typedef struct ui_btns_t ui_btns_t;

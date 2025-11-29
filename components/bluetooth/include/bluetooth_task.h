@@ -3,7 +3,10 @@
 
 #include "freertos/idf_additions.h"
 
+extern SemaphoreHandle_t xBleConnectedSemaphore;
+
 extern QueueHandle_t xBluetoothMediaCmdQueue;
+extern QueueHandle_t xBluetoothAiCmdQueue;
 
 /**
  * @brief Creates bluetooth task at shared priority
