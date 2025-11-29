@@ -21,7 +21,11 @@
 #include "lcd_utils.h"
 #include "lcd_bluetooth_funcs.h"
 #include "bluetooth_funcs.h"
+#include "wifi_funcs.h"
+
+#include "wifi_task.h"
 #include "bluetooth_task.h"
+#include "ai_task.h"
 
 #define TAG "LCD_BLUETOOTH_FUNCS"
 
@@ -31,6 +35,7 @@
 #define MAX_BT_NAME_LEN 12
 
 extern char bt_wifi_portal_pass[];
+extern bool wifi_ai_req;
 
 static uint8_t current_category = 0;
 
@@ -1259,6 +1264,127 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 		init = false;
 
 		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+	}
+}
+
+void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
+{
+	// Statics
+	static bool do_once = false;
+	static lv_obj_t *lbl_ins = NULL;
+	static lv_obj_t *lbl_loading = NULL;
+	static int16_t angle = 0; // 0.1 degree units
+	
+	// Only execute once
+	if (!do_once) {
+		lbl_ins = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_ins, "Hold select and ask!", user_secondary_color,
+				&lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 12);
+
+		lbl_loading = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_loading, LV_SYMBOL_REFRESH, user_secondary_color,
+				&lv_font_montserrat_48, LV_ALIGN_CENTER, 0, 12);
+
+		lv_obj_update_layout(lbl_loading);
+
+		// Set pivot to center so it spins around its middle
+        int w = lv_obj_get_width(lbl_loading);
+        int h = lv_obj_get_height(lbl_loading);
+        lv_obj_set_style_transform_pivot_x(lbl_loading, w / 2, 0);
+        lv_obj_set_style_transform_pivot_y(lbl_loading, h / 2, 0);
+
+        // Give some extra draw area so rotation isn't clipped
+        lv_obj_set_style_transform_width(lbl_loading, 8, 0);
+        lv_obj_set_style_transform_height(lbl_loading, 8, 0);
+
+		lv_timer_handler();
+		
+		// Signal not to check for OTA (AI request)
+		wifi_ai_req = true; // TODO: Mutex
+
+		// Connect to previous Wi-Fi network
+		wifi_login_t prev_network = wifi_funcs_get_prev(); // Loads boot state saved network info
+		prev_network.prev = true; // Connecting to previous
+		if (xQueueSend(xWifiSelectedNetworkQueue, &prev_network, portMAX_DELAY) != pdPASS) {
+			ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue previous_network");
+		}
+
+		// Wait for Wi-Fi connected
+		xSemaphoreTake(xWifiNetworkConnectedSemaphore, portMAX_DELAY);
+
+		// Clear AI request flag
+		wifi_ai_req = false;
+
+		// Connect to BLE
+		uint16_t cmd = BLUETOOTH_CMD_INIT;
+		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+
+		// Wait for BLE connected
+		xSemaphoreTake(xBleConnectedSemaphore, portMAX_DELAY);
+		
+		do_once = true;
+	}
+
+	// Up button pressed
+	if (ui_btns->up_btn == 1) {
+
+	}
+	// Down button pressed
+	else if (ui_btns->down_btn == 1) {
+		
+	}
+	// Right button pressed
+	else if (ui_btns->right_btn == 1) {
+		
+	}
+	// Record selected
+	else if (ui_btns->select_btn == 1) {
+		angle = (angle + 450) % 3600; // 45 degrees per frame
+        lv_obj_set_style_transform_angle(lbl_loading, angle, 0);
+
+		xQueueSend(xAiCmdQueue, "please open chrome and search for purrple cat then open spotify and search for purrple cat", pdMS_TO_TICKS(100));
+	}
+	// Back selected
+	else if (ui_btns->left_btn == 1) {
+		// Disconnect from Wi-Fi
+		xSemaphoreGive(xWifiDisconnectSemaphore);
+
+		// Deactivate bluetooth
+		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_loading);
+		
+		// Reset statics
+		do_once = false;
+		lbl_ins = lbl_loading = NULL;
+
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = BLUETOOTH_PAGE;
+	}
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Disconnect from Wi-Fi
+		xSemaphoreGive(xWifiDisconnectSemaphore);
+
+		// Deactivate bluetooth
+		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+		
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_loading);
+		
+		// Reset statics
+		do_once = false;
+		lbl_ins = lbl_loading = NULL;
+		
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 

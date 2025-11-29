@@ -41,7 +41,6 @@
 #include "gpio_task.h"
 #include "lora_task.h"
 #include "espnow_task.h"
-#include "ai_task.h"
 
 #define DRAW_LINES 20
 #define FLUSH_CHUNK 2
@@ -3352,7 +3351,17 @@ void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t
 	}
 	// AI keyboard selected
 	else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 2) {
-		xQueueSend(xAiCmdQueue, "please open notepad and write some pseudocode explaining how dijkstras algorithm works in detail", pdMS_TO_TICKS(100));
+		// Hide bluetooth menu
+		lv_obj_add_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+		// Reset static
+		do_once = false;
+
+		// Show right arrow
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+		// Switch pages
+		ui_menu->page = BLUETOOTH_AI_KEYBOARD_PAGE;
 	}
 	// Media controller selected
 	else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 3) {

@@ -24,6 +24,8 @@
     "*.inc": "c",
     "polycast5_macros.h": "c",
     "string": "cpp",
-    "format": "cpp"
+    "format": "cpp",
+    "wifi_task.h": "c",
+    "wifi_funcs.h": "c"
   }
 }
