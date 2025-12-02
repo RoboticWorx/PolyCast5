@@ -6,13 +6,14 @@
   />
 </p>
 
-PolyCast5 Firmware
-====================
+# PolyCast5 Firmware
+
 Welcome to the official GitHub page for the PolyCast5!
 
 PolyCast5 is a open-source multi-tool wireless remote that you can use to control outlets, custom devices, bluetooth devices, anything infrared, and more.
 
 You can find some relevant links below:
+
 * [PolyCast5 official website.](https://polycast5.com/) A graphical explanation of what you can do with it and how it works!
 * [PolyCast5 user documentation.](https://polycast5.com/pages/docs) How to use it and unleash its full capabilities.
 * [PolyCast5 attachment tutorials.](https://polycast5.com/pages/tutorials) Custom builds you can control with your PolyCast5. Including:
@@ -22,6 +23,7 @@ You can find some relevant links below:
   * and more!
 
 # Functionality
+
 * **Outlet actuator**  - Turn on and off outlets/applicances wirelessly and set schedules, timers, and modes.
 * **Bluetooth controller** - Send media and autotype commands to instantly type out repetitive text, control volume, etc.
 * **Infrared remote** - Save and replay infrared signals for TVs, air conditioners, lamps, etc.
@@ -33,8 +35,10 @@ You can find some relevant links below:
 _PolyCast5 also comes with cool, customizable homescreen animations and hotkeys!_
 
 # Project Structure
+
 * `main` - Initialization code. The program runs from here.
 * `assets` - Media image files stored as `.bin` for SPIFFS access.
+* `bin` - Precompiled binaries of the latest release for OTA/updater.
 * `scripts` - Bluetooth keystroke injection (autotype) examples as well as a few miscellaneous developement scripts.
 * `components` - The various pieces of the application code broken into folders.
   * `bluetooth` - Communicates with a connected BLE device as a Human Interface Device (HID) to behave as a media controller and autotype keyboard.
@@ -49,35 +53,49 @@ _PolyCast5 also comes with cool, customizable homescreen animations and hotkeys!
   * `wifi` - Connects to networks, monitors packets, and sends data over long distances via MQTT.
 
 # Licensing
-*Code in this repository is licensed under [CC Attribution-NonCommercial-ShareAlike 4.0 International](https://github.com/RoboticWorx/PolyCast5/blob/main/LICENSE.md) ([canonical](https://creativecommons.org/licenses/by-nc-sa/4.0/)).*
 
-*Unless required by applicable law or agreed to in writing, this
+_Code in this repository is licensed under [CC Attribution-NonCommercial-ShareAlike 4.0 International](https://github.com/RoboticWorx/PolyCast5/blob/main/LICENSE.md) ([canonical](https://creativecommons.org/licenses/by-nc-sa/4.0/))._
+
+_Unless required by applicable law or agreed to in writing, this
 software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-CONDITIONS OF ANY KIND, either express or implied.*
+CONDITIONS OF ANY KIND, either express or implied._
 
 # Development
+
 PolyCast5 is written in C and built on [ESP-IDF](https://github.com/espressif/esp-idf).
 
 ## Cloning
+
 The repository can be cloned with the following git command:
-```
+
+```shell
 git clone https://github.com/RoboticWorx/PolyCast5.git
 ```
+
 ## Build
+
 Set the microcontroller target:
-```
+
+```shell
 idf.py set-target esp32c5
 ```
+
 Change the device configuration (if needed):
-```
+
+```shell
 idf.py menuconfig
 ```
+
 Build the code:
-```
+
+```shell
 idf.py build
 ```
+
 ## Flashing
+
 Flash the full code:
-```
+
+```shell
 idf.py -p PORT flash
 ```
