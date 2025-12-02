@@ -22,7 +22,7 @@
 QueueHandle_t xAiCmdQueue;
 
 EXT_RAM_BSS_ATTR static ai_cmd_t msg;
-EXT_RAM_BSS_ATTR static char ai_response[AI_RESPONSE_MAX_LEN] = {0};
+EXT_RAM_BSS_ATTR static char ai_response[AI_RESPONSE_MAX_LEN] = {0}; // TODO: Increase MAX_LEN here and for BT
 
 static void ai_task(void *pvParameters)
 {
@@ -44,20 +44,20 @@ static void ai_task(void *pvParameters)
 	}
 	#endif
 
-	while (1) {
-		// Clear message buffer
-		memset(&msg, 0, sizeof(msg));
+	// Clear message buffer
+	memset(&msg, 0, sizeof(msg));
 
+	while (1) {
 		// Block until AI task activated
 		if (xQueueReceive(xAiCmdQueue, &msg, portMAX_DELAY) != pdTRUE) {
 			continue;
 		}
 
-		// Clear script buffer
+		// Clear ai_response buffer
 		memset(ai_response, 0, sizeof(ai_response));
 
 		// Send cmd to the AI
-		// 'script' output
+		// 'ai_response' output
 		#ifdef USING_GROK
 		err = xai_send_command(msg.cmd, ai_response, sizeof(ai_response));
 		#else
@@ -76,6 +76,9 @@ static void ai_task(void *pvParameters)
 		else {
 			ESP_LOGE(TAG, "AI request failed: %s", esp_err_to_name(err));
 		}
+
+		// Reset message buffer
+		memset(&msg, 0, sizeof(msg));
 
 		vTaskDelay(pdMS_TO_TICKS(100));
 	}
