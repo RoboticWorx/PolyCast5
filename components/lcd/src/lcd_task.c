@@ -4,13 +4,15 @@
 
 #include "esp_log.h"
 
-#include "lcd_task.h"
-#include "gpio_task.h"
+#include "lcd_utils.h"
 #include "lcd_bluetooth_funcs.h"
 #include "lcd_hotkey_funcs.h"
 #include "lcd_gpio_funcs.h"
-#include "lcd_utils.h"
-#include "widgets/label/lv_label.h"
+
+#include "lcd_task.h"
+#include "gpio_task.h"
+#include "wifi_task.h"
+#include "bluetooth_task.h"
 
 extern int8_t lcd_ledc_brightness;
 
@@ -522,6 +524,22 @@ static void lcd_task(void *pvParameters)
 			lcd_update_battery(&ui_menu, battery_percentage, is_charging);
 		}
 
+		// Check for connectivity -> update icon
+		// TODO: Handle if both are on at once/with hotkey eye 
+		// TODO: RGB LED customibility if green/blue indicator not wanted (too bright)
+		if (xWifiDisconnectedIconSemaphore && xSemaphoreTake(xWifiDisconnectedIconSemaphore, 0) == pdTRUE) {
+			lv_obj_add_flag(ui_menu.lbl_wifi_icon, LV_OBJ_FLAG_HIDDEN); // Hide Wi-Fi icon
+		}
+		else if (xWifiConnectedIconSemaphore && xSemaphoreTake(xWifiConnectedIconSemaphore, 0) == pdTRUE) {
+			lv_obj_remove_flag(ui_menu.lbl_wifi_icon, LV_OBJ_FLAG_HIDDEN); // Show Wi-Fi icon
+		}
+		if (xBleDisconnectedIconSemaphore && xSemaphoreTake(xBleDisconnectedIconSemaphore, 0) == pdTRUE) {
+			lv_obj_add_flag(ui_menu.lbl_bluetooth_icon, LV_OBJ_FLAG_HIDDEN); // Hide Bluetooth icon
+		}
+		else if (xBleConnectedIconSemaphore && xSemaphoreTake(xBleConnectedIconSemaphore, 0) == pdTRUE) {
+			lv_obj_remove_flag(ui_menu.lbl_bluetooth_icon, LV_OBJ_FLAG_HIDDEN); // Show Bluetooth icon
+		}
+		
 		lv_timer_handler();
 		vTaskDelay(pdMS_TO_TICKS(10));
 	}

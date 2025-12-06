@@ -26,6 +26,9 @@
     "string": "cpp",
     "format": "cpp",
     "wifi_task.h": "c",
-    "wifi_funcs.h": "c"
+    "wifi_funcs.h": "c",
+    "lcd_hotkey_funcs.h": "c",
+    "lcd_utils.h": "c",
+    "lcd_bluetooth_funcs.h": "c"
   }
 }

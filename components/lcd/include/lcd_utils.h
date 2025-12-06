@@ -126,14 +126,14 @@ extern volatile bool lcd_clear_pending_inputs;
 extern volatile bool go_to_sleep;
 
 typedef struct ui_menu_t {
-    const char **options; // your array of strings
-    int size; // how many entries
-    int index; // the one that’s currently in the middle
+    const char **options; // Array of strings
+    int size; // How many entries
+    int index; // The one that's currently in the middle
     int page;
     lv_obj_t *scroll_bar;
     lv_obj_t *scroll_track;
     lv_obj_t *btn_mid;
-    lv_obj_t *lbl_top; // The three labels on screen
+    lv_obj_t *lbl_top;
     lv_obj_t *lbl_mid;
     lv_obj_t *lbl_bot;
     lv_obj_t *arrow_bot;
@@ -143,6 +143,8 @@ typedef struct ui_menu_t {
     lv_obj_t *lbl_battery_txt;
     lv_obj_t *lbl_battery_icon;
     lv_obj_t *lbl_hotkey_icon;
+    lv_obj_t *lbl_wifi_icon;
+    lv_obj_t *lbl_bluetooth_icon;
 } ui_menu_t;
 
 typedef struct ui_btns_t {

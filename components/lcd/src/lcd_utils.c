@@ -992,8 +992,17 @@ void lcd_init_selection_labels(ui_menu_t *ui_menu)
 	// Hotkey icon
 	ui_menu->lbl_hotkey_icon = lv_label_create(ACTIVE_SCR);
 	lcd_format_label(ui_menu->lbl_hotkey_icon, LV_SYMBOL_EYE_OPEN, user_secondary_color,
-			&lv_font_montserrat_18, LV_ALIGN_TOP_LEFT, 4, -1);
-					 
+			&lv_font_montserrat_18, LV_ALIGN_TOP_LEFT, 4, -1); // (Right+, Down+)
+
+	// Connectivity icons
+	ui_menu->lbl_bluetooth_icon = lv_label_create(ACTIVE_SCR); // BLE connected
+	lcd_format_label(ui_menu->lbl_bluetooth_icon, LV_SYMBOL_BLUETOOTH, user_secondary_color,
+			&lv_font_montserrat_20, LV_ALIGN_TOP_LEFT, 2, 1);
+
+	ui_menu->lbl_wifi_icon = lv_label_create(ACTIVE_SCR); // Wi-Fi connected
+	lcd_format_label(ui_menu->lbl_wifi_icon, LV_SYMBOL_WIFI, user_secondary_color,
+			&lv_font_montserrat_18, LV_ALIGN_TOP_LEFT, 3, 0);
+	
 	// Hide all for now
 	lv_obj_add_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->lbl_top, LV_OBJ_FLAG_HIDDEN);
@@ -1008,6 +1017,9 @@ void lcd_init_selection_labels(ui_menu_t *ui_menu)
 	lv_obj_add_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->scroll_bar, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(ui_menu->scroll_track, LV_OBJ_FLAG_HIDDEN);
+
+	lv_obj_add_flag(ui_menu->lbl_bluetooth_icon, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(ui_menu->lbl_wifi_icon, LV_OBJ_FLAG_HIDDEN);
 }
 
 void lcd_clear_user_in()

@@ -1278,7 +1278,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 	// Only execute once
 	if (!do_once) {
 		lbl_ins = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_ins, "Hold select and ask!", user_secondary_color,
+		lcd_format_label(lbl_ins, "Push to talk!", user_secondary_color,
 				&lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 12);
 
 		lbl_loading = lv_label_create(ACTIVE_SCR);

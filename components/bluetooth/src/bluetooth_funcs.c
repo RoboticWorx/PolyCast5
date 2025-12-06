@@ -1016,6 +1016,8 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 
 			break;
 		case ESP_HIDD_CONNECT_EVENT: {
+			xSemaphoreGive(xBleConnectedIconSemaphore); // Show BLE connected icon
+
 			// RGB indicator
 			uint8_t rgb_state = RGB_SET_BLUE;
 			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
@@ -1025,6 +1027,8 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 			break;
 		}
 		case ESP_HIDD_DISCONNECT_EVENT: {
+			xSemaphoreGive(xBleDisconnectedIconSemaphore); // Remove BLE connected icon
+
 			// RGB indicator
 			uint8_t rgb_state = RGB_SET_OFF;
 			xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);

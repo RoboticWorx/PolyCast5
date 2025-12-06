@@ -51,6 +51,8 @@ SemaphoreHandle_t xWifiMqttConnectedSemaphore;
 SemaphoreHandle_t xWifiMqttDisconnectedSemaphore;
 SemaphoreHandle_t xWifiCycleSemaphore;
 SemaphoreHandle_t xWifiPingSemaphore;
+SemaphoreHandle_t xWifiConnectedIconSemaphore;
+SemaphoreHandle_t xWifiDisconnectedIconSemaphore;
 
 // OTA
 SemaphoreHandle_t xWifiOtaAvailableSemaphore; // Wi-Fi -> LCD
@@ -84,6 +86,10 @@ static void wifi_task(void *param)
 	configASSERT(xWifiCycleSemaphore);
 	xWifiPingSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xWifiPingSemaphore);
+	xWifiConnectedIconSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xWifiConnectedIconSemaphore);
+	xWifiDisconnectedIconSemaphore = xSemaphoreCreateBinary();
+	configASSERT(xWifiDisconnectedIconSemaphore);
 	
 	xWifiScanQueue = xQueueCreate(WIFI_MAX_NETWORKS, sizeof(wifi_scan_t));
 	configASSERT(xWifiScanQueue);
