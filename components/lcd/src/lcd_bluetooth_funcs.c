@@ -55,7 +55,7 @@ bluetooth_keyboard_menu_t bluetooth_keyboard_submenu = {
 };
 
 bluetooth_menu_t bluetooth_menu = {
-	.options = {"How It Works", "Auto Keyboard", "AI Keyboard", "Media Controller", "Page Scroller",
+	.options = {"Pair Device", "Auto Keyboard", "AI Keyboard", "Media Controller", "Page Scroller",
 			"PowerPoint Clicker", "Camera Clicker", "Socials Scroller", "Known Devices"},
 	.size = NUM_BLUETOOTH_OPTIONS,
 	.index = 1,
@@ -651,7 +651,7 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
 
 		// Title label
 		title_lbl = lv_label_create(cont);
-		lv_label_set_text(title_lbl, "How It Works:");
+		lv_label_set_text(title_lbl, "How To Pair:");
 		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
 		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
 		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
@@ -666,8 +666,8 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
 
 		// Set custom text
 		const char *instr_text =
-				"Bluetooth is now advertising as 'PolyCast5'.\n\n"
-				"Click the right arrow if you want to forget all devices.\n\n"
+				"Do not leave this page until you're done pairing.\n\nBluetooth is now advertising as 'PolyCast5'.\n\n"
+				//"Click the right arrow if you want to forget all devices.\n\n" // TODO: Forget all should be own button
 				"To connect a new device, just go to settings on any Bluetooth device such as a phone or PC, "
 				"click on 'PolyCast5', and enter '%d' as the pin.\n\nAfter connecting once, PolyCast5 "
 				"will automatically reconnect to the last known device after selecting an option from the Bluetooth menu.\n\nYou "
@@ -1846,7 +1846,7 @@ static void peer_menu_build(bluetooth_peer_menu_t *pm)
 	pm->size = (n > 0) ? (n + 1) : 1;
 
 	// Row 0
-	strncpy(pm->labels[0], "Pair New Device", sizeof(pm->labels[0]));
+	strncpy(pm->labels[0], "Pair Another", sizeof(pm->labels[0]));
 	pm->btns[0] = lv_list_add_btn(pm->main_list, NULL, pm->labels[0]);
 	lv_obj_set_size(pm->btns[0], 200, 30);
 

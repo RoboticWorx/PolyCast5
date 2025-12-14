@@ -525,19 +525,19 @@ static void lcd_task(void *pvParameters)
 		}
 
 		// Check for connectivity -> update icon
-		// TODO: Handle if both are on at once/with hotkey eye 
+		// TODO: Handle if both are on at once/with hotkey eye -> symbol queue to handle cases?
 		// TODO: RGB LED customibility if green/blue indicator not wanted (too bright)
+		if (xWifiConnectedIconSemaphore && xSemaphoreTake(xWifiConnectedIconSemaphore, 0) == pdTRUE) {
+			lv_obj_remove_flag(ui_menu.lbl_wifi_icon, LV_OBJ_FLAG_HIDDEN); // Show Wi-Fi icon
+		}
 		if (xWifiDisconnectedIconSemaphore && xSemaphoreTake(xWifiDisconnectedIconSemaphore, 0) == pdTRUE) {
 			lv_obj_add_flag(ui_menu.lbl_wifi_icon, LV_OBJ_FLAG_HIDDEN); // Hide Wi-Fi icon
 		}
-		else if (xWifiConnectedIconSemaphore && xSemaphoreTake(xWifiConnectedIconSemaphore, 0) == pdTRUE) {
-			lv_obj_remove_flag(ui_menu.lbl_wifi_icon, LV_OBJ_FLAG_HIDDEN); // Show Wi-Fi icon
+		if (xBleConnectedIconSemaphore && xSemaphoreTake(xBleConnectedIconSemaphore, 0) == pdTRUE) {
+			lv_obj_remove_flag(ui_menu.lbl_bluetooth_icon, LV_OBJ_FLAG_HIDDEN); // Show Bluetooth icon
 		}
 		if (xBleDisconnectedIconSemaphore && xSemaphoreTake(xBleDisconnectedIconSemaphore, 0) == pdTRUE) {
 			lv_obj_add_flag(ui_menu.lbl_bluetooth_icon, LV_OBJ_FLAG_HIDDEN); // Hide Bluetooth icon
-		}
-		else if (xBleConnectedIconSemaphore && xSemaphoreTake(xBleConnectedIconSemaphore, 0) == pdTRUE) {
-			lv_obj_remove_flag(ui_menu.lbl_bluetooth_icon, LV_OBJ_FLAG_HIDDEN); // Show Bluetooth icon
 		}
 		
 		lv_timer_handler();
