@@ -633,6 +633,8 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
 	static lv_obj_t *cont = NULL;
 	static lv_obj_t *title_lbl = NULL;
 	static lv_obj_t *instr_lbl = NULL;
+	static lv_obj_t *pin_lbl = NULL;
+	static lv_obj_t *ending_lbl = NULL;
 	
 	if (!init) {
 		// Create a scrollable container for the instructions
@@ -666,21 +668,45 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
 
 		// Set custom text
 		const char *instr_text =
-				"Do not leave this page until you're done pairing.\n\nBluetooth is now advertising as 'PolyCast5'.\n\n"
-				//"Click the right arrow if you want to forget all devices.\n\n" // TODO: Forget all should be own button
-				"To connect a new device, just go to settings on any Bluetooth device such as a phone or PC, "
-				"click on 'PolyCast5', and enter '%d' as the pin.\n\nAfter connecting once, PolyCast5 "
-				"will automatically reconnect to the last known device after selecting an option from the Bluetooth menu.\n\nYou "
-				"will also see the RGB LED turn blue to indicate PolyCast5 is currently connected to a device. If you don't wish to "
-				"see this, it can be disabled in settings by setting 'Blink every' to 0 for 'Adjust RGB LED'.";
+				"Don't press back until you're done pairing! Bluetooth is now advertising as 'PolyCast5'\n\n"
+				"Pairing PIN:";
+				// TODO: Forget all should be own button
 		
+		lv_label_set_text_fmt(instr_lbl, instr_text);
+
+		// Pairing pin label
+		pin_lbl = lv_label_create(cont);
+		lv_label_set_long_mode(pin_lbl, LV_LABEL_LONG_WRAP);
+		lv_obj_set_width(pin_lbl, lv_pct(100)); // Full width for wrapping
+		lv_obj_set_style_text_font(pin_lbl, &lv_font_montserrat_30, 0);
+		lv_obj_set_style_text_color(pin_lbl, user_secondary_color, 0);
+		lv_obj_align_to(pin_lbl, instr_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+
 		// Load pairing key from NVS
 		uint32_t pairing_key;
-		bluetooth_pairing_key_load_nvs(&pairing_key);
-		lv_label_set_text_fmt(instr_lbl, instr_text, pairing_key);
+		bluetooth_pairing_key_load_nvs(&pairing_key); // pairing_key
+		lv_label_set_text_fmt(pin_lbl, "     %" PRIu32, pairing_key);
+
+		// Instructions label (scrollable if text is long)
+		ending_lbl = lv_label_create(cont);
+		lv_label_set_long_mode(ending_lbl, LV_LABEL_LONG_WRAP);
+		lv_obj_set_width(ending_lbl, lv_pct(100)); // Full width for wrapping
+		lv_obj_set_style_text_font(ending_lbl, &lv_font_montserrat_14, 0);
+		lv_obj_set_style_text_color(ending_lbl, user_secondary_color, 0);
+		lv_obj_align_to(ending_lbl, pin_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+
+		// Set custom text
+		const char *ending_text =
+				"Note:\nAfter this pairing, PolyCast5 will automatically reconnect "
+				"when selecting an option from the Bluetooth menu. You DON'T need to come back here!\n\n"
+				"The RGB LED will turn blue to indicate PolyCast5 has connected.\n\nIf you don't wish to "
+				"see this, it can be disabled in settings by setting 'Blink every' to 0 for 'Adjust RGB LED'.";
+		
+		lv_label_set_text_fmt(ending_lbl, ending_text);
 
 		lv_timer_handler();
-		// Active bluetooth
+		
+		// Activate bluetooth
 		uint16_t cmd = BLUETOOTH_CMD_INIT;
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
@@ -712,7 +738,7 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
 		
 		// Reset statics
 		cont = NULL;
-		title_lbl = instr_lbl = NULL;
+		title_lbl = instr_lbl = pin_lbl = ending_lbl = NULL;
 		init = false;
 			
 		// Show bluetooth menu
@@ -732,7 +758,7 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
 		
 		// Reset statics
 		cont = NULL;
-		title_lbl = instr_lbl = NULL;
+		title_lbl = instr_lbl = pin_lbl = ending_lbl =NULL;
 		init = false;
 		
  		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
