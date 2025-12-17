@@ -470,6 +470,9 @@ static void lcd_task(void *pvParameters)
 				case BLUETOOTH_SCRIPT_ADD_PAGE:
 					lcd_bluetooth_add_script_page(&ui_btns, &ui_menu, &bluetooth_menu);
 					break;
+				case BLUETOOTH_FORGET_ALL_PAGE:
+					lcd_bluetooth_forget_all_page(&ui_btns, &ui_menu, &bluetooth_menu);
+					break;
 				case BLUETOOTH_KNOWN_DEVICES_PAGE:
 					lcd_bluetooth_known_devices_page(&ui_btns, &ui_menu, &bluetooth_menu);
 					break;

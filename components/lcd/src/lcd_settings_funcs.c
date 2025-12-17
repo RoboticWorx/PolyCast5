@@ -2025,11 +2025,11 @@ void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
 	if (!do_once) {
 		lbl_ins = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_ins, "Press RIGHT to factory reset.", user_secondary_color,
-					 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 18);
+				&lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 18);
 					 
 		lbl_note = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_note, "NOTE: This will erase\n       all user data!", user_secondary_color,
-					 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+				&lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
 
 		do_once = true;
 	}
@@ -2047,7 +2047,7 @@ void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
 		// Confirmation text
 		lv_obj_t *lbl_rst = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_rst, "Resetting...", user_secondary_color,
-				 &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 0);
+				&lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 0);
 		lv_timer_handler();
 		vTaskDelay(pdMS_TO_TICKS(1000));
 		

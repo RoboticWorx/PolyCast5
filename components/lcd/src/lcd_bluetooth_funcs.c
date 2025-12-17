@@ -56,7 +56,7 @@ bluetooth_keyboard_menu_t bluetooth_keyboard_submenu = {
 
 bluetooth_menu_t bluetooth_menu = {
 	.options = {"Pair Device", "Auto Keyboard", "AI Keyboard", "Media Controller", "Page Scroller",
-			"PowerPoint Clicker", "Camera Clicker", "Socials Scroller", "Known Devices"},
+			"PowerPoint Clicker", "Camera Clicker", "Socials Scroller", "Forget All Devices", "Known Devices"},
 	.size = NUM_BLUETOOTH_OPTIONS,
 	.index = 1,
 	.cont = NULL,
@@ -670,7 +670,6 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
 		const char *instr_text =
 				"Don't press back until you're done pairing! Bluetooth is now advertising as 'PolyCast5'\n\n"
 				"Pairing PIN:";
-				// TODO: Forget all should be own button
 		
 		lv_label_set_text_fmt(instr_lbl, instr_text);
 
@@ -718,11 +717,6 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
 	}
 	else if (ui_btns->down_btn == 1) {
 		lv_obj_scroll_by_bounded(cont, 0, -HOW_Y_OFFSET, LV_ANIM_ON);
-	}
-	else if (ui_btns->right_btn == 1) {
-		// Forget all bluetooth bonding keys
-		uint16_t cmd = BLUETOOTH_CMD_UNPAIR_ALL;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 	}
 	// Go back
 	else if (ui_btns->left_btn) {
@@ -2385,6 +2379,102 @@ void lcd_bluetooth_rename_peer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 		// Go back to list page
 		ui_menu->page = BLUETOOTH_KNOWN_DEVICES_PAGE;
 		return;
+	}
+}
+
+void lcd_bluetooth_forget_all_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
+{
+	// Statics
+	static bool do_once = false;
+	
+	static lv_obj_t *lbl_ins;
+	static lv_obj_t *lbl_note;
+	
+	// Only execute once
+	if (!do_once) {
+		lbl_ins = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_ins, "Press RIGHT to\nforget all devices.", user_secondary_color,
+				&lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 10);
+					 
+		lbl_note = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_note, "Note: You will need\nto do this on your\nhost device as well.", user_secondary_color,
+				&lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -10);
+		do_once = true;
+	}
+	
+	// Factory reset
+	if (ui_btns->right_btn == 1) {		
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_note);
+		
+		// Reset statics
+		lbl_ins = lbl_note = NULL;
+		do_once = false;
+
+		// Show bluetooth list
+		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show top and bottom arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+		lv_timer_handler();
+
+		// BT must be activated to forget bonding keys:
+
+		// Activate bluetooth
+		uint16_t cmd = BLUETOOTH_CMD_INIT;
+		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+		
+		// Forget all bluetooth bonding keys
+		cmd = BLUETOOTH_CMD_UNPAIR_ALL;
+		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+
+		// Deactivate bluetooth
+		cmd = BLUETOOTH_CMD_DEINIT;
+		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+		
+		// Switch pages
+		ui_menu->page = BLUETOOTH_PAGE;
+	}
+	// Back selected
+	else if (ui_btns->left_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_note);
+		
+		// Reset statics
+		lbl_ins = lbl_note = NULL;
+		do_once = false;
+		
+		// Show bluetooth list
+		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Show top and bottom arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch pages
+		ui_menu->page = BLUETOOTH_PAGE;
+	}
+	// Home or power off selected
+	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_note);
+		
+		// Reset statics
+		lbl_ins = lbl_note = NULL;
+		do_once = false;
+		
+		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
 }
 

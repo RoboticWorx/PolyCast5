@@ -10,7 +10,7 @@
 #include "bluetooth_funcs.h"
 #include "bluetooth_web_portal.h"
 
-#define NUM_BLUETOOTH_OPTIONS 9
+#define NUM_BLUETOOTH_OPTIONS 10
 
 // Forward-declare structs (from lcd_utils.h)
 typedef struct ui_btns_t ui_btns_t;
@@ -150,6 +150,15 @@ void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
  * @param [in] bluetooth_menu Bluetooth menu structure
  */
 void lcd_bluetooth_rename_peer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
+
+/**
+ * @brief Forget all paired bluetooth devices
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] bluetooth_menu Bluetooth menu structure
+ */
+void lcd_bluetooth_forget_all_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
 
 /** 
  * @brief Sets the last selected script
