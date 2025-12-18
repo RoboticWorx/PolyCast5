@@ -3,6 +3,26 @@
 
 #include "freertos/idf_additions.h"
 
+// Connection icon bits
+#define ICON_BIT_WIFI_CONNECTED (1U << 0)
+#define ICON_BIT_BT_CONNECTED   (1U << 1)
+#define ICON_BIT_HOTKEY_ACTIVE  (1U << 2)
+enum {
+    ICON_NONE, // Default starting state
+    ICON_BLUETOOTH_CONNECTED,
+    ICON_BLUETOOTH_DISCONNECTED,
+    ICON_WIFI_CONNECTED,
+    ICON_WIFI_DISCONNECTED,
+    ICON_HOTKEY_ACTIVE,
+    ICON_HOTKEY_INACTIVE,
+};  
+typedef struct {
+    uint8_t icon_wifi;
+    uint8_t icon_bluetooth;
+    uint8_t icon_hotkey;
+} icon_state_t;
+extern EventGroupHandle_t xConnectionIconEventGroup;
+
 extern QueueHandle_t xWifiScanQueue;
 extern QueueHandle_t xWifiSelectedNetworkQueue;
 extern QueueHandle_t xWifiSniffQueue;
@@ -23,8 +43,6 @@ extern SemaphoreHandle_t xWifiMqttConnectedSemaphore;
 extern SemaphoreHandle_t xWifiMqttDisconnectedSemaphore;
 extern SemaphoreHandle_t xWifiCycleSemaphore;
 extern SemaphoreHandle_t xWifiPingSemaphore;
-extern SemaphoreHandle_t xWifiConnectedIconSemaphore;
-extern SemaphoreHandle_t xWifiDisconnectedIconSemaphore;
 
 // OTA
 extern QueueHandle_t xWifiOtaPctQueue;

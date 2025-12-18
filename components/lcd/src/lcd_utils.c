@@ -1526,6 +1526,52 @@ void lcd_boot_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu)
 	}
 }
 
+// TODO: RGB LED customibility if green/blue indicator not wanted (too bright)
+void lcd_update_icons(icon_state_t *icon_state, ui_menu_t *ui_menu)
+{
+	bool wifi_on = (icon_state->icon_wifi == ICON_WIFI_CONNECTED);
+    bool bt_on = (icon_state->icon_bluetooth == ICON_BLUETOOTH_CONNECTED);
+    bool hotkey_on = (icon_state->icon_hotkey == ICON_HOTKEY_ACTIVE);
+
+	if (wifi_on && bt_on && hotkey_on) {
+		lv_obj_align(ui_menu->lbl_hotkey_icon, LV_ALIGN_TOP_LEFT, 4, -1);
+		lv_obj_align(ui_menu->lbl_wifi_icon, LV_ALIGN_TOP_LEFT, 3, 0 + 18);
+		lv_obj_align(ui_menu->lbl_bluetooth_icon, LV_ALIGN_TOP_LEFT, 2 + 3, 1 + 37);
+	}
+	else if (wifi_on && bt_on) {
+		lv_obj_align(ui_menu->lbl_wifi_icon, LV_ALIGN_TOP_LEFT, 3, 0);
+		lv_obj_align(ui_menu->lbl_bluetooth_icon, LV_ALIGN_TOP_LEFT, 2 + 3, 1 + 21);
+	}
+	else if (hotkey_on && wifi_on) {
+		lv_obj_align(ui_menu->lbl_hotkey_icon, LV_ALIGN_TOP_LEFT, 4, -1);
+		lv_obj_align(ui_menu->lbl_wifi_icon, LV_ALIGN_TOP_LEFT, 3, 0 + 18);
+	}
+	else if (hotkey_on && bt_on) {
+		lv_obj_align(ui_menu->lbl_hotkey_icon, LV_ALIGN_TOP_LEFT, 4, -1);
+		lv_obj_align(ui_menu->lbl_bluetooth_icon, LV_ALIGN_TOP_LEFT, 2, 1 + 18);
+	}
+	else {
+		if (wifi_on) {
+			lv_obj_align(ui_menu->lbl_wifi_icon, LV_ALIGN_TOP_LEFT, 3, 0);
+		}
+		else if (bt_on) {
+			lv_obj_align(ui_menu->lbl_bluetooth_icon, LV_ALIGN_TOP_LEFT, 2, 1);
+		}
+		else if (hotkey_on) {
+			lv_obj_align(ui_menu->lbl_hotkey_icon, LV_ALIGN_TOP_LEFT, 4, -1);
+		}
+	}
+
+	if (wifi_on)  lv_obj_remove_flag(ui_menu->lbl_wifi_icon, LV_OBJ_FLAG_HIDDEN); // Show Wi-Fi
+	else 		  lv_obj_add_flag(ui_menu->lbl_wifi_icon, LV_OBJ_FLAG_HIDDEN); // Hide Wi-Fi
+
+	if (bt_on) 	lv_obj_remove_flag(ui_menu->lbl_bluetooth_icon, LV_OBJ_FLAG_HIDDEN); // Show Bluetooth
+	else 		lv_obj_add_flag(ui_menu->lbl_bluetooth_icon, LV_OBJ_FLAG_HIDDEN); // Hide Bluetooth
+	
+	if (hotkey_on) 	lv_obj_remove_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN); // Show hotkey
+	else 			lv_obj_add_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN); // Hide hotkey
+}
+
 void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
 	if (ui_btns->up_btn == 1) {
@@ -2336,7 +2382,8 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
 			hotkey_cmd.has_lora[hotkey_cmd.active_idx] = false;
 			
 			// Hide hotkey icon
-			lv_obj_add_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN);
+			//lv_obj_add_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN);
+			xEventGroupClearBits(xConnectionIconEventGroup, ICON_BIT_HOTKEY_ACTIVE);
 			
 			// Persist to NVS
 			lcd_hotkey_nvs_save(&hotkey_cmd);

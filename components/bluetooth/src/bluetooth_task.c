@@ -19,8 +19,6 @@
 #define TAG "BLUETOOTH_TASK"
 
 SemaphoreHandle_t xBleConnectedSemaphore;
-SemaphoreHandle_t xBleConnectedIconSemaphore;
-SemaphoreHandle_t xBleDisconnectedIconSemaphore;
 
 QueueHandle_t xBluetoothMediaCmdQueue;
 QueueHandle_t xBluetoothAiCmdQueue;
@@ -40,10 +38,6 @@ static void bluetooth_task(void *arg)
 {
 	xBleConnectedSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xBleConnectedSemaphore);
-	xBleConnectedIconSemaphore = xSemaphoreCreateBinary();
-	configASSERT(xBleConnectedIconSemaphore);
-	xBleDisconnectedIconSemaphore = xSemaphoreCreateBinary();
-	configASSERT(xBleDisconnectedIconSemaphore);
 
 	xBluetoothMediaCmdQueue = xQueueCreate(1, sizeof(uint16_t));
 	configASSERT(xBluetoothMediaCmdQueue);

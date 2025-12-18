@@ -23,6 +23,7 @@
 #include "gpio_funcs.h"
 #include "gpio_task.h"
 #include "bluetooth_task.h"
+#include "wifi_task.h"
 
 #define TAG "BLUETOOTH_FUNCS"
 
@@ -1016,7 +1017,8 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 
 			break;
 		case ESP_HIDD_CONNECT_EVENT: {
-			xSemaphoreGive(xBleConnectedIconSemaphore); // Show BLE connected icon
+			// Show Bluetooth connected icon
+			xEventGroupSetBits(xConnectionIconEventGroup, ICON_BIT_BT_CONNECTED);
 
 			// RGB indicator
 			uint8_t rgb_state = RGB_SET_BLUE;
@@ -1027,7 +1029,8 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 			break;
 		}
 		case ESP_HIDD_DISCONNECT_EVENT: {
-			xSemaphoreGive(xBleDisconnectedIconSemaphore); // Remove BLE connected icon
+			// Remove Bluetooth connected icon
+			xEventGroupClearBits(xConnectionIconEventGroup, ICON_BIT_BT_CONNECTED);
 
 			// RGB indicator
 			uint8_t rgb_state = RGB_SET_OFF;

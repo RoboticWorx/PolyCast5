@@ -701,7 +701,9 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 		wifi_funcs_radio_stop();
 		
 		xSemaphoreGive(xWifiMqttDisconnectedSemaphore); // Notify LCD we disconnected
-		xSemaphoreGive(xWifiDisconnectedIconSemaphore); // Remove Wi-Fi connected icon
+
+		// Remove Wi-Fi connected icon
+		xEventGroupClearBits(xConnectionIconEventGroup, ICON_BIT_WIFI_CONNECTED);
 
 		xEventGroupSetBits(wifi_event_group, WIFI_DISCONNECTED_BIT);
 		
@@ -726,7 +728,9 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 		sta_gw_valid = true;
 
 		xSemaphoreGive(xWifiNetworkConnectedSemaphore); // Notify LCD we connected
-		xSemaphoreGive(xWifiConnectedIconSemaphore); // Show Wi-Fi connected icon
+		
+		// Show Wi-Fi connected icon
+		xEventGroupSetBits(xConnectionIconEventGroup, ICON_BIT_WIFI_CONNECTED);
 
 		xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
 		

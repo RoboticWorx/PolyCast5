@@ -20,6 +20,9 @@ static const char *TAG = "LCD_TASK";
 
 static volatile bool is_charging = false;
 
+static icon_state_t icon_state = {0};
+static EventBits_t icon_bits = 0;
+
 static const TickType_t btn_timer_interval = pdMS_TO_TICKS(200);
 
 uint8_t sleep_time_s = 30; // Default 30s
@@ -528,21 +531,24 @@ static void lcd_task(void *pvParameters)
 		}
 
 		// Check for connectivity -> update icon
-		// TODO: Handle if both are on at once/with hotkey eye -> symbol queue to handle cases?
-		// TODO: RGB LED customibility if green/blue indicator not wanted (too bright)
-		if (xWifiConnectedIconSemaphore && xSemaphoreTake(xWifiConnectedIconSemaphore, 0) == pdTRUE) {
-			lv_obj_remove_flag(ui_menu.lbl_wifi_icon, LV_OBJ_FLAG_HIDDEN); // Show Wi-Fi icon
+		if (xConnectionIconEventGroup) {
+			EventBits_t last_bits = xEventGroupGetBits(xConnectionIconEventGroup);
+			if (last_bits != icon_bits) {
+				icon_bits = last_bits;
+
+				icon_state.icon_wifi = (last_bits & ICON_BIT_WIFI_CONNECTED)
+						? ICON_WIFI_CONNECTED : ICON_WIFI_DISCONNECTED;
+
+				icon_state.icon_bluetooth = (last_bits & ICON_BIT_BT_CONNECTED)
+						? ICON_BLUETOOTH_CONNECTED : ICON_BLUETOOTH_DISCONNECTED;
+
+				icon_state.icon_hotkey = (last_bits & ICON_BIT_HOTKEY_ACTIVE)
+						? ICON_HOTKEY_ACTIVE : ICON_HOTKEY_INACTIVE;
+
+				lcd_update_icons(&icon_state, &ui_menu);
+			}
 		}
-		if (xWifiDisconnectedIconSemaphore && xSemaphoreTake(xWifiDisconnectedIconSemaphore, 0) == pdTRUE) {
-			lv_obj_add_flag(ui_menu.lbl_wifi_icon, LV_OBJ_FLAG_HIDDEN); // Hide Wi-Fi icon
-		}
-		if (xBleConnectedIconSemaphore && xSemaphoreTake(xBleConnectedIconSemaphore, 0) == pdTRUE) {
-			lv_obj_remove_flag(ui_menu.lbl_bluetooth_icon, LV_OBJ_FLAG_HIDDEN); // Show Bluetooth icon
-		}
-		if (xBleDisconnectedIconSemaphore && xSemaphoreTake(xBleDisconnectedIconSemaphore, 0) == pdTRUE) {
-			lv_obj_add_flag(ui_menu.lbl_bluetooth_icon, LV_OBJ_FLAG_HIDDEN); // Hide Bluetooth icon
-		}
-		
+
 		lv_timer_handler();
 		vTaskDelay(pdMS_TO_TICKS(10));
 	}

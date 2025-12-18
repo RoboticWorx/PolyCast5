@@ -15,6 +15,8 @@
 
 #include "gpio_funcs.h"
 
+#include "wifi_task.h" // icon_state_t
+
 #define ACTIVE_SCR (lv_scr_act())
 
 #define HOR_RES 240
@@ -323,6 +325,14 @@ void lcd_apply_scrollbar_style(lv_obj_t *obj);
  * @returns 0 on success
  */
 int lcd_draw_qr(lv_obj_t *canvas, const char *text, int size_px, uint8_t **pbuf);
+
+/**
+ * @brief Update connectivity icons for the LCD
+ *
+ * @param [in] icon_state Icon state structure
+ * @param [in] ui_menu UI menu structure
+ */
+void lcd_update_icons(icon_state_t *icon_state, ui_menu_t *ui_menu);
 
 /**
  * @brief Show one time boot up page with some starter info

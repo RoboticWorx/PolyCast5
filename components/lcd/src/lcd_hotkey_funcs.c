@@ -11,6 +11,8 @@
 #include "lcd_hotkey_funcs.h"
 #include "lcd_utils.h"
 
+#include "wifi_task.h"
+
 #define TAG "LCD_HOTKEY_FUNCS"
 
 #define HOTKEY_NS "hotkeys" // NVS namespace
@@ -248,7 +250,8 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
 		lcd_unhide_selection_widgets(ui_menu);
 		
 		// Show hotkey icon
-		lv_obj_remove_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN);
+		//lv_obj_remove_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN);
+		xEventGroupSetBits(xConnectionIconEventGroup, ICON_BIT_HOTKEY_ACTIVE);
 		
 		// Switch
 		ui_menu->page = SELECTION_PAGE;
