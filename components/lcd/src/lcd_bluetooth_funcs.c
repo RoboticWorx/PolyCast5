@@ -22,6 +22,8 @@
 #include "lcd_bluetooth_funcs.h"
 #include "bluetooth_funcs.h"
 #include "wifi_funcs.h"
+#include "ai_funcs.h"
+#include "ai_web_portal.h"
 
 #include "wifi_task.h"
 #include "bluetooth_task.h"
@@ -1287,13 +1289,125 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 	}
 }
 
+void lcd_bluetooth_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
+{
+	#define AI_CONFIG_SETUP_Y_OFFSET 40
+	
+	// Statics
+	static bool init = false;
+	
+	static lv_obj_t *cont = NULL;
+	static lv_obj_t *title_lbl = NULL;
+	static lv_obj_t *instr_lbl = NULL;
+	
+	if (!init) {
+		// Create a scrollable container for the instructions
+		cont = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(cont, 210, 106);
+		lv_obj_center(cont);
+		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
+
+		// Title label
+		title_lbl = lv_label_create(cont);
+		lv_label_set_text(title_lbl, "How To Setup:");
+		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+		// Instructions label (scrollable if text is long)
+		instr_lbl = lv_label_create(cont);
+		lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+		lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
+		lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
+		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+
+		// Set custom text based on hotkey index
+		const char *instr_text = 
+				"Everything you need to know is below!\n\n"
+				"polycast5.com/blogs\n/docs/ai-keyboard\n\n"
+				"SSID: %s\nPassword: %s";
+		
+		lv_label_set_text_fmt(instr_lbl, instr_text, ai_portal_get_ssid(), ai_portal_get_pass());
+
+		lv_timer_handler();
+		
+		// Start portal
+		xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_BIT);
+
+		init = true;
+	}
+	
+	// Scroll up
+	if (ui_btns->up_btn == 1) {
+		lv_obj_scroll_by_bounded(cont, 0, AI_CONFIG_SETUP_Y_OFFSET, LV_ANIM_ON);
+	}
+	// Scroll down
+	else if (ui_btns->down_btn == 1) {
+		lv_obj_scroll_by_bounded(cont, 0, -AI_CONFIG_SETUP_Y_OFFSET, LV_ANIM_ON);
+	}
+	// Go back
+	else if (ui_btns->left_btn) {
+		// Delete objects
+		lv_obj_delete(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+		
+		// Stop portal
+		xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_BIT);
+		
+		// Show bluetooth menu
+		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch back
+		ui_menu->page = BLUETOOTH_PAGE;
+	}
+	// Home or power off
+	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
+		// Delete objects
+		lv_obj_delete(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+		
+		// Stop portal
+		xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_BIT);
+		
+ 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+	}
+}
+
 void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
 {
 	// Statics
 	static bool do_once = false;
 	static lv_obj_t *lbl_ins = NULL;
 	static lv_obj_t *lbl_loading = NULL;
+	static lv_obj_t *lbl_config = NULL;
 	static int16_t angle = 0; // 0.1 degree units
+
+	char api_key[AI_API_KEY_MAX_LEN] = {0};
+	esp_err_t err = xai_load_api_key_nvs(api_key, AI_API_KEY_MAX_LEN);
+	if (err != ESP_OK) {
+		ESP_LOGW(TAG, "Failed to load xAI API key from NVS: err %s, switching to AI config page.", esp_err_to_name(err));
+
+		// Switch pages
+		ui_menu->page = BLUETOOTH_AI_CONFIG_PAGE;
+		return;
+	}
 	
 	// Only execute once
 	if (!do_once) {
@@ -1304,6 +1418,10 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 		lbl_loading = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_loading, LV_SYMBOL_REFRESH, user_secondary_color,
 				&lv_font_montserrat_48, LV_ALIGN_CENTER, 0, 12);
+
+		lbl_config = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_config, LV_SYMBOL_SETTINGS, user_secondary_color,
+				&lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -15, 0);
 
 		lv_obj_update_layout(lbl_loading);
 
@@ -1353,9 +1471,30 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 	else if (ui_btns->down_btn == 1) {
 		
 	}
-	// Right button pressed
+	// Config page selected
 	else if (ui_btns->right_btn == 1) {
+		// Disconnect from Wi-Fi
+		xSemaphoreGive(xWifiDisconnectSemaphore);
+
+		// Deactivate bluetooth
+		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+		lv_obj_delete(lbl_loading);
+		lv_obj_delete(lbl_config);
 		
+		// Reset statics
+		do_once = false;
+		lbl_ins = lbl_loading = lbl_config = NULL;
+
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+		// Switch to config page
+		ui_menu->page = BLUETOOTH_AI_CONFIG_PAGE;
+		return;
 	}
 	// Record selected
 	else if (ui_btns->select_btn == 1) {
@@ -1376,10 +1515,11 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 		// Delete objects
 		lv_obj_delete(lbl_ins);
 		lv_obj_delete(lbl_loading);
+		lv_obj_delete(lbl_config);
 		
 		// Reset statics
 		do_once = false;
-		lbl_ins = lbl_loading = NULL;
+		lbl_ins = lbl_loading = lbl_config = NULL;
 
 		// Hide right arrow
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -1399,10 +1539,11 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 		// Delete objects
 		lv_obj_delete(lbl_ins);
 		lv_obj_delete(lbl_loading);
+		lv_obj_delete(lbl_config);
 		
 		// Reset statics
 		do_once = false;
-		lbl_ins = lbl_loading = NULL;
+		lbl_ins = lbl_loading = lbl_config = NULL;
 		
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
@@ -1663,13 +1804,11 @@ void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
 		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
 		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
-
 		// Start SoftAP and web portal
+		xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_BT_BIT);
+
 		char msg[64];
-	    if (bluetooth_web_portal_start() == ESP_OK) {
-			// Get portal IP
-	        snprintf(msg, sizeof(msg), "http://%s", bluetooth_web_portal_get_ip());
-	    }
+		snprintf(msg, sizeof(msg), "http://%s", bluetooth_web_portal_get_ip());
 
 		// Set custom text based on hotkey index
 		const char *instr_text = "How to quickly add a new Bluetooth autotype text script:\n\nFirst, grab your phone or other device and navigate to Wi-Fi settings."
@@ -1692,7 +1831,7 @@ void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
 	// Go back
 	else if (ui_btns->left_btn) {
 		// Turn off web portal
-		bluetooth_web_portal_stop();
+		xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_BT_BIT);
 		
 		// Hide right arrow
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -1714,7 +1853,7 @@ void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
 	// Home or power off
 	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
 		// Turn off web portal
-		bluetooth_web_portal_stop();
+		xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_BT_BIT);
 
 		// Delete objects
 		lv_obj_delete(cont); // Deletes children

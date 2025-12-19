@@ -92,7 +92,6 @@ static void lcd_task(void *pvParameters)
 	lcd_ns_nvs_clear(WIFI_TOPIC_NS);
 	#endif
 	
-	
 	// Create common items
 	#ifdef POLYCAST5_PERSIST_SELECTION_INDEX
 	lcd_selection_index_nvs_load(&ui_menu); // Load selection menu previous index
@@ -466,6 +465,9 @@ static void lcd_task(void *pvParameters)
 					break;
 				case BLUETOOTH_AI_KEYBOARD_PAGE:
 					lcd_bluetooth_ai_keyboard_page(&ui_btns, &ui_menu, &bluetooth_menu);
+					break;
+				case BLUETOOTH_AI_CONFIG_PAGE:
+					lcd_bluetooth_ai_config_page(&ui_btns, &ui_menu, &bluetooth_menu);
 					break;
 				case BLUETOOTH_KEYBOARD_SUB_PAGE:
 					lcd_bluetooth_keyboard_sub_page(&ui_btns, &ui_menu, &bluetooth_menu);

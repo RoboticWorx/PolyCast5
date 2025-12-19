@@ -1742,7 +1742,7 @@ void lcd_tools_btc_addr_setup_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools
 
 		// Title label
 		title_lbl = lv_label_create(cont);
-		lv_label_set_text(title_lbl, "How It Works:");
+		lv_label_set_text(title_lbl, "How To Setup:");
 		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
 		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
 		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
@@ -1768,11 +1768,7 @@ void lcd_tools_btc_addr_setup_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools
 		lv_timer_handler();
 		
 		// Start portal
-		esp_err_t err = btc_portal_start();
-			
-		if (err != ESP_OK) {
-			ESP_LOGE(TAG, "btc_portal_start failed: %s", esp_err_to_name(err));
-		}
+		xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_BTC_BIT);
 
 		init = true;
 	}
@@ -1796,7 +1792,7 @@ void lcd_tools_btc_addr_setup_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools
 		init = false;
 		
 		// Stop portal
-		btc_portal_stop();
+		xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_BTC_BIT);
 		
 		// Show tools menu
 		lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -1815,7 +1811,7 @@ void lcd_tools_btc_addr_setup_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools
 		init = false;
 		
 		// Stop portal
-		btc_portal_stop();
+		xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_BTC_BIT);
 		
  		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}

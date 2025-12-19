@@ -3,6 +3,14 @@
 
 #include "esp_err.h"
 
+// NVS keys for OpenAI API key
+#define OPENAI_NS "openai"
+#define OPENAI_KEY "api_key"
+
+// NVS keys for xAI (Grok) API key
+#define XAI_NS "xai"
+#define XAI_KEY "api_key"
+
 #define AI_RESPONSE_MAX_LEN 2048
 #define AI_CMD_MAX_LEN 2048
 #define AI_API_KEY_MAX_LEN 256
@@ -70,6 +78,25 @@ esp_err_t openai_send_command(const char *command, char *response_buf, size_t bu
  * @returns ESP error status
  */
 esp_err_t xai_send_command(const char *command, char *response_buf, size_t buf_sz);
+
+/**
+ * @brief Save AI prompt override to NVS (empty string => use compiled default)
+ *
+ * @param [in] prompt Prompt text to save
+ *
+ * @returns ESP error status
+ */
+esp_err_t ai_prompt_save_nvs(const char *prompt);
+
+/**
+ * @brief Load AI prompt override from NVS
+ *
+ * @param [out] out Buffer to store the loaded prompt
+ * @param [in] out_sz Size of the output buffer
+ *
+ * @returns ESP error status
+ */
+esp_err_t ai_prompt_load_nvs(char *out, size_t out_sz);
 
 
 #endif // AI_FUNCS_H

@@ -89,6 +89,15 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
 void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu, uint8_t type);
 
 /**
+ * @brief Starts web portal and uses it to prompt user for desired AI configuration
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] bluetooth_menu Bluetooth menu structure
+ */
+void lcd_bluetooth_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu);
+
+/**
  * @brief Starts Wi-Fi and bluetooth and prompts user input for AI keyboard scripter
  *
  * @param [in] ui_btns UI input structure

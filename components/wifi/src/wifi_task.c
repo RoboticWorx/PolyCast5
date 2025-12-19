@@ -18,6 +18,8 @@
 #include "ota_update.h"
 #include "esp_app_desc.h"
 #include "btc_web_portal.h"
+#include "ai_web_portal.h"
+#include "bluetooth_web_portal.h"
 
 #define TAG "WIFI_TASK"
 
@@ -53,10 +55,13 @@ SemaphoreHandle_t xWifiCycleSemaphore;
 SemaphoreHandle_t xWifiPingSemaphore;
 
 EventGroupHandle_t xConnectionIconEventGroup;
+EventGroupHandle_t xWiFiPortalEventGroup;
 
 // OTA
 SemaphoreHandle_t xWifiOtaAvailableSemaphore; // Wi-Fi -> LCD
 QueueHandle_t xWifiOtaPctQueue;
+
+static EventBits_t last_portal_bits;
 
 static void wifi_task(void *param)
 {
@@ -106,6 +111,8 @@ static void wifi_task(void *param)
 
 	xConnectionIconEventGroup = xEventGroupCreate();
 	configASSERT(xConnectionIconEventGroup);
+	xWiFiPortalEventGroup = xEventGroupCreate();
+	configASSERT(xWiFiPortalEventGroup);
 	
 	uint8_t my_mac[6];
 	esp_read_mac(my_mac, ESP_MAC_WIFI_STA);
@@ -136,12 +143,12 @@ static void wifi_task(void *param)
 		btc_wifi_pass_save_nvs(btc_wifi_portal_pass);
 		
 		#ifdef POLYCAST5_PASS_DEBUG
-		ESP_LOGW(TAG, "Setting first time BT Wi-Fi portal password: %s", bt_wifi_portal_pass);
+		ESP_LOGW(TAG, "Setting first time BTC Wi-Fi portal password: %s", btc_wifi_portal_pass);
 		#endif
 	}
 	else {
 		#ifdef POLYCAST5_PASS_DEBUG
-		ESP_LOGI(TAG, "Using pre-set BT Wi-Fi portal password: '%s'", bt_wifi_portal_pass);
+		ESP_LOGI(TAG, "Using pre-set BTC Wi-Fi portal password: '%s'", btc_wifi_portal_pass);
 		#endif
 	}
 
@@ -300,6 +307,56 @@ static void wifi_task(void *param)
 			if (xQueueSend(xWifiPingQueue, &wifi_ping, pdMS_TO_TICKS(1000)) != pdTRUE) {
 				ESP_LOGE(TAG, "xWifiPingQueue: Failed to enqueue ping results");
 			}
+		}
+
+		// Check for web portal events
+		EventBits_t current_portal_bits = xEventGroupGetBits(xWiFiPortalEventGroup);
+		if (current_portal_bits != last_portal_bits) { // Only act on changes
+			esp_err_t err;
+
+			// If AI web portal bit transitioned 0 -> 1
+			if ((current_portal_bits & WIFI_PORTAL_START_AI_BIT) &&
+					!(last_portal_bits & WIFI_PORTAL_START_AI_BIT)) {
+				err = ai_portal_start();
+				if (err != ESP_OK) {
+					ESP_LOGE(TAG, "ai_portal_start failed: %s", esp_err_to_name(err));
+				}
+			}
+			// If AI web portal bit transitioned 1 -> 0
+			if ((last_portal_bits & WIFI_PORTAL_START_AI_BIT) &&
+					!(current_portal_bits & WIFI_PORTAL_START_AI_BIT)) {
+				ai_portal_stop();
+			}
+
+			// If BTC web portal bit transitioned 0 -> 1
+			if ((current_portal_bits & WIFI_PORTAL_START_BTC_BIT) &&
+					!(last_portal_bits & WIFI_PORTAL_START_BTC_BIT)) {
+				esp_err_t err = btc_portal_start();
+				if (err != ESP_OK) {
+					ESP_LOGE(TAG, "btc_portal_start failed: %s", esp_err_to_name(err));
+				}
+			}
+			// If BTC web portal bit transitioned 1 -> 0
+			if ((last_portal_bits & WIFI_PORTAL_START_BTC_BIT) &&
+					!(current_portal_bits & WIFI_PORTAL_START_BTC_BIT)) {
+				btc_portal_stop();
+			}
+			
+			// If BT web portal bit transitioned 0 -> 1
+			if ((current_portal_bits & WIFI_PORTAL_START_BT_BIT) &&
+					!(last_portal_bits & WIFI_PORTAL_START_BT_BIT)) {
+				err = bluetooth_web_portal_start();
+				if (err != ESP_OK) {
+					ESP_LOGE(TAG, "bluetooth_web_portal_start failed: %s", esp_err_to_name(err));
+				}
+			}
+			// If BT web portal bit transitioned 1 -> 0
+			if ((last_portal_bits & WIFI_PORTAL_START_BT_BIT) &&
+					!(current_portal_bits & WIFI_PORTAL_START_BT_BIT)) {
+				bluetooth_web_portal_stop();
+			}
+
+			last_portal_bits = current_portal_bits;
 		}
     
 		vTaskDelay(pdMS_TO_TICKS(10));

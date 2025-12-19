@@ -25,15 +25,6 @@
 
 #define TAG "AI_FUNCS"
 
-// NVS keys for OpenAI API key
-#define OPENAI_NS "openai"
-#define OPENAI_KEY "api_key"
-
-// NVS keys for xAI (Grok) API key
-// Keep these separate so you can store both keys without conflicts.
-#define XAI_NS "xai"
-#define XAI_KEY "api_key"
-
 // Hard ceiling so a bad response doesn't eat all RAM
 #define AI_HTTP_BODY_MAX_CAP (48 * 1024)
 
@@ -47,8 +38,15 @@ typedef struct {
 	size_t cap; // Allocated capacity (includes space for NUL)
 	bool oom; // Set if we failed to allocate more memory
 	bool truncated; // Set if we hit max cap and refused to grow
-	bool caps_alloc; // true if allocated via heap_caps_* (PSRAM/8BIT), false if malloc/realloc
+	bool caps_alloc; // True if allocated via heap_caps_* (PSRAM/8BIT), false if malloc/realloc
 } http_accum_t;
+
+// NVS keys for AI prompt override
+#define AI_PROMPT_NS "ai"
+#define AI_PROMPT_KEY "prompt"
+#define AI_PROMPT_NVS_MAX_LEN 4096
+
+EXT_RAM_BSS_ATTR static char prompt_buf[AI_PROMPT_NVS_MAX_LEN] = {0};
 
 // Save API key string to NVS
 esp_err_t openai_save_api_key_nvs(const char *api_key)
@@ -138,7 +136,6 @@ esp_err_t xai_load_api_key_nvs(char *out, size_t out_sz)
 	nvs_close(h);
 	return err;
 }
-
 
 /* String cleanup helpers */
 
@@ -497,6 +494,24 @@ static esp_err_t http_evt(esp_http_client_event_t *evt)
 	return ESP_OK;
 }
 
+static const char *ai_prompt_get_for_request(char *buf, size_t buf_sz)
+{
+	// If no buffer provided, fall back to compiled default
+	if (!buf || buf_sz == 0) {
+		return AI_PROMPT;
+	}
+
+	// Default to empty
+	buf[0] = '\0';
+
+	// Try to load override from NVS; fall back to compiled default if missing/empty
+	if (ai_prompt_load_nvs(buf, buf_sz) != ESP_OK || buf[0] == '\0') {
+		return AI_PROMPT;
+	}
+
+	// Use NVS override
+	return buf;
+}
 
 /* OpenAI request (Responses API) */
 
@@ -517,6 +532,10 @@ esp_err_t openai_send_command(const char *command, char *response_buf, size_t bu
 		ESP_LOGE(TAG, "Failed to load OpenAI API key from NVS");
 		return ESP_FAIL;
 	}
+
+	// Build prompt (NVS override; fallback to compiled default)
+	memset(prompt_buf, 0, sizeof(prompt_buf)); // Zero out previous contents
+	const char *prompt = ai_prompt_get_for_request(prompt_buf, sizeof(prompt_buf));
 
 	// Create JSON payload root
 	cJSON *root = cJSON_CreateObject();
@@ -546,7 +565,7 @@ esp_err_t openai_send_command(const char *command, char *response_buf, size_t bu
 	// Developer message (instructions)
 	cJSON *dev = cJSON_CreateObject();
 	cJSON_AddStringToObject(dev, "role", "developer");
-	cJSON_AddStringToObject(dev, "content", AI_PROMPT);
+	cJSON_AddStringToObject(dev, "content", prompt);
 	cJSON_AddItemToArray(input, dev);
 
 	// User message (the actual command)
@@ -727,6 +746,10 @@ esp_err_t xai_send_command(const char *command, char *response_buf, size_t buf_s
 		return ESP_FAIL;
 	}
 
+	// Build prompt (NVS override; fallback to compiled default)
+	memset(prompt_buf, 0, sizeof(prompt_buf)); // Zero out previous contents
+	const char *prompt = ai_prompt_get_for_request(prompt_buf, sizeof(prompt_buf));
+
 	// Build JSON payload for /v1/chat/completions
 	// Minimal shape:
 	//   {
@@ -757,7 +780,7 @@ esp_err_t xai_send_command(const char *command, char *response_buf, size_t buf_s
 	// System / developer instructions
 	cJSON *sys = cJSON_CreateObject();
 	cJSON_AddStringToObject(sys, "role", "system");
-	cJSON_AddStringToObject(sys, "content", AI_PROMPT);
+	cJSON_AddStringToObject(sys, "content", prompt);
 	cJSON_AddItemToArray(messages, sys);
 
 	// User message
@@ -915,4 +938,58 @@ esp_err_t xai_send_command(const char *command, char *response_buf, size_t buf_s
 	}
 
 	return ESP_OK;
+}
+
+esp_err_t ai_prompt_save_nvs(const char *prompt)
+{
+	// NVS handle
+	nvs_handle_t h;
+
+	// Treat NULL as empty (empty => "use default" semantics)
+	if (!prompt) {
+		prompt = "";
+	}
+
+	// Open NVS namespace
+	esp_err_t err = nvs_open(AI_PROMPT_NS, NVS_READWRITE, &h);
+	if (err != ESP_OK) {
+		return err;
+	}
+
+	// Save prompt string
+	err = nvs_set_str(h, AI_PROMPT_KEY, prompt);
+
+	// Commit only on success
+	if (err == ESP_OK) {
+		err = nvs_commit(h);
+	}
+
+	// Close handle
+	nvs_close(h);
+	return err;
+}
+
+esp_err_t ai_prompt_load_nvs(char *out, size_t out_sz)
+{
+	// NVS handle
+	nvs_handle_t h;
+
+	// Validate output buffer
+	if (!out || out_sz == 0) {
+		return ESP_ERR_INVALID_ARG;
+	}
+
+	// Open NVS namespace
+	esp_err_t err = nvs_open(AI_PROMPT_NS, NVS_READONLY, &h);
+	if (err != ESP_OK) {
+		return err;
+	}
+
+	// Read prompt string (sz is in/out)
+	size_t sz = out_sz;
+	err = nvs_get_str(h, AI_PROMPT_KEY, out, &sz);
+
+	// Close handle
+	nvs_close(h);
+	return err;
 }

@@ -23,6 +23,11 @@ typedef struct {
 } icon_state_t;
 extern EventGroupHandle_t xConnectionIconEventGroup;
 
+#define WIFI_PORTAL_START_AI_BIT  (1U << 0)
+#define WIFI_PORTAL_START_BTC_BIT (1U << 1)
+#define WIFI_PORTAL_START_BT_BIT (1U << 2)
+extern EventGroupHandle_t xWiFiPortalEventGroup;
+
 extern QueueHandle_t xWifiScanQueue;
 extern QueueHandle_t xWifiSelectedNetworkQueue;
 extern QueueHandle_t xWifiSniffQueue;

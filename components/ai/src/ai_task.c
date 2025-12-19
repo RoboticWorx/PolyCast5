@@ -8,9 +8,11 @@
 
 #include "esp_log.h"
 #include "esp_err.h"
+#include "esp_random.h"
 
 #include "wifi_task.h"
 #include "gpio_task.h"
+#include "ai_web_portal.h"
 #include "bluetooth_task.h"
 
 #include "ai_funcs.h"
@@ -20,6 +22,8 @@
 #define USING_GROK 1 // Else using ChatGPT
 
 QueueHandle_t xAiCmdQueue;
+
+char ai_wifi_portal_pass[64];
 
 EXT_RAM_BSS_ATTR static ai_cmd_t msg;
 EXT_RAM_BSS_ATTR static char ai_response[AI_RESPONSE_MAX_LEN] = {0}; // TODO: Increase MAX_LEN here and for BT
@@ -32,18 +36,37 @@ static void ai_task(void *pvParameters)
 
 	esp_err_t err;
 
-	#ifdef USING_GROK
-	err = xai_save_api_key_nvs("xai-7hrSSKPvjhZ19QK5IW3Ab7byKQYfBlCVHAlAGsR8FIQkE0BaE7eaeG98O27xqMf0XW4Vrcz71Qdp5dzp");
-	if (err != ESP_OK) {
-		ESP_LOGE(TAG, "Failed to save xAI API key to NVS: %s", esp_err_to_name(err));
+	// If Wi-Fi AI portal password NVS doesn't exist yet, set it
+	if (ai_wifi_pass_load_nvs(ai_wifi_portal_pass, sizeof(ai_wifi_portal_pass)) != ESP_OK) {
+		// Random chars to pick from
+		static const char alphabet[] =
+				"ABCDEFGHJKLMNPQRSTUVWXYZ"
+				"abcdefghijkmnopqrstuvwxyz"
+				"0123456789";
+		
+		const size_t N = sizeof(alphabet) - 1;
+		const size_t PASS_LEN = 12;
+	
+		// Create random password
+		for (size_t i = 0; i < PASS_LEN; ++i) {
+			uint32_t r = esp_random();
+			ai_wifi_portal_pass[i] = alphabet[r % N];
+		}
+		ai_wifi_portal_pass[PASS_LEN] = '\0';
+		
+		// Save that version to NVS
+		ai_wifi_pass_save_nvs(ai_wifi_portal_pass);
+		
+		#ifdef POLYCAST5_PASS_DEBUG
+		ESP_LOGW(TAG, "Setting first time AI Wi-Fi portal password: %s", ai_wifi_portal_pass);
+		#endif
 	}
-	#else
-	err = openai_save_api_key_nvs("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");
-	if (err != ESP_OK) {
-		ESP_LOGE(TAG, "Failed to save OpenAI API key to NVS: %s", esp_err_to_name(err));
+	else {
+		#ifdef POLYCAST5_PASS_DEBUG
+		ESP_LOGI(TAG, "Using pre-set AI Wi-Fi portal password: '%s'", ai_wifi_portal_pass);
+		#endif
 	}
-	#endif
-
+	
 	// Clear message buffer
 	memset(&msg, 0, sizeof(msg));
 
