@@ -166,10 +166,10 @@ void lcd_tools_coin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 	// Statics
 	static bool do_once = false;
 	
-	static lv_obj_t *lbl_ins;
-	static lv_obj_t *lbl_result;
-	static lv_obj_t *coin_heads;
-	static lv_obj_t *coin_tails;
+	static lv_obj_t *lbl_ins = NULL;
+	static lv_obj_t *lbl_result = NULL;
+	static lv_obj_t *coin_heads = NULL;
+	static lv_obj_t *coin_tails = NULL;
 	
 	// Only execute once
 	if (!do_once) {

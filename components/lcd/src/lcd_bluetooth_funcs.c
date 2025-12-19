@@ -29,6 +29,8 @@
 #include "bluetooth_task.h"
 #include "ai_task.h"
 
+#include "img_ai_orb.h"
+
 #define TAG "LCD_BLUETOOTH_FUNCS"
 
 #define KEYBOARD_SELECTED_IDX_NS "keyb_sel"
@@ -1395,8 +1397,8 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 	// Statics
 	static bool do_once = false;
 	static lv_obj_t *lbl_ins = NULL;
-	static lv_obj_t *lbl_loading = NULL;
 	static lv_obj_t *lbl_config = NULL;
+	static lv_obj_t *ai_orb = NULL;
 	static int16_t angle = 0; // 0.1 degree units
 
 	char api_key[AI_API_KEY_MAX_LEN] = {0};
@@ -1413,27 +1415,27 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 	if (!do_once) {
 		lbl_ins = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_ins, "Push to talk!", user_secondary_color,
-				&lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 12);
+				&lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 16);
 
-		lbl_loading = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_loading, LV_SYMBOL_REFRESH, user_secondary_color,
-				&lv_font_montserrat_48, LV_ALIGN_CENTER, 0, 12);
+		ai_orb = lv_img_create(ACTIVE_SCR);
+		lv_img_set_src(ai_orb, &img_ai_orb);
+		lv_obj_align(ai_orb, LV_ALIGN_CENTER, 0, 12);
 
 		lbl_config = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_config, LV_SYMBOL_SETTINGS, user_secondary_color,
 				&lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -15, 0);
 
-		lv_obj_update_layout(lbl_loading);
+		lv_obj_update_layout(ai_orb); // Save current layout
 
 		// Set pivot to center so it spins around its middle
-        int w = lv_obj_get_width(lbl_loading);
-        int h = lv_obj_get_height(lbl_loading);
-        lv_obj_set_style_transform_pivot_x(lbl_loading, w / 2, 0);
-        lv_obj_set_style_transform_pivot_y(lbl_loading, h / 2, 0);
+        int w = lv_obj_get_width(ai_orb);
+        int h = lv_obj_get_height(ai_orb);
+        lv_obj_set_style_transform_pivot_x(ai_orb, w / 2, 0);
+        lv_obj_set_style_transform_pivot_y(ai_orb, h / 2, 0);
 
         // Give some extra draw area so rotation isn't clipped
-        lv_obj_set_style_transform_width(lbl_loading, 8, 0);
-        lv_obj_set_style_transform_height(lbl_loading, 8, 0);
+        lv_obj_set_style_transform_width(ai_orb, 8, 0);
+        lv_obj_set_style_transform_height(ai_orb, 8, 0);
 
 		lv_timer_handler();
 		
@@ -1447,21 +1449,23 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 			ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue previous_network");
 		}
 
-		// Wait for Wi-Fi connected
-		xSemaphoreTake(xWifiNetworkConnectedSemaphore, portMAX_DELAY);
-
 		// Clear AI request flag
 		wifi_ai_req = false;
+
+		// TODO: Switch to EventGroup and wait for connected until select available
+		// xSemaphoreTake(xBleConnectedSemaphore, portMAX_DELAY);
+		// xSemaphoreTake(xWifiNetworkConnectedSemaphore, portMAX_DELAY);
 
 		// Connect to BLE
 		uint16_t cmd = BLUETOOTH_CMD_INIT;
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-
-		// Wait for BLE connected
-		xSemaphoreTake(xBleConnectedSemaphore, portMAX_DELAY);
 		
 		do_once = true;
 	}
+
+	// TEST
+	angle = (angle + 100) % 3600; // 10 degrees per frame
+    lv_obj_set_style_transform_angle(ai_orb, angle, 0);
 
 	// Up button pressed
 	if (ui_btns->up_btn == 1) {
@@ -1479,15 +1483,15 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 		// Deactivate bluetooth
 		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
 		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-
+		
 		// Delete objects
 		lv_obj_delete(lbl_ins);
-		lv_obj_delete(lbl_loading);
+		lv_obj_delete(ai_orb);
 		lv_obj_delete(lbl_config);
 		
 		// Reset statics
 		do_once = false;
-		lbl_ins = lbl_loading = lbl_config = NULL;
+		lbl_ins = ai_orb = lbl_config = NULL;
 
 		// Hide right arrow
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -1499,9 +1503,9 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 	// Record selected
 	else if (ui_btns->select_btn == 1) {
 		angle = (angle + 450) % 3600; // 45 degrees per frame
-        lv_obj_set_style_transform_angle(lbl_loading, angle, 0);
+        lv_obj_set_style_transform_angle(ai_orb, angle, 0);
 
-		xQueueSend(xAiCmdQueue, "please open chrome and search for high quality cow pictures. Then open notepad and explain how LTP in the brain works in detail for beginners", pdMS_TO_TICKS(100));
+		xQueueSend(xAiCmdQueue, "please explain how wifi deauth works", pdMS_TO_TICKS(100));
 	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {
@@ -1514,12 +1518,12 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 
 		// Delete objects
 		lv_obj_delete(lbl_ins);
-		lv_obj_delete(lbl_loading);
+		lv_obj_delete(ai_orb);
 		lv_obj_delete(lbl_config);
 		
 		// Reset statics
 		do_once = false;
-		lbl_ins = lbl_loading = lbl_config = NULL;
+		lbl_ins = ai_orb = lbl_config = NULL;
 
 		// Hide right arrow
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -1538,12 +1542,12 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 		
 		// Delete objects
 		lv_obj_delete(lbl_ins);
-		lv_obj_delete(lbl_loading);
+		lv_obj_delete(ai_orb);
 		lv_obj_delete(lbl_config);
 		
 		// Reset statics
 		do_once = false;
-		lbl_ins = lbl_loading = lbl_config = NULL;
+		lbl_ins = ai_orb = lbl_config = NULL;
 		
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
