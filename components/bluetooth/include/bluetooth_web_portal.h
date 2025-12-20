@@ -42,16 +42,6 @@ const char *bluetooth_web_portal_get_ip(void);
 uint8_t bluetooth_category_count_get_nvs(void);
 
 /** 
- * @brief Save the category index (cat) for a script index
- *
- * @param [in] idx Index
- * @param [in] cat Category index
- *
- * @returns ESP error status
- */
-esp_err_t bluetooth_script_cat_set_nvs(uint8_t idx, uint8_t cat);
-
-/** 
  * @brief Gets the name of a given category
  *
  * @param [in] idx Index of category name to get
@@ -82,6 +72,16 @@ esp_err_t bluetooth_category_set_nvs(uint8_t idx, const char *name);
 esp_err_t bluetooth_category_delete_nvs(uint8_t idx);
 
 /** 
+ * @brief Save the category index for a given script index
+ *
+ * @param [in] idx Index
+ * @param [in] cat Category index
+ *
+ * @returns ESP error status
+ */
+esp_err_t bluetooth_script_cat_idx_set_nvs(uint8_t idx, uint8_t cat);
+
+/** 
  * @brief Gets the category index of a given script
  *
  * @param [in] idx Index of script category to get
@@ -89,7 +89,7 @@ esp_err_t bluetooth_category_delete_nvs(uint8_t idx);
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_script_cat_get_nvs(uint8_t idx, uint8_t *cat);
+esp_err_t bluetooth_script_cat_idx_get_nvs(uint8_t idx, uint8_t *cat);
 
 /** 
  * @brief Gets the number of user-added scripts
@@ -99,7 +99,7 @@ esp_err_t bluetooth_script_cat_get_nvs(uint8_t idx, uint8_t *cat);
 uint8_t bluetooth_script_count_get_nvs(void);
 
 /** 
- * @brief Gets the label of a given script
+ * @brief Gets the label of a given script by index
  *
  * @param [in] idx Index of script label to get
  * @param [in] buf Buffer to copy the label into

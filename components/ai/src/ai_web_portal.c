@@ -16,9 +16,9 @@
 
 #include "ai_web_portal.h"
 #include "ai_funcs.h"
-#include "ai_prompt.h"
+#include "ai_prompts.h"
 
-#define TAG	"ai_PORTAL"
+#define TAG	"AI_PORTAL"
 
 // Keep the Wi-Fi AP password NVS as-is (this module still needs portal creds)
 #define AI_PASS_NS "ai_wifi"
@@ -256,7 +256,7 @@ static esp_err_t prompt_get(httpd_req_t *req)
 	esp_err_t e = ai_prompt_load_nvs(prompt, sizeof(prompt));
 
 	if (e != ESP_OK || prompt[0] == '\0') {
-		strncpy(prompt, AI_PROMPT, sizeof(prompt) - 1);
+		strncpy(prompt, AI_PROMPT_AUTOKEY, sizeof(prompt) - 1);
 		prompt[sizeof(prompt) - 1] = '\0';
 	}
 

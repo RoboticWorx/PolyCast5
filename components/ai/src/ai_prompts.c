@@ -1,8 +1,8 @@
-#include "ai_prompt.h"
+#include "ai_prompts.h"
 
 // AI dev prompt string for BLE HID keyboard script generation
 // Note: this is the compiled default: runtime override may be loaded from NVS via the web portal
-const char AI_PROMPT[] =
+const char AI_PROMPT_AUTOKEY[] =
   "You generate BLE HID keyboard scripts.\n"
   "Convert the user's command into a keystroke script (Windows 11, US layout, Chrome installed).\n"
   "Do not assume any app is open unless the user implies it.\n"
@@ -66,3 +66,13 @@ const char AI_PROMPT[] =
   "<win+s><delay=500>notepad<delay=500><enter><delay=1000>\n"
   "User: open a chrome and search for dog videos\n"
   "<win+s><delay=500>chrome<delay=500><enter><delay=1000>dog videos<enter><delay=1000>\n";
+
+// AI dev prompt string for password label location
+const char AI_PROMPT_CREDS[] =
+  "You are selecting ONE saved Bluetooth autotype entry from a list.\n"
+  "The user wants either a USERNAME or a PASSWORD for a service/app.\n"
+  "Pick the BEST match from the provided entries.\n"
+  "Each entry line is: global_index|category_name|label\n"
+  "Respond with ONLY the INTEGER global_index of the best match.\n"
+  "If none match, respond with -1.\n"
+  "Do not output any other text.\n";

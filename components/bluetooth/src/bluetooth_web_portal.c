@@ -276,7 +276,7 @@ uint8_t bluetooth_script_count_get_nvs(void)
 	return count;
 }
 
-// Read a script label into caller buffer (buflen should be >= bluetooth_SCRIPT_LABEL_MAX_LEN + 1)
+// Read a script label into caller buffer (buflen should be >= BLUETOOTH_SCRIPT_LABEL_MAX_LEN + 1)
 esp_err_t bluetooth_script_label_get_nvs(uint8_t idx, char *buf, size_t buflen)
 {
  	nvs_handle_t h;
@@ -353,8 +353,30 @@ esp_err_t bluetooth_script_body_get_nvs(uint8_t idx, char *buf, size_t buflen, s
  	return err;
 }
 
+uint8_t bluetooth_category_count_get_nvs(void)
+{
+	nvs_handle_t h;
+	uint8_t count = 0;
+	
+	// Open NVS
+	esp_err_t err = nvs_open(BT_SCRIPT_NS, NVS_READONLY, &h);
+	if (err == ESP_OK) {
+		// Get count
+		if (nvs_get_u8(h, "cat_count", &count) != ESP_OK) {
+			// 0 if DNE
+			count = 0;
+		}
+		
+		// Close NVS
+		nvs_close(h);
+	}
+	
+	return count;
+}
+
 // Persist the category id for a given script index
-esp_err_t bluetooth_script_cat_set_nvs(uint8_t idx, uint8_t cat)
+// Note: idx is the GLOBAL script index (matches script body + label indexing)
+esp_err_t bluetooth_script_cat_idx_set_nvs(uint8_t idx, uint8_t cat)
 {
 	// Open NVS under the same namespace used for bodies/cats
 	nvs_handle_t h;
@@ -389,28 +411,7 @@ esp_err_t bluetooth_script_cat_set_nvs(uint8_t idx, uint8_t cat)
 	return err;
 }
 
-uint8_t bluetooth_category_count_get_nvs(void)
-{
-	nvs_handle_t h;
-	uint8_t count = 0;
-	
-	// Open NVS
-	esp_err_t err = nvs_open(BT_SCRIPT_NS, NVS_READONLY, &h);
-	if (err == ESP_OK) {
-		// Get count
-		if (nvs_get_u8(h, "cat_count", &count) != ESP_OK) {
-			// 0 if DNE
-			count = 0;
-		}
-		
-		// Close NVS
-		nvs_close(h);
-	}
-	
-	return count;
-}
-
-esp_err_t bluetooth_script_cat_get_nvs(uint8_t idx, uint8_t *cat)
+esp_err_t bluetooth_script_cat_idx_get_nvs(uint8_t idx, uint8_t *cat)
 {
 	nvs_handle_t h;
 	
@@ -684,7 +685,7 @@ static bool resolve_global_index_for_local(uint8_t cat, uint8_t local_index, boo
 	uint8_t seen = 0;
 	for (uint8_t i = 0; i < total; i++) {
 		uint8_t c = 0;
-		(void)bluetooth_script_cat_get_nvs(i, &c);
+		(void)bluetooth_script_cat_idx_get_nvs(i, &c);
 
 		if (c == cat) {
 			// If we've reached the requested local_index, return this global position
@@ -766,7 +767,7 @@ static esp_err_t script_one_get(httpd_req_t *req)
 	// Read label/body/cat
 	bluetooth_script_label_get_nvs(global_idx, name, sizeof(name));
 	bluetooth_script_body_get_nvs(global_idx, body, MAX_HTTP_BODY_TXT + 1, &blen);
-	bluetooth_script_cat_get_nvs(global_idx, &cat);
+	bluetooth_script_cat_idx_get_nvs(global_idx, &cat);
 
 	// Build JSON
 	cJSON *root = cJSON_CreateObject();
@@ -969,7 +970,7 @@ static esp_err_t script_one_post(httpd_req_t *req)
 
 	// Persist category only if supplied (keep old if not)
 	if (err == ESP_OK && has_cat) {
-		err = bluetooth_script_cat_set_nvs(global_idx, cat);
+		err = bluetooth_script_cat_idx_set_nvs(global_idx, cat);
 	}
 
 	// If any write failed, report
@@ -1057,18 +1058,18 @@ static esp_err_t script_one_delete(httpd_req_t *req)
 
 		bluetooth_script_label_get_nvs(i + 1, next_label, sizeof(next_label));
 		bluetooth_script_body_get_nvs(i + 1, next_body, MAX_HTTP_BODY_TXT + 1, &blen);
-		bluetooth_script_cat_get_nvs(i + 1, &next_cat);
+		bluetooth_script_cat_idx_get_nvs(i + 1, &next_cat);
 
 		// Write into current slot
 		bluetooth_script_label_set_nvs(i, next_label);
 		bluetooth_script_body_set_nvs(i, (blen > 0) ? next_body : "");
-		bluetooth_script_cat_set_nvs(i, next_cat);
+		bluetooth_script_cat_idx_set_nvs(i, next_cat);
 	}
 
 	// Clear old tail
 	bluetooth_script_label_set_nvs(count - 1, "");
 	bluetooth_script_body_set_nvs(count - 1, "");
-	bluetooth_script_cat_set_nvs(count - 1, 0);
+	bluetooth_script_cat_idx_set_nvs(count - 1, 0);
 
 	// Decrement count
 	bluetooth_script_count_set_nvs(count - 1);

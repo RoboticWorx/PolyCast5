@@ -16,11 +16,12 @@
 #include "wifi_funcs.h"
 #include "gpio_funcs.h"
 #include "bluetooth_funcs.h"
+#include "bluetooth_web_portal.h"
 
 #include "wifi_task.h"
 #include "gpio_task.h"
 #include "ai_funcs.h"
-#include "ai_prompt.h"
+#include "ai_prompts.h"
 #include "ai_task.h"
 
 #define TAG "AI_FUNCS"
@@ -41,13 +42,14 @@ typedef struct {
 	bool caps_alloc; // True if allocated via heap_caps_* (PSRAM/8BIT), false if malloc/realloc
 } http_accum_t;
 
+EXT_RAM_BSS_ATTR static char canidate_creds[1536];
+EXT_RAM_BSS_ATTR static char user_cred_msg[2048];
+
 // NVS keys for AI prompt override
 #define AI_PROMPT_NS "ai"
 #define AI_PROMPT_KEY "prompt"
-#define AI_PROMPT_NVS_MAX_LEN 4096
 
-EXT_RAM_BSS_ATTR static char prompt_buf[AI_PROMPT_NVS_MAX_LEN] = {0};
-
+#ifdef USING_CHATGPT
 // Save API key string to NVS
 esp_err_t openai_save_api_key_nvs(const char *api_key)
 {
@@ -93,6 +95,7 @@ esp_err_t openai_load_api_key_nvs(char *out, size_t out_sz)
 
 	return err;
 }
+#endif // USING_CHATGPT
 
 // Save xAI API key string to NVS
 esp_err_t xai_save_api_key_nvs(const char *api_key)
@@ -225,6 +228,7 @@ static void strip_wrappers_inplace(char *s)
 
 /* Responses API parsing helpers */
 
+#ifdef USING_CHATGPT
 // The "text" field can be a string OR {"value":"..."} depending on output shape
 static const char *json_text_string_or_value_obj(cJSON *text_item)
 {
@@ -294,6 +298,7 @@ static const char *openai_extract_text(cJSON *json)
 
 	return NULL;
 }
+#endif // USING_CHATGPT
 
 // xAI (Grok) chat-completions parsing helper
 static const char *xai_extract_text(cJSON *json)
@@ -494,11 +499,11 @@ static esp_err_t http_evt(esp_http_client_event_t *evt)
 	return ESP_OK;
 }
 
-static const char *ai_prompt_get_for_request(char *buf, size_t buf_sz)
+const char *ai_get_autokey_prompt(char *buf, size_t buf_sz)
 {
 	// If no buffer provided, fall back to compiled default
 	if (!buf || buf_sz == 0) {
-		return AI_PROMPT;
+		return AI_PROMPT_AUTOKEY;
 	}
 
 	// Default to empty
@@ -506,15 +511,14 @@ static const char *ai_prompt_get_for_request(char *buf, size_t buf_sz)
 
 	// Try to load override from NVS; fall back to compiled default if missing/empty
 	if (ai_prompt_load_nvs(buf, buf_sz) != ESP_OK || buf[0] == '\0') {
-		return AI_PROMPT;
+		return AI_PROMPT_AUTOKEY;
 	}
 
 	// Use NVS override
 	return buf;
 }
 
-/* OpenAI request (Responses API) */
-
+#ifdef USING_CHATGPT
 // Send a user command to OpenAI Responses API and return the generated HID script
 esp_err_t openai_send_command(const char *command, char *response_buf, size_t buf_sz)
 {
@@ -727,12 +731,13 @@ esp_err_t openai_send_command(const char *command, char *response_buf, size_t bu
 
 	return ESP_OK;
 }
+#endif // USING_CHATGPT
 
 // xAI (Grok) request (Chat Completions API)
-esp_err_t xai_send_command(const char *command, char *response_buf, size_t buf_sz)
+esp_err_t xai_send_command(const char *system_prompt, const char *command, char *response_buf, size_t buf_sz)
 {
 	// Validate args
-	if (!command || !response_buf || buf_sz == 0) {
+	if (!system_prompt || !command || !response_buf || buf_sz == 0) {
 		return ESP_ERR_INVALID_ARG;
 	}
 
@@ -745,10 +750,6 @@ esp_err_t xai_send_command(const char *command, char *response_buf, size_t buf_s
 		ESP_LOGE(TAG, "Failed to load xAI API key from NVS");
 		return ESP_FAIL;
 	}
-
-	// Build prompt (NVS override; fallback to compiled default)
-	memset(prompt_buf, 0, sizeof(prompt_buf)); // Zero out previous contents
-	const char *prompt = ai_prompt_get_for_request(prompt_buf, sizeof(prompt_buf));
 
 	// Build JSON payload for /v1/chat/completions
 	// Minimal shape:
@@ -780,7 +781,7 @@ esp_err_t xai_send_command(const char *command, char *response_buf, size_t buf_s
 	// System / developer instructions
 	cJSON *sys = cJSON_CreateObject();
 	cJSON_AddStringToObject(sys, "role", "system");
-	cJSON_AddStringToObject(sys, "content", prompt);
+	cJSON_AddStringToObject(sys, "content", system_prompt);
 	cJSON_AddItemToArray(messages, sys);
 
 	// User message
@@ -992,4 +993,187 @@ esp_err_t ai_prompt_load_nvs(char *out, size_t out_sz)
 	// Close handle
 	nvs_close(h);
 	return err;
+}
+
+// Case-insensitive substring test (ASCII)
+static bool strcasestr_local_bool(const char *hay, const char *needle)
+{
+	// Reject NULL inputs and empty needle (treat empty needle as "not found" for this helper)
+	if (!hay || !needle || !needle[0]) {
+		return false;
+	}
+
+	// Try each possible starting position in haystack
+	for (const char *p = hay; *p; ++p) {
+		const char *h = p; // Walks forward in haystack from this start
+		const char *n = needle; // Walks forward in needle
+
+		// Compare forward until mismatch or we hit end of one string
+		while (*h && *n) {
+			// ASCII-only case fold for both characters
+			char ch = *h;
+			char cn = *n;
+
+			// If uppercase, convert to lowercase
+			if (ch >= 'A' && ch <= 'Z') ch = (char)(ch - 'A' + 'a');
+			if (cn >= 'A' && cn <= 'Z') cn = (char)(cn - 'A' + 'a');
+
+			// Stop on first mismatch for this starting position
+			if (ch != cn) {
+				break;
+			}
+
+			++h;
+			++n;
+		}
+
+		// If we consumed the full needle, we found a match starting at p
+		if (*n == '\0') {
+			return true;
+		}
+	}
+
+	// No starting position matched the whole needle
+	return false;
+}
+
+static bool is_cred_candidate(const char *cat_name)
+{
+	const char *cat = cat_name ? cat_name : "";
+
+	// Category-first filter: treat any "credential-ish" category as eligible
+	// Grok will decide which label best matches username vs password
+	return strcasestr_local_bool(cat, "pass") ||
+			strcasestr_local_bool(cat, "pwd") ||
+			strcasestr_local_bool(cat, "password") ||
+			strcasestr_local_bool(cat, "passwords") ||
+			strcasestr_local_bool(cat, "login") ||
+			strcasestr_local_bool(cat, "logins") ||
+			strcasestr_local_bool(cat, "user") ||
+			strcasestr_local_bool(cat, "users") ||
+			strcasestr_local_bool(cat, "email") ||
+			strcasestr_local_bool(cat, "emails") ||
+			strcasestr_local_bool(cat, "username") ||
+			strcasestr_local_bool(cat, "usernames");
+}
+
+esp_err_t ai_lookup_creds(ai_cmd_type_t type, const char *query, char *out_script, size_t out_sz)
+{
+	// Validate
+	if (!query || !out_script || out_sz == 0) {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGW(TAG, "ai_lookup_creds: invalid arg(s)");
+		#endif
+		return ESP_ERR_INVALID_ARG;
+	}
+
+	out_script[0] = '\0';
+
+	// Build a compact catalog of saved BT scripts (global order)
+	uint8_t total = bluetooth_script_count_get_nvs(); // Get total saved scripts
+	if (total == 0) {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGW(TAG, "ai_lookup_creds: no saved BT scripts");
+		#endif
+		return ESP_ERR_NOT_FOUND;
+	}
+
+	// First pass: include only likely credential entries
+	// If none, fall back to all
+	canidate_creds[0] = '\0'; // Canidate credentials
+	size_t used = 0;
+
+	// Loop through all saved BT scripts
+	for (uint8_t i = 0; i < total; ++i) {
+		char label[BT_SCRIPT_LABEL_MAX_LEN + 1] = {0};
+		uint8_t cat_idx = 0;
+		char cat_name[BT_CAT_LABEL_MAX_LEN + 1] = {0};
+
+		// i = global script index
+		// Get this script's label and category
+		(void)bluetooth_script_label_get_nvs(i, label, sizeof(label));
+		(void)bluetooth_script_cat_idx_get_nvs(i, &cat_idx);
+
+		// Get cat_name of cat_idx
+		if (bluetooth_category_name_get_nvs(cat_idx, cat_name, sizeof(cat_name)) != ESP_OK) {
+			cat_name[0] = '\0';
+		}
+
+		// Check if should consider: not empty + credential-like category
+		if (label[0] == '\0') {
+			continue;
+		}
+		if (!is_cred_candidate(cat_name)) {
+			continue;
+		}
+
+		// Append to canidate list: "index|cat_name|label\n"
+		int n = snprintf(canidate_creds + used, sizeof(canidate_creds) - used, "%u|%s|%s\n",
+				(unsigned)i,
+				cat_name[0] ? cat_name : "",
+				label);
+
+		// Check for snprintf errors/truncation
+		if (n <= 0 || (size_t)n >= sizeof(canidate_creds) - used) {
+			ESP_LOGE(TAG, "Canidate creds snprintf list truncated at %u entries. n = %d", (unsigned)(used / 64), n);
+			break;
+		}
+
+		used += (size_t)n;
+	}
+
+	const char *want = (type == CMD_CRED_PASSWORD) ? "password" : "username";
+
+	int m = snprintf(user_cred_msg, sizeof(user_cred_msg),
+			"want=%s\nquery=%s\nentries:\n%s",
+			want, // Desired credential type
+			query, // User prompt query
+			canidate_creds); // List of candidate choices
+
+	if (m <= 0 || m >= (int)sizeof(user_cred_msg)) {
+		ESP_LOGE(TAG, "User creds snprintf list truncated. m = %d", m);
+		return ESP_ERR_NO_MEM;
+	}
+
+	// Ask Grok for best matching global index
+	char model_reply[64] = {0};
+	esp_err_t err = xai_send_command(AI_PROMPT_CREDS, user_cred_msg, model_reply, sizeof(model_reply));
+	if (err != ESP_OK) {
+		return err;
+	}
+
+	// Parse integer index
+	char *endp = NULL;
+	long idx = strtol(model_reply, &endp, 10); // Base 10
+	if (endp == model_reply) { // No digits parsed
+		ESP_LOGE(TAG, "No digits parsed from Grok reply: '%s'", model_reply);
+		return ESP_FAIL;
+	}
+
+	// Validate index range
+	if (idx < 0 || idx >= total) {
+		if (idx == -1) {
+			// -1 is Grok indicates no suitable match found
+			#ifdef POLYCAST5_DEBUG
+			ESP_LOGW(TAG, "Grok indicates no suitable match found");
+			#endif
+		}
+
+		ESP_LOGE(TAG, "Grok reply index out of range: '%s'", model_reply);
+		return ESP_ERR_NOT_FOUND;
+	}
+
+	// Load the chosen script body
+	size_t blen = 0;
+	err = bluetooth_script_body_get_nvs((uint8_t)idx, out_script, out_sz, &blen);
+	if (err != ESP_OK || out_script[0] == '\0') {
+		ESP_LOGE(TAG, "Failed to load script body for index %ld", idx);
+		return ESP_ERR_NOT_FOUND;
+	}
+
+	#ifdef POLYCAST5_DEBUG
+	ESP_LOGI(TAG, "Grok chose index %ld; script_len=%u", idx, (unsigned)blen);
+	#endif
+
+	return ESP_OK;
 }

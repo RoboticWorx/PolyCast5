@@ -203,7 +203,7 @@ static void keyboard_submenu_refresh_from_nvs(bluetooth_keyboard_menu_t *km, uin
 
 	for (uint32_t i = 0; i < count; ++i) {
 		uint8_t cat = 0;
-		esp_err_t err = bluetooth_script_cat_get_nvs((uint8_t)i, &cat);
+		esp_err_t err = bluetooth_script_cat_idx_get_nvs((uint8_t)i, &cat);
 
 		if (err == ESP_OK && cat == category) {
 			// Fill default label first
@@ -1505,7 +1505,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 		angle = (angle + 450) % 3600; // 45 degrees per frame
         lv_obj_set_style_transform_angle(ai_orb, angle, 0);
 
-		xQueueSend(xAiCmdQueue, "please explain how wifi deauth works", pdMS_TO_TICKS(100));
+		xQueueSend(xAiCmdQueue, "pass discord", pdMS_TO_TICKS(100));
 	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {

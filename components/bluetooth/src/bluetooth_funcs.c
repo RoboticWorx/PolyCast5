@@ -289,7 +289,7 @@ static void kbd_state_clear(void)
 {
 	bt_mod_state = 0;
 	memset(bt_keys_state, 0, sizeof(bt_keys_state));
-	kbd_release_all(); // Aends an all-zero report
+	kbd_release_all(); // Sends an all-zero report
 }
 
 // Add modifiers + keys into the current state and send

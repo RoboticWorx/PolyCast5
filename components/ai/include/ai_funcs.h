@@ -3,6 +3,9 @@
 
 #include "esp_err.h"
 
+#define USING_GROK 1
+//#define USING_CHATGPT 1 // UNTESTED!
+
 // NVS keys for OpenAI API key
 #define OPENAI_NS "openai"
 #define OPENAI_KEY "api_key"
@@ -15,10 +18,17 @@
 #define AI_CMD_MAX_LEN 2048
 #define AI_API_KEY_MAX_LEN 256
 
+typedef enum {
+    CMD_NORMAL = 0,
+    CMD_CRED_USERNAME,
+    CMD_CRED_PASSWORD,
+} ai_cmd_type_t;
+
 typedef struct {
 	char cmd[AI_CMD_MAX_LEN];
 } ai_cmd_t;
 
+#ifdef USING_CHATGPT
 /** 
  * @brief Save OpenAI API key to NVS
  *
@@ -37,6 +47,7 @@ esp_err_t openai_save_api_key_nvs(const char *api_key);
  * @returns ESP error status
  */
 esp_err_t openai_load_api_key_nvs(char *out, size_t out_sz);
+#endif // USING_CHATGPT
 
 /** 
  * @brief Save xAI API key to NVS
@@ -57,6 +68,7 @@ esp_err_t xai_save_api_key_nvs(const char *api_key);
  */
 esp_err_t xai_load_api_key_nvs(char *out, size_t out_sz);
 
+#ifdef USING_CHATGPT
 /** 
  * @brief Send command to ChatGPT and get keyboard script response
  *
@@ -67,17 +79,31 @@ esp_err_t xai_load_api_key_nvs(char *out, size_t out_sz);
  * @returns ESP error status
  */
 esp_err_t openai_send_command(const char *command, char *response_buf, size_t buf_sz);
+#endif // USING_CHATGPT
 
 /** 
- * @brief Send command to xAI Grok and get keyboard script response
+ * @brief Send command to xAI Grok and get autokey script response
  *
+ * @param [in] system_prompt The system prompt string to use
  * @param [in] command The user command string to send
  * @param [out] response_buf Buffer to store the Grok response script
  * @param [in] buf_sz Size of the response buffer
  *
  * @returns ESP error status
  */
-esp_err_t xai_send_command(const char *command, char *response_buf, size_t buf_sz);
+esp_err_t xai_send_command(const char *system_prompt, const char *command, char *response_buf, size_t buf_sz);
+
+/** 
+ * @brief Lookup credentials via AI and get the corresponding Bluetooth script
+ *
+ * @param [in] type Type of credential to look up (username or password)
+ * @param [in] query The query string to find matching credentials
+ * @param [out] out_script Buffer to store the resulting Bluetooth script
+ * @param [in] out_sz Size of the output script buffer
+ *
+ * @returns ESP error status
+ */
+esp_err_t ai_lookup_creds(ai_cmd_type_t type, const char *query, char *out_script, size_t out_sz);
 
 /**
  * @brief Save AI prompt override to NVS (empty string => use compiled default)
@@ -98,5 +124,14 @@ esp_err_t ai_prompt_save_nvs(const char *prompt);
  */
 esp_err_t ai_prompt_load_nvs(char *out, size_t out_sz);
 
+/** 
+ * @brief Get the autotype prompt, either from NVS override or compiled default
+ *
+ * @param [out] buf Buffer to store the prompt (if provided)
+ * @param [in] buf_sz Size of the buffer
+ *
+ * @returns Pointer to the prompt string (either buf or compiled default)
+ */
+const char *ai_get_autokey_prompt(char *buf, size_t buf_sz);
 
 #endif // AI_FUNCS_H

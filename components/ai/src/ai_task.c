@@ -1,7 +1,7 @@
 #include "polycast5_macros.h"
 
 #include <string.h>
-#include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 
 #include "freertos/idf_additions.h"
@@ -19,14 +19,48 @@
 
 #define TAG "AI_TASK"
 
-#define USING_GROK 1 // Else using ChatGPT
+#define AI_PROMPT_NVS_MAX_LEN 4096
 
 QueueHandle_t xAiCmdQueue;
 
 char ai_wifi_portal_pass[64];
 
 EXT_RAM_BSS_ATTR static ai_cmd_t msg;
+EXT_RAM_BSS_ATTR static char prompt_buf[AI_PROMPT_NVS_MAX_LEN] = {0};
 EXT_RAM_BSS_ATTR static char ai_response[AI_RESPONSE_MAX_LEN] = {0}; // TODO: Increase MAX_LEN here and for BT
+
+static ai_cmd_type_t parse_kind_and_query(const char *in, const char **query_out)
+{
+    // Trim leading spaces
+    while (*in == ' ') in++;
+
+    // Case-insensitive prefix match
+
+	// If password query
+    if ((!strncasecmp(in, "password", 8) && (in[8] == ' ' || in[8] == '\t')) ||
+		(!strncasecmp(in, "pass", 4) && (in[4] == ' ' || in[4] == '\t'))) {
+
+		*query_out = in + (!strncasecmp(in, "pass", 4) ? 4 : 8); // Move past prefix
+        while (**query_out == ' ' || **query_out == '\t') (*query_out)++; // Trim any spaces
+
+        return CMD_CRED_PASSWORD;
+    }
+
+	// If username query
+    if ((!strncasecmp(in, "username", 8) && (in[8] == ' ' || in[8] == '\t')) ||
+		(!strncasecmp(in, "user", 4) && (in[4] == ' ' || in[4] == '\t'))) {
+
+		*query_out = in + (!strncasecmp(in, "user", 4) ? 4 : 8); // Move past prefix
+        while (**query_out == ' ' || **query_out == '\t') (*query_out)++; // Trim any spaces
+
+        return CMD_CRED_USERNAME;
+	}
+
+	// Fallback to full command
+    *query_out = in;
+
+    return CMD_NORMAL;
+}
 
 static void ai_task(void *pvParameters)
 {
@@ -79,17 +113,37 @@ static void ai_task(void *pvParameters)
 		// Clear ai_response buffer
 		memset(ai_response, 0, sizeof(ai_response));
 
-		// Send cmd to the AI
-		// 'ai_response' output
-		#ifdef USING_GROK
-		err = xai_send_command(msg.cmd, ai_response, sizeof(ai_response));
-		#else
-		err = openai_send_command(msg.cmd, ai_response, sizeof(ai_response));
-		#endif
+		const char *query = NULL;
+		ai_cmd_type_t type = parse_kind_and_query(msg.cmd, &query);
+
+		// Auto keyboard command
+		if (type == CMD_NORMAL) {
+			// Build autotype prompt (NVS override; fallback to compiled default)
+			memset(prompt_buf, 0, sizeof(prompt_buf)); // Zero out previous contents
+			const char *prompt = ai_get_autokey_prompt(prompt_buf, sizeof(prompt_buf));
+
+			// Send cmd to the AI
+			// 'ai_response' output
+			err = xai_send_command(prompt, msg.cmd, ai_response, sizeof(ai_response));
+			
+			#ifdef USING_CHATGPT // UNTESTED!
+			err = openai_send_command(msg.cmd, ai_response, sizeof(ai_response));
+			#endif
+		}
+		// Username or password command
+		else {
+			err = ai_lookup_creds(type, query, ai_response, sizeof(ai_response));
+		}
 
 		if (err == ESP_OK) {
 			#ifdef POLYCAST5_DEBUG
-			ESP_LOGI(TAG, "AI script: %s", ai_response);
+			// Never log credential payloads (passwords/usernames)
+			if (type == CMD_NORMAL) {
+				ESP_LOGI(TAG, "AI script: %s", ai_response);
+			}
+			else {
+				ESP_LOGI(TAG, "Credential script resolved (len=%u)", (unsigned)strlen(ai_response));
+			}
 			#endif
 
 			// Send pointer to script to execute as BLE keyboard sequence
