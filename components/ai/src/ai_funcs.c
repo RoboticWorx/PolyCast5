@@ -1044,17 +1044,23 @@ static bool is_cred_candidate(const char *cat_name)
 	// Category-first filter: treat any "credential-ish" category as eligible
 	// Grok will decide which label best matches username vs password
 	return strcasestr_local_bool(cat, "pass") ||
+			strcasestr_local_bool(cat, "passes") ||
 			strcasestr_local_bool(cat, "pwd") ||
+			strcasestr_local_bool(cat, "pwds") ||
 			strcasestr_local_bool(cat, "password") ||
 			strcasestr_local_bool(cat, "passwords") ||
+			strcasestr_local_bool(cat, "pass word") ||
+			strcasestr_local_bool(cat, "pass words") ||
 			strcasestr_local_bool(cat, "login") ||
 			strcasestr_local_bool(cat, "logins") ||
-			strcasestr_local_bool(cat, "user") ||
-			strcasestr_local_bool(cat, "users") ||
 			strcasestr_local_bool(cat, "email") ||
 			strcasestr_local_bool(cat, "emails") ||
+			strcasestr_local_bool(cat, "user") ||
+			strcasestr_local_bool(cat, "users") ||
 			strcasestr_local_bool(cat, "username") ||
-			strcasestr_local_bool(cat, "usernames");
+			strcasestr_local_bool(cat, "usernames") ||
+			strcasestr_local_bool(cat, "user name") ||
+			strcasestr_local_bool(cat, "user names");
 }
 
 esp_err_t ai_lookup_creds(ai_cmd_type_t type, const char *query, char *out_script, size_t out_sz)

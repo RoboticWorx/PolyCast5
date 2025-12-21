@@ -25,7 +25,10 @@ static EventBits_t icon_bits = 0;
 
 static const TickType_t btn_timer_interval = pdMS_TO_TICKS(200);
 
-uint8_t sleep_time_s = 30; // Default 30s
+static uint16_t device_sleep_after_s = 300; // Not home: default 5m/300s
+uint16_t home_sleep_after_s = 30; // Home: default 30s
+
+bool sleeping_from_home = true;
 
 ui_menu_t ui_menu = {
 	.options = (const char *[]) {OPTION_GPIO, OPTION_WIFI, OPTION_BLUETOOTH, OPTION_LORA, OPTION_ESPNOW,
@@ -511,12 +514,22 @@ static void lcd_task(void *pvParameters)
 			lcd_device_sleep();
 		}
 		#else
-		TickType_t sleep_timer_interval = pdMS_TO_TICKS(sleep_time_s * 1000); // sleep_time_s is extern
-		
-		// If home and sleep_timer_interval has passed without intervention
-		if (((ui_menu.page == HOME_PAGE) || (ui_menu.page == BOOT_PAGE)) && ((xTaskGetTickCount() - sleep_timer_last >= sleep_timer_interval) || go_to_sleep)) {
+		TickType_t home_sleep_timer_interval = pdMS_TO_TICKS((uint32_t)home_sleep_after_s * 1000U); // home_sleep_after_s is extern
+		// If home and home_sleep_timer_interval has passed without intervention
+		if (((ui_menu.page == HOME_PAGE) || (ui_menu.page == BOOT_PAGE)) &&
+				((xTaskGetTickCount() - sleep_timer_last >= home_sleep_timer_interval) || go_to_sleep)) {
+			sleeping_from_home = true; // Sleeping from home requires pin reentry
 			lcd_device_sleep();
-				
+
+			sleep_timer_last = xTaskGetTickCount();
+		}
+		// Else if not home and device_sleep_after_s has passed without intervention
+		else if ((ui_menu.page != HOME_PAGE) && (ui_menu.page != BOOT_PAGE) && (ui_menu.page != TOOLS_POMODORO_PAGE) &&
+				(ui_menu.page != TOOLS_SRS_PAGE) &&
+				(xTaskGetTickCount() - sleep_timer_last >= pdMS_TO_TICKS((uint32_t)device_sleep_after_s * 1000U))) {
+			sleeping_from_home = false; // Sleeping from device doesn't require pin reentry
+			lcd_device_sleep();
+			
 			sleep_timer_last = xTaskGetTickCount();
 		}
 		#endif

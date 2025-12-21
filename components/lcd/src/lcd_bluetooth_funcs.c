@@ -1505,7 +1505,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 		angle = (angle + 450) % 3600; // 45 degrees per frame
         lv_obj_set_style_transform_angle(ai_orb, angle, 0);
 
-		xQueueSend(xAiCmdQueue, "pass discord", pdMS_TO_TICKS(100));
+		xQueueSend(xAiCmdQueue, "pass autofill my justin roboticworx email", pdMS_TO_TICKS(100));
 	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {

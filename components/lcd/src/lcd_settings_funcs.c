@@ -84,7 +84,7 @@ extern bool pin_signing_in;
 extern volatile uint8_t haptic_len_ms;
 extern volatile bool haptic_btns[6];
 
-extern uint8_t sleep_time_s;
+extern uint16_t home_sleep_after_s;
 
 extern int16_t rbg_blink_period_ms;
 extern int16_t rgb_blink_total_ms;
@@ -1159,56 +1159,56 @@ void lcd_settings_sleep_timer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
 	
 	// Only execute once
 	if (!init) {
-		uint32_t mins = sleep_time_s / 60;
-		uint32_t frac = (sleep_time_s % 60) * 100 / 60;
+		uint32_t mins = home_sleep_after_s / 60;
+		uint32_t frac = (home_sleep_after_s % 60) * 100 / 60;
 		
 		lbl_ins = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_ins, "", user_secondary_color,
-					 &lv_font_montserrat_18, LV_ALIGN_CENTER, -25, 0);
-		lv_label_set_text_fmt(lbl_ins, SLEEP_TIMER_TXT, (unsigned)sleep_time_s, (unsigned)mins, (unsigned)frac);
+				&lv_font_montserrat_18, LV_ALIGN_CENTER, -25, 0);
+		lv_label_set_text_fmt(lbl_ins, SLEEP_TIMER_TXT, (unsigned)home_sleep_after_s, (unsigned)mins, (unsigned)frac);
 
 		// Slider
 		slider = lv_slider_create(ACTIVE_SCR);
 		lv_obj_set_size(slider, 10, 100);
 		lv_obj_align(slider, LV_ALIGN_CENTER, 55, 0);
 		lv_slider_set_range(slider, SLEEP_TIMER_MIN_S, SLEEP_TIMER_MAX_S);
-		lv_slider_set_value(slider, sleep_time_s, LV_ANIM_OFF);
+		lv_slider_set_value(slider, home_sleep_after_s, LV_ANIM_OFF);
 		
 		init = true;
 	}
 	
 	// Increase sleep timer
 	if (ui_btns->up_btn == 1) {
-		sleep_time_s += 5;
+		home_sleep_after_s += 5;
 		
 		// Wrap
-		if (sleep_time_s > SLEEP_TIMER_MAX_S) {
-			sleep_time_s = SLEEP_TIMER_MIN_S;
+		if (home_sleep_after_s > SLEEP_TIMER_MAX_S) {
+			home_sleep_after_s = SLEEP_TIMER_MIN_S;
 		}
 		
 		// Create text
-		uint32_t mins = sleep_time_s / 60;
-		uint32_t frac = (sleep_time_s % 60) * 100 / 60;
-		lv_label_set_text_fmt(lbl_ins, SLEEP_TIMER_TXT, (unsigned)sleep_time_s, (unsigned)mins, (unsigned)frac);
-		lv_slider_set_value(slider, sleep_time_s, LV_ANIM_OFF);
+		uint32_t mins = home_sleep_after_s / 60;
+		uint32_t frac = (home_sleep_after_s % 60) * 100 / 60;
+		lv_label_set_text_fmt(lbl_ins, SLEEP_TIMER_TXT, (unsigned)home_sleep_after_s, (unsigned)mins, (unsigned)frac);
+		lv_slider_set_value(slider, home_sleep_after_s, LV_ANIM_OFF);
 		
 		// Persist to NVS
 		lcd_settings_sleep_timer_nvs_save();
 	}
 	// Decrease sleep timer
 	else if (ui_btns->down_btn == 1) {
-		sleep_time_s -= 5;
+		home_sleep_after_s -= 5;
 		
 		// Wrap
-		if (sleep_time_s < SLEEP_TIMER_MIN_S) {
-			sleep_time_s = SLEEP_TIMER_MAX_S;
+		if (home_sleep_after_s < SLEEP_TIMER_MIN_S) {
+			home_sleep_after_s = SLEEP_TIMER_MAX_S;
 		}
 		
 		// Create text
-		uint32_t mins = sleep_time_s / 60;
-		uint32_t frac = (sleep_time_s % 60) * 100 / 60;
-		lv_label_set_text_fmt(lbl_ins, SLEEP_TIMER_TXT, (unsigned)sleep_time_s, (unsigned)mins, (unsigned)frac);
-		lv_slider_set_value(slider, sleep_time_s, LV_ANIM_OFF);
+		uint32_t mins = home_sleep_after_s / 60;
+		uint32_t frac = (home_sleep_after_s % 60) * 100 / 60;
+		lv_label_set_text_fmt(lbl_ins, SLEEP_TIMER_TXT, (unsigned)home_sleep_after_s, (unsigned)mins, (unsigned)frac);
+		lv_slider_set_value(slider, home_sleep_after_s, LV_ANIM_OFF);
 		
 		// Persist to NVS
 		lcd_settings_sleep_timer_nvs_save();
@@ -2389,7 +2389,7 @@ void lcd_settings_sleep_timer_nvs_save(void)
 	}
 
 	// Save the timer length
-	err = nvs_set_u8(h, SETTINGS_SLEEP_TIMER_KEY, sleep_time_s);
+	err = nvs_set_u16(h, SETTINGS_SLEEP_TIMER_KEY, home_sleep_after_s);
 	if (err != ESP_OK) {
 		ESP_LOGE(TAG, "lcd_settings_sleep_timer_nvs_save: len set failed");
 	}
@@ -2416,11 +2416,11 @@ void lcd_settings_sleep_timer_nvs_load(void)
 	}
 
 	// Load sleep timer length
-	uint8_t len;
-	if (nvs_get_u8(h, SETTINGS_SLEEP_TIMER_KEY, &len) == ESP_OK) {
-		sleep_time_s = len;
+	uint16_t len;
+	if (nvs_get_u16(h, SETTINGS_SLEEP_TIMER_KEY, &len) == ESP_OK) {
+		home_sleep_after_s = len;
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGI(TAG, "Loaded sleep timer: %u sec", sleep_time_s);
+		ESP_LOGI(TAG, "Loaded sleep timer: %u sec", home_sleep_after_s);
 		#endif
 	}
 	
@@ -2477,7 +2477,7 @@ void lcd_settings_rgb_led_nvs_load(void)
 	if (nvs_get_i16(h, SETTINGS_RGB_LED_PERIOD_KEY, &len) == ESP_OK) {
 		rbg_blink_period_ms = len;
 		#ifdef POLYCAST5_DEBUG
-			ESP_LOGI(TAG, "Loaded RGB LED period: %d ms", rbg_blink_period_ms);
+		ESP_LOGI(TAG, "Loaded RGB LED period: %d ms", rbg_blink_period_ms);
 		#endif
 	}
 	

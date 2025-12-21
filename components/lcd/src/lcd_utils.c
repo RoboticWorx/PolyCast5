@@ -112,6 +112,7 @@ enum
 
 extern wifi_login_t selected_network;
 extern bool monitoring_packets;
+extern bool sleeping_from_home;
 
 uint32_t pin_attempts = 0;
 bool pin_signing_in = false;
@@ -363,9 +364,11 @@ void lcd_device_sleep(void)
 	go_to_sleep = false; // Clear sleep flag
 	lcd_clear_pending_inputs = true; // Clear if action button pressed to wake
 	
-	// Require pin re-entry
-	settings_menu.pin_menu.prompt_pin = true;
-
+	// Require pin re-entry if sleeping from home page
+	if (sleeping_from_home) {
+		settings_menu.pin_menu.prompt_pin = true;
+	}
+	
 	// TODO: Noticable delay on LCD
 	//xSemaphoreGive(xWifiCycleSemaphore); // Cycle Wi-Fi radio on wake
 }
