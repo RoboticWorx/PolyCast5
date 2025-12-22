@@ -29,7 +29,9 @@
 #include "bluetooth_task.h"
 #include "ai_task.h"
 
-#include "img_ai_orb.h"
+#include "img_ai_orb_1.h"
+#include "img_ai_orb_2.h"
+#include "img_ai_orb_3.h"
 
 #define TAG "LCD_BLUETOOTH_FUNCS"
 
@@ -1399,7 +1401,8 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 	static lv_obj_t *lbl_ins = NULL;
 	static lv_obj_t *lbl_config = NULL;
 	static lv_obj_t *ai_orb = NULL;
-	static int16_t angle = 0; // 0.1 degree units
+	static uint8_t orb_frame = 0;
+	static int16_t orb_angle = 0; // 0.1 degree units
 
 	char api_key[AI_API_KEY_MAX_LEN] = {0};
 	esp_err_t err = xai_load_api_key_nvs(api_key, AI_API_KEY_MAX_LEN);
@@ -1418,8 +1421,8 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 				&lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 16);
 
 		ai_orb = lv_img_create(ACTIVE_SCR);
-		lv_img_set_src(ai_orb, &img_ai_orb);
-		lv_obj_align(ai_orb, LV_ALIGN_CENTER, 0, 12);
+		lv_img_set_src(ai_orb, &img_ai_orb_1);
+		lv_obj_align(ai_orb, LV_ALIGN_CENTER, 0, 15);
 
 		lbl_config = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_config, LV_SYMBOL_SETTINGS, user_secondary_color,
@@ -1454,7 +1457,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 
 		// TODO: Switch to EventGroup and wait for connected until select available
 		// xSemaphoreTake(xBleConnectedSemaphore, portMAX_DELAY);
-		// xSemaphoreTake(xWifiNetworkConnectedSemaphore, portMAX_DELAY);
+		xSemaphoreTake(xWifiNetworkConnectedSemaphore, portMAX_DELAY);
 
 		// Connect to BLE
 		uint16_t cmd = BLUETOOTH_CMD_INIT;
@@ -1464,8 +1467,55 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 	}
 
 	// TEST
-	angle = (angle + 100) % 3600; // 10 degrees per frame
-    lv_obj_set_style_transform_angle(ai_orb, angle, 0);
+	if (orb_frame == 6) {
+		for (int i = 0; i < 5; ++i) {
+			if (i == 0) 	 lv_img_set_src(ai_orb, &img_ai_orb_1);
+			else if (i == 1) lv_img_set_src(ai_orb, &img_ai_orb_2);
+			else if (i == 2) lv_img_set_src(ai_orb, &img_ai_orb_3);
+			else if (i == 3) lv_img_set_src(ai_orb, &img_ai_orb_2);
+			else if (i == 4) lv_img_set_src(ai_orb, &img_ai_orb_1);
+			lv_timer_handler();
+			vTaskDelay(pdMS_TO_TICKS(1));
+		}
+	}
+	if (orb_frame == 7) {
+		for (int i = 0; i < 5; ++i) {
+			if (i == 0) 	 lv_img_set_src(ai_orb, &img_ai_orb_1);
+			else if (i == 1) lv_img_set_src(ai_orb, &img_ai_orb_2);
+			else if (i == 2) lv_img_set_src(ai_orb, &img_ai_orb_3);
+			else if (i == 3) lv_img_set_src(ai_orb, &img_ai_orb_2);
+			else if (i == 4) lv_img_set_src(ai_orb, &img_ai_orb_1);
+			lv_timer_handler();
+			vTaskDelay(pdMS_TO_TICKS(1));
+		}
+	}
+	if (orb_frame == 8) {
+		for (int i = 0; i < 5; ++i) {
+			if (i == 0) 	 lv_img_set_src(ai_orb, &img_ai_orb_1);
+			else if (i == 1) lv_img_set_src(ai_orb, &img_ai_orb_2);
+			else if (i == 2) lv_img_set_src(ai_orb, &img_ai_orb_3);
+			else if (i == 3) lv_img_set_src(ai_orb, &img_ai_orb_2);
+			else if (i == 4) lv_img_set_src(ai_orb, &img_ai_orb_1);
+			lv_timer_handler();
+			vTaskDelay(pdMS_TO_TICKS(1));
+		}
+	}
+	if (orb_frame == 9) {
+		for (int i = 0; i < 5; ++i) {
+			if (i == 0) 	 lv_img_set_src(ai_orb, &img_ai_orb_1);
+			else if (i == 1) lv_img_set_src(ai_orb, &img_ai_orb_2);
+			else if (i == 2) lv_img_set_src(ai_orb, &img_ai_orb_3);
+			else if (i == 3) lv_img_set_src(ai_orb, &img_ai_orb_2);
+			else if (i == 4) lv_img_set_src(ai_orb, &img_ai_orb_1);
+			lv_timer_handler();
+			vTaskDelay(pdMS_TO_TICKS(1));
+		}
+	}
+
+	orb_frame = (orb_frame + 1) % 10;
+
+	orb_angle = (orb_angle + 50) % 3600; // 5 degrees per frame
+    lv_obj_set_style_transform_angle(ai_orb, orb_angle, 0);
 
 	// Up button pressed
 	if (ui_btns->up_btn == 1) {
@@ -1496,14 +1546,18 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 		// Hide right arrow
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
+		// Show top and bottom arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
 		// Switch to config page
 		ui_menu->page = BLUETOOTH_AI_CONFIG_PAGE;
 		return;
 	}
 	// Record selected
 	else if (ui_btns->select_btn == 1) {
-		angle = (angle + 450) % 3600; // 45 degrees per frame
-        lv_obj_set_style_transform_angle(ai_orb, angle, 0);
+		// angle = (angle + 450) % 3600; // 45 degrees per frame
+        // lv_obj_set_style_transform_angle(ai_orb, angle, 0);
 
 		xQueueSend(xAiCmdQueue, "pass autofill my justin roboticworx email", pdMS_TO_TICKS(100));
 	}
@@ -1527,6 +1581,10 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 
 		// Hide right arrow
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+		// Show top and bottom arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
 		// Switch pages
 		ui_menu->page = BLUETOOTH_PAGE;

@@ -3422,6 +3422,10 @@ void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t
 		// Show right arrow
 		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
+		// Hide top and bottom arrows
+		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
 		// Switch pages
 		ui_menu->page = BLUETOOTH_AI_KEYBOARD_PAGE;
 	}
