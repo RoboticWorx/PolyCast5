@@ -33,6 +33,8 @@ static wifi_sniff_t sniff_network;
 
 static wifi_mqtt_t wifi_mqtt;
 
+EventGroupHandle_t xWifiEventGroup;
+
 QueueHandle_t xWifiScanQueue;
 QueueHandle_t xWifiSelectedNetworkQueue;
 QueueHandle_t xWifiSniffQueue;
@@ -41,16 +43,7 @@ QueueHandle_t xWifiDataQueue;
 QueueHandle_t xWifiMqttCmdQueue;
 QueueHandle_t xWifiPingQueue;
 
-SemaphoreHandle_t xWifiStartScanSemaphore;
-SemaphoreHandle_t xWifiNetworkConnectedSemaphore;
-SemaphoreHandle_t xWifiNetworkDisconnectedSemaphore;
-SemaphoreHandle_t xWifiDisconnectSemaphore;
-SemaphoreHandle_t xWifiConnectingSemaphore;
-SemaphoreHandle_t xWifiReconnectSemaphore;
 SemaphoreHandle_t xWifiCanSleepSemaphore;
-SemaphoreHandle_t xWifiMqttSuccessSemaphore;
-SemaphoreHandle_t xWifiMqttConnectedSemaphore;
-SemaphoreHandle_t xWifiMqttDisconnectedSemaphore;
 SemaphoreHandle_t xWifiCycleSemaphore;
 SemaphoreHandle_t xWifiPingSemaphore;
 
@@ -61,30 +54,16 @@ EventGroupHandle_t xWiFiPortalEventGroup;
 SemaphoreHandle_t xWifiOtaAvailableSemaphore; // Wi-Fi -> LCD
 QueueHandle_t xWifiOtaPctQueue;
 
-static EventBits_t last_portal_bits;
+static EventBits_t last_portal_bits = 0;
+static EventBits_t last_wifi_event_bits = 0;
 
 static void wifi_task(void *param)
 {
-	xWifiStartScanSemaphore = xSemaphoreCreateBinary();
-	configASSERT(xWifiStartScanSemaphore);
-	xWifiNetworkConnectedSemaphore = xSemaphoreCreateBinary();
-	configASSERT(xWifiNetworkConnectedSemaphore);
-	xWifiNetworkDisconnectedSemaphore = xSemaphoreCreateBinary();
-	configASSERT(xWifiNetworkDisconnectedSemaphore);
-	xWifiDisconnectSemaphore = xSemaphoreCreateBinary();
-	configASSERT(xWifiDisconnectSemaphore);
-	xWifiConnectingSemaphore = xSemaphoreCreateBinary();
-	configASSERT(xWifiConnectingSemaphore);
-	xWifiReconnectSemaphore = xSemaphoreCreateBinary();
-	configASSERT(xWifiReconnectSemaphore);
+	xWifiEventGroup = xEventGroupCreate();
+	configASSERT(xWifiEventGroup);
+
 	xWifiCanSleepSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xWifiCanSleepSemaphore);
-	xWifiMqttSuccessSemaphore = xSemaphoreCreateBinary();
-	configASSERT(xWifiMqttSuccessSemaphore);
-	xWifiMqttConnectedSemaphore = xSemaphoreCreateBinary();
-	configASSERT(xWifiMqttConnectedSemaphore);
-	xWifiMqttDisconnectedSemaphore = xSemaphoreCreateBinary();
-	configASSERT(xWifiMqttDisconnectedSemaphore);
 	xWifiOtaAvailableSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xWifiOtaAvailableSemaphore);
 	xWifiCycleSemaphore = xSemaphoreCreateBinary();
@@ -188,20 +167,6 @@ static void wifi_task(void *param)
 			}
 		}
 		
-		// Start a Wi-Fi scan
-		if (xSemaphoreTake(xWifiStartScanSemaphore, 0) == pdTRUE) {
-			ESP_ERROR_CHECK(esp_wifi_start());
-			
-			wifi_funcs_scan(wifi_scan);
-			
-			wifi_funcs_radio_stop();
-		}
-		
-		// Disconnect from Wi-Fi
-		if (xSemaphoreTake(xWifiDisconnectSemaphore, 0) == pdTRUE) {			
-			wifi_funcs_radio_stop();
-		}
-		
 		// Specific network to connect selected
 		if (xQueueReceive(xWifiSelectedNetworkQueue, &selected_network, 0) == pdTRUE) {
 			#ifdef POLYCAST5_DEBUG
@@ -210,34 +175,21 @@ static void wifi_task(void *param)
 				    selected_network.bssid[0], selected_network.bssid[1], selected_network.bssid[2],
 				    selected_network.bssid[3], selected_network.bssid[4], selected_network.bssid[5]);
 			#endif
-			
-			xQueueReset(xWifiNetworkDisconnectedSemaphore); // Reset previous gives
-			
+						
 			if (selected_network.prev && strlen(selected_network.ssid) == 0) {
 				#ifdef POLYCAST5_DEBUG
 				ESP_LOGW(TAG, "No previous network to connect to");
 			    #endif
 			    
-			    xSemaphoreGive(xWifiNetworkDisconnectedSemaphore);
+			    xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_CONNECTING_BIT); // Not connected / not connecting
 			}
 			else {
-				xSemaphoreGive(xWifiConnectingSemaphore); // Tell LCD we're trying
+				xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // Tell LCD we're trying
 				
 				ESP_ERROR_CHECK(wifi_funcs_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password));
 				
 				ESP_ERROR_CHECK(wifi_funcs_connect());
 			}
-		}
-		
-		// Reconnect to last known network
-		if (xSemaphoreTake(xWifiReconnectSemaphore, 0) == pdTRUE) {
-			xQueueReset(xWifiNetworkDisconnectedSemaphore); // Reset previous gives
-			
-			xSemaphoreGive(xWifiConnectingSemaphore); // Tell LCD we're trying
-			
-			ESP_ERROR_CHECK(wifi_funcs_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password));
-							
-			ESP_ERROR_CHECK(wifi_funcs_connect());
 		}
 		
 		// Send data over MQTT
@@ -307,6 +259,53 @@ static void wifi_task(void *param)
 			if (xQueueSend(xWifiPingQueue, &wifi_ping, pdMS_TO_TICKS(1000)) != pdTRUE) {
 				ESP_LOGE(TAG, "xWifiPingQueue: Failed to enqueue ping results");
 			}
+		}
+
+		// Check for Wi-Fi events
+		EventBits_t wifi_event_bits = xEventGroupGetBits(xWifiEventGroup);
+		if (wifi_event_bits != last_wifi_event_bits) { // Only act on changes
+			esp_err_t err;
+
+			// If Wi-Fi reconnect bit transitioned 0 -> 1
+			if ((wifi_event_bits & WIFI_RECONNECT_BIT) && !(last_wifi_event_bits & WIFI_RECONNECT_BIT)) {
+				xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // Tell LCD we're trying
+
+				err = wifi_funcs_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password);
+				if (err != ESP_OK) {
+					ESP_LOGE(TAG, "WIFI_RECONNECT_BIT: wifi_funcs_radio_start failed: %s", esp_err_to_name(err));
+				}
+				err = wifi_funcs_connect();
+				if (err != ESP_OK) {
+					ESP_LOGE(TAG, "WIFI_RECONNECT_BIT: wifi_funcs_connect failed: %s", esp_err_to_name(err));
+				}
+				xEventGroupClearBits(xWifiEventGroup, WIFI_RECONNECT_BIT); // Reset for next time
+			}
+			// If Wi-Fi disconnect bit transitioned 0 -> 1
+			if ((wifi_event_bits & WIFI_DISCONNECT_BIT) && !(last_wifi_event_bits & WIFI_DISCONNECT_BIT)) {
+				err = wifi_funcs_radio_stop();
+				if (err != ESP_OK) {
+					ESP_LOGE(TAG, "WIFI_DISCONNECT_BIT: wifi_funcs_radio_stop failed: %s", esp_err_to_name(err));
+				}
+				xEventGroupClearBits(xWifiEventGroup, WIFI_DISCONNECT_BIT); // Reset for next time
+			}
+			// If Wi-Fi scan networks bit transitioned 0 -> 1
+			if ((wifi_event_bits & WIFI_SCAN_NETWORKS_BIT) && !(last_wifi_event_bits & WIFI_SCAN_NETWORKS_BIT)) {
+				err = esp_wifi_start();
+				if (err != ESP_OK) {
+					ESP_LOGE(TAG, "WIFI_SCAN_NETWORKS_BIT: esp_wifi_start failed: %s", esp_err_to_name(err));
+				}
+				err = wifi_funcs_scan(wifi_scan);
+				if (err != ESP_OK) {
+					ESP_LOGE(TAG, "WIFI_SCAN_NETWORKS_BIT: wifi_funcs_scan failed: %s", esp_err_to_name(err));
+				}
+				err = wifi_funcs_radio_stop();
+				if (err != ESP_OK) {
+					ESP_LOGE(TAG, "WIFI_SCAN_NETWORKS_BIT: wifi_funcs_radio_stop failed: %s", esp_err_to_name(err));
+				}
+				xEventGroupClearBits(xWifiEventGroup, WIFI_SCAN_NETWORKS_BIT); // Reset for next time
+			}
+
+			last_wifi_event_bits = wifi_event_bits;
 		}
 
 		// Check for web portal events

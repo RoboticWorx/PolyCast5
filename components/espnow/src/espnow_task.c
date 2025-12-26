@@ -121,7 +121,7 @@ static void espnow_task(void *param)
 			ESP_ERROR_CHECK(espnow_funcs_wifi_radio_stop());
 			
 			// Reconnect to previous network
-			xSemaphoreGive(xWifiReconnectSemaphore);
+			xEventGroupSetBits(xWifiEventGroup, WIFI_RECONNECT_BIT);
 		}
 		
 		// Sending ESP32 -> ESP32 command via ESP-NOW

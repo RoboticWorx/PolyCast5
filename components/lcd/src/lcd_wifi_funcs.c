@@ -331,7 +331,7 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		}
 		else {
 			// Disconnect if connected
-			xSemaphoreGive(xWifiDisconnectSemaphore);
+			xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 			
 			lbl_wait = lv_label_create(ACTIVE_SCR);
 			lcd_format_label(lbl_wait, "Scanning for networks...\nPlease wait, then select\na network to monitor.", user_secondary_color,
@@ -340,7 +340,7 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 			lv_timer_handler(); // Show
 							 
 			// Start scan
-			xSemaphoreGive(xWifiStartScanSemaphore);
+			xEventGroupSetBits(xWifiEventGroup, WIFI_SCAN_NETWORKS_BIT);
 			
 			scanning = true;
 		}
@@ -440,7 +440,7 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 					&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 20);
 							 
 			// Start scan
-			xSemaphoreGive(xWifiStartScanSemaphore);
+			xEventGroupSetBits(xWifiEventGroup, WIFI_SCAN_NETWORKS_BIT);
 			
 			scanning = true;
 		}
@@ -1190,7 +1190,7 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
 		series = NULL;
 		
 		// Turn off Wi-Fi
-		xSemaphoreGive(xWifiDisconnectSemaphore);
+		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 		
 		// Hide right arrow
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -1213,7 +1213,7 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
 		series = NULL;
 		
 		// Turn off Wi-Fi
-		xSemaphoreGive(xWifiDisconnectSemaphore);
+		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 		
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 	}
@@ -1229,7 +1229,7 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
 		series = NULL;
 		
 		// Turn off Wi-Fi
-		xSemaphoreGive(xWifiDisconnectSemaphore);
+		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 		
 		// Switch mask
 		sniff_network.mask = 0; // 1 = WIFI_PROMIS_FILTER_MASK_MGMT
@@ -1448,7 +1448,7 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		series = NULL;
 		
 		// Turn off Wi-Fi
-		xSemaphoreGive(xWifiDisconnectSemaphore);
+		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 		
 		// Switch mask
 		sniff_network.mask = 1; // 1 = WIFI_PROMIS_FILTER_MASK_MGMT
@@ -1478,7 +1478,7 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		series = NULL;
 		
 		// Turn off Wi-Fi
-		xSemaphoreGive(xWifiDisconnectSemaphore);
+		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 		
 		lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
 	}
@@ -1496,7 +1496,7 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		series = NULL;
 		
 		// Turn off Wi-Fi
-		xSemaphoreGive(xWifiDisconnectSemaphore);
+		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 		
 		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
 	}
@@ -2053,20 +2053,31 @@ void lcd_wifi_send_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 	static bool mqtt_connected = false;
 	
 	// Update labels on status
-	if (xSemaphoreTake(xWifiMqttDisconnectedSemaphore, 0) == pdTRUE) {
-		lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_ins, MQTT_CONNECTING_TXT);
-		mqtt_connected = false;
-	}
-	else if (xSemaphoreTake(xWifiMqttConnectedSemaphore, 0) == pdTRUE) {
-		lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_ins, MQTT_READY_TXT);
-		mqtt_connected = true;
-	}
-	// If got receipt back from MQTT receiver
-	else if (xSemaphoreTake(xWifiMqttSuccessSemaphore, 0) == pdTRUE) {
-		lv_label_set_text(wifi_menu->wifi_submenu.lbl_receipt, LV_SYMBOL_OK);
-		lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
+	static EventBits_t last_wifi_event_bits = {0};
+	EventBits_t wifi_event_bits = xEventGroupGetBits(xWifiEventGroup);
+	if (wifi_event_bits != last_wifi_event_bits) { // Only act on changes
+		// If Wi-Fi MQTT connected bit transitioned 0 -> 1
+		if ((wifi_event_bits & WIFI_MQTT_CONNECTED_BIT) && !(last_wifi_event_bits & WIFI_MQTT_CONNECTED_BIT)) {
+			lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_ins, MQTT_READY_TXT);
+			mqtt_connected = true;
+		}
+		// If Wi-Fi MQTT connected bit transitioned 1 -> 0
+		if ((last_wifi_event_bits & WIFI_MQTT_CONNECTED_BIT) && !(wifi_event_bits & WIFI_MQTT_CONNECTED_BIT)) {
+			lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_ins, MQTT_CONNECTING_TXT);
+			mqtt_connected = false;
+		}
+		// If Wi-Fi MQTT success bit transitioned 0 -> 1
+		if ((wifi_event_bits & WIFI_MQTT_SUCCESS_BIT) && !(last_wifi_event_bits & WIFI_MQTT_SUCCESS_BIT)) {
+			lv_label_set_text(wifi_menu->wifi_submenu.lbl_receipt, LV_SYMBOL_OK);
+			lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
+			
+			lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_ins, MQTT_READY_TXT);
+			
+			// Reset for next time
+			xEventGroupClearBits(xWifiEventGroup, WIFI_MQTT_SUCCESS_BIT);
+		}
 		
-		lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_ins, MQTT_READY_TXT);
+		last_wifi_event_bits = wifi_event_bits;
 	}
 	
 	// Send via MQTT

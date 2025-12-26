@@ -1457,7 +1457,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 
 		// TODO: Switch to EventGroup and wait for connected until select available
 		// xSemaphoreTake(xBleConnectedSemaphore, portMAX_DELAY);
-		xSemaphoreTake(xWifiNetworkConnectedSemaphore, portMAX_DELAY);
+		// xSemaphoreTake(xWifiNetworkConnectedSemaphore, portMAX_DELAY);
 
 		// Connect to BLE
 		uint16_t cmd = BLUETOOTH_CMD_INIT;
@@ -1528,7 +1528,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 	// Config page selected
 	else if (ui_btns->right_btn == 1) {
 		// Disconnect from Wi-Fi
-		xSemaphoreGive(xWifiDisconnectSemaphore);
+		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
 		// Deactivate bluetooth
 		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
@@ -1564,7 +1564,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 	// Back selected
 	else if (ui_btns->left_btn == 1) {
 		// Disconnect from Wi-Fi
-		xSemaphoreGive(xWifiDisconnectSemaphore);
+		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
 		// Deactivate bluetooth
 		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
@@ -1592,7 +1592,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 	// Home or power off selected
 	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
 		// Disconnect from Wi-Fi
-		xSemaphoreGive(xWifiDisconnectSemaphore);
+		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
 		// Deactivate bluetooth
 		uint16_t cmd = BLUETOOTH_CMD_DEINIT;

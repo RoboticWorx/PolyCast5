@@ -142,16 +142,15 @@ bool srs_sync_time_over_wifi(void)
 	}
 
 	// Wait up to 6s for connection
-	if (xSemaphoreTake(xWifiNetworkConnectedSemaphore, pdMS_TO_TICKS(6000)) == pdTRUE) {
+	if ((xEventGroupWaitBits(xWifiEventGroup, WIFI_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(6000)) & WIFI_CONNECTED_BIT) != 0) {
 		// Get time
 		wifi_funcs_get_current_date_time();
-		
+
 		// Done with Wi-Fi -> disconnect to save power
-		xSemaphoreGive(xWifiDisconnectSemaphore);
+		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
 		lcd_clear_pending_inputs = true; // Clear user inputs from wait
 	}
-	// If failed
 	else {
 		// Notify user
 		lcd_format_label(lbl_info, "Failed!\n\nPlease connect to a Wi-Fi\nnetwork at least once.\nYou can disconnect after.", user_secondary_color,

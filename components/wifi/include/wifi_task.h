@@ -25,8 +25,17 @@ extern EventGroupHandle_t xConnectionIconEventGroup;
 
 #define WIFI_PORTAL_START_AI_BIT  (1U << 0)
 #define WIFI_PORTAL_START_BTC_BIT (1U << 1)
-#define WIFI_PORTAL_START_BT_BIT (1U << 2)
+#define WIFI_PORTAL_START_BT_BIT  (1U << 2)
 extern EventGroupHandle_t xWiFiPortalEventGroup;
+
+#define WIFI_SCAN_NETWORKS_BIT  (1U << 0)
+#define WIFI_CONNECTING_BIT     (1U << 1)
+#define WIFI_CONNECTED_BIT      (1U << 2)
+#define WIFI_DISCONNECT_BIT     (1U << 3)
+#define WIFI_RECONNECT_BIT      (1U << 4)
+#define WIFI_MQTT_CONNECTED_BIT (1U << 5)
+#define WIFI_MQTT_SUCCESS_BIT   (1U << 6)
+extern EventGroupHandle_t xWifiEventGroup;
 
 extern QueueHandle_t xWifiScanQueue;
 extern QueueHandle_t xWifiSelectedNetworkQueue;
@@ -36,16 +45,7 @@ extern QueueHandle_t xWifiDataQueue;
 extern QueueHandle_t xWifiMqttCmdQueue;
 extern QueueHandle_t xWifiPingQueue;
 
-extern SemaphoreHandle_t xWifiStartScanSemaphore;
-extern SemaphoreHandle_t xWifiNetworkConnectedSemaphore;
-extern SemaphoreHandle_t xWifiNetworkDisconnectedSemaphore;
-extern SemaphoreHandle_t xWifiDisconnectSemaphore;
-extern SemaphoreHandle_t xWifiConnectingSemaphore;
-extern SemaphoreHandle_t xWifiReconnectSemaphore;
 extern SemaphoreHandle_t xWifiCanSleepSemaphore;
-extern SemaphoreHandle_t xWifiMqttSuccessSemaphore;
-extern SemaphoreHandle_t xWifiMqttConnectedSemaphore;
-extern SemaphoreHandle_t xWifiMqttDisconnectedSemaphore;
 extern SemaphoreHandle_t xWifiCycleSemaphore;
 extern SemaphoreHandle_t xWifiPingSemaphore;
 

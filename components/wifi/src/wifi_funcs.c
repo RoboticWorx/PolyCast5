@@ -32,8 +32,8 @@
 #define TAG "WIFI_FUNCS"
 #define TAG_PING "PING"
 
-#define WIFI_CONNECTED_BIT (1 << 0)
-#define WIFI_DISCONNECTED_BIT (1 << 1)
+#define WIFI_INTERNAL_CONNECTED_BIT (1 << 0)
+#define WIFI_INTERNAL_DISCONNECTED_BIT (1 << 1)
 
 /* Helpers to pull type/subtype from the 802.11 frame control */
 #define FC_TYPE(fc)	(((fc) & 0x0C) >> 2)
@@ -49,7 +49,7 @@ bool wifi_connected = false;
 static esp_mqtt_client_handle_t mqtt_client;
 
 static uint8_t target_bssid[6] = { 0x60, 0x55, 0xF9, 0xFC, 0xDE, 0xA8 };
-static EventGroupHandle_t wifi_event_group;
+static EventGroupHandle_t wifi_internal_event_group;
 
 static wifi_data_t wifi_data;
 static char mqtt_active_ack_topic[80] = {0};
@@ -700,12 +700,12 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 		
 		wifi_funcs_radio_stop();
 		
-		xSemaphoreGive(xWifiMqttDisconnectedSemaphore); // Notify LCD we disconnected
+		xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_MQTT_CONNECTED_BIT); // Notify LCD we disconnected
 
 		// Remove Wi-Fi connected icon
 		xEventGroupClearBits(xConnectionIconEventGroup, ICON_BIT_WIFI_CONNECTED);
 
-		xEventGroupSetBits(wifi_event_group, WIFI_DISCONNECTED_BIT);
+		xEventGroupSetBits(wifi_internal_event_group, WIFI_INTERNAL_DISCONNECTED_BIT);
 		
 		// RGB indicator
 		uint8_t rgb_state = RGB_SET_OFF;
@@ -727,12 +727,13 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 		sta_gw = e->ip_info.gw;
 		sta_gw_valid = true;
 
-		xSemaphoreGive(xWifiNetworkConnectedSemaphore); // Notify LCD we connected
+		xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTED_BIT); // Notify LCD we connected
+		xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // No longer trying to connect
 		
 		// Show Wi-Fi connected icon
 		xEventGroupSetBits(xConnectionIconEventGroup, ICON_BIT_WIFI_CONNECTED);
 
-		xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
+		xEventGroupSetBits(wifi_internal_event_group, WIFI_INTERNAL_CONNECTED_BIT);
 		
 		// RGB indicator
 		uint8_t rgb_state = RGB_SET_GREEN;
@@ -750,7 +751,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 
 void wifi_funcs_wifi_event_init(void)
 {
-	wifi_event_group = xEventGroupCreate();
+	wifi_internal_event_group = xEventGroupCreate();
 	
 	ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler,
 			NULL, NULL));
@@ -771,9 +772,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 			// Subscribe to any polycast5/.../ack
 			esp_mqtt_client_subscribe(event->client, "polycast5/+/ack", 0);
 			
-			xSemaphoreGive(xWifiMqttConnectedSemaphore); // Notify LCD we connected
-			
 			mqtt_connected = true;
+			xEventGroupSetBits(xWifiEventGroup, WIFI_MQTT_CONNECTED_BIT); // Notify LCD we connected
 			break;
 			
 		case MQTT_EVENT_DISCONNECTED:
@@ -781,7 +781,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 			ESP_LOGW(TAG, "Disconnected from MQTT");
 			#endif
 			
-			xSemaphoreGive(xWifiMqttDisconnectedSemaphore); // Notify LCD we disconnected
+			xEventGroupClearBits(xWifiEventGroup, WIFI_MQTT_CONNECTED_BIT); // Notify LCD we disconnected
 			break;
 			
 		case MQTT_EVENT_PUBLISHED:
@@ -814,7 +814,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 					ESP_LOGI(TAG, "Received MQTT receipt matches!");
 					#endif
 					
-					xSemaphoreGive(xWifiMqttSuccessSemaphore);
+					xEventGroupSetBits(xWifiEventGroup, WIFI_MQTT_SUCCESS_BIT);
 				}
 			}
 			break;
@@ -904,15 +904,15 @@ void wifi_funcs_mqtt_client_publish(char *payload, const uint8_t key[16])
 static bool wait_for_connection(TickType_t timeout)
 {
 	// Wait for either bit
-	EventBits_t bits = xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_BIT | WIFI_DISCONNECTED_BIT, pdTRUE, pdFALSE, timeout);
+	EventBits_t bits = xEventGroupWaitBits(wifi_internal_event_group, WIFI_INTERNAL_CONNECTED_BIT | WIFI_INTERNAL_DISCONNECTED_BIT, pdTRUE, pdFALSE, timeout);
 
 	// Got IP
-	if (bits & WIFI_CONNECTED_BIT) {
+	if (bits & WIFI_INTERNAL_CONNECTED_BIT) {
 		return true;
 	}
 	
 	// Disconnected
-	if (bits & WIFI_DISCONNECTED_BIT) {
+	if (bits & WIFI_INTERNAL_DISCONNECTED_BIT) {
 		return false;
 	}
 	
@@ -922,7 +922,7 @@ static bool wait_for_connection(TickType_t timeout)
 
 esp_err_t wifi_funcs_connect(void)
 {
-	xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT | WIFI_DISCONNECTED_BIT);
+	xEventGroupClearBits(wifi_internal_event_group, WIFI_INTERNAL_CONNECTED_BIT | WIFI_INTERNAL_DISCONNECTED_BIT);
 	
 	esp_err_t err = esp_wifi_connect();
 	
@@ -995,10 +995,11 @@ esp_err_t wifi_funcs_radio_stop(void)
 	// Stop Wi-Fi
 	esp_err_t err = esp_wifi_stop();
 	if (err == ESP_OK) {
-		xSemaphoreGive(xWifiNetworkDisconnectedSemaphore);
+		xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT);
+		xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // No longer trying to connect
 	}
 	else {
-		ESP_LOGE(TAG, "wifi_funcs_radio_stop: %d", err);
+		ESP_LOGE(TAG, "wifi_funcs_radio_stop error: %d", err);
 	}
 	
 	xSemaphoreGive(xWifiCanSleepSemaphore);

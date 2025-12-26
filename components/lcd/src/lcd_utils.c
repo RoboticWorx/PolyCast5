@@ -114,6 +114,8 @@ extern wifi_login_t selected_network;
 extern bool monitoring_packets;
 extern bool sleeping_from_home;
 
+extern bool wifi_ai_req; // TODO: Not this bool
+
 uint32_t pin_attempts = 0;
 bool pin_signing_in = false;
 bool lcd_wifi_connected = false;
@@ -322,7 +324,9 @@ static void lcd_panel_wake(void)
 void lcd_device_sleep(void)
 {
 	xQueueReset(xWifiCanSleepSemaphore);
-	xSemaphoreGive(xWifiDisconnectSemaphore); // Disconnect from Wi-Fi if connected
+	
+	// Disconnect from Wi-Fi if connected
+	xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 	
 	lcd_panel_sleep(); // Put ST7789 to sleep
 	gpio_set_level(ST7789_LEDA_PIN, 1); // BL low
@@ -2509,7 +2513,8 @@ void lcd_lora_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_men
 		}
 		// Else we're good to add another
 		else {
-			xSemaphoreGive(xWifiDisconnectSemaphore); // Disconnect from Wi-Fi if connected
+			// Disconnect from Wi-Fi if connected
+			xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 			
 			// Show right arrow
 			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -2637,7 +2642,8 @@ void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espn
 	}
 	// Specific selected
 	else if (ui_btns->select_btn == 1) {
-		xSemaphoreGive(xWifiDisconnectSemaphore); // Disconnect from Wi-Fi if connected
+		// Disconnect from Wi-Fi if connected
+		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 		
 		// Hide ESP-NOW menu
 		lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -2740,24 +2746,35 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 	}
 	
 	// Update label based on connection
-	if (xSemaphoreTake(xWifiConnectingSemaphore, 0) == pdTRUE) {
-		lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
-		lv_label_set_text(lbl, "Connecting...");
-	}
-	if (xSemaphoreTake(xWifiNetworkConnectedSemaphore, 0) == pdTRUE) {
-		char buf[44];
-		snprintf(buf, sizeof(buf), "Connected: %s", selected_network.ssid);
-		
-		lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
-		lv_label_set_text(lbl, buf);
-		
-		lcd_wifi_connected = true;
-	}
-	if (xSemaphoreTake(xWifiNetworkDisconnectedSemaphore, 0) == pdTRUE) {
-		lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
-		lv_label_set_text(lbl, "Connect to network");
-		
-		lcd_wifi_connected = false;
+	static EventBits_t last_wifi_event_bits = {0};
+	EventBits_t wifi_event_bits = xEventGroupGetBits(xWifiEventGroup);
+	if (wifi_event_bits != last_wifi_event_bits) { // Only act on changes
+		// If Wi-Fi connecting bit transitioned 0 -> 1
+		if ((wifi_event_bits & WIFI_CONNECTING_BIT) && !(last_wifi_event_bits & WIFI_CONNECTING_BIT)) {
+			lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
+			lv_label_set_text(lbl, "Connecting...");
+
+			xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // Reset for next time
+		}
+		// If Wi-Fi connected bit transitioned 0 -> 1
+		if ((wifi_event_bits & WIFI_CONNECTED_BIT) && !(last_wifi_event_bits & WIFI_CONNECTED_BIT)) {
+			char buf[44];
+			snprintf(buf, sizeof(buf), "Connected: %s", selected_network.ssid);
+			
+			lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
+			lv_label_set_text(lbl, buf);
+			
+			lcd_wifi_connected = true;
+		}
+		// If Wi-Fi connected bit transitioned 1 -> 0
+		if ((last_wifi_event_bits & WIFI_CONNECTED_BIT) && !(wifi_event_bits & WIFI_CONNECTED_BIT)) {
+			lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
+			lv_label_set_text(lbl, "Connect to network");
+			
+			lcd_wifi_connected = false;
+		}
+
+		last_wifi_event_bits = wifi_event_bits;
 	}
 	
 	// If update is available
@@ -2797,7 +2814,7 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 		else if (ui_btns->select_btn == 1 && wifi_menu->index == 0) {
 			// If connected to a network
 			if (lcd_wifi_connected) {
-				xSemaphoreGive(xWifiDisconnectSemaphore);
+				xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 			}
 			// Already disconnected
 			else {
@@ -3164,8 +3181,60 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		settings_menu->index++;
 		lcd_settings_update_menu(settings_menu);
 	}
-	// Set unlock pin selected
+	// Check for updates selected
 	else if (ui_btns->select_btn == 1 && settings_menu->index == 0) {
+		// Hide settings menu
+		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+		lv_obj_t *lbl_check = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_check, "Checking for updates...", user_secondary_color,
+				&lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+		lv_timer_handler();
+
+		// Signal not to check for OTA (AI request)
+		wifi_ai_req = true; // TODO: Mutex + not this bool
+
+		// Connect to previous Wi-Fi network
+		wifi_login_t prev_network = wifi_funcs_get_prev(); // Loads boot state saved network info
+		prev_network.prev = true; // Connecting to previous
+		if (xQueueSend(xWifiSelectedNetworkQueue, &prev_network, portMAX_DELAY) != pdPASS) {
+			ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue previous_network");
+		}
+
+		// Clear AI request flag
+		wifi_ai_req = false;
+
+		if (xSemaphoreTake(xWifiOtaAvailableSemaphore, pdMS_TO_TICKS(8000)) == pdTRUE) {
+			lv_label_set_text(lbl_check, "Update available!");
+			lv_timer_handler();
+			vTaskDelay(pdMS_TO_TICKS(1000));
+
+			// Reset static
+			do_once = false;
+
+			// Show right arrow
+			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+			
+			// Switch pages
+			ui_menu->page = WIFI_OTA_CONFIRM_PAGE;
+		}
+		else {
+			lv_label_set_text(lbl_check, "No updates found.");
+			lv_timer_handler();
+			vTaskDelay(pdMS_TO_TICKS(1000));
+
+			// Show settings menu
+			lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		}
+
+		// Disconnect from Wi-Fi
+		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+
+		lv_obj_delete(lbl_check);
+		lbl_check = NULL;
+	}
+	// Set unlock pin selected
+	else if (ui_btns->select_btn == 1 && settings_menu->index == 1) {
 		// Hide settings menu
 		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -3192,7 +3261,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		}
 	}
 	// Change colors selected
-	else if (ui_btns->select_btn == 1 && settings_menu->index == 1) {
+	else if (ui_btns->select_btn == 1 && settings_menu->index == 2) {
 		// Hide settings menu
 		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -3209,8 +3278,19 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		// Switch pages
 		ui_menu->page = SETTINGS_COLORS_PAGE;
 	}
+	// Adjust LCD selected
+	else if (ui_btns->select_btn == 1 && settings_menu->index == 3) {
+		// Hide settings menu
+		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+		
+		// Reset static
+		do_once = false;
+		
+		// Switch pages
+		ui_menu->page = SETTINGS_LCD_PAGE;
+	}
 	// Adjust haptics selected
-	else if (ui_btns->select_btn == 1 && settings_menu->index == 2) {
+	else if (ui_btns->select_btn == 1 && settings_menu->index == 4) {
 		// Hide settings menu
 		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -3221,7 +3301,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		ui_menu->page = SETTINGS_HAPTIC_PAGE;
 	}
 	// Adjust sleep timer selected
-	else if (ui_btns->select_btn == 1 && settings_menu->index == 3) {
+	else if (ui_btns->select_btn == 1 && settings_menu->index == 5) {
 		// Hide settings menu
 		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -3232,7 +3312,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		ui_menu->page = SETTINGS_SLEEP_TIMER_PAGE;
 	}
 	// Adjust RGB LED selected
-	else if (ui_btns->select_btn == 1 && settings_menu->index == 4) {
+	else if (ui_btns->select_btn == 1 && settings_menu->index == 6) {
 		// Hide settings menu
 		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -3245,19 +3325,8 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		// Switch pages
 		ui_menu->page = SETTINGS_RGB_LED_PAGE;
 	}
-	// Adjust LCD selected
-	else if (ui_btns->select_btn == 1 && settings_menu->index == 5) {
-		// Hide settings menu
-		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Reset static
-		do_once = false;
-		
-		// Switch pages
-		ui_menu->page = SETTINGS_LCD_PAGE;
-	}
 	// Tips and tricks selected
-	else if (ui_btns->select_btn == 1 && settings_menu->index == 6) {
+	else if (ui_btns->select_btn == 1 && settings_menu->index == 7) {
 		// Hide settings menu
 		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -3268,7 +3337,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		ui_menu->page = SETTINGS_HELP_PAGE;
 	}
 	// System check selected
-	else if (ui_btns->select_btn == 1 && settings_menu->index == 7) {
+	else if (ui_btns->select_btn == 1 && settings_menu->index == 8) {
 		// Hide settings menu
 		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -3279,7 +3348,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		ui_menu->page = SETTINGS_SYSTEM_PAGE;
 	}
 	// Reboot selected
-	else if (ui_btns->select_btn == 1 && settings_menu->index == 8) {
+	else if (ui_btns->select_btn == 1 && settings_menu->index == 9) {
 		// Hide settings menu
 		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -3294,7 +3363,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		esp_restart();
 	}
 	// Factory reset selected
-	else if (ui_btns->select_btn == 1 && settings_menu->index == 9) {
+	else if (ui_btns->select_btn == 1 && settings_menu->index == 10) {
 		// Hide settings menu
 		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
