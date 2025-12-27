@@ -23,8 +23,6 @@
 
 #define TAG "WIFI_TASK"
 
-extern bool wifi_connected;
-
 char btc_wifi_portal_pass[64];
 
 static wifi_scan_t wifi_scan[WIFI_MAX_NETWORKS];
@@ -223,7 +221,8 @@ static void wifi_task(void *param)
 
 		// Ping the network
 		if (xSemaphoreTake(xWifiPingSemaphore, 0) == pdTRUE) {
-			if (!wifi_connected) {
+			// If not connected to Wi-Fi, skip pings
+			if (!(xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT)) {
 				#ifdef POLYCAST5_DEBUG
 				ESP_LOGW(TAG, "xWifiPingSemaphore: Skipping ping, not connected to Wi-Fi");
 				#endif

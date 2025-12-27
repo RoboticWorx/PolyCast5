@@ -43,9 +43,6 @@
 
 #define EXPECTED_MQTT_RX "PolyCast5MQTTRxSuccess"
 
-bool wifi_getting_time = false;
-bool wifi_connected = false;
-
 static esp_mqtt_client_handle_t mqtt_client;
 
 static uint8_t target_bssid[6] = { 0x60, 0x55, 0xF9, 0xFC, 0xDE, 0xA8 };
@@ -58,8 +55,6 @@ static bool mqtt_connected = false;
 static volatile int32_t ping_avg_ms = -1;
 static esp_ip4_addr_t sta_gw = {0};
 static bool sta_gw_valid = false;
-
-bool wifi_ai_req = false;
 
 esp_err_t wifi_funcs_scan(wifi_scan_t *wifi_scan)
 {
@@ -710,8 +705,6 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 		// RGB indicator
 		uint8_t rgb_state = RGB_SET_OFF;
 		xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-
-		wifi_connected = false;
 	}
 	// Connected event
 	else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
@@ -738,13 +731,14 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 		// RGB indicator
 		uint8_t rgb_state = RGB_SET_GREEN;
 		xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-
-		wifi_connected = true;
 		
-		// If not just grabing local time -> OTA
-		if (!wifi_getting_time && !wifi_ai_req) {
+		// If WIFI_CHECK_OTA_ON_CONN_BIT is set, check for OTA firmware update on this connection
+		if (xEventGroupGetBits(xWifiEventGroup) & WIFI_CHECK_OTA_ON_CONN_BIT) {
 			// Check for new firmware version and update if so
 			ota_update_check_start("https://raw.githubusercontent.com/RoboticWorx/pc5-test/main/manifest.json");
+
+			// Clear the bit now that we've acted on it
+			xEventGroupClearBits(xWifiEventGroup, WIFI_CHECK_OTA_ON_CONN_BIT);
 		}
 	}
 }

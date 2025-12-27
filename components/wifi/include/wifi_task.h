@@ -28,13 +28,14 @@ extern EventGroupHandle_t xConnectionIconEventGroup;
 #define WIFI_PORTAL_START_BT_BIT  (1U << 2)
 extern EventGroupHandle_t xWiFiPortalEventGroup;
 
-#define WIFI_SCAN_NETWORKS_BIT  (1U << 0)
-#define WIFI_CONNECTING_BIT     (1U << 1)
-#define WIFI_CONNECTED_BIT      (1U << 2)
-#define WIFI_DISCONNECT_BIT     (1U << 3)
-#define WIFI_RECONNECT_BIT      (1U << 4)
-#define WIFI_MQTT_CONNECTED_BIT (1U << 5)
-#define WIFI_MQTT_SUCCESS_BIT   (1U << 6)
+#define WIFI_SCAN_NETWORKS_BIT     (1U << 0)
+#define WIFI_CONNECTING_BIT        (1U << 1)
+#define WIFI_CONNECTED_BIT         (1U << 2)
+#define WIFI_DISCONNECT_BIT        (1U << 3)
+#define WIFI_RECONNECT_BIT         (1U << 4)
+#define WIFI_MQTT_CONNECTED_BIT    (1U << 5)
+#define WIFI_MQTT_SUCCESS_BIT      (1U << 6)
+#define WIFI_CHECK_OTA_ON_CONN_BIT (1U << 7)
 extern EventGroupHandle_t xWifiEventGroup;
 
 extern QueueHandle_t xWifiScanQueue;

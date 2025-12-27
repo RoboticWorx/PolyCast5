@@ -3,7 +3,8 @@
 
 #include "freertos/idf_additions.h"
 
-extern SemaphoreHandle_t xBleConnectedSemaphore;
+#define BLUETOOTH_CONNECTED_BIT (1U << 0)
+extern EventGroupHandle_t xBluetoothEventGroup;
 
 extern QueueHandle_t xBluetoothMediaCmdQueue;
 extern QueueHandle_t xBluetoothAiCmdQueue;

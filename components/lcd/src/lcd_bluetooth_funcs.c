@@ -41,7 +41,6 @@
 #define MAX_BT_NAME_LEN 12
 
 extern char bt_wifi_portal_pass[];
-extern bool wifi_ai_req;
 
 static uint8_t current_category = 0;
 
@@ -1396,6 +1395,9 @@ void lcd_bluetooth_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blueto
 
 void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
 {
+	#define AI_BT_FAILED_TXT "Connection failed!\nPlease pair to a\nBluetooth device at\nleast once and make\nsure you are in range."
+	#define AI_WIFI_FAILED_TXT "Connection failed!\nPlease connect to your\nWi-Fi network at least\nonce in the 'Wi-Fi'\nmenu and make sure\nyou are in range."
+
 	// Statics
 	static bool do_once = false;
 	static lv_obj_t *lbl_ins = NULL;
@@ -1417,7 +1419,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 	// Only execute once
 	if (!do_once) {
 		lbl_ins = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_ins, "Push to talk!", user_secondary_color,
+		lcd_format_label(lbl_ins, "Connecting to Wi-Fi...", user_secondary_color,
 				&lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 16);
 
 		ai_orb = lv_img_create(ACTIVE_SCR);
@@ -1441,27 +1443,69 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         lv_obj_set_style_transform_height(ai_orb, 8, 0);
 
 		lv_timer_handler();
-		
-		// Signal not to check for OTA (AI request)
-		wifi_ai_req = true; // TODO: Mutex
 
-		// Connect to previous Wi-Fi network
-		wifi_login_t prev_network = wifi_funcs_get_prev(); // Loads boot state saved network info
-		prev_network.prev = true; // Connecting to previous
-		if (xQueueSend(xWifiSelectedNetworkQueue, &prev_network, portMAX_DELAY) != pdPASS) {
-			ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue previous_network");
+		// Already connected to Wi-Fi
+		if (xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT) {
+			lv_label_set_text(lbl_ins, "Connecting with BLE...");
+			lv_timer_handler();
+
+			// Connect to BLE
+			uint16_t cmd = BLUETOOTH_CMD_INIT;
+			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+
+			// Wait up to 6s for bluetooth to connect
+			if ((xEventGroupWaitBits(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(6000)) & BLUETOOTH_CONNECTED_BIT) != 0) {
+				lv_label_set_text(lbl_ins, "Hold & talk!");
+			}
+			else {
+				// Hide unused and center error label
+				lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
+				lv_obj_add_flag(lbl_config, LV_OBJ_FLAG_HIDDEN);
+
+				lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
+				lv_label_set_text(lbl_ins, AI_BT_FAILED_TXT);
+			}
 		}
+		// Connect to Wi-Fi and BLE
+		else {
+			// Connect to previous Wi-Fi network
+			wifi_login_t prev_network = wifi_funcs_get_prev(); // Loads boot state saved network info
+			prev_network.prev = true; // Connecting to previous
+			if (xQueueSend(xWifiSelectedNetworkQueue, &prev_network, portMAX_DELAY) != pdPASS) {
+				ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue previous_network");
+			}
+	
+			// Wait up to 10s for Wi-Fi to connect
+			if ((xEventGroupWaitBits(xWifiEventGroup, WIFI_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(10000)) & WIFI_CONNECTED_BIT) != 0) {
+				lv_label_set_text(lbl_ins, "Connecting with BLE...");
+				lv_timer_handler();
+	
+				// Connect to BLE
+				uint16_t cmd = BLUETOOTH_CMD_INIT;
+				xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+	
+				// Wait up to 15s for bluetooth to connect
+				if ((xEventGroupWaitBits(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(15000)) & BLUETOOTH_CONNECTED_BIT) != 0) {
+					lv_label_set_text(lbl_ins, "Hold & talk!");
+				}
+				else {
+					// Hide unused and center error label
+					lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
+					lv_obj_add_flag(lbl_config, LV_OBJ_FLAG_HIDDEN);
+					
+					lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
+					lv_label_set_text(lbl_ins, AI_BT_FAILED_TXT);
+				}
+			}
+			else {
+				// Hide unused and center error label
+				lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
+				lv_obj_add_flag(lbl_config, LV_OBJ_FLAG_HIDDEN);
 
-		// Clear AI request flag
-		wifi_ai_req = false;
-
-		// TODO: Switch to EventGroup and wait for connected until select available
-		// xSemaphoreTake(xBleConnectedSemaphore, portMAX_DELAY);
-		// xSemaphoreTake(xWifiNetworkConnectedSemaphore, portMAX_DELAY);
-
-		// Connect to BLE
-		uint16_t cmd = BLUETOOTH_CMD_INIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+				lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
+				lv_label_set_text(lbl_ins, AI_WIFI_FAILED_TXT);
+			}
+		}
 		
 		do_once = true;
 	}
@@ -1559,7 +1603,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 		// angle = (angle + 450) % 3600; // 45 degrees per frame
         // lv_obj_set_style_transform_angle(ai_orb, angle, 0);
 
-		xQueueSend(xAiCmdQueue, "pass autofill my justin roboticworx email", pdMS_TO_TICKS(100));
+		xQueueSend(xAiCmdQueue, "please explain how memories could be transferred from one human to another", pdMS_TO_TICKS(100));
 	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {

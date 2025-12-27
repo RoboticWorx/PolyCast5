@@ -1017,6 +1017,9 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 
 			break;
 		case ESP_HIDD_CONNECT_EVENT: {
+			// Signal Bluetooth is connected
+			xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT);
+
 			// Show Bluetooth connected icon
 			xEventGroupSetBits(xConnectionIconEventGroup, ICON_BIT_BT_CONNECTED);
 
@@ -1029,6 +1032,9 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 			break;
 		}
 		case ESP_HIDD_DISCONNECT_EVENT: {
+			// Signal Bluetooth is disconnected
+			xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT);
+
 			// Remove Bluetooth connected icon
 			xEventGroupClearBits(xConnectionIconEventGroup, ICON_BIT_BT_CONNECTED);
 
@@ -1106,8 +1112,6 @@ void bluetooth_init(void)
 	#endif
 
 	bluetooth_state = BT_STATE_RUNNING;
-
-	xSemaphoreGive(xBleConnectedSemaphore); // Signal Bluetooth is connected
 }
 
 // Declare self-implemented function

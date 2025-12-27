@@ -18,7 +18,7 @@
 
 #define TAG "BLUETOOTH_TASK"
 
-SemaphoreHandle_t xBleConnectedSemaphore;
+EventGroupHandle_t xBluetoothEventGroup;
 
 QueueHandle_t xBluetoothMediaCmdQueue;
 QueueHandle_t xBluetoothAiCmdQueue;
@@ -36,8 +36,8 @@ static const TickType_t battery_timer_interval = pdMS_TO_TICKS(1000);
 
 static void bluetooth_task(void *arg)
 {
-	xBleConnectedSemaphore = xSemaphoreCreateBinary();
-	configASSERT(xBleConnectedSemaphore);
+	xBluetoothEventGroup = xEventGroupCreate();
+	configASSERT(xBluetoothEventGroup);
 
 	xBluetoothMediaCmdQueue = xQueueCreate(1, sizeof(uint16_t));
 	configASSERT(xBluetoothMediaCmdQueue);

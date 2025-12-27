@@ -30,7 +30,6 @@
 #define AI_HTTP_BODY_MAX_CAP (48 * 1024)
 
 // TODO: Add mutexes if these are shared across tasks
-extern bool wifi_connected;
 extern bluetooth_state_t bluetooth_state;
 
 typedef struct {

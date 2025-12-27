@@ -114,11 +114,8 @@ extern wifi_login_t selected_network;
 extern bool monitoring_packets;
 extern bool sleeping_from_home;
 
-extern bool wifi_ai_req; // TODO: Not this bool
-
 uint32_t pin_attempts = 0;
 bool pin_signing_in = false;
-bool lcd_wifi_connected = false;
 
 static bool pin_to_selection_page = true; // Flag on if going to selection or hotkey page from pin
 
@@ -2763,20 +2760,17 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 			
 			lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
 			lv_label_set_text(lbl, buf);
-			
-			lcd_wifi_connected = true;
 		}
 		// If Wi-Fi connected bit transitioned 1 -> 0
 		if ((last_wifi_event_bits & WIFI_CONNECTED_BIT) && !(wifi_event_bits & WIFI_CONNECTED_BIT)) {
 			lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
 			lv_label_set_text(lbl, "Connect to network");
-			
-			lcd_wifi_connected = false;
 		}
 
 		last_wifi_event_bits = wifi_event_bits;
 	}
 	
+	// TODO: Settings only?
 	// If update is available
 	if (xSemaphoreTake(xWifiOtaAvailableSemaphore, 0) == pdTRUE) {
 		// Hide Wi-Fi menu
@@ -2813,7 +2807,7 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 		// Connect to network
 		else if (ui_btns->select_btn == 1 && wifi_menu->index == 0) {
 			// If connected to a network
-			if (lcd_wifi_connected) {
+			if (xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT) {
 				xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 			}
 			// Already disconnected
@@ -2860,7 +2854,8 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 			// Hide Wi-Fi menu
 			lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 			
-			if (lcd_wifi_connected) {
+			// If connected to a network
+			if (xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT) {
 				// Delete ping labels
 				lv_obj_delete(gateway_ping_lbl);
 				lv_obj_delete(dns_ping_lbl);
@@ -2897,7 +2892,8 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 			// Hide Wi-Fi menu
 			lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 			
-			if (lcd_wifi_connected) {
+			// If connected to a network
+			if (xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT) {
 				// Delete ping labels
 				lv_obj_delete(gateway_ping_lbl);
 				lv_obj_delete(dns_ping_lbl);
@@ -3191,8 +3187,8 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 				&lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
 		lv_timer_handler();
 
-		// Signal not to check for OTA (AI request)
-		wifi_ai_req = true; // TODO: Mutex + not this bool
+		// Check for OTA on connect
+		xEventGroupSetBits(xWifiEventGroup, WIFI_CHECK_OTA_ON_CONN_BIT);
 
 		// Connect to previous Wi-Fi network
 		wifi_login_t prev_network = wifi_funcs_get_prev(); // Loads boot state saved network info
@@ -3200,9 +3196,6 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		if (xQueueSend(xWifiSelectedNetworkQueue, &prev_network, portMAX_DELAY) != pdPASS) {
 			ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue previous_network");
 		}
-
-		// Clear AI request flag
-		wifi_ai_req = false;
 
 		if (xSemaphoreTake(xWifiOtaAvailableSemaphore, pdMS_TO_TICKS(8000)) == pdTRUE) {
 			lv_label_set_text(lbl_check, "Update available!");

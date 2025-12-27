@@ -37,9 +37,6 @@ LTP of synapses between neurons in the brain.
 #define SRS_CNT_KEY "cnt" // Number of entries key
 #define SRS_LAST_PAGE_KEY "last" // Last page used (for auto-increment)
 
-extern bool lcd_wifi_connected;
-extern bool wifi_getting_time;
-
 // SRS intervals: 1d > 3d > 7d > 14d > 1m > 3m > 6m > 12m
 const uint16_t srs_days[] = {1, 3, 7, 14, 30, 90, 180, 365};
 
@@ -113,10 +110,8 @@ bool srs_sync_time_over_wifi(void)
 	ESP_LOGI(TAG, "Getting day via Wi-Fi");
 	#endif
 
-	wifi_getting_time = true;
-
 	// If Wi-Fi already connected
-	if (lcd_wifi_connected) {
+	if (xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT) {
 		#ifdef POLYCAST5_DEBUG
 		ESP_LOGI(TAG, "Wi-Fi already connected");
 		#endif
@@ -128,8 +123,6 @@ bool srs_sync_time_over_wifi(void)
 		lv_obj_delete(lbl_info);
 		lbl_info = NULL;
 	
-		wifi_getting_time = false;
-
 		return true;
 	}
 
@@ -165,7 +158,6 @@ bool srs_sync_time_over_wifi(void)
 		lbl_info = NULL;
 
 		lcd_clear_pending_inputs = true; // Clear user inputs from wait
-		wifi_getting_time = false;
 
 		return false;
 	}
@@ -173,7 +165,6 @@ bool srs_sync_time_over_wifi(void)
 	// Delete helper text
 	lv_obj_delete(lbl_info);
 	lbl_info = NULL;
-	wifi_getting_time = false;
 	return true;
 }
 
