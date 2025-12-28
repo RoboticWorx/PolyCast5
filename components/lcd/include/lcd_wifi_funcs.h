@@ -143,24 +143,6 @@ void lcd_wifi_send_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
 
 /**
- * @brief Prompts user confirmation to update the device via OTA
- *
- * @param [in] ui_btns UI input structure
- * @param [in] ui_menu UI menu structure
- * @param [in] wifi_menu Wi-Fi menu structure
- */
-void lcd_wifi_ota_confirm_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
-
-/**
- * @brief Display updating screen and update progress bar
- *
- * @param [in] ui_btns UI input structure
- * @param [in] ui_menu UI menu structure
- * @param [in] wifi_menu Wi-Fi menu structure
- */
-void lcd_wifi_ota_updating_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
-
-/**
  * @brief Loads Wi-Fi menu items from NVS
  *
  * @param [in] wifi_menu Wi-Fi menu structure

@@ -367,12 +367,6 @@ static void lcd_task(void *pvParameters)
 				case WIFI_NAME_PAGE:
 					lcd_wifi_create_custom_name(&ui_btns, &ui_menu, &wifi_menu);
 					break;
-				case WIFI_OTA_CONFIRM_PAGE:
-					lcd_wifi_ota_confirm_page(&ui_btns, &ui_menu, &wifi_menu);
-					break;
-				case WIFI_OTA_UPDATING_PAGE:
-					lcd_wifi_ota_updating_page(&ui_btns, &ui_menu, &wifi_menu);
-					break;
 				// Tools pages
 				case TOOLS_PAGE:
 					lcd_tools_page(&ui_btns, &ui_menu, &tools_menu);
@@ -408,6 +402,12 @@ static void lcd_task(void *pvParameters)
 					lcd_tools_srs_page(&ui_btns, &ui_menu, &tools_menu);
 					break;
 				// Settings pages
+				case SETTINGS_OTA_CONFIRM_PAGE:
+					lcd_settings_ota_confirm_page(&ui_btns, &ui_menu, &settings_menu);
+					break;
+				case SETTINGS_OTA_UPDATING_PAGE:
+					lcd_settings_ota_updating_page(&ui_btns, &ui_menu, &settings_menu);
+					break;
 				case SETTINGS_PAGE:
 					lcd_settings_page(&ui_btns, &ui_menu, &settings_menu);
 					break;

@@ -331,13 +331,16 @@ static void ota_check_task(void *_)
 		// Save the pending version to global buffer
 		strlcpy(pending_manifest_ver, new_ver, sizeof(pending_manifest_ver));
 		
-		// Notify user that an update is available via LCD
-		xSemaphoreGive(xWifiOtaAvailableSemaphore);
+		// OTA update is available
+		xEventGroupSetBits(xWifiEventGroup, WIFI_OTA_AVAILABLE_BIT);
 	}
 	else {
 		#ifdef POLYCAST5_DEBUG
 		ESP_LOGI(TAG, "Already up-to-date");
 		#endif
+
+		// No OTA available
+		xEventGroupClearBits(xWifiEventGroup, WIFI_OTA_AVAILABLE_BIT);
 
 		pending_manifest_ver[0] = '\0'; // Clear pending version
 		ota_update_url[0] = '\0';

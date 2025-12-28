@@ -44,10 +44,6 @@
 #define MQTT_SENDING_TXT "Sending via\nMQTT broker..." 
 #define MQTT_CONNECTING_TXT "Please wait...\nConnecting..."
 
-// ota_update.c: Safe to use, no simultaneous calls
-extern char ota_update_info[512];
-extern char ota_update_url[512];
-
 wifi_menu_t wifi_menu = {
 	.options = {"Connect to network", "Monitor packets", "Sync with PolyPlug"},
 	.size = WIFI_MENU_START_SIZE,
@@ -338,7 +334,7 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 					&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
 						 						 
 			lv_timer_handler(); // Show
-							 
+			
 			// Start scan
 			xEventGroupSetBits(xWifiEventGroup, WIFI_SCAN_NETWORKS_BIT);
 			
@@ -436,8 +432,8 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		if (!scanning) {
 			// Wait label
 			lbl_wait = lv_label_create(ACTIVE_SCR);
-			lcd_format_label(lbl_wait, "Scanning for networks...\nPlease wait...", user_secondary_color,
-					&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 20);
+			lcd_format_label(lbl_wait, "Scanning for networks...", user_secondary_color,
+					&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -10);
 							 
 			// Start scan
 			xEventGroupSetBits(xWifiEventGroup, WIFI_SCAN_NETWORKS_BIT);
@@ -547,6 +543,11 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		
 		selected_network = wifi_funcs_get_prev(); // Loads boot state saved network info
 		selected_network.prev = true; // Connecting to previous
+
+		#ifdef POLYCAST5_CHECK_OTA_ON_CONN
+		// Check for OTA on connect
+		xEventGroupSetBits(xWifiEventGroup, WIFI_CHECK_OTA_ON_CONN_BIT);
+		#endif
 		
 		if (xQueueSend(xWifiSelectedNetworkQueue, &selected_network, portMAX_DELAY) != pdPASS) {
 			ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue previous_network");
@@ -2291,243 +2292,6 @@ void lcd_wifi_setup_send_page(wifi_menu_t *wifi_menu)
 	
 	// Hide everything for now
 	hide_wifi_send_page(wifi_menu);
-}
-
-void lcd_wifi_ota_confirm_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu) 
-{	
-	#define OTA_CONF_Y_OFFSET 40
-	
-	// Statics
-	static bool init = false;
-	static lv_obj_t *cont = NULL;
-	static lv_obj_t *title_lbl = NULL;
-	static lv_obj_t *instr_lbl = NULL;
-	
-	if (!init) {
-		// Create a scrollable container for the instructions
-		cont = lv_obj_create(ACTIVE_SCR);
-		lv_obj_set_size(cont, 210, 106);
-		lv_obj_center(cont);
-		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
-		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
-		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
-		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
-
-		// Title label
-		title_lbl = lv_label_create(cont);
-		lv_label_set_text(title_lbl, "Update Available!");
-		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
-		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
-		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
-
-		// Instructions label (scrollable if text is long)
-		instr_lbl = lv_label_create(cont);
-		lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
-		lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
-		lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
-		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
-		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
-
-		// Set instruction text
-		const char *instr_text =
-				"A new firmware update is available. "
-				"Press RIGHT to start the update or LEFT to dismiss this message."
-				"\n\nMore update info below:\n\n%s";
-		
-		// Combine into single string
-		char buf[1024];
-		snprintf(buf, sizeof(buf), instr_text, ota_update_info);
-		
-		lv_label_set_text(instr_lbl, buf);
-	
-		init = true;
-	}
-	
-	if (ui_btns->up_btn == 1) {
-		lv_obj_scroll_by_bounded(cont, 0, OTA_CONF_Y_OFFSET, LV_ANIM_ON);
-	}
-	else if (ui_btns->down_btn == 1) {
-		lv_obj_scroll_by_bounded(cont, 0, -OTA_CONF_Y_OFFSET, LV_ANIM_ON);
-	}
-	// Dismiss
-	else if (ui_btns->left_btn) {
-		// Hide right arrow
-		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-		
-		// Delete objects
-		lv_obj_delete(cont); // Deletes children
-		
-		// Reset statics
-		cont = NULL;
-		title_lbl = instr_lbl = NULL;
-		init = false;
-
-		// Show Wi-Fi list
-		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-
-		ui_menu->page = WIFI_PAGE;
-	}
-	// Start the update selected
-	else if (ui_btns->right_btn == 1) {
-		// Delete objects
-		lv_obj_delete(cont); // Deletes children
-		
-		// Reset statics
-		cont = NULL;
-		title_lbl = instr_lbl = NULL;
-		init = false;
-
-		// Hide right and left arrows
-		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-
-		// Go to progress bar page
-		ui_menu->page = WIFI_OTA_UPDATING_PAGE;
-	}
-	// Home or power off
-	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
-		// Delete objects
-		lv_obj_delete(cont); // Deletes children
-		
-		// Reset statics
-		cont = NULL;
-		title_lbl = instr_lbl = NULL;
-		init = false;
-		
- 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
-	}
-}
-
-void lcd_wifi_ota_updating_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu) 
-{
-	#define OTA_UPDATING_Y_OFFSET 40
-
-	// Statics
-	static bool init = false;
-	static lv_obj_t *cont = NULL;
-	static lv_obj_t *title_lbl = NULL;
-	static lv_obj_t *instr_lbl = NULL;
-
-	static lv_obj_t *prog_row = NULL;
-	static lv_obj_t *prog_bar = NULL;
-	static lv_obj_t *pct_lbl  = NULL;
-
-	static int ota_pct = 0;
-
-	if (!init) {
-		// Create a scrollable container for the instructions
-		cont = lv_obj_create(ACTIVE_SCR);
-		lv_obj_set_size(cont, 210, 106);
-		lv_obj_center(cont);
-		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners
-		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
-		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
-		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding
-
-		// Title
-		title_lbl = lv_label_create(cont);
-		lv_label_set_text(title_lbl, "Updating...");
-		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
-		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
-		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
-
-		// Instructions
-		instr_lbl = lv_label_create(cont);
-		lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
-		lv_obj_set_width(instr_lbl, lv_pct(100));
-		lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
-		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
-		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
-
-		const char *instr_text =
-				"Please do not turn off your device.\n\n\n"
-				"If you get stuck at 0% for any reason, please reboot your device by pressing the HOME and RIGHT buttons at the same time then try again.";
-
-		lv_label_set_text(instr_lbl, instr_text);
-
-		// Progress row
-		prog_row = lv_obj_create(cont);
-		lv_obj_remove_style_all(prog_row);
-		lv_obj_set_width(prog_row, lv_pct(100));
-		lv_obj_set_style_pad_row(prog_row, 0, 0);
-		lv_obj_set_style_pad_column(prog_row, 4, 0); // Space between bar and %
-		lv_obj_set_style_pad_all(prog_row, 2, 0);
-		lv_obj_set_flex_flow(prog_row, LV_FLEX_FLOW_ROW);
-		lv_obj_set_flex_align(prog_row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-		lv_obj_align_to(prog_row, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, -10); // Progress bar offset
-
-		// Bar
-		prog_bar = lv_bar_create(prog_row);
-		lv_bar_set_range(prog_bar, 0, 100);
-		lv_bar_set_value(prog_bar, 0, LV_ANIM_OFF);
-		lv_obj_set_height(prog_bar, 12);
-		lv_obj_set_width(prog_bar, lv_pct(100));
-		lv_obj_set_flex_grow(prog_bar, 1); // Take remaining width
-		// Bar style
-		lv_obj_set_style_border_width(prog_bar, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_border_color(prog_bar, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_bg_opa(prog_bar, LV_OPA_20, LV_PART_MAIN);
-		lv_obj_set_style_bg_color(prog_bar, lv_color_darken(user_primary_color, 100), LV_PART_MAIN);
-		lv_obj_set_style_bg_color(prog_bar, user_secondary_color, LV_PART_INDICATOR);
-		lv_obj_set_style_bg_opa(prog_bar, LV_OPA_COVER, LV_PART_INDICATOR);
-		lv_obj_set_style_radius(prog_bar, 6, LV_PART_MAIN | LV_PART_INDICATOR);
-
-		// Percentage label
-		pct_lbl = lv_label_create(prog_row);
-		lv_label_set_text(pct_lbl, "0%");
-		lv_obj_set_style_text_color(pct_lbl, user_secondary_color, 0);
-		lv_obj_set_style_text_font(pct_lbl, &lv_font_montserrat_14, 0);
-
-		// Start the OTA update
-		ota_update_start(ota_update_url);
-
-		init = true;
-	}
-
-	// Update progress when OTA task posts a new value
-	if (xQueueReceive(xWifiOtaPctQueue, &ota_pct, 0) == pdTRUE) {
-		// Success
-		if (ota_pct == -1) {
-			lv_bar_set_value(prog_bar, 100, LV_ANIM_ON);
-			lv_label_set_text(pct_lbl, "Done!");
-		}
-		// Fail
-		else if (ota_pct == -2) {
-			lv_bar_set_value(prog_bar, 0, LV_ANIM_ON);
-			lv_label_set_text(pct_lbl, "Fail!");
-		}
-		// Normal percentage
-		else {
-			if (ota_pct < 0) {
-				ota_pct = 0;
-			}
-			else if (ota_pct > 100) {
-				ota_pct = 100;
-			}
-			
-			// Smooth % fill
-			lv_bar_set_value(prog_bar, ota_pct, LV_ANIM_ON);
-			lv_label_set_text_fmt(pct_lbl, "%d%%", ota_pct);
-		}
-	}
-
-	// Scrolling
-	if (ui_btns->up_btn == 1) {
-		lv_obj_scroll_by_bounded(cont, 0, OTA_UPDATING_Y_OFFSET, LV_ANIM_ON);
-	}
-	else if (ui_btns->down_btn == 1) {
-		lv_obj_scroll_by_bounded(cont, 0, -OTA_UPDATING_Y_OFFSET, LV_ANIM_ON);
-	}
 }
 
 esp_err_t lcd_wifi_menu_nvs_save(const wifi_menu_t *menu)

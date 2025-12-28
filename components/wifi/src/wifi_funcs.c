@@ -32,9 +32,6 @@
 #define TAG "WIFI_FUNCS"
 #define TAG_PING "PING"
 
-#define WIFI_INTERNAL_CONNECTED_BIT (1 << 0)
-#define WIFI_INTERNAL_DISCONNECTED_BIT (1 << 1)
-
 /* Helpers to pull type/subtype from the 802.11 frame control */
 #define FC_TYPE(fc)	(((fc) & 0x0C) >> 2)
 #define FC_SUBTYPE(fc) (((fc) & 0xF0) >> 4)
@@ -46,11 +43,9 @@
 static esp_mqtt_client_handle_t mqtt_client;
 
 static uint8_t target_bssid[6] = { 0x60, 0x55, 0xF9, 0xFC, 0xDE, 0xA8 };
-static EventGroupHandle_t wifi_internal_event_group;
 
 static wifi_data_t wifi_data;
 static char mqtt_active_ack_topic[80] = {0};
-static bool mqtt_connected = false;
 
 static volatile int32_t ping_avg_ms = -1;
 static esp_ip4_addr_t sta_gw = {0};
@@ -655,7 +650,7 @@ void wifi_funcs_get_current_date_time(void)
 		setenv("TZ", "EST5EDT,M3.2.0/2,M11.1.0/2", 1); // Fallback to EST
 		tzset();
 		
-		ESP_LOGE(TAG, "wifi_funcs_apply_timezone_auto FAILED: Falling back to UTC0");
+		ESP_LOGE(TAG, "wifi_funcs_apply_timezone_auto FAILED: Falling back to EST (EST5EDT,M3.2.0/2,M11.1.0/2)");
 	}
 	
 	char strftime_buf[64];
@@ -695,12 +690,11 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 		
 		wifi_funcs_radio_stop();
 		
-		xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_MQTT_CONNECTED_BIT); // Notify LCD we disconnected
+		// Notify we disconnected
+		xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_MQTT_CONNECTED_BIT | WIFI_CONNECTING_BIT);
 
-		// Remove Wi-Fi connected icon
+		// Disconnected icon
 		xEventGroupClearBits(xConnectionIconEventGroup, ICON_BIT_WIFI_CONNECTED);
-
-		xEventGroupSetBits(wifi_internal_event_group, WIFI_INTERNAL_DISCONNECTED_BIT);
 		
 		// RGB indicator
 		uint8_t rgb_state = RGB_SET_OFF;
@@ -720,13 +714,12 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 		sta_gw = e->ip_info.gw;
 		sta_gw_valid = true;
 
-		xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTED_BIT); // Notify LCD we connected
+		// Notify we connected
+		xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTED_BIT);
 		xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // No longer trying to connect
 		
-		// Show Wi-Fi connected icon
+		// Connected icon
 		xEventGroupSetBits(xConnectionIconEventGroup, ICON_BIT_WIFI_CONNECTED);
-
-		xEventGroupSetBits(wifi_internal_event_group, WIFI_INTERNAL_CONNECTED_BIT);
 		
 		// RGB indicator
 		uint8_t rgb_state = RGB_SET_GREEN;
@@ -745,8 +738,6 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 
 void wifi_funcs_wifi_event_init(void)
 {
-	wifi_internal_event_group = xEventGroupCreate();
-	
 	ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler,
 			NULL, NULL));
 				 
@@ -766,7 +757,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 			// Subscribe to any polycast5/.../ack
 			esp_mqtt_client_subscribe(event->client, "polycast5/+/ack", 0);
 			
-			mqtt_connected = true;
 			xEventGroupSetBits(xWifiEventGroup, WIFI_MQTT_CONNECTED_BIT); // Notify LCD we connected
 			break;
 			
@@ -783,7 +773,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 			ESP_LOGI(TAG, "Broker ACKed message ID %d on topic %.*s", event->msg_id, event->topic_len, event->topic);
 			#endif
 			
-			mqtt_connected = false;
 			break;
 			
 		case MQTT_EVENT_DATA:
@@ -808,6 +797,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 					ESP_LOGI(TAG, "Received MQTT receipt matches!");
 					#endif
 					
+					// Notify user of successful send
 					xEventGroupSetBits(xWifiEventGroup, WIFI_MQTT_SUCCESS_BIT);
 				}
 			}
@@ -894,34 +884,16 @@ void wifi_funcs_mqtt_client_publish(char *payload, const uint8_t key[16])
 	}
 }
 
-
-static bool wait_for_connection(TickType_t timeout)
-{
-	// Wait for either bit
-	EventBits_t bits = xEventGroupWaitBits(wifi_internal_event_group, WIFI_INTERNAL_CONNECTED_BIT | WIFI_INTERNAL_DISCONNECTED_BIT, pdTRUE, pdFALSE, timeout);
-
-	// Got IP
-	if (bits & WIFI_INTERNAL_CONNECTED_BIT) {
-		return true;
-	}
-	
-	// Disconnected
-	if (bits & WIFI_INTERNAL_DISCONNECTED_BIT) {
-		return false;
-	}
-	
-	// Timed out
-	return false;
-}
-
 esp_err_t wifi_funcs_connect(void)
 {
-	xEventGroupClearBits(wifi_internal_event_group, WIFI_INTERNAL_CONNECTED_BIT | WIFI_INTERNAL_DISCONNECTED_BIT);
+	// Fresh start
+	xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_MQTT_CONNECTED_BIT);
 	
 	esp_err_t err = esp_wifi_connect();
 	
-	// Check connetion
-	if (wait_for_connection(pdMS_TO_TICKS(15000))) {
+	// Wait for connection or timeout
+	if (xEventGroupWaitBits(xWifiEventGroup, WIFI_CONNECTED_BIT,
+			pdFALSE, pdFALSE, pdMS_TO_TICKS(15000)) & WIFI_CONNECTED_BIT) {
 		#ifdef POLYCAST5_DEBUG
 		ESP_LOGI(TAG, "Wi-Fi connected and got IP!");
 		#endif
@@ -929,8 +901,15 @@ esp_err_t wifi_funcs_connect(void)
 		// wifi_funcs_mqtt_client_start() called after checking for OTA update
 	}
 	else {
-		ESP_LOGE(TAG, "Failed to connect");
+		ESP_LOGE(TAG, "wifi_funcs_connect: Timeout. Failed to connect.");
+
 		// Notify LCD
+		// WIFI_CONNECTING_FAILED_BIT for LCD "Connecting..." to change state
+		xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTING_FAILED_BIT);
+
+		// No longer trying to connect
+		xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTING_BIT);
+
 		wifi_funcs_radio_stop();
 	}
 	
@@ -980,7 +959,7 @@ esp_err_t wifi_funcs_radio_start(const char *ssid, const uint8_t* bssid, const c
 esp_err_t wifi_funcs_radio_stop(void)
 {
 	// Stop client if started
-	if (mqtt_connected) {
+	if (xEventGroupGetBits(xWifiEventGroup) & WIFI_MQTT_CONNECTED_BIT) {
 		esp_mqtt_client_disconnect(mqtt_client);
 	}
 	

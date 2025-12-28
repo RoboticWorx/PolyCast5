@@ -49,7 +49,6 @@ EventGroupHandle_t xConnectionIconEventGroup;
 EventGroupHandle_t xWiFiPortalEventGroup;
 
 // OTA
-SemaphoreHandle_t xWifiOtaAvailableSemaphore; // Wi-Fi -> LCD
 QueueHandle_t xWifiOtaPctQueue;
 
 static EventBits_t last_portal_bits = 0;
@@ -62,8 +61,6 @@ static void wifi_task(void *param)
 
 	xWifiCanSleepSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xWifiCanSleepSemaphore);
-	xWifiOtaAvailableSemaphore = xSemaphoreCreateBinary();
-	configASSERT(xWifiOtaAvailableSemaphore);
 	xWifiCycleSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xWifiCycleSemaphore);
 	xWifiPingSemaphore = xSemaphoreCreateBinary();
@@ -173,7 +170,7 @@ static void wifi_task(void *param)
 				    selected_network.bssid[0], selected_network.bssid[1], selected_network.bssid[2],
 				    selected_network.bssid[3], selected_network.bssid[4], selected_network.bssid[5]);
 			#endif
-						
+			
 			if (selected_network.prev && strlen(selected_network.ssid) == 0) {
 				#ifdef POLYCAST5_DEBUG
 				ESP_LOGW(TAG, "No previous network to connect to");

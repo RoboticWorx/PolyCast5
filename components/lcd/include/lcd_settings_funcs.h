@@ -74,6 +74,24 @@ void lcd_settings_setup_pin_page(settings_menu_t *settings_menu);
 void lcd_settings_rebuild_pin_boxes(lv_obj_t *pin_container, lv_obj_t **pin_labels, char *unlock_pin, int *num_boxes, int num_filled);
 
 /**
+ * @brief Prompts user confirmation to update the device via OTA
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] settings_menu Settings menu structure
+ */
+void lcd_settings_ota_confirm_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
+
+/**
+ * @brief Display updating screen and update progress bar
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] settings_menu Settings menu structure
+ */
+void lcd_settings_ota_updating_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
+
+/**
  * @brief Prompts user to create a pin to unlock the device
  *
  * @param [in] ui_btns User input structure

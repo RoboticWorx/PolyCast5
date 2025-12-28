@@ -2762,17 +2762,20 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 			lv_label_set_text(lbl, buf);
 		}
 		// If Wi-Fi connected bit transitioned 1 -> 0
-		if ((last_wifi_event_bits & WIFI_CONNECTED_BIT) && !(wifi_event_bits & WIFI_CONNECTED_BIT)) {
+		if (((last_wifi_event_bits & WIFI_CONNECTED_BIT) && !(wifi_event_bits & WIFI_CONNECTED_BIT))
+				|| (wifi_event_bits & WIFI_CONNECTING_FAILED_BIT)) {
 			lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
 			lv_label_set_text(lbl, "Connect to network");
+
+			xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTING_FAILED_BIT); // Reset for next time
 		}
 
 		last_wifi_event_bits = wifi_event_bits;
 	}
-	
-	// TODO: Settings only?
-	// If update is available
-	if (xSemaphoreTake(xWifiOtaAvailableSemaphore, 0) == pdTRUE) {
+
+	#ifdef POLYCAST5_CHECK_OTA_ON_CONN
+	// If OTA update is available -> confirm page
+	if (xEventGroupGetBits(xWifiEventGroup) & WIFI_OTA_AVAILABLE_BIT) {
 		// Hide Wi-Fi menu
 		lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
@@ -2789,9 +2792,13 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 		
 		// Switch pages
 		ui_menu->page = WIFI_OTA_CONFIRM_PAGE;
+
+		// Clear for next time
+		xEventGroupClearBits(xWifiEventGroup, WIFI_OTA_AVAILABLE_BIT);
 	}
 	// Else normal Wi-Fi page
 	else {
+	#endif
 		// Up button pressed
 		if (ui_btns->up_btn == 1) {
 			// Update selection
@@ -2873,7 +2880,7 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 				lbl_conf = lv_label_create(ACTIVE_SCR);
 				
 				lcd_format_label(lbl_conf, "Please connect to\n  a network first!", user_secondary_color,
-							&lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+						&lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
 				
 				lv_timer_handler();
 				vTaskDelay(pdMS_TO_TICKS(1000));
@@ -2924,7 +2931,7 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 				lbl_conf = lv_label_create(ACTIVE_SCR);
 				
 				lcd_format_label(lbl_conf, "Please connect to\n  a network first!", user_secondary_color,
-							&lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+						&lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
 				
 				lv_timer_handler();
 				vTaskDelay(pdMS_TO_TICKS(1000));
@@ -2980,7 +2987,9 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 			
 			lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 		}
+	#ifdef POLYCAST5_CHECK_OTA_ON_CONN
 	}
+	#endif
 }
 
 void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
@@ -3154,6 +3163,8 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
 
 void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
+	#define OTA_CONN_FAILED_TXT "Connection failed!\nPlease connect to your\nWi-Fi network at least\nonce in the 'Wi-Fi'\nmenu and make sure\nyou are in range."
+	
 	// Statics
 	static bool do_once = false;
 	
@@ -3182,9 +3193,13 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 		// Hide settings menu
 		lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
+		// Hide arrows
+		lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
 		lv_obj_t *lbl_check = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_check, "Checking for updates...", user_secondary_color,
-				&lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+		lcd_format_label(lbl_check, "Connecting to Wi-Fi...", user_secondary_color,
+				&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
 		lv_timer_handler();
 
 		// Check for OTA on connect
@@ -3197,34 +3212,68 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
 			ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue previous_network");
 		}
 
-		if (xSemaphoreTake(xWifiOtaAvailableSemaphore, pdMS_TO_TICKS(8000)) == pdTRUE) {
-			lv_label_set_text(lbl_check, "Update available!");
+		// Wait up to 15s to connect to Wi-Fi
+		if ((xEventGroupWaitBits(xWifiEventGroup, WIFI_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(15000)) & WIFI_CONNECTED_BIT) != 0) {
+			lv_label_set_text(lbl_check, "Checking for updates...");
 			lv_timer_handler();
-			vTaskDelay(pdMS_TO_TICKS(1000));
 
-			// Reset static
-			do_once = false;
+			// Wait up to 10s for OTA update
+			if ((xEventGroupWaitBits(xWifiEventGroup, WIFI_OTA_AVAILABLE_BIT, pdTRUE, pdFALSE, pdMS_TO_TICKS(10000)) & WIFI_OTA_AVAILABLE_BIT) != 0) {
+				lv_label_set_text(lbl_check, "Update found!");
+				lv_timer_handler();
+				vTaskDelay(pdMS_TO_TICKS(500));
+				lcd_clear_pending_inputs = true; // Clear any button presses during wait
 
-			// Show right arrow
-			lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-			
-			// Switch pages
-			ui_menu->page = WIFI_OTA_CONFIRM_PAGE;
+				// Reset static
+				do_once = false;
+
+				// Show right arrow
+				lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+				// Show top and bottom arrows
+				lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+				lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+				// Reset objects
+				lv_obj_delete(lbl_check);
+				lbl_check = NULL;
+				
+				// Switch pages
+				ui_menu->page = SETTINGS_OTA_CONFIRM_PAGE;
+				return;
+			}
+			else {
+				lv_label_set_text(lbl_check, "No new updates.");
+				lv_timer_handler();
+
+				// Wait for left button to be pressed
+				xSemaphoreTake(xLeftButtonSemaphore, portMAX_DELAY);
+				lcd_clear_pending_inputs = true; // Clear any button presses during wait
+			}
 		}
 		else {
-			lv_label_set_text(lbl_check, "No updates found.");
+			lv_label_set_text(lbl_check, OTA_CONN_FAILED_TXT);
 			lv_timer_handler();
-			vTaskDelay(pdMS_TO_TICKS(1000));
 
-			// Show settings menu
-			lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			// Wait for left button to be pressed
+			xSemaphoreTake(xLeftButtonSemaphore, portMAX_DELAY);
+			lcd_clear_pending_inputs = true; // Clear any button presses during wait
 		}
-
-		// Disconnect from Wi-Fi
-		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
 		lv_obj_delete(lbl_check);
 		lbl_check = NULL;
+
+		// Show settings menu
+		lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+		// Show top and bottom arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		lv_timer_handler();
+
+		// Disconnect from Wi-Fi
+		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 	}
 	// Set unlock pin selected
 	else if (ui_btns->select_btn == 1 && settings_menu->index == 1) {

@@ -29,5 +29,7 @@
 
 //#define POLYCAST5_CYCLE_RGB_ON_BOOT 1 // Cycle through the RGB LED to make sure it is working
 
+//#define POLYCAST5_CHECK_OTA_ON_CONN 1 // Check for OTA update on regular Wi-Fi connect
+
 
 #endif // POLYCAST5_MACROS_H
