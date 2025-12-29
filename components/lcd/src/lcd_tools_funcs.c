@@ -1340,6 +1340,7 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
 	static bool do_once = false;
 	static lv_obj_t *lbl_title, *lbl_help, *lbl_list[SRS_MAX_TO_SHOW], *lbl_hint;
 	static int sel = 0; // Selection cursor inside due list
+	static int top = 0; // Scroll offset: which due item is on the top row
 	static int due_total = 0; // Total due today (not just displayed)
 	static int due_vis = 0; // How many we're displaying (<= SRS_MAX_TO_SHOW)
 	static int due_idx[SRS_NUM_STEPS]; // Workspace of indices (store more than shown)
@@ -1382,47 +1383,107 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
 		for (int i = 0; i < SRS_MAX_TO_SHOW; ++i) {
 			lbl_list[i] = lv_label_create(ACTIVE_SCR);
 			lcd_format_label(lbl_list[i], "", user_secondary_color,
-					&lv_font_montserrat_16, LV_ALIGN_LEFT_MID, 18, -25 + (i * 18));
+					&lv_font_montserrat_16, LV_ALIGN_LEFT_MID, 21, -28 + (i * 22));
 		}
 
 		lbl_hint = lv_label_create(ACTIVE_SCR);
 		lcd_format_label(lbl_hint, "", user_secondary_color,
 				&lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, -24);
 
+		// Fresh start
 		do_once = true;
-		sel = 0;
+		sel = top = 0;
 	}
 
 	// Recompute today and the due queue
 	today = srs_days_since_epoch_local(calibrate);
-	
+
 	// Build entries due
-	const int cap = (int)(sizeof(due_idx) / sizeof(due_idx[0]));
-	due_total = srs_build_due_list(due_idx, cap, today);
+	due_total = srs_build_due_list(due_idx, SRS_NUM_STEPS, today); // SRS_NUM_STEPS cap
+
+	// Compute how many to show (up to SRS_MAX_TO_SHOW)
+	due_vis = (due_total > SRS_MAX_TO_SHOW) ? SRS_MAX_TO_SHOW : due_total;
+	// Keep sel/top valid when the list shrinks/grows
+	if (due_total == 0) {
+		sel = 0;
+		top = 0;
+	}
+	// Entries are due
+	else {
+		// Clamp sel into valid range
+		if (sel >= due_total) {
+			sel = due_total - 1;
+		}
+		if (sel < 0) {
+			sel = 0;
+		}
+
+		// Compute the maximum valid top entry
+		int max_top = due_total - due_vis; // >= 0
+
+		// Clamp top into valid range
+		if (top > max_top) {
+			top = max_top;
+		}
+		if (top < 0) {
+			top = 0;
+		}
+
+		// Auto-scroll to keep selection visible in the 3-row window:
+		// Selection is above the top visible row, so scroll up
+		if (sel < top) {
+			top = sel;
+		}
+		// Selection is below the bottom visible row, so scroll down
+		else if (sel >= top + due_vis) {
+			top = sel - due_vis + 1; // +1 to land on the last visible row
+		}
+	}
 
 	// Render list (SRS_MAX_TO_SHOW rows)
 	due_vis = (due_total > SRS_MAX_TO_SHOW) ? SRS_MAX_TO_SHOW : due_total; // Cap at SRS_MAX_TO_SHOW
 	for (int i = 0; i < SRS_MAX_TO_SHOW; ++i) {
-		// If within visible window -> show
-		if (i < due_vis) {
-			int idx = due_idx[i]; // Entry to consider
+		int g = top + i; // global index into due_idx[]
+
+		if (g < due_total) {
+			int idx = due_idx[g];
+			int days_since_added = (int)(today - srs_tbl[idx].start_day);
+
 			#ifdef POLYCAST5_DEBUG
-			int current_step = (int)srs_days[srs_tbl[idx].step]; // Get the step the entry is on
+			int current_step = (int)srs_days[srs_tbl[idx].step];
+			ESP_LOGI(TAG, "Pg. %u is on: interval %d | step %d | added %d days ago",
+					srs_tbl[idx].page, current_step, srs_tbl[idx].step, days_since_added);
 			#endif
-			int days_since_added = (int)(today - srs_tbl[idx].start_day); // How many days have elapsed since added
-			
-			#ifdef POLYCAST5_DEBUG
-			ESP_LOGI(TAG, "Pg. %u is on: interval %d | step %d | added %d days ago", srs_tbl[idx].page, current_step, srs_tbl[idx].step, days_since_added);
-			#endif
-			
-			// Format label
+
 			char line[32];
-			snprintf(line, sizeof(line), "%c Pg. %u: %d day(s) ago", (i == sel) ? '>' : '<', srs_tbl[idx].page, days_since_added);
-			lv_label_set_text(lbl_list[i], line); // Set text
-			lv_obj_remove_flag(lbl_list[i], LV_OBJ_FLAG_HIDDEN); // Ensure visible
+			if (days_since_added > 1) {
+				snprintf(line, sizeof(line), "Pg. %u: %d days ago",
+						srs_tbl[idx].page,
+						days_since_added);
+			}
+			else {
+				snprintf(line, sizeof(line), "Pg. %u: %d day ago",
+						srs_tbl[idx].page,
+						days_since_added);
+			}
+
+			// Apply box to selected
+			if (g == sel) {
+				lv_obj_set_style_outline_width(lbl_list[i], 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+				lv_obj_set_style_outline_opa(lbl_list[i], LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+				lv_obj_set_style_outline_pad(lbl_list[i], 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+				lv_obj_set_style_outline_color(lbl_list[i], lv_color_mix(user_primary_color, user_secondary_color, 100), LV_PART_MAIN | LV_STATE_DEFAULT);
+			}
+			// Else remove box
+			else {
+				lv_obj_set_style_outline_opa(lbl_list[i], LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+			}
+
+			lv_label_set_text(lbl_list[i], line);
+			lv_obj_remove_flag(lbl_list[i], LV_OBJ_FLAG_HIDDEN);
 		}
 		else {
-			lv_obj_add_flag(lbl_list[i], LV_OBJ_FLAG_HIDDEN); // Else hide for now
+			lv_obj_add_flag(lbl_list[i], LV_OBJ_FLAG_HIDDEN);
 		}
 	}
 
@@ -1431,7 +1492,12 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
 	}
 	else {
 		char msg[48];
-		snprintf(msg, sizeof(msg), "%d Page(s) to review", due_total);
+		if (due_total > 1) {
+			snprintf(msg, sizeof(msg), "%d Pages to review", due_total);
+		}
+		else {
+			snprintf(msg, sizeof(msg), "%d Page to review", due_total);
+		}
 		lv_label_set_text(lbl_hint, msg);
 	}
 	
@@ -1443,20 +1509,19 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
 
 	/* User input */
 	// Increment selected
-	if (ui_btns->up_btn == 1 && due_vis > 0) {
-		sel = (sel - 1 + due_vis) % due_vis;
+	if (ui_btns->up_btn == 1 && due_total > 0) {
+    	sel = (sel - 1 + due_total) % due_total;
 	}
 	// Decrement selected
-	else if (ui_btns->down_btn == 1 && due_vis > 0) {
-		sel = (sel + 1) % due_vis;
+	else if (ui_btns->down_btn == 1 && due_total > 0) {
+		sel = (sel + 1) % due_total;
 	}
-	// Mark selected page
-	else if (ui_btns->select_btn == 1 && due_vis > 0) {
+	// Mark selected page as reviewed
+	else if (ui_btns->select_btn == 1 && due_total > 0) {
 		srs_mark_reviewed_index(due_idx[sel], today);
-		
-		// Keep selection sensible
-		if (sel >= due_vis - 1) {
-			sel = MAX(0, due_vis - 2);
+
+		if (sel >= due_total - 1) {
+			sel = MAX(0, due_total - 2);
 		}
 	}
 	// Add page selected
@@ -1472,7 +1537,7 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
 		
 		// Show
 		lv_timer_handler();
-		vTaskDelay(pdMS_TO_TICKS(500));
+		vTaskDelay(pdMS_TO_TICKS(750));
 		lcd_clear_pending_inputs = true; // Don't count input while waiting
 	}
 	// Back out
@@ -1489,7 +1554,7 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
 		// Reset statics
 		lbl_title = lbl_help = lbl_hint = NULL;
 		do_once = false;
-		sel = 0;
+		sel = top = 0;
 
 		// Hide right arrow
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -1517,7 +1582,7 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
 		// Reset statics
 		lbl_title = lbl_help = lbl_hint = NULL;
 		do_once = false;
-		sel = 0;
+		sel = top = 0;
 
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);
 	}
