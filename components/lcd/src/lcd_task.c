@@ -159,6 +159,9 @@ static void lcd_task(void *pvParameters)
 	lcd_bluetooth_setup_page(&bluetooth_menu);
 	
 	lcd_gpio_setup_page(&gpio_menu);
+
+	// Create periodic timer to save uptime every 60s
+	lcd_create_uptime_timer();
 	
 	#ifdef POLYCAST5_ESPNOW_DUMP_NVS
 	lcd_espnow_dump_nvs();

@@ -1,6 +1,8 @@
 #ifndef LCD_FUNCS_H
 #define LCD_FUNCS_H
 
+#include <stdint.h>
+
 #include "lvgl.h"
 
 #include "lcd_ir_funcs.h"
@@ -314,6 +316,16 @@ bool lcd_is_first_boot(void);
  * @param [in] obj Object to apply the scrollbar to
  */
 void lcd_apply_scrollbar_style(lv_obj_t *obj);
+
+/**
+ * @brief Create an uptime timer to recalculate uptime every 60 seconds
+ */
+void lcd_create_uptime_timer(void);
+
+/**
+ * @brief Get live total uptime in seconds (NVS prior + current boot time)
+ */
+uint64_t lcd_get_uptime_seconds(void);
 
 /**
  * @brief Draw text as a QR into an LVGL canvas (RGB565)

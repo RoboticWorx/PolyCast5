@@ -1316,6 +1316,63 @@ void lcd_apply_scrollbar_style(lv_obj_t *obj)
 	lv_obj_add_style(obj, &sb_style, LV_PART_SCROLLBAR);
 }
 
+static uint64_t uptime_prior_s = 0;
+static bool uptime_prior_loaded = false;
+
+uint64_t lcd_get_uptime_seconds(void)
+{
+	if (!uptime_prior_loaded) {
+		lcd_settings_uptime_nvs_load(&uptime_prior_s);
+		uptime_prior_loaded = true;
+	}
+
+	uint64_t boot_uptime_us = (uint64_t)esp_timer_get_time();
+	return uptime_prior_s + (boot_uptime_us / 1000000ULL);
+}
+
+static void uptime_timer_callback(void* arg)
+{
+    (void)arg;
+
+	// Save total uptime
+	lcd_settings_uptime_nvs_save(lcd_get_uptime_seconds());
+}
+
+void lcd_create_uptime_timer(void)
+{
+	static esp_timer_handle_t uptime_timer_handle = NULL;
+
+	if (!uptime_prior_loaded) {
+		lcd_settings_uptime_nvs_load(&uptime_prior_s);
+		uptime_prior_loaded = true;
+	}
+
+	// If exists already, stop it first
+    if (uptime_timer_handle) {
+        esp_err_t err = esp_timer_stop(uptime_timer_handle);
+        if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+            ESP_LOGE(TAG, "Failed to stop uptime timer: %s", esp_err_to_name(err));
+        }
+    }
+	// Else create it
+	else {
+        const esp_timer_create_args_t uptime_timer_args = {
+            .callback = &uptime_timer_callback,
+            .arg = NULL,
+            .name = "uptime_timer",
+            .skip_unhandled_events = true,
+        };
+        ESP_ERROR_CHECK(esp_timer_create(&uptime_timer_args, &uptime_timer_handle));
+    }
+
+    // Fire once every 60s
+    esp_err_t err = esp_timer_start_periodic(uptime_timer_handle, 60000000ULL);
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+        // INVALID_STATE here would mean already running
+        ESP_LOGE(TAG, "Failed to start uptime timer: %s", esp_err_to_name(err));
+    }
+}
+
 // Draw text as QR into an LVGL canvas (RGB565) -> returns 0 on success
 int lcd_draw_qr(lv_obj_t *canvas, const char *text, int size_px, uint8_t **pbuf)
 {
@@ -2765,7 +2822,7 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 		if (((last_wifi_event_bits & WIFI_CONNECTED_BIT) && !(wifi_event_bits & WIFI_CONNECTED_BIT))
 				|| (wifi_event_bits & WIFI_CONNECTING_FAILED_BIT)) {
 			lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
-			lv_label_set_text(lbl, "Connect to network");
+			lv_label_set_text(lbl, "Connect to Network");
 
 			xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTING_FAILED_BIT); // Reset for next time
 		}

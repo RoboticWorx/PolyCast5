@@ -65,6 +65,10 @@
 #define SETTINGS_LCD_LEDC_NS "set_ledc" // NVS namespace
 #define SETTINGS_LCD_LEDC_KEY "brightness" // LCD brightness
 
+// Uptime settings
+#define SETTINGS_UPTIME_NS "set_uptime" // NVS namespace
+#define SETTINGS_UPTIME_KEY "uptime" // Uptime (seconds)
+
 #define COLOR_OPTION_COUNT 23
 
 #define SLEEP_TIMER_MIN_S 5 // 5 sec
@@ -1733,14 +1737,17 @@ static void system_build_info(char *buf, size_t n)
 	size_t heap_free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM); // External PSRAM only
 	size_t heap_largest_psram = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM); // Largest contiguous PSRAM block
 
-	// Uptime
-	uint64_t us = esp_timer_get_time();
-	uint32_t total_s = (uint32_t)(us / 1000000ULL);
-	unsigned h = (unsigned)(total_s / 3600U);
-	
-	total_s %= 3600U;
-	unsigned m = (unsigned)(total_s / 60U);
-	unsigned s = (unsigned)(total_s % 60U);
+	// Load uptime
+	uint64_t uptime_s_live = lcd_get_uptime_seconds();
+
+	// Calculate days/hours/minutes
+	uint64_t total = uptime_s_live;
+	uint64_t uptime_d = total / 86400ULL;
+	total %= 86400ULL;
+	uint64_t uptime_h = total / 3600ULL;
+	total %= 3600ULL;
+	uint64_t uptime_m = total / 60ULL;
+	uint64_t uptime_s = total % 60ULL;
 
 	// Chip / IDF
 	esp_chip_info_t ci;
@@ -1803,7 +1810,11 @@ static void system_build_info(char *buf, size_t n)
 
 	// Compose buffer text
 	snprintf(buf, n,
-		"Uptime: %02u:%02u:%02u\n\n"
+		"Time since conception:\n"
+		"%" PRIu64 " days\n"
+		"%" PRIu64 " hours\n"
+		"%" PRIu64 " minutes\n"
+		"%" PRIu64 " seconds\n\n"
 
 		"Firmware: v%s\n"
 		"ESP-IDF: %s\n\n"
@@ -1830,7 +1841,7 @@ static void system_build_info(char *buf, size_t n)
 		"BT:\n"
 		"MAC: %s",
 		
-		h, m, s,
+		uptime_d, uptime_h, uptime_m, uptime_s,
 
 		pc5_fw_version,
 		idf,
@@ -2013,10 +2024,9 @@ void lcd_settings_help_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_men
 								"the HOME and RIGHT buttons at the same time.\n\n"
 								"This will not erase any user data, so feel free to use it any time if something is being weird.\n\n"
 								"PolyCast5 also has OTA wireless updates so you can always be running the newest firmware.\n\n"
-								"To check if an update is available, simply connect to any Wi-Fi network using the Wi-Fi menu.\n\n"
-								"After connecting, you will be asked if you'd like to update automatically whenever a new firmware version is out.\n\n"
-								"Being open-source, you can also feel free to check out the code at:\n\ngithub.com/RoboticWo rx/PolyCast5\n\n"
-								"For additional information, docs, and guides, please visit polycast5.com!";
+								"To check if an update is available, simply click 'Check for Updates' in the 'Settings' menu.\n\n"
+								"Being open-source, you can also feel free to check out the source code at:\n\ngithub.com/RoboticWo rx/PolyCast5\n\n"
+								"For additional information, docs, and guides, please visit polycast5.com or scan the QR codes in 'Read the Docs' under the 'Tools' menu!";
 		
 		lv_label_set_text(instr_lbl, instr_text);
 
@@ -2796,6 +2806,58 @@ void lcd_settings_lcd_ledc_nvs_load(void)
 	}
 	else {
 		ESP_LOGE(TAG, "lcd_settings_lcd_ledc_nvs_load: get failed (%s)", esp_err_to_name(err));
+	}
+	
+	// Close NVS
+	nvs_close(h);
+}
+
+void lcd_settings_uptime_nvs_save(uint64_t uptime_seconds)
+{
+	nvs_handle_t h;
+	
+	// Open NVS
+	esp_err_t err = nvs_open(SETTINGS_UPTIME_NS, NVS_READWRITE, &h);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_uptime_nvs_save: open failed: %s", esp_err_to_name(err));
+		return;
+	}
+
+	// Save the uptime
+	err = nvs_set_u64(h, SETTINGS_UPTIME_KEY, uptime_seconds);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_uptime_nvs_save: set failed: %s", esp_err_to_name(err));
+	}
+
+	// Commit changes
+	err = nvs_commit(h);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_uptime_nvs_save: commit failed: %s", esp_err_to_name(err));
+	}
+	
+	// Close NVS
+	nvs_close(h);
+}
+
+void lcd_settings_uptime_nvs_load(uint64_t *uptime_seconds)
+{
+	nvs_handle_t h;
+	
+	// Open NVS
+	esp_err_t err = nvs_open(SETTINGS_UPTIME_NS, NVS_READONLY, &h);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_uptime_nvs_load: open failed: %s", esp_err_to_name(err));
+		return;
+	}
+	
+	// Load the uptime
+	err = nvs_get_u64(h, SETTINGS_UPTIME_KEY, uptime_seconds);
+	if (err == ESP_ERR_NVS_NOT_FOUND) {
+		// Key not found: default to 0
+		*uptime_seconds = 0;
+	}
+	else if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lcd_settings_uptime_nvs_load: get failed: %s", esp_err_to_name(err));
 	}
 	
 	// Close NVS

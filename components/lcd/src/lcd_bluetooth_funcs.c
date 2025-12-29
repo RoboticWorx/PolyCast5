@@ -658,7 +658,7 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
 
 		// Title label
 		title_lbl = lv_label_create(cont);
-		lv_label_set_text(title_lbl, "How To Pair:");
+		lv_label_set_text(title_lbl, "How to Pair:");
 		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
 		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
 		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
@@ -2283,6 +2283,8 @@ void lcd_bluetooth_pair_new_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 	static lv_obj_t *cont = NULL;
 	static lv_obj_t *title_lbl = NULL;
 	static lv_obj_t *instr_lbl = NULL;
+	static lv_obj_t *pin_lbl = NULL;
+	static lv_obj_t *ending_lbl = NULL;
 	
 	if (!init) {
 		// Create a scrollable container for the instructions
@@ -2301,7 +2303,7 @@ void lcd_bluetooth_pair_new_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 
 		// Title label
 		title_lbl = lv_label_create(cont);
-		lv_label_set_text(title_lbl, "Known Devices:");
+		lv_label_set_text(title_lbl, "Pairing Another:");
 		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
 		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
 		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
@@ -2316,16 +2318,41 @@ void lcd_bluetooth_pair_new_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 
 		// Set custom text
 		const char *instr_text =
-				"The known devices page (prior) allows you to select a specific device to pair to from any of the devices you've paired to in the past.\n\n"
-				"This can be great for pranks or just switching between various devices such as PC or phone without having to re-pair every time.\n\n"
-				"Right now the Bluetooth whitelist has been cleared, allowing PolyCast5 to connect to a new device like normal.\n\n"
-				"For this to work, please also walk out of range or turn off Bluetooth on any previously known devices.\n\n"
-				"Afterwards, you can repair normally using '%d' as the pin.";		
+				"Don't press back until you're done pairing! Bluetooth is now advertising as 'PolyCast5'\n\n"
+				"Pairing PIN:";
+		
+		lv_label_set_text_fmt(instr_lbl, instr_text);
+
+		// Pairing pin label
+		pin_lbl = lv_label_create(cont);
+		lv_label_set_long_mode(pin_lbl, LV_LABEL_LONG_WRAP);
+		lv_obj_set_width(pin_lbl, lv_pct(100)); // Full width for wrapping
+		lv_obj_set_style_text_font(pin_lbl, &lv_font_montserrat_30, 0);
+		lv_obj_set_style_text_color(pin_lbl, user_secondary_color, 0);
+		lv_obj_align_to(pin_lbl, instr_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);	
 		
 		// Load pairing key from NVS
 		uint32_t pairing_key;
-		bluetooth_pairing_key_load_nvs(&pairing_key);
-		lv_label_set_text_fmt(instr_lbl, instr_text, pairing_key);
+		bluetooth_pairing_key_load_nvs(&pairing_key); // pairing_key
+		lv_label_set_text_fmt(pin_lbl, "     %" PRIu32, pairing_key);
+
+		lv_timer_handler();
+
+		// Instructions label (scrollable if text is long)
+		ending_lbl = lv_label_create(cont);
+		lv_label_set_long_mode(ending_lbl, LV_LABEL_LONG_WRAP);
+		lv_obj_set_width(ending_lbl, lv_pct(100)); // Full width for wrapping
+		lv_obj_set_style_text_font(ending_lbl, &lv_font_montserrat_14, 0);
+		lv_obj_set_style_text_color(ending_lbl, user_secondary_color, 0);
+		lv_obj_align_to(ending_lbl, pin_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+
+		// Set custom text
+		const char *ending_text =
+				"The known devices page (prior) allows you to select a specific device to pair to from any of the devices you've paired to in the past.\n\n"
+				"Within this page, the Bluetooth whitelist has been cleared allowing you to pair an additional device.\n\n"
+				"For this to work, you must also walk out of range or turn off Bluetooth on any previously known devices so that only the new device is pairable.";
+
+		lv_label_set_text_fmt(ending_lbl, ending_text);
 
 		lv_timer_handler();
 		
@@ -2356,7 +2383,7 @@ void lcd_bluetooth_pair_new_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 		
 		// Reset statics
 		cont = NULL;
-		title_lbl = instr_lbl = NULL;
+		title_lbl = instr_lbl = pin_lbl = ending_lbl = NULL;
 		init = false;
 			
 		// Show bluetooth menu
@@ -2376,7 +2403,7 @@ void lcd_bluetooth_pair_new_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 		
 		// Reset statics
 		cont = NULL;
-		title_lbl = instr_lbl = NULL;
+		title_lbl = instr_lbl = pin_lbl = ending_lbl = NULL;
 		init = false;
 		
  		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep

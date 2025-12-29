@@ -260,4 +260,18 @@ void lcd_settings_lcd_ledc_nvs_save(void);
  */
 void lcd_settings_lcd_ledc_nvs_load(void);
 
+/**
+ * @brief Saves the current uptime in seconds to NVS
+ *
+ * @param [in] uptime_seconds Uptime in seconds
+ */
+void lcd_settings_uptime_nvs_save(uint64_t uptime_seconds);
+
+/**
+ * @brief Loads the current uptime in seconds from NVS
+ *
+ * @param [out] uptime_seconds Pointer to store uptime in seconds
+ */
+void lcd_settings_uptime_nvs_load(uint64_t *uptime_seconds);
+
 #endif // LCD_SETTINGS_FUNCS_H

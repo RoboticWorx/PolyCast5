@@ -45,7 +45,7 @@
 #define MQTT_CONNECTING_TXT "Please wait...\nConnecting..."
 
 wifi_menu_t wifi_menu = {
-	.options = {"Connect to network", "Monitor packets", "Sync with PolyPlug"},
+	.options = {"Connect to Network", "Monitor Packets", "Sync With PolyPlug"},
 	.size = WIFI_MENU_START_SIZE,
 	.index = 0,
 	.cont = NULL,
@@ -300,7 +300,7 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		
 			/* Add prev button */
 			char buf[16];
-			snprintf(buf, sizeof(buf), "Connect to last");
+			snprintf(buf, sizeof(buf), "Connect to Last");
 			
 			// Create button
 			wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size] = lv_list_add_btn(wifi_menu->scan_menu.main_list, NULL, buf);
