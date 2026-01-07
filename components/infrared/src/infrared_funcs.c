@@ -285,13 +285,11 @@ void infrared_nvs_load_remotes(void)
 
 		if (ret != ESP_OK || len == 0) { // If empty or missing
 			remotes[r].name = strdup("REMOTE"); // Default
-		}
-		else {			
+		} else {			
 			remotes[r].name = malloc(len);
 			if (!remotes[r].name) { // Out of heap -> fallback
 				remotes[r].name = strdup("REMOTE");
-			}
-			else {
+			} else {
 				remotes[r].name[0] = '\0'; // Always NULL-terminated
 				nvs_get_str(h, key, remotes[r].name, &len);
 			}
@@ -316,8 +314,7 @@ void infrared_nvs_load_remotes(void)
 				// Get actual name
 				remotes[r].signal_names[s] = malloc(len);
 				nvs_get_str(h, key, remotes[r].signal_names[s], &len);
-			}
-			else {
+			} else {
 				// Default empty
 				remotes[r].signal_names[s] = strdup("");
 			}
@@ -342,8 +339,7 @@ void infrared_nvs_load_remotes(void)
 						free(sig);
 						remotes[r].signals[s] = NULL;
 					}
-				}
-				else {
+				} else {
 					remotes[r].signals[s] = NULL;
 				}
 			}

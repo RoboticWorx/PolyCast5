@@ -94,8 +94,7 @@ static void ai_task(void *pvParameters)
 		#ifdef POLYCAST5_PASS_DEBUG
 		ESP_LOGW(TAG, "Setting first time AI Wi-Fi portal password: %s", ai_wifi_portal_pass);
 		#endif
-	}
-	else {
+	} else {
 		#ifdef POLYCAST5_PASS_DEBUG
 		ESP_LOGI(TAG, "Using pre-set AI Wi-Fi portal password: '%s'", ai_wifi_portal_pass);
 		#endif
@@ -143,13 +142,9 @@ static void ai_task(void *pvParameters)
 			#ifdef USING_CHATGPT // UNTESTED!
 			err = openai_send_command(cmd.msg, ai_response, sizeof(ai_response));
 			#endif
-		}
-		// Username or password command
-		else if (cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD) {
+		} else if (cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD) { // Username or password command
 			err = ai_lookup_creds(cmd.type, query, ai_response, sizeof(ai_response));
-		}
-		// Organizing raw Wi-Fi frames
-		else if (cmd.type == AI_CMD_RAW_FRAMES) {
+		} else if (cmd.type == AI_CMD_RAW_FRAMES) { // Organizing raw Wi-Fi frames
 			#ifdef POLYCAST5_DEBUG
 			size_t msg_len = (cmd.msg_len != 0) ? cmd.msg_len : strlen(cmd.msg);
 			ESP_LOGI(TAG, "AI_CMD_RAW_FRAMES payload len=%u", (unsigned)msg_len);
@@ -167,16 +162,14 @@ static void ai_task(void *pvParameters)
 
 				char *ai_script_ptr = ai_response;
 				xQueueSend(xBluetoothAiCmdQueue, &ai_script_ptr, portMAX_DELAY);
-			}
-			else if (cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD) {
+			} else if (cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD) {
 				#ifdef POLYCAST5_DEBUG
 				ESP_LOGI(TAG, "Credential script resolved (len=%u)", (unsigned)strlen(ai_response));
 				#endif
 
 				char *ai_script_ptr = ai_response;
 				xQueueSend(xBluetoothAiCmdQueue, &ai_script_ptr, portMAX_DELAY);
-			}
-			else if (cmd.type == AI_CMD_RAW_FRAMES) {
+			} else if (cmd.type == AI_CMD_RAW_FRAMES) {
 				#ifdef POLYCAST5_DEBUG
 				ESP_LOGI(TAG, "Raw frames sniff resolved with response. Grok analysis of raw frames: %s", ai_response);
 				#endif
@@ -184,8 +177,7 @@ static void ai_task(void *pvParameters)
 				char *ai_script_ptr = ai_response;
 				xQueueSend(xWifiAiRawSniffQueue, &ai_script_ptr, portMAX_DELAY);
 			}
-		}
-		else {
+		} else {
 			ESP_LOGE(TAG, "AI request failed: %s", esp_err_to_name(err));
 		}
 

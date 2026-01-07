@@ -109,9 +109,7 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 		lv_obj_delete(lbl_edit);
 		lv_obj_delete(lbl_select);
 		lbl_title = lbl_name = lbl_back = lbl_edit = lbl_select = NULL;
-	}
-	// Actions on select
-	else if (ui_btns->select_btn) {
+	} else if (ui_btns->select_btn) { // Actions on select
 		// Create new remote
 		if (edit_idx == 1) {
 			new_remote = true;
@@ -124,9 +122,7 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 			lv_obj_delete(lbl_edit);
 			lv_obj_delete(lbl_select);
 			lbl_title = lbl_name = lbl_back = lbl_edit = lbl_select = NULL;
-		}
-		// Delete remote
-		else if (edit_idx == 2) {
+		} else if (edit_idx == 2) { // Delete remote
 			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 			infrared_nvs_delete_remote(ir_current_remote);
 			xSemaphoreGive(xInfraredDataMutex); // Release IR
@@ -150,9 +146,7 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 			
 			// Back to main page
 			ui_menu->page = INFRARED_PAGE;
-		}
-		// Delete signal
-		else if (edit_idx > 2) {
+		} else if (edit_idx > 2) { // Delete signal
 			int to_delete = edit_idx;
 			int q = -to_delete;
 			xQueueSend(xInfraredSignalToTxQueue, &q, portMAX_DELAY);
@@ -168,9 +162,7 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 			lv_obj_delete(lbl_select);
 			lbl_title = lbl_name = lbl_back = lbl_edit = lbl_select = NULL;
 		}
-	}
-	// Exit
-	else if (ui_btns->left_btn) {
+	} else if (ui_btns->left_btn) { // Exit
 		// Reset
 		lv_obj_delete(lbl_title);
 		lv_obj_delete(lbl_name);
@@ -184,9 +176,7 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 		
 		// Switch pages
 		ui_menu->page = INFRARED_PAGE;
-	}
-	// Go home or power off
-	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
+	} else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Go home or power off
 		// Reset
 		lv_obj_delete(lbl_title);
 		lv_obj_delete(lbl_name);
@@ -196,9 +186,7 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 		lbl_title = lbl_name = lbl_back = lbl_edit = lbl_select = NULL;
 		
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);
-	}
-	// Iterate up
-	else if (ui_btns->up_btn) {
+	} else if (ui_btns->up_btn) { // Iterate up
 		edit_idx++;
 		
 		// Wrap
@@ -214,15 +202,11 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 			lv_label_set_text(lbl_name, remotes[ir_current_remote].name);
 			xSemaphoreGive(xInfraredDataMutex); // Release IR
-		}
-		// New remote
-		else if (edit_idx == 1) {
+		} else if (edit_idx == 1) { // New remote
 			lv_label_set_text(lbl_name, ADD_NEW_LABEL);
 			lv_label_set_text(lbl_edit, ""); // Can't edit "Add New"
 			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Hide right arrow
-		}
-		// Delete remote
-		else if (edit_idx == 2) {
+		} else if (edit_idx == 2) { // Delete remote
 			lv_label_set_text(lbl_name, DELETE_LABEL);
 			lv_label_set_text(lbl_edit, ""); // Can't edit "Delete"
 			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Hide right arrow
@@ -242,11 +226,9 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 			lv_label_set_text(lbl_title, REMOTE_TXT);
 			if (edit_idx == 0) {
 				lv_label_set_text(lbl_select, EDIT_TXT);
-			}
-			else if (edit_idx == 1) {
+			} else if (edit_idx == 1) {
 				lv_label_set_text(lbl_select, CREATE_REMOTE_TXT);
-			}
-			else {
+			} else {
 				lv_label_set_text(lbl_select, DELETE_REMOTE_TXT);
 			}
 		}
@@ -255,9 +237,7 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 			lv_label_set_text(lbl_title, SIG_TXT);
 			lv_label_set_text(lbl_select, SELECT_TXT);
 		}
-	}
-	// Iterate down
-	else if (ui_btns->down_btn) {	
+	} else if (ui_btns->down_btn) { // Iterate down	
 		// Wrap	
 		if (edit_idx == 0) {
 			edit_idx = (ir_menu->size > 3) ? (ir_menu->size - 1) : 0;
@@ -275,15 +255,11 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 			xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
 			lv_label_set_text(lbl_name, remotes[ir_current_remote].name);
 			xSemaphoreGive(xInfraredDataMutex); // Release IR
-		}
-		// New remote
-		else if (edit_idx == 1) {
+		} else if (edit_idx == 1) { // New remote
 			lv_label_set_text(lbl_name, ADD_NEW_LABEL);
 			lv_label_set_text(lbl_edit, ""); // Can't edit "Add New"
 			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Hide right arrow
-		}
-		// Delete remote
-		else if (edit_idx == 2) {
+		} else if (edit_idx == 2) { // Delete remote
 			lv_label_set_text(lbl_name, DELETE_LABEL);
 			lv_label_set_text(lbl_edit, ""); // Can't edit "Delete"
 			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Hide right arrow
@@ -303,11 +279,9 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
 			lv_label_set_text(lbl_title, REMOTE_TXT);
 			if (edit_idx == 0) {
 				lv_label_set_text(lbl_select, EDIT_TXT);
-			}
-			else if (edit_idx == 1) {
+			} else if (edit_idx == 1) {
 				lv_label_set_text(lbl_select, CREATE_REMOTE_TXT);
-			}
-			else {
+			} else {
 				lv_label_set_text(lbl_select, DELETE_REMOTE_TXT);
 			}
 		}
@@ -428,9 +402,7 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 			else {
 				lv_label_set_text(lbl_dirs, "   Enter new signal name:\nPress HOME to cycle chars.");
 			}
-		}
-		// If adding new remote
-		else if (new_remote) {
+		} else if (new_remote) { // If adding new remote
 			lv_label_set_text(lbl_dirs, " Enter new remote name:\nPress HOME to cycle chars.");
 		}
 		
@@ -451,15 +423,12 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 		// Left-arrow visibility on first slot
 		if (lv_obj_has_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN) && !(cur_pos == 0 && cur_char == '_' && !ir_menu_overwrite)) {
 			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-		}
-		else if (!ir_menu_overwrite && cur_pos == 0 && cur_char == '_') {
+		} else if (!ir_menu_overwrite && cur_pos == 0 && cur_char == '_') {
 			lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 		}
 
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	}
-	// If up, iterate up
-	else if (ui_btns->up_btn) {
+	} else if (ui_btns->up_btn) { // If up, iterate up
 		// Increment with wrap
 		size_t row_len = strlen(ir_char_rows[row_idx]);
 		char_idx = (char_idx + 1) % row_len;
@@ -471,15 +440,12 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 		// If left arrow hidden -> remove
 		if (lv_obj_has_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN)) {
 			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-		}
-		else if (!ir_menu_overwrite && cur_pos == 0 && cur_char == '_') {
+		} else if (!ir_menu_overwrite && cur_pos == 0 && cur_char == '_') {
 			lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 		}
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	}
-	// If down, iterate down
-	else if (ui_btns->down_btn) {
+	} else if (ui_btns->down_btn) { // If down, iterate down
 		// Decrement with wrap
 		size_t row_len = strlen(ir_char_rows[row_idx]);
 		char_idx = (int)((char_idx + row_len - 1) % row_len);
@@ -491,15 +457,12 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 		// If left arrow hidden -> remove
 		if (lv_obj_has_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN)) {
 			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-		}
-		else if (!ir_menu_overwrite && cur_pos == 0 && cur_char == '_') {
+		} else if (!ir_menu_overwrite && cur_pos == 0 && cur_char == '_') {
 			lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 		}
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	}
-	// If left pressed and at start and overwriting
-	else if (ui_btns->left_btn && cur_pos == 0 && ir_menu_overwrite) {
+	} else if (ui_btns->left_btn && cur_pos == 0 && ir_menu_overwrite) { // If left pressed and at start and overwriting
 		// Delete objects
 		lv_obj_delete(lbl_user_in);
 		lv_obj_delete(lbl_dirs);
@@ -521,9 +484,7 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 		
  		ui_menu->page = INFRARED_REMOTE_EDIT_PAGE;
 		return;
-	}
-	// If power off and overwriting
-	else if (ui_btns->pwr_btn && ir_menu_overwrite) {
+	} else if (ui_btns->pwr_btn && ir_menu_overwrite) { // If power off and overwriting
 		// Delete objects
 		lv_obj_delete(lbl_user_in);
 		lv_obj_delete(lbl_dirs);
@@ -544,9 +505,7 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 		ir_menu_overwrite = false;
 		
  		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
-	}
-	// If left and not at start
-	else if (ui_btns->left_btn) {
+	} else if (ui_btns->left_btn) { // If left and not at start
 		// Clear the current slot
 		name_buf[cur_pos] = '\0';
 	
@@ -575,9 +534,7 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 		}
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	}
-	// If right
-	else if (ui_btns->right_btn) {
+	} else if (ui_btns->right_btn) { // If right
 		// Handle case where up/down wasn't pressed
 		name_buf[cur_pos] = cur_char;
 		
@@ -587,8 +544,7 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 			name_buf[cur_pos] = '\0';
 			char_idx = 0;
 			cur_char = ir_char_rows[row_idx][char_idx];
-		}
-		else {
+		} else {
 			name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
 		}
 		
@@ -598,9 +554,7 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 		}
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	}
-	// If save button pressed
-	else if (ui_btns->select_btn) {
+	} else if (ui_btns->select_btn) { // If save button pressed
 		// Push final
 		if (cur_pos < MAX_CUSTOM_NAME_LEN) {
 			name_buf[cur_pos] = cur_char;
@@ -663,8 +617,7 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
 
 			// Clean up
 			ir_menu_overwrite = false;
-		}
-		else {
+		} else {
 			// Adding new remote
 			if (new_remote) {
 				// Limit check
@@ -920,8 +873,7 @@ void lcd_ir_update_menu(ir_menu_t *ir_menu)
 	// Wrap index
 	if (ir_menu->index >= ir_menu->size) {
 		ir_menu->index = 0;
-	}
-	else if (ir_menu->index < 0) {
+	} else if (ir_menu->index < 0) {
 		ir_menu->index = ir_menu->size - 1;
 	}
 

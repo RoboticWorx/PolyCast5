@@ -85,8 +85,7 @@ void lcd_gpio_setup_page(gpio_menu_t *menu)
 	// Wrap index
 	if (menu->index >= menu->size) {
 		menu->index = 0;
-	}
-	else if (menu->index < 0) {
+	} else if (menu->index < 0) {
 		menu->index = menu->size - 1;
 	}
 	
@@ -99,8 +98,7 @@ void lcd_gpio_setup_page(gpio_menu_t *menu)
 		// Style selected
 		if (i == menu->index) {
 			lv_obj_add_style(menu->btns[i], &menu->sel_style, 0);
-		}
-		else {
+		} else {
 			lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
 		}
 
@@ -129,8 +127,7 @@ void lcd_gpio_update_menu(gpio_menu_t *menu)
 	// Wrap index
 	if (menu->index >= menu->size) {
 		menu->index = 0;
-	}
-	else if (menu->index < 0) {
+	} else if (menu->index < 0) {
 		menu->index = menu->size - 1;
 	}
 
@@ -207,12 +204,9 @@ void lcd_gpio_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio
 	
 	if (ui_btns->up_btn == 1) {
 		lv_obj_scroll_by_bounded(cont, 0, HOW_Y_OFFSET, LV_ANIM_ON);
-	}
-	else if (ui_btns->down_btn == 1) {
+	} else if (ui_btns->down_btn == 1) {
 		lv_obj_scroll_by_bounded(cont, 0, -HOW_Y_OFFSET, LV_ANIM_ON);
-	}
-	// Go back
-	else if (ui_btns->left_btn) {
+	} else if (ui_btns->left_btn) { // Go back
 		// Delete objects
 		lv_obj_delete(cont); // Deletes children
 		
@@ -226,9 +220,7 @@ void lcd_gpio_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio
 		
 		// Switch back
 		ui_menu->page = GPIO_PAGE;
-	}
-	// Home or power off
-	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
+	} else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
 		// Delete objects
 		lv_obj_delete(cont); // Deletes children
 		
@@ -345,11 +337,9 @@ void lcd_gpio_scanner_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *
 	/* User input */
 	if (ui_btns->up_btn == 1) {
 		lv_obj_scroll_by_bounded(cont, 0, I2C_SCROLL_OFFSET, LV_ANIM_ON); // Scroll up
-	}
-	else if (ui_btns->down_btn == 1) {
+	} else if (ui_btns->down_btn == 1) {
 		lv_obj_scroll_by_bounded(cont, 0, -I2C_SCROLL_OFFSET, LV_ANIM_ON); // Scroll down
-	}
-	else if (ui_btns->select_btn == 1) {
+	} else if (ui_btns->select_btn == 1) {
 		lv_label_set_text(status_lbl, "Scanning...");
 		lv_obj_add_flag(addrs_lbl, LV_OBJ_FLAG_HIDDEN);
 		
@@ -390,9 +380,7 @@ void lcd_gpio_scanner_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *
 		}
 
 		lv_timer_handler(); // Force update
-	}
-	// Exit
-	else if (ui_btns->left_btn == 1) {
+	} else if (ui_btns->left_btn == 1) { // Exit
 		// Clean up
 		lv_obj_delete(cont); // Deletes children
 		cont = title_lbl = status_lbl = addrs_lbl = NULL;
@@ -403,9 +391,7 @@ void lcd_gpio_scanner_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *
 
 		// Switch back
 		ui_menu->page = GPIO_PAGE;
-	}
-	// Home or power off
-	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+	} else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off
 		// Clean up
 		lv_obj_delete(cont);
 		cont = title_lbl = status_lbl = addrs_lbl = NULL;
@@ -489,8 +475,7 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
 
 		lv_label_set_text(log_lbl, log_buffer);
 		lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
-	}
-	else if (ui_btns->down_btn == 1) {
+	} else if (ui_btns->down_btn == 1) {
 		// Decrement cmd with wrap
 		current_cmd = (current_cmd > 0) ? current_cmd - 1 : TERMINAL_MAX_CMD;
 		
@@ -502,8 +487,7 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
 		lv_label_set_text(log_lbl, log_buffer);
 
 		lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
-	}
-	else if (ui_btns->select_btn == 1) {
+	} else if (ui_btns->select_btn == 1) {
 		#define TERMINAL_MAX_RESPONSE_LEN 126  // Match slave
 		#define TERMINAL_FIXED_LEN (1 + TERMINAL_MAX_RESPONSE_LEN)  // Fixed read size
 	
@@ -561,9 +545,7 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
 				// len == 0 -> empty
 				if (response_len == 0) {
 					snprintf(msg, sizeof(msg), "Empty response.\n\n");
-				}
-				// Response too big
-				else if (response_len > TERMINAL_MAX_RESPONSE_LEN) {
+				} else if (response_len > TERMINAL_MAX_RESPONSE_LEN) { // Response too big
 					snprintf(msg, sizeof(msg), "Invalid response length: %u\n\n", response_len);
 				}
 				// Else valid response
@@ -573,8 +555,7 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
 					response_str[response_len] = '\0'; // NUL-terminate
 					snprintf(msg, sizeof(msg), "Response: %s\n\n", response_str);
 				}
-			}
-			else {
+			} else {
 				snprintf(msg, sizeof(msg), "Read failed: %s\n\n", esp_err_to_name(ret));
 			}
 			
@@ -586,8 +567,7 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
 			// Show and scroll to bottom
 			lv_label_set_text(log_lbl, log_buffer);
 			lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
-		}
-		else {
+		} else {
 			// Mutex timeout - append error
 			term_log_append(log_buffer, sizeof(log_buffer), "\nI2C bus busy - timed out.\n\n");
 	
@@ -595,9 +575,7 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
 			lv_label_set_text(log_lbl, log_buffer);
 			lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
 		}
-	}
-	// Exit
-	else if (ui_btns->left_btn == 1) {
+	} else if (ui_btns->left_btn == 1) { // Exit
 		// Clean up
 		lv_obj_delete(cont); // Deletes children
 		cont = title_lbl = log_lbl = NULL;
@@ -610,9 +588,7 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
  
 		// Switch back
 		ui_menu->page = GPIO_PAGE;
-	}
-	// Home or power off
-	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+	} else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off
 		// Clean up
 		lv_obj_delete(cont); // Deletes children
 		cont = title_lbl = log_lbl = NULL;

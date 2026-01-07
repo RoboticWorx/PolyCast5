@@ -112,8 +112,7 @@ void lcd_espnow_setup_page(espnow_menu_t *menu)
 	// Wrap index
 	if (menu->index >= menu->size) {
 		menu->index = 0;
-	}
-	else if (menu->index < 0) {
+	} else if (menu->index < 0) {
 		menu->index = menu->size - 1;
 	}
 	
@@ -130,8 +129,7 @@ void lcd_espnow_setup_page(espnow_menu_t *menu)
 		// Style selected
 		if (i == menu->index) {
 			lv_obj_add_style(menu->btns[i], &menu->sel_style, 0);
-		}
-		else {
+		} else {
 			lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
 		}
 
@@ -160,8 +158,7 @@ void lcd_espnow_update_menu(espnow_menu_t *menu)
 	// Wrap index
 	if (menu->index >= menu->size) {
 		menu->index = 0;
-	}
-	else if (menu->index < 0) {
+	} else if (menu->index < 0) {
 		menu->index = menu->size - 1;
 	}
 
@@ -372,8 +369,7 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 			// Color selected
 			if (i == (int)digit_index) {
 				lv_obj_set_style_text_color(lbl_sel_digit[i], lv_palette_main(LV_PALETTE_RED), 0);
-			}
-			else {
+			} else {
 				lv_obj_set_style_text_color(lbl_sel_digit[i], user_secondary_color, 0);
 			}
 		}
@@ -402,8 +398,7 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 		if (nibble_pos == 0) {
 			// Increment high nibble with wrap
 			high_n = (high_n + 1) & 0x0F;
-		}
-		else {
+		} else {
 			// Increment low nibble with wrap
 			low_n = (low_n + 1) & 0x0F;
 		}
@@ -418,9 +413,7 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 			hex_char = "0123456789ABCDEF"[low_n];
 			
 		lv_label_set_text_fmt(lbl_sel_digit[digit_index], "%c", hex_char);
-	}
-	// Decrement digit down
-	else if (ui_btns->down_btn) {
+	} else if (ui_btns->down_btn) { // Decrement digit down
 		int byte_idx = digit_index / 2; // Byte index that's being edited
 		int nibble_pos = digit_index % 2; // 0 = high nibble, 1 = low nibble
 
@@ -432,8 +425,7 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 		if (nibble_pos == 0) {
 			// Decrement high nibble with wrap
 			high_n = (high_n == 0 ? 0x0F : high_n - 1);
-		}
-		else {
+		} else {
 			// Decrement low nibble with wrap
 			low_n = (low_n == 0 ? 0x0F : low_n - 1);
 		}
@@ -449,9 +441,7 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 			hex_char = "0123456789ABCDEF"[low_n];
 			
 		lv_label_set_text_fmt(lbl_sel_digit[digit_index], "%c", hex_char);
-	}
-	// Move selection left
-	else if (ui_btns->left_btn && digit_index > 0) {
+	} else if (ui_btns->left_btn && digit_index > 0) { // Move selection left
 		// De-style old digit
 		lv_obj_set_style_text_color(lbl_sel_digit[digit_index], user_secondary_color, 0);
 		
@@ -460,9 +450,7 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 		
 		// Style new digit
 		lv_obj_set_style_text_color(lbl_sel_digit[digit_index], RX_MAC_IN_SEL_COLOR, 0);
-	}
-	// Go back
-	else if (ui_btns->left_btn) {
+	} else if (ui_btns->left_btn) { // Go back
 		// Clean all
 		for (int i = 0; i < 12; ++i) {
 			lv_obj_delete(lbl_sel_digit[i]);
@@ -488,9 +476,7 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 		
 		// Go back
 		ui_menu->page = ESPNOW_PAGE;
-	}
-	// Go home or power off
-	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+	} else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Go home or power off
 		// Clean all
 		for (int i = 0; i < 12; ++i) {
 			lv_obj_delete(lbl_sel_digit[i]);
@@ -509,9 +495,7 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 		digit_index = 0;
 		
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
-	}
-	// Move selection right
-	else if (ui_btns->right_btn && digit_index < 11) {
+	} else if (ui_btns->right_btn && digit_index < 11) { // Move selection right
 		// De-style old digit
 		lv_obj_set_style_text_color(lbl_sel_digit[digit_index], user_secondary_color, 0);
 			
@@ -520,9 +504,7 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 			
 		// Style new digit
 		lv_obj_set_style_text_color(lbl_sel_digit[digit_index], RX_MAC_IN_SEL_COLOR, 0);
-	}
-	// Confirm
-	else if (ui_btns->right_btn) {
+	} else if (ui_btns->right_btn) { // Confirm
 		// Copy the 6 bytes into espnow_menu->rx_mac[] for later use.
 		for (int b = 0; b < ESPNOW_MAC_SIZE; b++) {
 			espnow_menu->rx_mac[espnow_menu->size][b] = mac_bytes[b];
@@ -549,8 +531,7 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
 		bool enc_peer = prompt_yn_encryption(ui_menu, espnow_menu);
 		if (enc_peer) {
 			display_mac_and_lmk(ui_menu, espnow_menu);
-		}
-		else {
+		} else {
 			memset(espnow_menu->lmk[espnow_menu->size], 0, LMK_LEN); // Zero out enc entry
 		}
 	}
@@ -668,8 +649,7 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 
 			// Place cursor at the end
 			cur_pos = strlen(name_buf);
-		}
-		else { // Else blank slate
+		} else { // Else blank slate
 			memset(name_buf, 0, sizeof name_buf);
 			cur_pos = 0;
 		}
@@ -709,9 +689,7 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 		cur_char = espnow_char_rows[row_idx][char_idx];
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	}
-	// If up, iterate up
-	else if (ui_btns->up_btn) {
+	} else if (ui_btns->up_btn) { // If up, iterate up
 		// Increment with wrap
 		size_t row_len = strlen(espnow_char_rows[row_idx]);
 		char_idx = (char_idx + 1) % (int)row_len;
@@ -721,9 +699,7 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 		name_buf[cur_pos] = cur_char;
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	}
-	// If down, iterate down
-	else if (ui_btns->down_btn) {
+	} else if (ui_btns->down_btn) { // If down, iterate down
 		// Decrement with wrap
 		size_t row_len = strlen(espnow_char_rows[row_idx]);
 		char_idx = (char_idx + (int)row_len - 1) % (int)row_len;
@@ -733,9 +709,7 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 		name_buf[cur_pos] = cur_char;
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	}
-	// Can back out if at start
-	else if (ui_btns->left_btn && cur_pos == 0) {
+	} else if (ui_btns->left_btn && cur_pos == 0) { // Can back out if at start
 		// Delete labels since no longer used
 		lv_obj_delete(lbl_user_in);
 		lv_obj_delete(lbl_dirs);
@@ -761,9 +735,7 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 		// Switch pages
  		ui_menu->page = ESPNOW_PAGE;
 		return;
-	}
- 	// Power off
-	else if (ui_btns->pwr_btn == 1) {
+	} else if (ui_btns->pwr_btn == 1) { // Power off
 		// Delete labels since no longer used
 		lv_obj_delete(lbl_user_in);
 		lv_obj_delete(lbl_dirs);
@@ -784,9 +756,7 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 		espnow_menu_overwrite = false;
 		
 		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
-	}
-	// If left and not at start
-	else if (ui_btns->left_btn && cur_pos != 0) {
+	} else if (ui_btns->left_btn && cur_pos != 0) { // If left and not at start
 		// Clear the current slot
 		name_buf[cur_pos] = '\0';
 	
@@ -809,9 +779,7 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 		cur_char = espnow_char_rows[row_idx][char_idx];
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	}
-	// If right
-	else if (ui_btns->right_btn) {
+	} else if (ui_btns->right_btn) { // If right
 		// Handle case where up/down wasn't pressed
 		name_buf[cur_pos] = cur_char;
 		
@@ -821,15 +789,12 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 			name_buf[cur_pos] = '\0';
 			char_idx = 0;
 			cur_char = espnow_char_rows[row_idx][char_idx];
-		}
-		else {
+		} else {
 			name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
 		}
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	}
-	// If save button pressed
-	else if (ui_btns->select_btn) {
+	} else if (ui_btns->select_btn) { // If save button pressed
 		// Save final
         if (cur_pos < MAX_CUSTOM_NAME_LEN) {
 			name_buf[cur_pos] = cur_char;
@@ -1160,8 +1125,7 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
 	
 	if (xSemaphoreTake(xEspCmdTxSuccessSemaphore, 0) == pdTRUE) { // If transmission successful
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT LV_SYMBOL_OK);
-	}
-	else if (xSemaphoreTake(xEspCmdTxFailedSemaphore, 0) == pdTRUE) { // If transmission failed
+	} else if (xSemaphoreTake(xEspCmdTxFailedSemaphore, 0) == pdTRUE) { // If transmission failed
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT LV_SYMBOL_CLOSE);
 	}
 	
@@ -1223,9 +1187,7 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
 		xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
 		
 		lcd_clear_pending_inputs = true; // Would sometimes get "ghost" up press
-	}
-	// Exit
-	else if (ui_btns->left_btn == 1) {
+	} else if (ui_btns->left_btn == 1) { // Exit
 		// Reset receipts
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT);
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, RX_TXT);
@@ -1261,9 +1223,7 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
 		
 		// Go back
 		ui_menu->page = ESPNOW_PAGE;
-	}
-	// Power off
-	else if (ui_btns->pwr_btn == 1) {
+	} else if (ui_btns->pwr_btn == 1) { // Power off
 		// Reset receipts
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT);
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, RX_TXT);
@@ -1285,9 +1245,7 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
 		lv_obj_add_flag(espnow_menu->espnow_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
 		
 		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
-	}
-	// Increment command
-	else if (ui_btns->up_btn == 1) {
+	} else if (ui_btns->up_btn == 1) { // Increment command
 		// Reset receipts
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT);
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, RX_TXT);
@@ -1297,9 +1255,7 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
 		char buf[BUF_SIZE];
 		snprintf(buf, sizeof(buf), "%u", espnow_menu->espnow_submenu.cmd_to_send);
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_cmd, buf);
-	}
-	// Decrement command
-	else if (ui_btns->down_btn == 1) {
+	} else if (ui_btns->down_btn == 1) { // Decrement command
 		// Reset receipts
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT);
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, RX_TXT);
@@ -1309,9 +1265,7 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
 		char buf[BUF_SIZE];
 		snprintf(buf, sizeof(buf), "%u", espnow_menu->espnow_submenu.cmd_to_send);
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_cmd, buf);
-	}
-	// Increment command by 3
-	else if (ui_btns->select_btn == 1) {
+	} else if (ui_btns->select_btn == 1) { // Increment command by 3
 		// Reset receipts
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT);
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, RX_TXT);
@@ -1321,9 +1275,7 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
 		char buf[BUF_SIZE];
 		snprintf(buf, sizeof(buf), "%u", espnow_menu->espnow_submenu.cmd_to_send);
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_cmd, buf);
-	}
-	// Edit
-	else if (ui_btns->home_btn == 1) {
+	} else if (ui_btns->home_btn == 1) { // Edit
 		// Reset receipts
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT);
 		lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, RX_TXT);
@@ -1477,8 +1429,7 @@ esp_err_t lcd_espnow_rx_mac_nvs_save(const espnow_menu_t *espnow_menu)
 		if (i < user_cnt) {
 			// Save MAC in 6-byte blob
 			err = nvs_set_blob(nvs_handle, key, espnow_menu->rx_mac[i + 1], ESPNOW_MAC_SIZE); // Skip 0 to allign with index
-		}
-		else {
+		} else {
 			// Erase leftover key if it exists
 			err = nvs_erase_key(nvs_handle, key);
 			if (err == ESP_ERR_NVS_NOT_FOUND)
@@ -1527,8 +1478,7 @@ esp_err_t lcd_espnow_lmk_nvs_save(const espnow_menu_t *espnow_menu)
 		if (i < user_cnt) {
 			// Save LMK in 16-byte blob
 			err = nvs_set_blob(nvs_handle, key, espnow_menu->lmk[i + 1], LMK_LEN); // Skip 0 to allign with index
-		}
-		else {
+		} else {
 			// Erase leftover key if it exists
 			err = nvs_erase_key(nvs_handle, key);
 			if (err == ESP_ERR_NVS_NOT_FOUND)

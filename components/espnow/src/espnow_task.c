@@ -159,8 +159,7 @@ static void espnow_task(void *param)
 			if (espnow_funcs_espnow_send_data(espnow_cmd.mac_selected, (uint8_t*)tx_payload, tx_payload_len) == ESP_OK) {
 				// Notify the LCD that the transmission was successful
 				xSemaphoreGive(xEspCmdTxSuccessSemaphore);
-			}
-			else {
+			} else {
 				xSemaphoreGive(xEspCmdTxFailedSemaphore); // Mark as failed TX for LCD
 			}
 			

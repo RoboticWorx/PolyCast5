@@ -46,19 +46,19 @@
 
 // RGB LED states
 enum {
-	RGB_SET_OFF,
-	
-	RGB_SET_RED,
-	RGB_SET_GREEN,
-	RGB_SET_BLUE,
-	RGB_SET_PURPLE, // B + R
-	RGB_SET_TEAL, // B + G
-	
-	RGB_BLINK_RED,
-	RGB_BLINK_GREEN,
-	RGB_BLINK_BLUE,
-	RGB_BLINK_PURPLE, // B + R
-	RGB_BLINK_TEAL, // B + G
+    RGB_SET_OFF,
+    
+    RGB_SET_RED,
+    RGB_SET_GREEN,
+    RGB_SET_BLUE,
+    RGB_SET_PURPLE, // B + R
+    RGB_SET_TEAL, // B + G
+    
+    RGB_BLINK_RED,
+    RGB_BLINK_GREEN,
+    RGB_BLINK_BLUE,
+    RGB_BLINK_PURPLE, // B + R
+    RGB_BLINK_TEAL, // B + G
 };
 
 /** 

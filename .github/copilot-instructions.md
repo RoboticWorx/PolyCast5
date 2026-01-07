@@ -15,7 +15,7 @@ If the local style is unclear, prefer:
 1) the style already used in the same file, then
 2) the style used in the closest related module/component folder.
 
-Do not introduce new formatting rules or “personal preferences”. Do not reformat unrelated code.
+Do not introduce new formatting rules or "personal preferences". Do not reformat unrelated code.
 
 ## Scope and safety
 - Make minimal, focused changes that solve the requested problem.

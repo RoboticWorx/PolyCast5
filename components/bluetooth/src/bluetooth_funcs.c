@@ -183,8 +183,7 @@ static inline void cc_send_usage(uint16_t usage, bool key_pressed)
 	if (key_pressed) {
 		rpt[0] = (uint8_t)(usage & 0xFF); // LSB first
 		rpt[1] = (uint8_t)((usage >> 8) & 0xFF);
-	}
-	else {
+	} else {
 		rpt[0] = 0x00; rpt[1] = 0x00; // Release: no usage
 	}
 
@@ -985,15 +984,13 @@ void bluetooth_forget_all_peers(void)
 				#ifdef POLYCAST5_DEBUG
 				ESP_LOGI(TAG, "Unpaired peer %d", i);
 				#endif
-			}
-			else {
+			} else {
 				#ifdef POLYCAST5_DEBUG
 				ESP_LOGW(TAG, "Failed to unpair peer %d; rc=%d", i, rc);
 				#endif
 			}
 		}
-	}
-	else {
+	} else {
 		#ifdef POLYCAST5_DEBUG
 		ESP_LOGI(TAG, "No bonded peers found to delete.");
 		#endif
@@ -1265,8 +1262,7 @@ void bluetooth_add_to_peers_list_nvs(const ble_addr_t *peer)
 	// Append or rotate
 	if (n < BT_MAX_PEERS) {
 		tmp[n++] = *peer;
-	}
-	else {
+	} else {
 		memmove(&tmp[0], &tmp[1], (BT_MAX_PEERS - 1) * sizeof(ble_addr_t));
 		tmp[BT_MAX_PEERS - 1] = *peer;
 	}
@@ -1458,8 +1454,7 @@ esp_err_t bluetooth_set_peer_label_nvs(const ble_addr_t *addr, const char *label
 	if (label && label[0]) {
 		// Write label into address key
 		err = nvs_set_str(h, key, label);
-	}
-	else {
+	} else {
 		// Erase if DNE
 		err = nvs_erase_key(h, key);
 		if (err == ESP_ERR_NVS_NOT_FOUND) {

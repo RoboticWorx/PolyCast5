@@ -127,8 +127,7 @@ void lcd_lora_setup_page(lora_menu_t *menu)
 	// Wrap index
 	if (menu->index >= menu->size) {
 		menu->index = 0;
-	}
-	else if (menu->index < 0) {
+	} else if (menu->index < 0) {
 		menu->index = menu->size - 1;
 	}
 	
@@ -145,8 +144,7 @@ void lcd_lora_setup_page(lora_menu_t *menu)
 		// Style selected
 		if (i == menu->index) {
 			lv_obj_add_style(menu->btns[i], &menu->sel_style, 0);
-		}
-		else {
+		} else {
 			lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
 		}
 
@@ -256,8 +254,7 @@ void lcd_lora_update_menu(lora_menu_t *menu)
 	// Wrap index
 	if (menu->index >= menu->size) {
 		menu->index = 0;
-	}
-	else if (menu->index < 0) {
+	} else if (menu->index < 0) {
 		menu->index = menu->size - 1;
 	}
 
@@ -287,8 +284,7 @@ void lcd_lora_update_submenu(lora_menu_t *menu)
 	// Wrap index
 	if (menu->submenu.index >= menu->submenu.size) {
 		menu->submenu.index = 0;
-	}
-	else if (menu->submenu.index < 0) {
+	} else if (menu->submenu.index < 0) {
 		menu->submenu.index = menu->submenu.size - 1;
 	}
 
@@ -360,12 +356,9 @@ void lcd_lora_add_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora
 	
 	if (ui_btns->up_btn == 1) {
 		lv_obj_scroll_by_bounded(cont, 0, LORA_ADD_Y_OFFSET, LV_ANIM_ON);
-	}
-	else if (ui_btns->down_btn == 1) {
+	} else if (ui_btns->down_btn == 1) {
 		lv_obj_scroll_by_bounded(cont, 0, -LORA_ADD_Y_OFFSET, LV_ANIM_ON);
-	}
-	// Go back
-	else if (ui_btns->left_btn) {
+	} else if (ui_btns->left_btn) { // Go back
 		// Hide right arrow
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
@@ -382,9 +375,7 @@ void lcd_lora_add_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora
 		
 		// Switch back
 		ui_menu->page = LORA_PAGE;
-	}
-	// Confirm
-	else if (ui_btns->right_btn == 1) {
+	} else if (ui_btns->right_btn == 1) { // Confirm
 		// Delete objects
 		lv_obj_delete(cont); // Deletes children
 		
@@ -398,9 +389,7 @@ void lcd_lora_add_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora
 					
 		// Prompt to enter name
 		ui_menu->page = LORA_NAME_PAGE;
-	}
-	// Home or power off
-	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
+	} else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
 		// Delete objects
 		lv_obj_delete(cont); // Deletes children
 		
@@ -461,8 +450,7 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 
 			// Place cursor at the end
 			cur_pos = strlen(name_buf);
-		}
-		else { // Else blank slate
+		} else { // Else blank slate
 			memset(name_buf, 0, sizeof name_buf);
 			cur_pos = 0;
 		}
@@ -502,9 +490,7 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		cur_char = lora_char_rows[row_idx][char_idx];
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	}
-	// If up, iterate up
-	else if (ui_btns->up_btn) {
+	} else if (ui_btns->up_btn) { // If up, iterate up
 		// Increment with wrap
 		size_t row_len = strlen(lora_char_rows[row_idx]);
 		char_idx = (char_idx + 1) % (int)row_len;
@@ -514,9 +500,7 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		name_buf[cur_pos] = cur_char;
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	}
-	// If down, iterate down
-	else if (ui_btns->down_btn) {
+	} else if (ui_btns->down_btn) { // If down, iterate down
 		// Decrement with wrap
 		size_t row_len = strlen(lora_char_rows[row_idx]);
 		char_idx = (char_idx + (int)row_len - 1) % (int)row_len;
@@ -526,9 +510,7 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		name_buf[cur_pos] = cur_char;
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	}
-	// Can back out if at start and renaming
-	else if (ui_btns->left_btn && cur_pos == 0 && lora_menu_overwrite) {
+	} else if (ui_btns->left_btn && cur_pos == 0 && lora_menu_overwrite) { // Can back out if at start and renaming
 		// Delete labels since no longer used
 		lv_obj_delete(lbl_user_in);
 		lv_obj_delete(lbl_dirs);
@@ -548,9 +530,7 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		
  		ui_menu->page = LORA_SUBPAGE;
 		return;
-	}
-	// Go home or power off if ranaming
-	else if (ui_btns->pwr_btn && lora_menu_overwrite) {
+	} else if (ui_btns->pwr_btn && lora_menu_overwrite) { // Go home or power off if ranaming
 		// Delete labels since no longer used
 		lv_obj_delete(lbl_user_in);
 		lv_obj_delete(lbl_dirs);
@@ -572,9 +552,7 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 		
  		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
-	}
-	// If left and not at start
-	else if (ui_btns->left_btn && cur_pos != 0) {
+	} else if (ui_btns->left_btn && cur_pos != 0) { // If left and not at start
 		// Clear the current slot
 		name_buf[cur_pos] = '\0';
 	
@@ -597,9 +575,7 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		cur_char = lora_char_rows[row_idx][char_idx];
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	}
-	// If right
-	else if (ui_btns->right_btn) {
+	} else if (ui_btns->right_btn) { // If right
 		// Handle case where up/down wasn't pressed
 		name_buf[cur_pos] = cur_char;
 		
@@ -609,15 +585,12 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 			name_buf[cur_pos] = '\0';
 			char_idx = 0;
 			cur_char = lora_char_rows[row_idx][char_idx];
-		}
-		else {
+		} else {
 			name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
 		}
 		
 		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	}
-	// If save button pressed
-	else if (ui_btns->select_btn) {
+	} else if (ui_btns->select_btn) { // If save button pressed
 		// Save final
         if (cur_pos < MAX_CUSTOM_NAME_LEN) {
 			name_buf[cur_pos] = cur_char;
@@ -903,9 +876,7 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 		// Update selection
 		lora_menu->submenu.index++;
 		lcd_lora_update_submenu(lora_menu);
-	}
-	// Exit
-	else if (ui_btns->left_btn == 1 && lora_menu->submenu.index == 0) {
+	} else if (ui_btns->left_btn == 1 && lora_menu->submenu.index == 0) { // Exit
 		// Hide cont
 		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 		
@@ -921,9 +892,7 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 		
 		// Go back
 		ui_menu->page = LORA_PAGE;
-	}
-	// Home or power off selected
-	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+	} else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off selected
 		// Reset selection
 		lora_menu->submenu.index = 0;
 		lcd_lora_update_submenu(lora_menu);
@@ -939,26 +908,19 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
-	}
-	// Scroll left
-	else if (ui_btns->left_btn == 1) {
+	} else if (ui_btns->left_btn == 1) { // Scroll left
 		// Update selection
 		lora_menu->submenu.index--;
 		lcd_lora_update_submenu(lora_menu);
-	}
-	// Scroll up
-	else if (ui_btns->up_btn == 1) {
+	} else if (ui_btns->up_btn == 1) { // Scroll up
 		// Update selection
 		if (lora_menu->submenu.index > 2) {
 			lora_menu->submenu.index -= 3;
-		}
-		else if (lora_menu->submenu.index < 3) {
+		} else if (lora_menu->submenu.index < 3) {
 			lora_menu->submenu.index += 3;
 		}
 		lcd_lora_update_submenu(lora_menu);
-	}
-	// Send selected
-	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 0) {		
+	} else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 0) { // Send selected		
 		// Build the packet
 		lora_cmd_t lora_cmd = {}; // Zero out
 		lora_cmd.index = lora_menu->submenu.index;
@@ -999,20 +961,15 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 		
 		// Reset receipt label
 		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
-	}
-	// Scroll down
-	else if (ui_btns->down_btn == 1) {
+	} else if (ui_btns->down_btn == 1) { // Scroll down
 		// Update selection
 		if (lora_menu->submenu.index < 3) {
 			lora_menu->submenu.index += 3;
-		}
-		else if (lora_menu->submenu.index > 2) {
+		} else if (lora_menu->submenu.index > 2) {
 			lora_menu->submenu.index -= 3;
 		}
 		lcd_lora_update_submenu(lora_menu);
-	}
-	// Loop selected
-	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 1) {
+	} else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 1) { // Loop selected
 		// Hide cont
 		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 		
@@ -1022,9 +979,7 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 		
 		// Go to subpage loop page
 		ui_menu->page = LORA_LOOP_SUBPAGE;
-	}
-	// Plan selected
-	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 2) {
+	} else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 2) { // Plan selected
 		// Hide and reset receipt label
 		lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
 		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
@@ -1044,9 +999,7 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 		
 		// Go to subpage plan page
 		ui_menu->page = LORA_PLAN_SUBPAGE;
-	}
-	// Away selected
-	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 3) {
+	} else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 3) { // Away selected
 		// Hide and reset receipt label
 		lv_obj_add_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
 		lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
@@ -1059,9 +1012,7 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 		
 		// Go to subpage away page
 		ui_menu->page = LORA_AWAY_SUBPAGE;
-	}
-	// GPIO selected
-	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 4) {
+	} else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 4) { // GPIO selected
 		// Hide cont
 		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 		
@@ -1075,9 +1026,7 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
 		
 		// Go to subpage gpio page
 		ui_menu->page = LORA_GPIO_SUBPAGE;
-	}
-	// Edit selected
-	else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 5) {
+	} else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 5) { // Edit selected
 		// Hide cont
 		lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 		
@@ -1151,22 +1100,17 @@ void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 			// Move pointer up
 			lv_obj_set_y(lbl_selected_icon, 22);
 			selected_index = 0;
-		}
-		else if (selected_index == 0) {
+		} else if (selected_index == 0) {
 			// Move pointer up
 			lv_obj_set_y(lbl_selected_icon, LOOP_Y_SEL_POS);
 			selected_index = 1;
 		}
-	}
-	// Move down
-	else if (ui_btns->down_btn == 1 && selected_index == 0) {
+	} else if (ui_btns->down_btn == 1 && selected_index == 0) { // Move down
 		// Move pointer down
 		lv_obj_set_y(lbl_selected_icon, LOOP_Y_SEL_POS);
 			
 		selected_index = 1;
-	}
-	// Shift time of selected right
-	else if (ui_btns->right_btn == 1) {
+	} else if (ui_btns->right_btn == 1) { // Shift time of selected right
 		// Changing top time
 		if (selected_index == 0) {
 			on_idx = (on_idx  + 1) % LOOP_TIME_OPT_COUNT;
@@ -1181,9 +1125,7 @@ void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 			snprintf(buf, sizeof(buf), "%s", time_opts[off_idx]);
 			lv_label_set_text(lbl_bot_time, buf);
 		}
-	}
-	// Shift time of selected left
-	else if (ui_btns->left_btn == 1) {
+	} else if (ui_btns->left_btn == 1) { // Shift time of selected left
 		// Changing top time
 		if (selected_index == 0) {
 			on_idx = (on_idx - 1 + LOOP_TIME_OPT_COUNT) % LOOP_TIME_OPT_COUNT;
@@ -1198,9 +1140,7 @@ void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 			snprintf(buf, sizeof(buf), "%s", time_opts[off_idx]);
 			lv_label_set_text(lbl_bot_time, buf);
 		}
-	}
-	// Confirm
-	else if (ui_btns->select_btn == 1) {				 
+	} else if (ui_btns->select_btn == 1) { // Confirm				 
 		// Reset objects
 		lv_obj_delete(lbl_subpage_times);
 		lv_obj_delete(lbl_selected_icon);
@@ -1239,9 +1179,7 @@ void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 			
 		// Go back
 		ui_menu->page = LORA_SUBPAGE;
-	}
-	// Go back
-	else if (ui_btns->down_btn == 1) {
+	} else if (ui_btns->down_btn == 1) { // Go back
 		// Show LoRa submenu cont
 		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 		
@@ -1264,9 +1202,7 @@ void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 			
 		// Go back
 		ui_menu->page = LORA_SUBPAGE;
-	}
-	// Home or power off selected
-	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {			
+	} else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off selected			
 		// Reset objects
 		lv_obj_delete(lbl_subpage_times);
 		lv_obj_delete(lbl_selected_icon);
@@ -1423,9 +1359,7 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		char buf[GPIO_BUF_SIZE];
 		snprintf(buf, sizeof(buf), "%u", cmd_to_send);
 		lv_label_set_text(lbl_send_cmd, buf);
-	}
-	// Decrement command
-	else if (ui_btns->down_btn == 1) {
+	} else if (ui_btns->down_btn == 1) { // Decrement command
 		// Reset receipts
 		lv_label_set_text(lbl_send_tx, GPIO_TX_TXT);
 		lv_label_set_text(lbl_send_rx, GPIO_RX_TXT);
@@ -1435,9 +1369,7 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		char buf[GPIO_BUF_SIZE];
 		snprintf(buf, sizeof(buf), "%u", cmd_to_send);
 		lv_label_set_text(lbl_send_cmd, buf);
-	}
-	// Increment command by 3
-	else if (ui_btns->select_btn == 1) {
+	} else if (ui_btns->select_btn == 1) { // Increment command by 3
 		// Reset receipts
 		lv_label_set_text(lbl_send_tx, GPIO_TX_TXT);
 		lv_label_set_text(lbl_send_rx, GPIO_RX_TXT);
@@ -1447,9 +1379,7 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		char buf[GPIO_BUF_SIZE];
 		snprintf(buf, sizeof(buf), "%u", cmd_to_send);
 		lv_label_set_text(lbl_send_cmd, buf);
-	}
-	// Send to PolyPlug
-	else if (ui_btns->right_btn == 1) {
+	} else if (ui_btns->right_btn == 1) { // Send to PolyPlug
 		// Reset receipts
 		lv_label_set_text(lbl_send_tx, GPIO_TX_TXT);
 		lv_label_set_text(lbl_send_rx, GPIO_RX_TXT);
@@ -1464,9 +1394,7 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		
 		// TX confirmation
 		tx_success = true;
-	}
-	// Back
-	else if (ui_btns->left_btn == 1) {
+	} else if (ui_btns->left_btn == 1) { // Back
 		// Reset objects
 		lv_obj_delete(lbl_send_tx);
 		lv_obj_delete(lbl_send_rx);
@@ -1494,9 +1422,7 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 			
 		// Go back
 		ui_menu->page = LORA_SUBPAGE;
-	}
-	// Home selected
-	else if (ui_btns->home_btn == 1) {			
+	} else if (ui_btns->home_btn == 1) { // Home selected			
 		// Reset objects
 		lv_obj_delete(lbl_send_tx);
 		lv_obj_delete(lbl_send_rx);
@@ -1560,9 +1486,7 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 			
 		// Go back
 		ui_menu->page = LORA_SUBPAGE;
-	}
-	// Power off selected
-	else if (ui_btns->pwr_btn == 1) {			
+	} else if (ui_btns->pwr_btn == 1) { // Power off selected			
 		// Reset objects
 		lv_obj_delete(lbl_send_tx);
 		lv_obj_delete(lbl_send_rx);
@@ -1658,8 +1582,7 @@ void lcd_lora_setup_plan_page(ui_menu_t *ui_menu, lora_plan_menu_t *lora_plan_me
 		// Add style
 		if (i == lora_plan_menu->plan_index) {
 			lv_obj_add_style(lora_plan_menu->plan_btns[i], &lora_plan_menu->plan_btn_style, 0);
-		}
-		else {
+		} else {
 			lv_obj_add_style(lora_plan_menu->plan_btns[i], &lora_plan_menu->plan_sel_style, 0);
 		}
 	
@@ -1737,17 +1660,13 @@ void lcd_lora_plan_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		
 		// Switch pages
 		ui_menu->page = LORA_PLAN_CONFIRM_SUBPAGE;
-	}
-	// Go right
-	else if (ui_btns->right_btn == 1) {		
+	} else if (ui_btns->right_btn == 1) { // Go right		
 		// Update selection right
 		lora_plan_menu->plan_index = (lora_plan_menu->plan_index + 1) % LORA_PLAN_SUBMENU_COUNT;
 		
 		// Update plan menu
 		lcd_lora_update_plan_menu(lora_plan_menu);
-	}
-	// Back
-	else if (ui_btns->left_btn == 1 && lora_plan_menu->plan_index == 0) {
+	} else if (ui_btns->left_btn == 1 && lora_plan_menu->plan_index == 0) { // Back
 		// Reset all labels and days
 		for (int i = 0; i < 7; ++i) {
 			days_selected[i] = false;
@@ -1769,22 +1688,17 @@ void lcd_lora_plan_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		
 		// Switch pages
 		ui_menu->page = LORA_SUBPAGE;
-	}
-	// Go left
-	else if (ui_btns->left_btn == 1) {
+	} else if (ui_btns->left_btn == 1) { // Go left
 		// Update selection left
 		lora_plan_menu->plan_index = (lora_plan_menu->plan_index - 1 + LORA_PLAN_SUBMENU_COUNT) % LORA_PLAN_SUBMENU_COUNT;
 		
 		// Update plan menu
 		lcd_lora_update_plan_menu(lora_plan_menu);
-	}
-	// Go up
-	else if (ui_btns->up_btn == 1) {
+	} else if (ui_btns->up_btn == 1) { // Go up
 		// Update selection up (for 4 columns: if > 3 subtract 4, else add 4)
 		if (lora_plan_menu->plan_index > (PLAN_COLUMNS - 1)) {
 			lora_plan_menu->plan_index -= PLAN_COLUMNS;
-		}
-		else {
+		} else {
 			lora_plan_menu->plan_index += PLAN_COLUMNS;
 		}
 		
@@ -1795,14 +1709,11 @@ void lcd_lora_plan_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		
 		// Update plan menu
 		lcd_lora_update_plan_menu(lora_plan_menu);
-	}
-	// Go down
-	else if (ui_btns->down_btn == 1) {
+	} else if (ui_btns->down_btn == 1) { // Go down
 		// Update selection down (for 4 columns: if < 4 add 4, else subtract 4)
 		if (lora_plan_menu->plan_index < PLAN_COLUMNS) {
 			lora_plan_menu->plan_index += PLAN_COLUMNS;
-		}
-		else {
+		} else {
 			lora_plan_menu->plan_index -= PLAN_COLUMNS;
 		}
 		
@@ -1813,9 +1724,7 @@ void lcd_lora_plan_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		
 		// Update plan menu
 		lcd_lora_update_plan_menu(lora_plan_menu);
-	}
-	// Select option
-	else if (ui_btns->select_btn == 1) {
+	} else if (ui_btns->select_btn == 1) { // Select option
 		// If a day, toggle it and update symbol
 		if (lora_plan_menu->plan_index < 7) {
 			days_selected[lora_plan_menu->plan_index] = !days_selected[lora_plan_menu->plan_index]; // Toggle day
@@ -1853,9 +1762,7 @@ void lcd_lora_plan_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 			// Switch pages
 			ui_menu->page = LORA_SUBPAGE;
 		}
-	}
-	// Home or power off
-	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+	} else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off
 		// Reset all labels and days
 		for (int i = 0; i < 7; ++i) {
 			days_selected[i] = false;
@@ -1924,9 +1831,7 @@ void lcd_lora_plan_confirm_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_
 		
 		// Go back
 		ui_menu->page = LORA_PLAN_SUBPAGE;
-	}
-	// Home or power off
-	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+	} else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off
 		// Reset objects
 		lv_obj_delete(lbl_ins_top);
 		lv_obj_delete(lbl_ins_bot);
@@ -1937,9 +1842,7 @@ void lcd_lora_plan_confirm_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_
 		init = false;
 		
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
-	}
-	// Confirm
-	else if (ui_btns->select_btn == 1) {
+	} else if (ui_btns->select_btn == 1) { // Confirm
 		// Reset objects
 		lv_obj_delete(lbl_ins_top);
 		lv_obj_delete(lbl_ins_bot);
@@ -2104,9 +2007,7 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 
 		// Go back
 		ui_menu->page = LORA_SUBPAGE;
-	}
-	// Go back
-	else if (ui_btns->left_btn == 1 && selected_digit == 0) {
+	} else if (ui_btns->left_btn == 1 && selected_digit == 0) { // Go back
 		// Reset objects
 		lv_obj_delete(lbl_subpage_times);
 		lv_obj_delete(lbl_selected_icon);
@@ -2130,9 +2031,7 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 
 		// Go back
 		ui_menu->page = LORA_PLAN_SUBPAGE;
-	}
-	// Digit right
-	else if (ui_btns->right_btn == 1) {
+	} else if (ui_btns->right_btn == 1) { // Digit right
 		// Increment with wrap
 		selected_digit = (selected_digit + 1) % PLAN_TIME_DIGITS;
 		
@@ -2141,9 +2040,7 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		
 		// Update
 		update_time_label(time_labels, start_time, end_time);
-	}
-	// Digit left
-	else if (ui_btns->left_btn == 1) {
+	} else if (ui_btns->left_btn == 1) { // Digit left
 		// Decrement with wrap
 		selected_digit = (selected_digit + PLAN_TIME_DIGITS - 1) % PLAN_TIME_DIGITS;
 		
@@ -2152,9 +2049,7 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		
 		// Update
 		update_time_label(time_labels, start_time, end_time);
-	}
-	// Digit up
-	else if (ui_btns->up_btn == 1) {
+	} else if (ui_btns->up_btn == 1) { // Digit up
 		// Select time string and adjusted pos (0-5)
 		char *current_time_str = (selected_digit < 6) ? start_time : end_time; // Which half
 		uint8_t adj_pos = selected_digit % 6;
@@ -2165,11 +2060,9 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		// Range limits based on position
 		if (adj_pos == 0) { // Tens of hours (0-2)
 			max_val = 2;
-		}
-		else if (adj_pos == 1) { // Hours
+		} else if (adj_pos == 1) { // Hours
 			max_val = (get_digit(current_time_str, 0) == 2) ? 3 : 9;
-		}
-		else if (adj_pos == 2 || adj_pos == 4) { // Tens of min/sec (0-5)
+		} else if (adj_pos == 2 || adj_pos == 4) { // Tens of min/sec (0-5)
 			max_val = 5;
 		}
 
@@ -2179,9 +2072,7 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		// Update
 		set_digit(current_time_str, adj_pos, digit_val);
 		update_time_label(time_labels, start_time, end_time);
-	}
-	// Digit down
-	else if (ui_btns->down_btn == 1) {
+	} else if (ui_btns->down_btn == 1) { // Digit down
 		// Select time string and adjusted pos (0-5)
 		char *current_time_str = (selected_digit < 6) ? start_time : end_time; // Which half
 		uint8_t adj_pos = selected_digit % 6;
@@ -2192,11 +2083,9 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		// Range limits based on position
 		if (adj_pos == 0) { // Tens of hours (0-2)
 			max_val = 2;
-		}
-		else if (adj_pos == 1) { // Hours
+		} else if (adj_pos == 1) { // Hours
 			max_val = (get_digit(current_time_str, 0) == 2) ? 3 : 9;
-		}
-		else if (adj_pos == 2 || adj_pos == 4) { // Tens of min/sec (0-5)
+		} else if (adj_pos == 2 || adj_pos == 4) { // Tens of min/sec (0-5)
 			max_val = 5;
 		}
 
@@ -2206,9 +2095,7 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 		// Update
 		set_digit(current_time_str, adj_pos, digit_val);
 		update_time_label(time_labels, start_time, end_time);
-	}
-	// Home or power off selected
-	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+	} else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off selected
 		// Reset objects
 		lv_obj_delete(lbl_subpage_times);
 		lv_obj_delete(lbl_selected_icon);
@@ -2234,8 +2121,7 @@ void lcd_lora_update_plan_menu(lora_plan_menu_t *lora_plan_menu)
 	// Wrap index
 	if (lora_plan_menu->plan_index >= LORA_PLAN_SUBMENU_COUNT) {
 		lora_plan_menu->plan_index = 0;
-	}
-	else if (lora_plan_menu->plan_index < 0) {
+	} else if (lora_plan_menu->plan_index < 0) {
 		lora_plan_menu->plan_index = LORA_PLAN_SUBMENU_COUNT - 1;
 	}
 
@@ -2310,9 +2196,7 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 		
 		ui_menu->page = LORA_SUBPAGE;
-	}
-	// Home or power off selected
-	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+	} else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off selected
 		// Delete away_menu lv_obj
 		lv_obj_delete(away_menu->main_list);
 		
@@ -2328,21 +2212,15 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		away_menu = NULL;
 		
 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
-	}
-	// Scroll up pressed
-	else if (ui_btns->up_btn == 1) {
+	} else if (ui_btns->up_btn == 1) { // Scroll up pressed
 		// Update selection
 		away_menu->index--;
 		lcd_lora_update_menu(away_menu);
-	}
-	// Scroll down pressed
-	else if (ui_btns->down_btn == 1) {
+	} else if (ui_btns->down_btn == 1) { // Scroll down pressed
 		// Update selection
 		away_menu->index++;
 		lcd_lora_update_menu(away_menu);
-	}
-	// Custom selected
-	else if (ui_btns->select_btn == 1 && away_menu->index == 0) {
+	} else if (ui_btns->select_btn == 1 && away_menu->index == 0) { // Custom selected
 		// Delete away_menu lv_obj
 		lv_obj_delete(away_menu->main_list);
 		
@@ -2361,9 +2239,7 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
 		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 		
 		ui_menu->page = LORA_AWAY_CUSTOM_SUBPAGE;
-	}
-	// Specific option selected
-	else if (ui_btns->select_btn == 1 && away_menu->index != 0) {
+	} else if (ui_btns->select_btn == 1 && away_menu->index != 0) { // Specific option selected
 		// Hide away_menu
 		lv_obj_add_flag(away_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 		
@@ -2559,9 +2435,7 @@ void lcd_lora_away_custom_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_m
 		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 
 		ui_menu->page = LORA_SUBPAGE;
-	}
-	// Move right (toggle min/max)
-	else if (ui_btns->right_btn == 1) {
+	} else if (ui_btns->right_btn == 1) { // Move right (toggle min/max)
 		// Point to max
 		if (user_idx == 0) {
 			lv_obj_set_x(lbl_pointer, AWAY_CUSTOM_X_POS);
@@ -2572,29 +2446,22 @@ void lcd_lora_away_custom_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_m
 			lv_obj_set_x(lbl_pointer, AWAY_CUSTOM_X_POS - AWAY_CUSTOM_X_OFFSET);
 			user_idx = 0;
 		}
-	}
-	// Move left inside page (only if currently on max)
-	else if (ui_btns->left_btn == 1 && user_idx != 0) {
+	} else if (ui_btns->left_btn == 1 && user_idx != 0) { // Move left inside page (only if currently on max)
 		lv_obj_set_x(lbl_pointer, AWAY_CUSTOM_X_POS - AWAY_CUSTOM_X_OFFSET);
 		user_idx = 0;
-	}
-	// Increment value
-	else if (ui_btns->up_btn == 1) {
+	} else if (ui_btns->up_btn == 1) { // Increment value
 		if (user_idx == 0) {
 			min_val++;
 			char buf[AWAY_CUSTOM_BUF_SIZE];
 			snprintf(buf, sizeof(buf), "%d", min_val);
 			lv_label_set_text(lbl_val_min, buf);
-		}
-		else {
+		} else {
 			max_val++;
 			char buf[AWAY_CUSTOM_BUF_SIZE];
 			snprintf(buf, sizeof(buf), "%d", max_val);
 			lv_label_set_text(lbl_val_max, buf);
 		}
-	}
-	// Decrement value
-	else if (ui_btns->down_btn == 1) {
+	} else if (ui_btns->down_btn == 1) { // Decrement value
 		if (user_idx == 0) {
 			min_val--;
 			if (min_val < 0) {
@@ -2604,8 +2471,7 @@ void lcd_lora_away_custom_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_m
 			char buf[AWAY_CUSTOM_BUF_SIZE];
 			snprintf(buf, sizeof(buf), "%d", min_val);
 			lv_label_set_text(lbl_val_min, buf);
-		}
-		else {
+		} else {
 			max_val--;
 			if (max_val < 0) {
 				max_val = 0;
@@ -2615,9 +2481,7 @@ void lcd_lora_away_custom_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_m
 			snprintf(buf, sizeof(buf), "%d", max_val);
 			lv_label_set_text(lbl_val_max, buf);
 		}
-	}
-	// Back selected and pointer is on min
-	else if (ui_btns->left_btn == 1) {
+	} else if (ui_btns->left_btn == 1) { // Back selected and pointer is on min
 		// Remove styles
 		lv_obj_remove_style_all(lbl_min);
 		lv_obj_remove_style_all(lbl_max);
@@ -2639,9 +2503,7 @@ void lcd_lora_away_custom_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_m
 		lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 
 		ui_menu->page = LORA_SUBPAGE;
-	}
-	// Home or power off selected
-	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+	} else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off selected
 		// Remove styles
 		lv_obj_remove_style_all(lbl_min);
 		lv_obj_remove_style_all(lbl_max);

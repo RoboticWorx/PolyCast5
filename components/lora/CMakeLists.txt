@@ -7,11 +7,11 @@ idf_component_register(
     SRCS ${SRCS}
                 
     INCLUDE_DIRS 
-    	"include"
+        "include"
     
     REQUIRES
-    	common sx126x
+        common sx126x
     
     PRIV_REQUIRES
-    	espnow gpio bootloader_support
+        espnow gpio bootloader_support
 )

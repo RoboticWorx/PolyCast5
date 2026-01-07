@@ -931,15 +931,13 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
 			#endif
 			rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
 			ESP_LOGI(TAG, "ble_sm_inject_io result: %d", rc);
-		}
-		else if (event->passkey.params.action == BLE_SM_IOACT_NUMCMP) {
+		} else if (event->passkey.params.action == BLE_SM_IOACT_NUMCMP) {
 			ESP_LOGI(TAG, "Accepting passkey..");
 			pkey.action = event->passkey.params.action;
 			pkey.numcmp_accept = key;
 			rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
 			ESP_LOGI(TAG, "ble_sm_inject_io result: %d", rc);
-		}
-		else if (event->passkey.params.action == BLE_SM_IOACT_OOB) {
+		} else if (event->passkey.params.action == BLE_SM_IOACT_OOB) {
 			static uint8_t tem_oob[16] = {0};
 			pkey.action = event->passkey.params.action;
 			for (int i = 0; i < 16; i++) {
@@ -947,8 +945,7 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
 			}
 			rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
 			ESP_LOGI(TAG, "ble_sm_inject_io result: %d", rc);
-		}
-		else if (event->passkey.params.action == BLE_SM_IOACT_INPUT) {
+		} else if (event->passkey.params.action == BLE_SM_IOACT_INPUT) {
 			pkey.action = event->passkey.params.action;
 			
 			// Load pairing key from NVS

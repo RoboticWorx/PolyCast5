@@ -49,49 +49,49 @@ typedef struct {
 } wifi_login_t;
 
 typedef struct {
-	uint8_t type;
+    uint8_t type;
     uint8_t channel;
     int mask;
     uint8_t target_bssid[6];
 } wifi_sniff_t;
 
 typedef enum {
-	WIFI_PHY_UNKNOWN = 0,
-	WIFI_PHY_11B,
-	WIFI_PHY_11G,
-	WIFI_PHY_11A,
-	WIFI_PHY_11N,  // Wi-Fi 4
-	WIFI_PHY_11AC, // Wi-Fi 5
-	WIFI_PHY_11AX, // Wi-Fi 6
+    WIFI_PHY_UNKNOWN = 0,
+    WIFI_PHY_11B,
+    WIFI_PHY_11G,
+    WIFI_PHY_11A,
+    WIFI_PHY_11N,  // Wi-Fi 4
+    WIFI_PHY_11AC, // Wi-Fi 5
+    WIFI_PHY_11AX, // Wi-Fi 6
 } wifi_phy_t;
 
 typedef struct {
-	char ssid[33];
-	int channel;
-	int freq;
-	int rssi;
-	int snr;
+    char ssid[33];
+    int channel;
+    int freq;
+    int rssi;
+    int snr;
 
-	uint16_t cap_info;
-	uint16_t interval;
-	uint64_t timestamp;
+    uint16_t cap_info;
+    uint16_t interval;
+    uint64_t timestamp;
 
-	bool rsn; // RSN IE present
-	bool wpa; // WPA IE present (vendor 221: 00:50:F2:01)
-	bool wps; // WPS IE present (vendor 221: 00:50:F2:04)
+    bool rsn; // RSN IE present
+    bool wpa; // WPA IE present (vendor 221: 00:50:F2:01)
+    bool wps; // WPS IE present (vendor 221: 00:50:F2:04)
 
-	// RSN details
-	uint8_t  rsn_group_cipher; // Cipher type (e.g. 2 TKIP, 4 CCMP, 8 GCMP)
-	uint32_t rsn_pairwise_ciphers; // Bitmask: (1u<<cipher_type)
-	uint32_t rsn_akm_suites; // Bitmask: (1u<<akm_type)
-	bool pmf_capable; // MFPC
-	bool pmf_required; // MFPR
+    // RSN details
+    uint8_t  rsn_group_cipher; // Cipher type (e.g. 2 TKIP, 4 CCMP, 8 GCMP)
+    uint32_t rsn_pairwise_ciphers; // Bitmask: (1u<<cipher_type)
+    uint32_t rsn_akm_suites; // Bitmask: (1u<<akm_type)
+    bool pmf_capable; // MFPC
+    bool pmf_required; // MFPR
 
     // Wi-Fi PHY type
-	wifi_phy_t phy;
-	bool ht;
-	bool vht;
-	bool he;
+    wifi_phy_t phy;
+    bool ht;
+    bool vht;
+    bool he;
 } wifi_beacon_t;
 
 typedef struct {

@@ -129,8 +129,7 @@ static void make_key_hint(const char *key, char *out, size_t out_sz)
 	// Try to preserve prefix if it looks like an xAI key
 	if (strncmp(key, "xai-", 4) == 0) {
 		snprintf(out, out_sz, "xai-...%s", tail);
-	}
-	else {
+	} else {
 		snprintf(out, out_sz, "...%s", tail);
 	}
 }

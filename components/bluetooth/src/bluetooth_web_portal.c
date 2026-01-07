@@ -399,8 +399,7 @@ esp_err_t bluetooth_script_cat_idx_set_nvs(uint8_t idx, uint8_t cat)
 	if (err == ESP_OK) {
 		// Commit changes on success
 		err = nvs_commit(h);
-	}
-	else {
+	} else {
 		#ifdef POLYCAST5_DEBUG
 		ESP_LOGE(TAG, "bluetooth_script_cat_set nvs_set_u8 failed: %s", esp_err_to_name(err));
 		#endif
@@ -546,8 +545,7 @@ esp_err_t bluetooth_category_delete_nvs(uint8_t idx)
 			if (cat > idx) {
 				cat--;
 				nvs_set_u8(h, cat_key, cat);
-			}
-			else if (cat == idx) {
+			} else if (cat == idx) {
 				// Optional: set to 0 (default cat) or delete script? Here, set to 0.
 				nvs_set_u8(h, cat_key, 0);
 			}
@@ -740,8 +738,7 @@ static esp_err_t script_one_get(httpd_req_t *req)
 		if (!resolve_global_index_for_local(cat, local_idx, false, &global_idx)) {
 			return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "not found");
 		}
-	}
-	else {
+	} else {
 		// Treat as global directly
 		global_idx = (uint8_t)atoi(idx_str);
 
@@ -921,8 +918,7 @@ static esp_err_t script_one_post(httpd_req_t *req)
 			free(buf);
 			return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad index/cat");
 		}
-	}
-	else {
+	} else {
 		// Treat as global (edit or append at tail)
 		uint8_t total = bluetooth_script_count_get_nvs();
 
@@ -940,8 +936,7 @@ static esp_err_t script_one_post(httpd_req_t *req)
 		strncpy(label, name_in, BT_SCRIPT_LABEL_MAX_LEN);
 		label[BT_SCRIPT_LABEL_MAX_LEN] = '\0';
 		trim_ascii(label);
-	}
-	else {
+	} else {
 		label_from_body(body_in, label, sizeof(label));
 		if (label[0] == '\0') {
 			snprintf(label, sizeof(label), "Script %02d", (int)global_idx);
@@ -1028,8 +1023,7 @@ static esp_err_t script_one_delete(httpd_req_t *req)
 		if (!resolve_global_index_for_local(cat, local_idx, false, &global_idx)) {
 			return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "not found");
 		}
-	}
-	else {
+	} else {
 		global_idx = (uint8_t)atoi(idx_str);
 	}
 
@@ -1108,8 +1102,7 @@ static esp_err_t categories_get(httpd_req_t *req)
 
 		if (bluetooth_category_name_get_nvs(i, buf, sizeof(buf)) == ESP_OK) {
 			cJSON_AddItemToArray(names, cJSON_CreateString(buf));
-		}
-		else {
+		} else {
 			cJSON_AddItemToArray(names, cJSON_CreateString("(unnamed)"));
 		}
 	}
@@ -1166,8 +1159,7 @@ static esp_err_t category_one_get(httpd_req_t *req)
 	char buf[BT_CAT_LABEL_MAX_LEN + 1];
 	if (bluetooth_category_name_get_nvs((uint8_t)index, buf, sizeof(buf)) == ESP_OK) {
 		cJSON_AddStringToObject(root, "name", buf);
-	}
-	else {
+	} else {
 		cJSON_AddStringToObject(root, "name", "");
 	}
 

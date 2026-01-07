@@ -7,11 +7,11 @@ idf_component_register(
     SRCS ${SRCS}
         
     INCLUDE_DIRS 
-    	"include"
+        "include"
     
     REQUIRES
-    	common 
+        common 
     
     PRIV_REQUIRES
-    	esp_adc efuse
+        esp_adc efuse
 )

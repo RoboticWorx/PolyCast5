@@ -103,8 +103,7 @@ void lcd_hotkey_update_menu(hotkey_menu_t *menu)
 	// Wrap index
 	if (menu->index >= menu->size) {
 		menu->index = 0;
-	}
-	else if (menu->index < 0) {
+	} else if (menu->index < 0) {
 		menu->index = menu->size - 1;
 	}
 
@@ -167,33 +166,23 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
 			instr_text = "How to configure your command for Hot1:\n\nThis hotkey is triggered when SHORT pressing the "
 			"HOME button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
 			"ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to represent waiting for a command.";
-		}
-		// Hot2
-		else if (hotkey_menu->index == 1) {
+		} else if (hotkey_menu->index == 1) { // Hot2
 			instr_text = "How to configure your command for Hot2:\n\nThis hotkey is triggered when LONG pressing the "
 			"HOME button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
 			"ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to represent waiting for a command.";
-		}
-		// Hot3
-		else if (hotkey_menu->index == 2) {
+		} else if (hotkey_menu->index == 2) { // Hot3
 			instr_text = "How to configure your command for Hot3:\n\nThis hotkey is triggered when LONG pressing the "
 			"LEFT button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
 			"ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to represent waiting for a command.";
-		}
-		// Hot4
-		else if (hotkey_menu->index == 3) {
+		} else if (hotkey_menu->index == 3) { // Hot4
 			instr_text = "How to configure your command for Hot4:\n\nThis hotkey is triggered when LONG pressing the "
 			"SELECT button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
 			"ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to represent waiting for a command.";
-		}
-		// Hot5
-		else if (hotkey_menu->index == 4) {
+		} else if (hotkey_menu->index == 4) { // Hot5
 			instr_text = "How to configure your command for Hot5:\n\nThis hotkey is triggered when SHORT pressing the "
 			"RIGHT button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
 			"ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to represent waiting for a command.";
-		}
-		// Hot6
-		else if (hotkey_menu->index == 5) {
+		} else if (hotkey_menu->index == 5) { // Hot6
 			instr_text = "How to configure your command for Hot6:\n\nThis hotkey is triggered when LONG pressing the "
 			"RIGHT button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
 			"ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to represent waiting for a command.";
@@ -218,17 +207,11 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
 		
 		// Switch
 		ui_menu->page = HOTKEY_PAGE;
-	}
-	// Scroll up
-	else if (ui_btns->up_btn == 1) {
+	} else if (ui_btns->up_btn == 1) { // Scroll up
 		lv_obj_scroll_by_bounded(cont, 0, HOTKEY_Y_OFFSET, LV_ANIM_ON);
-	}
-	// Scroll down
-	else if (ui_btns->down_btn == 1) {
+	} else if (ui_btns->down_btn == 1) { // Scroll down
 		lv_obj_scroll_by_bounded(cont, 0, -HOTKEY_Y_OFFSET, LV_ANIM_ON);
-	}
-	// Confirm and active viewer
-	else if (ui_btns->right_btn == 1) {
+	} else if (ui_btns->right_btn == 1) { // Confirm and active viewer
 		// Save active index
 		hotkey_cmd.active_idx = hotkey_menu->index; // Hot1-Hot6 0-based
 		
@@ -255,9 +238,7 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
 		
 		// Switch
 		ui_menu->page = SELECTION_PAGE;
-	}
-	// Home or power off
-	else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {		
+	} else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off		
 		// Delete objects
 		lv_obj_delete(cont); // Deletes children
 		
@@ -286,8 +267,7 @@ void lcd_hotkey_nvs_save(const hotkey_cmd_t *src)
 	if (err == ESP_OK) {
 		// Commit changes if success
 		err = nvs_commit(h);
-	}
-	else {
+	} else {
 		ESP_LOGE(TAG, "lcd_hotkey_nvs_save set_blob failed: %s", esp_err_to_name(err));
 	}
 
@@ -318,9 +298,7 @@ void lcd_hotkey_nvs_load(hotkey_cmd_t *dst)
 	// Check if first boot
 	if (err == ESP_ERR_NVS_NOT_FOUND) {
 		memset(dst, 0, sizeof(*dst)); // Zero out for first-boot default
-	}
-	// Other error
-	else if (err != ESP_OK) {
+	} else if (err != ESP_OK) { // Other error
 		ESP_LOGE(TAG, "lcd_hotkey_nvs_load get_blob failed: %s", esp_err_to_name(err));
 		memset(dst, 0, sizeof(*dst));
 	}
