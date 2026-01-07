@@ -12,28 +12,28 @@ typedef struct ui_menu_t ui_menu_t;
 #define MAX_HOTKEY_OPTIONS 6 // Long/short left and home + long left + long select
 
 typedef struct {
-	const char *options[MAX_HOTKEY_OPTIONS];
-	lv_obj_t *btns[MAX_HOTKEY_OPTIONS];
-	int size;
-	int index;
-	lv_obj_t *cont;
-	lv_style_t btn_style;
-	lv_style_t sel_style;
+    const char *options[MAX_HOTKEY_OPTIONS];
+    lv_obj_t *btns[MAX_HOTKEY_OPTIONS];
+    int size;
+    int index;
+    lv_obj_t *cont;
+    lv_style_t btn_style;
+    lv_style_t sel_style;
 } hotkey_menu_t;
 
 typedef struct {
-	size_t current_remote;
-	int index;
+    size_t current_remote;
+    int index;
 } ir_cmd_t;
 
 typedef struct {
-	uint8_t active_idx;
-	bool has_lora[MAX_HOTKEY_OPTIONS]; // Hot0-Hot5
-	bool has_espnow[MAX_HOTKEY_OPTIONS];
-	bool has_ir[MAX_HOTKEY_OPTIONS];
-	lora_cmd_t lora_cmd[MAX_HOTKEY_OPTIONS];
-	espnow_cmd_t espnow_cmd[MAX_HOTKEY_OPTIONS];
-	ir_cmd_t ir_cmd[MAX_HOTKEY_OPTIONS];
+    uint8_t active_idx;
+    bool has_lora[MAX_HOTKEY_OPTIONS]; // Hot0-Hot5
+    bool has_espnow[MAX_HOTKEY_OPTIONS];
+    bool has_ir[MAX_HOTKEY_OPTIONS];
+    lora_cmd_t lora_cmd[MAX_HOTKEY_OPTIONS];
+    espnow_cmd_t espnow_cmd[MAX_HOTKEY_OPTIONS];
+    ir_cmd_t ir_cmd[MAX_HOTKEY_OPTIONS];
 } hotkey_cmd_t;
 
 extern hotkey_menu_t hotkey_menu;

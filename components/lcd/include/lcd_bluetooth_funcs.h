@@ -28,29 +28,29 @@ typedef struct {
 } bluetooth_peer_menu_t;
 
 typedef struct {
-	char *options[NUM_KEYBOARD_BASE + MAX_KEYBOARD_SCRIPTS];
-	lv_obj_t *btns[NUM_KEYBOARD_BASE + MAX_KEYBOARD_SCRIPTS];
-	int size;
-	int index;
-	lv_obj_t *main_list;
-	lv_style_t btn_style;
-	lv_style_t sel_style;
-	lv_obj_t *cont;
-	char cat_labels[MAX_CATEGORIES][BT_CAT_LABEL_MAX_LEN + 1]; // For dynamic category names
-	uint8_t script_indices[MAX_KEYBOARD_SCRIPTS]; // For mapping submenu positions to script indices
+    char *options[NUM_KEYBOARD_BASE + MAX_KEYBOARD_SCRIPTS];
+    lv_obj_t *btns[NUM_KEYBOARD_BASE + MAX_KEYBOARD_SCRIPTS];
+    int size;
+    int index;
+    lv_obj_t *main_list;
+    lv_style_t btn_style;
+    lv_style_t sel_style;
+    lv_obj_t *cont;
+    char cat_labels[MAX_CATEGORIES][BT_CAT_LABEL_MAX_LEN + 1]; // For dynamic category names
+    uint8_t script_indices[MAX_KEYBOARD_SCRIPTS]; // For mapping submenu positions to script indices
 } bluetooth_keyboard_menu_t;
 
 typedef struct {
-	char *options[NUM_BLUETOOTH_OPTIONS];
-	lv_obj_t *btns[NUM_BLUETOOTH_OPTIONS];
-	int size;
-	int index;
-	lv_obj_t *main_list;
-	lv_style_t btn_style;
-	lv_style_t sel_style;
-	lv_obj_t *cont;
-	bluetooth_keyboard_menu_t bluetooth_keyboard_menu;
-	bluetooth_peer_menu_t bluetooth_peer_menu;
+    char *options[NUM_BLUETOOTH_OPTIONS];
+    lv_obj_t *btns[NUM_BLUETOOTH_OPTIONS];
+    int size;
+    int index;
+    lv_obj_t *main_list;
+    lv_style_t btn_style;
+    lv_style_t sel_style;
+    lv_obj_t *cont;
+    bluetooth_keyboard_menu_t bluetooth_keyboard_menu;
+    bluetooth_peer_menu_t bluetooth_peer_menu;
 } bluetooth_menu_t;
 
 extern bluetooth_menu_t bluetooth_menu;

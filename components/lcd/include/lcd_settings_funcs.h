@@ -18,25 +18,25 @@ typedef struct ui_btns_t ui_btns_t;
 typedef struct ui_menu_t ui_menu_t;
 
 typedef struct {
-	bool pin_set;
-	bool prompt_pin;
-	char unlock_pin[SETTINGS_MAX_PIN_LEN + 1];
-	lv_obj_t *pin_container;
-	lv_obj_t *lbl_ins;
-	lv_obj_t *lbl_back;
-	lv_obj_t *lbl_attempts;
+    bool pin_set;
+    bool prompt_pin;
+    char unlock_pin[SETTINGS_MAX_PIN_LEN + 1];
+    lv_obj_t *pin_container;
+    lv_obj_t *lbl_ins;
+    lv_obj_t *lbl_back;
+    lv_obj_t *lbl_attempts;
 } settings_pin_menu_t;
 
 typedef struct {
-	char *options[MAX_SETTINGS_OPTIONS];
-	lv_obj_t *btns[MAX_SETTINGS_OPTIONS];
-	int size;
-	int index;
-	lv_obj_t *main_list;
-	lv_style_t btn_style;
-	lv_style_t sel_style;
-	lv_obj_t *cont;
-	settings_pin_menu_t pin_menu;
+    char *options[MAX_SETTINGS_OPTIONS];
+    lv_obj_t *btns[MAX_SETTINGS_OPTIONS];
+    int size;
+    int index;
+    lv_obj_t *main_list;
+    lv_style_t btn_style;
+    lv_style_t sel_style;
+    lv_obj_t *cont;
+    settings_pin_menu_t pin_menu;
 } settings_menu_t;
 
 extern settings_menu_t settings_menu;

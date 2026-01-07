@@ -5,11 +5,11 @@ idf_component_register(
         #"src/espnow_funcs.c"
         
     INCLUDE_DIRS 
-    	"include"
+        "include"
     
     REQUIRES
-    	driver freertos nvs_flash
+        driver freertos nvs_flash
     
     PRIV_REQUIRES
-    	
+        
 )

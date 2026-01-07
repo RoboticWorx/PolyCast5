@@ -145,9 +145,7 @@ static void ota_task(void *_)
 
             // Send percentage to LCD
             xQueueSend(xWifiOtaPctQueue, &pct, 0);
-        }
-        // Fallback when content length is unknown: every ~64KB
-        else {
+        } else { // Fallback when content length is unknown: every ~64KB
             if (read - last >= 64 * 1024) {
                 last = read;
                 

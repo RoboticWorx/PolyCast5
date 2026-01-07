@@ -19,27 +19,27 @@
 typedef enum {DIRECTION0, DIRECTION90, DIRECTION180, DIRECTION270} DIRECTION;
 
 typedef enum {
-	SCROLL_RIGHT = 1,
-	SCROLL_LEFT = 2,
-	SCROLL_DOWN = 3,
-	SCROLL_UP = 4,
+    SCROLL_RIGHT = 1,
+    SCROLL_LEFT = 2,
+    SCROLL_DOWN = 3,
+    SCROLL_UP = 4,
 } SCROLL_TYPE_t;
 
 typedef struct {
-	uint16_t _width;
-	uint16_t _height;
-	uint16_t _offsetx;
-	uint16_t _offsety;
-	uint16_t _font_direction;
-	uint16_t _font_fill;
-	uint16_t _font_fill_color;
-	uint16_t _font_underline;
-	uint16_t _font_underline_color;
-	int16_t _dc;
-	int16_t _bl;
-	spi_device_handle_t _SPIHandle;
-	bool _use_frame_buffer;
-	uint16_t *_frame_buffer;
+    uint16_t _width;
+    uint16_t _height;
+    uint16_t _offsetx;
+    uint16_t _offsety;
+    uint16_t _font_direction;
+    uint16_t _font_fill;
+    uint16_t _font_fill_color;
+    uint16_t _font_underline;
+    uint16_t _font_underline_color;
+    int16_t _dc;
+    int16_t _bl;
+    spi_device_handle_t _SPIHandle;
+    bool _use_frame_buffer;
+    uint16_t *_frame_buffer;
 } TFT_t;
 
 void spi_clock_speed(int speed);

@@ -35,7 +35,7 @@
 
 // Define each sequentially (0, 1, 2, ...)
 enum {
-	BOOT_PAGE,
+    BOOT_PAGE,
     HOME_PAGE,
     UNLOCK_PAGE,
     HOTKEY_PAGE,
@@ -269,7 +269,7 @@ void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32
  * @param [in] speed_px_s Speed to move animation
  */
 void lcd_swipe_anim(ui_menu_t *menu, bool swipe_left, uint32_t speed_px_s);
-							  
+                              
 /**
  * @brief Format main center button for wireless selection page
  *
@@ -399,7 +399,7 @@ void lcd_hotkey_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotk
  * @param [in] gpio_menu GPIO menu structure
  */
 void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu,
-		wifi_menu_t* wifi_menu, tools_menu_t* tools_menu, settings_menu_t* settings_menu, bluetooth_menu_t *bluetooth_menu, gpio_menu_t *gpio_menu);
+        wifi_menu_t* wifi_menu, tools_menu_t* tools_menu, settings_menu_t* settings_menu, bluetooth_menu_t *bluetooth_menu, gpio_menu_t *gpio_menu);
 
 /**
  * @brief Executes on infrared page

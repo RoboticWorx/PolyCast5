@@ -454,9 +454,7 @@ static bool acc_reserve(http_accum_t *a, size_t need_cap)
     // If this buffer came from heap_caps_*, only use heap_caps_realloc
     if (a->caps_alloc) {
         nb = (char *)heap_caps_realloc(a->buf, nc, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
-    }
-    // If this buffer came from malloc/realloc, only use realloc
-    else {
+    } else { // If this buffer came from malloc/realloc, only use realloc
         nb = (char *)realloc(a->buf, nc);
     }
 

@@ -614,9 +614,7 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
                 
                 // Switch pages
                 ui_menu->page = WIFI_PASSWORD_PAGE;
-            }
-            // Else open network: go ahead and send
-            else {
+            } else { // Else open network: go ahead and send
                 selected_network.locked = false; // Doesn't require password
                 
                 if (xQueueSend(xWifiSelectedNetworkQueue, &selected_network, portMAX_DELAY) != pdPASS) {
@@ -648,9 +646,7 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
                 // Switch pages
                 ui_menu->page = WIFI_PAGE;
             }
-        }
-        // Monitoring packets
-        else {
+        } else { // Monitoring packets
             // Copy in data
             // Copy channel
             sniff_network.channel = channels[wifi_menu->scan_menu.index];
@@ -2199,9 +2195,7 @@ void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_m
 
             // Reset flag
             wifi_menu_overwrite = false;
-        }
-        // Else adding a whole new Wi-Fi plug
-        else {
+        } else { // Else adding a whole new Wi-Fi plug
             // Size one bigger
             wifi_menu->size++;
             
@@ -2674,9 +2668,7 @@ esp_err_t lcd_wifi_menu_nvs_save(const wifi_menu_t *menu)
         if (i < user_cnt) {
             // Store the menu option string at each key starting at index WIFI_MENU_START_SIZE
             err = nvs_set_str(h, key, menu->options[i + WIFI_MENU_START_SIZE]);
-        }
-         // Not in range: erase
-        else {
+        } else { // Not in range: erase
             err = nvs_erase_key(h, key);
             if (err == ESP_ERR_NVS_NOT_FOUND) {
                 err = ESP_OK;
@@ -2782,9 +2774,7 @@ esp_err_t lcd_wifi_topic_keys_nvs_save(const wifi_menu_t *menu)
         if (i < count) {
             // Save index to NVS
             err = nvs_set_blob(h, key, menu->topic_keys[i], sizeof(menu->topic_keys[i]));
-        }
-         // Not in range: erase
-        else {
+        } else { // Not in range: erase
             err = nvs_erase_key(h, key);
             if (err == ESP_ERR_NVS_NOT_FOUND) {
                 err = ESP_OK;

@@ -29,16 +29,16 @@ typedef enum {
 
 typedef struct {
     //bool thinking; // True = reasoning, false = non-reasoning model
-	ai_cmd_type_t type;
-	const char *msg;
-	size_t msg_len;
+    ai_cmd_type_t type;
+    const char *msg;
+    size_t msg_len;
 
-	// If free_on_done is true, ai_task will free(free_ptr) after processing
-	void *free_ptr;
-	bool free_on_done;
+    // If free_on_done is true, ai_task will free(free_ptr) after processing
+    void *free_ptr;
+    bool free_on_done;
 
-	// True = use reasoning model, false = non-reasoning
-	bool reasoning;
+    // True = use reasoning model, false = non-reasoning
+    bool reasoning;
 } ai_cmd_t;
 
 #ifdef USING_CHATGPT

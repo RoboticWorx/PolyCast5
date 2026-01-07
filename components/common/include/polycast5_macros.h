@@ -7,18 +7,18 @@
 //EXT_RAM_BSS_ATTR
 
 #ifdef POLYCAST5_DEBUG
-	//#define POLYCAST5_DEBUG_GPIO 1 // If debugging user buttons
-	//#define POLYCAST5_DEBUG_ADC 1 // If debugging battery ADC
-	//#define POLYCAST5_DEBUG_RAM 1 // Print RAM heap state on boot
-	//#define POLYCAST5_DEBUG_SPIFFS 1 // Print SPIFFS assets size on boot
-	
-	//#define POLYCAST5_ESPNOW_DUMP_NVS 1 // Show ESP-NOW NVS state on boot
-	//#define POLYCAST5_WIFI_DUMP_NVS 1 // Show Wi-Fi NVS state on boot
-	
-	//#define POLYCAST5_IR_NVS_CLEAR 1 // Clear all IR namespaces 
-	//#define POLYCAST5_WIFI_NVS_CLEAR 1 // Clear all Wi-Fi namespaces
-	
-	//#define POLYCAST5_DIS_SLEEP_TIMER 1 // Disable sleep timer
+    //#define POLYCAST5_DEBUG_GPIO 1 // If debugging user buttons
+    //#define POLYCAST5_DEBUG_ADC 1 // If debugging battery ADC
+    //#define POLYCAST5_DEBUG_RAM 1 // Print RAM heap state on boot
+    //#define POLYCAST5_DEBUG_SPIFFS 1 // Print SPIFFS assets size on boot
+    
+    //#define POLYCAST5_ESPNOW_DUMP_NVS 1 // Show ESP-NOW NVS state on boot
+    //#define POLYCAST5_WIFI_DUMP_NVS 1 // Show Wi-Fi NVS state on boot
+    
+    //#define POLYCAST5_IR_NVS_CLEAR 1 // Clear all IR namespaces 
+    //#define POLYCAST5_WIFI_NVS_CLEAR 1 // Clear all Wi-Fi namespaces
+    
+    //#define POLYCAST5_DIS_SLEEP_TIMER 1 // Disable sleep timer
 #endif
 
 //#define POLYCAST5_PERSIST_SELECTION_INDEX 1 // Persist selected menu option across NVS and home

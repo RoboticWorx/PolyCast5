@@ -12,8 +12,8 @@
 #include "host/ble_hs.h"
 
 typedef struct {
-	ble_addr_t addr; // Identity address
-	char label[32]; // Name
+    ble_addr_t addr; // Identity address
+    char label[32]; // Name
 } bluetooth_peer_info_t;
 
 #define BT_MAX_PEERS 20
@@ -187,7 +187,7 @@ typedef struct {
 #define BLUETOOTH_CMD_VOLUME_DOWN 234
 
 typedef enum {
-	BT_STATE_OFF = 0, BT_STATE_INITING, BT_STATE_RUNNING, BT_STATE_DEINITING
+    BT_STATE_OFF = 0, BT_STATE_INITING, BT_STATE_RUNNING, BT_STATE_DEINITING
 } bluetooth_state_t;
 
 /** 

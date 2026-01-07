@@ -49,1312 +49,1312 @@ static char bt_name_buf[MAX_BT_NAME_LEN + 1] = {0};
 EXT_RAM_BSS_ATTR static char script_labels[MAX_KEYBOARD_SCRIPTS][BT_SCRIPT_LABEL_MAX_LEN + 1];
 
 bluetooth_keyboard_menu_t bluetooth_keyboard_submenu = {
-	.options = {NULL}, // Dynamically populated
-	.btns = {NULL},
-	.size = 0,
-	.index = 0,
-	.main_list = NULL,
-	.cont = NULL,
-	// Styles will be init in setup
-	// cat_labels and script_indices zero-init
+    .options = {NULL}, // Dynamically populated
+    .btns = {NULL},
+    .size = 0,
+    .index = 0,
+    .main_list = NULL,
+    .cont = NULL,
+    // Styles will be init in setup
+    // cat_labels and script_indices zero-init
 };
 
 bluetooth_menu_t bluetooth_menu = {
-	.options = {"Pair Device", "Auto Keyboard", "AI Keyboard", "Media Controller", "Page Scroller",
-			"PowerPoint Clicker", "Camera Clicker", "Socials Scroller", "Forget All Devices", "Known Devices"},
-	.size = NUM_BLUETOOTH_OPTIONS,
-	.index = 1,
-	.cont = NULL,
+    .options = {"Pair Device", "Auto Keyboard", "AI Keyboard", "Media Controller", "Page Scroller",
+            "PowerPoint Clicker", "Camera Clicker", "Socials Scroller", "Forget All Devices", "Known Devices"},
+    .size = NUM_BLUETOOTH_OPTIONS,
+    .index = 1,
+    .cont = NULL,
 };
 
 static void keyboard_menu_rebuild_lvlist(bluetooth_keyboard_menu_t *km)
 {
-	// Remove all old buttons (if any)
-	if (km->main_list != NULL) {
-		lv_obj_clean(km->main_list);
-	}
+    // Remove all old buttons (if any)
+    if (km->main_list != NULL) {
+        lv_obj_clean(km->main_list);
+    }
 
-	// If no rows to show, render a disabled placeholder and return
-	if (km->size <= 0) {
-		// Create single disabled-looking row
-		lv_obj_t *btn = lv_list_add_btn(km->main_list, NULL, "No scripts added");
-		lv_obj_set_size(btn, 200, 30);
+    // If no rows to show, render a disabled placeholder and return
+    if (km->size <= 0) {
+        // Create single disabled-looking row
+        lv_obj_t *btn = lv_list_add_btn(km->main_list, NULL, "No scripts added");
+        lv_obj_set_size(btn, 200, 30);
 
-		// Apply base style so it still fits the UI
-		lv_obj_add_style(btn, &km->btn_style, 0);
+        // Apply base style so it still fits the UI
+        lv_obj_add_style(btn, &km->btn_style, 0);
 
-		// Center the label text and make it scroll if needed
-		lv_obj_t *lbl = lv_obj_get_child(btn, 0);
-		lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
-		lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-		lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+        // Center the label text and make it scroll if needed
+        lv_obj_t *lbl = lv_obj_get_child(btn, 0);
+        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
 
-		// Set flex container formatting
-		km->cont = lv_obj_get_parent(btn);
-		lv_obj_set_flex_flow (km->cont, LV_FLEX_FLOW_COLUMN);
-		lv_obj_set_flex_align(km->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-		lv_obj_set_style_pad_gap(km->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+        // Set flex container formatting
+        km->cont = lv_obj_get_parent(btn);
+        lv_obj_set_flex_flow (km->cont, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_flex_align(km->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_gap(km->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-		// Nothing to scroll; leave now
-		return;
-	}
+        // Nothing to scroll; leave now
+        return;
+    }
 
-	// Create a button for each row we currently have
-	for (int i = 0; i < km->size; ++i) {
-		km->btns[i] = lv_list_add_btn(km->main_list, NULL, km->options[i]);
-		lv_obj_set_size(km->btns[i], 200, 30);
+    // Create a button for each row we currently have
+    for (int i = 0; i < km->size; ++i) {
+        km->btns[i] = lv_list_add_btn(km->main_list, NULL, km->options[i]);
+        lv_obj_set_size(km->btns[i], 200, 30);
 
-		// Style selected
-		if (i == km->index) {
-			lv_obj_add_style(km->btns[i], &km->sel_style, 0);
-		} else {
-			lv_obj_add_style(km->btns[i], &km->btn_style, 0);
-		}
+        // Style selected
+        if (i == km->index) {
+            lv_obj_add_style(km->btns[i], &km->sel_style, 0);
+        } else {
+            lv_obj_add_style(km->btns[i], &km->btn_style, 0);
+        }
 
-		// Create and format text label
-		lv_obj_t *lbl = lv_obj_get_child(km->btns[i], 0);
-		lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
-		lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-		lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
-	}
+        // Create and format text label
+        lv_obj_t *lbl = lv_obj_get_child(km->btns[i], 0);
+        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+    }
 
-	// Format button container (list internal container is parent of first button)
-	km->cont = lv_obj_get_parent(km->btns[0]);
-	lv_obj_set_flex_flow (km->cont, LV_FLEX_FLOW_COLUMN);
-	lv_obj_set_flex_align(km->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-	lv_obj_set_style_pad_gap(km->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+    // Format button container (list internal container is parent of first button)
+    km->cont = lv_obj_get_parent(km->btns[0]);
+    lv_obj_set_flex_flow (km->cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(km->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(km->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-	// Clamp index for safety, then scroll selected into view
-	if (km->index < 0) {
-		km->index = 0;
-	} else if (km->index >= km->size) {
-		km->index = km->size - 1;
-	}
+    // Clamp index for safety, then scroll selected into view
+    if (km->index < 0) {
+        km->index = 0;
+    } else if (km->index >= km->size) {
+        km->index = km->size - 1;
+    }
 
-	if (km->index + 1 >= km->size) {
-		lv_obj_scroll_to_view(km->btns[km->index], LV_ANIM_OFF);
-	} else {
-		lv_obj_scroll_to_view(km->btns[km->index + 1], LV_ANIM_OFF); // Put selected near middle
-	}
+    if (km->index + 1 >= km->size) {
+        lv_obj_scroll_to_view(km->btns[km->index], LV_ANIM_OFF);
+    } else {
+        lv_obj_scroll_to_view(km->btns[km->index + 1], LV_ANIM_OFF); // Put selected near middle
+    }
 }
 
 // Pulls labels from NVS and rebuilds the LVGL list
 static void keyboard_menu_refresh_from_nvs(bluetooth_keyboard_menu_t *km)
 {
-	// Base rows always present
-	km->options[0] = "Add/Edit Script";
-	km->options[1] = "Test";
+    // Base rows always present
+    km->options[0] = "Add/Edit Script";
+    km->options[1] = "Test";
 
-	// Read how many categories are stored
-	uint8_t cat_count = bluetooth_category_count_get_nvs();
+    // Read how many categories are stored
+    uint8_t cat_count = bluetooth_category_count_get_nvs();
 
-	// Cap
-	if (cat_count > MAX_CATEGORIES) {
-		cat_count = MAX_CATEGORIES;
-	}
+    // Cap
+    if (cat_count > MAX_CATEGORIES) {
+        cat_count = MAX_CATEGORIES;
+    }
 
-	// Pull names for each category i -> row (i + NUM_KEYBOARD_BASE)
-	for (uint8_t i = 0; i < cat_count; ++i) {
-		// Fill default name first
-		km->cat_labels[i][0] = '\0';
+    // Pull names for each category i -> row (i + NUM_KEYBOARD_BASE)
+    for (uint8_t i = 0; i < cat_count; ++i) {
+        // Fill default name first
+        km->cat_labels[i][0] = '\0';
 
-		// Read name from NVS
-		esp_err_t err = bluetooth_category_name_get_nvs(i, km->cat_labels[i], sizeof(km->cat_labels[i]));
-		if (err != ESP_OK) {
-			// On error, show a placeholder
-			snprintf(km->cat_labels[i], sizeof(km->cat_labels[i]), "Category %u", (unsigned)i);
-		}
+        // Read name from NVS
+        esp_err_t err = bluetooth_category_name_get_nvs(i, km->cat_labels[i], sizeof(km->cat_labels[i]));
+        if (err != ESP_OK) {
+            // On error, show a placeholder
+            snprintf(km->cat_labels[i], sizeof(km->cat_labels[i]), "Category %u", (unsigned)i);
+        }
 
-		km->options[NUM_KEYBOARD_BASE + i] = km->cat_labels[i];
-	}
+        km->options[NUM_KEYBOARD_BASE + i] = km->cat_labels[i];
+    }
 
-	// New total = base + categories (all shown, even empty—user can delete if unwanted)
-	km->size = NUM_KEYBOARD_BASE + (int)cat_count;
+    // New total = base + categories (all shown, even empty—user can delete if unwanted)
+    km->size = NUM_KEYBOARD_BASE + (int)cat_count;
 
-	// Update index
-	km->index = lcd_bluetooth_script_selected_get();
-	if (km->index >= km->size) {
-		km->index = (km->size > 1) ? 1 : 0;
-	} else if (km->index < 0) {
-		km->index = km->size - 1;
-	}
+    // Update index
+    km->index = lcd_bluetooth_script_selected_get();
+    if (km->index >= km->size) {
+        km->index = (km->size > 1) ? 1 : 0;
+    } else if (km->index < 0) {
+        km->index = km->size - 1;
+    }
 
-	// Rebuild LVGL widgets to match new size
-	keyboard_menu_rebuild_lvlist(km);
+    // Rebuild LVGL widgets to match new size
+    keyboard_menu_rebuild_lvlist(km);
 }
 
 // Pulls labels from NVS and rebuilds the submenu LVGL list
 static void keyboard_submenu_refresh_from_nvs(bluetooth_keyboard_menu_t *km, uint8_t category)
 {
-	// Read how many user scripts are stored
-	uint32_t count = bluetooth_script_count_get_nvs();
+    // Read how many user scripts are stored
+    uint32_t count = bluetooth_script_count_get_nvs();
 
-	// Cap
-	if (count > MAX_KEYBOARD_SCRIPTS) {
-		count = MAX_KEYBOARD_SCRIPTS;
-	}
+    // Cap
+    if (count > MAX_KEYBOARD_SCRIPTS) {
+        count = MAX_KEYBOARD_SCRIPTS;
+    }
 
-	// Pull labels for each user script i that matches category
-	int s = 0;
-	memset(km->script_indices, 0, sizeof(km->script_indices));
+    // Pull labels for each user script i that matches category
+    int s = 0;
+    memset(km->script_indices, 0, sizeof(km->script_indices));
 
-	for (uint32_t i = 0; i < count; ++i) {
-		uint8_t cat = 0;
-		esp_err_t err = bluetooth_script_cat_idx_get_nvs((uint8_t)i, &cat);
+    for (uint32_t i = 0; i < count; ++i) {
+        uint8_t cat = 0;
+        esp_err_t err = bluetooth_script_cat_idx_get_nvs((uint8_t)i, &cat);
 
-		if (err == ESP_OK && cat == category) {
-			// Fill default label first
-			script_labels[s][0] = '\0';
+        if (err == ESP_OK && cat == category) {
+            // Fill default label first
+            script_labels[s][0] = '\0';
 
-			// Read label from NVS (namespace/keys match the portal)
-			size_t len = sizeof(script_labels[s]);
-			err = bluetooth_script_label_get_nvs((uint8_t)i, script_labels[s], len);
-			if (err != ESP_OK) {
-				// On error, show a placeholder rather than leaving a blank
-				snprintf(script_labels[s], sizeof(script_labels[s]), "Script %u", (unsigned)i);
-			}
+            // Read label from NVS (namespace/keys match the portal)
+            size_t len = sizeof(script_labels[s]);
+            err = bluetooth_script_label_get_nvs((uint8_t)i, script_labels[s], len);
+            if (err != ESP_OK) {
+                // On error, show a placeholder rather than leaving a blank
+                snprintf(script_labels[s], sizeof(script_labels[s]), "Script %u", (unsigned)i);
+            }
 
-			km->options[s] = script_labels[s];
-			km->script_indices[s] = (uint8_t)i;
-			s++;
-		}
-	}
+            km->options[s] = script_labels[s];
+            km->script_indices[s] = (uint8_t)i;
+            s++;
+        }
+    }
 
-	// Handle empty submenu with placeholder
-	if (s == 0) {
-		snprintf(script_labels[0], sizeof(script_labels[0]), "No scripts");
-		km->options[0] = script_labels[0];
-		km->script_indices[0] = 255; // Invalid index to skip execution on select
-		s = 1;
-	}
+    // Handle empty submenu with placeholder
+    if (s == 0) {
+        snprintf(script_labels[0], sizeof(script_labels[0]), "No scripts");
+        km->options[0] = script_labels[0];
+        km->script_indices[0] = 255; // Invalid index to skip execution on select
+        s = 1;
+    }
 
-	km->size = s;
+    km->size = s;
 
-	// Update index (clamp)
-	if (km->index >= km->size) {
-		km->index = (km->size > 0) ? km->size - 1 : 0;
-	} else if (km->index < 0) {
-		km->index = 0;
-	}
+    // Update index (clamp)
+    if (km->index >= km->size) {
+        km->index = (km->size > 0) ? km->size - 1 : 0;
+    } else if (km->index < 0) {
+        km->index = 0;
+    }
 
-	// Rebuild LVGL widgets to match new size
-	keyboard_menu_rebuild_lvlist(km);
+    // Rebuild LVGL widgets to match new size
+    keyboard_menu_rebuild_lvlist(km);
 }
 
 static void lcd_bluetooth_setup_keyboard_page(bluetooth_keyboard_menu_t *menu)
 {
-	// Create list
-	menu->main_list = lv_list_create(ACTIVE_SCR);
-	lv_obj_set_size(menu->main_list, 210, 106);
-	
-	// Format
-	lv_obj_set_style_bg_color(menu->main_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_align(menu->main_list, LV_ALIGN_CENTER, 0, 0);
-	lv_obj_set_style_border_width(menu->main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lcd_apply_scrollbar_style(menu->main_list);
-	lv_obj_set_scroll_dir(menu->main_list, LV_DIR_VER);
+    // Create list
+    menu->main_list = lv_list_create(ACTIVE_SCR);
+    lv_obj_set_size(menu->main_list, 210, 106);
+    
+    // Format
+    lv_obj_set_style_bg_color(menu->main_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_align(menu->main_list, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_border_width(menu->main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lcd_apply_scrollbar_style(menu->main_list);
+    lv_obj_set_scroll_dir(menu->main_list, LV_DIR_VER);
 
-	// Create button style
-	lv_style_init(&menu->btn_style);
-	
-	lv_style_set_radius(&menu->btn_style, 8);
-	lv_style_set_bg_color(&menu->btn_style, user_primary_color);
-	
-	lv_style_set_border_width(&menu->btn_style, 2);
-	lv_style_set_border_color(&menu->btn_style, user_secondary_color);
-	lv_style_set_border_side(&menu->btn_style, LV_BORDER_SIDE_FULL);
-	
-	lv_style_set_pad_top(&menu->btn_style, 3);
-	lv_style_set_pad_bottom(&menu->btn_style, 3);
-	
-	lv_style_set_text_font(&menu->btn_style, &lv_font_montserrat_16);
-	lv_style_set_text_color(&menu->btn_style, user_secondary_color);
-	lv_style_set_text_align(&menu->btn_style, LV_TEXT_ALIGN_CENTER);
-	
-	// Create selected button style
-	lv_style_init(&menu->sel_style);
-	
-	lv_style_set_radius(&menu->sel_style, 8);
-	lv_style_set_bg_color(&menu->sel_style, user_secondary_color);
-	
-	lv_style_set_border_width(&menu->sel_style, 2);
-	lv_style_set_border_color(&menu->sel_style, user_secondary_color);
-	lv_style_set_border_side(&menu->sel_style, LV_BORDER_SIDE_FULL);
-	
-	lv_style_set_pad_top(&menu->sel_style, 3);
-	lv_style_set_pad_bottom(&menu->sel_style, 3);
-	
-	lv_style_set_text_font(&menu->sel_style, &lv_font_montserrat_16);
-	lv_style_set_text_color(&menu->sel_style, user_primary_color);
-	lv_style_set_text_align(&menu->sel_style, LV_TEXT_ALIGN_CENTER);
-	
-	// Create buttons
-	// Wrap index
-	if (menu->index >= menu->size) {
-		menu->index = 1;
-	} else if (menu->index < 0) {
-		menu->index = menu->size - 1;
-	}
-	
-	// Create button for each option based on NVS
-	keyboard_menu_refresh_from_nvs(menu);
-	
-	// Hide for now
-	lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
+    // Create button style
+    lv_style_init(&menu->btn_style);
+    
+    lv_style_set_radius(&menu->btn_style, 8);
+    lv_style_set_bg_color(&menu->btn_style, user_primary_color);
+    
+    lv_style_set_border_width(&menu->btn_style, 2);
+    lv_style_set_border_color(&menu->btn_style, user_secondary_color);
+    lv_style_set_border_side(&menu->btn_style, LV_BORDER_SIDE_FULL);
+    
+    lv_style_set_pad_top(&menu->btn_style, 3);
+    lv_style_set_pad_bottom(&menu->btn_style, 3);
+    
+    lv_style_set_text_font(&menu->btn_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&menu->btn_style, user_secondary_color);
+    lv_style_set_text_align(&menu->btn_style, LV_TEXT_ALIGN_CENTER);
+    
+    // Create selected button style
+    lv_style_init(&menu->sel_style);
+    
+    lv_style_set_radius(&menu->sel_style, 8);
+    lv_style_set_bg_color(&menu->sel_style, user_secondary_color);
+    
+    lv_style_set_border_width(&menu->sel_style, 2);
+    lv_style_set_border_color(&menu->sel_style, user_secondary_color);
+    lv_style_set_border_side(&menu->sel_style, LV_BORDER_SIDE_FULL);
+    
+    lv_style_set_pad_top(&menu->sel_style, 3);
+    lv_style_set_pad_bottom(&menu->sel_style, 3);
+    
+    lv_style_set_text_font(&menu->sel_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&menu->sel_style, user_primary_color);
+    lv_style_set_text_align(&menu->sel_style, LV_TEXT_ALIGN_CENTER);
+    
+    // Create buttons
+    // Wrap index
+    if (menu->index >= menu->size) {
+        menu->index = 1;
+    } else if (menu->index < 0) {
+        menu->index = menu->size - 1;
+    }
+    
+    // Create button for each option based on NVS
+    keyboard_menu_refresh_from_nvs(menu);
+    
+    // Hide for now
+    lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
 }
 
 static void setup_keyboard_submenu_page(bluetooth_keyboard_menu_t *submenu)
 {
-	// Create list
-	submenu->main_list = lv_list_create(ACTIVE_SCR);
-	lv_obj_set_size(submenu->main_list, 210, 106);
-	
-	// Format
-	lv_obj_set_style_bg_color(submenu->main_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_align(submenu->main_list, LV_ALIGN_CENTER, 0, 0);
-	lv_obj_set_style_border_width(submenu->main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lcd_apply_scrollbar_style(submenu->main_list);
-	lv_obj_set_scroll_dir(submenu->main_list, LV_DIR_VER);
+    // Create list
+    submenu->main_list = lv_list_create(ACTIVE_SCR);
+    lv_obj_set_size(submenu->main_list, 210, 106);
+    
+    // Format
+    lv_obj_set_style_bg_color(submenu->main_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_align(submenu->main_list, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_border_width(submenu->main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lcd_apply_scrollbar_style(submenu->main_list);
+    lv_obj_set_scroll_dir(submenu->main_list, LV_DIR_VER);
 
-	// Create button style
-	lv_style_init(&submenu->btn_style);
-	
-	lv_style_set_radius(&submenu->btn_style, 8);
-	lv_style_set_bg_color(&submenu->btn_style, user_primary_color);
-	
-	lv_style_set_border_width(&submenu->btn_style, 2);
-	lv_style_set_border_color(&submenu->btn_style, user_secondary_color);
-	lv_style_set_border_side(&submenu->btn_style, LV_BORDER_SIDE_FULL);
-	
-	lv_style_set_pad_top(&submenu->btn_style, 3);
-	lv_style_set_pad_bottom(&submenu->btn_style, 3);
-	
-	lv_style_set_text_font(&submenu->btn_style, &lv_font_montserrat_16);
-	lv_style_set_text_color(&submenu->btn_style, user_secondary_color);
-	lv_style_set_text_align(&submenu->btn_style, LV_TEXT_ALIGN_CENTER);
-	
-	// Create selected button style
-	lv_style_init(&submenu->sel_style);
-	
-	lv_style_set_radius(&submenu->sel_style, 8);
-	lv_style_set_bg_color(&submenu->sel_style, user_secondary_color);
-	
-	lv_style_set_border_width(&submenu->sel_style, 2);
-	lv_style_set_border_color(&submenu->sel_style, user_secondary_color);
-	lv_style_set_border_side(&submenu->sel_style, LV_BORDER_SIDE_FULL);
-	
-	lv_style_set_pad_top(&submenu->sel_style, 3);
-	lv_style_set_pad_bottom(&submenu->sel_style, 3);
-	
-	lv_style_set_text_font(&submenu->sel_style, &lv_font_montserrat_16);
-	lv_style_set_text_color(&submenu->sel_style, user_primary_color);
-	lv_style_set_text_align(&submenu->sel_style, LV_TEXT_ALIGN_CENTER);
+    // Create button style
+    lv_style_init(&submenu->btn_style);
+    
+    lv_style_set_radius(&submenu->btn_style, 8);
+    lv_style_set_bg_color(&submenu->btn_style, user_primary_color);
+    
+    lv_style_set_border_width(&submenu->btn_style, 2);
+    lv_style_set_border_color(&submenu->btn_style, user_secondary_color);
+    lv_style_set_border_side(&submenu->btn_style, LV_BORDER_SIDE_FULL);
+    
+    lv_style_set_pad_top(&submenu->btn_style, 3);
+    lv_style_set_pad_bottom(&submenu->btn_style, 3);
+    
+    lv_style_set_text_font(&submenu->btn_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&submenu->btn_style, user_secondary_color);
+    lv_style_set_text_align(&submenu->btn_style, LV_TEXT_ALIGN_CENTER);
+    
+    // Create selected button style
+    lv_style_init(&submenu->sel_style);
+    
+    lv_style_set_radius(&submenu->sel_style, 8);
+    lv_style_set_bg_color(&submenu->sel_style, user_secondary_color);
+    
+    lv_style_set_border_width(&submenu->sel_style, 2);
+    lv_style_set_border_color(&submenu->sel_style, user_secondary_color);
+    lv_style_set_border_side(&submenu->sel_style, LV_BORDER_SIDE_FULL);
+    
+    lv_style_set_pad_top(&submenu->sel_style, 3);
+    lv_style_set_pad_bottom(&submenu->sel_style, 3);
+    
+    lv_style_set_text_font(&submenu->sel_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&submenu->sel_style, user_primary_color);
+    lv_style_set_text_align(&submenu->sel_style, LV_TEXT_ALIGN_CENTER);
 
-	// Wrap index
-	if (submenu->index >= submenu->size) {
-		submenu->index = 1;
-	} else if (submenu->index < 0) {
-		submenu->index = submenu->size - 1;
-	}
+    // Wrap index
+    if (submenu->index >= submenu->size) {
+        submenu->index = 1;
+    } else if (submenu->index < 0) {
+        submenu->index = submenu->size - 1;
+    }
 }
 
 static void setup_known_devices_page(bluetooth_peer_menu_t *menu)
 {
-	// Create list
-	menu->main_list = lv_list_create(ACTIVE_SCR);
-	lv_obj_set_size(menu->main_list, 210, 106);
-	
-	// Format
-	lv_obj_set_style_bg_color(menu->main_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_align(menu->main_list, LV_ALIGN_CENTER, 0, 0);
-	lv_obj_set_style_border_width(menu->main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lcd_apply_scrollbar_style(menu->main_list);
-	lv_obj_set_scroll_dir(menu->main_list, LV_DIR_VER);
+    // Create list
+    menu->main_list = lv_list_create(ACTIVE_SCR);
+    lv_obj_set_size(menu->main_list, 210, 106);
+    
+    // Format
+    lv_obj_set_style_bg_color(menu->main_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_align(menu->main_list, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_border_width(menu->main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lcd_apply_scrollbar_style(menu->main_list);
+    lv_obj_set_scroll_dir(menu->main_list, LV_DIR_VER);
 
-	// Create button style
-	lv_style_init(&menu->btn_style);
-	
-	lv_style_set_radius(&menu->btn_style, 8);
-	lv_style_set_bg_color(&menu->btn_style, user_primary_color);
-	
-	lv_style_set_border_width(&menu->btn_style, 2);
-	lv_style_set_border_color(&menu->btn_style, user_secondary_color);
-	lv_style_set_border_side(&menu->btn_style, LV_BORDER_SIDE_FULL);
-	
-	lv_style_set_pad_top(&menu->btn_style, 3);
-	lv_style_set_pad_bottom(&menu->btn_style, 3);
-	
-	lv_style_set_text_font(&menu->btn_style, &lv_font_montserrat_16);
-	lv_style_set_text_color(&menu->btn_style, user_secondary_color);
-	lv_style_set_text_align(&menu->btn_style, LV_TEXT_ALIGN_CENTER);
-	
-	// Create selected button style
-	lv_style_init(&menu->sel_style);
-	
-	lv_style_set_radius(&menu->sel_style, 8);
-	lv_style_set_bg_color(&menu->sel_style, user_secondary_color);
-	
-	lv_style_set_border_width(&menu->sel_style, 2);
-	lv_style_set_border_color(&menu->sel_style, user_secondary_color);
-	lv_style_set_border_side(&menu->sel_style, LV_BORDER_SIDE_FULL);
-	
-	lv_style_set_pad_top(&menu->sel_style, 3);
-	lv_style_set_pad_bottom(&menu->sel_style, 3);
-	
-	lv_style_set_text_font(&menu->sel_style, &lv_font_montserrat_16);
-	lv_style_set_text_color(&menu->sel_style, user_primary_color);
-	lv_style_set_text_align(&menu->sel_style, LV_TEXT_ALIGN_CENTER);
-	
-	// Set index
-	menu->index = 0;
+    // Create button style
+    lv_style_init(&menu->btn_style);
+    
+    lv_style_set_radius(&menu->btn_style, 8);
+    lv_style_set_bg_color(&menu->btn_style, user_primary_color);
+    
+    lv_style_set_border_width(&menu->btn_style, 2);
+    lv_style_set_border_color(&menu->btn_style, user_secondary_color);
+    lv_style_set_border_side(&menu->btn_style, LV_BORDER_SIDE_FULL);
+    
+    lv_style_set_pad_top(&menu->btn_style, 3);
+    lv_style_set_pad_bottom(&menu->btn_style, 3);
+    
+    lv_style_set_text_font(&menu->btn_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&menu->btn_style, user_secondary_color);
+    lv_style_set_text_align(&menu->btn_style, LV_TEXT_ALIGN_CENTER);
+    
+    // Create selected button style
+    lv_style_init(&menu->sel_style);
+    
+    lv_style_set_radius(&menu->sel_style, 8);
+    lv_style_set_bg_color(&menu->sel_style, user_secondary_color);
+    
+    lv_style_set_border_width(&menu->sel_style, 2);
+    lv_style_set_border_color(&menu->sel_style, user_secondary_color);
+    lv_style_set_border_side(&menu->sel_style, LV_BORDER_SIDE_FULL);
+    
+    lv_style_set_pad_top(&menu->sel_style, 3);
+    lv_style_set_pad_bottom(&menu->sel_style, 3);
+    
+    lv_style_set_text_font(&menu->sel_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&menu->sel_style, user_primary_color);
+    lv_style_set_text_align(&menu->sel_style, LV_TEXT_ALIGN_CENTER);
+    
+    // Set index
+    menu->index = 0;
 }
 
 void lcd_bluetooth_setup_page(bluetooth_menu_t *menu)
 {
-	// Setup bluetooth keyboard menu once
-	bluetooth_keyboard_menu_t *km = &menu->bluetooth_keyboard_menu;
-	if (km->size <= 0) {
-		km->options[0] = "Add/Edit Script";
-		km->options[1] = "Test";
-		km->size = NUM_KEYBOARD_BASE; // Final index + 1
-		km->index = 1; // Default index
-	}
-	lcd_bluetooth_setup_keyboard_page(km);
+    // Setup bluetooth keyboard menu once
+    bluetooth_keyboard_menu_t *km = &menu->bluetooth_keyboard_menu;
+    if (km->size <= 0) {
+        km->options[0] = "Add/Edit Script";
+        km->options[1] = "Test";
+        km->size = NUM_KEYBOARD_BASE; // Final index + 1
+        km->index = 1; // Default index
+    }
+    lcd_bluetooth_setup_keyboard_page(km);
 
-	// Create list
-	menu->main_list = lv_list_create(ACTIVE_SCR);
-	lv_obj_set_size(menu->main_list, 210, 106);
-	
-	// Format
-	lv_obj_set_style_bg_color(menu->main_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_align(menu->main_list, LV_ALIGN_CENTER, 0, 0);
-	lv_obj_set_style_border_width(menu->main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lcd_apply_scrollbar_style(menu->main_list);
-	lv_obj_set_scroll_dir(menu->main_list, LV_DIR_VER);
+    // Create list
+    menu->main_list = lv_list_create(ACTIVE_SCR);
+    lv_obj_set_size(menu->main_list, 210, 106);
+    
+    // Format
+    lv_obj_set_style_bg_color(menu->main_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_align(menu->main_list, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_border_width(menu->main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lcd_apply_scrollbar_style(menu->main_list);
+    lv_obj_set_scroll_dir(menu->main_list, LV_DIR_VER);
 
-	// Create button style
-	lv_style_init(&menu->btn_style);
-	
-	lv_style_set_radius(&menu->btn_style, 8);
-	lv_style_set_bg_color(&menu->btn_style, user_primary_color);
-	
-	lv_style_set_border_width(&menu->btn_style, 2);
-	lv_style_set_border_color(&menu->btn_style, user_secondary_color);
-	lv_style_set_border_side(&menu->btn_style, LV_BORDER_SIDE_FULL);
-	
-	lv_style_set_pad_top(&menu->btn_style, 3);
-	lv_style_set_pad_bottom(&menu->btn_style, 3);
-	
-	lv_style_set_text_font(&menu->btn_style, &lv_font_montserrat_16);
-	lv_style_set_text_color(&menu->btn_style, user_secondary_color);
-	lv_style_set_text_align(&menu->btn_style, LV_TEXT_ALIGN_CENTER);
-	
-	// Create selected button style
-	lv_style_init(&menu->sel_style);
-	
-	lv_style_set_radius(&menu->sel_style, 8);
-	lv_style_set_bg_color(&menu->sel_style, user_secondary_color);
-	
-	lv_style_set_border_width(&menu->sel_style, 2);
-	lv_style_set_border_color(&menu->sel_style, user_secondary_color);
-	lv_style_set_border_side(&menu->sel_style, LV_BORDER_SIDE_FULL);
-	
-	lv_style_set_pad_top(&menu->sel_style, 3);
-	lv_style_set_pad_bottom(&menu->sel_style, 3);
-	
-	lv_style_set_text_font(&menu->sel_style, &lv_font_montserrat_16);
-	lv_style_set_text_color(&menu->sel_style, user_primary_color);
-	lv_style_set_text_align(&menu->sel_style, LV_TEXT_ALIGN_CENTER);
-	
-	
-	// Create buttons
-	// Wrap index
-	if (menu->index >= menu->size) {
-		menu->index = 1;
-	} else if (menu->index < 0) {
-		menu->index = menu->size - 1;
-	}
-	
-	// Create button for each option
-	for (int i = 0; i < menu->size; ++i) {
-		menu->btns[i] = lv_list_add_btn(menu->main_list, NULL, menu->options[i]);
-		lv_obj_set_size(menu->btns[i], 200, 30);
+    // Create button style
+    lv_style_init(&menu->btn_style);
+    
+    lv_style_set_radius(&menu->btn_style, 8);
+    lv_style_set_bg_color(&menu->btn_style, user_primary_color);
+    
+    lv_style_set_border_width(&menu->btn_style, 2);
+    lv_style_set_border_color(&menu->btn_style, user_secondary_color);
+    lv_style_set_border_side(&menu->btn_style, LV_BORDER_SIDE_FULL);
+    
+    lv_style_set_pad_top(&menu->btn_style, 3);
+    lv_style_set_pad_bottom(&menu->btn_style, 3);
+    
+    lv_style_set_text_font(&menu->btn_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&menu->btn_style, user_secondary_color);
+    lv_style_set_text_align(&menu->btn_style, LV_TEXT_ALIGN_CENTER);
+    
+    // Create selected button style
+    lv_style_init(&menu->sel_style);
+    
+    lv_style_set_radius(&menu->sel_style, 8);
+    lv_style_set_bg_color(&menu->sel_style, user_secondary_color);
+    
+    lv_style_set_border_width(&menu->sel_style, 2);
+    lv_style_set_border_color(&menu->sel_style, user_secondary_color);
+    lv_style_set_border_side(&menu->sel_style, LV_BORDER_SIDE_FULL);
+    
+    lv_style_set_pad_top(&menu->sel_style, 3);
+    lv_style_set_pad_bottom(&menu->sel_style, 3);
+    
+    lv_style_set_text_font(&menu->sel_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&menu->sel_style, user_primary_color);
+    lv_style_set_text_align(&menu->sel_style, LV_TEXT_ALIGN_CENTER);
+    
+    
+    // Create buttons
+    // Wrap index
+    if (menu->index >= menu->size) {
+        menu->index = 1;
+    } else if (menu->index < 0) {
+        menu->index = menu->size - 1;
+    }
+    
+    // Create button for each option
+    for (int i = 0; i < menu->size; ++i) {
+        menu->btns[i] = lv_list_add_btn(menu->main_list, NULL, menu->options[i]);
+        lv_obj_set_size(menu->btns[i], 200, 30);
 
-		// Style selected
-		if (i == menu->index) {
-			lv_obj_add_style(menu->btns[i], &menu->sel_style, 0);
-		} else {
-			lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
-		}
+        // Style selected
+        if (i == menu->index) {
+            lv_obj_add_style(menu->btns[i], &menu->sel_style, 0);
+        } else {
+            lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
+        }
 
-		// Create and format text label
-		lv_obj_t *lbl = lv_obj_get_child(menu->btns[i], 0);
-		lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
-		lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-		lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
-	}
+        // Create and format text label
+        lv_obj_t *lbl = lv_obj_get_child(menu->btns[i], 0);
+        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+    }
 
-	// Format buttons as container
-	menu->cont = lv_obj_get_parent(menu->btns[0]);
-	lv_obj_set_flex_flow (menu->cont, LV_FLEX_FLOW_COLUMN);
-	lv_obj_set_flex_align(menu->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-	lv_obj_set_style_pad_gap(menu->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT); // Set button spacing
-	
-	// Hide for now
-	lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
+    // Format buttons as container
+    menu->cont = lv_obj_get_parent(menu->btns[0]);
+    lv_obj_set_flex_flow (menu->cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(menu->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(menu->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT); // Set button spacing
+    
+    // Hide for now
+    lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
 }
 
 void lcd_bluetooth_update_menu(bluetooth_menu_t *menu)
 {
-	// Reveal
-	lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
+    // Reveal
+    lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
-	// Wrap index
-	if (menu->index >= menu->size) {
-		menu->index = 0;
-	} else if (menu->index < 0) {
-		menu->index = menu->size - 1;
-	}
+    // Wrap index
+    if (menu->index >= menu->size) {
+        menu->index = 0;
+    } else if (menu->index < 0) {
+        menu->index = menu->size - 1;
+    }
 
-	// Reset every button to unselected
-	for (int i = 0; i < menu->size; ++i) {
-		lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
-		lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
-	}
+    // Reset every button to unselected
+    for (int i = 0; i < menu->size; ++i) {
+        lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
+        lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
+    }
 
-	// Highlight only the current index
-	lv_obj_remove_style(menu->btns[menu->index], &menu->btn_style, 0);
-	lv_obj_add_style(menu->btns[menu->index], &menu->sel_style, 0);
-	
-	// Scroll to selected
-	if (menu->size > 0) {
-		lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
-	}
+    // Highlight only the current index
+    lv_obj_remove_style(menu->btns[menu->index], &menu->btn_style, 0);
+    lv_obj_add_style(menu->btns[menu->index], &menu->sel_style, 0);
+    
+    // Scroll to selected
+    if (menu->size > 0) {
+        lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
+    }
 }
 
 static void update_keyboard_menu(bluetooth_keyboard_menu_t *menu)
 {
-	// Reveal
-	lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
+    // Reveal
+    lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
-	// Wrap index
-	if (menu->index >= menu->size) {
-		menu->index = 0;
-	} else if (menu->index < 0) {
-		menu->index = menu->size - 1;
-	}
+    // Wrap index
+    if (menu->index >= menu->size) {
+        menu->index = 0;
+    } else if (menu->index < 0) {
+        menu->index = menu->size - 1;
+    }
 
-	// Reset every button to unselected
-	for (int i = 0; i < menu->size; ++i) {
-		lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
-		lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
-	}
+    // Reset every button to unselected
+    for (int i = 0; i < menu->size; ++i) {
+        lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
+        lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
+    }
 
-	// Highlight only the current index
-	lv_obj_remove_style(menu->btns[menu->index], &menu->btn_style, 0);
-	lv_obj_add_style(menu->btns[menu->index], &menu->sel_style, 0);
-	
-	// Scroll to selected
-	if (menu->size > 0) {
-		lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
-	}
+    // Highlight only the current index
+    lv_obj_remove_style(menu->btns[menu->index], &menu->btn_style, 0);
+    lv_obj_add_style(menu->btns[menu->index], &menu->sel_style, 0);
+    
+    // Scroll to selected
+    if (menu->size > 0) {
+        lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
+    }
 }
 
 static void update_keyboard_submenu(bluetooth_keyboard_menu_t *submenu)
 {
-	// Reveal
-	lv_obj_remove_flag(submenu->main_list, LV_OBJ_FLAG_HIDDEN);
+    // Reveal
+    lv_obj_remove_flag(submenu->main_list, LV_OBJ_FLAG_HIDDEN);
 
-	// Wrap index
-	if (submenu->index >= submenu->size) {
-		submenu->index = 0;
-	} else if (submenu->index < 0) {
-		submenu->index = submenu->size - 1;
-	}
+    // Wrap index
+    if (submenu->index >= submenu->size) {
+        submenu->index = 0;
+    } else if (submenu->index < 0) {
+        submenu->index = submenu->size - 1;
+    }
 
-	// Reset every button to unselected
-	for (int i = 0; i < submenu->size; ++i) {
-		lv_obj_remove_style(submenu->btns[i], &submenu->sel_style, 0);
-		lv_obj_add_style(submenu->btns[i], &submenu->btn_style, 0);
-	}
+    // Reset every button to unselected
+    for (int i = 0; i < submenu->size; ++i) {
+        lv_obj_remove_style(submenu->btns[i], &submenu->sel_style, 0);
+        lv_obj_add_style(submenu->btns[i], &submenu->btn_style, 0);
+    }
 
-	// Highlight only the current index
-	lv_obj_remove_style(submenu->btns[submenu->index], &submenu->btn_style, 0);
-	lv_obj_add_style(submenu->btns[submenu->index], &submenu->sel_style, 0);
-	
-	// Scroll to selected
-	if (submenu->size > 0) {
-		lv_obj_scroll_to_view(submenu->btns[submenu->index], LV_ANIM_ON); // LV_ANIM_OFF
-	}
+    // Highlight only the current index
+    lv_obj_remove_style(submenu->btns[submenu->index], &submenu->btn_style, 0);
+    lv_obj_add_style(submenu->btns[submenu->index], &submenu->sel_style, 0);
+    
+    // Scroll to selected
+    if (submenu->size > 0) {
+        lv_obj_scroll_to_view(submenu->btns[submenu->index], LV_ANIM_ON); // LV_ANIM_OFF
+    }
 }
 
 static void update_known_devices_menu(bluetooth_peer_menu_t *menu)
 {
-	// Reveal
-	lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
+    // Reveal
+    lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
-	// Wrap index
-	if (menu->index >= menu->size) {
-		menu->index = 0;
-	} else if (menu->index < 0) {
-		menu->index = menu->size - 1;
-	}
+    // Wrap index
+    if (menu->index >= menu->size) {
+        menu->index = 0;
+    } else if (menu->index < 0) {
+        menu->index = menu->size - 1;
+    }
 
-	// Reset every button to unselected
-	for (int i = 0; i < menu->size; ++i) {
-		lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
-		lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
-	}
+    // Reset every button to unselected
+    for (int i = 0; i < menu->size; ++i) {
+        lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
+        lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
+    }
 
-	// Highlight only the current index
-	lv_obj_remove_style(menu->btns[menu->index], &menu->btn_style, 0);
-	lv_obj_add_style(menu->btns[menu->index], &menu->sel_style, 0);
-	
-	// Scroll to selected
-	if (menu->size > 0) {
-		lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
-	}
+    // Highlight only the current index
+    lv_obj_remove_style(menu->btns[menu->index], &menu->btn_style, 0);
+    lv_obj_add_style(menu->btns[menu->index], &menu->sel_style, 0);
+    
+    // Scroll to selected
+    if (menu->size > 0) {
+        lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
+    }
 }
 
 void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
 {
-	#define HOW_Y_OFFSET 40
-	
-	// Statics
-	static bool init = false;
-	static lv_obj_t *cont = NULL;
-	static lv_obj_t *title_lbl = NULL;
-	static lv_obj_t *instr_lbl = NULL;
-	static lv_obj_t *pin_lbl = NULL;
-	static lv_obj_t *ending_lbl = NULL;
-	
-	if (!init) {
-		// Create a scrollable container for the instructions
-		cont = lv_obj_create(ACTIVE_SCR);
-		lv_obj_set_size(cont, 210, 106);
-		lv_obj_center(cont);
-		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
-		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
-		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
-		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
+    #define HOW_Y_OFFSET 40
+    
+    // Statics
+    static bool init = false;
+    static lv_obj_t *cont = NULL;
+    static lv_obj_t *title_lbl = NULL;
+    static lv_obj_t *instr_lbl = NULL;
+    static lv_obj_t *pin_lbl = NULL;
+    static lv_obj_t *ending_lbl = NULL;
+    
+    if (!init) {
+        // Create a scrollable container for the instructions
+        cont = lv_obj_create(ACTIVE_SCR);
+        lv_obj_set_size(cont, 210, 106);
+        lv_obj_center(cont);
+        lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+        lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+        lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+        lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
 
-		// Title label
-		title_lbl = lv_label_create(cont);
-		lv_label_set_text(title_lbl, "How to Pair:");
-		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
-		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
-		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+        // Title label
+        title_lbl = lv_label_create(cont);
+        lv_label_set_text(title_lbl, "How to Pair:");
+        lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+        lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
 
-		// Instructions label (scrollable if text is long)
-		instr_lbl = lv_label_create(cont);
-		lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
-		lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
-		lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
-		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
-		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+        // Instructions label (scrollable if text is long)
+        instr_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+        lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
-		// Set custom text
-		const char *instr_text =
-				"Don't press back until you're done pairing! Bluetooth is now advertising as 'PolyCast5'\n\n"
-				"Pairing PIN:";
-		
-		lv_label_set_text_fmt(instr_lbl, instr_text);
+        // Set custom text
+        const char *instr_text =
+                "Don't press back until you're done pairing! Bluetooth is now advertising as 'PolyCast5'\n\n"
+                "Pairing PIN:";
+        
+        lv_label_set_text_fmt(instr_lbl, instr_text);
 
-		// Pairing pin label
-		pin_lbl = lv_label_create(cont);
-		lv_label_set_long_mode(pin_lbl, LV_LABEL_LONG_WRAP);
-		lv_obj_set_width(pin_lbl, lv_pct(100)); // Full width for wrapping
-		lv_obj_set_style_text_font(pin_lbl, &lv_font_montserrat_30, 0);
-		lv_obj_set_style_text_color(pin_lbl, user_secondary_color, 0);
-		lv_obj_align_to(pin_lbl, instr_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+        // Pairing pin label
+        pin_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(pin_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(pin_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(pin_lbl, &lv_font_montserrat_30, 0);
+        lv_obj_set_style_text_color(pin_lbl, user_secondary_color, 0);
+        lv_obj_align_to(pin_lbl, instr_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
 
-		// Load pairing key from NVS
-		uint32_t pairing_key;
-		bluetooth_pairing_key_load_nvs(&pairing_key); // pairing_key
-		lv_label_set_text_fmt(pin_lbl, "     %" PRIu32, pairing_key);
+        // Load pairing key from NVS
+        uint32_t pairing_key;
+        bluetooth_pairing_key_load_nvs(&pairing_key); // pairing_key
+        lv_label_set_text_fmt(pin_lbl, "     %" PRIu32, pairing_key);
 
-		// Instructions label (scrollable if text is long)
-		ending_lbl = lv_label_create(cont);
-		lv_label_set_long_mode(ending_lbl, LV_LABEL_LONG_WRAP);
-		lv_obj_set_width(ending_lbl, lv_pct(100)); // Full width for wrapping
-		lv_obj_set_style_text_font(ending_lbl, &lv_font_montserrat_14, 0);
-		lv_obj_set_style_text_color(ending_lbl, user_secondary_color, 0);
-		lv_obj_align_to(ending_lbl, pin_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+        // Instructions label (scrollable if text is long)
+        ending_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(ending_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(ending_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(ending_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(ending_lbl, user_secondary_color, 0);
+        lv_obj_align_to(ending_lbl, pin_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
 
-		// Set custom text
-		const char *ending_text =
-				"Note:\nAfter this pairing, PolyCast5 will automatically reconnect "
-				"when selecting an option from the Bluetooth menu. You DON'T need to come back here!\n\n"
-				"The RGB LED will turn blue to indicate PolyCast5 has connected.\n\nIf you don't wish to "
-				"see this, it can be disabled in settings by setting 'Blink every' to 0 for 'Adjust RGB LED'.";
-		
-		lv_label_set_text_fmt(ending_lbl, ending_text);
+        // Set custom text
+        const char *ending_text =
+                "Note:\nAfter this pairing, PolyCast5 will automatically reconnect "
+                "when selecting an option from the Bluetooth menu. You DON'T need to come back here!\n\n"
+                "The RGB LED will turn blue to indicate PolyCast5 has connected.\n\nIf you don't wish to "
+                "see this, it can be disabled in settings by setting 'Blink every' to 0 for 'Adjust RGB LED'.";
+        
+        lv_label_set_text_fmt(ending_lbl, ending_text);
 
-		lv_timer_handler();
-		
-		// Activate bluetooth
-		uint16_t cmd = BLUETOOTH_CMD_INIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        lv_timer_handler();
+        
+        // Activate bluetooth
+        uint16_t cmd = BLUETOOTH_CMD_INIT;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-		init = true;
-	}
-	
-	if (ui_btns->up_btn == 1) {
-		lv_obj_scroll_by_bounded(cont, 0, HOW_Y_OFFSET, LV_ANIM_ON);
-	} else if (ui_btns->down_btn == 1) {
-		lv_obj_scroll_by_bounded(cont, 0, -HOW_Y_OFFSET, LV_ANIM_ON);
-	} else if (ui_btns->left_btn) { // Go back
-		// Deactivate bluetooth
-		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        init = true;
+    }
+    
+    if (ui_btns->up_btn == 1) {
+        lv_obj_scroll_by_bounded(cont, 0, HOW_Y_OFFSET, LV_ANIM_ON);
+    } else if (ui_btns->down_btn == 1) {
+        lv_obj_scroll_by_bounded(cont, 0, -HOW_Y_OFFSET, LV_ANIM_ON);
+    } else if (ui_btns->left_btn) { // Go back
+        // Deactivate bluetooth
+        uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-		// Hide right arrow
-		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        // Hide right arrow
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
-		// Delete objects
-		lv_obj_delete(cont); // Deletes children
-		
-		// Reset statics
-		cont = NULL;
-		title_lbl = instr_lbl = pin_lbl = ending_lbl = NULL;
-		init = false;
-			
-		// Show bluetooth menu
-		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Switch back
-		ui_menu->page = BLUETOOTH_PAGE;
-	} else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
-		// Deactivate bluetooth
-		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        // Delete objects
+        lv_obj_delete(cont); // Deletes children
+        
+        // Reset statics
+        cont = NULL;
+        title_lbl = instr_lbl = pin_lbl = ending_lbl = NULL;
+        init = false;
+            
+        // Show bluetooth menu
+        lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Switch back
+        ui_menu->page = BLUETOOTH_PAGE;
+    } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
+        // Deactivate bluetooth
+        uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-		// Delete objects
-		lv_obj_delete(cont); // Deletes children
-		
-		// Reset statics
-		cont = NULL;
-		title_lbl = instr_lbl = pin_lbl = ending_lbl =NULL;
-		init = false;
-		
- 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
-	}
+        // Delete objects
+        lv_obj_delete(cont); // Deletes children
+        
+        // Reset statics
+        cont = NULL;
+        title_lbl = instr_lbl = pin_lbl = ending_lbl =NULL;
+        init = false;
+        
+         lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
 }
 
 void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu, uint8_t type)
 {
-	// Macros
-	#define MEDIA_OUTER_SZ 130 // Diameter of big ring
-	#define MEDIA_OUTER_BW 2 // Ring border width
-	#define MEDIA_BTN_SZ 35 // Diameter of each small circle
-	#define MEDIA_BTN_RAD (MEDIA_BTN_SZ / 2)
-	#define MEDIA_OUTER_RAD (MEDIA_OUTER_SZ / 2)
-	#define MEDIA_MARGIN 8 // Extra gap from inner edge of outer ring
-	#define MEDIA_R (MEDIA_OUTER_RAD - MEDIA_BTN_RAD - MEDIA_MARGIN) // Offset for outer buttons
-	#define MEDIA_X_OFFSET 35
+    // Macros
+    #define MEDIA_OUTER_SZ 130 // Diameter of big ring
+    #define MEDIA_OUTER_BW 2 // Ring border width
+    #define MEDIA_BTN_SZ 35 // Diameter of each small circle
+    #define MEDIA_BTN_RAD (MEDIA_BTN_SZ / 2)
+    #define MEDIA_OUTER_RAD (MEDIA_OUTER_SZ / 2)
+    #define MEDIA_MARGIN 8 // Extra gap from inner edge of outer ring
+    #define MEDIA_R (MEDIA_OUTER_RAD - MEDIA_BTN_RAD - MEDIA_MARGIN) // Offset for outer buttons
+    #define MEDIA_X_OFFSET 35
 
-	// Statics
-	static bool init = false;
-	static lv_obj_t *lbl_home = NULL;
+    // Statics
+    static bool init = false;
+    static lv_obj_t *lbl_home = NULL;
 
-	// Outer ring
-	static lv_obj_t *ring = NULL;
+    // Outer ring
+    static lv_obj_t *ring = NULL;
 
-	// Inner circles
-	static lv_obj_t *circ_up = NULL, *circ_right = NULL, *circ_down = NULL, *circ_left = NULL, *circ_center = NULL;
+    // Inner circles
+    static lv_obj_t *circ_up = NULL, *circ_right = NULL, *circ_down = NULL, *circ_left = NULL, *circ_center = NULL;
 
-	// Labels
-	static lv_obj_t *lbl_up = NULL, *lbl_right = NULL, *lbl_down = NULL, *lbl_left = NULL, *lbl_center = NULL;
+    // Labels
+    static lv_obj_t *lbl_up = NULL, *lbl_right = NULL, *lbl_down = NULL, *lbl_left = NULL, *lbl_center = NULL;
 
-	// Styles
-	static lv_style_t style_ring; // Big outer circle border
-	static lv_style_t style_circle; // Small circles border
-	static lv_style_t style_circle_pressed; // Small circle pressed
+    // Styles
+    static lv_style_t style_ring; // Big outer circle border
+    static lv_style_t style_circle; // Small circles border
+    static lv_style_t style_circle_pressed; // Small circle pressed
 
-	// Build initial UI elements
-	if (!init) {
-		// Create home label
-		lbl_home = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_home, "HOME", user_secondary_color,
-				&lv_font_montserrat_16, LV_ALIGN_LEFT_MID, 17, 0);
+    // Build initial UI elements
+    if (!init) {
+        // Create home label
+        lbl_home = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_home, "HOME", user_secondary_color,
+                &lv_font_montserrat_16, LV_ALIGN_LEFT_MID, 17, 0);
 
-		// Create styles
-		lv_style_init(&style_ring);
-		lv_style_set_radius(&style_ring, LV_RADIUS_CIRCLE);
-		lv_style_set_bg_opa(&style_ring, LV_OPA_TRANSP);
-		lv_style_set_border_width(&style_ring, MEDIA_OUTER_BW);
-		lv_style_set_border_color(&style_ring, user_secondary_color);
+        // Create styles
+        lv_style_init(&style_ring);
+        lv_style_set_radius(&style_ring, LV_RADIUS_CIRCLE);
+        lv_style_set_bg_opa(&style_ring, LV_OPA_TRANSP);
+        lv_style_set_border_width(&style_ring, MEDIA_OUTER_BW);
+        lv_style_set_border_color(&style_ring, user_secondary_color);
 
-		lv_style_init(&style_circle);
-		lv_style_set_radius(&style_circle, LV_RADIUS_CIRCLE);
-		lv_style_set_bg_opa(&style_circle, LV_OPA_TRANSP);
-		lv_style_set_border_width(&style_circle, 2);
-		lv_style_set_border_color(&style_circle, user_secondary_color);
+        lv_style_init(&style_circle);
+        lv_style_set_radius(&style_circle, LV_RADIUS_CIRCLE);
+        lv_style_set_bg_opa(&style_circle, LV_OPA_TRANSP);
+        lv_style_set_border_width(&style_circle, 2);
+        lv_style_set_border_color(&style_circle, user_secondary_color);
 
-		lv_style_init(&style_circle_pressed);
-		lv_style_set_radius(&style_circle_pressed, LV_RADIUS_CIRCLE);
-		lv_style_set_bg_opa(&style_circle_pressed, LV_OPA_COVER);
-		lv_style_set_bg_color(&style_circle_pressed, user_secondary_color);
-		lv_style_set_border_width(&style_circle_pressed, 2);
-		lv_style_set_border_color(&style_circle_pressed, user_secondary_color);
+        lv_style_init(&style_circle_pressed);
+        lv_style_set_radius(&style_circle_pressed, LV_RADIUS_CIRCLE);
+        lv_style_set_bg_opa(&style_circle_pressed, LV_OPA_COVER);
+        lv_style_set_bg_color(&style_circle_pressed, user_secondary_color);
+        lv_style_set_border_width(&style_circle_pressed, 2);
+        lv_style_set_border_color(&style_circle_pressed, user_secondary_color);
 
-		// Outer ring (acts as container for all 5 small circles)
-		ring = lv_obj_create(ACTIVE_SCR);
-		lv_obj_add_style(ring, &style_ring, 0);
-		lv_obj_set_size(ring, MEDIA_OUTER_SZ, MEDIA_OUTER_SZ);
-		lv_obj_align(ring, LV_ALIGN_CENTER, MEDIA_X_OFFSET, 0);
-		// No scrollbar
-		lv_obj_set_scrollbar_mode(ring, LV_SCROLLBAR_MODE_OFF);
-		lv_obj_clear_flag(ring, LV_OBJ_FLAG_SCROLLABLE);
+        // Outer ring (acts as container for all 5 small circles)
+        ring = lv_obj_create(ACTIVE_SCR);
+        lv_obj_add_style(ring, &style_ring, 0);
+        lv_obj_set_size(ring, MEDIA_OUTER_SZ, MEDIA_OUTER_SZ);
+        lv_obj_align(ring, LV_ALIGN_CENTER, MEDIA_X_OFFSET, 0);
+        // No scrollbar
+        lv_obj_set_scrollbar_mode(ring, LV_SCROLLBAR_MODE_OFF);
+        lv_obj_clear_flag(ring, LV_OBJ_FLAG_SCROLLABLE);
 
-		/* Small circles and labels */
+        /* Small circles and labels */
 
-		// UP
-		circ_up = lv_obj_create(ring);
-		lv_obj_add_style(circ_up, &style_circle, 0);
-		lv_obj_set_size(circ_up, MEDIA_BTN_SZ, MEDIA_BTN_SZ);
-		lv_obj_align(circ_up, LV_ALIGN_CENTER, 0, -MEDIA_R);
-		lv_obj_set_style_radius(circ_up, LV_RADIUS_CIRCLE, 0);
-		lv_obj_set_scrollbar_mode(circ_up, LV_SCROLLBAR_MODE_OFF);
-		lv_obj_clear_flag(circ_up, LV_OBJ_FLAG_SCROLLABLE);
-		lbl_up = lv_label_create(circ_up);
+        // UP
+        circ_up = lv_obj_create(ring);
+        lv_obj_add_style(circ_up, &style_circle, 0);
+        lv_obj_set_size(circ_up, MEDIA_BTN_SZ, MEDIA_BTN_SZ);
+        lv_obj_align(circ_up, LV_ALIGN_CENTER, 0, -MEDIA_R);
+        lv_obj_set_style_radius(circ_up, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_scrollbar_mode(circ_up, LV_SCROLLBAR_MODE_OFF);
+        lv_obj_clear_flag(circ_up, LV_OBJ_FLAG_SCROLLABLE);
+        lbl_up = lv_label_create(circ_up);
 
-		// Text
-		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
-			lv_label_set_text(lbl_up, LV_SYMBOL_VOLUME_MAX); // Vol+
-		} else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
-			lv_label_set_text(lbl_up, LV_SYMBOL_OK); // Start
-		} else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE || type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
-			lv_label_set_text(lbl_up, LV_SYMBOL_UP); // Scroll up
-		} else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) {
-			lv_label_set_text(lbl_up, "");
-		}
-		lv_obj_set_style_text_font(lbl_up, &lv_font_montserrat_18, 0);
-		lv_obj_set_style_text_color(lbl_up, user_secondary_color, 0);
+        // Text
+        if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
+            lv_label_set_text(lbl_up, LV_SYMBOL_VOLUME_MAX); // Vol+
+        } else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
+            lv_label_set_text(lbl_up, LV_SYMBOL_OK); // Start
+        } else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE || type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
+            lv_label_set_text(lbl_up, LV_SYMBOL_UP); // Scroll up
+        } else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) {
+            lv_label_set_text(lbl_up, "");
+        }
+        lv_obj_set_style_text_font(lbl_up, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_color(lbl_up, user_secondary_color, 0);
 
-		// Alignment
-		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE || type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
-			lv_obj_align(lbl_up, LV_ALIGN_CENTER, 0, 0);
-		} else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE || type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
-			lv_obj_align(lbl_up, LV_ALIGN_CENTER, 0, -1);
-		}
+        // Alignment
+        if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE || type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
+            lv_obj_align(lbl_up, LV_ALIGN_CENTER, 0, 0);
+        } else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE || type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
+            lv_obj_align(lbl_up, LV_ALIGN_CENTER, 0, -1);
+        }
 
-		// RIGHT
-		circ_right = lv_obj_create(ring);
-		lv_obj_add_style(circ_right, &style_circle, 0);
-		lv_obj_set_size(circ_right, MEDIA_BTN_SZ, MEDIA_BTN_SZ);
-		lv_obj_align(circ_right, LV_ALIGN_CENTER, MEDIA_R, 0);
-		lv_obj_set_style_radius(circ_right, LV_RADIUS_CIRCLE, 0);
-		lv_obj_set_scrollbar_mode(circ_right, LV_SCROLLBAR_MODE_OFF);
-		lv_obj_clear_flag(circ_right, LV_OBJ_FLAG_SCROLLABLE);
-		lbl_right = lv_label_create(circ_right);
+        // RIGHT
+        circ_right = lv_obj_create(ring);
+        lv_obj_add_style(circ_right, &style_circle, 0);
+        lv_obj_set_size(circ_right, MEDIA_BTN_SZ, MEDIA_BTN_SZ);
+        lv_obj_align(circ_right, LV_ALIGN_CENTER, MEDIA_R, 0);
+        lv_obj_set_style_radius(circ_right, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_scrollbar_mode(circ_right, LV_SCROLLBAR_MODE_OFF);
+        lv_obj_clear_flag(circ_right, LV_OBJ_FLAG_SCROLLABLE);
+        lbl_right = lv_label_create(circ_right);
 
-		// Text
-		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE || type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
-			lv_label_set_text(lbl_right, LV_SYMBOL_NEXT); // Next || Page up
-		} else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
-			lv_label_set_text(lbl_right, LV_SYMBOL_RIGHT); // Next slide
-		} else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) {
-			lv_label_set_text(lbl_right, "");
-		} else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) { // Vol up
-			lv_label_set_text(lbl_right, LV_SYMBOL_VOLUME_MAX);
-		}
-		lv_obj_set_style_text_font(lbl_right, &lv_font_montserrat_18, 0);
-		lv_obj_set_style_text_color(lbl_right, user_secondary_color, 0);
+        // Text
+        if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE || type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
+            lv_label_set_text(lbl_right, LV_SYMBOL_NEXT); // Next || Page up
+        } else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
+            lv_label_set_text(lbl_right, LV_SYMBOL_RIGHT); // Next slide
+        } else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) {
+            lv_label_set_text(lbl_right, "");
+        } else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) { // Vol up
+            lv_label_set_text(lbl_right, LV_SYMBOL_VOLUME_MAX);
+        }
+        lv_obj_set_style_text_font(lbl_right, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_color(lbl_right, user_secondary_color, 0);
 
-		// Alignment
-		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE || type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
-			lv_obj_align(lbl_right, LV_ALIGN_CENTER, 1, 0);
-		} else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
-			lv_obj_align(lbl_right, LV_ALIGN_CENTER, 0, 0);
-		} else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
-			lv_obj_align(lbl_right, LV_ALIGN_CENTER, 0, 0);
+        // Alignment
+        if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE || type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
+            lv_obj_align(lbl_right, LV_ALIGN_CENTER, 1, 0);
+        } else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
+            lv_obj_align(lbl_right, LV_ALIGN_CENTER, 0, 0);
+        } else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
+            lv_obj_align(lbl_right, LV_ALIGN_CENTER, 0, 0);
 
-			// Rotate to point text down
-			lv_obj_update_layout(circ_right); // Ensure sizes are known
+            // Rotate to point text down
+            lv_obj_update_layout(circ_right); // Ensure sizes are known
 
-			int w = lv_obj_get_width(lbl_right);
-			int h = lv_obj_get_height(lbl_right);
-			
-			// Rotate around the label's center
-			lv_obj_set_style_transform_pivot_x(lbl_right, w / 2, 0);
-			lv_obj_set_style_transform_pivot_y(lbl_right, h / 2, 0);
-			
-			lv_obj_set_style_transform_angle(lbl_right, 900, 0); // 900 = 90.0 degrees (units are 0.1)
-			
-			// Give LVGL a little extra draw area so the rotated glyph isn't clipped
-			lv_obj_set_style_transform_width(lbl_right, 8, 0);
-			lv_obj_set_style_transform_height(lbl_right, 8, 0);
-		}
+            int w = lv_obj_get_width(lbl_right);
+            int h = lv_obj_get_height(lbl_right);
+            
+            // Rotate around the label's center
+            lv_obj_set_style_transform_pivot_x(lbl_right, w / 2, 0);
+            lv_obj_set_style_transform_pivot_y(lbl_right, h / 2, 0);
+            
+            lv_obj_set_style_transform_angle(lbl_right, 900, 0); // 900 = 90.0 degrees (units are 0.1)
+            
+            // Give LVGL a little extra draw area so the rotated glyph isn't clipped
+            lv_obj_set_style_transform_width(lbl_right, 8, 0);
+            lv_obj_set_style_transform_height(lbl_right, 8, 0);
+        }
 
-		// DOWN
-		circ_down = lv_obj_create(ring);
-		lv_obj_add_style(circ_down, &style_circle, 0);
-		lv_obj_set_size(circ_down, MEDIA_BTN_SZ, MEDIA_BTN_SZ);
-		lv_obj_align(circ_down, LV_ALIGN_CENTER, 0, MEDIA_R);
-		lv_obj_set_style_radius(circ_down, LV_RADIUS_CIRCLE, 0);
-		lv_obj_set_scrollbar_mode(circ_down, LV_SCROLLBAR_MODE_OFF);
-		lv_obj_clear_flag(circ_down, LV_OBJ_FLAG_SCROLLABLE);
-		lbl_down = lv_label_create(circ_down);
+        // DOWN
+        circ_down = lv_obj_create(ring);
+        lv_obj_add_style(circ_down, &style_circle, 0);
+        lv_obj_set_size(circ_down, MEDIA_BTN_SZ, MEDIA_BTN_SZ);
+        lv_obj_align(circ_down, LV_ALIGN_CENTER, 0, MEDIA_R);
+        lv_obj_set_style_radius(circ_down, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_scrollbar_mode(circ_down, LV_SCROLLBAR_MODE_OFF);
+        lv_obj_clear_flag(circ_down, LV_OBJ_FLAG_SCROLLABLE);
+        lbl_down = lv_label_create(circ_down);
 
-		// Text
-		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
-			lv_label_set_text(lbl_down, LV_SYMBOL_VOLUME_MID); // Vol-
-		} else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
-			lv_label_set_text(lbl_down, LV_SYMBOL_CLOSE); // ESC
-		} else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE || type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
-			lv_label_set_text(lbl_down, LV_SYMBOL_DOWN); // Scroll down
-		} else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) {
-			lv_label_set_text(lbl_down, "");
-		}
-		lv_obj_set_style_text_font(lbl_down, &lv_font_montserrat_18, 0);
-		lv_obj_set_style_text_color(lbl_down, user_secondary_color, 0);
+        // Text
+        if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
+            lv_label_set_text(lbl_down, LV_SYMBOL_VOLUME_MID); // Vol-
+        } else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
+            lv_label_set_text(lbl_down, LV_SYMBOL_CLOSE); // ESC
+        } else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE || type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
+            lv_label_set_text(lbl_down, LV_SYMBOL_DOWN); // Scroll down
+        } else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) {
+            lv_label_set_text(lbl_down, "");
+        }
+        lv_obj_set_style_text_font(lbl_down, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_color(lbl_down, user_secondary_color, 0);
 
-		// Alignment
-		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE || type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
-			lv_obj_align(lbl_down, LV_ALIGN_CENTER, 0, 0);
-		} else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE || type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
-			lv_obj_align(lbl_down, LV_ALIGN_CENTER, 0, 1);
-		}
+        // Alignment
+        if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE || type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
+            lv_obj_align(lbl_down, LV_ALIGN_CENTER, 0, 0);
+        } else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE || type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
+            lv_obj_align(lbl_down, LV_ALIGN_CENTER, 0, 1);
+        }
 
-		// LEFT
-		circ_left = lv_obj_create(ring);
-		lv_obj_add_style(circ_left, &style_circle, 0);
-		lv_obj_set_size(circ_left, MEDIA_BTN_SZ, MEDIA_BTN_SZ);
-		lv_obj_align(circ_left, LV_ALIGN_CENTER, -MEDIA_R, 0);
-		lv_obj_set_style_radius(circ_left, LV_RADIUS_CIRCLE, 0);
-		lv_obj_set_scrollbar_mode(circ_left, LV_SCROLLBAR_MODE_OFF);
-		lv_obj_clear_flag(circ_left, LV_OBJ_FLAG_SCROLLABLE);
-		lbl_left = lv_label_create(circ_left);
+        // LEFT
+        circ_left = lv_obj_create(ring);
+        lv_obj_add_style(circ_left, &style_circle, 0);
+        lv_obj_set_size(circ_left, MEDIA_BTN_SZ, MEDIA_BTN_SZ);
+        lv_obj_align(circ_left, LV_ALIGN_CENTER, -MEDIA_R, 0);
+        lv_obj_set_style_radius(circ_left, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_scrollbar_mode(circ_left, LV_SCROLLBAR_MODE_OFF);
+        lv_obj_clear_flag(circ_left, LV_OBJ_FLAG_SCROLLABLE);
+        lbl_left = lv_label_create(circ_left);
 
-		// Text
-		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE || type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
-			lv_label_set_text(lbl_left, LV_SYMBOL_PREV); // Previous || Page down
-		} else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
-			lv_label_set_text(lbl_left, LV_SYMBOL_LEFT); // Previous slide
-		} else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) {
-			lv_label_set_text(lbl_left, "");
-		} else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) { // Vol down
-			lv_label_set_text(lbl_left, LV_SYMBOL_VOLUME_MID);
-		}
-		lv_obj_set_style_text_font(lbl_left, &lv_font_montserrat_18, 0);
-		lv_obj_set_style_text_color(lbl_left, user_secondary_color, 0);
+        // Text
+        if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE || type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
+            lv_label_set_text(lbl_left, LV_SYMBOL_PREV); // Previous || Page down
+        } else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
+            lv_label_set_text(lbl_left, LV_SYMBOL_LEFT); // Previous slide
+        } else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) {
+            lv_label_set_text(lbl_left, "");
+        } else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) { // Vol down
+            lv_label_set_text(lbl_left, LV_SYMBOL_VOLUME_MID);
+        }
+        lv_obj_set_style_text_font(lbl_left, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_color(lbl_left, user_secondary_color, 0);
 
-		// Alignment
-		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
-			lv_obj_align(lbl_left, LV_ALIGN_CENTER, 0, 0);
-		} else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
-			lv_obj_align(lbl_left, LV_ALIGN_CENTER, -1, 0);
-		} else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
-			lv_obj_align(lbl_left, LV_ALIGN_CENTER, 0, 0);
-		} else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
-			lv_obj_align(lbl_left, LV_ALIGN_CENTER, 0, 0);
+        // Alignment
+        if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
+            lv_obj_align(lbl_left, LV_ALIGN_CENTER, 0, 0);
+        } else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
+            lv_obj_align(lbl_left, LV_ALIGN_CENTER, -1, 0);
+        } else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
+            lv_obj_align(lbl_left, LV_ALIGN_CENTER, 0, 0);
+        } else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
+            lv_obj_align(lbl_left, LV_ALIGN_CENTER, 0, 0);
 
-			// Rotate to point text up
-			lv_obj_update_layout(circ_left); // Ensure sizes are known
+            // Rotate to point text up
+            lv_obj_update_layout(circ_left); // Ensure sizes are known
 
-			int w = lv_obj_get_width(lbl_left);
-			int h = lv_obj_get_height(lbl_left);
-			
-			// Rotate around the label's center
-			lv_obj_set_style_transform_pivot_x(lbl_left, w / 2, 0);
-			lv_obj_set_style_transform_pivot_y(lbl_left, h / 2, 0);
-			
-			lv_obj_set_style_transform_angle(lbl_left, 900, 0); // 900 = 90.0 degrees (units are 0.1)
-			
-			// Give LVGL a little extra draw area so the rotated glyph isn't clipped
-			lv_obj_set_style_transform_width(lbl_left, 8, 0);
-			lv_obj_set_style_transform_height(lbl_left, 8, 0);
-		}
+            int w = lv_obj_get_width(lbl_left);
+            int h = lv_obj_get_height(lbl_left);
+            
+            // Rotate around the label's center
+            lv_obj_set_style_transform_pivot_x(lbl_left, w / 2, 0);
+            lv_obj_set_style_transform_pivot_y(lbl_left, h / 2, 0);
+            
+            lv_obj_set_style_transform_angle(lbl_left, 900, 0); // 900 = 90.0 degrees (units are 0.1)
+            
+            // Give LVGL a little extra draw area so the rotated glyph isn't clipped
+            lv_obj_set_style_transform_width(lbl_left, 8, 0);
+            lv_obj_set_style_transform_height(lbl_left, 8, 0);
+        }
 
-		// CENTER
-		circ_center = lv_obj_create(ring);
-		lv_obj_add_style(circ_center, &style_circle, 0);
-		lv_obj_set_size(circ_center, MEDIA_BTN_SZ, MEDIA_BTN_SZ);
-		lv_obj_align(circ_center, LV_ALIGN_CENTER, 0, 0);
-		lv_obj_set_style_radius(circ_center, LV_RADIUS_CIRCLE, 0);
-		lv_obj_set_scrollbar_mode(circ_center, LV_SCROLLBAR_MODE_OFF);
-		lv_obj_clear_flag(circ_center, LV_OBJ_FLAG_SCROLLABLE);
-		lbl_center = lv_label_create(circ_center);
+        // CENTER
+        circ_center = lv_obj_create(ring);
+        lv_obj_add_style(circ_center, &style_circle, 0);
+        lv_obj_set_size(circ_center, MEDIA_BTN_SZ, MEDIA_BTN_SZ);
+        lv_obj_align(circ_center, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_set_style_radius(circ_center, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_scrollbar_mode(circ_center, LV_SCROLLBAR_MODE_OFF);
+        lv_obj_clear_flag(circ_center, LV_OBJ_FLAG_SCROLLABLE);
+        lbl_center = lv_label_create(circ_center);
 
-		// Text
-		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
-			lv_label_set_text(lbl_center, LV_SYMBOL_PLAY); // Pause/Play
-		} else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
-			lv_label_set_text(lbl_center, LV_SYMBOL_FILE); // Blank page
-		} else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
-			lv_label_set_text(lbl_center, LV_SYMBOL_MUTE); // Mute
-		} else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) { // Take image/video
-			lv_label_set_text(lbl_center, LV_SYMBOL_IMAGE);
-		} else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) { // Like post
-			lv_label_set_text(lbl_center, LV_SYMBOL_OK);
-		}
-		lv_obj_set_style_text_font(lbl_center, &lv_font_montserrat_18, 0);
-		lv_obj_set_style_text_color(lbl_center, user_secondary_color, 0);
+        // Text
+        if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
+            lv_label_set_text(lbl_center, LV_SYMBOL_PLAY); // Pause/Play
+        } else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
+            lv_label_set_text(lbl_center, LV_SYMBOL_FILE); // Blank page
+        } else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
+            lv_label_set_text(lbl_center, LV_SYMBOL_MUTE); // Mute
+        } else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) { // Take image/video
+            lv_label_set_text(lbl_center, LV_SYMBOL_IMAGE);
+        } else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) { // Like post
+            lv_label_set_text(lbl_center, LV_SYMBOL_OK);
+        }
+        lv_obj_set_style_text_font(lbl_center, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_color(lbl_center, user_secondary_color, 0);
 
-		// Alignment
-		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
-			lv_obj_align(lbl_center, LV_ALIGN_CENTER, 2, 0);
-		} else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
-			lv_obj_align(lbl_center, LV_ALIGN_CENTER, 1, 0);
-		} else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
-			lv_obj_align(lbl_center, LV_ALIGN_CENTER, -1, 0);
-		} else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE || type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
-			lv_obj_align(lbl_center, LV_ALIGN_CENTER, 0, 0);
-		}
+        // Alignment
+        if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
+            lv_obj_align(lbl_center, LV_ALIGN_CENTER, 2, 0);
+        } else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
+            lv_obj_align(lbl_center, LV_ALIGN_CENTER, 1, 0);
+        } else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
+            lv_obj_align(lbl_center, LV_ALIGN_CENTER, -1, 0);
+        } else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE || type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
+            lv_obj_align(lbl_center, LV_ALIGN_CENTER, 0, 0);
+        }
 
-		lv_timer_handler(); // Show now
+        lv_timer_handler(); // Show now
 
-		// Active bluetooth
-		uint16_t cmd = BLUETOOTH_CMD_INIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        // Active bluetooth
+        uint16_t cmd = BLUETOOTH_CMD_INIT;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-		init = true;
-	}
+        init = true;
+    }
 
-	// Reset visuals if no button event this tick
-	if (ui_btns->up_btn != 1 && ui_btns->right_btn != 1 && ui_btns->down_btn != 1 && ui_btns->left_btn != 1 && ui_btns->select_btn != 1)
-	{
-		if (circ_up) {
-			lv_obj_remove_style(circ_up, &style_circle_pressed, 0);
-		}
-		if (circ_right)	{
-			lv_obj_remove_style(circ_right, &style_circle_pressed, 0);
-		}
-		if (circ_down) {
-			lv_obj_remove_style(circ_down, &style_circle_pressed, 0);
-		}
-		if (circ_left) {
-			lv_obj_remove_style(circ_left, &style_circle_pressed, 0);
-		}
-		if (circ_center) {
-			lv_obj_remove_style(circ_center, &style_circle_pressed, 0);
-		}
+    // Reset visuals if no button event this tick
+    if (ui_btns->up_btn != 1 && ui_btns->right_btn != 1 && ui_btns->down_btn != 1 && ui_btns->left_btn != 1 && ui_btns->select_btn != 1)
+    {
+        if (circ_up) {
+            lv_obj_remove_style(circ_up, &style_circle_pressed, 0);
+        }
+        if (circ_right)    {
+            lv_obj_remove_style(circ_right, &style_circle_pressed, 0);
+        }
+        if (circ_down) {
+            lv_obj_remove_style(circ_down, &style_circle_pressed, 0);
+        }
+        if (circ_left) {
+            lv_obj_remove_style(circ_left, &style_circle_pressed, 0);
+        }
+        if (circ_center) {
+            lv_obj_remove_style(circ_center, &style_circle_pressed, 0);
+        }
 
-		if (lbl_up) {
-			lv_obj_set_style_text_color(lbl_up, user_secondary_color, 0);
-		}
-		if (lbl_right) {
-			lv_obj_set_style_text_color(lbl_right, user_secondary_color, 0);
-		}
-		if (lbl_down) {
-			lv_obj_set_style_text_color(lbl_down, user_secondary_color, 0);
-		}
-		if (lbl_left) {
-			lv_obj_set_style_text_color(lbl_left, user_secondary_color, 0);
-		}
-		if (lbl_center)	{
-			lv_obj_set_style_text_color(lbl_center, user_secondary_color, 0);
-		}
-	}
+        if (lbl_up) {
+            lv_obj_set_style_text_color(lbl_up, user_secondary_color, 0);
+        }
+        if (lbl_right) {
+            lv_obj_set_style_text_color(lbl_right, user_secondary_color, 0);
+        }
+        if (lbl_down) {
+            lv_obj_set_style_text_color(lbl_down, user_secondary_color, 0);
+        }
+        if (lbl_left) {
+            lv_obj_set_style_text_color(lbl_left, user_secondary_color, 0);
+        }
+        if (lbl_center)    {
+            lv_obj_set_style_text_color(lbl_center, user_secondary_color, 0);
+        }
+    }
 
-	/* Input handling */
-	// Up pressed
-	if (ui_btns->up_btn == 1) {
-		// Invert circle
-		lv_obj_add_style(circ_up, &style_circle_pressed, 0);
-		lv_obj_set_style_text_color(lbl_up, user_primary_color, 0);
+    /* Input handling */
+    // Up pressed
+    if (ui_btns->up_btn == 1) {
+        // Invert circle
+        lv_obj_add_style(circ_up, &style_circle_pressed, 0);
+        lv_obj_set_style_text_color(lbl_up, user_primary_color, 0);
 
-		// Send command
-		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
-			uint16_t cmd = BLUETOOTH_CMD_VOLUME_UP;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		} else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
-			// Send script
-			uint16_t cmd = BLUETOOTH_SCRIPT_PRESENTATION_START;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		} else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
-			// Send script
-			uint16_t cmd = BLUETOOTH_SCRIPT_SCROLL_UP;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		} else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
-			// Send script
-			uint16_t cmd = BLUETOOTH_SCRIPT_SOCIALS_UP;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		}
-	} else if (ui_btns->right_btn == 1) { // Right pressed
-		// Invert circle
-		lv_obj_add_style(circ_right, &style_circle_pressed, 0);
-		lv_obj_set_style_text_color(lbl_right, user_primary_color, 0);
+        // Send command
+        if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
+            uint16_t cmd = BLUETOOTH_CMD_VOLUME_UP;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        } else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
+            // Send script
+            uint16_t cmd = BLUETOOTH_SCRIPT_PRESENTATION_START;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        } else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
+            // Send script
+            uint16_t cmd = BLUETOOTH_SCRIPT_SCROLL_UP;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        } else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
+            // Send script
+            uint16_t cmd = BLUETOOTH_SCRIPT_SOCIALS_UP;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        }
+    } else if (ui_btns->right_btn == 1) { // Right pressed
+        // Invert circle
+        lv_obj_add_style(circ_right, &style_circle_pressed, 0);
+        lv_obj_set_style_text_color(lbl_right, user_primary_color, 0);
 
-		// Send command
-		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
-			uint16_t cmd = BLUETOOTH_CMD_NEXT_TRK;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		} else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
-			// Send script
-			uint16_t cmd = BLUETOOTH_SCRIPT_PRESENTATION_RIGHT;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		} else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
-			// Send script
-			uint16_t cmd = BLUETOOTH_SCRIPT_SCROLL_PG_DOWN;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		} else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
-			// Send script
-			uint16_t cmd = BLUETOOTH_CMD_VOLUME_UP;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		}
-	} else if (ui_btns->down_btn == 1) { // Down pressed
-		// Invert circle
-		lv_obj_add_style(circ_down, &style_circle_pressed, 0);
-		lv_obj_set_style_text_color(lbl_down, user_primary_color, 0);
+        // Send command
+        if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
+            uint16_t cmd = BLUETOOTH_CMD_NEXT_TRK;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        } else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
+            // Send script
+            uint16_t cmd = BLUETOOTH_SCRIPT_PRESENTATION_RIGHT;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        } else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
+            // Send script
+            uint16_t cmd = BLUETOOTH_SCRIPT_SCROLL_PG_DOWN;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        } else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
+            // Send script
+            uint16_t cmd = BLUETOOTH_CMD_VOLUME_UP;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        }
+    } else if (ui_btns->down_btn == 1) { // Down pressed
+        // Invert circle
+        lv_obj_add_style(circ_down, &style_circle_pressed, 0);
+        lv_obj_set_style_text_color(lbl_down, user_primary_color, 0);
 
-		// Send command
-		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
-			uint16_t cmd = BLUETOOTH_CMD_VOLUME_DOWN;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		} else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
-			// Send script
-			uint16_t cmd = BLUETOOTH_SCRIPT_PRESENTATION_ESC;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		} else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
-			// Send script
-			uint16_t cmd = BLUETOOTH_SCRIPT_SCROLL_DOWN;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		} else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
-			// Send script
-			uint16_t cmd = BLUETOOTH_SCRIPT_SOCIALS_DOWN;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		}
-	} else if (ui_btns->left_btn == 1) { // Left pressed		
-		// Invert circle
-		lv_obj_add_style(circ_left, &style_circle_pressed, 0);
-		lv_obj_set_style_text_color(lbl_left, user_primary_color, 0);
+        // Send command
+        if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
+            uint16_t cmd = BLUETOOTH_CMD_VOLUME_DOWN;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        } else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
+            // Send script
+            uint16_t cmd = BLUETOOTH_SCRIPT_PRESENTATION_ESC;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        } else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
+            // Send script
+            uint16_t cmd = BLUETOOTH_SCRIPT_SCROLL_DOWN;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        } else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
+            // Send script
+            uint16_t cmd = BLUETOOTH_SCRIPT_SOCIALS_DOWN;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        }
+    } else if (ui_btns->left_btn == 1) { // Left pressed        
+        // Invert circle
+        lv_obj_add_style(circ_left, &style_circle_pressed, 0);
+        lv_obj_set_style_text_color(lbl_left, user_primary_color, 0);
 
-		// Send command
-		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
-			uint16_t cmd = BLUETOOTH_CMD_PREV_TRK;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		} else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
-			// Send script
-			uint16_t cmd = BLUETOOTH_SCRIPT_PRESENTATION_LEFT;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		} else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
-			// Send script
-			uint16_t cmd = BLUETOOTH_SCRIPT_SCROLL_PG_UP;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		} else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
-			// Send script
-			uint16_t cmd = BLUETOOTH_CMD_VOLUME_DOWN;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		}
-	} else if (ui_btns->select_btn == 1) { // Center pressed
-		// Invert circle
-		lv_obj_add_style(circ_center, &style_circle_pressed, 0);
-		lv_obj_set_style_text_color(lbl_center, user_primary_color, 0);
+        // Send command
+        if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
+            uint16_t cmd = BLUETOOTH_CMD_PREV_TRK;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        } else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
+            // Send script
+            uint16_t cmd = BLUETOOTH_SCRIPT_PRESENTATION_LEFT;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        } else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
+            // Send script
+            uint16_t cmd = BLUETOOTH_SCRIPT_SCROLL_PG_UP;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        } else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
+            // Send script
+            uint16_t cmd = BLUETOOTH_CMD_VOLUME_DOWN;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        }
+    } else if (ui_btns->select_btn == 1) { // Center pressed
+        // Invert circle
+        lv_obj_add_style(circ_center, &style_circle_pressed, 0);
+        lv_obj_set_style_text_color(lbl_center, user_primary_color, 0);
 
-		// Send command
-		if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
-			uint16_t cmd = BLUETOOTH_CMD_PLAY_PAUSE;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		} else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
-			// Send script
-			uint16_t cmd = BLUETOOTH_SCRIPT_PRESENTATION_BLANK;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		} else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
-			uint16_t cmd = BLUETOOTH_CMD_MUTE;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		} else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) {
-			uint16_t cmd = BLUETOOTH_CMD_VOLUME_UP;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		} else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
-			// Send script
-			uint16_t cmd = BLUETOOTH_SCRIPT_SOCIALS_LIKE;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		}
-	} else if (ui_btns->home_btn == 1) { // Go back
-		// Deinit bluetooth
-		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        // Send command
+        if (type == BLUETOOTH_MEDIA_CLASSIC_PAGE) {
+            uint16_t cmd = BLUETOOTH_CMD_PLAY_PAUSE;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        } else if (type == BLUETOOTH_MEDIA_PRESENTATION_PAGE) {
+            // Send script
+            uint16_t cmd = BLUETOOTH_SCRIPT_PRESENTATION_BLANK;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        } else if (type == BLUETOOTH_MEDIA_SCROLL_PAGE) {
+            uint16_t cmd = BLUETOOTH_CMD_MUTE;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        } else if (type == BLUETOOTH_MEDIA_CAMERA_PAGE) {
+            uint16_t cmd = BLUETOOTH_CMD_VOLUME_UP;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        } else if (type == BLUETOOTH_MEDIA_SOCIALS_PAGE) {
+            // Send script
+            uint16_t cmd = BLUETOOTH_SCRIPT_SOCIALS_LIKE;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        }
+    } else if (ui_btns->home_btn == 1) { // Go back
+        // Deinit bluetooth
+        uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-		// Delete objects
-		lv_obj_delete(ring); // Deletes children
-		lv_obj_delete(lbl_home);
-		
-		// Reset styles
-		lv_style_reset(&style_ring);
-		lv_style_reset(&style_circle);
-		lv_style_reset(&style_circle_pressed);
-		
-		// Reset statics
-		circ_up = circ_right = circ_down = circ_left = circ_center = NULL;
-		lbl_up = lbl_right = lbl_down = lbl_left = lbl_center = NULL;
-		lbl_home = NULL;
-		init = false;
+        // Delete objects
+        lv_obj_delete(ring); // Deletes children
+        lv_obj_delete(lbl_home);
+        
+        // Reset styles
+        lv_style_reset(&style_ring);
+        lv_style_reset(&style_circle);
+        lv_style_reset(&style_circle_pressed);
+        
+        // Reset statics
+        circ_up = circ_right = circ_down = circ_left = circ_center = NULL;
+        lbl_up = lbl_right = lbl_down = lbl_left = lbl_center = NULL;
+        lbl_home = NULL;
+        init = false;
 
-		// Show arrows
-		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        // Show arrows
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 
-		// Show bluetooth list
-		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Switch pages
-		ui_menu->page = BLUETOOTH_PAGE;
-	} else if (ui_btns->pwr_btn == 1) { // Power off
-		// Deinit bluetooth
-		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        // Show bluetooth list
+        lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Switch pages
+        ui_menu->page = BLUETOOTH_PAGE;
+    } else if (ui_btns->pwr_btn == 1) { // Power off
+        // Deinit bluetooth
+        uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-		// Delete objects
-		lv_obj_delete(ring); // Deletes children
-		lv_obj_delete(lbl_home);
-		
-		// Reset styles
-		lv_style_reset(&style_ring);
-		lv_style_reset(&style_circle);
-		lv_style_reset(&style_circle_pressed);
-		
-		// Reset statics
-		circ_up = circ_right = circ_down = circ_left = circ_center = NULL;
-		lbl_up = lbl_right = lbl_down = lbl_left = lbl_center = NULL;
-		lbl_home = NULL;
-		init = false;
+        // Delete objects
+        lv_obj_delete(ring); // Deletes children
+        lv_obj_delete(lbl_home);
+        
+        // Reset styles
+        lv_style_reset(&style_ring);
+        lv_style_reset(&style_circle);
+        lv_style_reset(&style_circle_pressed);
+        
+        // Reset statics
+        circ_up = circ_right = circ_down = circ_left = circ_center = NULL;
+        lbl_up = lbl_right = lbl_down = lbl_left = lbl_center = NULL;
+        lbl_home = NULL;
+        init = false;
 
-		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
-	}
+        lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+    }
 }
 
 void lcd_bluetooth_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
 {
-	#define AI_CONFIG_SETUP_Y_OFFSET 40
-	
-	// Statics
-	static bool init = false;
-	
-	static lv_obj_t *cont = NULL;
-	static lv_obj_t *title_lbl = NULL;
-	static lv_obj_t *instr_lbl = NULL;
-	
-	if (!init) {
-		// Create a scrollable container for the instructions
-		cont = lv_obj_create(ACTIVE_SCR);
-		lv_obj_set_size(cont, 210, 106);
-		lv_obj_center(cont);
-		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
-		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
-		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
-		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
+    #define AI_CONFIG_SETUP_Y_OFFSET 40
+    
+    // Statics
+    static bool init = false;
+    
+    static lv_obj_t *cont = NULL;
+    static lv_obj_t *title_lbl = NULL;
+    static lv_obj_t *instr_lbl = NULL;
+    
+    if (!init) {
+        // Create a scrollable container for the instructions
+        cont = lv_obj_create(ACTIVE_SCR);
+        lv_obj_set_size(cont, 210, 106);
+        lv_obj_center(cont);
+        lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+        lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+        lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+        lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
 
-		// Title label
-		title_lbl = lv_label_create(cont);
-		lv_label_set_text(title_lbl, "How To Setup:");
-		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
-		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
-		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+        // Title label
+        title_lbl = lv_label_create(cont);
+        lv_label_set_text(title_lbl, "How To Setup:");
+        lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+        lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
 
-		// Instructions label (scrollable if text is long)
-		instr_lbl = lv_label_create(cont);
-		lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
-		lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
-		lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
-		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
-		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+        // Instructions label (scrollable if text is long)
+        instr_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+        lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
-		// Set custom text based on hotkey index
-		const char *instr_text = 
-				"Everything you need to know is below!\n\n"
-				"polycast5.com/blogs\n/docs/ai-keyboard\n\n"
-				"SSID: %s\nPassword: %s";
-		
-		lv_label_set_text_fmt(instr_lbl, instr_text, ai_portal_get_ssid(), ai_portal_get_pass());
+        // Set custom text based on hotkey index
+        const char *instr_text = 
+                "Everything you need to know is below!\n\n"
+                "polycast5.com/blogs\n/docs/ai-keyboard\n\n"
+                "SSID: %s\nPassword: %s";
+        
+        lv_label_set_text_fmt(instr_lbl, instr_text, ai_portal_get_ssid(), ai_portal_get_pass());
 
-		lv_timer_handler();
-		
-		// Start portal
-		xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_BIT);
+        lv_timer_handler();
+        
+        // Start portal
+        xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_BIT);
 
-		init = true;
-	}
-	
-	// Scroll up
-	if (ui_btns->up_btn == 1) {
-		lv_obj_scroll_by_bounded(cont, 0, AI_CONFIG_SETUP_Y_OFFSET, LV_ANIM_ON);
-	} else if (ui_btns->down_btn == 1) { // Scroll down
-		lv_obj_scroll_by_bounded(cont, 0, -AI_CONFIG_SETUP_Y_OFFSET, LV_ANIM_ON);
-	} else if (ui_btns->left_btn) { // Go back
-		// Delete objects
-		lv_obj_delete(cont); // Deletes children
-		
-		// Reset statics
-		cont = NULL;
-		title_lbl = instr_lbl = NULL;
-		init = false;
-		
-		// Stop portal
-		xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_BIT);
-		
-		// Show bluetooth menu
-		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Switch back
-		ui_menu->page = BLUETOOTH_PAGE;
-	} else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
-		// Delete objects
-		lv_obj_delete(cont); // Deletes children
-		
-		// Reset statics
-		cont = NULL;
-		title_lbl = instr_lbl = NULL;
-		init = false;
-		
-		// Stop portal
-		xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_BIT);
-		
- 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
-	}
+        init = true;
+    }
+    
+    // Scroll up
+    if (ui_btns->up_btn == 1) {
+        lv_obj_scroll_by_bounded(cont, 0, AI_CONFIG_SETUP_Y_OFFSET, LV_ANIM_ON);
+    } else if (ui_btns->down_btn == 1) { // Scroll down
+        lv_obj_scroll_by_bounded(cont, 0, -AI_CONFIG_SETUP_Y_OFFSET, LV_ANIM_ON);
+    } else if (ui_btns->left_btn) { // Go back
+        // Delete objects
+        lv_obj_delete(cont); // Deletes children
+        
+        // Reset statics
+        cont = NULL;
+        title_lbl = instr_lbl = NULL;
+        init = false;
+        
+        // Stop portal
+        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_BIT);
+        
+        // Show bluetooth menu
+        lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Switch back
+        ui_menu->page = BLUETOOTH_PAGE;
+    } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
+        // Delete objects
+        lv_obj_delete(cont); // Deletes children
+        
+        // Reset statics
+        cont = NULL;
+        title_lbl = instr_lbl = NULL;
+        init = false;
+        
+        // Stop portal
+        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_BIT);
+        
+         lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
 }
 
 void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
 {
-	#define AI_BT_FAILED_TXT "Connection failed!\nPlease pair to a\nBluetooth device at\nleast once and make\nsure you are in range."
-	#define AI_WIFI_FAILED_TXT "Connection failed!\nPlease connect to your\nWi-Fi network at least\nonce in the 'Wi-Fi'\nmenu and make sure\nyou are in range."
+    #define AI_BT_FAILED_TXT "Connection failed!\nPlease pair to a\nBluetooth device at\nleast once and make\nsure you are in range."
+    #define AI_WIFI_FAILED_TXT "Connection failed!\nPlease connect to your\nWi-Fi network at least\nonce in the 'Wi-Fi'\nmenu and make sure\nyou are in range."
 
-	// Statics
-	static bool do_once = false;
-	static lv_obj_t *lbl_ins = NULL;
-	static lv_obj_t *lbl_config = NULL;
-	static lv_obj_t *ai_orb = NULL;
-	static uint8_t orb_frame = 0;
-	static int16_t orb_angle = 0; // 0.1 degree units
+    // Statics
+    static bool do_once = false;
+    static lv_obj_t *lbl_ins = NULL;
+    static lv_obj_t *lbl_config = NULL;
+    static lv_obj_t *ai_orb = NULL;
+    static uint8_t orb_frame = 0;
+    static int16_t orb_angle = 0; // 0.1 degree units
 
-	char api_key[AI_API_KEY_MAX_LEN] = {0};
-	esp_err_t err = xai_load_api_key_nvs(api_key, AI_API_KEY_MAX_LEN);
-	if (err != ESP_OK) {
-		ESP_LOGW(TAG, "Failed to load xAI API key from NVS: err %s, switching to AI config page.", esp_err_to_name(err));
+    char api_key[AI_API_KEY_MAX_LEN] = {0};
+    esp_err_t err = xai_load_api_key_nvs(api_key, AI_API_KEY_MAX_LEN);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to load xAI API key from NVS: err %s, switching to AI config page.", esp_err_to_name(err));
 
-		// Switch pages
-		ui_menu->page = BLUETOOTH_AI_CONFIG_PAGE;
-		return;
-	}
-	
-	// Only execute once
-	if (!do_once) {
-		lbl_ins = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_ins, "Connecting to Wi-Fi...", user_secondary_color,
-				&lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 16);
+        // Switch pages
+        ui_menu->page = BLUETOOTH_AI_CONFIG_PAGE;
+        return;
+    }
+    
+    // Only execute once
+    if (!do_once) {
+        lbl_ins = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_ins, "Connecting to Wi-Fi...", user_secondary_color,
+                &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 16);
 
-		ai_orb = lv_img_create(ACTIVE_SCR);
-		lv_img_set_src(ai_orb, &img_ai_orb_1);
-		lv_obj_align(ai_orb, LV_ALIGN_CENTER, 0, 15);
+        ai_orb = lv_img_create(ACTIVE_SCR);
+        lv_img_set_src(ai_orb, &img_ai_orb_1);
+        lv_obj_align(ai_orb, LV_ALIGN_CENTER, 0, 15);
 
-		lbl_config = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_config, LV_SYMBOL_SETTINGS, user_secondary_color,
-				&lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -15, 0);
+        lbl_config = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_config, LV_SYMBOL_SETTINGS, user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -15, 0);
 
-		lv_obj_update_layout(ai_orb); // Save current layout
+        lv_obj_update_layout(ai_orb); // Save current layout
 
-		// Set pivot to center so it spins around its middle
+        // Set pivot to center so it spins around its middle
         int w = lv_obj_get_width(ai_orb);
         int h = lv_obj_get_height(ai_orb);
         lv_obj_set_style_transform_pivot_x(ai_orb, w / 2, 0);
@@ -1364,1312 +1364,1304 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         lv_obj_set_style_transform_width(ai_orb, 8, 0);
         lv_obj_set_style_transform_height(ai_orb, 8, 0);
 
-		lv_timer_handler();
+        lv_timer_handler();
 
-		// Already connected to Wi-Fi
-		if (xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT) {
-			lv_label_set_text(lbl_ins, "Connecting with BLE...");
-			lv_timer_handler();
+        // Already connected to Wi-Fi
+        if (xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT) {
+            lv_label_set_text(lbl_ins, "Connecting with BLE...");
+            lv_timer_handler();
 
-			// Connect to BLE
-			uint16_t cmd = BLUETOOTH_CMD_INIT;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+            // Connect to BLE
+            uint16_t cmd = BLUETOOTH_CMD_INIT;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-			// Wait up to 6s for bluetooth to connect
-			if ((xEventGroupWaitBits(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(6000)) & BLUETOOTH_CONNECTED_BIT) != 0) {
-				lv_label_set_text(lbl_ins, "Hold & talk!");
-			} else {
-				// Hide unused and center error label
-				lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
-				lv_obj_add_flag(lbl_config, LV_OBJ_FLAG_HIDDEN);
+            // Wait up to 6s for bluetooth to connect
+            if ((xEventGroupWaitBits(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(6000)) & BLUETOOTH_CONNECTED_BIT) != 0) {
+                lv_label_set_text(lbl_ins, "Hold & talk!");
+            } else {
+                // Hide unused and center error label
+                lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_add_flag(lbl_config, LV_OBJ_FLAG_HIDDEN);
 
-				lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
-				lv_label_set_text(lbl_ins, AI_BT_FAILED_TXT);
-			}
-		}
-		// Connect to Wi-Fi and BLE
-		else {
-			// Connect to previous Wi-Fi network
-			wifi_login_t prev_network = wifi_funcs_get_prev(); // Loads boot state saved network info
-			prev_network.prev = true; // Connecting to previous
-			if (xQueueSend(xWifiSelectedNetworkQueue, &prev_network, portMAX_DELAY) != pdPASS) {
-				ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue previous_network");
-			}
-	
-			// Wait up to 10s for Wi-Fi to connect
-			if ((xEventGroupWaitBits(xWifiEventGroup, WIFI_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(10000)) & WIFI_CONNECTED_BIT) != 0) {
-				lv_label_set_text(lbl_ins, "Connecting with BLE...");
-				lv_timer_handler();
-	
-				// Connect to BLE
-				uint16_t cmd = BLUETOOTH_CMD_INIT;
-				xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-	
-				// Wait up to 15s for bluetooth to connect
-				if ((xEventGroupWaitBits(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(15000)) & BLUETOOTH_CONNECTED_BIT) != 0) {
-					lv_label_set_text(lbl_ins, "Hold & talk!");
-				} else {
-					// Hide unused and center error label
-					lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
-					lv_obj_add_flag(lbl_config, LV_OBJ_FLAG_HIDDEN);
-					
-					lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
-					lv_label_set_text(lbl_ins, AI_BT_FAILED_TXT);
-				}
-			} else {
-				// Hide unused and center error label
-				lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
-				lv_obj_add_flag(lbl_config, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
+                lv_label_set_text(lbl_ins, AI_BT_FAILED_TXT);
+            }
+        } else { // Connect to Wi-Fi and BLE
+            // Connect to previous Wi-Fi network
+            wifi_login_t prev_network = wifi_funcs_get_prev(); // Loads boot state saved network info
+            prev_network.prev = true; // Connecting to previous
+            if (xQueueSend(xWifiSelectedNetworkQueue, &prev_network, portMAX_DELAY) != pdPASS) {
+                ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue previous_network");
+            }
+    
+            // Wait up to 10s for Wi-Fi to connect
+            if ((xEventGroupWaitBits(xWifiEventGroup, WIFI_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(10000)) & WIFI_CONNECTED_BIT) != 0) {
+                lv_label_set_text(lbl_ins, "Connecting with BLE...");
+                lv_timer_handler();
+    
+                // Connect to BLE
+                uint16_t cmd = BLUETOOTH_CMD_INIT;
+                xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+    
+                // Wait up to 15s for bluetooth to connect
+                if ((xEventGroupWaitBits(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(15000)) & BLUETOOTH_CONNECTED_BIT) != 0) {
+                    lv_label_set_text(lbl_ins, "Hold & talk!");
+                } else {
+                    // Hide unused and center error label
+                    lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(lbl_config, LV_OBJ_FLAG_HIDDEN);
+                    
+                    lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
+                    lv_label_set_text(lbl_ins, AI_BT_FAILED_TXT);
+                }
+            } else {
+                // Hide unused and center error label
+                lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_add_flag(lbl_config, LV_OBJ_FLAG_HIDDEN);
 
-				lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
-				lv_label_set_text(lbl_ins, AI_WIFI_FAILED_TXT);
-			}
-		}
-		
-		do_once = true;
-	}
+                lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
+                lv_label_set_text(lbl_ins, AI_WIFI_FAILED_TXT);
+            }
+        }
+        
+        do_once = true;
+    }
 
-	// TEST
-	if (orb_frame == 6) {
-		for (int i = 0; i < 5; ++i) {
-			if (i == 0) 	 lv_img_set_src(ai_orb, &img_ai_orb_1);
-			else if (i == 1) lv_img_set_src(ai_orb, &img_ai_orb_2);
-			else if (i == 2) lv_img_set_src(ai_orb, &img_ai_orb_3);
-			else if (i == 3) lv_img_set_src(ai_orb, &img_ai_orb_2);
-			else if (i == 4) lv_img_set_src(ai_orb, &img_ai_orb_1);
-			lv_timer_handler();
-			vTaskDelay(pdMS_TO_TICKS(1));
-		}
-	}
-	if (orb_frame == 7) {
-		for (int i = 0; i < 5; ++i) {
-			if (i == 0) 	 lv_img_set_src(ai_orb, &img_ai_orb_1);
-			else if (i == 1) lv_img_set_src(ai_orb, &img_ai_orb_2);
-			else if (i == 2) lv_img_set_src(ai_orb, &img_ai_orb_3);
-			else if (i == 3) lv_img_set_src(ai_orb, &img_ai_orb_2);
-			else if (i == 4) lv_img_set_src(ai_orb, &img_ai_orb_1);
-			lv_timer_handler();
-			vTaskDelay(pdMS_TO_TICKS(1));
-		}
-	}
-	if (orb_frame == 8) {
-		for (int i = 0; i < 5; ++i) {
-			if (i == 0) 	 lv_img_set_src(ai_orb, &img_ai_orb_1);
-			else if (i == 1) lv_img_set_src(ai_orb, &img_ai_orb_2);
-			else if (i == 2) lv_img_set_src(ai_orb, &img_ai_orb_3);
-			else if (i == 3) lv_img_set_src(ai_orb, &img_ai_orb_2);
-			else if (i == 4) lv_img_set_src(ai_orb, &img_ai_orb_1);
-			lv_timer_handler();
-			vTaskDelay(pdMS_TO_TICKS(1));
-		}
-	}
-	if (orb_frame == 9) {
-		for (int i = 0; i < 5; ++i) {
-			if (i == 0) 	 lv_img_set_src(ai_orb, &img_ai_orb_1);
-			else if (i == 1) lv_img_set_src(ai_orb, &img_ai_orb_2);
-			else if (i == 2) lv_img_set_src(ai_orb, &img_ai_orb_3);
-			else if (i == 3) lv_img_set_src(ai_orb, &img_ai_orb_2);
-			else if (i == 4) lv_img_set_src(ai_orb, &img_ai_orb_1);
-			lv_timer_handler();
-			vTaskDelay(pdMS_TO_TICKS(1));
-		}
-	}
+    // TEST
+    if (orb_frame == 6) {
+        for (int i = 0; i < 5; ++i) {
+            if (i == 0)      lv_img_set_src(ai_orb, &img_ai_orb_1);
+            else if (i == 1) lv_img_set_src(ai_orb, &img_ai_orb_2);
+            else if (i == 2) lv_img_set_src(ai_orb, &img_ai_orb_3);
+            else if (i == 3) lv_img_set_src(ai_orb, &img_ai_orb_2);
+            else if (i == 4) lv_img_set_src(ai_orb, &img_ai_orb_1);
+            lv_timer_handler();
+            vTaskDelay(pdMS_TO_TICKS(1));
+        }
+    }
+    if (orb_frame == 7) {
+        for (int i = 0; i < 5; ++i) {
+            if (i == 0)      lv_img_set_src(ai_orb, &img_ai_orb_1);
+            else if (i == 1) lv_img_set_src(ai_orb, &img_ai_orb_2);
+            else if (i == 2) lv_img_set_src(ai_orb, &img_ai_orb_3);
+            else if (i == 3) lv_img_set_src(ai_orb, &img_ai_orb_2);
+            else if (i == 4) lv_img_set_src(ai_orb, &img_ai_orb_1);
+            lv_timer_handler();
+            vTaskDelay(pdMS_TO_TICKS(1));
+        }
+    }
+    if (orb_frame == 8) {
+        for (int i = 0; i < 5; ++i) {
+            if (i == 0)      lv_img_set_src(ai_orb, &img_ai_orb_1);
+            else if (i == 1) lv_img_set_src(ai_orb, &img_ai_orb_2);
+            else if (i == 2) lv_img_set_src(ai_orb, &img_ai_orb_3);
+            else if (i == 3) lv_img_set_src(ai_orb, &img_ai_orb_2);
+            else if (i == 4) lv_img_set_src(ai_orb, &img_ai_orb_1);
+            lv_timer_handler();
+            vTaskDelay(pdMS_TO_TICKS(1));
+        }
+    }
+    if (orb_frame == 9) {
+        for (int i = 0; i < 5; ++i) {
+            if (i == 0)      lv_img_set_src(ai_orb, &img_ai_orb_1);
+            else if (i == 1) lv_img_set_src(ai_orb, &img_ai_orb_2);
+            else if (i == 2) lv_img_set_src(ai_orb, &img_ai_orb_3);
+            else if (i == 3) lv_img_set_src(ai_orb, &img_ai_orb_2);
+            else if (i == 4) lv_img_set_src(ai_orb, &img_ai_orb_1);
+            lv_timer_handler();
+            vTaskDelay(pdMS_TO_TICKS(1));
+        }
+    }
 
-	orb_frame = (orb_frame + 1) % 10;
+    orb_frame = (orb_frame + 1) % 10;
 
-	orb_angle = (orb_angle + 50) % 3600; // 5 degrees per frame
+    orb_angle = (orb_angle + 50) % 3600; // 5 degrees per frame
     lv_obj_set_style_transform_angle(ai_orb, orb_angle, 0);
 
-	// Up button pressed
-	if (ui_btns->up_btn == 1) {
+    // Up button pressed
+    if (ui_btns->up_btn == 1) {
 
-	} else if (ui_btns->down_btn == 1) { // Down button pressed
-		
-	} else if (ui_btns->right_btn == 1) { // Config page selected
-		// Disconnect from Wi-Fi
-		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+    } else if (ui_btns->down_btn == 1) { // Down button pressed
+        
+    } else if (ui_btns->right_btn == 1) { // Config page selected
+        // Disconnect from Wi-Fi
+        xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
-		// Deactivate bluetooth
-		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		
-		// Delete objects
-		lv_obj_delete(lbl_ins);
-		lv_obj_delete(ai_orb);
-		lv_obj_delete(lbl_config);
-		
-		// Reset statics
-		do_once = false;
-		lbl_ins = ai_orb = lbl_config = NULL;
+        // Deactivate bluetooth
+        uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        
+        // Delete objects
+        lv_obj_delete(lbl_ins);
+        lv_obj_delete(ai_orb);
+        lv_obj_delete(lbl_config);
+        
+        // Reset statics
+        do_once = false;
+        lbl_ins = ai_orb = lbl_config = NULL;
 
-		// Hide right arrow
-		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        // Hide right arrow
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
-		// Show top and bottom arrows
-		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+        // Show top and bottom arrows
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 
-		// Switch to config page
-		ui_menu->page = BLUETOOTH_AI_CONFIG_PAGE;
-		return;
-	} else if (ui_btns->select_btn == 1) { // Record selected
-		// angle = (angle + 450) % 3600; // 45 degrees per frame
+        // Switch to config page
+        ui_menu->page = BLUETOOTH_AI_CONFIG_PAGE;
+        return;
+    } else if (ui_btns->select_btn == 1) { // Record selected
+        // angle = (angle + 450) % 3600; // 45 degrees per frame
         // lv_obj_set_style_transform_angle(ai_orb, angle, 0);
 
-		// Send to Grok via xAI API
-		const char *msg_str = "please open notepad and given me the tsla and btc price predictions for next week";
-		ai_cmd_t cmd = {
-			.type = AI_CMD_NORMAL,
-			.msg = msg_str,
-			.msg_len = strlen(msg_str),
-			.free_ptr = NULL,
-			.free_on_done = false,
-			.reasoning = false,
-		};
+        // Send to Grok via xAI API
+        const char *msg_str = "please open notepad and given me the tsla and btc price predictions for next week";
+        ai_cmd_t cmd = {
+            .type = AI_CMD_NORMAL,
+            .msg = msg_str,
+            .msg_len = strlen(msg_str),
+            .free_ptr = NULL,
+            .free_on_done = false,
+            .reasoning = false,
+        };
 
-		xQueueSend(xAiCmdQueue, &cmd, portMAX_DELAY);
-	} else if (ui_btns->left_btn == 1) { // Back selected
-		// Disconnect from Wi-Fi
-		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+        xQueueSend(xAiCmdQueue, &cmd, portMAX_DELAY);
+    } else if (ui_btns->left_btn == 1) { // Back selected
+        // Disconnect from Wi-Fi
+        xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
-		// Deactivate bluetooth
-		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        // Deactivate bluetooth
+        uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-		// Delete objects
-		lv_obj_delete(lbl_ins);
-		lv_obj_delete(ai_orb);
-		lv_obj_delete(lbl_config);
-		
-		// Reset statics
-		do_once = false;
-		lbl_ins = ai_orb = lbl_config = NULL;
+        // Delete objects
+        lv_obj_delete(lbl_ins);
+        lv_obj_delete(ai_orb);
+        lv_obj_delete(lbl_config);
+        
+        // Reset statics
+        do_once = false;
+        lbl_ins = ai_orb = lbl_config = NULL;
 
-		// Hide right arrow
-		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        // Hide right arrow
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
-		// Show top and bottom arrows
-		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-		
-		// Switch pages
-		ui_menu->page = BLUETOOTH_PAGE;
-	} else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off selected
-		// Disconnect from Wi-Fi
-		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+        // Show top and bottom arrows
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+        
+        // Switch pages
+        ui_menu->page = BLUETOOTH_PAGE;
+    } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off selected
+        // Disconnect from Wi-Fi
+        xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
-		// Deactivate bluetooth
-		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		
-		// Delete objects
-		lv_obj_delete(lbl_ins);
-		lv_obj_delete(ai_orb);
-		lv_obj_delete(lbl_config);
-		
-		// Reset statics
-		do_once = false;
-		lbl_ins = ai_orb = lbl_config = NULL;
-		
-		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
-	}
+        // Deactivate bluetooth
+        uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        
+        // Delete objects
+        lv_obj_delete(lbl_ins);
+        lv_obj_delete(ai_orb);
+        lv_obj_delete(lbl_config);
+        
+        // Reset statics
+        do_once = false;
+        lbl_ins = ai_orb = lbl_config = NULL;
+        
+        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
 }
 
 void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
 {
-	// Statics
-	static bool do_once = false;
-	
-	// Only execute once
-	if (!do_once) {
-		// Reset long semaphore to avoid false triggers
-		xQueueReset(xRightButtonLongSemaphore);
+    // Statics
+    static bool do_once = false;
+    
+    // Only execute once
+    if (!do_once) {
+        // Reset long semaphore to avoid false triggers
+        xQueueReset(xRightButtonLongSemaphore);
 
-		// Ensure updated based on NVS
-		keyboard_menu_refresh_from_nvs(&bluetooth_menu->bluetooth_keyboard_menu);
+        // Ensure updated based on NVS
+        keyboard_menu_refresh_from_nvs(&bluetooth_menu->bluetooth_keyboard_menu);
 
-		// Show bluetooth keyboard menu
-		lv_obj_remove_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+        // Show bluetooth keyboard menu
+        lv_obj_remove_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
 
-		lv_timer_handler();
+        lv_timer_handler();
 
-		// Active bluetooth
-		uint16_t cmd = BLUETOOTH_CMD_INIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		
-		do_once = true;
-	}
+        // Active bluetooth
+        uint16_t cmd = BLUETOOTH_CMD_INIT;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        
+        do_once = true;
+    }
 
-	// Up button pressed
-	if (ui_btns->up_btn == 1) {
-		// Update selection
-		bluetooth_menu->bluetooth_keyboard_menu.index--;
-		update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
+    // Up button pressed
+    if (ui_btns->up_btn == 1) {
+        // Update selection
+        bluetooth_menu->bluetooth_keyboard_menu.index--;
+        update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
 
-		// Save to NVS
-		lcd_bluetooth_script_selected_set(bluetooth_menu->bluetooth_keyboard_menu.index);
-	} else if (ui_btns->down_btn == 1) { // Down button pressed
-		// Update selection
-		bluetooth_menu->bluetooth_keyboard_menu.index++;
-		update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
+        // Save to NVS
+        lcd_bluetooth_script_selected_set(bluetooth_menu->bluetooth_keyboard_menu.index);
+    } else if (ui_btns->down_btn == 1) { // Down button pressed
+        // Update selection
+        bluetooth_menu->bluetooth_keyboard_menu.index++;
+        update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
 
-		// Save to NVS
-		lcd_bluetooth_script_selected_set(bluetooth_menu->bluetooth_keyboard_menu.index);
-	} else if (ui_btns->right_btn == 1) { // Right button pressed (+5)
-		// Update selection
-		bluetooth_menu->bluetooth_keyboard_menu.index = bluetooth_menu->bluetooth_keyboard_menu.index + 5;
-		update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
+        // Save to NVS
+        lcd_bluetooth_script_selected_set(bluetooth_menu->bluetooth_keyboard_menu.index);
+    } else if (ui_btns->right_btn == 1) { // Right button pressed (+5)
+        // Update selection
+        bluetooth_menu->bluetooth_keyboard_menu.index = bluetooth_menu->bluetooth_keyboard_menu.index + 5;
+        update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
 
-		// Save to NVS
-		lcd_bluetooth_script_selected_set(bluetooth_menu->bluetooth_keyboard_menu.index);
-	}
-	// Long right -> go to index 2 (first user index)
-	else if (xSemaphoreTake(xRightButtonLongSemaphore, 0) == pdTRUE) {
-		// Update selection
-		bluetooth_menu->bluetooth_keyboard_menu.index = 2;
-		update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
+        // Save to NVS
+        lcd_bluetooth_script_selected_set(bluetooth_menu->bluetooth_keyboard_menu.index);
+    }
+    // Long right -> go to index 2 (first user index)
+    else if (xSemaphoreTake(xRightButtonLongSemaphore, 0) == pdTRUE) {
+        // Update selection
+        bluetooth_menu->bluetooth_keyboard_menu.index = 2;
+        update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
 
-		// Save to NVS
-		lcd_bluetooth_script_selected_set(bluetooth_menu->bluetooth_keyboard_menu.index);
-	} else if (ui_btns->left_btn == 1) { // Back selected
-		// Deactivate bluetooth
-		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        // Save to NVS
+        lcd_bluetooth_script_selected_set(bluetooth_menu->bluetooth_keyboard_menu.index);
+    } else if (ui_btns->left_btn == 1) { // Back selected
+        // Deactivate bluetooth
+        uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-		// Refresh scrolling index
-		keyboard_menu_refresh_from_nvs(&bluetooth_menu->bluetooth_keyboard_menu);
+        // Refresh scrolling index
+        keyboard_menu_refresh_from_nvs(&bluetooth_menu->bluetooth_keyboard_menu);
 
-		// Hide bluetooth keyboard menu
-		lv_obj_add_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Show bluetooth menu
-		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Reset static
-		do_once = false;
-		
-		// Switch pages
-		ui_menu->page = BLUETOOTH_PAGE;
-	} else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off selected
-		// Deactivate bluetooth
-		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        // Hide bluetooth keyboard menu
+        lv_obj_add_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Show bluetooth menu
+        lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Reset static
+        do_once = false;
+        
+        // Switch pages
+        ui_menu->page = BLUETOOTH_PAGE;
+    } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off selected
+        // Deactivate bluetooth
+        uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-		// Refresh scrolling index
-		keyboard_menu_refresh_from_nvs(&bluetooth_menu->bluetooth_keyboard_menu);
+        // Refresh scrolling index
+        keyboard_menu_refresh_from_nvs(&bluetooth_menu->bluetooth_keyboard_menu);
 
-		// Hide bluetooth keyboard menu
-		lv_obj_add_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Reset static
-		do_once = false;
-		
-		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
-	} else if (ui_btns->select_btn == 1) { // Option selected
-		// Add/Edit selected
-		if (bluetooth_menu->bluetooth_keyboard_menu.index == 0) {
-			// Deactivate bluetooth
-			uint16_t cmd = BLUETOOTH_CMD_DEINIT;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        // Hide bluetooth keyboard menu
+        lv_obj_add_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Reset static
+        do_once = false;
+        
+        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    } else if (ui_btns->select_btn == 1) { // Option selected
+        // Add/Edit selected
+        if (bluetooth_menu->bluetooth_keyboard_menu.index == 0) {
+            // Deactivate bluetooth
+            uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-			// Hide keyboard menu
-			lv_obj_add_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
-			
-			// Reset static
-			do_once = false;
-			
-			// Switch pages
-			ui_menu->page = BLUETOOTH_SCRIPT_ADD_PAGE;
-		} else if (bluetooth_menu->bluetooth_keyboard_menu.index == 1) { // Test selected
-			// Send test command
-			uint16_t cmd = BLUETOOTH_SCRIPT_OFFSET + 1;
-			xQueueSend(xBluetoothMediaCmdQueue, &cmd, 0);
-		}
-		// Category selected
-		else {
-			// Get category index (direct since no filtering)
-			current_category = (uint8_t)(bluetooth_menu->bluetooth_keyboard_menu.index - NUM_KEYBOARD_BASE);
-			
-			// Hide keyboard menu
-			lv_obj_add_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
-			
-			// Switch to sub page
-			ui_menu->page = BLUETOOTH_KEYBOARD_SUB_PAGE;
-		}
-	}
+            // Hide keyboard menu
+            lv_obj_add_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+            
+            // Reset static
+            do_once = false;
+            
+            // Switch pages
+            ui_menu->page = BLUETOOTH_SCRIPT_ADD_PAGE;
+        } else if (bluetooth_menu->bluetooth_keyboard_menu.index == 1) { // Test selected
+            // Send test command
+            uint16_t cmd = BLUETOOTH_SCRIPT_OFFSET + 1;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, 0);
+        } else { // Category selected
+            // Get category index (direct since no filtering)
+            current_category = (uint8_t)(bluetooth_menu->bluetooth_keyboard_menu.index - NUM_KEYBOARD_BASE);
+            
+            // Hide keyboard menu
+            lv_obj_add_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+            
+            // Switch to sub page
+            ui_menu->page = BLUETOOTH_KEYBOARD_SUB_PAGE;
+        }
+    }
 }
 
 void lcd_bluetooth_keyboard_sub_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
 {
-	static bool init = false;
-	bluetooth_keyboard_menu_t *submenu = &bluetooth_keyboard_submenu;
-	
-	// Init once
-	if (!init) {
-		// Fetch menu
-		setup_keyboard_submenu_page(submenu);
-		keyboard_submenu_refresh_from_nvs(submenu, current_category);
+    static bool init = false;
+    bluetooth_keyboard_menu_t *submenu = &bluetooth_keyboard_submenu;
+    
+    // Init once
+    if (!init) {
+        // Fetch menu
+        setup_keyboard_submenu_page(submenu);
+        keyboard_submenu_refresh_from_nvs(submenu, current_category);
 
-		// Show
-		lv_obj_remove_flag(submenu->main_list, LV_OBJ_FLAG_HIDDEN);
+        // Show
+        lv_obj_remove_flag(submenu->main_list, LV_OBJ_FLAG_HIDDEN);
 
-		init = true;
-	}
-	
-	// Up button
-	if (ui_btns->up_btn == 1) {
-		submenu->index--;
-		update_keyboard_submenu(submenu);
-	} else if (ui_btns->down_btn == 1) { // Down button
-		submenu->index++;
-		update_keyboard_submenu(submenu);
-	} else if (ui_btns->select_btn == 1) { // Select script
-		// If no scripts in this category, ignore select
-		if (bluetooth_keyboard_submenu.size <= 0) {
-			#ifdef POLYCAST5_DEBUG
-			ESP_LOGW(TAG, "No scripts in selected category");
-			#endif
-		
-			return;
-		}
+        init = true;
+    }
+    
+    // Up button
+    if (ui_btns->up_btn == 1) {
+        submenu->index--;
+        update_keyboard_submenu(submenu);
+    } else if (ui_btns->down_btn == 1) { // Down button
+        submenu->index++;
+        update_keyboard_submenu(submenu);
+    } else if (ui_btns->select_btn == 1) { // Select script
+        // If no scripts in this category, ignore select
+        if (bluetooth_keyboard_submenu.size <= 0) {
+            #ifdef POLYCAST5_DEBUG
+            ESP_LOGW(TAG, "No scripts in selected category");
+            #endif
+        
+            return;
+        }
 
-		// Send the script to type out
-		uint8_t script_idx = submenu->script_indices[submenu->index];
-		uint16_t cmd = BLUETOOTH_SCRIPT_OFFSET + NUM_KEYBOARD_BASE + script_idx;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, 0);
-	} else if (ui_btns->left_btn == 1) { // Back
-		// Hide submenu
-		lv_obj_add_flag(submenu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Clean up
-		lv_obj_clean(submenu->main_list);
-		
-		// Show top-level keyboard menu
-		lv_obj_remove_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Reset init
-		init = false;
-		
-		// Switch page
-		ui_menu->page = BLUETOOTH_KEYBOARD_PAGE;
-	} else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off
-		// Deactivate bluetooth
-		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        // Send the script to type out
+        uint8_t script_idx = submenu->script_indices[submenu->index];
+        uint16_t cmd = BLUETOOTH_SCRIPT_OFFSET + NUM_KEYBOARD_BASE + script_idx;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, 0);
+    } else if (ui_btns->left_btn == 1) { // Back
+        // Hide submenu
+        lv_obj_add_flag(submenu->main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Clean up
+        lv_obj_clean(submenu->main_list);
+        
+        // Show top-level keyboard menu
+        lv_obj_remove_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Reset init
+        init = false;
+        
+        // Switch page
+        ui_menu->page = BLUETOOTH_KEYBOARD_PAGE;
+    } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off
+        // Deactivate bluetooth
+        uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-		// Hide submenu
-		lv_obj_add_flag(submenu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Clean up
-		lv_obj_clean(submenu->main_list);
-		
-		// Reset init
-		init = false;
-		
-		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);  // True = home, false = sleep
-	}
+        // Hide submenu
+        lv_obj_add_flag(submenu->main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Clean up
+        lv_obj_clean(submenu->main_list);
+        
+        // Reset init
+        init = false;
+        
+        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);  // True = home, false = sleep
+    }
 }
 
 void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
 {
-	#define SCRIPT_ADD_Y_OFFSET 40
-	
-	// Statics
-	static bool init = false;
-	static lv_obj_t *cont = NULL;
-	static lv_obj_t *title_lbl = NULL;
-	static lv_obj_t *instr_lbl = NULL;
-	
-	if (!init) {
-		// Create a scrollable container for the instructions
-		cont = lv_obj_create(ACTIVE_SCR);
-		lv_obj_set_size(cont, 210, 106);
-		lv_obj_center(cont);
-		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
-		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
-		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
-		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
+    #define SCRIPT_ADD_Y_OFFSET 40
+    
+    // Statics
+    static bool init = false;
+    static lv_obj_t *cont = NULL;
+    static lv_obj_t *title_lbl = NULL;
+    static lv_obj_t *instr_lbl = NULL;
+    
+    if (!init) {
+        // Create a scrollable container for the instructions
+        cont = lv_obj_create(ACTIVE_SCR);
+        lv_obj_set_size(cont, 210, 106);
+        lv_obj_center(cont);
+        lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+        lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+        lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+        lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
 
-		// Title label
-		title_lbl = lv_label_create(cont);
-		lv_label_set_text(title_lbl, "Adding a Script:");
-		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
-		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
-		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+        // Title label
+        title_lbl = lv_label_create(cont);
+        lv_label_set_text(title_lbl, "Adding a Script:");
+        lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+        lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
 
-		// Instructions label (scrollable if text is long)
-		instr_lbl = lv_label_create(cont);
-		lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
-		lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
-		lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
-		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
-		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+        // Instructions label (scrollable if text is long)
+        instr_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+        lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
-		// Start SoftAP and web portal
-		xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_BT_BIT);
+        // Start SoftAP and web portal
+        xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_BT_BIT);
 
-		char msg[64];
-		snprintf(msg, sizeof(msg), "http://%s", bluetooth_web_portal_get_ip());
+        char msg[64];
+        snprintf(msg, sizeof(msg), "http://%s", bluetooth_web_portal_get_ip());
 
-		// Set custom text based on hotkey index
-		const char *instr_text = "How to quickly add a new Bluetooth autotype text script:\n\nFirst, grab your phone or other device and navigate to Wi-Fi settings."
-				"\n\nThere, you should see a joinable Wi-Fi network named '" BT_PORTAL_SSID "'. Click on it and enter the password '%s'."
-				"\n\nIf you don't see it, please wait a minute or try refreshing."
-				"\n\nOnce connected, open up your internet browser of choice and search:\n\n%s\n\nFrom there, follow the on-screen instructions. "
-				"DO NOT exit this page until you're done entering what you want into the web portal.";
-		
-		lv_label_set_text_fmt(instr_lbl, instr_text, bt_wifi_portal_pass, msg);
-	
-		init = true;
-	}
-	
-	if (ui_btns->up_btn == 1) {
-		lv_obj_scroll_by_bounded(cont, 0, SCRIPT_ADD_Y_OFFSET, LV_ANIM_ON);
-	} else if (ui_btns->down_btn == 1) {
-		lv_obj_scroll_by_bounded(cont, 0, -SCRIPT_ADD_Y_OFFSET, LV_ANIM_ON);
-	} else if (ui_btns->left_btn) { // Go back
-		// Turn off web portal
-		xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_BT_BIT);
-		
-		// Hide right arrow
-		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-		
-		// Delete objects
-		lv_obj_delete(cont); // Deletes children
-		
-		// Reset statics
-		cont = NULL;
-		title_lbl = instr_lbl = NULL;
-		init = false;
-			
-		// Show bluetooth menu
-		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Switch back
-		ui_menu->page = BLUETOOTH_PAGE;
-	} else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
-		// Turn off web portal
-		xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_BT_BIT);
+        // Set custom text based on hotkey index
+        const char *instr_text = "How to quickly add a new Bluetooth autotype text script:\n\nFirst, grab your phone or other device and navigate to Wi-Fi settings."
+                "\n\nThere, you should see a joinable Wi-Fi network named '" BT_PORTAL_SSID "'. Click on it and enter the password '%s'."
+                "\n\nIf you don't see it, please wait a minute or try refreshing."
+                "\n\nOnce connected, open up your internet browser of choice and search:\n\n%s\n\nFrom there, follow the on-screen instructions. "
+                "DO NOT exit this page until you're done entering what you want into the web portal.";
+        
+        lv_label_set_text_fmt(instr_lbl, instr_text, bt_wifi_portal_pass, msg);
+    
+        init = true;
+    }
+    
+    if (ui_btns->up_btn == 1) {
+        lv_obj_scroll_by_bounded(cont, 0, SCRIPT_ADD_Y_OFFSET, LV_ANIM_ON);
+    } else if (ui_btns->down_btn == 1) {
+        lv_obj_scroll_by_bounded(cont, 0, -SCRIPT_ADD_Y_OFFSET, LV_ANIM_ON);
+    } else if (ui_btns->left_btn) { // Go back
+        // Turn off web portal
+        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_BT_BIT);
+        
+        // Hide right arrow
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        
+        // Delete objects
+        lv_obj_delete(cont); // Deletes children
+        
+        // Reset statics
+        cont = NULL;
+        title_lbl = instr_lbl = NULL;
+        init = false;
+            
+        // Show bluetooth menu
+        lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Switch back
+        ui_menu->page = BLUETOOTH_PAGE;
+    } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
+        // Turn off web portal
+        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_BT_BIT);
 
-		// Delete objects
-		lv_obj_delete(cont); // Deletes children
-		
-		// Reset statics
-		cont = NULL;
-		title_lbl = instr_lbl = NULL;
-		init = false;
-		
- 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
-	}
+        // Delete objects
+        lv_obj_delete(cont); // Deletes children
+        
+        // Reset statics
+        cont = NULL;
+        title_lbl = instr_lbl = NULL;
+        init = false;
+        
+         lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
 }
 
 static void fmt_addr_str(const ble_addr_t *a, char *out, size_t out_sz)
 {
-	snprintf(out, out_sz, "%02X:%02X:%02X:%02X:%02X:%02X",
-			a->val[5], a->val[4], a->val[3], a->val[2], a->val[1], a->val[0]);
+    snprintf(out, out_sz, "%02X:%02X:%02X:%02X:%02X:%02X",
+            a->val[5], a->val[4], a->val[3], a->val[2], a->val[1], a->val[0]);
 }
 
 static void prompt_rename_or_del(ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
 {
-	// Show right and hide left arrow
-	lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-	lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-	
-	// Create and format ins labels
-	lv_obj_t *lbl_ins = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(lbl_ins, "", user_secondary_color,
-			&lv_font_montserrat_30, LV_ALIGN_CENTER, 0, 0);
-				 
-	lv_obj_t *lbl_exit = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(lbl_exit, "DEFAULT", user_secondary_color,
-			&lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -16, -1);
-				 
-	lv_obj_t *lbl_name = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(lbl_name, "RENAME", user_secondary_color,
-			&lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 13);
-				 
-	lv_obj_t *lbl_del = lv_label_create(ACTIVE_SCR);
-	lcd_format_label(lbl_del, "DELETE", user_secondary_color,
-			&lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
-	
-	while (1) {
-		lv_timer_handler();
-		
-		// Done
-		if (xSemaphoreTake(xRightButtonSemaphore, 0) == pdTRUE) {			
-			// Save preferred peer to whitelist
-			esp_err_t err = bluetooth_set_preferred_peer_nvs(&bluetooth_menu->bluetooth_peer_menu.peers[bluetooth_menu->bluetooth_peer_menu.index]);
-			#ifdef POLYCAST5_DEBUG
-			if (err != ESP_OK) {
-				ESP_LOGE(TAG, "bluetooth_set_preferred_peer_nvs failed: %s", esp_err_to_name(err));
-			}
-			#endif
-			
-			lv_obj_delete(lbl_exit);
-			lv_obj_delete(lbl_name);
-			lv_obj_delete(lbl_del);
-			lv_obj_delete(lbl_ins);
+    // Show right and hide left arrow
+    lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+    
+    // Create and format ins labels
+    lv_obj_t *lbl_ins = lv_label_create(ACTIVE_SCR);
+    lcd_format_label(lbl_ins, "", user_secondary_color,
+            &lv_font_montserrat_30, LV_ALIGN_CENTER, 0, 0);
+                 
+    lv_obj_t *lbl_exit = lv_label_create(ACTIVE_SCR);
+    lcd_format_label(lbl_exit, "DEFAULT", user_secondary_color,
+            &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -16, -1);
+                 
+    lv_obj_t *lbl_name = lv_label_create(ACTIVE_SCR);
+    lcd_format_label(lbl_name, "RENAME", user_secondary_color,
+            &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 13);
+                 
+    lv_obj_t *lbl_del = lv_label_create(ACTIVE_SCR);
+    lcd_format_label(lbl_del, "DELETE", user_secondary_color,
+            &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
+    
+    while (1) {
+        lv_timer_handler();
+        
+        // Done
+        if (xSemaphoreTake(xRightButtonSemaphore, 0) == pdTRUE) {            
+            // Save preferred peer to whitelist
+            esp_err_t err = bluetooth_set_preferred_peer_nvs(&bluetooth_menu->bluetooth_peer_menu.peers[bluetooth_menu->bluetooth_peer_menu.index]);
+            #ifdef POLYCAST5_DEBUG
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "bluetooth_set_preferred_peer_nvs failed: %s", esp_err_to_name(err));
+            }
+            #endif
+            
+            lv_obj_delete(lbl_exit);
+            lv_obj_delete(lbl_name);
+            lv_obj_delete(lbl_del);
+            lv_obj_delete(lbl_ins);
 
-			lcd_clear_pending_inputs = true; // Clear any false inputs
-			
-			// Show left and hide right arrow
-			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+            lcd_clear_pending_inputs = true; // Clear any false inputs
+            
+            // Show left and hide right arrow
+            lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 
-			// Show bluetooth menu
-			lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-			
-			// Switch pages
-			ui_menu->page = BLUETOOTH_PAGE;
-			
-			// Go back
-			return;
-		}
-		// Rename
-		else if (xSemaphoreTake(xUpButtonSemaphore, 0) == pdTRUE) {
-			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-			
-			lv_obj_delete(lbl_exit);
-			lv_obj_delete(lbl_name);
-			lv_obj_delete(lbl_del);
-			lv_obj_delete(lbl_ins);
-			
-			lcd_clear_pending_inputs = true; // Clear any false inputs
+            // Show bluetooth menu
+            lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+            
+            // Switch pages
+            ui_menu->page = BLUETOOTH_PAGE;
+            
+            // Go back
+            return;
+        }
+        // Rename
+        else if (xSemaphoreTake(xUpButtonSemaphore, 0) == pdTRUE) {
+            lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+            
+            lv_obj_delete(lbl_exit);
+            lv_obj_delete(lbl_name);
+            lv_obj_delete(lbl_del);
+            lv_obj_delete(lbl_ins);
+            
+            lcd_clear_pending_inputs = true; // Clear any false inputs
 
-			// Show left and hide right arrow
-			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-			
-			// Prompt to enter name
-			ui_menu->page = BLUETOOTH_RENAME_PEER_PAGE;
-			
-			// Go back
-			return;
-		}
-		// Delete
-		else if (xSemaphoreTake(xDownButtonSemaphore, 0) == pdTRUE) {			
-			lv_obj_delete(lbl_exit);
-			lv_obj_delete(lbl_name);
-			lv_obj_delete(lbl_del);
-			lv_obj_delete(lbl_ins);
-			
-			lcd_clear_pending_inputs = true; // Clear any false inputs
+            // Show left and hide right arrow
+            lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+            
+            // Prompt to enter name
+            ui_menu->page = BLUETOOTH_RENAME_PEER_PAGE;
+            
+            // Go back
+            return;
+        }
+        // Delete
+        else if (xSemaphoreTake(xDownButtonSemaphore, 0) == pdTRUE) {            
+            lv_obj_delete(lbl_exit);
+            lv_obj_delete(lbl_name);
+            lv_obj_delete(lbl_del);
+            lv_obj_delete(lbl_ins);
+            
+            lcd_clear_pending_inputs = true; // Clear any false inputs
 
-			// Delete selected peer from NVS
-			ble_addr_t addr = bluetooth_menu->bluetooth_peer_menu.peers[bluetooth_menu->bluetooth_peer_menu.index];
-			bluetooth_remove_peer_nvs(&addr);
+            // Delete selected peer from NVS
+            ble_addr_t addr = bluetooth_menu->bluetooth_peer_menu.peers[bluetooth_menu->bluetooth_peer_menu.index];
+            bluetooth_remove_peer_nvs(&addr);
 
-			// Check size
-			bluetooth_peer_info_t tmp[BT_MAX_PEERS];
-			int n = bluetooth_get_peers_list_nvs(tmp, BT_MAX_PEERS);
-			// If empty now, forget all
-			if (n == 0) {
-				// Active bluetooth
-				uint16_t cmd = BLUETOOTH_CMD_INIT;
-				xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-				
-				// Forget all bluetooth bonding keys
-				cmd = BLUETOOTH_CMD_UNPAIR_ALL_NO_REINIT;
-				xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-			}
-			
-			// Show left and hide right arrow
-			lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-			lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+            // Check size
+            bluetooth_peer_info_t tmp[BT_MAX_PEERS];
+            int n = bluetooth_get_peers_list_nvs(tmp, BT_MAX_PEERS);
+            // If empty now, forget all
+            if (n == 0) {
+                // Active bluetooth
+                uint16_t cmd = BLUETOOTH_CMD_INIT;
+                xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+                
+                // Forget all bluetooth bonding keys
+                cmd = BLUETOOTH_CMD_UNPAIR_ALL_NO_REINIT;
+                xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+            }
+            
+            // Show left and hide right arrow
+            lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 
-			// Force next rebuild of the known-devices list
-			lv_obj_clean(bluetooth_menu->bluetooth_peer_menu.main_list);
-			
-	 		// Switch pages
-			ui_menu->page = BLUETOOTH_KNOWN_DEVICES_PAGE;
-			
-			// Go back
-			return;
-		}
-		
-		vTaskDelay(pdMS_TO_TICKS(10));
-	}
+            // Force next rebuild of the known-devices list
+            lv_obj_clean(bluetooth_menu->bluetooth_peer_menu.main_list);
+            
+             // Switch pages
+            ui_menu->page = BLUETOOTH_KNOWN_DEVICES_PAGE;
+            
+            // Go back
+            return;
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
 }
 
 static void peer_menu_build(bluetooth_peer_menu_t *pm)
 {
-	// Read cached peers (BT stays OFF)
-	bluetooth_peer_info_t tmp[BT_MAX_PEERS];
-	int n = bluetooth_get_peers_list_nvs(tmp, BT_MAX_PEERS);
+    // Read cached peers (BT stays OFF)
+    bluetooth_peer_info_t tmp[BT_MAX_PEERS];
+    int n = bluetooth_get_peers_list_nvs(tmp, BT_MAX_PEERS);
 
-	// Size (+1 for the "Allow new devices" row)
-	pm->size = (n > 0) ? (n + 1) : 1;
+    // Size (+1 for the "Allow new devices" row)
+    pm->size = (n > 0) ? (n + 1) : 1;
 
-	// Row 0
-	strncpy(pm->labels[0], "Pair Another", sizeof(pm->labels[0]));
-	pm->btns[0] = lv_list_add_btn(pm->main_list, NULL, pm->labels[0]);
-	lv_obj_set_size(pm->btns[0], 200, 30);
+    // Row 0
+    strncpy(pm->labels[0], "Pair Another", sizeof(pm->labels[0]));
+    pm->btns[0] = lv_list_add_btn(pm->main_list, NULL, pm->labels[0]);
+    lv_obj_set_size(pm->btns[0], 200, 30);
 
-	// Style selected
-	if (0 == pm->index) {
-		lv_obj_add_style(pm->btns[0], &pm->sel_style, 0);
-	} else {
-		lv_obj_add_style(pm->btns[0], &pm->btn_style, 0);
-	}
+    // Style selected
+    if (0 == pm->index) {
+        lv_obj_add_style(pm->btns[0], &pm->sel_style, 0);
+    } else {
+        lv_obj_add_style(pm->btns[0], &pm->btn_style, 0);
+    }
 
-	// Label center
-	lv_obj_t *lbl0 = lv_obj_get_child(pm->btns[0], 0);
-	lv_label_set_long_mode(lbl0, LV_LABEL_LONG_SCROLL);
-	lv_obj_set_style_text_align(lbl0, LV_TEXT_ALIGN_CENTER, 0);
-	lv_obj_align(lbl0, LV_ALIGN_CENTER, 0, 0);
+    // Label center
+    lv_obj_t *lbl0 = lv_obj_get_child(pm->btns[0], 0);
+    lv_label_set_long_mode(lbl0, LV_LABEL_LONG_SCROLL);
+    lv_obj_set_style_text_align(lbl0, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(lbl0, LV_ALIGN_CENTER, 0, 0);
 
-	// Rows 1..n: saved peers (shifted by +1)
-	for (int i = 0; i < n; ++i) {
-		const int row = i + 1;
+    // Rows 1..n: saved peers (shifted by +1)
+    for (int i = 0; i < n; ++i) {
+        const int row = i + 1;
 
-		// Store
-		pm->peers[row] = tmp[i].addr;
+        // Store
+        pm->peers[row] = tmp[i].addr;
 
-		// Label text
-		char label[32] = {0};
-		// Use name if it exists, else use address
-		if (!bluetooth_get_peer_label_nvs(&pm->peers[row], label, sizeof(label)) || label[0] == '\0') {
-			fmt_addr_str(&pm->peers[row], label, sizeof(label));
-		}
+        // Label text
+        char label[32] = {0};
+        // Use name if it exists, else use address
+        if (!bluetooth_get_peer_label_nvs(&pm->peers[row], label, sizeof(label)) || label[0] == '\0') {
+            fmt_addr_str(&pm->peers[row], label, sizeof(label));
+        }
 
-		strncpy(pm->labels[row], label, sizeof(pm->labels[row]) - 1);
-		pm->labels[row][sizeof(pm->labels[row]) - 1] = '\0';
+        strncpy(pm->labels[row], label, sizeof(pm->labels[row]) - 1);
+        pm->labels[row][sizeof(pm->labels[row]) - 1] = '\0';
 
-		// Style button
-		pm->btns[row] = lv_list_add_btn(pm->main_list, NULL, pm->labels[row]);
-		lv_obj_set_size(pm->btns[row], 200, 30);
+        // Style button
+        pm->btns[row] = lv_list_add_btn(pm->main_list, NULL, pm->labels[row]);
+        lv_obj_set_size(pm->btns[row], 200, 30);
 
-		// Style selected
-		if (row == pm->index) {
-			lv_obj_add_style(pm->btns[row], &pm->sel_style, 0);
-		} else {
-			lv_obj_add_style(pm->btns[row], &pm->btn_style, 0);
-		}
+        // Style selected
+        if (row == pm->index) {
+            lv_obj_add_style(pm->btns[row], &pm->sel_style, 0);
+        } else {
+            lv_obj_add_style(pm->btns[row], &pm->btn_style, 0);
+        }
 
-		// Format label
-		lv_obj_t *lbl = lv_obj_get_child(pm->btns[row], 0);
-		lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
-		lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-		lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
-	}
+        // Format label
+        lv_obj_t *lbl = lv_obj_get_child(pm->btns[row], 0);
+        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+    }
 
-	// Layout
-	pm->cont = (pm->size > 0) ? lv_obj_get_parent(pm->btns[0]) : pm->main_list;
-	lv_obj_set_flex_flow(pm->cont,  LV_FLEX_FLOW_COLUMN);
-	lv_obj_set_flex_align(pm->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-	lv_obj_set_style_pad_gap(pm->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+    // Layout
+    pm->cont = (pm->size > 0) ? lv_obj_get_parent(pm->btns[0]) : pm->main_list;
+    lv_obj_set_flex_flow(pm->cont,  LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(pm->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(pm->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-	// Clamp
-	if (pm->index >= pm->size) {
-		pm->index = pm->size - 1;
-	}
-	if (pm->index < 0) {
-		pm->index = 0;
-	}
+    // Clamp
+    if (pm->index >= pm->size) {
+        pm->index = pm->size - 1;
+    }
+    if (pm->index < 0) {
+        pm->index = 0;
+    }
 
-	// Scroll
-	if (pm->size > 0) {
-		lv_obj_scroll_to_view(pm->btns[pm->index], LV_ANIM_OFF);
-	}
+    // Scroll
+    if (pm->size > 0) {
+        lv_obj_scroll_to_view(pm->btns[pm->index], LV_ANIM_OFF);
+    }
 }
 
 void lcd_bluetooth_known_devices_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
 {
-	static bool init = false;
-	bluetooth_peer_menu_t *peer_menu = &bluetooth_menu->bluetooth_peer_menu;
-	
-	// Init once
-	if (!init) {
-		// Fetch menu
-		setup_known_devices_page(peer_menu);
-		peer_menu_build(peer_menu);
+    static bool init = false;
+    bluetooth_peer_menu_t *peer_menu = &bluetooth_menu->bluetooth_peer_menu;
+    
+    // Init once
+    if (!init) {
+        // Fetch menu
+        setup_known_devices_page(peer_menu);
+        peer_menu_build(peer_menu);
 
-		init = true;
-	}
-	
-	// Up button
-	if (ui_btns->up_btn == 1) {
-		peer_menu->index--;
-		update_known_devices_menu(peer_menu);
-	} else if (ui_btns->down_btn == 1) { // Down button
-		peer_menu->index++;
-		update_known_devices_menu(peer_menu);
-	} else if (ui_btns->select_btn == 1 && peer_menu->size > 0) { // Selected peer
-		// Go to 'pair new' page
-		if (peer_menu->index == 0) {
-			// Hide peer menu
-			lv_obj_add_flag(peer_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-			
-			// Clean up
-			lv_obj_clean(peer_menu->main_list);
-			
-			// Reset init
-			init = false;
-			
-			// Switch page
-			ui_menu->page = BLUETOOTH_PAIR_NEW_PAGE;
-		}
-		// Yes whitelist: set specific peer only (in prompt_rename_or_del 'done')
-		else {
-			// Hide peer menu
-			lv_obj_add_flag(peer_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-			
-			// Clean up
-			lv_obj_clean(peer_menu->main_list);
-			
-			// Reset init
-			init = false;
-			
-			prompt_rename_or_del(ui_menu, bluetooth_menu);
-		}
-	} else if (ui_btns->left_btn == 1) { // Back
-		// Hide peer menu
-		lv_obj_add_flag(peer_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Clean up
-		lv_obj_clean(peer_menu->main_list);
-		
-		// Show bluetooth menu
-		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Reset init
-		init = false;
-		
-		// Switch page
-		ui_menu->page = BLUETOOTH_PAGE;
-	} else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off
-		// Hide peer menu
-		lv_obj_add_flag(peer_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Clean up
-		lv_obj_clean(peer_menu->main_list);
-		
-		// Show bluetooth menu
-		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Reset init
-		init = false;
-		
-		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);  // True = home, false = sleep
-	}
+        init = true;
+    }
+    
+    // Up button
+    if (ui_btns->up_btn == 1) {
+        peer_menu->index--;
+        update_known_devices_menu(peer_menu);
+    } else if (ui_btns->down_btn == 1) { // Down button
+        peer_menu->index++;
+        update_known_devices_menu(peer_menu);
+    } else if (ui_btns->select_btn == 1 && peer_menu->size > 0) { // Selected peer
+        // Go to 'pair new' page
+        if (peer_menu->index == 0) {
+            // Hide peer menu
+            lv_obj_add_flag(peer_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+            
+            // Clean up
+            lv_obj_clean(peer_menu->main_list);
+            
+            // Reset init
+            init = false;
+            
+            // Switch page
+            ui_menu->page = BLUETOOTH_PAIR_NEW_PAGE;
+        } else { // Yes whitelist: set specific peer only (in prompt_rename_or_del 'done')
+            // Hide peer menu
+            lv_obj_add_flag(peer_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+            
+            // Clean up
+            lv_obj_clean(peer_menu->main_list);
+            
+            // Reset init
+            init = false;
+            
+            prompt_rename_or_del(ui_menu, bluetooth_menu);
+        }
+    } else if (ui_btns->left_btn == 1) { // Back
+        // Hide peer menu
+        lv_obj_add_flag(peer_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Clean up
+        lv_obj_clean(peer_menu->main_list);
+        
+        // Show bluetooth menu
+        lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Reset init
+        init = false;
+        
+        // Switch page
+        ui_menu->page = BLUETOOTH_PAGE;
+    } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off
+        // Hide peer menu
+        lv_obj_add_flag(peer_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Clean up
+        lv_obj_clean(peer_menu->main_list);
+        
+        // Show bluetooth menu
+        lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Reset init
+        init = false;
+        
+        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);  // True = home, false = sleep
+    }
 }
 
 void lcd_bluetooth_pair_new_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
 {
-	#define PAIR_NEW_Y_OFFSET 40
-	
-	// Statics
-	static bool init = false;
-	static lv_obj_t *cont = NULL;
-	static lv_obj_t *title_lbl = NULL;
-	static lv_obj_t *instr_lbl = NULL;
-	static lv_obj_t *pin_lbl = NULL;
-	static lv_obj_t *ending_lbl = NULL;
-	
-	if (!init) {
-		// Create a scrollable container for the instructions
-		cont = lv_obj_create(ACTIVE_SCR);
-		lv_obj_set_size(cont, 210, 106);
-		lv_obj_center(cont);
-		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
-		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
-		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
-		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
+    #define PAIR_NEW_Y_OFFSET 40
+    
+    // Statics
+    static bool init = false;
+    static lv_obj_t *cont = NULL;
+    static lv_obj_t *title_lbl = NULL;
+    static lv_obj_t *instr_lbl = NULL;
+    static lv_obj_t *pin_lbl = NULL;
+    static lv_obj_t *ending_lbl = NULL;
+    
+    if (!init) {
+        // Create a scrollable container for the instructions
+        cont = lv_obj_create(ACTIVE_SCR);
+        lv_obj_set_size(cont, 210, 106);
+        lv_obj_center(cont);
+        lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+        lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+        lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+        lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
 
-		// Title label
-		title_lbl = lv_label_create(cont);
-		lv_label_set_text(title_lbl, "Pairing Another:");
-		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
-		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
-		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+        // Title label
+        title_lbl = lv_label_create(cont);
+        lv_label_set_text(title_lbl, "Pairing Another:");
+        lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+        lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
 
-		// Instructions label (scrollable if text is long)
-		instr_lbl = lv_label_create(cont);
-		lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
-		lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
-		lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
-		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
-		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+        // Instructions label (scrollable if text is long)
+        instr_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+        lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
-		// Set custom text
-		const char *instr_text =
-				"Don't press back until you're done pairing! Bluetooth is now advertising as 'PolyCast5'\n\n"
-				"Pairing PIN:";
-		
-		lv_label_set_text_fmt(instr_lbl, instr_text);
+        // Set custom text
+        const char *instr_text =
+                "Don't press back until you're done pairing! Bluetooth is now advertising as 'PolyCast5'\n\n"
+                "Pairing PIN:";
+        
+        lv_label_set_text_fmt(instr_lbl, instr_text);
 
-		// Pairing pin label
-		pin_lbl = lv_label_create(cont);
-		lv_label_set_long_mode(pin_lbl, LV_LABEL_LONG_WRAP);
-		lv_obj_set_width(pin_lbl, lv_pct(100)); // Full width for wrapping
-		lv_obj_set_style_text_font(pin_lbl, &lv_font_montserrat_30, 0);
-		lv_obj_set_style_text_color(pin_lbl, user_secondary_color, 0);
-		lv_obj_align_to(pin_lbl, instr_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);	
-		
-		// Load pairing key from NVS
-		uint32_t pairing_key;
-		bluetooth_pairing_key_load_nvs(&pairing_key); // pairing_key
-		lv_label_set_text_fmt(pin_lbl, "     %" PRIu32, pairing_key);
+        // Pairing pin label
+        pin_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(pin_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(pin_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(pin_lbl, &lv_font_montserrat_30, 0);
+        lv_obj_set_style_text_color(pin_lbl, user_secondary_color, 0);
+        lv_obj_align_to(pin_lbl, instr_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);    
+        
+        // Load pairing key from NVS
+        uint32_t pairing_key;
+        bluetooth_pairing_key_load_nvs(&pairing_key); // pairing_key
+        lv_label_set_text_fmt(pin_lbl, "     %" PRIu32, pairing_key);
 
-		lv_timer_handler();
+        lv_timer_handler();
 
-		// Instructions label (scrollable if text is long)
-		ending_lbl = lv_label_create(cont);
-		lv_label_set_long_mode(ending_lbl, LV_LABEL_LONG_WRAP);
-		lv_obj_set_width(ending_lbl, lv_pct(100)); // Full width for wrapping
-		lv_obj_set_style_text_font(ending_lbl, &lv_font_montserrat_14, 0);
-		lv_obj_set_style_text_color(ending_lbl, user_secondary_color, 0);
-		lv_obj_align_to(ending_lbl, pin_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+        // Instructions label (scrollable if text is long)
+        ending_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(ending_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(ending_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(ending_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(ending_lbl, user_secondary_color, 0);
+        lv_obj_align_to(ending_lbl, pin_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
 
-		// Set custom text
-		const char *ending_text =
-				"The known devices page (prior) allows you to select a specific device to pair to from any of the devices you've paired to in the past.\n\n"
-				"Within this page, the Bluetooth whitelist has been cleared allowing you to pair an additional device.\n\n"
-				"For this to work, you must also walk out of range or turn off Bluetooth on any previously known devices so that only the new device is pairable.";
+        // Set custom text
+        const char *ending_text =
+                "The known devices page (prior) allows you to select a specific device to pair to from any of the devices you've paired to in the past.\n\n"
+                "Within this page, the Bluetooth whitelist has been cleared allowing you to pair an additional device.\n\n"
+                "For this to work, you must also walk out of range or turn off Bluetooth on any previously known devices so that only the new device is pairable.";
 
-		lv_label_set_text_fmt(ending_lbl, ending_text);
+        lv_label_set_text_fmt(ending_lbl, ending_text);
 
-		lv_timer_handler();
-		
-		// No whitelist: anyone can pair
-		bluetooth_clear_peers_list_nvs(true); // Clear preferred peer
-	
-		// Active bluetooth
-		uint16_t cmd = BLUETOOTH_CMD_INIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        lv_timer_handler();
+        
+        // No whitelist: anyone can pair
+        bluetooth_clear_peers_list_nvs(true); // Clear preferred peer
+    
+        // Active bluetooth
+        uint16_t cmd = BLUETOOTH_CMD_INIT;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-		init = true;
-	}
-	
-	if (ui_btns->up_btn == 1) {
-		lv_obj_scroll_by_bounded(cont, 0, PAIR_NEW_Y_OFFSET, LV_ANIM_ON);
-	} else if (ui_btns->down_btn == 1) {
-		lv_obj_scroll_by_bounded(cont, 0, -PAIR_NEW_Y_OFFSET, LV_ANIM_ON);
-	} else if (ui_btns->left_btn) { // Go back
-		// Deactivate bluetooth
-		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        init = true;
+    }
+    
+    if (ui_btns->up_btn == 1) {
+        lv_obj_scroll_by_bounded(cont, 0, PAIR_NEW_Y_OFFSET, LV_ANIM_ON);
+    } else if (ui_btns->down_btn == 1) {
+        lv_obj_scroll_by_bounded(cont, 0, -PAIR_NEW_Y_OFFSET, LV_ANIM_ON);
+    } else if (ui_btns->left_btn) { // Go back
+        // Deactivate bluetooth
+        uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-		// Delete objects
-		lv_obj_delete(cont); // Deletes children
-		
-		// Reset statics
-		cont = NULL;
-		title_lbl = instr_lbl = pin_lbl = ending_lbl = NULL;
-		init = false;
-			
-		// Show bluetooth menu
-		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Switch back
-		ui_menu->page = BLUETOOTH_PAGE;
-	} else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
-		// Deactivate bluetooth
-		uint16_t cmd = BLUETOOTH_CMD_DEINIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        // Delete objects
+        lv_obj_delete(cont); // Deletes children
+        
+        // Reset statics
+        cont = NULL;
+        title_lbl = instr_lbl = pin_lbl = ending_lbl = NULL;
+        init = false;
+            
+        // Show bluetooth menu
+        lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Switch back
+        ui_menu->page = BLUETOOTH_PAGE;
+    } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
+        // Deactivate bluetooth
+        uint16_t cmd = BLUETOOTH_CMD_DEINIT;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-		// Delete objects
-		lv_obj_delete(cont); // Deletes children
-		
-		// Reset statics
-		cont = NULL;
-		title_lbl = instr_lbl = pin_lbl = ending_lbl = NULL;
-		init = false;
-		
- 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
-	}
+        // Delete objects
+        lv_obj_delete(cont); // Deletes children
+        
+        // Reset statics
+        cont = NULL;
+        title_lbl = instr_lbl = pin_lbl = ending_lbl = NULL;
+        init = false;
+        
+         lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
 }
 
 static void update_name_label_lcd(lv_obj_t *lbl_display, char cur_char, int cur_pos)
 {
-	char display[MAX_CUSTOM_NAME_LEN + 2]; // Buffer
-	
-	int len = cur_pos + 1; // Current length of name
-	
-	// Cap
-	if (len > MAX_CUSTOM_NAME_LEN + 1) {
-		len = MAX_CUSTOM_NAME_LEN + 1;
-	}
-	
-	// Copy name into display buffer
-	if (cur_pos > 0) {
-		memcpy(display, bt_name_buf, cur_pos);
-	}
-	
-	// Get current
-	display[cur_pos] = cur_char;
-	display[len] = '\0';
-	
-	// Set text and re-center
-	lv_label_set_text(lbl_display, display);
-	lv_obj_align(lbl_display, LV_ALIGN_CENTER, 0, 30);
+    char display[MAX_CUSTOM_NAME_LEN + 2]; // Buffer
+    
+    int len = cur_pos + 1; // Current length of name
+    
+    // Cap
+    if (len > MAX_CUSTOM_NAME_LEN + 1) {
+        len = MAX_CUSTOM_NAME_LEN + 1;
+    }
+    
+    // Copy name into display buffer
+    if (cur_pos > 0) {
+        memcpy(display, bt_name_buf, cur_pos);
+    }
+    
+    // Get current
+    display[cur_pos] = cur_char;
+    display[len] = '\0';
+    
+    // Set text and re-center
+    lv_label_set_text(lbl_display, display);
+    lv_obj_align(lbl_display, LV_ALIGN_CENTER, 0, 30);
 }
 
 void lcd_bluetooth_rename_peer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
 {
-	#define BT_NUM_CHAR_ROWS 4
+    #define BT_NUM_CHAR_ROWS 4
 
-	static const char *bt_char_rows[BT_NUM_CHAR_ROWS] = {
-		"_ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-		"abcdefghijklmnopqrstuvwxyz",
-		"0123456789",
-		"!@#$%^&*()-_=+[]{};:'\",<>/?\\|`~"
-	};
-	
-	// Declare statics
-	static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
-	static int cur_pos = 0; // User position
-	static int row_idx = 0; // Which character row is active
+    static const char *bt_char_rows[BT_NUM_CHAR_ROWS] = {
+        "_ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+        "abcdefghijklmnopqrstuvwxyz",
+        "0123456789",
+        "!@#$%^&*()-_=+[]{};:'\",<>/?\\|`~"
+    };
+    
+    // Declare statics
+    static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
+    static int cur_pos = 0; // User position
+    static int row_idx = 0; // Which character row is active
     static int char_idx = 0; // Index within that row
-	static char cur_char = '_';
-	static lv_obj_t *lbl_dirs = NULL;
-	static lv_obj_t *lbl_chars = NULL;
-	static lv_obj_t *lbl_user_in = NULL;
-	
-	// Create initial label
-	if (!lbl_user_in) {
-		// Auto-fill previous
-		ble_addr_t peer_addr = bluetooth_menu->bluetooth_peer_menu.peers[bluetooth_menu->bluetooth_peer_menu.index];
-		char prefill[MAX_BT_NAME_LEN + 1] = {0}; // Buffer
-		bluetooth_get_peer_label_nvs(&peer_addr, prefill, sizeof(prefill));
+    static char cur_char = '_';
+    static lv_obj_t *lbl_dirs = NULL;
+    static lv_obj_t *lbl_chars = NULL;
+    static lv_obj_t *lbl_user_in = NULL;
+    
+    // Create initial label
+    if (!lbl_user_in) {
+        // Auto-fill previous
+        ble_addr_t peer_addr = bluetooth_menu->bluetooth_peer_menu.peers[bluetooth_menu->bluetooth_peer_menu.index];
+        char prefill[MAX_BT_NAME_LEN + 1] = {0}; // Buffer
+        bluetooth_get_peer_label_nvs(&peer_addr, prefill, sizeof(prefill));
 
-		// Copy the old name into buffer
-		strncpy(bt_name_buf, prefill, MAX_CUSTOM_NAME_LEN);
+        // Copy the old name into buffer
+        strncpy(bt_name_buf, prefill, MAX_CUSTOM_NAME_LEN);
 
-		// Place cursor at the end
-		cur_pos = strlen(bt_name_buf);
-		
-		// Starting char
-		row_idx = 0;
-		char_idx = 0;
-		cur_char = bt_char_rows[row_idx][char_idx];
-		
-		lbl_user_in = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_user_in, "", user_secondary_color,
-				&lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
-						 
-		lbl_dirs = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_dirs, "      Enter device name:\nPress HOME to cycle chars.", user_secondary_color,
-				&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -31);
-						 
-		lbl_chars = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_chars, "(Up to 12 characters)", user_secondary_color,
-				&lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0);
-						 
-		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	}
+        // Place cursor at the end
+        cur_pos = strlen(bt_name_buf);
+        
+        // Starting char
+        row_idx = 0;
+        char_idx = 0;
+        cur_char = bt_char_rows[row_idx][char_idx];
+        
+        lbl_user_in = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_user_in, "", user_secondary_color,
+                &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
+                         
+        lbl_dirs = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_dirs, "      Enter device name:\nPress HOME to cycle chars.", user_secondary_color,
+                &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -31);
+                         
+        lbl_chars = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_chars, "(Up to 12 characters)", user_secondary_color,
+                &lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0);
+                         
+        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+    }
 
-	/* User input */
-	// Cycle chars
-	if (ui_btns->home_btn) {
-		// Cycle character row
-		row_idx = (row_idx + 1) % BT_NUM_CHAR_ROWS;
-		char_idx = 0; // Reset within row
-		
-		// New current char
-		cur_char = bt_char_rows[row_idx][char_idx];
-		
-		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	} else if (ui_btns->up_btn) { // If up, iterate up
-		// Increment with wrap
-		size_t row_len = strlen(bt_char_rows[row_idx]);
-		char_idx = (char_idx + 1) % (int)row_len;
-		cur_char = bt_char_rows[row_idx][char_idx];
-		
-		// Save to array
-		bt_name_buf[cur_pos] = cur_char;
-		
-		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	} else if (ui_btns->down_btn) { // If down, iterate down
-		// Decrement with wrap
-		size_t row_len = strlen(bt_char_rows[row_idx]);
-		char_idx = (char_idx + (int)row_len - 1) % (int)row_len;
-		cur_char = bt_char_rows[row_idx][char_idx];
-		
-		// Save to array
-		bt_name_buf[cur_pos] = cur_char;
-		
-		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	} else if (ui_btns->left_btn && cur_pos == 0) { // Can back out if at start
-		// Delete labels since no longer used
-		lv_obj_delete(lbl_user_in);
-		lv_obj_delete(lbl_dirs);
-		lv_obj_delete(lbl_chars);
-		
-		// Reset statics for next time
-		lbl_user_in = lbl_chars = lbl_dirs = NULL;
-		cur_pos = row_idx = char_idx = 0;
-		cur_char = '_';
-		memset(bt_name_buf, 0, sizeof bt_name_buf);
+    /* User input */
+    // Cycle chars
+    if (ui_btns->home_btn) {
+        // Cycle character row
+        row_idx = (row_idx + 1) % BT_NUM_CHAR_ROWS;
+        char_idx = 0; // Reset within row
+        
+        // New current char
+        cur_char = bt_char_rows[row_idx][char_idx];
+        
+        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+    } else if (ui_btns->up_btn) { // If up, iterate up
+        // Increment with wrap
+        size_t row_len = strlen(bt_char_rows[row_idx]);
+        char_idx = (char_idx + 1) % (int)row_len;
+        cur_char = bt_char_rows[row_idx][char_idx];
+        
+        // Save to array
+        bt_name_buf[cur_pos] = cur_char;
+        
+        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+    } else if (ui_btns->down_btn) { // If down, iterate down
+        // Decrement with wrap
+        size_t row_len = strlen(bt_char_rows[row_idx]);
+        char_idx = (char_idx + (int)row_len - 1) % (int)row_len;
+        cur_char = bt_char_rows[row_idx][char_idx];
+        
+        // Save to array
+        bt_name_buf[cur_pos] = cur_char;
+        
+        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+    } else if (ui_btns->left_btn && cur_pos == 0) { // Can back out if at start
+        // Delete labels since no longer used
+        lv_obj_delete(lbl_user_in);
+        lv_obj_delete(lbl_dirs);
+        lv_obj_delete(lbl_chars);
+        
+        // Reset statics for next time
+        lbl_user_in = lbl_chars = lbl_dirs = NULL;
+        cur_pos = row_idx = char_idx = 0;
+        cur_char = '_';
+        memset(bt_name_buf, 0, sizeof bt_name_buf);
 
-		// Force next rebuild of the known-devices list
-		lv_obj_clean(bluetooth_menu->bluetooth_peer_menu.main_list);
-		
- 		// Switch to previous page
-		ui_menu->page = BLUETOOTH_KNOWN_DEVICES_PAGE;
-		return;
-	} else if (ui_btns->pwr_btn) { // Power off
-		// Delete labels since no longer used
-		lv_obj_delete(lbl_user_in);
-		lv_obj_delete(lbl_dirs);
-		lv_obj_delete(lbl_chars);
-		
-		// Reset statics for next time
-		lbl_user_in = lbl_chars = lbl_dirs = NULL;
-		cur_pos = row_idx = char_idx = 0;
-		cur_char = '_';
-		memset(bt_name_buf, 0, sizeof bt_name_buf);
-				
-		// Force next rebuild of the known-devices list
-		lv_obj_clean(bluetooth_menu->bluetooth_peer_menu.main_list);
-		
- 		lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
-	} else if (ui_btns->left_btn && cur_pos != 0) { // If left and not at start
-		// Clear the current slot
-		bt_name_buf[cur_pos] = '\0';
-	
-		// De-increment left
-		if (cur_pos > 0) {
-			cur_pos--;
-		}
-	
-		// Reload row/idx from the new slot's char
-		char target = bt_name_buf[cur_pos] ? bt_name_buf[cur_pos] : '_';
-		for (row_idx = 0; row_idx < BT_NUM_CHAR_ROWS; row_idx++) {
-			const char *row = bt_char_rows[row_idx];
-			const char *p = strchr(row, target);
-			
-			if (p) {
-				char_idx = (int)(p - row);
-				break;
-			}
-		}
-		cur_char = bt_char_rows[row_idx][char_idx];
-		
-		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	} else if (ui_btns->right_btn) { // If right
-		// Handle case where up/down wasn't pressed
-		bt_name_buf[cur_pos] = cur_char;
-		
-		// If not yet at end
-		if (cur_pos < MAX_CUSTOM_NAME_LEN - 1) {
-			cur_pos++;
-			bt_name_buf[cur_pos] = '\0';
-			char_idx = 0;
-			cur_char = bt_char_rows[row_idx][char_idx];
-		} else {
-			bt_name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
-		}
-		
-		update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-	} else if (ui_btns->select_btn) { // If save button pressed
-		// Save final
+        // Force next rebuild of the known-devices list
+        lv_obj_clean(bluetooth_menu->bluetooth_peer_menu.main_list);
+        
+         // Switch to previous page
+        ui_menu->page = BLUETOOTH_KNOWN_DEVICES_PAGE;
+        return;
+    } else if (ui_btns->pwr_btn) { // Power off
+        // Delete labels since no longer used
+        lv_obj_delete(lbl_user_in);
+        lv_obj_delete(lbl_dirs);
+        lv_obj_delete(lbl_chars);
+        
+        // Reset statics for next time
+        lbl_user_in = lbl_chars = lbl_dirs = NULL;
+        cur_pos = row_idx = char_idx = 0;
+        cur_char = '_';
+        memset(bt_name_buf, 0, sizeof bt_name_buf);
+                
+        // Force next rebuild of the known-devices list
+        lv_obj_clean(bluetooth_menu->bluetooth_peer_menu.main_list);
+        
+         lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+    } else if (ui_btns->left_btn && cur_pos != 0) { // If left and not at start
+        // Clear the current slot
+        bt_name_buf[cur_pos] = '\0';
+    
+        // De-increment left
+        if (cur_pos > 0) {
+            cur_pos--;
+        }
+    
+        // Reload row/idx from the new slot's char
+        char target = bt_name_buf[cur_pos] ? bt_name_buf[cur_pos] : '_';
+        for (row_idx = 0; row_idx < BT_NUM_CHAR_ROWS; row_idx++) {
+            const char *row = bt_char_rows[row_idx];
+            const char *p = strchr(row, target);
+            
+            if (p) {
+                char_idx = (int)(p - row);
+                break;
+            }
+        }
+        cur_char = bt_char_rows[row_idx][char_idx];
+        
+        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+    } else if (ui_btns->right_btn) { // If right
+        // Handle case where up/down wasn't pressed
+        bt_name_buf[cur_pos] = cur_char;
+        
+        // If not yet at end
+        if (cur_pos < MAX_CUSTOM_NAME_LEN - 1) {
+            cur_pos++;
+            bt_name_buf[cur_pos] = '\0';
+            char_idx = 0;
+            cur_char = bt_char_rows[row_idx][char_idx];
+        } else {
+            bt_name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
+        }
+        
+        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+    } else if (ui_btns->select_btn) { // If save button pressed
+        // Save final
         if (cur_pos < MAX_CUSTOM_NAME_LEN) {
-			bt_name_buf[cur_pos] = cur_char;
+            bt_name_buf[cur_pos] = cur_char;
 
-			// Terminate one past the last written char if room, else clamp
-			size_t term = (cur_pos + 1 <= MAX_CUSTOM_NAME_LEN) ? (cur_pos + 1) : MAX_CUSTOM_NAME_LEN;
-			bt_name_buf[term] = '\0';
-	    }
-	    
-		bt_name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
-		memcpy(saved_name, bt_name_buf, MAX_CUSTOM_NAME_LEN + 1);
-		
-		#ifdef POLYCAST5_DEBUG
-		ESP_LOGI(TAG, "Device name: %s", saved_name);
-		#endif
-		
-		// Delete labels since no longer used
-		lv_obj_delete(lbl_user_in);
-		lv_obj_delete(lbl_dirs);
-		lv_obj_delete(lbl_chars);
-		
-		// Reset statics for next time
-		lbl_user_in = lbl_chars = lbl_dirs = NULL;
-		cur_pos = row_idx = char_idx = 0;
-		cur_char = '_';
-		
-		// Clamp to MAX_BT_NAME_LEN to match storage buffer
-		saved_name[MAX_BT_NAME_LEN] = '\0';
-		
-		// Save the chosen label for the selected peer
-		int idx = bluetooth_menu->bluetooth_peer_menu.index;
-		bluetooth_set_peer_label_nvs(&bluetooth_menu->bluetooth_peer_menu.peers[idx], saved_name);
-		
-		// Update in-memory copy so the UI shows it after rebuild
-		strncpy(bluetooth_menu->bluetooth_peer_menu.labels[idx], saved_name, sizeof(bluetooth_menu->bluetooth_peer_menu.labels[idx]) - 1);
-		bluetooth_menu->bluetooth_peer_menu.labels[idx][sizeof(bluetooth_menu->bluetooth_peer_menu.labels[idx]) - 1] = '\0';
-		
-		// Force next rebuild of the known-devices list
-		lv_obj_clean(bluetooth_menu->bluetooth_peer_menu.main_list);
-		
-		// Go back to list page
-		ui_menu->page = BLUETOOTH_KNOWN_DEVICES_PAGE;
-		return;
-	}
+            // Terminate one past the last written char if room, else clamp
+            size_t term = (cur_pos + 1 <= MAX_CUSTOM_NAME_LEN) ? (cur_pos + 1) : MAX_CUSTOM_NAME_LEN;
+            bt_name_buf[term] = '\0';
+        }
+        
+        bt_name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
+        memcpy(saved_name, bt_name_buf, MAX_CUSTOM_NAME_LEN + 1);
+        
+        #ifdef POLYCAST5_DEBUG
+        ESP_LOGI(TAG, "Device name: %s", saved_name);
+        #endif
+        
+        // Delete labels since no longer used
+        lv_obj_delete(lbl_user_in);
+        lv_obj_delete(lbl_dirs);
+        lv_obj_delete(lbl_chars);
+        
+        // Reset statics for next time
+        lbl_user_in = lbl_chars = lbl_dirs = NULL;
+        cur_pos = row_idx = char_idx = 0;
+        cur_char = '_';
+        
+        // Clamp to MAX_BT_NAME_LEN to match storage buffer
+        saved_name[MAX_BT_NAME_LEN] = '\0';
+        
+        // Save the chosen label for the selected peer
+        int idx = bluetooth_menu->bluetooth_peer_menu.index;
+        bluetooth_set_peer_label_nvs(&bluetooth_menu->bluetooth_peer_menu.peers[idx], saved_name);
+        
+        // Update in-memory copy so the UI shows it after rebuild
+        strncpy(bluetooth_menu->bluetooth_peer_menu.labels[idx], saved_name, sizeof(bluetooth_menu->bluetooth_peer_menu.labels[idx]) - 1);
+        bluetooth_menu->bluetooth_peer_menu.labels[idx][sizeof(bluetooth_menu->bluetooth_peer_menu.labels[idx]) - 1] = '\0';
+        
+        // Force next rebuild of the known-devices list
+        lv_obj_clean(bluetooth_menu->bluetooth_peer_menu.main_list);
+        
+        // Go back to list page
+        ui_menu->page = BLUETOOTH_KNOWN_DEVICES_PAGE;
+        return;
+    }
 }
 
 void lcd_bluetooth_forget_all_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
 {
-	// Statics
-	static bool do_once = false;
-	
-	static lv_obj_t *lbl_ins;
-	static lv_obj_t *lbl_note;
-	
-	// Only execute once
-	if (!do_once) {
-		lbl_ins = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_ins, "Press RIGHT to\nforget all devices.", user_secondary_color,
-				&lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 10);
-					 
-		lbl_note = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_note, "Note: You will need\nto do this on your\nhost device as well.", user_secondary_color,
-				&lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -10);
-		do_once = true;
-	}
-	
-	// Factory reset
-	if (ui_btns->right_btn == 1) {		
-		// Delete objects
-		lv_obj_delete(lbl_ins);
-		lv_obj_delete(lbl_note);
-		
-		// Reset statics
-		lbl_ins = lbl_note = NULL;
-		do_once = false;
+    // Statics
+    static bool do_once = false;
+    
+    static lv_obj_t *lbl_ins;
+    static lv_obj_t *lbl_note;
+    
+    // Only execute once
+    if (!do_once) {
+        lbl_ins = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_ins, "Press RIGHT to\nforget all devices.", user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 10);
+                     
+        lbl_note = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_note, "Note: You will need\nto do this on your\nhost device as well.", user_secondary_color,
+                &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -10);
+        do_once = true;
+    }
+    
+    // Factory reset
+    if (ui_btns->right_btn == 1) {        
+        // Delete objects
+        lv_obj_delete(lbl_ins);
+        lv_obj_delete(lbl_note);
+        
+        // Reset statics
+        lbl_ins = lbl_note = NULL;
+        do_once = false;
 
-		// Show bluetooth list
-		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Show top and bottom arrows
-		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-		
-		// Hide right arrow
-		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        // Show bluetooth list
+        lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Show top and bottom arrows
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+        
+        // Hide right arrow
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
-		lv_timer_handler();
+        lv_timer_handler();
 
-		// BT must be activated to forget bonding keys:
+        // BT must be activated to forget bonding keys:
 
-		// Activate bluetooth
-		uint16_t cmd = BLUETOOTH_CMD_INIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		
-		// Forget all bluetooth bonding keys
-		cmd = BLUETOOTH_CMD_UNPAIR_ALL;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        // Activate bluetooth
+        uint16_t cmd = BLUETOOTH_CMD_INIT;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        
+        // Forget all bluetooth bonding keys
+        cmd = BLUETOOTH_CMD_UNPAIR_ALL;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-		// Deactivate bluetooth
-		cmd = BLUETOOTH_CMD_DEINIT;
-		xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-		
-		// Switch pages
-		ui_menu->page = BLUETOOTH_PAGE;
-	} else if (ui_btns->left_btn == 1) { // Back selected
-		// Delete objects
-		lv_obj_delete(lbl_ins);
-		lv_obj_delete(lbl_note);
-		
-		// Reset statics
-		lbl_ins = lbl_note = NULL;
-		do_once = false;
-		
-		// Show bluetooth list
-		lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-		
-		// Show top and bottom arrows
-		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-		
-		// Hide right arrow
-		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-		
-		// Switch pages
-		ui_menu->page = BLUETOOTH_PAGE;
-	} else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off selected
-		// Delete objects
-		lv_obj_delete(lbl_ins);
-		lv_obj_delete(lbl_note);
-		
-		// Reset statics
-		lbl_ins = lbl_note = NULL;
-		do_once = false;
-		
-		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
-	}
+        // Deactivate bluetooth
+        cmd = BLUETOOTH_CMD_DEINIT;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        
+        // Switch pages
+        ui_menu->page = BLUETOOTH_PAGE;
+    } else if (ui_btns->left_btn == 1) { // Back selected
+        // Delete objects
+        lv_obj_delete(lbl_ins);
+        lv_obj_delete(lbl_note);
+        
+        // Reset statics
+        lbl_ins = lbl_note = NULL;
+        do_once = false;
+        
+        // Show bluetooth list
+        lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Show top and bottom arrows
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+        
+        // Hide right arrow
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        
+        // Switch pages
+        ui_menu->page = BLUETOOTH_PAGE;
+    } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off selected
+        // Delete objects
+        lv_obj_delete(lbl_ins);
+        lv_obj_delete(lbl_note);
+        
+        // Reset statics
+        lbl_ins = lbl_note = NULL;
+        do_once = false;
+        
+        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
 }
 
 // Save the last-selected user script index (for convenience on LCD)
 esp_err_t lcd_bluetooth_script_selected_set(uint8_t idx)
 {
- 	nvs_handle_t h;
- 	
- 	// Open NVS
- 	esp_err_t err = nvs_open(KEYBOARD_SELECTED_IDX_NS, NVS_READWRITE, &h);
- 	if (err != ESP_OK) {
-		#ifdef POLYCAST5_DEBUG
-		ESP_LOGE(TAG, "lcd_bluetooth_script_selected_set nvs_open failed: %s", esp_err_to_name(err));
-		#endif
-		
- 	 	return err;
- 	}
- 	
- 	// Set selected key
- 	err = nvs_set_u8(h, KEYBOARD_SELECTED_IDX_KEY, idx);
- 	if (err == ESP_OK) {
-		// Commit changes on success
- 	 	err = nvs_commit(h);
- 	}
- 	else {
-		#ifdef POLYCAST5_DEBUG
-		ESP_LOGE(TAG, "lcd_bluetooth_script_selected_set nvs_set_u8 failed: %s", esp_err_to_name(err));
-		#endif
-	}
-	
-	// Close NVS
- 	nvs_close(h);
- 	return err;
+     nvs_handle_t h;
+     
+     // Open NVS
+     esp_err_t err = nvs_open(KEYBOARD_SELECTED_IDX_NS, NVS_READWRITE, &h);
+     if (err != ESP_OK) {
+        #ifdef POLYCAST5_DEBUG
+        ESP_LOGE(TAG, "lcd_bluetooth_script_selected_set nvs_open failed: %s", esp_err_to_name(err));
+        #endif
+        
+          return err;
+     }
+     
+     // Set selected key
+     err = nvs_set_u8(h, KEYBOARD_SELECTED_IDX_KEY, idx);
+     if (err == ESP_OK) {
+        // Commit changes on success
+          err = nvs_commit(h);
+     } else {
+        #ifdef POLYCAST5_DEBUG
+        ESP_LOGE(TAG, "lcd_bluetooth_script_selected_set nvs_set_u8 failed: %s", esp_err_to_name(err));
+        #endif
+    }
+    
+    // Close NVS
+     nvs_close(h);
+     return err;
 }
 
 // Read the previously selected index
 uint8_t lcd_bluetooth_script_selected_get(void)
 {
- 	nvs_handle_t h;
- 	uint8_t sel = 0;
- 	
- 	// Open NVS
- 	esp_err_t err = nvs_open(KEYBOARD_SELECTED_IDX_NS, NVS_READONLY, &h);
- 	if (err == ESP_OK) {
-		// Get count
- 	 	if (nvs_get_u8(h, KEYBOARD_SELECTED_IDX_KEY, &sel) != ESP_OK) {
-			// 0 if DNE
- 	 	 	sel = 0;
- 	 	 	
- 	 	 	#ifdef POLYCAST5_DEBUG
-			ESP_LOGE(TAG, "lcd_bluetooth_script_selected_set nvs_get_u8 failed: %s", esp_err_to_name(err));
-			#endif
- 	 	}
- 	 	
- 	 	// Close NVS
- 	 	nvs_close(h);
- 	}
- 	else {
-		#ifdef POLYCAST5_DEBUG
-		ESP_LOGW(TAG, "lcd_bluetooth_script_selected_set nvs_open failed: %s", esp_err_to_name(err));
-		#endif
-	}
-	
-	return sel;
+     nvs_handle_t h;
+     uint8_t sel = 0;
+     
+     // Open NVS
+     esp_err_t err = nvs_open(KEYBOARD_SELECTED_IDX_NS, NVS_READONLY, &h);
+     if (err == ESP_OK) {
+        // Get count
+          if (nvs_get_u8(h, KEYBOARD_SELECTED_IDX_KEY, &sel) != ESP_OK) {
+            // 0 if DNE
+               sel = 0;
+               
+               #ifdef POLYCAST5_DEBUG
+            ESP_LOGE(TAG, "lcd_bluetooth_script_selected_set nvs_get_u8 failed: %s", esp_err_to_name(err));
+            #endif
+          }
+          
+          // Close NVS
+          nvs_close(h);
+     } else {
+        #ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "lcd_bluetooth_script_selected_set nvs_open failed: %s", esp_err_to_name(err));
+        #endif
+    }
+    
+    return sel;
 }

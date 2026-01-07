@@ -7,10 +7,10 @@ idf_component_register(
     SRCS ${SRCS}
      
     INCLUDE_DIRS 
-    	"include"
+        "include"
     
     REQUIRES
-    	common
+        common
     
     PRIV_REQUIRES
     gpio wifi bluetooth espnow nvs_flash esp_http_server esp_wifi esp_netif json esp_http_client mbedtls

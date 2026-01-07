@@ -23,9 +23,9 @@ LTP of synapses between neurons in the brain.
 #define SRS_NUM_STEPS 8
 
 typedef struct {
-	uint16_t page; // Notebook page number
-	uint16_t step; // 0...SRS_NUM_STEPS - 1: e.g. 1d > 3d > 7d ...
-	uint32_t start_day; // Day of creation relative to epoch
+    uint16_t page; // Notebook page number
+    uint16_t step; // 0...SRS_NUM_STEPS - 1: e.g. 1d > 3d > 7d ...
+    uint32_t start_day; // Day of creation relative to epoch
 } srs_entry_t;
 
 extern srs_entry_t srs_tbl[SRS_MAX_ENTRIES];

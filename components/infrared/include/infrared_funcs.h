@@ -26,16 +26,16 @@
 
 // Stored signal structure
 typedef struct {
-	size_t length;
-	rmt_symbol_word_t pulses[];
+    size_t length;
+    rmt_symbol_word_t pulses[];
 } ir_signal_t;
 
 // Remote structure
 typedef struct ir_remote {
-	char *name;
-	char **signal_names;
-	ir_signal_t **signals;
-	size_t num_signals;
+    char *name;
+    char **signal_names;
+    ir_signal_t **signals;
+    size_t num_signals;
 } ir_remote_t;
 
 extern ir_remote_t remotes[MAX_REMOTES];

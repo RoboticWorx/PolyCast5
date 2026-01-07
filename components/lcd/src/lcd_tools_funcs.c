@@ -804,9 +804,7 @@ void lcd_tools_num_gen_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
         if (user_idx == 0) {
             lv_obj_set_x(lbl_pointer, NUM_GEN_X_POS);
             user_idx = 1;
-        }
-        // Back to min
-        else {
+        } else { // Back to min
             lv_obj_set_x(lbl_pointer, NUM_GEN_X_POS - NUM_GEN_X_OFFSET);
             user_idx = 0;
         }
@@ -1115,9 +1113,7 @@ void lcd_tools_pomodoro_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
                 
                 // Set value
                 lv_arc_set_value(arc, (int32_t)pct);
-            }
-            // Else at 0
-            else {
+            } else { // Else at 0
                 // Auto-advance: flip phase and keep running
                 phase = (phase == POMODORO_PHASE_WORK) ? POMODORO_PHASE_BREAK : POMODORO_PHASE_WORK;
 
@@ -1162,9 +1158,7 @@ void lcd_tools_pomodoro_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
             mode = POMODORO_50_10;
             work_time = 50 * 60;
             break_time = 10 * 60;
-        }
-        // Else switch 25 if 50
-        else {
+        } else { // Else switch 25 if 50
             mode = POMODORO_25_5;
             work_time = 25 * 60;
             break_time =  5 * 60;
@@ -1337,9 +1331,7 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
     if (due_total == 0) {
         sel = 0;
         top = 0;
-    }
-    // Entries are due
-    else {
+    } else { // Entries are due
         // Clamp sel into valid range
         if (sel >= due_total) {
             sel = due_total - 1;
@@ -1400,9 +1392,7 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
                 lv_obj_set_style_outline_opa(lbl_list[i], LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
                 lv_obj_set_style_outline_pad(lbl_list[i], 1, LV_PART_MAIN | LV_STATE_DEFAULT);
                 lv_obj_set_style_outline_color(lbl_list[i], lv_color_mix(user_primary_color, user_secondary_color, 100), LV_PART_MAIN | LV_STATE_DEFAULT);
-            }
-            // Else remove box
-            else {
+            } else { // Else remove box
                 lv_obj_set_style_outline_opa(lbl_list[i], LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
             }
 

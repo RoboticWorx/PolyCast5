@@ -16,9 +16,9 @@ typedef struct {
     int size;
     int index;
     lv_obj_t *main_list;
-	lv_style_t btn_style;
-	lv_style_t sel_style;
-	lv_obj_t *cont;
+    lv_style_t btn_style;
+    lv_style_t sel_style;
+    lv_obj_t *cont;
 } tools_menu_t;
 
 extern tools_menu_t tools_menu;

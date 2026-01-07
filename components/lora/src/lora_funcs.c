@@ -142,8 +142,7 @@ void lora_process_received_message(uint8_t *message, size_t message_len) {
             waiting_for_ack = false;
             
             xSemaphoreGive(xLoraReceiptValidSemaphore);
-        }
-        else {
+        } else {
             #ifdef POLYCAST5_DEBUG
                 ESP_LOGW(TAG, "ACK ID wrong (got=%" PRIu32 ", want=%" PRIu32 ")", received_rx_id, expected_rx_id);
             #endif

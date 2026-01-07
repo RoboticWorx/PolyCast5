@@ -20,8 +20,8 @@ typedef struct {
     int index;
     lv_obj_t *cont;
     lv_obj_t *lbl_receipt;
-	lv_style_t btn_style;
-	lv_style_t sel_style;
+    lv_style_t btn_style;
+    lv_style_t sel_style;
 } lora_submenu_t;
 
 typedef struct {
@@ -31,12 +31,12 @@ typedef struct {
     int size;
     int index;
     lv_obj_t *main_list;
-	lv_style_t btn_style;
-	lv_style_t sel_style;
-	lv_obj_t *cont;
-	lora_submenu_t submenu;
+    lv_style_t btn_style;
+    lv_style_t sel_style;
+    lv_obj_t *cont;
+    lora_submenu_t submenu;
 } lora_menu_t;
-	
+    
 typedef struct {
     lv_obj_t *plan_cont;
     lv_obj_t *plan_btns[LORA_PLAN_SUBMENU_COUNT];

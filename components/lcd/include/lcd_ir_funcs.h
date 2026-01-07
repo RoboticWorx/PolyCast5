@@ -15,15 +15,15 @@ typedef struct ui_btns_t ui_btns_t;
 typedef struct ui_menu_t ui_menu_t;
 
 typedef struct {
-	lv_obj_t *btns[MAX_IR_OPTIONS];
-	int size;
-	int index;
-	lv_obj_t *main_list;
-	lv_style_t btn_style;
-	lv_style_t sel_style;
-	lv_style_t name_style;
-	lv_style_t name_sel_style;
-	lv_obj_t *cont;
+    lv_obj_t *btns[MAX_IR_OPTIONS];
+    int size;
+    int index;
+    lv_obj_t *main_list;
+    lv_style_t btn_style;
+    lv_style_t sel_style;
+    lv_style_t name_style;
+    lv_style_t name_sel_style;
+    lv_obj_t *cont;
 } ir_menu_t;
 
 extern ir_menu_t ir_menu;

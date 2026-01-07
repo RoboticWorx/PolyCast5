@@ -14,25 +14,25 @@ typedef struct ui_btns_t ui_btns_t;
 typedef struct ui_menu_t ui_menu_t;
 
 typedef struct {
-	lv_obj_t *btns[MAX_WIFI_SUBOPTIONS];
+    lv_obj_t *btns[MAX_WIFI_SUBOPTIONS];
     lv_obj_t *main_list;
     lv_obj_t *cont;
     lv_style_t btn_style;
-	lv_style_t sel_style;
+    lv_style_t sel_style;
     int size;
     int index;
 } wifi_scan_menu_t;
 
 typedef struct {
     lv_obj_t *lbl_send_ins;
-	lv_obj_t *lbl_send_cmd;
-	lv_obj_t *lbl_send_box;
-	lv_obj_t *lbl_send;
-	lv_obj_t *lbl_edit;
-	lv_obj_t *lbl_receipt;
-	lv_obj_t *arrow_top;
-	lv_obj_t *arrow_bot;
-	uint8_t cmd_to_send;
+    lv_obj_t *lbl_send_cmd;
+    lv_obj_t *lbl_send_box;
+    lv_obj_t *lbl_send;
+    lv_obj_t *lbl_edit;
+    lv_obj_t *lbl_receipt;
+    lv_obj_t *arrow_top;
+    lv_obj_t *arrow_bot;
+    uint8_t cmd_to_send;
 } wifi_submenu_t;
 
 typedef struct {
@@ -42,11 +42,11 @@ typedef struct {
     int size;
     int index;
     lv_obj_t *main_list;
-	lv_style_t btn_style;
-	lv_style_t sel_style;
-	lv_obj_t *cont;
-	wifi_submenu_t wifi_submenu;
-	wifi_scan_menu_t scan_menu;
+    lv_style_t btn_style;
+    lv_style_t sel_style;
+    lv_obj_t *cont;
+    wifi_submenu_t wifi_submenu;
+    wifi_scan_menu_t scan_menu;
 } wifi_menu_t;
 
 extern wifi_menu_t wifi_menu; 
@@ -197,8 +197,8 @@ esp_err_t lcd_wifi_topic_keys_nvs_load(wifi_menu_t *menu);
 esp_err_t lcd_wifi_topic_keys_nvs_save(const wifi_menu_t *menu);
 
 #ifdef POLYCAST5_WIFI_DUMP_NVS
-	void lcd_wifi_dump_menu_nvs(void);
-	void lcd_wifi_dump_wifi_topic_nvs(void);
+    void lcd_wifi_dump_menu_nvs(void);
+    void lcd_wifi_dump_wifi_topic_nvs(void);
 #endif
 
 #endif // LCD_WIFI_FUNCS_H

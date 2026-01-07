@@ -7,11 +7,11 @@ idf_component_register(
     SRCS ${SRCS}
         
     INCLUDE_DIRS 
-    	"include"
+        "include"
     
     REQUIRES
-    	common esp_wifi
+        common esp_wifi
     
     PRIV_REQUIRES
-    	esp_netif lora wifi gpio
+        esp_netif lora wifi gpio
 )

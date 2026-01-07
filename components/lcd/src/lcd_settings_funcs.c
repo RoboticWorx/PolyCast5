@@ -671,9 +671,7 @@ void lcd_settings_ota_updating_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, sett
         } else if (ota_pct == -2) { // Fail
             lv_bar_set_value(prog_bar, 0, LV_ANIM_ON);
             lv_label_set_text(pct_lbl, "Fail!");
-        }
-        // Normal percentage
-        else {
+        } else { // Normal percentage
             if (ota_pct < 0) {
                 ota_pct = 0;
             } else if (ota_pct > 100) {
@@ -751,14 +749,11 @@ void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu
         // Assign code for unlock_pin
         if (ui_btns->up_btn) {
             code = 'U';
-        }
-        else if(ui_btns->down_btn) {
+        } else if (ui_btns->down_btn) {
             code = 'D';
-        }
-        else if(ui_btns->left_btn) {
+        } else if (ui_btns->left_btn) {
             code = 'L';
-        } 
-        else if(ui_btns->right_btn) {
+        } else if (ui_btns->right_btn) {
             code = 'R';
         }
 
@@ -818,9 +813,7 @@ void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu
             // Remove one and rebuild
             settings_menu->pin_menu.unlock_pin[num_filled--] = '\0';
             lcd_settings_rebuild_pin_boxes(pin_container, pin_labels, settings_menu->pin_menu.unlock_pin, &num_boxes, num_filled);
-        }
-        // First box: exit
-        else {
+        } else { // First box: exit
             // Reset objects
             lv_obj_delete(pin_container); // Clears children
             lv_obj_delete(lbl_ins);
@@ -1290,9 +1283,7 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
             
             // Update label
             lv_label_set_text_fmt(lbl_spin, "Buzz for %" PRIu8 " ms", haptic_len_ms);
-        }
-        // Toggle selected switch
-        else {
+        } else { // Toggle selected switch
             int idx = selected - 1;
             lv_obj_t *sw = sw_arr[idx];
             
@@ -1511,9 +1502,7 @@ void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
             // Half the time is off: blink every would be double
             lv_label_set_text_fmt(lbl_every, RGB_BLINK_EVERY_TXT, (unsigned)(rbg_blink_period_ms * 2));
             lv_slider_set_value(slider_every, rbg_blink_period_ms, LV_ANIM_OFF);
-        }
-        // Second option (for duration)
-        else {
+        } else { // Second option (for duration)
             rgb_blink_total_ms += 10;
         
             // Wrap
@@ -1546,9 +1535,7 @@ void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
             // Half the time is off: blink every would be double
             lv_label_set_text_fmt(lbl_every, RGB_BLINK_EVERY_TXT, (unsigned)(rbg_blink_period_ms * 2));
             lv_slider_set_value(slider_every, rbg_blink_period_ms, LV_ANIM_OFF);
-        }
-        // Second option (for duration)
-        else {
+        } else { // Second option (for duration)
             rgb_blink_total_ms -= 10;
         
             // Wrap
@@ -1599,9 +1586,7 @@ void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
             
             // Switch pages
             ui_menu->page = SETTINGS_PAGE;
-        }
-        // Select lbl_every
-        else {
+        } else { // Select lbl_every
             every_selected = true;
             lv_obj_set_x(pointer, lv_obj_get_x(lbl_every) + RGB_POINTER_OFFSET);
         }

@@ -270,9 +270,7 @@ static void gpio_task(void *arg)
                         gpio_spin_haptic(haptic_len_ms);
                     }
                     xSemaphoreGive(xHapticsMutex); // Release haptics
-                }
-                // Else long-press
-                else {
+                } else { // Else long-press
                     // If not yet fired long press
                     if (!b->long_press_fired) {
                         // Get elapsed time
@@ -326,9 +324,7 @@ static void gpio_task(void *arg)
             // LiPo is charging    
             if (is_charging) {
                 xSemaphoreGive(xIsChargingSemaphore);
-            }
-            // LiPo is not charging
-            else {
+            } else { // LiPo is not charging
                 xSemaphoreGive(xNotChargingSemaphore);
             }
             xSemaphoreGive(xStartAdcBatSemaphore); // Update battery reading

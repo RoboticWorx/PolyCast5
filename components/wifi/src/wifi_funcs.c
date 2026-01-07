@@ -175,9 +175,7 @@ esp_err_t wifi_funcs_scan(wifi_scan_t *wifi_scan)
             wifi_scan[unique_count].auth = ap_list[i].authmode;
 
             unique_count++;
-        }
-        // Same SSID as an existing one
-        else {
+        } else { // Same SSID as an existing one
             // Keep the stronger AP
             if (ap_list[i].rssi > wifi_scan[existing_idx].rssi) {
                 // Copy over since larger RSSI
@@ -1524,12 +1522,10 @@ static void wifi_sniffer_data_cb(void* buf, wifi_promiscuous_pkt_type_t type)
     if(!toDS && !fromDS) {
         // STA to STA
         sa = &frame[10]; // Addr2
-    }
-    else if(!toDS && fromDS) {
+    } else if (!toDS && fromDS) {
         // From DS: AP -> STA
         sa = &frame[16]; // Addr3 is transmitter (the AP's MAC)
-    }
-    else if(toDS && !fromDS) {
+    } else if (toDS && !fromDS) {
         // To DS: STA -> AP
         sa = &frame[10]; // Addr2 is station's MAC
     } else {

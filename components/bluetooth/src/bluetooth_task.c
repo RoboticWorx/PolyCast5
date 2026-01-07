@@ -256,7 +256,7 @@ static void bluetooth_task(void *arg)
         
         // Get device battery level
         xQueueReceive(xAdcBatBluetoothQueue, &battery_percentage, 0);
-	    
+        
         // Update bluetooth battery level every battery_timer_interval
         if (xTaskGetTickCount() - battery_timer_last >= battery_timer_interval && bluetooth_state == BT_STATE_RUNNING) {
             battery_timer_last = xTaskGetTickCount();

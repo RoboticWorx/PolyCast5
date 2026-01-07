@@ -12,15 +12,15 @@
 #define LORA_MAX_INSTR_LEN 32
 
 typedef struct sx126x_s {
-	void *context;
-	sx126x_hal_status_t (*hal_write)(const void *context, const uint8_t *command, const uint16_t command_length, const uint8_t *data, const uint16_t data_length);
-	sx126x_hal_status_t (*hal_read)(const void *context, const uint8_t *command, const uint16_t command_length, uint8_t *data, const uint16_t data_length);
-	sx126x_hal_status_t (*hal_reset)(const void *context);
-	sx126x_hal_status_t (*hal_wakeup)(const void *context);
+    void *context;
+    sx126x_hal_status_t (*hal_write)(const void *context, const uint8_t *command, const uint16_t command_length, const uint8_t *data, const uint16_t data_length);
+    sx126x_hal_status_t (*hal_read)(const void *context, const uint8_t *command, const uint16_t command_length, uint8_t *data, const uint16_t data_length);
+    sx126x_hal_status_t (*hal_reset)(const void *context);
+    sx126x_hal_status_t (*hal_wakeup)(const void *context);
 } sx126x_t;
 
 typedef struct {
-	char instr[LORA_MAX_INSTR_LEN];
+    char instr[LORA_MAX_INSTR_LEN];
     uint8_t key[LORA_ENC_KEY_LEN];
     int index;
 } lora_cmd_t;
