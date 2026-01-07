@@ -778,7 +778,7 @@ static int json_sanitize_u0000_inplace(char *s)
 }
 
 // xAI (Grok) request (Chat Completions API)
-esp_err_t xai_send_command(const char *system_prompt, const char *command, char *response_buf, size_t buf_sz)
+esp_err_t xai_send_command(const char *system_prompt, const char *command, char *response_buf, size_t buf_sz, bool reasoning)
 {
 	// Validate args
 	if (!system_prompt || !command || !response_buf || buf_sz == 0) {
@@ -813,7 +813,12 @@ esp_err_t xai_send_command(const char *system_prompt, const char *command, char 
 	}
 
 	// Fastest grok model
-	cJSON_AddStringToObject(root, "model", "grok-4-1-fast-non-reasoning");
+	if (reasoning) {
+		cJSON_AddStringToObject(root, "model", "grok-4-1-fast-reasoning");
+	}
+	else {
+		cJSON_AddStringToObject(root, "model", "grok-4-1-fast-non-reasoning");
+	}
 
 	// Messages array
 	cJSON *messages = cJSON_AddArrayToObject(root, "messages");
@@ -861,7 +866,7 @@ esp_err_t xai_send_command(const char *system_prompt, const char *command, char 
 		.crt_bundle_attach = esp_crt_bundle_attach,
 
 		// Large prompts can take longer end-to-end (network + model generation)
-		.timeout_ms = 60000,
+		.timeout_ms = 120000,
 
 		// Capture response body via callback
 		.event_handler = http_evt,
@@ -1219,7 +1224,7 @@ esp_err_t ai_lookup_creds(ai_cmd_type_t type, const char *query, char *out_scrip
 
 	// Ask Grok for best matching global index
 	char model_reply[64] = {0};
-	esp_err_t err = xai_send_command(AI_PROMPT_CREDS, user_cred_msg, model_reply, sizeof(model_reply));
+	esp_err_t err = xai_send_command(AI_PROMPT_CREDS, user_cred_msg, model_reply, sizeof(model_reply), false);
 	if (err != ESP_OK) {
 		return err;
 	}

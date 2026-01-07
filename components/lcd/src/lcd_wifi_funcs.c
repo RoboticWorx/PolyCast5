@@ -708,9 +708,13 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
 
 // TODO: Make system prompt editable
 // TODO: Bug: Can recapture after capture without going back to menu
+// TODO: Nicen up menu and clean up cases
 void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {
 	#define WIFI_AI_PKT_CONN_FAILED_TXT "Connection failed!\nPlease connect to your\nWi-Fi network at least\nonce in the 'Wi-Fi'\nmenu and make sure\nyou are in range."
+	#define WIFI_AI_PKT_CAPTURE_TXT "Captured %u/%u pkts"
+	#define WIFI_AI_PKT_HOLD_TXT "  Hold select to\ncapture on Ch. %u"
+
 
 	typedef enum {
 		AI_PKT_IDLE = 0,
@@ -720,9 +724,21 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 		AI_PKT_ANALYSIS_COMPLETE,
 	} ai_pkt_state_t;
 
+	// Common primary channels (2.4GHz + 5GHz). Actual availability depends on regulatory domain.
+	static const uint8_t wifi_ai_pkt_channels[] = {
+		// 2.4 GHz
+		1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+		// 5 GHz (non-DFS + DFS; inclusion here does not guarantee allowed in region)
+		36, 40, 44, 48,
+		52, 56, 60, 64,
+		100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144,
+		149, 153, 157, 161, 165
+	};
+
 	static bool init = true;
 	static lv_obj_t *lbl_ins = NULL;
-	// static lv_obj_t *lbl_channel = NULL;
+	static uint8_t channel = 6; // Default channel
+	static size_t channel_idx = 0;
 
 	static ai_pkt_state_t state = AI_PKT_IDLE;
 	static bool last_select = false;
@@ -735,12 +751,19 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 
 	if (init) {
 		lbl_ins = lv_label_create(ACTIVE_SCR);
-		lcd_format_label(lbl_ins, "Hold select\nto capture!", user_secondary_color,
-				&lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0); // LV_ALIGN_LEFT_MID, 10, 0);
+		lcd_format_label(lbl_ins, "", user_secondary_color,
+				&lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
 
-		// lbl_channel = lv_label_create(ACTIVE_SCR);
-		// lcd_format_label(lbl_channel, "Ch. 6", user_secondary_color,
-		// 		&lv_font_montserrat_18, LV_ALIGN_LEFT_MID, 10, 0);
+		// Find default channel in the list
+		for (size_t i = 0; i < (sizeof(wifi_ai_pkt_channels) / sizeof(wifi_ai_pkt_channels[0])); ++i) {
+			if (wifi_ai_pkt_channels[i] == channel) {
+				channel_idx = i; // Set channel index to default
+				break;
+			}
+		}
+		channel = wifi_ai_pkt_channels[channel_idx];
+
+		lv_label_set_text_fmt(lbl_ins, WIFI_AI_PKT_HOLD_TXT, (unsigned)channel);
 
 		state = AI_PKT_IDLE;
 		last_select = false;
@@ -761,7 +784,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 	if (state == AI_PKT_IDLE && select_pressed) {
 		// Set mask to all: previous sniff_network is disregarded in wifi_funcs_init_promiscuous
 		sniff_network.mask = WIFI_PROMIS_FILTER_MASK_RAW_USEFUL;
-		sniff_network.channel = 6; // Defult channel
+		sniff_network.channel = channel;
 
 		// Start sniff
 		if (xQueueSend(xWifiSniffQueue, &sniff_network, portMAX_DELAY) != pdPASS) {
@@ -775,9 +798,10 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 		xSemaphoreGive(xWifiRawFramesMutex); // Release raw sniffed frames
 
 		last_frames_shown = 0;
-		char buf[24];
+		
+		char buf[64];
 		lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_18, 0);
-		snprintf(buf, sizeof(buf), "Captured %u/%u pkts", (unsigned)0, (unsigned)WIFI_MAX_RAW_FRAMES);
+		snprintf(buf, sizeof(buf), WIFI_AI_PKT_CAPTURE_TXT, (unsigned)0, (unsigned)WIFI_MAX_RAW_FRAMES);
 		lv_label_set_text(lbl_ins, buf);
 		lv_timer_handler(); // Update immediately
 
@@ -794,9 +818,9 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 		xSemaphoreGive(xWifiRawFramesMutex);
 
 		if (frames != last_frames_shown) {
-			char buf[24];
+			char buf[64];
 			lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_18, 0);
-			snprintf(buf, sizeof(buf), "Captured %u/%u pkts", (unsigned)frames, (unsigned)WIFI_MAX_RAW_FRAMES);
+			snprintf(buf, sizeof(buf), WIFI_AI_PKT_CAPTURE_TXT, (unsigned)frames, (unsigned)WIFI_MAX_RAW_FRAMES);
 			lv_label_set_text(lbl_ins, buf);
 			last_frames_shown = frames;
 		}
@@ -905,6 +929,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 			.msg_len = copy_len,
 			.free_ptr = frames_copy,
 			.free_on_done = true,
+			.reasoning = true, // Want accuracy
 		};
 
 		// Actually send it
@@ -928,8 +953,30 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 		lv_timer_handler(); // Update immediately
 	}
 
+	// Change channel up
+	if (ui_btns->up_btn && state == AI_PKT_IDLE) {
+		channel_idx++;
+		if (channel_idx >= (sizeof(wifi_ai_pkt_channels) / sizeof(wifi_ai_pkt_channels[0]))) {
+			channel_idx = 0;
+		}
+
+		channel = wifi_ai_pkt_channels[channel_idx];
+		lv_label_set_text_fmt(lbl_ins, WIFI_AI_PKT_HOLD_TXT, (unsigned)channel);
+	}
+	// Change channel down
+	else if (ui_btns->down_btn && state == AI_PKT_IDLE) {
+		if (channel_idx == 0) {
+			channel_idx = (sizeof(wifi_ai_pkt_channels) / sizeof(wifi_ai_pkt_channels[0])) - 1;
+		}
+		else {
+			channel_idx--;
+		}
+
+		channel = wifi_ai_pkt_channels[channel_idx];
+		lv_label_set_text_fmt(lbl_ins, WIFI_AI_PKT_HOLD_TXT, (unsigned)channel);
+	}
 	// See results
-	if (ui_btns->right_btn && state == AI_PKT_ANALYSIS_COMPLETE) {
+	else if (ui_btns->right_btn && state == AI_PKT_ANALYSIS_COMPLETE) {
 		// Hide right arrow
 		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 

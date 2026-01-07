@@ -60,7 +60,7 @@ static const char *HTML =
 "<h2>PolyCast5 AI Packet Analysis</h2>"
 "<p><small>This page shows an AI analysis of the 802.11 packets captured.</small></p>"
 "<p><small>For your reference, packets captured can be of type: MGMT, CTRL, DATA, MISC, DATA_MPDU, or DATA_AMPDU.</small></p>"
-"<p><small>Information may be inaccurate, please verify.</small></p>"
+"<p><small>Please verify important information.</small></p>"
 "<div id=out>Loading...</div>"
 "<script>"
 "function escHtml(s){"

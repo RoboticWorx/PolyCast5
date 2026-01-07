@@ -109,6 +109,10 @@ static void ai_task(void *pvParameters)
 			continue;
 		}
 
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "AI task received command type=%d, msg_len=%u, reasoning=%d", (int)cmd.type, (unsigned)cmd.msg_len, cmd.reasoning);
+		#endif
+
 		if (!cmd.msg) {
 			ESP_LOGW(TAG, "AI cmd missing msg pointer");
 			if (cmd.free_on_done && cmd.free_ptr) {
@@ -134,7 +138,7 @@ static void ai_task(void *pvParameters)
 			const char *prompt = ai_get_autokey_prompt(prompt_buf, sizeof(prompt_buf));
 
 			// 'ai_response' output
-			err = xai_send_command(prompt, cmd.msg, ai_response, sizeof(ai_response));
+			err = xai_send_command(prompt, cmd.msg, ai_response, sizeof(ai_response), cmd.reasoning);
 
 			#ifdef USING_CHATGPT // UNTESTED!
 			err = openai_send_command(cmd.msg, ai_response, sizeof(ai_response));
@@ -152,7 +156,7 @@ static void ai_task(void *pvParameters)
 			#endif
 
 			// 'ai_response' output
-			err = xai_send_command(AI_PROMPT_RAW_FRAMES, cmd.msg, ai_response, sizeof(ai_response));
+			err = xai_send_command(AI_PROMPT_RAW_FRAMES, cmd.msg, ai_response, sizeof(ai_response), cmd.reasoning);
 		}
 
 		if (err == ESP_OK) {

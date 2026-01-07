@@ -1611,6 +1611,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 			.msg_len = strlen(msg_str),
 			.free_ptr = NULL,
 			.free_on_done = false,
+			.reasoning = false,
 		};
 
 		xQueueSend(xAiCmdQueue, &cmd, portMAX_DELAY);

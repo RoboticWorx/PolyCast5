@@ -1810,7 +1810,7 @@ static void system_build_info(char *buf, size_t n)
 
 	// Compose buffer text
 	snprintf(buf, n,
-		"Time since conception:\n"
+		"Total uptime:\n"
 		"%" PRIu64 " days\n"
 		"%" PRIu64 " hours\n"
 		"%" PRIu64 " minutes\n"

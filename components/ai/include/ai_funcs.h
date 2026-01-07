@@ -36,6 +36,9 @@ typedef struct {
 	// If free_on_done is true, ai_task will free(free_ptr) after processing
 	void *free_ptr;
 	bool free_on_done;
+
+	// True = use reasoning model, false = non-reasoning
+	bool reasoning;
 } ai_cmd_t;
 
 #ifdef USING_CHATGPT
@@ -98,10 +101,11 @@ esp_err_t openai_send_command(const char *command, char *response_buf, size_t bu
  * @param [in] command The user command string to send
  * @param [out] response_buf Buffer to store the Grok response script
  * @param [in] buf_sz Size of the response buffer
+ * @param [in] reasoning True to use reasoning model, false for non-reasoning
  *
  * @returns ESP error status
  */
-esp_err_t xai_send_command(const char *system_prompt, const char *command, char *response_buf, size_t buf_sz);
+esp_err_t xai_send_command(const char *system_prompt, const char *command, char *response_buf, size_t buf_sz, bool reasoning);
 
 /** 
  * @brief Lookup credentials via AI and get the corresponding Bluetooth script

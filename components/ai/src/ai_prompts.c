@@ -97,7 +97,4 @@ const char AI_PROMPT_RAW_FRAMES[] =
   "understand, and would be useful for network admin."
   "\n"
   "Respond with markdown formatting. Never say you are certain an attack is "
-  "happening, only highlight suspicious behavior. Note these are raw frames captured over the air on a scanner and may not represent "
-  "a complete or valid sequence of frames."
-  "\n"
-  "IMPORTANT RULE: NEVER EVER USE EMOJIS.";
+  "happening, only highlight suspicious behavior. Note these are raw frames captured over the air. NEVER USE EMOJIS.";

@@ -12,7 +12,6 @@
 	//#define POLYCAST5_DEBUG_RAM 1 // Print RAM heap state on boot
 	//#define POLYCAST5_DEBUG_SPIFFS 1 // Print SPIFFS assets size on boot
 	
-	// TODO: POLYCAST5 -> PC5
 	//#define POLYCAST5_ESPNOW_DUMP_NVS 1 // Show ESP-NOW NVS state on boot
 	//#define POLYCAST5_WIFI_DUMP_NVS 1 // Show Wi-Fi NVS state on boot
 	
