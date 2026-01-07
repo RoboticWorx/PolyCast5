@@ -447,7 +447,7 @@ esp_err_t ai_portal_start(void)
 	return ESP_OK;
 }
 
-void ai_portal_stop(void)
+esp_err_t ai_portal_stop(void)
 {
 	// Stop httpd if running
 	if (ai_server) {
@@ -455,10 +455,10 @@ void ai_portal_stop(void)
 		ai_server = NULL; // Mark stopped
 	}
 	
-	(void)esp_wifi_stop();
+	esp_err_t err = esp_wifi_stop();
 
 	// Fully detach Wi-Fi from any interface
-	(void)esp_wifi_set_mode(WIFI_MODE_NULL);
+	err = esp_wifi_set_mode(WIFI_MODE_NULL);
 	
 	if (ai_ap_netif) {
 		esp_netif_destroy_default_wifi(ai_ap_netif); // Destroys handlers and netif
@@ -466,7 +466,9 @@ void ai_portal_stop(void)
 	}
 
 	// Everything else needs station mode
-	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+	err = esp_wifi_set_mode(WIFI_MODE_STA);
+
+	return err;
 }
 
 /* =============== Public variables =============== */

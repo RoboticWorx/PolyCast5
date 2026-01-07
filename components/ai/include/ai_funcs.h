@@ -2,6 +2,8 @@
 #define AI_FUNCS_H
 
 #include "esp_err.h"
+#include <stdbool.h>
+#include <stddef.h>
 
 #define USING_GROK 1
 //#define USING_CHATGPT 1 // UNTESTED!
@@ -14,18 +16,26 @@
 #define XAI_NS "xai"
 #define XAI_KEY "api_key"
 
-#define AI_RESPONSE_MAX_LEN 2048
-#define AI_CMD_MAX_LEN 2048
+#define AI_RESPONSE_MAX_LEN (1024 * 64)
+#define AI_CMD_MAX_LEN (1024 * 256) // Large to send raw frames
 #define AI_API_KEY_MAX_LEN 256
 
 typedef enum {
-    CMD_NORMAL = 0,
-    CMD_CRED_USERNAME,
-    CMD_CRED_PASSWORD,
+    AI_CMD_NORMAL = 0,
+    AI_CMD_CRED_USERNAME,
+    AI_CMD_CRED_PASSWORD,
+    AI_CMD_RAW_FRAMES,
 } ai_cmd_type_t;
 
 typedef struct {
-	char cmd[AI_CMD_MAX_LEN];
+    //bool thinking; // True = reasoning, false = non-reasoning model
+	ai_cmd_type_t type;
+	const char *msg;
+	size_t msg_len;
+
+	// If free_on_done is true, ai_task will free(free_ptr) after processing
+	void *free_ptr;
+	bool free_on_done;
 } ai_cmd_t;
 
 #ifdef USING_CHATGPT

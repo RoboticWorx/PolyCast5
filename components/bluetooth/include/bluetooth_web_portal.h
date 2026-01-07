@@ -21,8 +21,10 @@ esp_err_t bluetooth_web_portal_start(void);
 
 /** 
  * @brief Stops SoftAP and HTTP server for web bluetooth script entry portal
+ * 
+ * @returns ESP error status
  */
-void bluetooth_web_portal_stop(void);
+esp_err_t bluetooth_web_portal_stop(void);
 
 /** 
  * @brief Gets the current web portal IP

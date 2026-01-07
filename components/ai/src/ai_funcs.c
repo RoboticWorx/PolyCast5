@@ -27,7 +27,7 @@
 #define TAG "AI_FUNCS"
 
 // Hard ceiling so a bad response doesn't eat all RAM
-#define AI_HTTP_BODY_MAX_CAP (48 * 1024)
+#define AI_HTTP_BODY_MAX_CAP (128 * 1024)
 
 // TODO: Add mutexes if these are shared across tasks
 extern bluetooth_state_t bluetooth_state;
@@ -334,6 +334,33 @@ static const char *xai_extract_text(cJSON *json)
 	// Return pointer into the cJSON-managed string (do not free)
 	return content->valuestring;
 }
+
+#ifdef POLYCAST5_DEBUG
+// xAI helper: read finish_reason (helps detect "length" truncation)
+static const char *xai_finish_reason(cJSON *json)
+{
+	if (!json) {
+		return NULL;
+	}
+
+	cJSON *choices = cJSON_GetObjectItem(json, "choices");
+	if (!cJSON_IsArray(choices)) {
+		return NULL;
+	}
+
+	cJSON *first_choice = cJSON_GetArrayItem(choices, 0);
+	if (!cJSON_IsObject(first_choice)) {
+		return NULL;
+	}
+
+	cJSON *fr = cJSON_GetObjectItem(first_choice, "finish_reason");
+	if (cJSON_IsString(fr) && fr->valuestring && fr->valuestring[0]) {
+		return fr->valuestring;
+	}
+
+	return NULL;
+}
+#endif // POLYCAST5_DEBUG
 
 /* HTTP accumulator (safe alloc/realloc/free)  */
 
@@ -732,6 +759,24 @@ esp_err_t openai_send_command(const char *command, char *response_buf, size_t bu
 }
 #endif // USING_CHATGPT
 
+// Replace any "\u0000" sequences in JSON text with "\u0020" (space) in-place
+// This avoids embedded NUL characters after JSON unescaping, which would truncate C strings
+static int json_sanitize_u0000_inplace(char *s)
+{
+	int cnt = 0;
+
+	if (!s) {
+		return 0;
+	}
+
+	for (char *p = s; (p = strstr(p, "\\u0000")) != NULL; p += 6) {
+		memcpy(p, "\\u0020", 6);
+		++cnt;
+	}
+
+	return cnt;
+}
+
 // xAI (Grok) request (Chat Completions API)
 esp_err_t xai_send_command(const char *system_prompt, const char *command, char *response_buf, size_t buf_sz)
 {
@@ -790,7 +835,7 @@ esp_err_t xai_send_command(const char *system_prompt, const char *command, char 
 	cJSON_AddItemToArray(messages, usr);
 
 	// Reasonable token limit – similar scale to the OpenAI call
-	cJSON_AddNumberToObject(root, "max_tokens", 2048);
+	cJSON_AddNumberToObject(root, "max_tokens", (1024 * 8));
 
 	// Serialize JSON payload
 	char *payload = cJSON_PrintUnformatted(root);
@@ -815,8 +860,8 @@ esp_err_t xai_send_command(const char *system_prompt, const char *command, char 
 		// Use ESP-IDF CA bundle for TLS verification
 		.crt_bundle_attach = esp_crt_bundle_attach,
 
-		// A bit of headroom for network hiccups
-		.timeout_ms = 20000,
+		// Large prompts can take longer end-to-end (network + model generation)
+		.timeout_ms = 60000,
 
 		// Capture response body via callback
 		.event_handler = http_evt,
@@ -893,6 +938,12 @@ esp_err_t xai_send_command(const char *system_prompt, const char *command, char 
 		return ESP_ERR_NO_MEM;
 	}
 
+	// Sanitize any embedded NUL escapes before JSON parsing
+	int nul_fix = json_sanitize_u0000_inplace(acc.buf);
+	if (nul_fix > 0) {
+		ESP_LOGW(TAG, "xAI response JSON contained \\u0000 (%d); replaced with space", nul_fix);
+	}
+
 	// Parse JSON response
 	cJSON *json = cJSON_ParseWithLength(acc.buf, acc.len);
 	if (!json) {
@@ -903,6 +954,24 @@ esp_err_t xai_send_command(const char *system_prompt, const char *command, char 
 
 	// Extract assistant output text from xAI payload
 	const char *extracted_text = xai_extract_text(json);
+
+	#ifdef POLYCAST5_DEBUG
+	// Warn if the model stopped due to length (common cause of cut off responses)
+	const char *finish_reason = xai_finish_reason(json);
+	if (finish_reason && strcmp(finish_reason, "length") == 0) {
+		ESP_LOGW(TAG, "xAI response may be incomplete (finish_reason=length). Consider increasing max_tokens.");
+	}
+
+	// Log finish_reason + output length to distinguish model truncation vs UART/UI truncation
+	if (finish_reason && extracted_text) {
+		ESP_LOGI(TAG, "xAI finish_reason=%s out_len=%u",
+				finish_reason,
+				(unsigned)strlen(extracted_text));
+	}
+	else if (finish_reason) {
+		ESP_LOGI(TAG, "xAI finish_reason=%s out_len=(none)", finish_reason);
+	}
+	#endif // POLYCAST5_DEBUG
 
 	if (!extracted_text || !extracted_text[0]) {
 		// Rrror logging
@@ -920,6 +989,14 @@ esp_err_t xai_send_command(const char *system_prompt, const char *command, char 
 		cJSON_Delete(json);
 		acc_free(&acc);
 		return ESP_FAIL;
+	}
+
+	// Warn if our local buffer will truncate the extracted text
+	size_t extracted_len = strlen(extracted_text);
+	if (extracted_len >= buf_sz) {
+		ESP_LOGW(TAG, "xAI output truncated by response buffer (need=%u have=%u)",
+				(unsigned)(extracted_len + 1),
+				(unsigned)buf_sz);
 	}
 
 	// Copy extracted text to user buffer
@@ -1127,7 +1204,7 @@ esp_err_t ai_lookup_creds(ai_cmd_type_t type, const char *query, char *out_scrip
 		used += (size_t)n;
 	}
 
-	const char *want = (type == CMD_CRED_PASSWORD) ? "password" : "username";
+	const char *want = (type == AI_CMD_CRED_PASSWORD) ? "password" : "username";
 
 	int m = snprintf(user_cred_msg, sizeof(user_cred_msg),
 			"want=%s\nquery=%s\nentries:\n%s",

@@ -1603,7 +1603,17 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 		// angle = (angle + 450) % 3600; // 45 degrees per frame
         // lv_obj_set_style_transform_angle(ai_orb, angle, 0);
 
-		xQueueSend(xAiCmdQueue, "please explain how memories could be transferred from one human to another", pdMS_TO_TICKS(100));
+		// Send to Grok via xAI API
+		const char *msg_str = "please open notepad and given me the tsla and btc price predictions for next week";
+		ai_cmd_t cmd = {
+			.type = AI_CMD_NORMAL,
+			.msg = msg_str,
+			.msg_len = strlen(msg_str),
+			.free_ptr = NULL,
+			.free_on_done = false,
+		};
+
+		xQueueSend(xAiCmdQueue, &cmd, portMAX_DELAY);
 	}
 	// Back selected
 	else if (ui_btns->left_btn == 1) {

@@ -64,6 +64,9 @@ typedef struct {
 volatile uint8_t haptic_len_ms = 20; // Default buzz 20ms
 volatile bool haptic_btns[6] = {true, false, false, false, false, false}; // Default buzz on select
 
+// True while the physical SELECT button is held (0 = pressed, 1 = released)
+volatile bool gpio_select_btn_held = false;
+
 int8_t lcd_ledc_brightness = 100;
 
 static const TickType_t adc_timer_interval = pdMS_TO_TICKS(20000); // 20s
@@ -248,7 +251,12 @@ static void gpio_task(void *arg)
 		for (size_t i = 0; i < 6; i++) {
 			btn_state_t *b = &buttons[i]; // Get the button
 			bool level = gpio_read_input(b->pin); // Read its state: 0 = pressed, 1 = released
-	
+
+			// Track held state for SELECT (buttons[0])
+			if (i == 0) {
+				gpio_select_btn_held = (level == 0);
+			}
+
 			// Button pressed
 			if (level == 0) {
 				// New press

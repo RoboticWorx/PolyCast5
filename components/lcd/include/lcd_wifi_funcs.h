@@ -80,13 +80,31 @@ void lcd_wifi_create_scan_list(wifi_scan_menu_t *wifi_scan_menu);
 void lcd_wifi_update_menu(wifi_menu_t *wifi_menu);
 
 /**
- * @brief Executes when WIFI_SCAN_PAGE selected
+ * @brief Scans a selected Wi-Fi network's beacon and data frames
  *
  * @param [in] ui_btns UI input structure
  * @param [in] ui_menu UI menu structure
  * @param [in] wifi_menu Wi-Fi menu structure
  */
 void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
+
+/**
+ * @brief Sniffs network frames and sends it to Grok for analysis
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] wifi_menu Wi-Fi menu structure
+ */
+void lcd_wifi_ai_packet_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
+
+/**
+ * @brief The results of the AI analysis of sniffed network frames via web portal
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] wifi_menu Wi-Fi menu structure
+ */
+void lcd_wifi_ai_packet_results_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
 
 /**
  * @brief Gets network password via user input
@@ -98,7 +116,7 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 void lcd_wifi_get_password(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
 
 /**
- * @brief Executes Wi-Fi beacon page
+ * @brief Shows beacon frame data of a given network
  *
  * @param [in] ui_btns UI input structure
  * @param [in] ui_menu UI menu structure
@@ -107,7 +125,7 @@ void lcd_wifi_get_password(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t 
 void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
 
 /**
- * @brief Executes Wi-Fi data page
+ * @brief Shows data frame data of a given network
  *
  * @param [in] ui_btns UI input structure
  * @param [in] ui_menu UI menu structure

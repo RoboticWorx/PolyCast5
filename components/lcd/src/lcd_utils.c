@@ -2913,8 +2913,24 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 			
 			ui_menu->page = WIFI_SCAN_PAGE;
 		}
-		// Sync with PolyPlug
+		// Analyze packets with AI
 		else if (ui_btns->select_btn == 1 && wifi_menu->index == 2) {
+			// Hide Wi-Fi menu
+			lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+			
+			// Delete ping labels
+			lv_obj_delete(gateway_ping_lbl);
+			lv_obj_delete(dns_ping_lbl);
+
+			// Reset statics
+			do_once = false;
+			gateway_ping_lbl = dns_ping_lbl = NULL;
+			
+			// Switch pages
+			ui_menu->page = WIFI_AI_PACKET_PAGE;
+		}
+		// Sync with PolyPlug
+		else if (ui_btns->select_btn == 1 && wifi_menu->index == 3) {
 			// Hide Wi-Fi menu
 			lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 			

@@ -20,6 +20,7 @@
 #include "btc_web_portal.h"
 #include "ai_web_portal.h"
 #include "bluetooth_web_portal.h"
+#include "ai_analysis_web_portal.h"
 
 #define TAG "WIFI_TASK"
 
@@ -40,10 +41,13 @@ QueueHandle_t xWifiBeaconQueue;
 QueueHandle_t xWifiDataQueue;
 QueueHandle_t xWifiMqttCmdQueue;
 QueueHandle_t xWifiPingQueue;
+QueueHandle_t xWifiAiRawSniffQueue;
 
 SemaphoreHandle_t xWifiCanSleepSemaphore;
 SemaphoreHandle_t xWifiCycleSemaphore;
 SemaphoreHandle_t xWifiPingSemaphore;
+
+SemaphoreHandle_t xWifiRawFramesMutex;
 
 EventGroupHandle_t xConnectionIconEventGroup;
 EventGroupHandle_t xWiFiPortalEventGroup;
@@ -65,6 +69,9 @@ static void wifi_task(void *param)
 	configASSERT(xWifiCycleSemaphore);
 	xWifiPingSemaphore = xSemaphoreCreateBinary();
 	configASSERT(xWifiPingSemaphore);
+
+	xWifiRawFramesMutex = xSemaphoreCreateMutex();
+	configASSERT(xWifiRawFramesMutex);
 	
 	xWifiScanQueue = xQueueCreate(WIFI_MAX_NETWORKS, sizeof(wifi_scan_t));
 	configASSERT(xWifiScanQueue);
@@ -82,6 +89,8 @@ static void wifi_task(void *param)
 	configASSERT(xWifiOtaPctQueue);
 	xWifiPingQueue = xQueueCreate(1, sizeof(wifi_ping_t));
 	configASSERT(xWifiPingQueue);
+	xWifiAiRawSniffQueue = xQueueCreate(1, sizeof(char *));
+	configASSERT(xWifiAiRawSniffQueue);
 
 	xConnectionIconEventGroup = xEventGroupCreate();
 	configASSERT(xConnectionIconEventGroup);
@@ -262,6 +271,10 @@ static void wifi_task(void *param)
 		if (wifi_event_bits != last_wifi_event_bits) { // Only act on changes
 			esp_err_t err;
 
+			#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "Received Wi-Fi event: %u", (unsigned int)wifi_event_bits);
+			#endif
+
 			// If Wi-Fi reconnect bit transitioned 0 -> 1
 			if ((wifi_event_bits & WIFI_RECONNECT_BIT) && !(last_wifi_event_bits & WIFI_RECONNECT_BIT)) {
 				xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // Tell LCD we're trying
@@ -278,6 +291,10 @@ static void wifi_task(void *param)
 			}
 			// If Wi-Fi disconnect bit transitioned 0 -> 1
 			if ((wifi_event_bits & WIFI_DISCONNECT_BIT) && !(last_wifi_event_bits & WIFI_DISCONNECT_BIT)) {
+				#ifdef POLYCAST5_DEBUG
+				ESP_LOGI(TAG, "Disconnecting Wi-Fi...");
+				#endif
+
 				err = wifi_funcs_radio_stop();
 				if (err != ESP_OK) {
 					ESP_LOGE(TAG, "WIFI_DISCONNECT_BIT: wifi_funcs_radio_stop failed: %s", esp_err_to_name(err));
@@ -320,13 +337,33 @@ static void wifi_task(void *param)
 			// If AI web portal bit transitioned 1 -> 0
 			if ((last_portal_bits & WIFI_PORTAL_START_AI_BIT) &&
 					!(current_portal_bits & WIFI_PORTAL_START_AI_BIT)) {
-				ai_portal_stop();
+				err = ai_portal_stop();
+				if (err != ESP_OK) {
+					ESP_LOGE(TAG, "ai_portal_stop failed: %s", esp_err_to_name(err));
+				}
+			}
+
+			// If AI packet analysis web portal bit transitioned 0 -> 1
+			if ((current_portal_bits & WIFI_PORTAL_START_AI_PKT_ANALYSIS_BIT) &&
+					!(last_portal_bits & WIFI_PORTAL_START_AI_PKT_ANALYSIS_BIT)) {
+				err = ai_analysis_portal_start();
+				if (err != ESP_OK) {
+					ESP_LOGE(TAG, "ai_analysis_portal_start failed: %s", esp_err_to_name(err));
+				}
+			}
+			// If AI packet analysis web portal bit transitioned 1 -> 0
+			if ((last_portal_bits & WIFI_PORTAL_START_AI_PKT_ANALYSIS_BIT) &&
+					!(current_portal_bits & WIFI_PORTAL_START_AI_PKT_ANALYSIS_BIT)) {
+				err = ai_analysis_portal_stop();
+				if (err != ESP_OK) {
+					ESP_LOGE(TAG, "ai_analysis_portal_stop failed: %s", esp_err_to_name(err));
+				}
 			}
 
 			// If BTC web portal bit transitioned 0 -> 1
 			if ((current_portal_bits & WIFI_PORTAL_START_BTC_BIT) &&
 					!(last_portal_bits & WIFI_PORTAL_START_BTC_BIT)) {
-				esp_err_t err = btc_portal_start();
+				err = btc_portal_start();
 				if (err != ESP_OK) {
 					ESP_LOGE(TAG, "btc_portal_start failed: %s", esp_err_to_name(err));
 				}
@@ -334,7 +371,10 @@ static void wifi_task(void *param)
 			// If BTC web portal bit transitioned 1 -> 0
 			if ((last_portal_bits & WIFI_PORTAL_START_BTC_BIT) &&
 					!(current_portal_bits & WIFI_PORTAL_START_BTC_BIT)) {
-				btc_portal_stop();
+				err = btc_portal_stop();
+				if (err != ESP_OK) {
+					ESP_LOGE(TAG, "btc_portal_stop failed: %s", esp_err_to_name(err));
+				}
 			}
 			
 			// If BT web portal bit transitioned 0 -> 1
@@ -348,7 +388,10 @@ static void wifi_task(void *param)
 			// If BT web portal bit transitioned 1 -> 0
 			if ((last_portal_bits & WIFI_PORTAL_START_BT_BIT) &&
 					!(current_portal_bits & WIFI_PORTAL_START_BT_BIT)) {
-				bluetooth_web_portal_stop();
+				err = bluetooth_web_portal_stop();
+				if (err != ESP_OK) {
+					ESP_LOGE(TAG, "bluetooth_web_portal_stop failed: %s", esp_err_to_name(err));
+				}
 			}
 
 			last_portal_bits = current_portal_bits;

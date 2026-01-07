@@ -352,6 +352,12 @@ static void lcd_task(void *pvParameters)
 				case WIFI_SCAN_PAGE:
 					lcd_wifi_scan_page(&ui_btns, &ui_menu, &wifi_menu);
 					break;
+				case WIFI_AI_PACKET_PAGE:
+					lcd_wifi_ai_packet_page(&ui_btns, &ui_menu, &wifi_menu);
+					break;
+				case WIFI_AI_PACKET_RESULTS_PAGE:
+					lcd_wifi_ai_packet_results_page(&ui_btns, &ui_menu, &wifi_menu);
+					break;
 				case WIFI_PASSWORD_PAGE:
 					lcd_wifi_get_password(&ui_btns, &ui_menu, &wifi_menu);
 					break;

@@ -12,8 +12,10 @@ esp_err_t ai_portal_start(void);
 
 /**
  * @brief Stops the AI key web portal
+ * 
+ * @returns ESP error status
  */
-void ai_portal_stop(void);
+esp_err_t ai_portal_stop(void);
 
 /**
  * @brief Get AI key web portal SSID

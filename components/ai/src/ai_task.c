@@ -15,6 +15,7 @@
 #include "ai_web_portal.h"
 #include "bluetooth_task.h"
 
+#include "ai_prompts.h"
 #include "ai_funcs.h"
 
 #define TAG "AI_TASK"
@@ -25,7 +26,6 @@ QueueHandle_t xAiCmdQueue;
 
 char ai_wifi_portal_pass[64];
 
-EXT_RAM_BSS_ATTR static ai_cmd_t msg;
 EXT_RAM_BSS_ATTR static char prompt_buf[AI_PROMPT_NVS_MAX_LEN] = {0};
 EXT_RAM_BSS_ATTR static char ai_response[AI_RESPONSE_MAX_LEN] = {0}; // TODO: Increase MAX_LEN here and for BT
 
@@ -43,7 +43,7 @@ static ai_cmd_type_t parse_kind_and_query(const char *in, const char **query_out
 		*query_out = in + (!strncasecmp(in, "pass", 4) ? 4 : 8); // Move past prefix
         while (**query_out == ' ' || **query_out == '\t') (*query_out)++; // Trim any spaces
 
-        return CMD_CRED_PASSWORD;
+        return AI_CMD_CRED_PASSWORD;
     }
 
 	// If username query
@@ -53,13 +53,13 @@ static ai_cmd_type_t parse_kind_and_query(const char *in, const char **query_out
 		*query_out = in + (!strncasecmp(in, "user", 4) ? 4 : 8); // Move past prefix
         while (**query_out == ' ' || **query_out == '\t') (*query_out)++; // Trim any spaces
 
-        return CMD_CRED_USERNAME;
+        return AI_CMD_CRED_USERNAME;
 	}
 
 	// Fallback to full command
     *query_out = in;
 
-    return CMD_NORMAL;
+    return AI_CMD_NORMAL;
 }
 
 static void ai_task(void *pvParameters)
@@ -68,7 +68,7 @@ static void ai_task(void *pvParameters)
 	xAiCmdQueue = xQueueCreate(1, sizeof(ai_cmd_t));
 	configASSERT(xAiCmdQueue);
 
-	esp_err_t err;
+	esp_err_t err = ESP_OK;
 
 	// If Wi-Fi AI portal password NVS doesn't exist yet, set it
 	if (ai_wifi_pass_load_nvs(ai_wifi_portal_pass, sizeof(ai_wifi_portal_pass)) != ESP_OK) {
@@ -100,62 +100,94 @@ static void ai_task(void *pvParameters)
 		ESP_LOGI(TAG, "Using pre-set AI Wi-Fi portal password: '%s'", ai_wifi_portal_pass);
 		#endif
 	}
-	
-	// Clear message buffer
-	memset(&msg, 0, sizeof(msg));
 
 	while (1) {
+		ai_cmd_t cmd = {0};
+
 		// Block until AI task activated
-		if (xQueueReceive(xAiCmdQueue, &msg, portMAX_DELAY) != pdTRUE) {
+		if (xQueueReceive(xAiCmdQueue, &cmd, portMAX_DELAY) != pdTRUE) {
 			continue;
+		}
+
+		if (!cmd.msg) {
+			ESP_LOGW(TAG, "AI cmd missing msg pointer");
+			if (cmd.free_on_done && cmd.free_ptr) {
+				free(cmd.free_ptr);
+			}
+			continue;	
 		}
 
 		// Clear ai_response buffer
 		memset(ai_response, 0, sizeof(ai_response));
 
 		const char *query = NULL;
-		ai_cmd_type_t type = parse_kind_and_query(msg.cmd, &query);
+
+		// If bt query, parse type of query
+		if (cmd.type == AI_CMD_NORMAL || cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD) {
+			cmd.type = parse_kind_and_query(cmd.msg, &query);
+		}
 
 		// Auto keyboard command
-		if (type == CMD_NORMAL) {
+		if (cmd.type == AI_CMD_NORMAL) {
 			// Build autotype prompt (NVS override; fallback to compiled default)
 			memset(prompt_buf, 0, sizeof(prompt_buf)); // Zero out previous contents
 			const char *prompt = ai_get_autokey_prompt(prompt_buf, sizeof(prompt_buf));
 
-			// Send cmd to the AI
 			// 'ai_response' output
-			err = xai_send_command(prompt, msg.cmd, ai_response, sizeof(ai_response));
-			
+			err = xai_send_command(prompt, cmd.msg, ai_response, sizeof(ai_response));
+
 			#ifdef USING_CHATGPT // UNTESTED!
-			err = openai_send_command(msg.cmd, ai_response, sizeof(ai_response));
+			err = openai_send_command(cmd.msg, ai_response, sizeof(ai_response));
 			#endif
 		}
 		// Username or password command
-		else {
-			err = ai_lookup_creds(type, query, ai_response, sizeof(ai_response));
+		else if (cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD) {
+			err = ai_lookup_creds(cmd.type, query, ai_response, sizeof(ai_response));
+		}
+		// Organizing raw Wi-Fi frames
+		else if (cmd.type == AI_CMD_RAW_FRAMES) {
+			#ifdef POLYCAST5_DEBUG
+			size_t msg_len = (cmd.msg_len != 0) ? cmd.msg_len : strlen(cmd.msg);
+			ESP_LOGI(TAG, "AI_CMD_RAW_FRAMES payload len=%u", (unsigned)msg_len);
+			#endif
+
+			// 'ai_response' output
+			err = xai_send_command(AI_PROMPT_RAW_FRAMES, cmd.msg, ai_response, sizeof(ai_response));
 		}
 
 		if (err == ESP_OK) {
-			#ifdef POLYCAST5_DEBUG
-			// Never log credential payloads (passwords/usernames)
-			if (type == CMD_NORMAL) {
+			if (cmd.type == AI_CMD_NORMAL) {
+				#ifdef POLYCAST5_DEBUG
 				ESP_LOGI(TAG, "AI script: %s", ai_response);
-			}
-			else {
-				ESP_LOGI(TAG, "Credential script resolved (len=%u)", (unsigned)strlen(ai_response));
-			}
-			#endif
+				#endif
 
-			// Send pointer to script to execute as BLE keyboard sequence
-			char *ai_script_ptr = ai_response;
-			xQueueSend(xBluetoothAiCmdQueue, &ai_script_ptr, portMAX_DELAY);
+				char *ai_script_ptr = ai_response;
+				xQueueSend(xBluetoothAiCmdQueue, &ai_script_ptr, portMAX_DELAY);
+			}
+			else if (cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD) {
+				#ifdef POLYCAST5_DEBUG
+				ESP_LOGI(TAG, "Credential script resolved (len=%u)", (unsigned)strlen(ai_response));
+				#endif
+
+				char *ai_script_ptr = ai_response;
+				xQueueSend(xBluetoothAiCmdQueue, &ai_script_ptr, portMAX_DELAY);
+			}
+			else if (cmd.type == AI_CMD_RAW_FRAMES) {
+				#ifdef POLYCAST5_DEBUG
+				ESP_LOGI(TAG, "Raw frames sniff resolved with response. Grok analysis of raw frames: %s", ai_response);
+				#endif
+
+				char *ai_script_ptr = ai_response;
+				xQueueSend(xWifiAiRawSniffQueue, &ai_script_ptr, portMAX_DELAY);
+			}
 		}
 		else {
 			ESP_LOGE(TAG, "AI request failed: %s", esp_err_to_name(err));
 		}
 
-		// Reset message buffer
-		memset(&msg, 0, sizeof(msg));
+		if (cmd.free_on_done && cmd.free_ptr) {
+			free(cmd.free_ptr);
+		}
 
 		vTaskDelay(pdMS_TO_TICKS(100));
 	}

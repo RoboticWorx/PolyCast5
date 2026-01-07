@@ -25,6 +25,7 @@
 #include "gpio_funcs.h"
 #include "espnow_funcs.h"
 #include "ota_update.h"
+#include "ai_funcs.h"
 
 #include "wifi_task.h"
 #include "gpio_task.h"
@@ -39,6 +40,13 @@
 #define SUBTYPE_BEACON 0x08
 
 #define EXPECTED_MQTT_RX "PolyCast5MQTTRxSuccess"
+
+#define RAW_HEX_BUF_CAP (AI_CMD_MAX_LEN) // AI_CMD_MAX_LEN PSRAM for hex strings
+
+// extern to lcd_wifi_funcs.c
+EXT_RAM_BSS_ATTR char raw_frames_hex_buf[RAW_HEX_BUF_CAP]; // Accumulated hex strings
+size_t raw_frames_hex_len = 0; // Current length
+uint32_t raw_frames_captured = 0; // Counter
 
 static esp_mqtt_client_handle_t mqtt_client;
 
@@ -678,18 +686,32 @@ void wifi_funcs_get_current_date_time(void)
 	#endif
 }
 
+static const char* wifi_disconnect_reason_str(uint8_t r)
+{
+	switch (r) {
+		case WIFI_REASON_AUTH_EXPIRE:			 return "AUTH_EXPIRE";
+		case WIFI_REASON_AUTH_FAIL:				 return "AUTH_FAIL";
+		case WIFI_REASON_ASSOC_EXPIRE:			 return "ASSOC_EXPIRE";
+		case WIFI_REASON_ASSOC_FAIL:			 return "ASSOC_FAIL";
+		case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT: return "4WAY_HANDSHAKE_TIMEOUT";
+		case WIFI_REASON_HANDSHAKE_TIMEOUT:		 return "HANDSHAKE_TIMEOUT";
+		case WIFI_REASON_NO_AP_FOUND:			 return "NO_AP_FOUND";
+		default:								 return "UNKNOWN";
+	}
+}
+
 static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, void* data)
 {
 	// Disconnection event
 	if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
 		wifi_event_sta_disconnected_t* d = (wifi_event_sta_disconnected_t*)data;
-		
+
 		#ifdef POLYCAST5_DEBUG
-		ESP_LOGW(TAG, "Disconnected, reason=%d", d->reason);
+		ESP_LOGW(TAG, "Disconnected, reason=%d (%s)", d->reason, wifi_disconnect_reason_str(d->reason));
 		#endif
-		
+
 		wifi_funcs_radio_stop();
-		
+
 		// Notify we disconnected
 		xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_MQTT_CONNECTED_BIT | WIFI_CONNECTING_BIT);
 
@@ -927,6 +949,9 @@ esp_err_t wifi_funcs_radio_start(const char *ssid, const uint8_t* bssid, const c
 	// Copy BSSID
 	//cfg.sta.bssid_set = true;
 	//memcpy(cfg.sta.bssid, bssid, sizeof(cfg.sta.bssid));
+
+	cfg.sta.channel = 0; // Don't lock to a specific channel
+	cfg.sta.scan_method = WIFI_FAST_SCAN; // First matching SSID (vs WIFI_ALL_CHANNEL_SCAN)
 	
 	cfg.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK; // Weakest auth mode to accept in the fast scan mode 
 
@@ -943,7 +968,7 @@ esp_err_t wifi_funcs_radio_start(const char *ssid, const uint8_t* bssid, const c
 	if (err != ESP_OK) {
 		return err;
 	}
-	
+
 	// Set config
 	err = esp_wifi_set_config(ESP_IF_WIFI_STA, &cfg);
 	if (err != ESP_OK) {
@@ -958,18 +983,30 @@ esp_err_t wifi_funcs_radio_start(const char *ssid, const uint8_t* bssid, const c
 
 esp_err_t wifi_funcs_radio_stop(void)
 {
+	// Stop promiscuous sniffing if enabled (ignore errors if not started)
+	(void)esp_wifi_set_promiscuous(false);
+	(void)esp_wifi_set_promiscuous_rx_cb(NULL);
+
 	// Stop client if started
 	if (xEventGroupGetBits(xWifiEventGroup) & WIFI_MQTT_CONNECTED_BIT) {
 		esp_mqtt_client_disconnect(mqtt_client);
 	}
-	
-	esp_wifi_disconnect(); // Disconnect if connected
+
+	esp_err_t err = esp_wifi_disconnect(); // Disconnect if connected
+	if (err != ESP_OK) {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGW(TAG, "wifi_funcs_radio_stop esp_wifi_disconnect failed, should be okay: %s", esp_err_to_name(err));
+		#endif
+	}
 	
 	// Stop Wi-Fi
-	esp_err_t err = esp_wifi_stop();
+	err = esp_wifi_stop();
 	if (err == ESP_OK) {
 		xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT);
 		xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // No longer trying to connect
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "wifi_funcs_radio_stop success");
+		#endif
 	}
 	else {
 		ESP_LOGE(TAG, "wifi_funcs_radio_stop error: %d", err);
@@ -1528,42 +1565,160 @@ static void wifi_sniffer_data_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 	}
 }
 
+// Append bytes as hex string to buf (e.g., "DE AD BE EF ")
+static bool append_hex(const uint8_t *bytes, size_t len, char *buf, size_t *cur_len, size_t cap)
+{
+	// Ensure all valid
+    if (!bytes || !buf || !cur_len) {
+		return false;
+	}
+
+	// Loop through buf len
+    for (size_t i = 0; i < len; ++i) {
+        if (*cur_len + 3 >= cap) {
+			return false; // Space for "XX "
+		}
+
+		// Append hex
+        int n = snprintf(buf + *cur_len, cap - *cur_len, "%02X ", bytes[i]);
+
+		// Check snprintf success
+        if (n < 0) {
+			return false;
+		}
+
+		// Move forward
+        *cur_len += n;
+    }
+    return true;
+}
+
+static void wifi_sniffer_raw_cb(void *buf, wifi_promiscuous_pkt_type_t type)
+{
+	// Promiscuous RX callback runs in the Wi-Fi RX path.
+	// Do not block here (ever), or the driver can stall.
+	if (xSemaphoreTake(xWifiRawFramesMutex, 0) != pdTRUE) {
+		return;
+	}
+
+	if (raw_frames_captured >= WIFI_MAX_RAW_FRAMES) {
+		xSemaphoreGive(xWifiRawFramesMutex); // Release raw sniffed frames
+		return; // Stop early if limit hit
+	}
+
+    wifi_promiscuous_pkt_t *pkt = (wifi_promiscuous_pkt_t *)buf;
+    uint8_t *frame = pkt->payload;
+    size_t frame_len = pkt->rx_ctrl.sig_len;
+
+    // Optional: Filter by type (e.g., skip if not management/data)
+    //if (type != WIFI_PKT_MGMT && type != WIFI_PKT_DATA) return;
+
+	// Append to global hex buffer: "Frame N: [hex] (len=L, rssi=R, chan=C)\n\n"
+	size_t start = raw_frames_hex_len;
+	uint32_t next = raw_frames_captured + 1;
+	bool ok = false;
+	int n;
+
+	do {
+		n = snprintf(raw_frames_hex_buf + raw_frames_hex_len,
+				RAW_HEX_BUF_CAP - raw_frames_hex_len,
+				"Frame %u: ",
+				(unsigned)next);
+
+		if (n <= 0 || raw_frames_hex_len + (size_t)n >= RAW_HEX_BUF_CAP) {
+			break;
+		}
+		raw_frames_hex_len += (size_t)n;
+
+		// Append hex bytes
+		if (!append_hex(frame, frame_len, raw_frames_hex_buf, &raw_frames_hex_len, RAW_HEX_BUF_CAP)) {
+			break;
+		}
+
+		// Append metadata
+		n = snprintf(raw_frames_hex_buf + raw_frames_hex_len,
+				RAW_HEX_BUF_CAP - raw_frames_hex_len,
+				"(len=%u, rssi=%d, chan=%d)\n\n",
+				(unsigned)frame_len, pkt->rx_ctrl.rssi, pkt->rx_ctrl.channel);
+		
+		if (n <= 0 || raw_frames_hex_len + (size_t)n >= RAW_HEX_BUF_CAP) {
+			break;
+		}
+		raw_frames_hex_len += (size_t)n;
+
+		raw_frames_captured = next;
+		ok = true;
+	} while (0);
+
+	if (!ok) {
+		// Roll back partial writes so buffer stays consistent
+		raw_frames_hex_len = start;
+		if (start < RAW_HEX_BUF_CAP) {
+			raw_frames_hex_buf[start] = '\0';
+		}
+		xSemaphoreGive(xWifiRawFramesMutex); // Release raw sniffed frames
+		return;
+	}
+
+    #ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "Captured frame %u (%u bytes)", (unsigned)raw_frames_captured, (unsigned)frame_len);
+    #endif
+
+	xSemaphoreGive(xWifiRawFramesMutex); // Release raw sniffed frames
+	return;
+}
+
 void wifi_funcs_init_promiscuous(wifi_sniff_t *network)
 {
 	// Start up the radio
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+
 	ESP_ERROR_CHECK(esp_wifi_start());
 	
-	// Fix the channel to the target AP
-	ESP_ERROR_CHECK(esp_wifi_set_channel(network->channel, WIFI_SECOND_CHAN_NONE));
+	// Fix the channel to the target AP: set channel (0 = auto/current)
+    ESP_ERROR_CHECK(esp_wifi_set_channel(network->channel, WIFI_SECOND_CHAN_NONE));
 	
-	// Only management frames
+	// Only selected frame(s)
 	wifi_promiscuous_filter_t filter = {
-		// 1 = WIFI_PROMIS_FILTER_MASK_MGMT
-		.filter_mask = (network->mask == 1) ? WIFI_PROMIS_FILTER_MASK_MGMT : WIFI_PROMIS_FILTER_MASK_DATA
+		.filter_mask = network->mask
 	};
 	
-	// Copy passed bssid into global
+	// target_bssid not checked unless beacon_cb
 	memcpy(target_bssid, network->target_bssid, 6);
 	
 	// Filter for matching packets
 	ESP_ERROR_CHECK(esp_wifi_set_promiscuous_filter(&filter));
 
 	// Register callback and enable promiscuous mode
-	if (network->mask == 1) {
-		ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_beacon_cb));
+	if (network->mask == WIFI_PROMIS_FILTER_MASK_MGMT) {
+		ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_beacon_cb)); // Sniff beacon frames
+	}
+	else if (network->mask == WIFI_PROMIS_FILTER_MASK_DATA) {
+		ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_data_cb)); // Sniff data frames
+	}
+	else if (network->mask == WIFI_PROMIS_FILTER_MASK_RAW_USEFUL) {
+		ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_raw_cb)); // Sniff everything
 	}
 	else {
-		ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_data_cb));
+		ESP_LOGE(TAG, "wifi_funcs_init_promiscuous: unknown filter mask: %d", network->mask);
 	}
 	ESP_ERROR_CHECK(esp_wifi_set_promiscuous(true));
 
-	#ifdef POLYCAST5_DEBUG
-	ESP_LOGI(TAG, "Sniffer initialized; filtering beacon frames from %02x:%02x:%02x:%02x:%02x:%02x",
-			network->target_bssid[0], network->target_bssid[1],
-			network->target_bssid[2], network->target_bssid[3],
-			network->target_bssid[4], network->target_bssid[5]);
-	#endif
+	// If sniffing a target network
+	if (network->mask != WIFI_PROMIS_FILTER_MASK_RAW_USEFUL) {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Sniffer initialized; filtering beacon frames from %02x:%02x:%02x:%02x:%02x:%02x",
+				network->target_bssid[0], network->target_bssid[1],
+				network->target_bssid[2], network->target_bssid[3],
+				network->target_bssid[4], network->target_bssid[5]);
+		#endif
+	}
+	// Else the kitchen sink
+	else {
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Sniffer initialized; sniffing the kitchen sink.");
+		#endif
+	}
 }
 
 static void ping_on_end(esp_ping_handle_t hdl, void *args)

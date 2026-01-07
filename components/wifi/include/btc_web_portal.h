@@ -12,8 +12,10 @@ esp_err_t btc_portal_start(void);
 
 /** 
  * @brief Stops BTC web portal
+ *
+ * @returns ESP error status
  */
-void btc_portal_stop(void);
+esp_err_t btc_portal_stop(void);
 
 /** 
  * @brief Get BTC web portal SSID

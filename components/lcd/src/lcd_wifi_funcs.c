@@ -24,6 +24,9 @@
 #include "espnow_funcs.h"
 #include "gpio_task.h"
 #include "lcd_utils.h"
+#include "ai_task.h"
+#include "ai_funcs.h"
+#include "ai_analysis_web_portal.h"
 
 // Wi-Fi menu options
 #define WIFI_MENU_NS "wifi_menu" // NVS namespace for menu entries
@@ -38,14 +41,22 @@
 #define MAX_PASSWORD_LEN 32
 #define NUM_CHAR_ROWS 4
 
-#define WIFI_MENU_START_SIZE 3
+#define WIFI_MENU_START_SIZE 4 // First 4 default options
 
 #define MQTT_READY_TXT "0 = OFF	    1 = ON\n  255 = UPDATE" // 'UPDATE' refers to checking and performing an OTA firmware update if available
 #define MQTT_SENDING_TXT "Sending via\nMQTT broker..." 
 #define MQTT_CONNECTING_TXT "Please wait...\nConnecting..."
 
+// wifi_funcs.c
+extern char raw_frames_hex_buf[]; // Accumulated hex strings
+extern size_t raw_frames_hex_len; // Current length
+extern uint32_t raw_frames_captured; // Counter
+
+// gpio_task.c
+extern volatile bool gpio_select_btn_held;
+
 wifi_menu_t wifi_menu = {
-	.options = {"Connect to Network", "Monitor Packets", "Sync With PolyPlug"},
+	.options = {"Connect to Network", "Monitor Packets", "AI Packet Analysis", "Sync With PolyPlug"},
 	.size = WIFI_MENU_START_SIZE,
 	.index = 0,
 	.cont = NULL,
@@ -56,6 +67,8 @@ wifi_login_t selected_network = {0};
 bool monitoring_packets = false;
 
 static const char* TAG = "LCD_WIFI_FUNCS";
+
+static char *raw_frames_ai_response;
 
 static wifi_sniff_t sniff_network;
 
@@ -277,8 +290,8 @@ static void lcd_wifi_update_scan_menu(wifi_scan_menu_t *menu)
 	lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
 }
 
-void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
-{	
+void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
+{
 	static lv_obj_t *lbl_wait;
 	static lv_obj_t *lbl_option;
 	static bool locked[WIFI_MAX_NETWORKS];
@@ -434,7 +447,7 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 			lbl_wait = lv_label_create(ACTIVE_SCR);
 			lcd_format_label(lbl_wait, "Scanning for networks...", user_secondary_color,
 					&lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -10);
-							 
+			
 			// Start scan
 			xEventGroupSetBits(xWifiEventGroup, WIFI_SCAN_NETWORKS_BIT);
 			
@@ -659,12 +672,12 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 			// Copy BSSID
 			memcpy(sniff_network.target_bssid, bssids[wifi_menu->scan_menu.index], sizeof(bssids[wifi_menu->scan_menu.index]));
 			// Set mask
-			sniff_network.mask = 1; // 1 = WIFI_PROMIS_FILTER_MASK_MGMT
-				
+			sniff_network.mask = WIFI_PROMIS_FILTER_MASK_MGMT;
+			
 			if (xQueueSend(xWifiSniffQueue, &sniff_network, portMAX_DELAY) != pdPASS) {
 				ESP_LOGE(TAG, "Failed: xWifiSniffQueue beacon");
 			}
-				
+			
 			// Reset
 			monitoring_packets = false;
 			initialized = false;
@@ -690,6 +703,394 @@ void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 			// Switch pages
 			ui_menu->page = WIFI_BEACON_PAGE;
 		}
+	}
+}
+
+// TODO: Make system prompt editable
+// TODO: Bug: Can recapture after capture without going back to menu
+void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
+{
+	#define WIFI_AI_PKT_CONN_FAILED_TXT "Connection failed!\nPlease connect to your\nWi-Fi network at least\nonce in the 'Wi-Fi'\nmenu and make sure\nyou are in range."
+
+	typedef enum {
+		AI_PKT_IDLE = 0,
+		AI_PKT_CAPTURING,
+		AI_PKT_RECONNECT_WAIT,
+		AI_PKT_SEND_AI,
+		AI_PKT_ANALYSIS_COMPLETE,
+	} ai_pkt_state_t;
+
+	static bool init = true;
+	static lv_obj_t *lbl_ins = NULL;
+	// static lv_obj_t *lbl_channel = NULL;
+
+	static ai_pkt_state_t state = AI_PKT_IDLE;
+	static bool last_select = false;
+
+	static uint32_t last_frames_shown = 0;
+
+	static bool reconnect_sent = false;
+	static TickType_t disconnect_tick = 0;
+	static TickType_t reconnect_start_tick = 0;
+
+	if (init) {
+		lbl_ins = lv_label_create(ACTIVE_SCR);
+		lcd_format_label(lbl_ins, "Hold select\nto capture!", user_secondary_color,
+				&lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0); // LV_ALIGN_LEFT_MID, 10, 0);
+
+		// lbl_channel = lv_label_create(ACTIVE_SCR);
+		// lcd_format_label(lbl_channel, "Ch. 6", user_secondary_color,
+		// 		&lv_font_montserrat_18, LV_ALIGN_LEFT_MID, 10, 0);
+
+		state = AI_PKT_IDLE;
+		last_select = false;
+		last_frames_shown = 0;
+		reconnect_sent = false;
+		disconnect_tick = reconnect_start_tick = 0;
+
+		init = false;
+	}
+
+	// Get physical held select button state
+	bool select_now = gpio_select_btn_held;
+	bool select_pressed = (select_now && !last_select);
+	bool select_released = (!select_now && last_select);
+	last_select = select_now;
+	
+	// Initial press
+	if (state == AI_PKT_IDLE && select_pressed) {
+		// Set mask to all: previous sniff_network is disregarded in wifi_funcs_init_promiscuous
+		sniff_network.mask = WIFI_PROMIS_FILTER_MASK_RAW_USEFUL;
+		sniff_network.channel = 6; // Defult channel
+
+		// Start sniff
+		if (xQueueSend(xWifiSniffQueue, &sniff_network, portMAX_DELAY) != pdPASS) {
+			ESP_LOGE(TAG, "lcd_wifi_ai_packet_page: failed: xWifiSniffQueue data");
+		}
+
+		xSemaphoreTake(xWifiRawFramesMutex, portMAX_DELAY); // Lock raw sniffed frames
+		raw_frames_hex_len = 0;
+		raw_frames_captured = 0;
+		raw_frames_hex_buf[0] = '\0';
+		xSemaphoreGive(xWifiRawFramesMutex); // Release raw sniffed frames
+
+		last_frames_shown = 0;
+		char buf[24];
+		lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_18, 0);
+		snprintf(buf, sizeof(buf), "Captured %u/%u pkts", (unsigned)0, (unsigned)WIFI_MAX_RAW_FRAMES);
+		lv_label_set_text(lbl_ins, buf);
+		lv_timer_handler(); // Update immediately
+
+		state = AI_PKT_CAPTURING;
+	}
+	// While held: update count - stop only on release (or buffer full)
+	if (state == AI_PKT_CAPTURING) {
+		uint32_t frames = 0;
+		size_t hex_len = 0;
+
+		xSemaphoreTake(xWifiRawFramesMutex, portMAX_DELAY);
+		frames = raw_frames_captured;
+		hex_len = raw_frames_hex_len;
+		xSemaphoreGive(xWifiRawFramesMutex);
+
+		if (frames != last_frames_shown) {
+			char buf[24];
+			lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_18, 0);
+			snprintf(buf, sizeof(buf), "Captured %u/%u pkts", (unsigned)frames, (unsigned)WIFI_MAX_RAW_FRAMES);
+			lv_label_set_text(lbl_ins, buf);
+			last_frames_shown = frames;
+		}
+
+		bool full = false;
+		if (frames >= WIFI_MAX_RAW_FRAMES) {
+			full = true;
+		}
+		if (hex_len >= (AI_CMD_MAX_LEN - 64)) {
+			full = true;
+			#ifdef POLYCAST5_DEBUG
+			ESP_LOGW(TAG, "lcd_wifi_ai_packet_page: Stopping sniff early: raw hex buffer full (len=%u cap=%u)",
+					(unsigned)hex_len, (unsigned)AI_CMD_MAX_LEN);
+			#endif
+		}
+
+		// When done capturing
+		if (select_released || full) {
+			lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
+			lv_label_set_text(lbl_ins, "Connecting to Wi-Fi...");
+
+			// Hide top and bottom arrows
+			lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+			// Stop promiscuous/Wi-Fi before reconnecting
+			xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+
+			disconnect_tick = xTaskGetTickCount();
+			reconnect_sent = false;
+			state = AI_PKT_RECONNECT_WAIT;
+		}
+	}
+	// Reconnect (non-blocking)
+	if (state == AI_PKT_RECONNECT_WAIT) {
+		if (!reconnect_sent) {
+			// Small settle delay after disconnect
+			if ((xTaskGetTickCount() - disconnect_tick) < pdMS_TO_TICKS(2000)) {
+				// Do nothing for a bit (non-blocking delay)
+			}
+			else {
+				selected_network = wifi_funcs_get_prev(); // Loads boot state saved network info
+				selected_network.prev = true; // Connecting to previous
+
+				if (xQueueSend(xWifiSelectedNetworkQueue, &selected_network, portMAX_DELAY) != pdPASS) {
+					ESP_LOGE(TAG, "lcd_wifi_ai_packet_page: Failed: xWifiSelectedNetworkQueue previous_network");
+					state = AI_PKT_IDLE;
+				}
+
+				reconnect_start_tick = xTaskGetTickCount();
+				reconnect_sent = true;
+			}
+		}
+		else {
+			// Wait up to 15 seconds for Wi-Fi connection
+			if (xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT) {
+				state = AI_PKT_SEND_AI;
+			}
+			else if ((xTaskGetTickCount() - reconnect_start_tick) >= pdMS_TO_TICKS(15000)) {
+				ESP_LOGE(TAG, "lcd_wifi_ai_packet_page: Wi-Fi reconnect timeout after sniff");
+				lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
+				lv_label_set_text(lbl_ins, WIFI_AI_PKT_CONN_FAILED_TXT);
+				
+				state = AI_PKT_IDLE;
+			}
+		}
+	}
+	// Send frames to Grok once connected
+	if (state == AI_PKT_SEND_AI) {
+		lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
+		lv_label_set_text(lbl_ins, "Analyzing captured\npackets with AI...\n\nPlease wait...");
+		lv_timer_handler(); // Update immediately
+		
+		xSemaphoreTake(xWifiRawFramesMutex, portMAX_DELAY); // Lock raw sniffed frames
+
+		size_t src_len = raw_frames_hex_len;
+		size_t copy_len = MIN(src_len, (size_t)AI_CMD_MAX_LEN - 1);
+
+		char *frames_copy = malloc(copy_len + 1);
+		if (!frames_copy) {
+			ESP_LOGE(TAG, "lcd_wifi_ai_packet_page: Raw frames malloc failed (len=%u)", (unsigned)copy_len);
+			state = AI_PKT_IDLE;
+		}
+
+		memcpy(frames_copy, raw_frames_hex_buf, copy_len);
+		frames_copy[copy_len] = '\0';
+
+		xSemaphoreGive(xWifiRawFramesMutex); // Release raw sniffed frames
+
+		if (src_len > copy_len) {
+			ESP_LOGW(TAG, "lcd_wifi_ai_packet_page: Raw frames truncated for AI: src_len=%u cap=%u",
+					(unsigned)src_len, (unsigned)copy_len);
+		}
+
+		#ifdef POLYCAST5_DEBUG
+		ESP_LOGI(TAG, "Sending raw frames to Grok for analysis (len=%u)", (unsigned)copy_len);
+		
+		// This is usually a lot of data :)
+		//ESP_LOGI(TAG, "Raw frames being sent:\n%s", frames_copy);
+		#endif
+
+		// Format AI cmd
+		ai_cmd_t cmd = {
+			.type = AI_CMD_RAW_FRAMES,
+			.msg = frames_copy,
+			.msg_len = copy_len,
+			.free_ptr = frames_copy,
+			.free_on_done = true,
+		};
+
+		// Actually send it
+		if (xQueueSend(xAiCmdQueue, &cmd, portMAX_DELAY) != pdPASS) {
+			free(frames_copy);
+			ESP_LOGE(TAG, "Failed: xAiCmdQueue raw frames");
+			state = AI_PKT_IDLE;
+		}
+
+		// Switched to AI_PKT_ANALYSIS_COMPLETE in xQueueReceive xWifiAiRawSniffQueue
+		state = AI_PKT_IDLE; // Idle for now
+	}
+
+	// When response received (non-blocking)
+	if (xQueueReceive(xWifiAiRawSniffQueue, &raw_frames_ai_response, 0) == pdTRUE) {
+		state = AI_PKT_ANALYSIS_COMPLETE;
+
+		lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
+		lv_label_set_text(lbl_ins, "Analysis complete!\n\nPress RIGHT to\nsee the results.");
+		lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Show right arrow
+		lv_timer_handler(); // Update immediately
+	}
+
+	// See results
+	if (ui_btns->right_btn && state == AI_PKT_ANALYSIS_COMPLETE) {
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+
+		// Reset capture state
+		state = AI_PKT_IDLE;
+		last_select = false;
+		reconnect_sent = false;
+
+		// Reset statics
+		init = true;
+		lbl_ins = NULL;
+
+		// Switch to results page
+		ui_menu->page = WIFI_AI_PACKET_RESULTS_PAGE;
+	}
+	// Go back
+	else if (ui_btns->left_btn) {
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+		// Show top and bottom arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+		// Delete objects
+		lv_obj_delete(lbl_ins);
+
+		// Reset capture state
+		state = AI_PKT_IDLE;
+		last_select = false;
+		reconnect_sent = false;
+
+		// Reset statics
+		init = true;
+		lbl_ins = NULL;
+
+		// Show Wi-Fi menu
+		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+		// Switch back
+		ui_menu->page = WIFI_PAGE;
+
+		// Disable Wi-Fi
+		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+	}
+}
+
+void lcd_wifi_ai_packet_results_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
+{
+	#define WIFI_AI_PKT_RESULTS_Y_OFFSET 40
+	
+	// Statics
+	static bool init = false;
+	static lv_obj_t *cont = NULL;
+	static lv_obj_t *title_lbl = NULL;
+	static lv_obj_t *instr_lbl = NULL;
+	
+	if (!init) {
+		// Create a scrollable container for the instructions
+		cont = lv_obj_create(ACTIVE_SCR);
+		lv_obj_set_size(cont, 210, 106);
+		lv_obj_center(cont);
+		lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+		lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+		lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+		lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+		lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
+
+		// Title label
+		title_lbl = lv_label_create(cont);
+		lv_label_set_text(title_lbl, "How to View:");
+		lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+		lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+		lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+		// Instructions label (scrollable if text is long)
+		instr_lbl = lv_label_create(cont);
+		lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+		lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
+		lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
+		lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+		lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+
+		// Set instruction text
+		const char *res = (raw_frames_ai_response) ? raw_frames_ai_response : "";
+
+		// Copy result into portal storage and start the portal
+		ai_analysis_portal_set_result(res);
+
+		// Activate web portal
+		xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_PKT_ANALYSIS_BIT);
+
+		char instr_text[512];
+		snprintf(instr_text, sizeof(instr_text),
+					"The results are displayed using a web portal.\nTo access it, please connect to the following Wi-Fi network:\n\n"
+					"SSID:\n - %s\n\n"
+					"After connecting, simply search:\n\n"
+					"http://%s/\n\n"
+					"Do NOT leave this page until you're done viewing the results!",
+					ai_analysis_portal_get_ssid(),
+					ai_analysis_portal_get_ip());
+
+		lv_label_set_text(instr_lbl, instr_text);
+
+		init = true;
+	}
+	
+	if (ui_btns->up_btn == 1) {
+		lv_obj_scroll_by_bounded(cont, 0, WIFI_AI_PKT_RESULTS_Y_OFFSET, LV_ANIM_ON);
+	}
+	else if (ui_btns->down_btn == 1) {
+		lv_obj_scroll_by_bounded(cont, 0, -WIFI_AI_PKT_RESULTS_Y_OFFSET, LV_ANIM_ON);
+	}
+	// Go back
+	else if (ui_btns->left_btn) {
+		// Hide right arrow
+		lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+		// Delete objects
+		lv_obj_delete(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+			
+		// Show Wi-Fi menu
+		lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+		// Show top and bottom arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+		
+		// Switch back
+		ui_menu->page = WIFI_PAGE;
+
+		// Disable portal and Wi-Fi (extra safety)
+		xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_PKT_ANALYSIS_BIT);
+		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+	}
+	// Home or power off
+	else if (ui_btns->home_btn || ui_btns->pwr_btn) {
+		// Delete objects
+		lv_obj_delete(cont); // Deletes children
+		
+		// Reset statics
+		cont = NULL;
+		title_lbl = instr_lbl = NULL;
+		init = false;
+		
+ 		lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+
+		// Stop the analysis portal if running
+		xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_PKT_ANALYSIS_BIT);
 	}
 }
 
@@ -1229,11 +1630,8 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
 		cont = chart = lbl_rssi = lbl_snr = lbl_scroll = lbl_info = lbl_data = NULL;
 		series = NULL;
 		
-		// Turn off Wi-Fi
-		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
-		
 		// Switch mask
-		sniff_network.mask = 0; // 1 = WIFI_PROMIS_FILTER_MASK_MGMT
+		sniff_network.mask = WIFI_PROMIS_FILTER_MASK_DATA;
 		
 		// Restart
 		if (xQueueSend(xWifiSniffQueue, &sniff_network, portMAX_DELAY) != pdPASS) {
@@ -1247,6 +1645,7 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
 		ui_menu->page = WIFI_DATA_PAGE;
 	}
 }
+
 
 // Colors bar more green or red based on value
 static void data_chart_draw_cb(lv_event_t * e)
@@ -1448,11 +1847,8 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		cont = chart = lbl_info = lbl_clients = lbl_scroll = lbl_beacon = NULL;
 		series = NULL;
 		
-		// Turn off Wi-Fi
-		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
-		
 		// Switch mask
-		sniff_network.mask = 1; // 1 = WIFI_PROMIS_FILTER_MASK_MGMT
+		sniff_network.mask = WIFI_PROMIS_FILTER_MASK_MGMT;
 				
 		// Restart
 		if (xQueueSend(xWifiSniffQueue, &sniff_network, portMAX_DELAY) != pdPASS) {
@@ -1529,7 +1925,7 @@ void lcd_wifi_sync_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 		
 		// Copy info
 		espnow_mqtt_t sync_info;
-		memcpy(sync_info.key, mqtt_key, sizeof(sync_info.key));
+		memcpy(sync_info.key, mqtt_key, sizeof(mqtt_key));
 		strlcpy(sync_info.password, selected_network.password, sizeof(sync_info.password));
 		strlcpy(sync_info.ssid, selected_network.ssid, sizeof(sync_info.ssid));
 	

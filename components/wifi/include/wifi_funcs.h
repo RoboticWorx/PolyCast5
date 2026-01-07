@@ -22,6 +22,16 @@
 #define RSN_AKM_SAE 8 // WPA3-Personal
 #define RSN_AKM_OWE 18 // Enhanced Open (OWE)
 
+#define WIFI_PROMIS_FILTER_MASK_RAW_USEFUL ( \
+    WIFI_PROMIS_FILTER_MASK_MGMT       | \
+    WIFI_PROMIS_FILTER_MASK_CTRL       | \
+    WIFI_PROMIS_FILTER_MASK_DATA       | \
+    WIFI_PROMIS_FILTER_MASK_MISC       | \
+    WIFI_PROMIS_FILTER_MASK_DATA_MPDU  | \
+    WIFI_PROMIS_FILTER_MASK_DATA_AMPDU   \
+)
+#define WIFI_MAX_RAW_FRAMES 150 // Max raw frames to capture for AI analysis
+
 typedef struct {
     uint8_t ssid[33];
     uint8_t bssid[6];
