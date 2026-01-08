@@ -742,7 +742,7 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
         title_lbl = instr_lbl = pin_lbl = ending_lbl =NULL;
         init = false;
         
-         lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -1216,7 +1216,7 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
         lbl_home = NULL;
         init = false;
 
-        lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+        lcd_transition_back(false, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -1311,7 +1311,7 @@ void lcd_bluetooth_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blueto
         // Stop portal
         xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_BIT);
         
-         lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -1394,8 +1394,8 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
                 ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue previous_network");
             }
     
-            // Wait up to 10s for Wi-Fi to connect
-            if ((xEventGroupWaitBits(xWifiEventGroup, WIFI_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(10000)) & WIFI_CONNECTED_BIT) != 0) {
+            // Wait up to WIFI_CONN_TIMEOUT_MS for Wi-Fi to connect
+            if ((xEventGroupWaitBits(xWifiEventGroup, WIFI_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(WIFI_CONN_TIMEOUT_MS)) & WIFI_CONNECTED_BIT) != 0) {
                 lv_label_set_text(lbl_ins, "Connecting with BLE...");
                 lv_timer_handler();
     
@@ -1569,7 +1569,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         do_once = false;
         lbl_ins = ai_orb = lbl_config = NULL;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -1662,7 +1662,7 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
         // Reset static
         do_once = false;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     } else if (ui_btns->select_btn == 1) { // Option selected
         // Add/Edit selected
         if (bluetooth_menu->bluetooth_keyboard_menu.index == 0) {
@@ -1762,7 +1762,7 @@ void lcd_bluetooth_keyboard_sub_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blu
         // Reset init
         init = false;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);  // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu);  // True = home, false = sleep
     }
 }
 
@@ -1860,7 +1860,7 @@ void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
         title_lbl = instr_lbl = NULL;
         init = false;
         
-         lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -2149,7 +2149,7 @@ void lcd_bluetooth_known_devices_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bl
         // Reset init
         init = false;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);  // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu);  // True = home, false = sleep
     }
 }
 
@@ -2280,7 +2280,7 @@ void lcd_bluetooth_pair_new_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
         title_lbl = instr_lbl = pin_lbl = ending_lbl = NULL;
         init = false;
         
-         lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -2427,7 +2427,7 @@ void lcd_bluetooth_rename_peer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         // Force next rebuild of the known-devices list
         lv_obj_clean(bluetooth_menu->bluetooth_peer_menu.main_list);
         
-         lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+         lcd_transition_back(false, ui_menu); // True = home, false = sleep
     } else if (ui_btns->left_btn && cur_pos != 0) { // If left and not at start
         // Clear the current slot
         bt_name_buf[cur_pos] = '\0';
@@ -2601,7 +2601,7 @@ void lcd_bluetooth_forget_all_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
         lbl_ins = lbl_note = NULL;
         do_once = false;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 

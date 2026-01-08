@@ -191,7 +191,7 @@ static void ai_task(void *pvParameters)
 
 void ai_task_create(void)
 {
-    if (xTaskCreate(ai_task, "ai_task", 1024 * 6, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
+		if (xTaskCreate(ai_task, "ai_task", 1024 * 6, NULL, POLYCAST5_PRIORITY_MEDIUM, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start ai_task");
     }
 }

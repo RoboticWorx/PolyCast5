@@ -199,7 +199,7 @@ static void infrared_task(void *pvParameters) {
 }
 
 void infrared_task_create(void) {
-    if (xTaskCreate(infrared_task, "infrared_task", 1024 * 3, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
+    if (xTaskCreate(infrared_task, "infrared_task", 1024 * 3, NULL, POLYCAST5_PRIORITY_MEDIUM, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start infrared_task");
     }
 }

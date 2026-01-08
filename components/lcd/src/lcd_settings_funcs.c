@@ -567,7 +567,7 @@ void lcd_settings_ota_confirm_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
         title_lbl = instr_lbl = NULL;
         init = false;
         
-         lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -848,7 +848,7 @@ void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu
         lbl_ins = lbl_conf = NULL;
         do_once = false;
         
-        lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+        lcd_transition_back(false, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -985,7 +985,7 @@ void lcd_settings_colors_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_m
         lbl_ins = primary_color_box = secondary_color_box = lbl_primary = lbl_secondary = lbl_selected = NULL;
         do_once = false;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -1161,7 +1161,7 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
         lbl_ins = lbl_arr = old_color_box = new_color_box = NULL;
         do_once = false;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -1332,7 +1332,7 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
             sw_arr[i] = sw_row[i] = NULL;
         }
 
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu);
     }
 }
 
@@ -1424,7 +1424,7 @@ void lcd_settings_sleep_timer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
         slider = NULL;
         init = false;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -1603,7 +1603,7 @@ void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
         slider_every = slider_for = NULL;
         init = false;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -1878,7 +1878,7 @@ void lcd_settings_system_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_m
         title_lbl = instr_lbl = NULL;
         init = false;
 
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -1967,7 +1967,7 @@ void lcd_settings_help_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_men
         title_lbl = instr_lbl = NULL;
         init = false;
         
-         lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -2154,7 +2154,7 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
         slider = NULL;
         init = false;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -2225,7 +2225,7 @@ void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
         lbl_ins = lbl_note = NULL;
         do_once = false;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 

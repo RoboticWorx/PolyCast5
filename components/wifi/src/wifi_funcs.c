@@ -681,6 +681,9 @@ void wifi_funcs_get_current_date_time(void)
     #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Current date/time 12h: %s", strftime_buf);
     #endif
+
+    // Notify time acquired
+    xEventGroupSetBits(xWifiEventGroup, WIFI_GOT_DATE_TIME_BIT); // Set got time
 }
 
 static const char* wifi_disconnect_reason_str(uint8_t r)
@@ -909,7 +912,7 @@ esp_err_t wifi_funcs_connect(void)
     
     // Wait for connection or timeout
     if (xEventGroupWaitBits(xWifiEventGroup, WIFI_CONNECTED_BIT,
-            pdFALSE, pdFALSE, pdMS_TO_TICKS(15000)) & WIFI_CONNECTED_BIT) {
+            pdFALSE, pdFALSE, pdMS_TO_TICKS(WIFI_CONN_TIMEOUT_MS)) & WIFI_CONNECTED_BIT) {
         #ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Wi-Fi connected and got IP!");
         #endif

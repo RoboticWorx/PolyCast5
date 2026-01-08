@@ -177,7 +177,7 @@ static void espnow_task(void *param)
 
 void espnow_task_create(void)
 {
-    if (xTaskCreate(espnow_task, "espnow_task", 1024 * 3, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
+    if (xTaskCreate(espnow_task, "espnow_task", 1024 * 3, NULL, POLYCAST5_PRIORITY_MEDIUM, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start espnow_task");
     }
 }

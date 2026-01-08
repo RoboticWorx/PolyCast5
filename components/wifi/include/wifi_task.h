@@ -39,6 +39,8 @@ extern EventGroupHandle_t xWiFiPortalEventGroup;
 #define WIFI_MQTT_SUCCESS_BIT      (1U << 7)
 #define WIFI_CHECK_OTA_ON_CONN_BIT (1U << 8)
 #define WIFI_OTA_AVAILABLE_BIT     (1U << 9)
+#define WIFI_GET_DATE_TIME_BIT     (1U << 10)
+#define WIFI_GOT_DATE_TIME_BIT     (1U << 11)
 extern EventGroupHandle_t xWifiEventGroup;
 
 extern QueueHandle_t xWifiScanQueue;

@@ -28,6 +28,7 @@ LTP of synapses between neurons in the brain.
 
 #include "wifi_funcs.h"
 #include "wifi_task.h"
+#include "gpio_task.h"
 #include "srs_memory.h"
 
 #define TAG "SRS_MEMORY"
@@ -100,11 +101,14 @@ bool srs_sync_time_over_wifi(void)
         return true; // No need for Wi-Fi if already synced
     }
 
+    LCD_LOADING_ANIM_START_DEFAULT();
+
     // Confirmation text
     lv_obj_t *lbl_info = lv_label_create(ACTIVE_SCR);
     lcd_format_label(lbl_info, "Getting day via Wi-Fi...", user_secondary_color,
             &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
     lv_timer_handler();
+    vTaskDelay(pdMS_TO_TICKS(100)); // Allow render
 
     #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Getting day via Wi-Fi");
@@ -116,12 +120,22 @@ bool srs_sync_time_over_wifi(void)
         ESP_LOGI(TAG, "Wi-Fi already connected");
         #endif
 
-        // Get time
-        wifi_funcs_get_current_date_time();
+        // Request to get date and time
+        xEventGroupSetBits(xWifiEventGroup, WIFI_GET_DATE_TIME_BIT);
+
+        // Wait for it to complete
+        while (!(xEventGroupGetBits(xWifiEventGroup) & WIFI_GOT_DATE_TIME_BIT)) {
+            lv_timer_handler();
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+        // Reset for next time
+        xEventGroupClearBits(xWifiEventGroup, WIFI_GOT_DATE_TIME_BIT);
 
         // Delete helper text
         lv_obj_delete(lbl_info);
         lbl_info = NULL;
+
+        lcd_loading_anim_stop();
     
         return true;
     }
@@ -134,32 +148,82 @@ bool srs_sync_time_over_wifi(void)
         ESP_LOGE(TAG, "Failed srs_sync_time_over_wifi: xWifiSelectedNetworkQueue");
     }
 
-    // Wait up to 6s for connection
-    if ((xEventGroupWaitBits(xWifiEventGroup, WIFI_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(6000)) & WIFI_CONNECTED_BIT) != 0) {
-        // Get time
-        wifi_funcs_get_current_date_time();
+    // Wait up to WIFI_CONN_TIMEOUT_MS for connection
+    TickType_t start = xTaskGetTickCount();
+    TickType_t timeout = pdMS_TO_TICKS(WIFI_CONN_TIMEOUT_MS);
+    bool connected = false;
+
+    while ((xTaskGetTickCount() - start) < timeout) {
+        // Connected
+        if ((xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT) != 0) {
+            connected = true;
+            break;
+        }
+
+        // User cancelled
+        if (xSemaphoreTake(xLeftButtonSemaphore, 0) == pdPASS) {
+            // Stop loading animation
+            lcd_loading_anim_stop();
+
+            // Delete helper text
+            lv_obj_delete(lbl_info);
+            lbl_info = NULL;
+
+            lcd_clear_pending_inputs = true; // Clear user inputs from wait
+
+            xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT); // Disconnect Wi-Fi
+
+            return false;
+        }
+
+        lv_timer_handler();
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    lcd_clear_pending_inputs = true; // Clear user inputs from wait
+
+    if (connected) {
+        // Request to get date and time
+        xEventGroupSetBits(xWifiEventGroup, WIFI_GET_DATE_TIME_BIT);
+        
+        // Wait for it to complete
+        while (!(xEventGroupGetBits(xWifiEventGroup) & WIFI_GOT_DATE_TIME_BIT)) {
+            lv_timer_handler();
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+        // Reset for next time
+        xEventGroupClearBits(xWifiEventGroup, WIFI_GOT_DATE_TIME_BIT);
 
         // Done with Wi-Fi -> disconnect to save power
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
         lcd_clear_pending_inputs = true; // Clear user inputs from wait
     } else {
+        // Stop loading animation
+        lcd_loading_anim_stop();
+
         // Notify user
-        lcd_format_label(lbl_info, "Failed!\n\nPlease connect to a Wi-Fi\nnetwork at least once.\nYou can disconnect after.", user_secondary_color,
+        lcd_format_label(lbl_info, "Connection failed!\nPlease connect to your\nWi-Fi network at least\nonce in the 'Wi-Fi'\nmenu and make sure\nyou are in range.", user_secondary_color,
                 &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
 
         // Show
         lv_timer_handler();
-        vTaskDelay(pdMS_TO_TICKS(4000));
+        
+        // Wait for left button press
+        while (xSemaphoreTake(xLeftButtonSemaphore, 0) != pdPASS) {
+            lv_timer_handler();
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+        lcd_clear_pending_inputs = true; // Clear user inputs from wait
 
         // Delete helper text
         lv_obj_delete(lbl_info);
         lbl_info = NULL;
 
-        lcd_clear_pending_inputs = true; // Clear user inputs from wait
-
         return false;
     }
+
+    // Stop loading animation
+    lcd_loading_anim_stop();
 
     // Delete helper text
     lv_obj_delete(lbl_info);

@@ -270,7 +270,7 @@ static void bluetooth_task(void *arg)
 
 void bluetooth_task_create(void)
 {
-    if (xTaskCreate(bluetooth_task, "bluetooth_task", 1024 * 4, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
+    if (xTaskCreate(bluetooth_task, "bluetooth_task", 1024 * 4, NULL, POLYCAST5_PRIORITY_MEDIUM, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start bluetooth_task");
     }
 }

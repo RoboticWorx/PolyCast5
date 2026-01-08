@@ -367,7 +367,7 @@ bool ota_update_check_start(const char *manifest_url)
     strlcpy(manifest_url_buf, manifest_url, sizeof(manifest_url_buf));
     
     // Create OTA check task
-    return xTaskCreate(ota_check_task, "ota_check_task", 5 * 1024, NULL, tskIDLE_PRIORITY + 1, &ota_check_task_handle) == pdPASS;
+    return xTaskCreate(ota_check_task, "ota_check_task", 5 * 1024, NULL, POLYCAST5_PRIORITY_HIGH, &ota_check_task_handle) == pdPASS;
 }
 
 bool ota_update_start(const char *url)
@@ -388,7 +388,7 @@ bool ota_update_start(const char *url)
     strlcpy(url_buf, url, sizeof(url_buf));
     
     // Create OTA task
-    if (xTaskCreate(ota_task, "ota_task", 8 * 1024, NULL, tskIDLE_PRIORITY + 2, &ota_task_handle) != pdPASS) {
+    if (xTaskCreate(ota_task, "ota_task", 8 * 1024, NULL, POLYCAST5_PRIORITY_HIGH, &ota_task_handle) != pdPASS) {
         ESP_LOGE(TAG, "Create ota_task failed");
         ota_task_handle = NULL;
         return false;

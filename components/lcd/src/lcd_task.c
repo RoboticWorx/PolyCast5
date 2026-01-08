@@ -570,7 +570,7 @@ static void lcd_task(void *pvParameters)
 
 void lcd_task_create(void)
 {
-    if (xTaskCreatePinnedToCore(lcd_task, "lcd_task", 1024 * 8, NULL, tskIDLE_PRIORITY + 2, NULL, 0) != pdPASS) {
+    if (xTaskCreatePinnedToCore(lcd_task, "lcd_task", 1024 * 8, NULL, POLYCAST5_PRIORITY_HIGH, NULL, 0) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start lcd_task");
     }
 }

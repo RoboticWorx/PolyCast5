@@ -264,6 +264,12 @@ void lcd_wifi_create_scan_list(wifi_scan_menu_t *menu)
 
 static void lcd_wifi_update_scan_menu(wifi_scan_menu_t *menu)
 {    
+    // Nothing to highlight if empty (prevents NULL/stale btn deref -> lv_obj_remove_style crash)
+    if (menu->size == 0) {
+        menu->index = 0;
+        return;
+    }
+
     // Wrap index
     if (menu->index >= menu->size) {
         menu->index = 0;
@@ -298,14 +304,16 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
     static uint8_t channels[WIFI_MAX_NETWORKS];
     
     // Do once
-    if (!initialized) {            
+    if (!initialized) {
+		// Clear any previous scans (fresh start)
+		xQueueReset(xWifiScanQueue);
+
         if (!monitoring_packets) {             
             // Option label
             lbl_option = lv_label_create(ACTIVE_SCR);
             lcd_format_label(lbl_option, "or press down to scan", user_secondary_color,
                     &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -10);
-                             
-        
+			
             /* Add prev button */
             char buf[16];
             snprintf(buf, sizeof(buf), "Connect to Last");
@@ -335,11 +343,18 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
         } else {
             // Disconnect if connected
             xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+
+			// Hide top and bottom arrows
+			lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
             
             lbl_wait = lv_label_create(ACTIVE_SCR);
             lcd_format_label(lbl_wait, "Scanning for networks...\nPlease wait, then select\na network to monitor.", user_secondary_color,
                     &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
-                                                  
+
+			// Start loading animation
+			LCD_LOADING_ANIM_START_DEFAULT();
+
             lv_timer_handler(); // Show
             
             // Start scan
@@ -365,9 +380,19 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
             scanning = false;
             scanned = false;
 
+            // Stop loading animation
+            lcd_loading_anim_stop();
+
+            // Ensure wait label exists before updating it
+            if (!lbl_wait) {
+                lbl_wait = lv_label_create(ACTIVE_SCR);
+                lcd_format_label(lbl_wait, "", user_secondary_color,
+                        &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
+            }
+
             lv_label_set_text(lbl_wait, "No networks found.\nPress LEFT to go back.");
             lv_obj_align(lbl_wait, LV_ALIGN_CENTER, 0, 20);
-            
+
             // Don't create any buttons for this sentinel
             continue;
         }
@@ -376,9 +401,24 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
         if ((result.ssid[0] == '\0') || (strlen((char*)result.ssid) == 0)) {
             continue;
         }
+
+        // Cap menu size to avoid overflowing local arrays/buttons
+        if (wifi_menu->scan_menu.size >= WIFI_MAX_NETWORKS) {
+            #ifdef POLYCAST5_DEBUG
+            ESP_LOGW(TAG, "lcd_wifi_scan_page: Too many networks; dropping '%s'", (char *)result.ssid);
+            #endif
+            continue;
+        }
         
         // Once networks have been received: delete help text
         if (!scanned) {
+			// Show top and bottom arrows
+			lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+			// Stop loading animation
+			lcd_loading_anim_stop();
+
             lv_obj_delete(lbl_wait);
             lbl_wait = NULL;
             scanning = false;
@@ -448,54 +488,81 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
         wifi_menu->scan_menu.index++;
         lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
     }
-    // Back
-    else if ((!scanning || scanned) && ui_btns->left_btn == 1) {
+    // Back (allow cancel even while scanning)
+    else if (ui_btns->left_btn == 1) {
         if (lbl_option) { // Delete if exists
             lv_obj_delete(lbl_option);
             lbl_option = NULL;
         }
-        
+
+        // If actively scanning, stop UI + request Wi-Fi stop so the scan task doesn't wedge on a full queue
+        if (scanning && !scanned) {
+            lcd_loading_anim_stop();
+            xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+            scanning = false;
+        }
+
         // Reset
         monitoring_packets = false;
         initialized = false;
         scanned = false;
+
         for (int i = 0; i < wifi_menu->scan_menu.size; ++i) {
             locked[i] = false;
             memset(bssids[i], 0, sizeof(bssids[i]));
             channels[i] = 0;
         }
+
         wifi_menu->scan_menu.size = 0;
         wifi_menu->scan_menu.index = 0;
         lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
-        
+
         // Clear children
         lv_obj_clean(wifi_menu->scan_menu.main_list);
-        
+
         // Hide scan menu
         lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
-        
+
+        // Clean wait label if present
+        if (lbl_wait) {
+            lv_obj_delete(lbl_wait);
+            lbl_wait = NULL;
+        }
+
+        // Show top and bottom arrows
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
         // Show Wi-Fi menu
         lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-        
+
         // Switch pages
         ui_menu->page = WIFI_PAGE;
     }
-    // Go home
-    else if ((!scanning || scanned) && ui_btns->home_btn == 1) {
+    // Go home or power off (allow cancel even while scanning)
+    else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
         if (lbl_option) { // Delete if exists
             lv_obj_delete(lbl_option);
             lbl_option = NULL;
         }
-        
+
+        if (scanning && !scanned) {
+            lcd_loading_anim_stop();
+            xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+            scanning = false;
+        }
+
         // Reset
         monitoring_packets = false;
         initialized = false;
         scanned = false;
+
         for (int i = 0; i < wifi_menu->scan_menu.size; ++i) {
             locked[i] = false;
             memset(bssids[i], 0, sizeof(bssids[i]));
             channels[i] = 0;
         }
+
         wifi_menu->scan_menu.size = 0;
         wifi_menu->scan_menu.index = 0;
         lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
@@ -505,36 +572,13 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
         
         // Hide scan menu
         lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
-        
-        lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
-    }
-    // Power off
-    else if ((!scanning || scanned) && ui_btns->pwr_btn == 1) {
-        if (lbl_option) { // Delete if exists
-            lv_obj_delete(lbl_option);
-            lbl_option = NULL;
+
+        if (lbl_wait) {
+            lv_obj_delete(lbl_wait);
+            lbl_wait = NULL;
         }
-        
-        // Reset
-        monitoring_packets = false;
-        initialized = false;
-        scanned = false;
-        for (int i = 0; i < wifi_menu->scan_menu.size; ++i) {
-            locked[i] = false;
-            memset(bssids[i], 0, sizeof(bssids[i]));
-            channels[i] = 0;
-        }
-        wifi_menu->scan_menu.size = 0;
-        wifi_menu->scan_menu.index = 0;
-        lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
-        
-        // Clear children
-        lv_obj_clean(wifi_menu->scan_menu.main_list);
-        
-        // Hide scan menu
-        lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
-        
-        lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     } else if (ui_btns->select_btn == 1 && wifi_menu->scan_menu.index == 0 && !scanning && !monitoring_packets) { // If connecting to last known
         if (lbl_option) { // Delete if exists
             lv_obj_delete(lbl_option);
@@ -688,8 +732,7 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
 }
 
 // TODO: Make system prompt editable
-// TODO: Bug: Can recapture after capture without going back to menu
-// TODO: Nicen up menu and clean up cases
+// TODO: Add deauth stuff and MAC spoofing
 void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {
     #define WIFI_AI_PKT_CONN_FAILED_TXT "Connection failed!\nPlease connect to your\nWi-Fi network at least\nonce in the 'Wi-Fi'\nmenu and make sure\nyou are in range."
@@ -701,6 +744,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
         AI_PKT_CAPTURING,
         AI_PKT_RECONNECT_WAIT,
         AI_PKT_SEND_AI,
+        AI_PKT_ANALYSIS_WAITING,
         AI_PKT_ANALYSIS_COMPLETE,
     } ai_pkt_state_t;
 
@@ -730,6 +774,12 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
     static TickType_t reconnect_start_tick = 0;
 
     if (init) {
+		// Ensure disconnected at start
+		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+
+		// Clear any previous sniffed frames
+		xQueueReset(xWifiAiRawSniffQueue);
+
         lbl_ins = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_ins, "", user_secondary_color,
                 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
@@ -745,6 +795,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 
         lv_label_set_text_fmt(lbl_ins, WIFI_AI_PKT_HOLD_TXT, (unsigned)channel);
 
+		// Default state
         state = AI_PKT_IDLE;
         last_select = false;
         last_frames_shown = 0;
@@ -822,6 +873,9 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
             lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
             lv_label_set_text(lbl_ins, "Connecting to Wi-Fi...");
 
+			// Start loading animation
+			LCD_LOADING_ANIM_START_DEFAULT();
+
             // Hide top and bottom arrows
             lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
@@ -853,10 +907,14 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
                 reconnect_sent = true;
             }
         } else {
-            // Wait up to 15 seconds for Wi-Fi connection
+            // Wait up to WIFI_CONN_TIMEOUT_MS for Wi-Fi connection
             if (xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT) {
                 state = AI_PKT_SEND_AI;
-            } else if ((xTaskGetTickCount() - reconnect_start_tick) >= pdMS_TO_TICKS(15000)) {
+            } else if ((xTaskGetTickCount() - reconnect_start_tick) >= pdMS_TO_TICKS(WIFI_CONN_TIMEOUT_MS)) {
+				// Stop loading animation
+				lcd_loading_anim_stop();
+
+				// Notify user of failure
                 ESP_LOGE(TAG, "lcd_wifi_ai_packet_page: Wi-Fi reconnect timeout after sniff");
                 lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
                 lv_label_set_text(lbl_ins, WIFI_AI_PKT_CONN_FAILED_TXT);
@@ -917,12 +975,15 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
         }
 
         // Switched to AI_PKT_ANALYSIS_COMPLETE in xQueueReceive xWifiAiRawSniffQueue
-        state = AI_PKT_IDLE; // Idle for now
+        state = AI_PKT_ANALYSIS_WAITING; // Waiting for analysis to complete
     }
 
     // When response received (non-blocking)
-    if (xQueueReceive(xWifiAiRawSniffQueue, &raw_frames_ai_response, 0) == pdTRUE) {
+    if ((xQueueReceive(xWifiAiRawSniffQueue, &raw_frames_ai_response, 0) == pdTRUE) && (state == AI_PKT_ANALYSIS_WAITING)) {
         state = AI_PKT_ANALYSIS_COMPLETE;
+
+		// Stop loading animation
+		lcd_loading_anim_stop();
 
         lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
         lv_label_set_text(lbl_ins, "Analysis complete!\n\nPress RIGHT to\nsee the results.");
@@ -967,6 +1028,9 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
         // Switch to results page
         ui_menu->page = WIFI_AI_PACKET_RESULTS_PAGE;
     } else if (ui_btns->left_btn) { // Go back
+		// Stop loading animation
+		lcd_loading_anim_stop();
+		
         // Hide right arrow
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
@@ -994,6 +1058,23 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 
         // Disable Wi-Fi
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+    } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
+        // Delete objects
+        lv_obj_delete(lbl_ins);
+
+        // Reset capture state
+        state = AI_PKT_IDLE;
+        last_select = false;
+        reconnect_sent = false;
+
+        // Reset statics
+        init = true;
+        lbl_ins = NULL;
+        
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+
+        // Stop the analysis portal if running
+        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_PKT_ANALYSIS_BIT);
     }
 }
 
@@ -1037,6 +1118,10 @@ void lcd_wifi_ai_packet_results_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wif
         lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
         lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
+		// Show top and bottom arrows
+		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
         // Set instruction text
         const char *res = (raw_frames_ai_response) ? raw_frames_ai_response : "";
 
@@ -1057,6 +1142,8 @@ void lcd_wifi_ai_packet_results_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wif
                     ai_analysis_portal_get_ip());
 
         lv_label_set_text(instr_lbl, instr_text);
+
+		lv_timer_handler(); // Update immediately
 
         init = true;
     }
@@ -1079,10 +1166,6 @@ void lcd_wifi_ai_packet_results_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wif
             
         // Show Wi-Fi menu
         lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-
-        // Show top and bottom arrows
-        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
         
         // Switch back
         ui_menu->page = WIFI_PAGE;
@@ -1099,7 +1182,7 @@ void lcd_wifi_ai_packet_results_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wif
         title_lbl = instr_lbl = NULL;
         init = false;
         
-         lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 
         // Stop the analysis portal if running
         xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_PKT_ANALYSIS_BIT);
@@ -1227,7 +1310,7 @@ void lcd_wifi_get_password(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t 
         cur_pos = row_idx = char_idx = 0;
         initialized = false;
 
-        lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+        lcd_transition_back(false, ui_menu); // True = home, false = sleep
     } else if (ui_btns->left_btn) { // Backspace
         // Save change to name buffer
         mqtt_name_buf[cur_pos] = '\0';
@@ -1605,7 +1688,7 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
         // Turn off Wi-Fi
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     } else if (ui_btns->right_btn) { // Switch to data frames
         // Delete obj
         lv_obj_delete(cont); // Also deletes children
@@ -1706,7 +1789,7 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
     static lv_chart_series_t *series;
 
     // Do once
-    if(!init) {
+    if (!init) {
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
         
         // Create container
@@ -1857,7 +1940,7 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
         // Turn off Wi-Fi
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
         
-        lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+        lcd_transition_back(true, ui_menu); // True = home, false = sleep
     } else if (ui_btns->pwr_btn) { // Power off
         lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
          
@@ -1873,7 +1956,7 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
         // Turn off Wi-Fi
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
         
-        lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+        lcd_transition_back(false, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -1959,7 +2042,7 @@ void lcd_wifi_sync_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
         // Hide right arrow
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -2110,7 +2193,7 @@ void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_m
         // Hide right arrow
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     } else if (ui_btns->left_btn && cur_pos != 0) { // If left and not at start
         // Clear the current slot
         mqtt_name_buf[cur_pos] = '\0';
@@ -2549,10 +2632,9 @@ void lcd_wifi_send_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
         lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
         
-        lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+        lcd_transition_back(false, ui_menu); // True = home, false = sleep
     }
 }
-
 
 void lcd_wifi_setup_send_page(wifi_menu_t *wifi_menu)
 {

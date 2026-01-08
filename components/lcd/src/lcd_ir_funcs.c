@@ -185,7 +185,7 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
         lv_obj_delete(lbl_select);
         lbl_title = lbl_name = lbl_back = lbl_edit = lbl_select = NULL;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu);
     } else if (ui_btns->up_btn) { // Iterate up
         edit_idx++;
         
@@ -488,7 +488,7 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
         
         ir_menu_overwrite = false;
         
-         lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+         lcd_transition_back(false, ui_menu); // True = home, false = sleep
     } else if (ui_btns->left_btn) { // If left and not at start
         // Clear the current slot
         name_buf[cur_pos] = '\0';

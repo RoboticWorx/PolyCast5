@@ -7,6 +7,8 @@
 
 #define WIFI_MAX_NETWORKS 40
 
+#define WIFI_CONN_TIMEOUT_MS 10000
+
 #define MAX_MAC_CLIENTS 100
 
 // RSN cipher types (store as 1u<<type)

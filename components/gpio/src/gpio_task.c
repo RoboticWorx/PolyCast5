@@ -237,7 +237,7 @@ static void gpio_task(void *arg)
     gpio_cycle_rgb();
     #endif
     
-    if (xTaskCreate(adc_task, "adc_task", 1024 * 2, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
+    if (xTaskCreate(adc_task, "adc_task", 1024 * 2, NULL, POLYCAST5_PRIORITY_LOW, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start adc_task");
     }
     
@@ -368,7 +368,7 @@ static void gpio_task(void *arg)
 
 void gpio_task_create(void)
 {
-    if (xTaskCreate(gpio_task, "gpio_task", 1024 * 2, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
+    if (xTaskCreate(gpio_task, "gpio_task", 1024 * 2, NULL, POLYCAST5_PRIORITY_MEDIUM, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start gpio_task");
     }
 }

@@ -127,6 +127,8 @@ static const char *TAG = "LCD_FUNCS";
 static TFT_t tft;
 static lv_display_t *disp; // LVGL display handle
 
+static lv_obj_t *loading_anim_cont = NULL; // Loading animation container
+
 static bool already_scrolling = false;
 static bool scrolling_menu = false;
 static bool scrolling_up = false;
@@ -1199,12 +1201,12 @@ static void start_animation(void)
     } else if (anim_active == BLACK_HOLE) {
         lv_obj_remove_flag(black_hole_anim.img,  LV_OBJ_FLAG_HIDDEN);
         lv_timer_resume(black_hole_anim.timer);
-    } else if (anim_active == MATRIX_RAIN){
+    } else if (anim_active == MATRIX_RAIN) {
         lv_obj_remove_flag(matrix_rain_anim.img,  LV_OBJ_FLAG_HIDDEN);
         lv_timer_resume(matrix_rain_anim.timer);
     }
     #ifdef POLYCAST5_EN_PYRAMID_ANIM
-    else if (anim_active == PYRAMID){
+    else if (anim_active == PYRAMID) {
         lv_obj_remove_flag(pyramid_anim.img,  LV_OBJ_FLAG_HIDDEN);
         lv_timer_resume(pyramid_anim.timer);
     }
@@ -1455,6 +1457,130 @@ int lcd_draw_qr(lv_obj_t *canvas, const char *text, int size_px, uint8_t **pbuf)
     return 0;
 }
 
+static void loading_anim_x_cb(void * var, int32_t v)
+{
+    lv_obj_t *obj = (lv_obj_t *)var;
+    lv_obj_t *parent = lv_obj_get_parent(obj);
+
+    if (parent) {
+        lv_coord_t max_x = lv_obj_get_width(parent) - lv_obj_get_width(obj);
+        if (max_x < 0) {
+            max_x = 0;
+        }
+
+        if (v < 0) {
+            v = 0;
+        } else if (v > max_x) {
+            v = max_x;
+        }
+    }
+
+    lv_obj_set_x(obj, (lv_coord_t)v);
+}
+
+static void loading_anim_size_cb(void * var, int32_t v)
+{
+    lv_obj_t *obj = (lv_obj_t *)var;
+    lv_obj_t *parent = lv_obj_get_parent(obj);
+
+    lv_obj_set_size(obj, (lv_coord_t)v, (lv_coord_t)v);
+
+    // Keep vertically centered within parent container as size changes
+    if (parent) {
+        lv_coord_t h = lv_obj_get_height(parent);
+        lv_obj_set_y(obj, (h - (lv_coord_t)v) / 2);
+
+        // Also keep X in-bounds if width changed
+        lv_coord_t max_x = lv_obj_get_width(parent) - lv_obj_get_width(obj);
+        if (max_x < 0) {
+            max_x = 0;
+        }
+        lv_coord_t x = lv_obj_get_x(obj);
+        if (x > max_x) {
+            lv_obj_set_x(obj, max_x);
+        } else if (x < 0) {
+            lv_obj_set_x(obj, 0);
+        }
+    }
+}
+
+void lcd_loading_anim_start(lv_align_t align, lv_coord_t x_off, lv_coord_t y_off, lv_color_t color)
+{
+    // If already running, stop first
+    if (loading_anim_cont) {
+        // Stop and recreate
+        lcd_loading_anim_stop();
+        #ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "lcd_loading_anim_start: Loading animation already running, restarting"); 
+        #endif
+    }
+
+    const lv_coord_t min_sz = 6;
+    const lv_coord_t max_sz = 24;
+
+    // Container (invisible) so we can position once and animate inside it
+    loading_anim_cont = lv_obj_create(ACTIVE_SCR);
+    lv_obj_set_size(loading_anim_cont, max_sz + 1, max_sz + 1);
+    lv_obj_set_style_bg_opa(loading_anim_cont, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(loading_anim_cont, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_all(loading_anim_cont, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_clear_flag(loading_anim_cont, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_align(loading_anim_cont, align, x_off, y_off);
+
+    // Dot
+    lv_obj_t *dot = lv_obj_create(loading_anim_cont);
+    lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(dot, color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(dot, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_all(dot, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    lv_obj_set_size(dot, min_sz, min_sz);
+    lv_obj_align(dot, LV_ALIGN_LEFT_MID, 0, 0);
+
+    // Pulse animation (size)
+    lv_anim_t a_size;
+    lv_anim_init(&a_size);
+    lv_anim_set_var(&a_size, dot);
+    lv_anim_set_exec_cb(&a_size, loading_anim_size_cb);
+    lv_anim_set_values(&a_size, min_sz, max_sz);
+    lv_anim_set_time(&a_size, 900);
+    lv_anim_set_playback_delay(&a_size, 80);
+    lv_anim_set_playback_time(&a_size, 280);
+    lv_anim_set_repeat_delay(&a_size, 250);
+    lv_anim_set_repeat_count(&a_size, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_path_cb(&a_size, lv_anim_path_ease_in_out);
+    lv_anim_start(&a_size);
+
+    // Travel animation (x) - values are clamped in loading_anim_x_cb anyway
+    lv_anim_t a_x;
+    lv_anim_init(&a_x);
+    lv_anim_set_var(&a_x, dot);
+    lv_anim_set_exec_cb(&a_x, loading_anim_x_cb);
+    lv_anim_set_values(&a_x, 0, lv_obj_get_width(loading_anim_cont));
+    lv_anim_set_time(&a_x, 1100);
+    lv_anim_set_repeat_count(&a_x, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_path_cb(&a_x, lv_anim_path_ease_in_out);
+    lv_anim_start(&a_x);
+}
+
+void lcd_loading_anim_stop(void)
+{
+    if (!loading_anim_cont) {
+        return;
+    }
+
+    lv_obj_t *dot = lv_obj_get_child(loading_anim_cont, 0);
+    if (dot) {
+        lv_anim_delete(dot, loading_anim_size_cb);
+        lv_anim_delete(dot, loading_anim_x_cb);
+        lv_obj_delete(dot);
+        dot = NULL;
+    }
+
+    lv_obj_delete(loading_anim_cont);
+    loading_anim_cont = NULL;
+}
+
 void lcd_boot_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu)
 {
     #define BOOT_PAGE_Y_OFFSET 40
@@ -1582,14 +1708,23 @@ void lcd_update_icons(icon_state_t *icon_state, ui_menu_t *ui_menu)
         }
     }
 
-    if (wifi_on)  lv_obj_remove_flag(ui_menu->lbl_wifi_icon, LV_OBJ_FLAG_HIDDEN); // Show Wi-Fi
-    else           lv_obj_add_flag(ui_menu->lbl_wifi_icon, LV_OBJ_FLAG_HIDDEN); // Hide Wi-Fi
+    if (wifi_on) {
+        lv_obj_remove_flag(ui_menu->lbl_wifi_icon, LV_OBJ_FLAG_HIDDEN); // Show Wi-Fi
+    } else {
+        lv_obj_add_flag(ui_menu->lbl_wifi_icon, LV_OBJ_FLAG_HIDDEN); // Hide Wi-Fi
+    }
 
-    if (bt_on)     lv_obj_remove_flag(ui_menu->lbl_bluetooth_icon, LV_OBJ_FLAG_HIDDEN); // Show Bluetooth
-    else         lv_obj_add_flag(ui_menu->lbl_bluetooth_icon, LV_OBJ_FLAG_HIDDEN); // Hide Bluetooth
+    if (bt_on) {
+        lv_obj_remove_flag(ui_menu->lbl_bluetooth_icon, LV_OBJ_FLAG_HIDDEN); // Show Bluetooth
+    } else {
+        lv_obj_add_flag(ui_menu->lbl_bluetooth_icon, LV_OBJ_FLAG_HIDDEN); // Hide Bluetooth
+    }
     
-    if (hotkey_on)     lv_obj_remove_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN); // Show hotkey
-    else             lv_obj_add_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN); // Hide hotkey
+    if (hotkey_on) {
+        lv_obj_remove_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN); // Show hotkey
+    } else {
+        lv_obj_add_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN); // Hide hotkey
+    }
 }
 
 void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
@@ -1997,7 +2132,7 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
                 input_pin, &num_boxes, num_filled);
                 
             pin_signing_in = false;
-            
+    
             // Update options text
             settings_menu->options[0] = SETTINGS_REMOVE_LOCK_TXT;
             lv_list_set_button_text(settings_menu->main_list, settings_menu->btns[0], settings_menu->options[0]);
@@ -2066,7 +2201,7 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
         lcd_settings_rebuild_pin_boxes(settings_menu->pin_menu.pin_container, unlock_labels,
             input_pin, &num_boxes, num_filled);
         
-        lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+        lcd_transition_back(false, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -2078,7 +2213,7 @@ void lcd_hotkey_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotk
         lv_obj_add_flag(hotkey_menu->cont, LV_OBJ_FLAG_HIDDEN);
         
         // Go back
-        lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+        lcd_transition_back(true, ui_menu); // True = home, false = sleep
     } else if (ui_btns->select_btn == 1) { // Select option
         // Hide hotkey page
         lv_obj_add_flag(hotkey_menu->cont, LV_OBJ_FLAG_HIDDEN);
@@ -2113,7 +2248,7 @@ void lcd_hotkey_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotk
         // Hide hotkey page
         lv_obj_add_flag(hotkey_menu->cont, LV_OBJ_FLAG_HIDDEN);
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -2163,7 +2298,7 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
         lv_obj_add_flag(ui_menu->scroll_bar, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(ui_menu->scroll_track, LV_OBJ_FLAG_HIDDEN);
                 
-        lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+        lcd_transition_back(true, ui_menu); // True = home, false = sleep
     } else if (ui_btns->pwr_btn == 1) { // Power off
         // Hide selection labels
         lv_obj_add_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
@@ -2173,7 +2308,7 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
         lv_obj_add_flag(ui_menu->scroll_bar, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(ui_menu->scroll_track, LV_OBJ_FLAG_HIDDEN);
         
-        lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+        lcd_transition_back(false, ui_menu); // True = home, false = sleep
     }
 
     if (scrolling_menu) {
@@ -2212,8 +2347,11 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
     }
 }
 
-void lcd_funcs_transition_back(bool home, ui_menu_t *ui_menu)
+void lcd_transition_back(bool home, ui_menu_t *ui_menu)
 {
+    // Stop loading animation if active
+	lcd_loading_anim_stop();
+    
     // Hide arrows
     lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
@@ -2354,7 +2492,7 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
         // Hide IR menu
         lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
                 
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     } else if (ui_btns->up_btn == 1) { // Switch to next remote
         // Increment current_remote with wrap
         xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
@@ -2457,6 +2595,7 @@ void lcd_lora_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_men
         // Reset static
         do_once = false;
         
+        // Switch pages
         ui_menu->page = SELECTION_PAGE;
     } else if (ui_btns->home_btn == 1) {
         // Hide LoRa menu
@@ -2465,7 +2604,7 @@ void lcd_lora_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_men
         // Reset static
         do_once = false;
         
-        lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+        lcd_transition_back(true, ui_menu); // True = home, false = sleep
     } else if (ui_btns->pwr_btn == 1) {
         // Hide LoRa menu
         lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -2473,7 +2612,7 @@ void lcd_lora_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_men
         // Reset static
         do_once = false;
         
-        lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+        lcd_transition_back(false, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -2581,7 +2720,7 @@ void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espn
         // Reset static
         do_once = false;
         
-        lcd_funcs_transition_back(true, ui_menu); // True = home, false = sleep
+        lcd_transition_back(true, ui_menu); // True = home, false = sleep
     } else if (ui_btns->pwr_btn == 1) { // Power off selected
         // Hide ESP-NOW menu
         lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -2589,7 +2728,7 @@ void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espn
         // Reset static
         do_once = false;
         
-        lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+        lcd_transition_back(false, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -2867,7 +3006,7 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
             do_once = false;
             gateway_ping_lbl = dns_ping_lbl = NULL;
             
-            lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+            lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
         }
     #ifdef POLYCAST5_CHECK_OTA_ON_CONN
     }
@@ -3017,7 +3156,7 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
         // Reset static
         do_once = false;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -3068,8 +3207,8 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
             ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue previous_network");
         }
 
-        // Wait up to 15s to connect to Wi-Fi
-        if ((xEventGroupWaitBits(xWifiEventGroup, WIFI_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(15000)) & WIFI_CONNECTED_BIT) != 0) {
+        // Wait up to WIFI_CONN_TIMEOUT_MS to connect to Wi-Fi
+        if ((xEventGroupWaitBits(xWifiEventGroup, WIFI_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(WIFI_CONN_TIMEOUT_MS)) & WIFI_CONNECTED_BIT) != 0) {
             lv_label_set_text(lbl_check, "Checking for updates...");
             lv_timer_handler();
 
@@ -3269,7 +3408,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
         // Reset static
         do_once = false;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -3314,7 +3453,7 @@ void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t
         // Reset static
         do_once = false;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     } else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 0) { // How it works selected
         // Hide bluetooth menu
         lv_obj_add_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -3516,8 +3655,6 @@ void lcd_gpio_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_men
         // Reset static
         do_once = false;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
-
-

@@ -312,6 +312,11 @@ static void wifi_task(void *param)
                 }
                 xEventGroupClearBits(xWifiEventGroup, WIFI_SCAN_NETWORKS_BIT); // Reset for next time
             }
+            // If Wi-Fi get date and time bit transitioned 0 -> 1
+            if ((wifi_event_bits & WIFI_GET_DATE_TIME_BIT) && !(last_wifi_event_bits & WIFI_GET_DATE_TIME_BIT)) {
+                wifi_funcs_get_current_date_time();
+                xEventGroupClearBits(xWifiEventGroup, WIFI_GET_DATE_TIME_BIT); // Reset for next time
+            }
 
             last_wifi_event_bits = wifi_event_bits;
         }
@@ -398,7 +403,7 @@ static void wifi_task(void *param)
 
 void wifi_task_create(void)
 {
-    if (xTaskCreate(wifi_task, "wifi_task", 1024 * 3, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
+    if (xTaskCreate(wifi_task, "wifi_task", 1024 * 3, NULL, POLYCAST5_PRIORITY_MEDIUM, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start wifi_task");
     }
 }

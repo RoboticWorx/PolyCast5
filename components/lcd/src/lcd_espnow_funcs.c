@@ -494,7 +494,7 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
         // Reset selected digit
         digit_index = 0;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     } else if (ui_btns->right_btn && digit_index < 11) { // Move selection right
         // De-style old digit
         lv_obj_set_style_text_color(lbl_sel_digit[digit_index], user_secondary_color, 0);
@@ -755,7 +755,7 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
         
         espnow_menu_overwrite = false;
         
-        lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+        lcd_transition_back(false, ui_menu); // True = home, false = sleep
     } else if (ui_btns->left_btn && cur_pos != 0) { // If left and not at start
         // Clear the current slot
         name_buf[cur_pos] = '\0';
@@ -1242,7 +1242,7 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
         lv_obj_add_flag(espnow_menu->espnow_submenu.arrow_top, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(espnow_menu->espnow_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
         
-        lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+        lcd_transition_back(false, ui_menu); // True = home, false = sleep
     } else if (ui_btns->up_btn == 1) { // Increment command
         // Reset receipts
         lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT);

@@ -27,7 +27,7 @@
 #define TCA9535_ADDR 0x20  // Adjust to your TCA9535's actual address (exclude from scan if desired)
 
 gpio_menu_t gpio_menu = {
-    .options = {"How It Works", "Terminal", "I2C Scanner"},
+    .options = {"How it Works", "Terminal", "I2C Scanner"},
     .size = 3,
     .index = 1,
     .cont = NULL,
@@ -229,7 +229,7 @@ void lcd_gpio_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio
         title_lbl = instr_lbl = NULL;
         init = false;
         
-         lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -395,7 +395,7 @@ void lcd_gpio_scanner_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *
         cont = title_lbl = status_lbl = addrs_lbl = NULL;
         init = false;
 
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);  // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu);  // True = home, false = sleep
     }
 }
 
@@ -592,7 +592,7 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
         memset(log_buffer, 0, sizeof(log_buffer)); // Clear log for next entry
         current_cmd = 0;
  
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 

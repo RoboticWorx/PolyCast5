@@ -255,7 +255,7 @@ void lcd_tools_coin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
         coin_heads = NULL;
         coin_tails = NULL;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -383,7 +383,7 @@ void lcd_tools_docs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
         lbl_ins = NULL;
         qr_canvas = NULL;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -686,7 +686,7 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
         lbl_ins = lbl_dice = lbl_sides = lbl_num_dice = lbl_num_sides = lbl_pointer = img_dice = lbl_result = lbl_roll_log = cont_roll_log = NULL;
         do_once = false;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -877,137 +877,7 @@ void lcd_tools_num_gen_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
         do_once = false;
         lbl_ins = lbl_min = lbl_max = lbl_val_min = lbl_val_max = lbl_pointer = lbl_result = NULL;
 
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
-    }
-}
-
-void lcd_tools_how_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
-{
-    #define HOW_Y_OFFSET 40
-    
-    // Statics
-    static bool init = false;
-    static lv_obj_t *cont = NULL;
-    static lv_obj_t *title_lbl = NULL;
-    static lv_obj_t *instr_lbl = NULL;
-    
-    if (!init) {
-        // Reset long select semaphore to avoid false notebook reset
-        xQueueReset(xSelectButtonLongSemaphore);
-        
-        // Create a scrollable container for the instructions
-        cont = lv_obj_create(ACTIVE_SCR);
-        lv_obj_set_size(cont, 210, 106);
-        lv_obj_center(cont);
-        lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
-        lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
-        lv_obj_set_scroll_dir(cont, LV_DIR_VER);
-        lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
-
-        // Title label
-        title_lbl = lv_label_create(cont);
-        lv_label_set_text(title_lbl, "How It Works:");
-        lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
-        lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
-        lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
-
-        // Instructions label (scrollable if text is long)
-        instr_lbl = lv_label_create(cont);
-        lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
-        lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
-        lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
-        lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
-        lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
-
-        // Set custom text based on hotkey index
-        const char *instr_text = "Press RIGHT to skip. Hold SELECT to forget notebooks.\n\n"
-                                 "The SRS memory planner is a tool to help you remember new information based on the Ebbinghaus "
-                                 "forgetting curve (via Spaced Repetition System).\n\nBasically, the more you review things, the "
-                                 "better you remember them at increasingly impressive intervals.\n\n"
-                                 "This option will help you keep track of what you need to review on which days to "
-                                 "optimize your long-term memory retention.\n\nFor more info on how to get started, please see:\n\n"
-                                 "polycast5.com/blogs /docs/srs-memory-planner";
-        
-        lv_label_set_text(instr_lbl, instr_text);
-
-        lv_timer_handler();
-
-        init = true;
-    }
-    
-    if (ui_btns->up_btn == 1) {
-        lv_obj_scroll_by_bounded(cont, 0, HOW_Y_OFFSET, LV_ANIM_ON);
-    } else if (ui_btns->down_btn == 1) {
-        lv_obj_scroll_by_bounded(cont, 0, -HOW_Y_OFFSET, LV_ANIM_ON);
-    } else if (ui_btns->right_btn == 1) { // Skip to TOOLS_SRS_PAGE
-        // Delete objects
-        lv_obj_delete(cont); // Deletes children
-        
-        // Reset statics
-        cont = NULL;
-        title_lbl = instr_lbl = NULL;
-        init = false;
-        
-        // Hide up/down arrow
-        lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-        
-        // Switch pages
-        ui_menu->page = TOOLS_SRS_PAGE;
-    }
-    // Reset notebook
-    else if (xSemaphoreTake(xSelectButtonLongSemaphore, 0) == pdTRUE) {
-        // Clear SRS NVS
-        lcd_ns_nvs_clear(SRS_NS);
-        
-        // Hide right arrow
-        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-
-        // Delete objects
-        lv_obj_delete(cont); // Deletes children
-        
-        // Reset statics
-        cont = NULL;
-        title_lbl = instr_lbl = NULL;
-        init = false;
-            
-        // Show tools menu
-        lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-        
-        // Switch back
-        ui_menu->page = TOOLS_PAGE;
-    } else if (ui_btns->left_btn) { // Go back
-        // Hide right arrow
-        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-
-        // Delete objects
-        lv_obj_delete(cont); // Deletes children
-        
-        // Reset statics
-        cont = NULL;
-        title_lbl = instr_lbl = NULL;
-        init = false;
-        
-        // Show tools menu
-        lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-        
-        // Switch back
-        ui_menu->page = TOOLS_PAGE;
-    } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
-        // Delete objects
-        lv_obj_delete(cont); // Deletes children
-        
-        // Reset statics
-        cont = NULL;
-        title_lbl = instr_lbl = NULL;
-        init = false;
-        
-         lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -1243,10 +1113,135 @@ void lcd_tools_pomodoro_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
         init = false;
         running = false;
 
-         lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
+void lcd_tools_how_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
+{
+    #define HOW_Y_OFFSET 40
+    
+    // Statics
+    static bool init = false;
+    static lv_obj_t *cont = NULL;
+    static lv_obj_t *title_lbl = NULL;
+    static lv_obj_t *instr_lbl = NULL;
+    
+    if (!init) {
+        // Reset long select semaphore to avoid false notebook reset
+        xQueueReset(xSelectButtonLongSemaphore);
+        
+        // Create a scrollable container for the instructions
+        cont = lv_obj_create(ACTIVE_SCR);
+        lv_obj_set_size(cont, 210, 106);
+        lv_obj_center(cont);
+        lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+        lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+        lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+        lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
+
+        // Title label
+        title_lbl = lv_label_create(cont);
+        lv_label_set_text(title_lbl, "How it Works:");
+        lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+        lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+        // Instructions label (scrollable if text is long)
+        instr_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+        lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+
+        // Set custom text based on hotkey index
+        const char *instr_text = "Press RIGHT to skip. Hold SELECT to forget notebooks.\n\n"
+                                 "The SRS memory planner is a tool to help you remember new information based on the Ebbinghaus "
+                                 "forgetting curve (via Spaced Repetition System).\n\nBasically, the more you review things, the "
+                                 "better you remember them at increasingly impressive intervals.\n\n"
+                                 "This option will help you keep track of what you need to review on which days to "
+                                 "optimize your long-term memory retention.\n\nFor more info on how to get started, please see:\n\n"
+                                 "polycast5.com/blogs /docs/srs-memory-planner";
+        
+        lv_label_set_text(instr_lbl, instr_text);
+
+        lv_timer_handler();
+
+        init = true;
+    }
+    
+    if (ui_btns->up_btn == 1) {
+        lv_obj_scroll_by_bounded(cont, 0, HOW_Y_OFFSET, LV_ANIM_ON);
+    } else if (ui_btns->down_btn == 1) {
+        lv_obj_scroll_by_bounded(cont, 0, -HOW_Y_OFFSET, LV_ANIM_ON);
+    } else if (ui_btns->right_btn == 1) { // Skip to TOOLS_SRS_PAGE
+        // Delete objects
+        lv_obj_delete(cont); // Deletes children
+        
+        // Reset statics
+        cont = NULL;
+        title_lbl = instr_lbl = NULL;
+        init = false;
+        
+        // Switch pages
+        ui_menu->page = TOOLS_SRS_PAGE;
+    }
+    // Reset notebook
+    else if (xSemaphoreTake(xSelectButtonLongSemaphore, 0) == pdTRUE) {
+        // Clear SRS NVS
+        lcd_ns_nvs_clear(SRS_NS);
+        
+        // Hide right arrow
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        // Delete objects
+        lv_obj_delete(cont); // Deletes children
+        
+        // Reset statics
+        cont = NULL;
+        title_lbl = instr_lbl = NULL;
+        init = false;
+            
+        // Show tools menu
+        lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Switch back
+        ui_menu->page = TOOLS_PAGE;
+    } else if (ui_btns->left_btn) { // Go back
+        // Hide right arrow
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        // Delete objects
+        lv_obj_delete(cont); // Deletes children
+        
+        // Reset statics
+        cont = NULL;
+        title_lbl = instr_lbl = NULL;
+        init = false;
+        
+        // Show tools menu
+        lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Switch back
+        ui_menu->page = TOOLS_PAGE;
+    } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
+        // Delete objects
+        lv_obj_delete(cont); // Deletes children
+        
+        // Reset statics
+        cont = NULL;
+        title_lbl = instr_lbl = NULL;
+        init = false;
+        
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
+}
 
 void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
 {
@@ -1272,17 +1267,20 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
     
     // Initialize
     if (!do_once) {
+        // Hide arrows to start
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+        lv_timer_handler();
+
         // Check time and sync if needed
         if (srs_sync_time_over_wifi() == false) {
             /* Exit */
-            
-            // Hide right arrow
-            lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-            
-            // Show up/down arrow
+
+            // Show top and bottom arrows
             lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
             lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-    
+
             // Show tools menu
             lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
     
@@ -1290,6 +1288,9 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
             
             return;
         }
+
+        // Show right arrow if succeed
+        lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
         // Load saved pages
         srs_nvs_load();
@@ -1488,7 +1489,7 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
         do_once = false;
         sel = top = 0;
 
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu);
     }
 }
 
@@ -1670,7 +1671,7 @@ void lcd_tools_btc_addr_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
         instr_lbl = qr_canvas = NULL;
         init = false;
         
-         lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -1767,7 +1768,7 @@ void lcd_tools_btc_addr_setup_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools
         // Stop portal
         xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_BTC_BIT);
         
-         lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -2256,7 +2257,7 @@ void lcd_tools_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t 
         tetris_canvas = tetris_score_label = tetris_game_over_label = tetris_canvas_pixels = NULL;
         init = false;
         
-        lcd_funcs_transition_back(false, ui_menu); // False = sleep
+        lcd_transition_back(false, ui_menu); // False = sleep
         return;
     }
 

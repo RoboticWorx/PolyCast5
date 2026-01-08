@@ -24,6 +24,8 @@
 #define HOR_RES 240
 #define VER_RES 135
 
+#define LCD_LOADING_ANIM_START_DEFAULT() do { lcd_loading_anim_start(LV_ALIGN_BOTTOM_RIGHT, -10, -10, user_secondary_color); } while (0)
+
 #define OPTION_GPIO "GPIO"
 #define OPTION_WIFI "Wi-Fi"
 #define OPTION_BLUETOOTH "Bluetooth"
@@ -216,7 +218,7 @@ void lcd_ns_nvs_clear(const char* ns);
  * @param [in] home Go home or sleep
  * @param [in] ui_menu UI menu structure
  */
-void lcd_funcs_transition_back(bool home, ui_menu_t *ui_menu);
+void lcd_transition_back(bool home, ui_menu_t *ui_menu);
 
 /**
  * @brief Format labels
@@ -340,6 +342,21 @@ uint64_t lcd_get_uptime_seconds(void);
  * @returns 0 on success
  */
 int lcd_draw_qr(lv_obj_t *canvas, const char *text, int size_px, uint8_t **pbuf);
+
+/**
+ * @brief Generic loading animation (single dot that moves + pulses)
+ *
+ * @param [in] align Alignment of the loading animation
+ * @param [in] x_off X offset from alignment (positive = right)
+ * @param [in] y_off Y offset from alignment (positive = down)
+ * @param [in] color Color of the loading dot
+ */
+void lcd_loading_anim_start(lv_align_t align, lv_coord_t x_off, lv_coord_t y_off, lv_color_t color);
+
+/**
+ * @brief Stop and delete loading animation
+ */
+void lcd_loading_anim_stop(void);
 
 /**
  * @brief Update connectivity icons for the LCD

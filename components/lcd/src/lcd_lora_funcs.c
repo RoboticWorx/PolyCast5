@@ -398,7 +398,7 @@ void lcd_lora_add_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora
         title_lbl = instr_lbl = NULL;
         init = false;
         
-         lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -551,7 +551,7 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
         // Hide
         lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
         
-         lcd_funcs_transition_back(false, ui_menu); // True = home, false = sleep
+         lcd_transition_back(false, ui_menu); // True = home, false = sleep
     } else if (ui_btns->left_btn && cur_pos != 0) { // If left and not at start
         // Clear the current slot
         name_buf[cur_pos] = '\0';
@@ -905,7 +905,7 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
         // Hide right arrow
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     } else if (ui_btns->left_btn == 1) { // Scroll left
         // Update selection
         lora_menu->submenu.index--;
@@ -1214,7 +1214,7 @@ void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
         on_idx = 0;
         off_idx = 0;
             
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -1499,7 +1499,7 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
         lbl_send_tx = lbl_send_rx = lbl_send_cmd = lbl_send_box = lbl_send = arrow_top = arrow_bot = lbl_info = NULL;
         init = false;
             
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -1772,7 +1772,7 @@ void lcd_lora_plan_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
         lv_obj_add_flag(lora_plan_menu->lbl_days_ins, LV_OBJ_FLAG_HIDDEN);
         
         // Go home or power off
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu);
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu);
     }
 }
 
@@ -1833,7 +1833,7 @@ void lcd_lora_plan_confirm_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_
         lbl_ins_top = lbl_ins_bot = lbl_conf = NULL;
         init = false;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     } else if (ui_btns->select_btn == 1) { // Confirm
         // Reset objects
         lv_obj_delete(lbl_ins_top);
@@ -2103,7 +2103,7 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
         strcpy(end_time, "00:00:00");
         init = false;
 
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -2203,7 +2203,7 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
         do_once = false;
         away_menu = NULL;
         
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     } else if (ui_btns->up_btn == 1) { // Scroll up pressed
         // Update selection
         away_menu->index--;
@@ -2511,7 +2511,7 @@ void lcd_lora_away_custom_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_m
         do_once = false;
         lbl_unit = lbl_ins = lbl_min = lbl_max = lbl_val_min = lbl_val_max = lbl_pointer = NULL;
 
-        lcd_funcs_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
