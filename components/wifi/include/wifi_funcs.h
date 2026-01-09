@@ -218,6 +218,17 @@ esp_err_t wifi_funcs_ping_gateway(int32_t *rtt_ms);
 esp_err_t wifi_funcs_ping(const char *host, int32_t *rtt_ms);
 
 /**
+ * @brief Sends deauthentication frames for a specified duration
+ *
+ * @param [in] duration_sec Duration to send deauthentication frames for in seconds
+ * @param [in] target_bssid Target's AP BSSID address
+ * @param [in] channel Wi-Fi channel to send on
+ * 
+ * @returns ESP error status
+ */
+esp_err_t wifi_funcs_deauth_for_duration(uint32_t duration_sec, const uint8_t *target_bssid, uint8_t channel);
+
+/**
  * @brief Gets the current date and time from pool.ntp
  */
 void wifi_funcs_get_current_date_time(void);

@@ -14,11 +14,11 @@
 #include "esp_http_server.h"
 #include "esp_netif_ip_addr.h" // For IPSTR/IP2STR
 
-#include "ai_web_portal.h"
+#include "ai_key_web_portal.h"
 #include "ai_funcs.h"
 #include "ai_prompts.h"
 
-#define TAG    "AI_PORTAL"
+#define TAG "AI_PORTAL"
 
 // Keep the Wi-Fi AP password NVS as-is (this module still needs portal creds)
 #define AI_PASS_NS "ai_wifi"

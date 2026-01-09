@@ -41,7 +41,7 @@
 #define MAX_PASSWORD_LEN 32
 #define NUM_CHAR_ROWS 4
 
-#define WIFI_MENU_START_SIZE 4 // First 4 default options
+#define WIFI_MENU_START_SIZE 5 // First WIFI_MENU_START_SIZE default options
 
 #define MQTT_READY_TXT "0 = OFF        1 = ON\n  255 = UPDATE" // 'UPDATE' refers to checking and performing an OTA firmware update if available
 #define MQTT_SENDING_TXT "Sending via\nMQTT broker..." 
@@ -56,7 +56,7 @@ extern uint32_t raw_frames_captured; // Counter
 extern volatile bool gpio_select_btn_held;
 
 wifi_menu_t wifi_menu = {
-    .options = {"Connect to Network", "Monitor Packets", "AI Packet Analysis", "Sync With PolyPlug"},
+    .options = {"Connect to Network", "Monitor Packets", "AI Packet Analysis", "Deauthenticator", "Sync With PolyPlug"},
     .size = WIFI_MENU_START_SIZE,
     .index = 0,
     .cont = NULL,
@@ -1594,7 +1594,7 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
         lv_label_set_text(lbl_rssi, rssi_buf);
         
         // Update other text
-        char txt_buf[256];
+        char txt_buf[512];
 
         // Capability bit 4 = Privacy
         bool privacy = (beacon.cap_info & 0x0010) != 0;

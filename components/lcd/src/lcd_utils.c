@@ -2888,7 +2888,10 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
             
             // Switch pages
             ui_menu->page = WIFI_AI_PACKET_PAGE;
-        } else if (ui_btns->select_btn == 1 && wifi_menu->index == 3) { // Sync with PolyPlug
+        } else if (ui_btns->select_btn == 1 && wifi_menu->index == 3) { // Send deauth frame
+            // Send deauth frame
+            xEventGroupSetBits(xWifiEventGroup, WIFI_DEAUTH_BIT);
+        } else if (ui_btns->select_btn == 1 && wifi_menu->index == 4) { // Sync with PolyPlug
             // Hide Wi-Fi menu
             lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
             

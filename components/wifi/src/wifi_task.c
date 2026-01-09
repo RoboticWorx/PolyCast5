@@ -18,7 +18,7 @@
 #include "ota_update.h"
 #include "esp_app_desc.h"
 #include "btc_web_portal.h"
-#include "ai_web_portal.h"
+#include "ai_key_web_portal.h"
 #include "bluetooth_web_portal.h"
 #include "ai_analysis_web_portal.h"
 
@@ -272,8 +272,12 @@ static void wifi_task(void *param)
 
             // If Wi-Fi reconnect bit transitioned 0 -> 1
             if ((wifi_event_bits & WIFI_RECONNECT_BIT) && !(last_wifi_event_bits & WIFI_RECONNECT_BIT)) {
+                // Get previous network credentials
+                selected_network = wifi_funcs_get_prev();
+
                 xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // Tell LCD we're trying
 
+                // Start radio and connect
                 err = wifi_funcs_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password);
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "WIFI_RECONNECT_BIT: wifi_funcs_radio_start failed: %s", esp_err_to_name(err));
@@ -316,6 +320,16 @@ static void wifi_task(void *param)
             if ((wifi_event_bits & WIFI_GET_DATE_TIME_BIT) && !(last_wifi_event_bits & WIFI_GET_DATE_TIME_BIT)) {
                 wifi_funcs_get_current_date_time();
                 xEventGroupClearBits(xWifiEventGroup, WIFI_GET_DATE_TIME_BIT); // Reset for next time
+            }
+            // If Wi-Fi deauth bit transitioned 0 -> 1
+            if ((wifi_event_bits & WIFI_DEAUTH_BIT) && !(last_wifi_event_bits & WIFI_DEAUTH_BIT)) {
+                // BSSID: 06:37:08:61:fb:0f
+                uint8_t target_bssid[6] = {0x06, 0x37, 0x08, 0x61, 0xfb, 0x0f};
+                err = wifi_funcs_deauth_for_duration(10, target_bssid, 6); // Seconds, BSSID, channel
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "WIFI_DEAUTH_BIT: wifi_funcs_send_deauth failed: %s", esp_err_to_name(err));
+                }
+                xEventGroupClearBits(xWifiEventGroup, WIFI_DEAUTH_BIT); // Reset for next time
             }
 
             last_wifi_event_bits = wifi_event_bits;

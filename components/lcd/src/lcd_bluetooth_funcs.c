@@ -23,7 +23,7 @@
 #include "bluetooth_funcs.h"
 #include "wifi_funcs.h"
 #include "ai_funcs.h"
-#include "ai_web_portal.h"
+#include "ai_key_web_portal.h"
 
 #include "wifi_task.h"
 #include "bluetooth_task.h"
