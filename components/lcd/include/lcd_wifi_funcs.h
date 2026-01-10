@@ -107,6 +107,24 @@ void lcd_wifi_ai_packet_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_
 void lcd_wifi_ai_packet_results_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
 
 /**
+ * @brief Scans for networks suitable for deauth and allows user to select one
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] wifi_menu Wi-Fi menu structure
+ */
+void lcd_wifi_scan_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
+
+/**
+ * @brief Gets user parameters for deauthentication broadcast
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] wifi_menu Wi-Fi menu structure
+ */
+void lcd_wifi_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
+
+/**
  * @brief Gets network password via user input
  *
  * @param [in] ui_btns UI input structure

@@ -72,6 +72,9 @@ static char *raw_frames_ai_response;
 
 static wifi_sniff_t sniff_network;
 
+static deauth_target_t deauth_target = {0};
+static deauth_stats_t deauth_stats = {0};
+
 static uint8_t mqtt_key[16];
 static bool wifi_menu_overwrite = false;
 
@@ -307,8 +310,10 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
     if (!initialized) {
 		// Clear any previous scans (fresh start)
 		xQueueReset(xWifiScanQueue);
+        lv_obj_clean(wifi_menu->scan_menu.main_list);
 
-        if (!monitoring_packets) {             
+        // Connecting to network
+        if (!monitoring_packets) {
             // Option label
             lbl_option = lv_label_create(ACTIVE_SCR);
             lcd_format_label(lbl_option, "or press down to scan", user_secondary_color,
@@ -340,7 +345,7 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
             wifi_menu->scan_menu.size++; // One larger
             
             lv_timer_handler(); // Show
-        } else {
+        } else { // Monitoring packets
             // Disconnect if connected
             xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
@@ -487,9 +492,7 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
     } else if (scanned && ui_btns->down_btn == 1) { // Scroll down
         wifi_menu->scan_menu.index++;
         lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
-    }
-    // Back (allow cancel even while scanning)
-    else if (ui_btns->left_btn == 1) {
+    } else if (ui_btns->left_btn == 1) { // Back (allow cancel even while scanning)
         if (lbl_option) { // Delete if exists
             lv_obj_delete(lbl_option);
             lbl_option = NULL;
@@ -538,9 +541,7 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
 
         // Switch pages
         ui_menu->page = WIFI_PAGE;
-    }
-    // Go home or power off (allow cancel even while scanning)
-    else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+    } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Go home or power off (allow cancel even while scanning)
         if (lbl_option) { // Delete if exists
             lv_obj_delete(lbl_option);
             lbl_option = NULL;
@@ -731,8 +732,461 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
     }
 }
 
+// TODO: Clean up these two deauth pages
+void lcd_wifi_scan_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
+{
+    #define DEAUTH_MAX_ENTRIES 80 // Allow for duplicate SSIDs (2.4 + 5GHz)
+
+    static lv_obj_t *lbl_wait;
+    static bool initialized = false;
+    static bool scanned = false;
+    static bool scanning = false;
+    
+    // Store full info for each displayed entry
+    static wifi_scan_deauth_t deauth_entries[DEAUTH_MAX_ENTRIES];
+    static int deauth_entry_count = 0;
+    
+    // Do once
+    if (!initialized) {
+        // Clear any previous states
+        xQueueReset(xWifiDeauthScanQueue);
+        lv_obj_clean(wifi_menu->scan_menu.main_list);
+        memset(deauth_entries, 0, sizeof(deauth_entries));
+        deauth_entry_count = 0;
+
+        // Disconnect if connected
+        xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+
+        // Hide top and bottom arrows
+        lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+        
+        lbl_wait = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_wait, "Scanning for eligible\nnetworks to send\ndeauth frames as...", user_secondary_color,
+                &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
+
+        // Start loading animation
+        LCD_LOADING_ANIM_START_DEFAULT();
+
+        lv_timer_handler(); // Show
+        
+        // Start scan
+        xEventGroupSetBits(xWifiEventGroup, WIFI_SCAN_DEAUTH_BIT);
+        
+        scanning = true;
+        initialized = true;
+    }
+
+    // When networks have been scanned
+    wifi_scan_deauth_t result;
+    while (xQueueReceive(xWifiDeauthScanQueue, &result, pdMS_TO_TICKS(1)) == pdPASS) {
+        // If no networks found sentinel
+        if (result.auth == 0xFF) {
+            scanning = false;
+            scanned = false;
+
+            lcd_loading_anim_stop();
+
+            if (!lbl_wait) {
+                lbl_wait = lv_label_create(ACTIVE_SCR);
+                lcd_format_label(lbl_wait, "", user_secondary_color,
+                        &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
+            }
+
+            lv_label_set_text(lbl_wait, "No eligible networks\nfound. (PMF enabled.)");
+            lv_obj_align(lbl_wait, LV_ALIGN_CENTER, 0, 0);
+            continue;
+        }
+
+        // Skip blank SSIDs
+        if ((result.ssid[0] == '\0') || (strlen((char*)result.ssid) == 0)) {
+            continue;
+        }
+
+        // Cap entry count
+        if (deauth_entry_count >= DEAUTH_MAX_ENTRIES) {
+            continue;
+        }
+
+        // Store the entry (keep all, including duplicates with different channels)
+        strlcpy((char *)deauth_entries[deauth_entry_count].ssid, (char *)result.ssid, 
+                sizeof(deauth_entries[deauth_entry_count].ssid));
+        memcpy(deauth_entries[deauth_entry_count].bssid, result.bssid, 6);
+        deauth_entries[deauth_entry_count].rssi = result.rssi;
+        deauth_entries[deauth_entry_count].channel = result.channel;
+        deauth_entries[deauth_entry_count].auth = result.auth;
+        deauth_entries[deauth_entry_count].freq_mhz = result.freq_mhz;
+        deauth_entries[deauth_entry_count].pmf_required = result.pmf_required; // Skipped earlier
+        deauth_entries[deauth_entry_count].pmf_capable = result.pmf_capable;
+        
+        deauth_entry_count++;
+    }
+
+    // Build the UI once scanning completes and we have entries
+    if (scanning && deauth_entry_count > 0 && !scanned) {
+        // Show top and bottom arrows
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+        // Stop loading animation
+        lcd_loading_anim_stop();
+
+        // Clean wait label
+        if (lbl_wait) {
+            lv_obj_delete(lbl_wait);
+            lbl_wait = NULL;
+        }
+
+        // Check for duplicate SSIDs to determine if we need frequency labels
+        // bool has_duplicates[DEAUTH_MAX_ENTRIES] = {false};
+        // for (int i = 0; i < deauth_entry_count; ++i) {
+        //     for (int j = i + 1; j < deauth_entry_count; ++j) {
+        //         if (strcmp((char *)deauth_entries[i].ssid, (char *)deauth_entries[j].ssid) == 0) {
+        //             has_duplicates[i] = true;
+        //             has_duplicates[j] = true;
+        //         }
+        //     }
+        // }
+
+        // Create buttons for each entry
+        wifi_menu->scan_menu.size = 0;
+        wifi_menu->scan_menu.index = 0;
+
+        for (int i = 0; i < deauth_entry_count && wifi_menu->scan_menu.size < WIFI_MAX_NETWORKS; ++i) {
+            // Format button text
+            char buf[48] = {0};
+
+            // Show frequency band for duplicate SSIDs
+            const char *band = (deauth_entries[i].freq_mhz >= 5000) ? "5GHz" : "2.4GHz";
+            snprintf(buf, sizeof(buf), "%.32s (%s)", deauth_entries[i].ssid, band);
+
+            // Add button
+            wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size] = lv_list_add_btn(wifi_menu->scan_menu.main_list, NULL, buf);
+            lv_obj_set_size(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size], 200, 30);
+
+            // Style
+            if (wifi_menu->scan_menu.size == 0) {
+                lv_obj_add_style(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size], 
+                        &wifi_menu->scan_menu.sel_style, 0);
+            } else {
+                lv_obj_add_style(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size], 
+                        &wifi_menu->scan_menu.btn_style, 0);
+            }
+
+            // Format text label
+            lv_obj_t *lbl = lv_obj_get_child(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size], 0);
+            lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+            lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+            lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+
+            // Format container
+            wifi_menu->scan_menu.cont = lv_obj_get_parent(wifi_menu->scan_menu.btns[wifi_menu->scan_menu.size]);
+            lv_obj_set_flex_flow(wifi_menu->scan_menu.cont, LV_FLEX_FLOW_COLUMN);
+            lv_obj_set_flex_align(wifi_menu->scan_menu.cont, LV_FLEX_ALIGN_START, 
+                    LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+            lv_obj_set_style_pad_gap(wifi_menu->scan_menu.cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+            wifi_menu->scan_menu.size++;
+        }
+
+        // Show the scan menu
+        lv_obj_remove_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+
+        scanning = false;
+        scanned = true;
+    }
+    
+    // User input
+    if (scanned && ui_btns->up_btn == 1) { // Scroll up
+        wifi_menu->scan_menu.index--;
+        lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
+    } else if (scanned && ui_btns->down_btn == 1) { // Scroll down
+        wifi_menu->scan_menu.index++;
+        lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
+    } else if (ui_btns->left_btn == 1) { // Back
+        if (scanning && !scanned) {
+            lcd_loading_anim_stop();
+            xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+            scanning = false;
+        }
+
+        // Reset
+        initialized = false;
+        scanned = false;
+        deauth_entry_count = 0;
+
+        wifi_menu->scan_menu.size = 0;
+        wifi_menu->scan_menu.index = 0;
+
+        // Clear children
+        lv_obj_clean(wifi_menu->scan_menu.main_list);
+
+        // Hide scan menu
+        lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+
+        if (lbl_wait) {
+            lv_obj_delete(lbl_wait);
+            lbl_wait = NULL;
+        }
+
+        // Show arrows
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+        // Show Wi-Fi menu
+        lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        ui_menu->page = WIFI_PAGE;
+    } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power
+        if (scanning && !scanned) {
+            lcd_loading_anim_stop();
+            xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+            scanning = false;
+        }
+
+        // Reset
+        initialized = false;
+        scanned = false;
+        deauth_entry_count = 0;
+
+        wifi_menu->scan_menu.size = 0;
+        wifi_menu->scan_menu.index = 0;
+
+        lv_obj_clean(wifi_menu->scan_menu.main_list);
+        lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+
+        if (lbl_wait) {
+            lv_obj_delete(lbl_wait);
+            lbl_wait = NULL;
+        }
+
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu);
+    } else if (scanned && ui_btns->select_btn == 1) { // Network selected
+        int idx = wifi_menu->scan_menu.index;
+        
+        // Ensure valid index
+        if (idx >= 0 && idx < deauth_entry_count) {
+            // Zero out structure
+            memset(&deauth_target, 0, sizeof(deauth_target));
+
+            // Copy selected network data to sniff_network for deauth
+            deauth_target.channel = deauth_entries[idx].channel;
+            memcpy(deauth_target.bssid, deauth_entries[idx].bssid, 6);
+            strncpy(deauth_target.ssid, deauth_entries[idx].ssid, sizeof(deauth_target.ssid) - 1);
+            deauth_target.ssid[(sizeof(deauth_target.ssid) - 1)] = '\0'; // Ensure null-termination
+
+            #ifdef POLYCAST5_DEBUG
+            ESP_LOGI(TAG, "Selected deauth target: %s Ch:%d BSSID:%02X:%02X:%02X:%02X:%02X:%02X",
+                    deauth_target.ssid, deauth_target.channel,
+                    deauth_target.bssid[0], deauth_target.bssid[1],
+                    deauth_target.bssid[2], deauth_target.bssid[3],
+                    deauth_target.bssid[4], deauth_target.bssid[5]);
+            #endif
+            
+            /* Exit */
+
+            if (scanning && !scanned) {
+                lcd_loading_anim_stop();
+                xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+                scanning = false;
+            }
+
+            // Reset
+            initialized = false;
+            scanned = false;
+            deauth_entry_count = 0;
+
+            wifi_menu->scan_menu.size = 0;
+            wifi_menu->scan_menu.index = 0;
+
+            // Clear children
+            lv_obj_clean(wifi_menu->scan_menu.main_list);
+
+            // Hide scan menu
+            lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+
+            if (lbl_wait) {
+                lv_obj_delete(lbl_wait);
+                lbl_wait = NULL;
+            }
+
+            // Show right arrow
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+            // Hide top and bottom arrows
+            lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+            ui_menu->page = WIFI_DEAUTH_PAGE;
+        }
+    }
+}
+
+void lcd_wifi_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
+{
+    #define BUF_SIZE 4
+    #define DEAUTH_X_POS -38
+
+    static bool init = true;
+    static lv_obj_t *lbl_sec_box = NULL;
+    static lv_obj_t *lbl_sec = NULL;
+    static lv_obj_t *lbl_sec_up = NULL;
+    static lv_obj_t *lbl_sec_down = NULL;
+    static lv_obj_t *lbl_sec_ins = NULL;
+    static lv_obj_t *lbl_send = NULL;
+    static lv_obj_t *lbl_stats = NULL;
+
+    if (init) {
+        // Default duration for deauth target
+        deauth_target.duration_sec = 10;
+
+        lbl_sec = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_sec, "", user_secondary_color,
+                &lv_font_montserrat_30, LV_ALIGN_CENTER, DEAUTH_X_POS, 8);
+        lv_label_set_text_fmt(lbl_sec, "%" PRIu32 "s", deauth_target.duration_sec);
+
+        lbl_sec_box = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_sec_box, "", user_secondary_color,
+                &lv_font_montserrat_24, LV_ALIGN_CENTER, DEAUTH_X_POS, 8);
+                        
+        lbl_send = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_send, "SEND", user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
+                        
+        lbl_sec_up = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_sec_up, LV_SYMBOL_UP, user_secondary_color,
+                &lv_font_montserrat_14, LV_ALIGN_CENTER, DEAUTH_X_POS, -22);
+                        
+        lbl_sec_down = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_sec_down, LV_SYMBOL_DOWN, user_secondary_color,
+                &lv_font_montserrat_14, LV_ALIGN_CENTER, DEAUTH_X_POS, 38);
+
+        lbl_sec_ins = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_sec_ins, "Deauth for:", user_secondary_color,
+                &lv_font_montserrat_16, LV_ALIGN_CENTER, DEAUTH_X_POS, -47);
+                
+        lbl_stats = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_stats, "", user_secondary_color,
+                &lv_font_montserrat_16, LV_ALIGN_RIGHT_MID, -5, 22);
+
+        // Create a style for the send cmd box
+        static lv_style_t style_cmd;
+        lv_style_init(&style_cmd);
+
+        lv_style_set_radius(&style_cmd, 8);
+        lv_style_set_bg_color(&style_cmd, user_primary_color);
+        lv_style_set_border_width(&style_cmd, 2);
+        lv_style_set_border_color(&style_cmd, user_secondary_color);
+        lv_style_set_border_side(&style_cmd, LV_BORDER_SIDE_FULL);
+        lv_style_set_text_color(&style_cmd, user_secondary_color);
+        
+        lv_color_t darker_user_primary_color = lv_color_darken(user_primary_color, 100); // % darker 
+        lv_style_set_shadow_spread(&style_cmd, 3);
+        lv_style_set_shadow_width(&style_cmd, 6);
+        lv_style_set_shadow_offset_x(&style_cmd, 3);
+        lv_style_set_shadow_offset_y(&style_cmd, 3);
+        lv_style_set_shadow_color(&style_cmd, darker_user_primary_color);
+            
+        lv_style_set_pad_left(&style_cmd, 55);
+        lv_style_set_pad_right(&style_cmd, 55);
+        lv_style_set_pad_top(&style_cmd, 25);
+        lv_style_set_pad_bottom(&style_cmd, 25);
+            
+        lv_obj_add_style(lbl_sec_box, &style_cmd, 0);
+
+        init = false;
+    }
+
+    if (xQueueReceive(xWifiDeauthStatsQueue, &deauth_stats, 0) == pdPASS) {
+        if (!deauth_stats.deauthing) {
+            // Show right arrow
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        
+            // Reset labels
+            lv_label_set_text(lbl_stats, "");
+            lcd_format_label(lbl_send, "SEND", user_secondary_color,
+                    &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
+
+            lcd_loading_anim_stop();
+        } else {
+            lv_label_set_text_fmt(lbl_stats, "%" PRIu32 " sent", deauth_stats.packets_sent);
+        }
+    }
+
+    // User input
+    if (ui_btns->right_btn == 1) { // Send deauth frames
+        if (xQueueSend(xWifiDeauthTargetQueue, &deauth_target, portMAX_DELAY) != pdPASS) {
+            ESP_LOGE(TAG, "lcd_wifi_deauth_page: failed: xWifiDeauthTargetQueue data");
+        }
+
+        // Hide right arrow
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        // Update label to show sending state
+        lcd_format_label(lbl_send, "SENDING", user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -3, -1);
+
+        LCD_LOADING_ANIM_START_DEFAULT();
+    } else if (ui_btns->up_btn == 1) { // Increase time by 1 second
+        deauth_target.duration_sec++;
+
+        // 17.06667min max (1024 seconds)
+        if (deauth_target.duration_sec > 1024) {
+            deauth_target.duration_sec = 1;
+        }
+
+        // Display new value
+        lv_label_set_text_fmt(lbl_sec, "%" PRIu32 "s", deauth_target.duration_sec);
+    } else if (ui_btns->down_btn == 1) { // Decrease time by 1 second
+        deauth_target.duration_sec--;
+
+        // Can't be less than 1 second
+        if (deauth_target.duration_sec < 1) {
+            deauth_target.duration_sec = 1024;
+        }
+
+        // Display new value
+        lv_label_set_text_fmt(lbl_sec, "%" PRIu32 "s", deauth_target.duration_sec);
+    } else if (ui_btns->select_btn == 1) { // Increase time by 3 seconds
+        deauth_target.duration_sec += 3;
+
+        // Display new value
+        lv_label_set_text_fmt(lbl_sec, "%" PRIu32 "s", deauth_target.duration_sec);
+    } else if (ui_btns->left_btn == 1) { // Go back
+        // Delete objects
+        lv_obj_delete(lbl_sec);
+        lv_obj_delete(lbl_sec_box);
+        lv_obj_delete(lbl_send);
+        lv_obj_delete(lbl_sec_up);
+        lv_obj_delete(lbl_sec_down);
+        lv_obj_delete(lbl_sec_ins);
+        lv_obj_delete(lbl_stats);
+
+        // Reset statics
+        init = true;
+        lbl_sec = lbl_sec_box = lbl_send = lbl_sec_up = lbl_sec_down = lbl_sec_ins = lbl_stats = NULL;
+
+        lcd_loading_anim_stop();
+
+        // Show Wi-Fi menu
+        lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Show top and bottom arrows
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+        // Hide right arrow
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        ui_menu->page = WIFI_PAGE;
+
+        // TODO: Cancel deauth if still sending
+    }
+}
+
 // TODO: Make system prompt editable
-// TODO: Add deauth stuff and MAC spoofing
+// TODO: Add MAC spoofing
+// TODO: Handle going it without xAI API key set (prompt to get key)
 void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {
     #define WIFI_AI_PKT_CONN_FAILED_TXT "Connection failed!\nPlease connect to your\nWi-Fi network at least\nonce in the 'Wi-Fi'\nmenu and make sure\nyou are in range."

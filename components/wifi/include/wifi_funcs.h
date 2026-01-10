@@ -45,6 +45,17 @@ typedef struct {
 typedef struct {
     char ssid[33];
     uint8_t bssid[6];
+    int8_t rssi;
+    uint8_t channel;
+    uint8_t auth;
+    bool pmf_required; // True if PMF is required (not attackable)
+    bool pmf_capable;  // True if PMF is capable
+    int freq_mhz;      // Frequency in MHz for 2.4/5GHz display
+} wifi_scan_deauth_t;
+
+typedef struct {
+    char ssid[33];
+    uint8_t bssid[6];
     char password[65];
     bool locked; // If network requires a password
     bool prev; // If connecting to the last known network
@@ -109,6 +120,21 @@ typedef struct {
 } wifi_data_t;
 
 typedef struct {
+    uint8_t bssid[6];
+    char ssid[33];
+    uint8_t channel;
+    uint32_t packets_sent; // TODO: Technically frames
+    uint16_t seq_num;
+    uint32_t duration_sec;
+} deauth_target_t;
+
+typedef struct {
+    bool deauthing;
+    uint32_t packets_sent; // TODO: Technically frames
+    uint32_t duration_sec;
+} deauth_stats_t;
+
+typedef struct {
     uint8_t key[16];
     char payload[4];
 } wifi_mqtt_t;
@@ -128,7 +154,7 @@ wifi_login_t wifi_funcs_get_prev(void);
 /**
  * @brief Scan and print available networks
  *
- * @param [in] wifi_scan Wi-Fi scan structure
+ * @param [out] wifi_scan Wi-Fi scan structure
  *
  * @returns ESP error status
  */
@@ -216,6 +242,15 @@ esp_err_t wifi_funcs_ping_gateway(int32_t *rtt_ms);
  * @returns ESP error status
  */
 esp_err_t wifi_funcs_ping(const char *host, int32_t *rtt_ms);
+
+/**
+ * @brief Scan for networks suitable for deauth as (excludes PMF-required networks)
+ *
+ * @param [out] wifi_scan_deauth Array to store scan results
+ *
+ * @returns ESP error status
+ */
+esp_err_t wifi_funcs_scan_deauth(wifi_scan_deauth_t *wifi_scan_deauth);
 
 /**
  * @brief Sends deauthentication frames for a specified duration

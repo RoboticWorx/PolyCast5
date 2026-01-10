@@ -343,6 +343,9 @@ static void lcd_task(void *pvParameters)
                 case WIFI_SCAN_PAGE:
                     lcd_wifi_scan_page(&ui_btns, &ui_menu, &wifi_menu);
                     break;
+                case WIFI_SCAN_DEAUTH_PAGE:
+                    lcd_wifi_scan_deauth_page(&ui_btns, &ui_menu, &wifi_menu);
+                    break;
                 case WIFI_AI_PACKET_PAGE:
                     lcd_wifi_ai_packet_page(&ui_btns, &ui_menu, &wifi_menu);
                     break;
@@ -366,6 +369,9 @@ static void lcd_task(void *pvParameters)
                     break;
                 case WIFI_NAME_PAGE:
                     lcd_wifi_create_custom_name(&ui_btns, &ui_menu, &wifi_menu);
+                    break;
+                case WIFI_DEAUTH_PAGE:
+                    lcd_wifi_deauth_page(&ui_btns, &ui_menu, &wifi_menu);
                     break;
                 // Tools pages
                 case TOOLS_PAGE:

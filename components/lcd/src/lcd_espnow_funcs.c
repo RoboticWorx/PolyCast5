@@ -890,7 +890,7 @@ void lcd_espnow_setup_send_page(espnow_menu_t *espnow_menu)
     espnow_menu->espnow_submenu.lbl_send_tx = lv_label_create(ACTIVE_SCR);
     lcd_format_label(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT, user_secondary_color,
             &lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS, 39);
-                     
+
     espnow_menu->espnow_submenu.lbl_send_rx = lv_label_create(ACTIVE_SCR);
     lcd_format_label(espnow_menu->espnow_submenu.lbl_send_rx, RX_TXT, user_secondary_color,
             &lv_font_montserrat_16, LV_ALIGN_CENTER, X_POS, 57);

@@ -27,14 +27,20 @@
 char btc_wifi_portal_pass[64];
 
 static wifi_scan_t wifi_scan[WIFI_MAX_NETWORKS];
-static wifi_login_t selected_network;
-static wifi_sniff_t sniff_network;
+static wifi_scan_deauth_t wifi_scan_deauth[WIFI_MAX_NETWORKS];
 
-static wifi_mqtt_t wifi_mqtt;
+static deauth_target_t deauth_target = {0};
+static wifi_login_t selected_network = {0};
+static wifi_sniff_t sniff_network = {0};
+
+static wifi_mqtt_t wifi_mqtt = {0};
 
 EventGroupHandle_t xWifiEventGroup;
 
 QueueHandle_t xWifiScanQueue;
+QueueHandle_t xWifiDeauthScanQueue;
+QueueHandle_t xWifiDeauthTargetQueue;
+QueueHandle_t xWifiDeauthStatsQueue;
 QueueHandle_t xWifiSelectedNetworkQueue;
 QueueHandle_t xWifiSniffQueue;
 QueueHandle_t xWifiBeaconQueue;
@@ -75,6 +81,12 @@ static void wifi_task(void *param)
     
     xWifiScanQueue = xQueueCreate(WIFI_MAX_NETWORKS, sizeof(wifi_scan_t));
     configASSERT(xWifiScanQueue);
+    xWifiDeauthScanQueue = xQueueCreate(WIFI_MAX_NETWORKS, sizeof(wifi_scan_deauth_t));
+    configASSERT(xWifiDeauthScanQueue);
+    xWifiDeauthTargetQueue = xQueueCreate(1, sizeof(deauth_target_t));
+    configASSERT(xWifiDeauthTargetQueue);
+    xWifiDeauthStatsQueue = xQueueCreate(1, sizeof(deauth_stats_t));
+    configASSERT(xWifiDeauthStatsQueue);
     xWifiSelectedNetworkQueue = xQueueCreate(1, sizeof(wifi_login_t));
     configASSERT(xWifiSelectedNetworkQueue);
     xWifiSniffQueue = xQueueCreate(1, sizeof(wifi_sniff_t));
@@ -222,6 +234,14 @@ static void wifi_task(void *param)
             wifi_funcs_init_promiscuous(&sniff_network);
         }
 
+        // Received target to deauth
+        if (xQueueReceive(xWifiDeauthTargetQueue, &deauth_target, 0) == pdTRUE) {
+            esp_err_t err = wifi_funcs_deauth_for_duration(deauth_target.duration_sec, deauth_target.bssid, deauth_target.channel); // Seconds, BSSID, channel
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "WIFI_DEAUTH_BIT: wifi_funcs_send_deauth failed: %s", esp_err_to_name(err));
+            }
+        }
+
         // Ping the network
         if (xSemaphoreTake(xWifiPingSemaphore, 0) == pdTRUE) {
             // If not connected to Wi-Fi, skip pings
@@ -316,20 +336,26 @@ static void wifi_task(void *param)
                 }
                 xEventGroupClearBits(xWifiEventGroup, WIFI_SCAN_NETWORKS_BIT); // Reset for next time
             }
+            // If Wi-Fi scan networks for deauth bit transitioned 0 -> 1
+            if ((wifi_event_bits & WIFI_SCAN_DEAUTH_BIT) && !(last_wifi_event_bits & WIFI_SCAN_DEAUTH_BIT)) {
+                err = esp_wifi_start();
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "WIFI_SCAN_DEAUTH_BIT: esp_wifi_start failed: %s", esp_err_to_name(err));
+                }
+                err = wifi_funcs_scan_deauth(wifi_scan_deauth);
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "WIFI_SCAN_DEAUTH_BIT: wifi_funcs_scan_deauth failed: %s", esp_err_to_name(err));
+                }
+                err = wifi_funcs_radio_stop();
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "WIFI_SCAN_DEAUTH_BIT: wifi_funcs_radio_stop failed: %s", esp_err_to_name(err));
+                }
+                xEventGroupClearBits(xWifiEventGroup, WIFI_SCAN_DEAUTH_BIT); // Reset for next time
+            }
             // If Wi-Fi get date and time bit transitioned 0 -> 1
             if ((wifi_event_bits & WIFI_GET_DATE_TIME_BIT) && !(last_wifi_event_bits & WIFI_GET_DATE_TIME_BIT)) {
                 wifi_funcs_get_current_date_time();
                 xEventGroupClearBits(xWifiEventGroup, WIFI_GET_DATE_TIME_BIT); // Reset for next time
-            }
-            // If Wi-Fi deauth bit transitioned 0 -> 1
-            if ((wifi_event_bits & WIFI_DEAUTH_BIT) && !(last_wifi_event_bits & WIFI_DEAUTH_BIT)) {
-                // BSSID: 06:37:08:61:fb:0f
-                uint8_t target_bssid[6] = {0x06, 0x37, 0x08, 0x61, 0xfb, 0x0f};
-                err = wifi_funcs_deauth_for_duration(10, target_bssid, 6); // Seconds, BSSID, channel
-                if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "WIFI_DEAUTH_BIT: wifi_funcs_send_deauth failed: %s", esp_err_to_name(err));
-                }
-                xEventGroupClearBits(xWifiEventGroup, WIFI_DEAUTH_BIT); // Reset for next time
             }
 
             last_wifi_event_bits = wifi_event_bits;
