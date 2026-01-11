@@ -21,7 +21,7 @@
 #include "misc/lv_timer.h"
 #include "widgets/label/lv_label.h"
 
-#include "btc_web_portal.h"
+#include "wifi_btc_web_portal.h"
 #include "lcd_asset_macros.h"
 #include "lcd_utils.h"
 
@@ -30,7 +30,7 @@
 #include "img_coin_heads.h"
 #include "img_coin_tails.h"
 
-#define TAG "LCD_TOOLS_FUNCS"
+#define TAG "LCD_TOOLS"
 
 #define HIGH_SCORE_NS "tetris"
 #define HIGH_SCORE_KEY "score"
@@ -1501,7 +1501,7 @@ static void btc_redraw_qr(lv_obj_t *canvas, uint8_t **pbuf)
     char addr[128] = "";
 
     // Get stored address
-    esp_err_t err = btc_addr_get_nvs(addr, sizeof(addr));
+    esp_err_t err = wifi_btc_addr_get_nvs(addr, sizeof(addr));
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "btc_redraw_qr btc_addr_get failed: %s", esp_err_to_name(err));
     }
@@ -1539,7 +1539,7 @@ void lcd_tools_btc_addr_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
         
         // Get stored address
         char btc_addr[128] = ""; // Public address buffer
-        esp_err_t err = btc_addr_get_nvs(btc_addr, sizeof(btc_addr));
+        esp_err_t err = wifi_btc_addr_get_nvs(btc_addr, sizeof(btc_addr));
         
         // If previous address exists
         if (err == ESP_OK) {
@@ -1724,7 +1724,7 @@ void lcd_tools_btc_addr_setup_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools
                 "\n\nOnce connected, open up your internet browser of choice and search:\n\n%s\n\nFrom there, follow the on-screen instructions. "
                 "DO NOT exit this page until you're done entering what you want into the web portal.";
         
-        lv_label_set_text_fmt(instr_lbl, instr_text, btc_portal_get_ssid(), btc_portal_get_pass(), btc_portal_get_ip());
+        lv_label_set_text_fmt(instr_lbl, instr_text, wifi_btc_portal_get_ssid(), wifi_btc_portal_get_pass(), wifi_btc_portal_get_ip());
 
         lv_timer_handler();
         

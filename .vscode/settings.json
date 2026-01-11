@@ -17,18 +17,4 @@
     "--compile-commands-dir=${workspaceFolder}\\build"
   ],
   "C_Cpp.errorSquiggles": "enabled",
-  "files.associations": {
-    "esp_crt_bundle.h": "c",
-    "esp_http_client.h": "c",
-    "netdb.h": "c",
-    "*.inc": "c",
-    "polycast5_macros.h": "c",
-    "string": "cpp",
-    "format": "cpp",
-    "wifi_task.h": "c",
-    "wifi_funcs.h": "c",
-    "lcd_hotkey_funcs.h": "c",
-    "lcd_utils.h": "c",
-    "lcd_bluetooth_funcs.h": "c"
-  }
 }

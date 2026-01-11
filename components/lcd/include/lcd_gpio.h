@@ -1,5 +1,5 @@
-#ifndef LCD_GPIO_FUNCS_H
-#define LCD_GPIO_FUNCS_H
+#ifndef LCD_GPIO_H
+#define LCD_GPIO_H
 
 #include "misc/lv_style.h"
 #include "misc/lv_types.h"
@@ -65,4 +65,4 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
 void lcd_gpio_scanner_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu);
 
 
-#endif // LCD_GPIO_FUNCS_H
+#endif // LCD_GPIO_H

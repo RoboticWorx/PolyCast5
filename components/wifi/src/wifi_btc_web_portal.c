@@ -14,9 +14,9 @@
 #include "esp_http_server.h"
 #include "esp_netif_ip_addr.h" // For IPSTR/IP2STR
 
-#include "btc_web_portal.h"
+#include "wifi_btc_web_portal.h"
 
-#define TAG    "BTC_PORTAL"
+#define TAG "WIFI_BTC_PORTAL"
 
 #define BTC_PASS_NS "btc_wifi"
 #define BTC_PASS_KEY "pass"
@@ -69,7 +69,7 @@ static esp_err_t addr_get(httpd_req_t *req)
 {
     // Read address from NVS
     char addr[128] = "";
-    (void)btc_addr_get_nvs(addr, sizeof(addr));
+    (void)wifi_btc_addr_get_nvs(addr, sizeof(addr));
 
     // Build JSON
     cJSON *root = cJSON_CreateObject();
@@ -166,7 +166,7 @@ static esp_err_t addr_post(httpd_req_t *req)
     }
 
     // Save to NVS
-    esp_err_t e = btc_addr_set_nvs(addr);
+    esp_err_t e = wifi_btc_addr_set_nvs(addr);
 
     // Cleanup
     cJSON_Delete(j);
@@ -214,7 +214,7 @@ static httpd_handle_t btc_httpd_start(void)
 
 /* =============== Wi-Fi AP bring-up =============== */
 
-esp_err_t btc_portal_start(void)
+esp_err_t wifi_btc_portal_start(void)
 {
     // If server already running, nothing to do
     if (btc_server) {
@@ -287,7 +287,7 @@ esp_err_t btc_portal_start(void)
     return ESP_OK;
 }
 
-esp_err_t btc_portal_stop(void)
+esp_err_t wifi_btc_portal_stop(void)
 {
     // Stop httpd if running
     if (btc_server) {
@@ -313,19 +313,19 @@ esp_err_t btc_portal_stop(void)
 
 /* =============== Public variables =============== */
 
-const char *btc_portal_get_ssid(void)
+const char *wifi_btc_portal_get_ssid(void)
 {
     // Return SSID
     return btc_portal_ssid;
 }
 
-const char *btc_portal_get_pass(void)
+const char *wifi_btc_portal_get_pass(void)
 {
     // Return password
     return btc_wifi_portal_pass;
 }
 
-const char *btc_portal_get_ip(void)
+const char *wifi_btc_portal_get_ip(void)
 {
     // Return IP
     return btc_portal_ip;
@@ -333,7 +333,7 @@ const char *btc_portal_get_ip(void)
 
 /* =============== NVS =============== */
 
-esp_err_t btc_addr_set_nvs(const char *addr)
+esp_err_t wifi_btc_addr_set_nvs(const char *addr)
 {
     // Fallback to empty string
     if (!addr) {
@@ -360,7 +360,7 @@ esp_err_t btc_addr_set_nvs(const char *addr)
     return err;
 }
 
-esp_err_t btc_addr_get_nvs(char *addr_out, size_t sz)
+esp_err_t wifi_btc_addr_get_nvs(char *addr_out, size_t sz)
 {
     // Validate args
     if (!addr_out || sz == 0) {
@@ -389,7 +389,7 @@ esp_err_t btc_addr_get_nvs(char *addr_out, size_t sz)
     return err;
 }
 
-esp_err_t btc_wifi_pass_save_nvs(const char *val)
+esp_err_t wifi_btc_pass_save_nvs(const char *val)
 {
     nvs_handle_t h;
     esp_err_t err;
@@ -413,7 +413,7 @@ esp_err_t btc_wifi_pass_save_nvs(const char *val)
     return err;
 }
 
-esp_err_t btc_wifi_pass_load_nvs(char *out, size_t out_sz)
+esp_err_t wifi_btc_pass_load_nvs(char *out, size_t out_sz)
 {
     nvs_handle_t h;
     esp_err_t err;

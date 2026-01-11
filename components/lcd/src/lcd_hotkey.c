@@ -8,12 +8,12 @@
 #include "widgets/label/lv_label.h"
 #include "font/lv_symbol_def.h"
 
-#include "lcd_hotkey_funcs.h"
+#include "lcd_hotkey.h"
 #include "lcd_utils.h"
 
 #include "wifi_task.h"
 
-#define TAG "LCD_HOTKEY_FUNCS"
+#define TAG "LCD_HOTKEY"
 
 #define HOTKEY_NS "hotkeys" // NVS namespace
 #define HOTKEY_KEY "data" // Data blob

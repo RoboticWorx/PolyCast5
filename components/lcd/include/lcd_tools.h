@@ -1,5 +1,5 @@
-#ifndef LCD_TOOLS_FUNCS_H
-#define LCD_TOOLS_FUNCS_H
+#ifndef LCD_TOOLS_H
+#define LCD_TOOLS_H
 
 #include "misc/lv_style.h"
 #include "misc/lv_types.h"
@@ -128,4 +128,4 @@ void lcd_tools_how_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
 void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu);
 
 
-#endif // LCD_TOOLS_FUNCS_H
+#endif // LCD_TOOLS_H

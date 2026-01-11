@@ -1,5 +1,5 @@
-#ifndef LCD_LORA_FUNCS_H
-#define LCD_LORA_FUNCS_H
+#ifndef LCD_LORA_H
+#define LCD_LORA_H
 
 #include "lvgl.h"
 
@@ -242,4 +242,4 @@ esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx);
  */
 esp_err_t lcd_lora_menu_nvs_delete(uint8_t del_idx);
 
-#endif // LCD_LORA_FUNCS_H
+#endif // LCD_LORA_H

@@ -30,10 +30,11 @@
 #include "misc/lv_timer.h"
 
 #include "lcd_asset_macros.h"
-#include "lcd_bluetooth_funcs.h"
-#include "lcd_gpio_funcs.h"
+#include "lcd_bluetooth.h"
+#include "lcd_gpio.h"
 #include "lcd_utils.h"
-#include "wifi_funcs.h"
+#include "wifi_utils.h"
+#include "wifi_ping.h"
 #include "wifi_task.h"
 #include "infrared_funcs.h"
 #include "infrared_task.h"
@@ -3217,7 +3218,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
         xEventGroupSetBits(xWifiEventGroup, WIFI_CHECK_OTA_ON_CONN_BIT);
 
         // Connect to previous Wi-Fi network
-        wifi_login_t prev_network = wifi_funcs_get_prev(); // Loads boot state saved network info
+        wifi_login_t prev_network = wifi_utils_get_prev(); // Loads boot state saved network info
         prev_network.prev = true; // Connecting to previous
         if (xQueueSend(xWifiSelectedNetworkQueue, &prev_network, portMAX_DELAY) != pdPASS) {
             ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue previous_network");

@@ -1,5 +1,5 @@
-#ifndef LCD_SETTINGS_FUNCS_H
-#define LCD_SETTINGS_FUNCS_H
+#ifndef LCD_SETTINGS_H
+#define LCD_SETTINGS_H
 
 #include "esp_err.h"
 
@@ -274,4 +274,4 @@ void lcd_settings_uptime_nvs_save(uint64_t uptime_seconds);
  */
 void lcd_settings_uptime_nvs_load(uint64_t *uptime_seconds);
 
-#endif // LCD_SETTINGS_FUNCS_H
+#endif // LCD_SETTINGS_H

@@ -13,7 +13,7 @@
 #include "cJSON.h"
 #include "nvs.h"
 
-#include "wifi_funcs.h"
+#include "wifi_utils.h"
 #include "gpio_funcs.h"
 #include "bluetooth_funcs.h"
 #include "bluetooth_web_portal.h"

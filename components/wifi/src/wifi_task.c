@@ -13,11 +13,14 @@
 #include "esp_wifi.h"
 #include "esp_random.h"
 
-#include "wifi_funcs.h"
+#include "wifi_utils.h"
+#include "wifi_ping.h"
+#include "wifi_mqtt.h"
+#include "wifi_deauth.h"
 #include "wifi_task.h"
-#include "ota_update.h"
+#include "wifi_ota_update.h"
 #include "esp_app_desc.h"
-#include "btc_web_portal.h"
+#include "wifi_btc_web_portal.h"
 #include "ai_key_web_portal.h"
 #include "bluetooth_web_portal.h"
 #include "ai_analysis_web_portal.h"
@@ -70,7 +73,7 @@ static void wifi_time_task(void *param)
 {
 	(void)param;
 
-	wifi_funcs_get_current_date_time();
+	wifi_utils_get_current_date_time();
 
 	// Mark not running and exit
 	wifi_time_task_handle = NULL;
@@ -126,11 +129,11 @@ static void wifi_task(void *param)
     esp_read_mac(my_mac, ESP_MAC_WIFI_STA);
 
     // Initialize MQTT client
-    wifi_funcs_wifi_event_init();
-    wifi_funcs_mqtt_client_init();
+    wifi_utils_wifi_event_init();
+    wifi_mqtt_client_init();
 
     // If Wi-Fi BTC portal password NVS doesn't exist yet, set it
-    if (btc_wifi_pass_load_nvs(btc_wifi_portal_pass, sizeof(btc_wifi_portal_pass)) != ESP_OK) {
+    if (wifi_btc_pass_load_nvs(btc_wifi_portal_pass, sizeof(btc_wifi_portal_pass)) != ESP_OK) {
         // Random chars to pick from
         static const char alphabet[] =
                 "ABCDEFGHJKLMNPQRSTUVWXYZ"
@@ -148,7 +151,7 @@ static void wifi_task(void *param)
         btc_wifi_portal_pass[PASS_LEN] = '\0';
         
         // Save that version to NVS
-        btc_wifi_pass_save_nvs(btc_wifi_portal_pass);
+        wifi_btc_pass_save_nvs(btc_wifi_portal_pass);
         
         #ifdef POLYCAST5_PASS_DEBUG
         ESP_LOGW(TAG, "Setting first time BTC Wi-Fi portal password: %s", btc_wifi_portal_pass);
@@ -163,18 +166,18 @@ static void wifi_task(void *param)
     vTaskDelay(pdMS_TO_TICKS(2000));
 
     // Get here without crashing -> This is a valid OTA app
-    ota_update_mark_app_valid();
+    wifi_ota_update_mark_app_valid();
 
     /* Update NVS FW version */
     // If NVS version doesn't exist yet, set it
     char dummy[64];
-    if (ota_update_get_nvs_version(dummy, sizeof(dummy)) != ESP_OK) {
+    if (wifi_ota_update_get_nvs_version(dummy, sizeof(dummy)) != ESP_OK) {
         // Read the current app's version string from the embedded app descriptor
         const esp_app_desc_t *running = esp_app_get_description();
         const char *cur = running ? running->version : "";
         
         // Save that version to NVS
-        ota_update_set_nvs_version(cur);
+        wifi_ota_update_set_nvs_version(cur);
         
         #ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "Setting first time FW version: %s", cur);
@@ -188,9 +191,9 @@ static void wifi_task(void *param)
     while (1) {
         // Check if need to cycle Wi-Fi radio (BT edge case)
         if (xSemaphoreTake(xWifiCycleSemaphore, 0) == pdTRUE) {
-            esp_err_t err = wifi_funcs_radio_cycle();
+            esp_err_t err = wifi_utils_radio_cycle();
             if (err != ESP_OK) {
-                ESP_LOGW(TAG, "wifi_funcs_radio_cycle failed: %s", esp_err_to_name(err));
+                ESP_LOGW(TAG, "wifi_utils_radio_cycle failed: %s", esp_err_to_name(err));
             }
         }
         
@@ -212,16 +215,16 @@ static void wifi_task(void *param)
             } else {
                 xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // Tell LCD we're trying
                 
-                ESP_ERROR_CHECK(wifi_funcs_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password));
+                ESP_ERROR_CHECK(wifi_utils_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password));
                 
-                ESP_ERROR_CHECK(wifi_funcs_connect());
+                ESP_ERROR_CHECK(wifi_utils_connect());
             }
         }
         
         // Send data over MQTT
         if (xQueueReceive(xWifiMqttCmdQueue, &wifi_mqtt, 0) == pdTRUE) {
-            // wifi_funcs_mqtt_client_publish() builds the topic safely
-            wifi_funcs_mqtt_client_publish(wifi_mqtt.payload, wifi_mqtt.key);
+            // wifi_mqtt_client_publish() builds the topic safely
+            wifi_mqtt_client_publish(wifi_mqtt.payload, wifi_mqtt.key);
         }
         
         // Received channel to sniff
@@ -233,14 +236,14 @@ static void wifi_task(void *param)
                     sniff_network.target_bssid[3], sniff_network.target_bssid[4], sniff_network.target_bssid[5]);
             #endif
             
-            wifi_funcs_init_promiscuous(&sniff_network);
+            wifi_utils_init_promiscuous(&sniff_network);
         }
 
         // Received target to deauth
         if (xQueueReceive(xWifiDeauthTargetQueue, &deauth_target, 0) == pdTRUE) {
-            esp_err_t err = wifi_funcs_deauth_for_duration(&deauth_target);
+            esp_err_t err = wifi_deauth_send_for_duration(&deauth_target);
             if (err != ESP_OK) {
-                ESP_LOGE(TAG, "xWifiDeauthTargetQueue: wifi_funcs_deauth_for_duration failed: %s", esp_err_to_name(err));
+                ESP_LOGE(TAG, "xWifiDeauthTargetQueue: wifi_deauth_send_for_duration failed: %s", esp_err_to_name(err));
             }
         }
 
@@ -258,7 +261,7 @@ static void wifi_task(void *param)
             wifi_ping_t wifi_ping = {0};
 
             // Ping the gateway
-            esp_err_t err = wifi_funcs_ping_gateway(&wifi_ping.rtt_gateway);
+            esp_err_t err = wifi_ping_gateway(&wifi_ping.rtt_gateway);
             if (err != ESP_OK) {
                 ESP_LOGW(TAG, "Initial gateway ping failed: %s", esp_err_to_name(err));
             } else {
@@ -268,7 +271,7 @@ static void wifi_task(void *param)
             }
 
             // Ping a public DNS server
-            err = wifi_funcs_ping("8.8.8.8", &wifi_ping.rtt_dns); // Google Public DNS
+            err = wifi_ping_dns("8.8.8.8", &wifi_ping.rtt_dns); // Google Public DNS
             if (err == ESP_OK) {
                 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Ping 8.8.8.8: %ld ms", (long)wifi_ping.rtt_dns);
@@ -295,18 +298,18 @@ static void wifi_task(void *param)
             // If Wi-Fi reconnect bit transitioned 0 -> 1
             if ((wifi_event_bits & WIFI_RECONNECT_BIT) && !(last_wifi_event_bits & WIFI_RECONNECT_BIT)) {
                 // Get previous network credentials
-                selected_network = wifi_funcs_get_prev();
+                selected_network = wifi_utils_get_prev();
 
                 xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // Tell LCD we're trying
 
                 // Start radio and connect
-                err = wifi_funcs_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password);
+                err = wifi_utils_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password);
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "WIFI_RECONNECT_BIT: wifi_funcs_radio_start failed: %s", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "WIFI_RECONNECT_BIT: wifi_utils_radio_start failed: %s", esp_err_to_name(err));
                 }
-                err = wifi_funcs_connect();
+                err = wifi_utils_connect();
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "WIFI_RECONNECT_BIT: wifi_funcs_connect failed: %s", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "WIFI_RECONNECT_BIT: wifi_utils_connect failed: %s", esp_err_to_name(err));
                 }
                 xEventGroupClearBits(xWifiEventGroup, WIFI_RECONNECT_BIT); // Reset for next time
             }
@@ -316,9 +319,9 @@ static void wifi_task(void *param)
                 ESP_LOGI(TAG, "Disconnecting Wi-Fi...");
                 #endif
 
-                err = wifi_funcs_radio_stop();
+                err = wifi_utils_radio_stop();
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "WIFI_DISCONNECT_BIT: wifi_funcs_radio_stop failed: %s", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "WIFI_DISCONNECT_BIT: wifi_utils_radio_stop failed: %s", esp_err_to_name(err));
                 }
                 xEventGroupClearBits(xWifiEventGroup, WIFI_DISCONNECT_BIT); // Reset for next time
             }
@@ -328,13 +331,13 @@ static void wifi_task(void *param)
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "WIFI_SCAN_NETWORKS_BIT: esp_wifi_start failed: %s", esp_err_to_name(err));
                 }
-                err = wifi_funcs_scan(wifi_scan);
+                err = wifi_utils_scan(wifi_scan);
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "WIFI_SCAN_NETWORKS_BIT: wifi_funcs_scan failed: %s", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "WIFI_SCAN_NETWORKS_BIT: wifi_utils_scan failed: %s", esp_err_to_name(err));
                 }
-                err = wifi_funcs_radio_stop();
+                err = wifi_utils_radio_stop();
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "WIFI_SCAN_NETWORKS_BIT: wifi_funcs_radio_stop failed: %s", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "WIFI_SCAN_NETWORKS_BIT: wifi_utils_radio_stop failed: %s", esp_err_to_name(err));
                 }
                 xEventGroupClearBits(xWifiEventGroup, WIFI_SCAN_NETWORKS_BIT); // Reset for next time
             }
@@ -344,13 +347,13 @@ static void wifi_task(void *param)
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "WIFI_SCAN_DEAUTH_BIT: esp_wifi_start failed: %s", esp_err_to_name(err));
                 }
-                err = wifi_funcs_scan_deauth(wifi_scan_deauth);
+                err = wifi_deauth_scan(wifi_scan_deauth);
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "WIFI_SCAN_DEAUTH_BIT: wifi_funcs_scan_deauth failed: %s", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "WIFI_SCAN_DEAUTH_BIT: wifi_deauth_scan failed: %s", esp_err_to_name(err));
                 }
-                err = wifi_funcs_radio_stop();
+                err = wifi_utils_radio_stop();
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "WIFI_SCAN_DEAUTH_BIT: wifi_funcs_radio_stop failed: %s", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "WIFI_SCAN_DEAUTH_BIT: wifi_utils_radio_stop failed: %s", esp_err_to_name(err));
                 }
                 xEventGroupClearBits(xWifiEventGroup, WIFI_SCAN_DEAUTH_BIT); // Reset for next time
             }
@@ -412,17 +415,17 @@ static void wifi_task(void *param)
             // If BTC web portal bit transitioned 0 -> 1
             if ((current_portal_bits & WIFI_PORTAL_START_BTC_BIT) &&
                     !(last_portal_bits & WIFI_PORTAL_START_BTC_BIT)) {
-                err = btc_portal_start();
+                err = wifi_btc_portal_start();
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "btc_portal_start failed: %s", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "wifi_btc_portal_start failed: %s", esp_err_to_name(err));
                 }
             }
             // If BTC web portal bit transitioned 1 -> 0
             if ((last_portal_bits & WIFI_PORTAL_START_BTC_BIT) &&
                     !(current_portal_bits & WIFI_PORTAL_START_BTC_BIT)) {
-                err = btc_portal_stop();
+                err = wifi_btc_portal_stop();
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "btc_portal_stop failed: %s", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "wifi_btc_portal_stop failed: %s", esp_err_to_name(err));
                 }
             }
             

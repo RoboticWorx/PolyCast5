@@ -1,5 +1,5 @@
-#ifndef WIFI_FUNCS_H
-#define WIFI_FUNCS_H
+#ifndef WIFI_UTILS_H
+#define WIFI_UTILS_H
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -25,6 +25,13 @@
 #define RSN_AKM_SAE 8 // WPA3-Personal
 #define RSN_AKM_OWE 18 // Enhanced Open (OWE)
 
+/* Helpers to pull type/subtype from the 802.11 frame control */
+#define FC_TYPE(fc)    (((fc) & 0x0C) >> 2)
+#define FC_SUBTYPE(fc) (((fc) & 0xF0) >> 4)
+#define TYPE_MGMT 0x00
+#define SUBTYPE_BEACON 0x08
+#define SUBTYPE_PROBE_RESP 0x05
+
 #define WIFI_PROMIS_FILTER_MASK_RAW_USEFUL ( \
     WIFI_PROMIS_FILTER_MASK_MGMT       | \
     WIFI_PROMIS_FILTER_MASK_CTRL       | \
@@ -42,39 +49,6 @@ typedef struct {
     uint8_t channel;
     uint8_t auth;
 } wifi_scan_t;
-
-typedef struct {
-    char ssid[33];
-    uint8_t bssid[WIFI_MAX_NETWORKS][6];
-    uint8_t channels[WIFI_MAX_NETWORKS]; // Channel for each BSSID
-    uint8_t bssid_count; // Number of BSSIDs stored for this SSID
-    int8_t rssi;
-    uint8_t channel; // Channel of the strongest AP (for display)
-    uint8_t auth;
-    bool pmf_required; // True if PMF is required (not attackable)
-    bool pmf_capable; // True if PMF is capable
-    int freq_mhz; // Frequency in MHz for 2.4/5GHz display
-} wifi_scan_deauth_t;
-
-typedef struct {
-    // Copied from wifi_scan_deauth_t entry
-    uint8_t bssid[WIFI_MAX_NETWORKS][6];
-    uint8_t bssid_count;
-    uint8_t channels[WIFI_MAX_NETWORKS]; // Channel for each BSSID
-    uint8_t channel; // Currently active channel (updated during attack)
-    char ssid[33];
-
-    // Handled by deauth function
-    uint32_t frames_sent;
-    uint32_t duration_sec;
-    uint16_t seq_nums[WIFI_MAX_NETWORKS]; // Sequence number for each BSSID
-} deauth_target_t;
-
-typedef struct {
-    bool deauthing;
-    uint32_t frames_sent;
-    uint32_t duration_sec;
-} deauth_stats_t;
 
 typedef struct {
     char ssid[33];
@@ -142,22 +116,12 @@ typedef struct {
     uint32_t channel;
 } wifi_data_t;
 
-typedef struct {
-    uint8_t key[16];
-    char payload[4];
-} wifi_mqtt_t;
-
-typedef struct {
-    int32_t rtt_gateway;
-    int32_t rtt_dns;
-} wifi_ping_t;
-
 /**
  * @brief Gets previous Wi-Fi config from NVS
  *
  * @returns Wi-Fi login information
  */
-wifi_login_t wifi_funcs_get_prev(void);
+wifi_login_t wifi_utils_get_prev(void);
 
 /**
  * @brief Scan and print available networks
@@ -166,14 +130,19 @@ wifi_login_t wifi_funcs_get_prev(void);
  *
  * @returns ESP error status
  */
-esp_err_t wifi_funcs_scan(wifi_scan_t *wifi_scan);
+esp_err_t wifi_utils_scan(wifi_scan_t *wifi_scan);
+
+/**
+ * @brief Creates ESP Wi-Fi event group
+ */
+void wifi_utils_wifi_event_init(void);
 
 /**
  * @brief Connect to a given Wi-Fi network
  *
  * @returns ESP error status
  */
-esp_err_t wifi_funcs_connect(void);
+esp_err_t wifi_utils_connect(void);
 
 /**
  * @brief Configure and start the radio to join a given network
@@ -184,102 +153,42 @@ esp_err_t wifi_funcs_connect(void);
  *
  * @returns ESP error status
  */
-esp_err_t wifi_funcs_radio_start(const char *ssid, const uint8_t* bssid, const char *password);
+esp_err_t wifi_utils_radio_start(const char *ssid, const uint8_t* bssid, const char *password);
 
 /**
  * @brief Disconnects from MQTT and Wi-Fi, then stops Wi-Fi
  *
  * @returns ESP error status
  */
-esp_err_t wifi_funcs_radio_stop(void);
+esp_err_t wifi_utils_radio_stop(void);
 
 /**
  * @brief Turn on/off Wi-Fi radio to nudge driver
  *
  * @returns ESP error status
  */
-esp_err_t wifi_funcs_radio_cycle(void);
-
-/**
- * @brief Creates MQTT ESP event group
- */
-void wifi_funcs_wifi_event_init(void);
-
-/**
- * @brief Initialize the MQTT client
- */
-void wifi_funcs_mqtt_client_init(void);
-
-/**
- * @brief Destroy/deinitialize the MQTT client
- */
-void wifi_funcs_mqtt_client_destroy(void);
-
-/**
- * @brief Stop the MQTT client
- */
-void wifi_funcs_mqtt_client_stop(void);
-
-/**
- * @brief Start the MQTT client
- */
-void wifi_funcs_mqtt_client_start(void);
+esp_err_t wifi_utils_radio_cycle(void);
 
 /**
  * @brief Initializes Wi-Fi promiscuous mode to sniff packets
  *
  * @param [in] network Network to sniff
  */
-void wifi_funcs_init_promiscuous(wifi_sniff_t *network);
+void wifi_utils_init_promiscuous(wifi_sniff_t *network);
 
 /**
- * @brief Ping the current gateway to get RTT
+ * @brief Parses the RSN IE from a beacon/probe response
  *
- * @param [out] rtt_ms Round-trip time in milliseconds
- * 
- * @returns ESP error status
+ * @param [in] rsn Pointer to the RSN IE body
+ * @param [in] rsn_len Length of the RSN IE body
+ * @param [out] out Parsed beacon information
  */
-esp_err_t wifi_funcs_ping_gateway(int32_t *rtt_ms);
-
-/**
- * @brief Ping a given host to get RTT
- *
- * @param [in] host Hostname or IP address to ping
- * @param [out] rtt_ms Round-trip time in milliseconds
- * 
- * @returns ESP error status
- */
-esp_err_t wifi_funcs_ping(const char *host, int32_t *rtt_ms);
-
-/**
- * @brief Scan for networks suitable for deauth as (excludes PMF-required networks)
- *
- * @param [out] wifi_scan_deauth Array to store scan results
- *
- * @returns ESP error status
- */
-esp_err_t wifi_funcs_scan_deauth(wifi_scan_deauth_t *wifi_scan_deauth);
-
-/**
- * @brief Sends deauthentication frames for a specified duration
- *
- * @param [in] deauth_target Pointer to deauth target configuration
- * 
- * @returns ESP error status
- */
-esp_err_t wifi_funcs_deauth_for_duration(deauth_target_t *deauth_target);
+void wifi_utils_parse_rsn_ie(const uint8_t *rsn, size_t rsn_len, wifi_beacon_t *out);
 
 /**
  * @brief Gets the current date and time from pool.ntp
  */
-void wifi_funcs_get_current_date_time(void);
+void wifi_utils_get_current_date_time(void);
 
-/**
- * @brief Sends data via MQTT to receiver
- *
- * @param [in] payload Data to send
- * @param [in] key Unique topic key to filter
- */
-void wifi_funcs_mqtt_client_publish(char *payload, const uint8_t key[16]);
 
-#endif // WIFI_FUNCS_H
+#endif // WIFI_UTILS_H

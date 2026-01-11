@@ -1,5 +1,5 @@
-#ifndef LCD_HOTKEY_FUNCS_H
-#define LCD_HOTKEY_FUNCS_H
+#ifndef LCD_HOTKEY_H
+#define LCD_HOTKEY_H
 
 #include "espnow_funcs.h"
 #include "lora_funcs.h"
@@ -76,4 +76,4 @@ void lcd_hotkey_nvs_load(hotkey_cmd_t *hotkey_cmd);
  */
 void lcd_hotkey_nvs_save(const hotkey_cmd_t *hotkey_cmd);
 
-#endif // LCD_HOTKEY_FUNCS_H
+#endif // LCD_HOTKEY_H

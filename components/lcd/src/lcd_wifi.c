@@ -1,4 +1,3 @@
-#include "ota_update.h"
 #include "polycast5_macros.h"
 
 #include "freertos/idf_additions.h"
@@ -17,9 +16,13 @@
 #include "esp_log.h"
 #include "esp_random.h"
 
-#include "lcd_wifi_funcs.h"
+#include "lcd_wifi.h"
 #include "wifi_task.h"
-#include "wifi_funcs.h"
+#include "wifi_utils.h"
+#include "wifi_mqtt.h"
+#include "wifi_ping.h"
+#include "wifi_deauth.h"
+#include "wifi_ota_update.h"
 #include "espnow_task.h"
 #include "espnow_funcs.h"
 #include "gpio_task.h"
@@ -27,6 +30,8 @@
 #include "ai_task.h"
 #include "ai_funcs.h"
 #include "ai_analysis_web_portal.h"
+
+#define TAG "LCD_WIFI"
 
 // Wi-Fi menu options
 #define WIFI_MENU_NS "wifi_menu" // NVS namespace for menu entries
@@ -47,7 +52,7 @@
 #define MQTT_SENDING_TXT "Sending via\nMQTT broker..." 
 #define MQTT_CONNECTING_TXT "Please wait...\nConnecting..."
 
-// wifi_funcs.c
+// wifi_utils.c
 extern char raw_frames_hex_buf[]; // Accumulated hex strings
 extern size_t raw_frames_hex_len; // Current length
 extern uint32_t raw_frames_captured; // Counter
@@ -65,8 +70,6 @@ wifi_menu_t wifi_menu = {
 wifi_login_t selected_network = {0};
 
 bool monitoring_packets = false;
-
-static const char* TAG = "LCD_WIFI_FUNCS";
 
 static char *raw_frames_ai_response;
 
@@ -586,7 +589,7 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
             lbl_option = NULL;
         }
         
-        selected_network = wifi_funcs_get_prev(); // Loads boot state saved network info
+        selected_network = wifi_utils_get_prev(); // Loads boot state saved network info
         selected_network.prev = true; // Connecting to previous
 
         #ifdef POLYCAST5_CHECK_OTA_ON_CONN
@@ -1228,7 +1231,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
     
     // Initial press
     if (state == AI_PKT_IDLE && select_pressed) {
-        // Set mask to all: previous sniff_network is disregarded in wifi_funcs_init_promiscuous
+        // Set mask to all: previous sniff_network is disregarded in wifi_utils_init_promiscuous
         sniff_network.mask = WIFI_PROMIS_FILTER_MASK_RAW_USEFUL;
         sniff_network.channel = channel;
 
@@ -1310,7 +1313,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
             if ((xTaskGetTickCount() - disconnect_tick) < pdMS_TO_TICKS(2000)) {
                 // Do nothing for a bit (non-blocking delay)
             } else {
-                selected_network = wifi_funcs_get_prev(); // Loads boot state saved network info
+                selected_network = wifi_utils_get_prev(); // Loads boot state saved network info
                 selected_network.prev = true; // Connecting to previous
 
                 if (xQueueSend(xWifiSelectedNetworkQueue, &selected_network, portMAX_DELAY) != pdPASS) {

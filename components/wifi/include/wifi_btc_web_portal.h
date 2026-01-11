@@ -1,5 +1,5 @@
-#ifndef BTC_PORTAL_H
-#define BTC_PORTAL_H
+#ifndef WIFI_BTC_WEB_PORTAL_H
+#define WIFI_BTC_WEB_PORTAL_H
 
 #include "esp_err.h"
 
@@ -8,29 +8,29 @@
  *
  * @returns ESP error status
  */
-esp_err_t btc_portal_start(void);
+esp_err_t wifi_btc_portal_start(void);
 
 /** 
  * @brief Stops BTC web portal
  *
  * @returns ESP error status
  */
-esp_err_t btc_portal_stop(void);
+esp_err_t wifi_btc_portal_stop(void);
 
 /** 
  * @brief Get BTC web portal SSID
  */
-const char *btc_portal_get_ssid(void);
+const char *wifi_btc_portal_get_ssid(void);
 
 /** 
  * @brief Get BTC web portal password
  */
-const char *btc_portal_get_pass(void);
+const char *wifi_btc_portal_get_pass(void);
 
 /** 
  * @brief Get BTC web portal IP address
  */
-const char *btc_portal_get_ip(void);
+const char *wifi_btc_portal_get_ip(void);
 
 /** 
  * @brief Save BTC public address to NVS
@@ -39,7 +39,7 @@ const char *btc_portal_get_ip(void);
  *
  * @returns ESP error status
  */
-esp_err_t btc_addr_set_nvs(const char *addr);
+esp_err_t wifi_btc_addr_set_nvs(const char *addr);
 
 /** 
  * @brief Get BTC public address from NVS
@@ -49,7 +49,7 @@ esp_err_t btc_addr_set_nvs(const char *addr);
  *
  * @returns ESP error status
  */
-esp_err_t btc_addr_get_nvs(char *addr_out, size_t sz);
+esp_err_t wifi_btc_addr_get_nvs(char *addr_out, size_t sz);
 
 /** 
  * @brief Save a randomly generated BTC Wi-Fi password to NVS
@@ -58,7 +58,7 @@ esp_err_t btc_addr_get_nvs(char *addr_out, size_t sz);
  *
  * @returns ESP error status
  */
-esp_err_t btc_wifi_pass_save_nvs(const char *val);
+esp_err_t wifi_btc_pass_save_nvs(const char *val);
 
 /** 
  * @brief Load the randomly generated BTC Wi-Fi password from NVS
@@ -68,7 +68,7 @@ esp_err_t btc_wifi_pass_save_nvs(const char *val);
  *
  * @returns ESP error status
  */
-esp_err_t btc_wifi_pass_load_nvs(char *out, size_t out_sz);
+esp_err_t wifi_btc_pass_load_nvs(char *out, size_t out_sz);
 
 
-#endif // BTC_PORTAL_H
+#endif // WIFI_BTC_WEB_PORTAL_H

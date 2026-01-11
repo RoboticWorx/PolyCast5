@@ -5,15 +5,15 @@
 
 #include "lvgl.h"
 
-#include "lcd_ir_funcs.h"
-#include "lcd_lora_funcs.h"
-#include "lcd_espnow_funcs.h"
-#include "lcd_wifi_funcs.h"
-#include "lcd_tools_funcs.h"
-#include "lcd_settings_funcs.h"
-#include "lcd_hotkey_funcs.h"
-#include "lcd_bluetooth_funcs.h"
-#include "lcd_gpio_funcs.h"
+#include "lcd_infrared.h"
+#include "lcd_lora.h"
+#include "lcd_espnow.h"
+#include "lcd_wifi.h"
+#include "lcd_tools.h"
+#include "lcd_settings.h"
+#include "lcd_hotkey.h"
+#include "lcd_bluetooth.h"
+#include "lcd_gpio.h"
 
 #include "gpio_funcs.h"
 

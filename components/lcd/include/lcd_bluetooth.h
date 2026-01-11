@@ -1,5 +1,5 @@
-#ifndef LCD_BLUETOOTH_FUNCS_H
-#define LCD_BLUETOOTH_FUNCS_H
+#ifndef LCD_BLUETOOTH_H
+#define LCD_BLUETOOTH_H
 
 #include "esp_err.h"
 #include "nimble/ble.h"
@@ -16,7 +16,7 @@
 typedef struct ui_btns_t ui_btns_t;
 typedef struct ui_menu_t ui_menu_t;
 
-// Simple “known devices” list
+// Simple "known devices" list
 typedef struct {
     char labels[BT_MAX_PEERS][18]; // "AA:BB:CC:DD:EE:FF"
     ble_addr_t peers[BT_MAX_PEERS]; // Identity addresses
@@ -186,4 +186,4 @@ esp_err_t lcd_bluetooth_script_selected_set(uint8_t idx);
 uint8_t lcd_bluetooth_script_selected_get(void);
 
 
-#endif // LCD_BLUETOOTH_FUNCS_H
+#endif // LCD_BLUETOOTH_H

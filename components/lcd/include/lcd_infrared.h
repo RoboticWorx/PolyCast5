@@ -1,5 +1,5 @@
-#ifndef LCD_IR_FUNCS_H
-#define LCD_IR_FUNCS_H
+#ifndef LCD_INFRARED_H
+#define LCD_INFRARED_H
 
 #include "lvgl.h"
 
@@ -76,4 +76,4 @@ void lcd_ir_build_current_menu(ir_menu_t *menu, size_t current_remote);
  */
 void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *ir_menu);
 
-#endif // LCD_IR_FUNCS_H
+#endif // LCD_INFRARED_H

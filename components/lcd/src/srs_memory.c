@@ -28,7 +28,7 @@ Please see https://polycast5.com/blogs/docs/srs-memory-planner
 #include "nvs.h"
 #include "esp_log.h"
 
-#include "wifi_funcs.h"
+#include "wifi_utils.h"
 #include "wifi_task.h"
 #include "gpio_task.h"
 #include "srs_memory.h"
@@ -144,7 +144,7 @@ bool srs_sync_time_over_wifi(void)
 
     /* If not synced */
     // Ask Wi-Fi to reconnect to the last used network
-    wifi_login_t selected_network = wifi_funcs_get_prev(); // Loads boot state saved network info
+    wifi_login_t selected_network = wifi_utils_get_prev(); // Loads boot state saved network info
     selected_network.prev = true; // Connecting to previous
     if (xQueueSend(xWifiSelectedNetworkQueue, &selected_network, portMAX_DELAY) != pdPASS) {
         ESP_LOGE(TAG, "Failed srs_sync_time_over_wifi: xWifiSelectedNetworkQueue");

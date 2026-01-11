@@ -19,9 +19,9 @@
 #include "widgets/label/lv_label.h"
 
 #include "lcd_utils.h"
-#include "lcd_bluetooth_funcs.h"
+#include "lcd_bluetooth.h"
 #include "bluetooth_funcs.h"
-#include "wifi_funcs.h"
+#include "wifi_utils.h"
 #include "ai_funcs.h"
 #include "ai_key_web_portal.h"
 
@@ -33,7 +33,7 @@
 #include "img_ai_orb_2.h"
 #include "img_ai_orb_3.h"
 
-#define TAG "LCD_BLUETOOTH_FUNCS"
+#define TAG "LCD_BLUETOOTH"
 
 #define KEYBOARD_SELECTED_IDX_NS "keyb_sel"
 #define KEYBOARD_SELECTED_IDX_KEY "selected"
@@ -1388,7 +1388,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
             }
         } else { // Connect to Wi-Fi and BLE
             // Connect to previous Wi-Fi network
-            wifi_login_t prev_network = wifi_funcs_get_prev(); // Loads boot state saved network info
+            wifi_login_t prev_network = wifi_utils_get_prev(); // Loads boot state saved network info
             prev_network.prev = true; // Connecting to previous
             if (xQueueSend(xWifiSelectedNetworkQueue, &prev_network, portMAX_DELAY) != pdPASS) {
                 ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue previous_network");

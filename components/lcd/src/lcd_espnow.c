@@ -1,7 +1,7 @@
 #include "core/lv_obj_pos.h"
 
 #include "core/lv_obj.h"
-#include "lcd_hotkey_funcs.h"
+#include "lcd_hotkey.h"
 #include "portmacro.h"
 #include "misc/lv_area.h"
 
@@ -14,8 +14,8 @@
 
 #include "lcd_asset_macros.h"
 #include "lcd_utils.h"
-#include "lcd_lora_funcs.h"
-#include "lcd_espnow_funcs.h"
+#include "lcd_lora.h"
+#include "lcd_espnow.h"
 #include "espnow_task.h"
 
 #include "gpio_task.h"
@@ -41,7 +41,7 @@
 
 #define ESPNOW_NUM_CHAR_ROWS 4
 
-static const char *TAG = "LCD_ESPNOW_FUNCS";
+static const char *TAG = "LCD_ESPNOW";
 
 static bool espnow_menu_overwrite = false;
 static char name_buf[MAX_CUSTOM_NAME_LEN + 1] = {0};

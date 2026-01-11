@@ -28,8 +28,8 @@
 
 #include "gpio_task.h"
 #include "lcd_utils.h"
-#include "lcd_settings_funcs.h"
-#include "ota_update.h"
+#include "lcd_settings.h"
+#include "wifi_ota_update.h"
 
 #define TAG "LCD_SETTINGS"
 
@@ -657,7 +657,7 @@ void lcd_settings_ota_updating_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, sett
         lv_obj_set_style_text_font(pct_lbl, &lv_font_montserrat_14, 0);
 
         // Start the OTA update
-        ota_update_start(ota_update_url);
+        wifi_ota_update_start(ota_update_url);
 
         init = true;
     }
@@ -1684,9 +1684,9 @@ static void system_build_info(char *buf, size_t n)
     
     // Get this firmware version
     char pc5_fw_version[64];
-    esp_err_t err = ota_update_get_nvs_version(pc5_fw_version, sizeof(pc5_fw_version));
+    esp_err_t err = wifi_ota_update_get_nvs_version(pc5_fw_version, sizeof(pc5_fw_version));
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "ota_update_get_nvs_version failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "wifi_ota_update_get_nvs_version failed: %s", esp_err_to_name(err));
     }
 
     // Format chip revision and cores

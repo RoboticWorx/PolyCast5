@@ -15,7 +15,7 @@
 #include "nvs.h"
 #include "esp_log.h"
 
-#include "lcd_lora_funcs.h"
+#include "lcd_lora.h"
 #include "lora_task.h"
 #include "lora_funcs.h"
 #include "gpio_task.h"
@@ -24,6 +24,8 @@
 #include "espnow_task.h"
 
 //#include "gpio_task.h"
+
+#define TAG "LCD_LORA"
 
 // LoRa menu options
 #define LORA_OPTIONS_NS "lora_menu" // NVS namespace
@@ -57,8 +59,6 @@ static const char *submenu_options[] = {
     LV_SYMBOL_USB "\nGPIO",
     LV_SYMBOL_SETTINGS "\nEDIT",
 };
-
-static const char* TAG = "LCD_LORA_FUNCS";
 
 static const int submenu_count = sizeof(submenu_options)/sizeof(submenu_options[0]);
 

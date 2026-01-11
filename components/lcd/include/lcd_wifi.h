@@ -1,5 +1,5 @@
-#ifndef LCD_WIFI_FUNCS_H
-#define LCD_WIFI_FUNCS_H
+#ifndef LCD_WIFI_H
+#define LCD_WIFI_H
 
 #include "lvgl.h"
 
@@ -219,4 +219,4 @@ esp_err_t lcd_wifi_topic_keys_nvs_save(const wifi_menu_t *menu);
     void lcd_wifi_dump_wifi_topic_nvs(void);
 #endif
 
-#endif // LCD_WIFI_FUNCS_H
+#endif // LCD_WIFI_H

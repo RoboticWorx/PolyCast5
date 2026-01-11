@@ -14,7 +14,7 @@
 #include "lora_funcs.h"
 #include "espnow_funcs.h"
 #include "espnow_task.h"
-#include "wifi_funcs.h"
+#include "wifi_utils.h"
 #include "wifi_task.h"
 
 #define TAG "ESPNOW_TASK"
@@ -89,7 +89,7 @@ static void espnow_task(void *param)
         
         // Sharing MAC address as unique token for MQTT commands
         if (xQueueReceive(xEspSendMqttQueue, &espnow_mqtt, 0) == pdPASS) {
-            wifi_funcs_radio_stop();
+            wifi_utils_radio_stop();
             
             // Start radio and initialize ESP-NOW
             ESP_ERROR_CHECK(espnow_funcs_wifi_radio_start(WIFI_CHANNEL));

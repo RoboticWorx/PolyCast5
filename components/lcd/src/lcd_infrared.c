@@ -11,13 +11,15 @@
 #include "widgets/label/lv_label.h"
 #include "widgets/list/lv_list.h"
 
-#include "lcd_ir_funcs.h"
+#include "lcd_infrared.h"
 #include "lcd_utils.h"
 #include "infrared_funcs.h"
 #include "infrared_task.h"
 #include "gpio_task.h"
 
 #include "img_save_new_remote.h"
+
+#define TAG "LCD_INFRARED"
 
 #define IR_NUM_CHAR_ROWS 4
 
@@ -28,8 +30,6 @@ ir_menu_t ir_menu = {
 };
 
 extern size_t ir_signal_length;
-
-static const char* TAG = "LCD_IR_FUNCS";
 
 static char name_buf[MAX_CUSTOM_NAME_LEN + 1] = {0};
 

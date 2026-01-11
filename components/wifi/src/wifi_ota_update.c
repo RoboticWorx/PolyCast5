@@ -18,11 +18,12 @@
 #include "esp_http_client.h"
 
 #include "portmacro.h"
-#include "wifi_funcs.h"
+#include "wifi_utils.h"
+#include "wifi_mqtt.h"
 #include "wifi_task.h"
-#include "ota_update.h"
+#include "wifi_ota_update.h"
 
-#define TAG "OTA"
+#define TAG "WIFI_OTA_UPDATE"
 
 #define NVS_OTA_VERSION_NS "ota"
 #define NVS_OTA_VERSION_KEY "version"
@@ -51,7 +52,7 @@ static void ota_task(void *_)
     #endif
 
     // Free some internal heap
-    wifi_funcs_mqtt_client_destroy();
+    wifi_mqtt_client_destroy();
 
     #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Pre-OTA heap after MQTT deinit: free=%u, internal=%u, min=%u",
@@ -178,9 +179,9 @@ static void ota_task(void *_)
 
         // Save the new version to NVS if exists
         if (pending_manifest_ver[0]) {
-            err = ota_update_set_nvs_version(pending_manifest_ver);
+            err = wifi_ota_update_set_nvs_version(pending_manifest_ver);
             if (err != ESP_OK) {
-                ESP_LOGE(TAG, "ota_update_set_nvs_version failed: %s", esp_err_to_name(err));
+                ESP_LOGE(TAG, "wifi_ota_update_set_nvs_version failed: %s", esp_err_to_name(err));
             } else {
                 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Saved new FW version to NVS: %s", pending_manifest_ver);
@@ -264,7 +265,7 @@ static bool http_get_small(const char *url, char *out, size_t out_sz)
 static void ota_check_task(void *_)
 {
     // Free heap before HTTPS manifest fetch
-    wifi_funcs_mqtt_client_stop();
+    wifi_mqtt_client_stop();
 
     char buf[2048];
     
@@ -304,9 +305,9 @@ static void ota_check_task(void *_)
 
     // Read the current app's version
     char current_ver[64] = {0};
-    esp_err_t err = ota_update_get_nvs_version(current_ver, sizeof(current_ver));
+    esp_err_t err = wifi_ota_update_get_nvs_version(current_ver, sizeof(current_ver));
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "ota_update_get_nvs_version failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "wifi_ota_update_get_nvs_version failed: %s", esp_err_to_name(err));
     }
     const char *new_ver = jver->valuestring;
     strlcpy(ota_update_url, jurl->valuestring, sizeof(ota_update_url));
@@ -346,15 +347,15 @@ static void ota_check_task(void *_)
     cJSON_Delete(root);
 
     done:
-    wifi_funcs_mqtt_client_start(); // Bring back MQTT for normal operation
+    wifi_mqtt_client_start(); // Bring back MQTT for normal operation
     ota_check_task_handle = NULL;
     vTaskDelete(NULL);
 }
 
-bool ota_update_check_start(const char *manifest_url)
+bool wifi_ota_update_check_start(const char *manifest_url)
 {    
     // If already checked or in progress, exit
-    if (ota_check_task_handle || ota_update_in_progress()) {
+    if (ota_check_task_handle || wifi_ota_update_in_progress()) {
         return false;
     }
     
@@ -370,7 +371,7 @@ bool ota_update_check_start(const char *manifest_url)
     return xTaskCreate(ota_check_task, "ota_check_task", 5 * 1024, NULL, POLYCAST5_PRIORITY_HIGH, &ota_check_task_handle) == pdPASS;
 }
 
-bool ota_update_start(const char *url)
+bool wifi_ota_update_start(const char *url)
 {
     // Make sure not already running
     if (ota_task_handle) {
@@ -415,12 +416,12 @@ static void log_versions(const esp_app_desc_t *running, const esp_app_desc_t *in
 }
 #endif
 
-bool ota_update_in_progress(void)
+bool wifi_ota_update_in_progress(void)
 {
     return ota_task_handle != NULL;
 }
 
-void ota_update_mark_app_valid(void)
+void wifi_ota_update_mark_app_valid(void)
 {
     #if CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
     esp_err_t err = esp_ota_mark_app_valid_cancel_rollback();
@@ -433,7 +434,7 @@ void ota_update_mark_app_valid(void)
     #endif
 }
 
-esp_err_t ota_update_set_nvs_version(const char *val)
+esp_err_t wifi_ota_update_set_nvs_version(const char *val)
 {
     nvs_handle_t h;
     esp_err_t err;
@@ -457,7 +458,7 @@ esp_err_t ota_update_set_nvs_version(const char *val)
     return err;
 }
 
-esp_err_t ota_update_get_nvs_version(char *out, size_t out_sz)
+esp_err_t wifi_ota_update_get_nvs_version(char *out, size_t out_sz)
 {
     nvs_handle_t h;
     esp_err_t err;

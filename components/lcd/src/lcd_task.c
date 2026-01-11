@@ -5,9 +5,9 @@
 #include "esp_log.h"
 
 #include "lcd_utils.h"
-#include "lcd_bluetooth_funcs.h"
-#include "lcd_hotkey_funcs.h"
-#include "lcd_gpio_funcs.h"
+#include "lcd_bluetooth.h"
+#include "lcd_hotkey.h"
+#include "lcd_gpio.h"
 
 #include "lcd_task.h"
 #include "gpio_task.h"

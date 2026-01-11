@@ -19,7 +19,7 @@
 #include "tca9535.h"
 #include "gpio_task.h"
 #include "lcd_utils.h"
-#include "lcd_gpio_funcs.h"
+#include "lcd_gpio.h"
 
 #define TAG "LCD_GPIO"
 

@@ -1,5 +1,5 @@
-#ifndef LCD_ESPNOW_FUNCS_H
-#define LCD_ESPNOW_FUNCS_H
+#ifndef LCD_ESPNOW_H
+#define LCD_ESPNOW_H
 
 #include "polycast5_macros.h"
 
@@ -161,4 +161,4 @@ esp_err_t lcd_espnow_rx_mac_lmk_nvs_delete(espnow_menu_t *espnow_menu, uint8_t s
     void lcd_espnow_dump_nvs(void);
 #endif
 
-#endif // LCD_ESPNOW_FUNCS_H
+#endif // LCD_ESPNOW_H
