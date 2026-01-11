@@ -7,7 +7,7 @@
 
 #include "lvgl.h"
 
-#include "espnow_funcs.h"
+#include "espnow_utils.h"
 
 #define MAX_ESPNOW_OPTIONS 51 // - 1 for "Add ESP32"
 

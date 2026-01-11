@@ -20,9 +20,9 @@
 
 #include "lcd_utils.h"
 #include "lcd_bluetooth.h"
-#include "bluetooth_funcs.h"
+#include "bluetooth_utils.h"
 #include "wifi_utils.h"
-#include "ai_funcs.h"
+#include "ai_utils.h"
 #include "ai_key_web_portal.h"
 
 #include "wifi_task.h"
@@ -675,7 +675,7 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
 
         // Load pairing key from NVS
         uint32_t pairing_key;
-        bluetooth_pairing_key_load_nvs(&pairing_key); // pairing_key
+        bluetooth_utils_pairing_key_load_nvs(&pairing_key); // pairing_key
         lv_label_set_text_fmt(pin_lbl, "     %" PRIu32, pairing_key);
 
         // Instructions label (scrollable if text is long)
@@ -1329,7 +1329,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     static int16_t orb_angle = 0; // 0.1 degree units
 
     char api_key[AI_API_KEY_MAX_LEN] = {0};
-    esp_err_t err = xai_load_api_key_nvs(api_key, AI_API_KEY_MAX_LEN);
+    esp_err_t err = ai_utils_load_api_key_nvs(api_key, AI_API_KEY_MAX_LEN);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Failed to load xAI API key from NVS: err %s, switching to AI config page.", esp_err_to_name(err));
 
@@ -1899,10 +1899,10 @@ static void prompt_rename_or_del(ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth
         // Done
         if (xSemaphoreTake(xRightButtonSemaphore, 0) == pdTRUE) {            
             // Save preferred peer to whitelist
-            esp_err_t err = bluetooth_set_preferred_peer_nvs(&bluetooth_menu->bluetooth_peer_menu.peers[bluetooth_menu->bluetooth_peer_menu.index]);
+            esp_err_t err = bluetooth_utils_set_preferred_peer_nvs(&bluetooth_menu->bluetooth_peer_menu.peers[bluetooth_menu->bluetooth_peer_menu.index]);
             #ifdef POLYCAST5_DEBUG
             if (err != ESP_OK) {
-                ESP_LOGE(TAG, "bluetooth_set_preferred_peer_nvs failed: %s", esp_err_to_name(err));
+                ESP_LOGE(TAG, "bluetooth_utils_set_preferred_peer_nvs failed: %s", esp_err_to_name(err));
             }
             #endif
             
@@ -1958,11 +1958,11 @@ static void prompt_rename_or_del(ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth
 
             // Delete selected peer from NVS
             ble_addr_t addr = bluetooth_menu->bluetooth_peer_menu.peers[bluetooth_menu->bluetooth_peer_menu.index];
-            bluetooth_remove_peer_nvs(&addr);
+            bluetooth_utils_remove_peer_nvs(&addr);
 
             // Check size
             bluetooth_peer_info_t tmp[BT_MAX_PEERS];
-            int n = bluetooth_get_peers_list_nvs(tmp, BT_MAX_PEERS);
+            int n = bluetooth_utils_get_peers_list_nvs(tmp, BT_MAX_PEERS);
             // If empty now, forget all
             if (n == 0) {
                 // Active bluetooth
@@ -1996,7 +1996,7 @@ static void peer_menu_build(bluetooth_peer_menu_t *pm)
 {
     // Read cached peers (BT stays OFF)
     bluetooth_peer_info_t tmp[BT_MAX_PEERS];
-    int n = bluetooth_get_peers_list_nvs(tmp, BT_MAX_PEERS);
+    int n = bluetooth_utils_get_peers_list_nvs(tmp, BT_MAX_PEERS);
 
     // Size (+1 for the "Allow new devices" row)
     pm->size = (n > 0) ? (n + 1) : 1;
@@ -2029,7 +2029,7 @@ static void peer_menu_build(bluetooth_peer_menu_t *pm)
         // Label text
         char label[32] = {0};
         // Use name if it exists, else use address
-        if (!bluetooth_get_peer_label_nvs(&pm->peers[row], label, sizeof(label)) || label[0] == '\0') {
+        if (!bluetooth_utils_get_peer_label_nvs(&pm->peers[row], label, sizeof(label)) || label[0] == '\0') {
             fmt_addr_str(&pm->peers[row], label, sizeof(label));
         }
 
@@ -2212,7 +2212,7 @@ void lcd_bluetooth_pair_new_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
         
         // Load pairing key from NVS
         uint32_t pairing_key;
-        bluetooth_pairing_key_load_nvs(&pairing_key); // pairing_key
+        bluetooth_utils_pairing_key_load_nvs(&pairing_key); // pairing_key
         lv_label_set_text_fmt(pin_lbl, "     %" PRIu32, pairing_key);
 
         lv_timer_handler();
@@ -2236,7 +2236,7 @@ void lcd_bluetooth_pair_new_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
         lv_timer_handler();
         
         // No whitelist: anyone can pair
-        bluetooth_clear_peers_list_nvs(true); // Clear preferred peer
+        bluetooth_utils_clear_peers_list_nvs(true); // Clear preferred peer
     
         // Active bluetooth
         uint16_t cmd = BLUETOOTH_CMD_INIT;
@@ -2335,7 +2335,7 @@ void lcd_bluetooth_rename_peer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         // Auto-fill previous
         ble_addr_t peer_addr = bluetooth_menu->bluetooth_peer_menu.peers[bluetooth_menu->bluetooth_peer_menu.index];
         char prefill[MAX_BT_NAME_LEN + 1] = {0}; // Buffer
-        bluetooth_get_peer_label_nvs(&peer_addr, prefill, sizeof(prefill));
+        bluetooth_utils_get_peer_label_nvs(&peer_addr, prefill, sizeof(prefill));
 
         // Copy the old name into buffer
         strncpy(bt_name_buf, prefill, MAX_CUSTOM_NAME_LEN);
@@ -2498,7 +2498,7 @@ void lcd_bluetooth_rename_peer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         
         // Save the chosen label for the selected peer
         int idx = bluetooth_menu->bluetooth_peer_menu.index;
-        bluetooth_set_peer_label_nvs(&bluetooth_menu->bluetooth_peer_menu.peers[idx], saved_name);
+        bluetooth_utils_set_peer_label_nvs(&bluetooth_menu->bluetooth_peer_menu.peers[idx], saved_name);
         
         // Update in-memory copy so the UI shows it after rebuild
         strncpy(bluetooth_menu->bluetooth_peer_menu.labels[idx], saved_name, sizeof(bluetooth_menu->bluetooth_peer_menu.labels[idx]) - 1);

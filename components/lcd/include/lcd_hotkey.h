@@ -1,8 +1,8 @@
 #ifndef LCD_HOTKEY_H
 #define LCD_HOTKEY_H
 
-#include "espnow_funcs.h"
-#include "lora_funcs.h"
+#include "espnow_utils.h"
+#include "lora_utils.h"
 #include "lvgl.h"
 
 // Forward-declare structs (from lcd_utils.h)

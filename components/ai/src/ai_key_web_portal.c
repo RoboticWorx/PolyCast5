@@ -15,7 +15,7 @@
 #include "esp_netif_ip_addr.h" // For IPSTR/IP2STR
 
 #include "ai_key_web_portal.h"
-#include "ai_funcs.h"
+#include "ai_utils.h"
 #include "ai_prompts.h"
 
 #define TAG "AI_PORTAL"
@@ -138,7 +138,7 @@ static esp_err_t key_get(httpd_req_t *req)
 {
     // Do not return the full key. Only return a boolean + masked hint.
     char key[AI_API_KEY_MAX_LEN] = {0};
-    esp_err_t e = xai_load_api_key_nvs(key, sizeof(key));
+    esp_err_t e = ai_utils_load_api_key_nvs(key, sizeof(key));
 
     bool has_key = (e == ESP_OK && key[0] != '\0');
 
@@ -236,7 +236,7 @@ static esp_err_t key_post(httpd_req_t *req)
     }
 
     // Save to NVS (canonical storage in ai_funcs.c)
-    esp_err_t e = xai_save_api_key_nvs(key);
+    esp_err_t e = ai_utils_save_api_key_nvs(key);
 
     cJSON_Delete(j);
 
@@ -252,7 +252,7 @@ static esp_err_t prompt_get(httpd_req_t *req)
 {
     // Return current prompt (NVS override if set; else compiled default)
     char prompt[4096] = {0};
-    esp_err_t e = ai_prompt_load_nvs(prompt, sizeof(prompt));
+    esp_err_t e = ai_utils_prompt_load_nvs(prompt, sizeof(prompt));
 
     if (e != ESP_OK || prompt[0] == '\0') {
         strncpy(prompt, AI_PROMPT_AUTOKEY, sizeof(prompt) - 1);
@@ -319,7 +319,7 @@ static esp_err_t prompt_post(httpd_req_t *req)
     strncpy(prompt, jp->valuestring, sizeof(prompt) - 1);
 
     // Allow empty string to mean "use default" (saved empty)
-    esp_err_t e = ai_prompt_save_nvs(prompt);
+    esp_err_t e = ai_utils_prompt_save_nvs(prompt);
 
     cJSON_Delete(j);
 

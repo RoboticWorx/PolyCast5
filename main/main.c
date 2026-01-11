@@ -19,16 +19,16 @@
 #include "tca9535.h"
 
 #include "lora_task.h"
-#include "lora_funcs.h"
+#include "lora_utils.h"
 #include "lcd_utils.h"
 #include "lcd_task.h"
 #include "infrared_task.h"
 #include "bluetooth_task.h"
-//#include "bluetooth_funcs.h"
+//#include "bluetooth_utils.h"
 #include "gpio_task.h"
-#include "gpio_funcs.h"
+#include "gpio_utils.h"
 #include "espnow_task.h"
-#include "espnow_funcs.h"
+#include "espnow_utils.h"
 #include "wifi_task.h"
 #include "ai_task.h"
 
@@ -73,12 +73,12 @@ void app_main(void) {
     #endif
     
     // Initialize NVS flash
-    gpio_init_nvs();
+    gpio_utils_init_nvs();
     
     // Allocate Wi-Fi buffers now without fragmentation
-    ESP_ERROR_CHECK(espnow_funcs_wifi_driver_init());
+    ESP_ERROR_CHECK(espnow_utils_wifi_driver_init());
     // Turn off radio to save power
-    ESP_ERROR_CHECK(espnow_funcs_wifi_radio_stop());
+    ESP_ERROR_CHECK(espnow_utils_wifi_radio_stop());
     
     // Isolate and configure sleep wake up
     //ESP_ERROR_CHECK(rtc_gpio_isolate(USER_BUTTON_POWER));
@@ -116,8 +116,9 @@ void app_main(void) {
     xPowerButtonSemaphore = xSemaphoreCreateBinary();
     configASSERT(xPowerButtonSemaphore);
     
-    if (gpio_init() != ESP_OK) {
-        ESP_LOGE(TAG, "gpio_init failed");
+    esp_err_t err = gpio_utils_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "gpio_utils_init failed: %s", esp_err_to_name(err));
         return;
     }
     

@@ -9,12 +9,12 @@
 #include "esp_now.h"
 #include "esp_err.h"
 
-#include "espnow_funcs.h"
+#include "espnow_utils.h"
 #include "espnow_task.h"
 
-#define TAG "espnow_funcs"
+#define TAG "ESPNOW_UTILS"
 
-esp_err_t espnow_funcs_wifi_driver_init(void)
+esp_err_t espnow_utils_wifi_driver_init(void)
 {
     // Bring up TCP/IP stack and default event loop
     ESP_ERROR_CHECK(esp_netif_init());
@@ -33,7 +33,7 @@ esp_err_t espnow_funcs_wifi_driver_init(void)
     return ESP_OK;
 }
 
-esp_err_t espnow_funcs_wifi_radio_start(uint8_t channel)
+esp_err_t espnow_utils_wifi_radio_start(uint8_t channel)
 {
     // Start Wi-Fi
     ESP_ERROR_CHECK(esp_wifi_start());
@@ -44,7 +44,7 @@ esp_err_t espnow_funcs_wifi_radio_start(uint8_t channel)
     return ESP_OK;
 }
 
-esp_err_t espnow_funcs_wifi_radio_stop(void)
+esp_err_t espnow_utils_wifi_radio_stop(void)
 {
     // Stop Wi-Fi
     ESP_ERROR_CHECK(esp_wifi_stop());
@@ -67,7 +67,7 @@ static void send_cb(const wifi_tx_info_t *info, esp_now_send_status_t status)
     }
 }
 
-esp_err_t espnow_funcs_espnow_init(const uint8_t *mac, uint8_t channel, bool encrypt, const uint8_t *lmk)
+esp_err_t espnow_utils_init(const uint8_t *mac, uint8_t channel, bool encrypt, const uint8_t *lmk)
 {
     esp_err_t err;
 
@@ -108,7 +108,7 @@ esp_err_t espnow_funcs_espnow_init(const uint8_t *mac, uint8_t channel, bool enc
     return ESP_OK;
 }
 
-esp_err_t espnow_funcs_espnow_deinit(void)
+esp_err_t espnow_utils_deinit(void)
 {
     // De-initialize ESP-NOW
     esp_err_t err = esp_now_deinit();
@@ -119,7 +119,7 @@ esp_err_t espnow_funcs_espnow_deinit(void)
     return err;
 }
 
-esp_err_t espnow_funcs_espnow_send_data(const uint8_t *mac, const uint8_t *data, size_t len)
+esp_err_t espnow_utils_send_data(const uint8_t *mac, const uint8_t *data, size_t len)
 {
     // Cap at max length
     if (len > ESP_NOW_MAX_DATA_LEN) {
@@ -130,7 +130,7 @@ esp_err_t espnow_funcs_espnow_send_data(const uint8_t *mac, const uint8_t *data,
     return esp_now_send(mac, data, len);
 }
 
-esp_err_t espnow_funcs_espnow_register_recv_cb(esp_now_recv_cb_t cb)
+esp_err_t espnow_utils_register_recv_cb(esp_now_recv_cb_t cb)
 {
     // Register receiver callback
     esp_err_t err = esp_now_register_recv_cb(cb);

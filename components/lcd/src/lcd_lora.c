@@ -17,7 +17,7 @@
 
 #include "lcd_lora.h"
 #include "lora_task.h"
-#include "lora_funcs.h"
+#include "lora_utils.h"
 #include "gpio_task.h"
 #include "lcd_utils.h"
 

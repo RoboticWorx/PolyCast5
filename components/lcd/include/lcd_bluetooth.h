@@ -7,7 +7,7 @@
 #include "misc/lv_style.h"
 #include "misc/lv_types.h"
 
-#include "bluetooth_funcs.h"
+#include "bluetooth_utils.h"
 #include "bluetooth_web_portal.h"
 
 #define NUM_BLUETOOTH_OPTIONS 10

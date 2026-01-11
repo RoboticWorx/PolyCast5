@@ -1,5 +1,5 @@
-#ifndef ESPNOW_FUNCS_H
-#define ESPNOW_FUNCS_H
+#ifndef ESPNOW_UTILS_H
+#define ESPNOW_UTILS_H
 
 #include "esp_err.h"
 #include "esp_now.h"
@@ -28,21 +28,21 @@ typedef struct {
  *
  * @return ESP_OK on success
  */
-esp_err_t espnow_funcs_wifi_driver_init(void);
+esp_err_t espnow_utils_wifi_driver_init(void);
 
 /**
  * @brief Start the Wi-Fi radio
  *
  * @return ESP_OK on success
  */
-esp_err_t espnow_funcs_wifi_radio_start(uint8_t channel);
+esp_err_t espnow_utils_wifi_radio_start(uint8_t channel);
 
 /**
  * @brief Stop the Wi-Fi radio
  *
  * @return ESP_OK on success
  */
-esp_err_t espnow_funcs_wifi_radio_stop(void);
+esp_err_t espnow_utils_wifi_radio_stop(void);
 
 /**
  * @brief Initialize ESP-NOW
@@ -54,14 +54,14 @@ esp_err_t espnow_funcs_wifi_radio_stop(void);
  *
  * @return ESP_OK on success
  */
-esp_err_t espnow_funcs_espnow_init(const uint8_t *mac, uint8_t channel, bool encrypt, const uint8_t *lmk);
+esp_err_t espnow_utils_init(const uint8_t *mac, uint8_t channel, bool encrypt, const uint8_t *lmk);
 
 /**
  * @brief De-initialize ESP-NOW
  *
  * @return ESP_OK on success
  */
-esp_err_t espnow_funcs_espnow_deinit(void);
+esp_err_t espnow_utils_deinit(void);
 
 /**
  * @brief Send data via ESP-NOW
@@ -72,7 +72,7 @@ esp_err_t espnow_funcs_espnow_deinit(void);
  *
  * @return ESP_OK on success
  */
-esp_err_t espnow_funcs_espnow_send_data(const uint8_t *mac, const uint8_t *data, size_t len);
+esp_err_t espnow_utils_send_data(const uint8_t *mac, const uint8_t *data, size_t len);
 
 /**
  * @brief Register an ESP-NOW receive callback
@@ -81,7 +81,7 @@ esp_err_t espnow_funcs_espnow_send_data(const uint8_t *mac, const uint8_t *data,
  *
  * @return ESP_OK on success
  */
-esp_err_t espnow_funcs_espnow_register_recv_cb(esp_now_recv_cb_t cb);
+esp_err_t espnow_utils_register_recv_cb(esp_now_recv_cb_t cb);
 
 
-#endif // ESPNOW_FUNCS_H
+#endif // ESPNOW_UTILS_H

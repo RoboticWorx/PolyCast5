@@ -20,10 +20,10 @@
 #include "wifi_utils.h"
 #include "wifi_mqtt.h"
 #include "wifi_ping.h"
-#include "gpio_funcs.h"
-#include "espnow_funcs.h"
+#include "gpio_utils.h"
+#include "espnow_utils.h"
 #include "wifi_ota_update.h"
-#include "ai_funcs.h"
+#include "ai_utils.h"
 
 #include "wifi_task.h"
 #include "gpio_task.h"
@@ -615,7 +615,7 @@ void wifi_utils_get_current_date_time(void)
         // Tell SNTP client to poll for time
         esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
     
-        // Point STNP client at a given server
+        // Point SNTP client at a given server
         esp_sntp_setservername(0, "pool.ntp.org"); // or time.nist.gov
     
         // Init and start SNTP service

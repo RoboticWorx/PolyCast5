@@ -36,9 +36,9 @@
 #include "wifi_utils.h"
 #include "wifi_ping.h"
 #include "wifi_task.h"
-#include "infrared_funcs.h"
+#include "infrared_utils.h"
 #include "infrared_task.h"
-#include "gpio_funcs.h"
+#include "gpio_utils.h"
 #include "gpio_task.h"
 #include "lora_task.h"
 #include "espnow_task.h"
@@ -332,7 +332,7 @@ void lcd_device_sleep(void)
     gpio_set_level(ST7789_LEDA_PIN, 1); // BL low
     
     // Don't auto wake
-    while (gpio_read_input(USER_BUTTON_POWER) != 1) {
+    while (gpio_utils_read_input(USER_BUTTON_POWER) != 1) {
         vTaskDelay(pdMS_TO_TICKS(25));
         lv_timer_handler();
     }
@@ -358,7 +358,7 @@ void lcd_device_sleep(void)
     xSemaphoreGive(xStartAdcBatSemaphore); // Start new battery ADC reading
     
     // Don't auto sleep
-    while (gpio_read_input(USER_BUTTON_POWER) != 1) {
+    while (gpio_utils_read_input(USER_BUTTON_POWER) != 1) {
         vTaskDelay(pdMS_TO_TICKS(25));
         lv_timer_handler();
     }

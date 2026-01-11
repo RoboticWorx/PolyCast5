@@ -8,12 +8,12 @@
 #include "sx126x.h"
 #include "sx126x_hal.h"
 
-#include "lora_funcs.h"
+#include "lora_utils.h"
 #include "lora_task.h"
 #include "espnow_task.h"
 #include "gpio_task.h"
 
-static const char *TAG = "LORA_FUNCS";
+static const char *TAG = "LORA_UTILS";
 
 uint32_t expected_rx_id = 0;
 uint8_t encryption_key[LORA_ENC_KEY_LEN] = {0};
@@ -27,7 +27,7 @@ static void generate_random_iv(uint8_t *iv, size_t length)
     }
 }
 
-uint32_t lora_create_msg_id(void)
+uint32_t lora_utils_create_msg_id(void)
 {
     uint32_t id;
     do {
@@ -37,13 +37,13 @@ uint32_t lora_create_msg_id(void)
     return id;
 }
 
-void lora_generate_random_key(void)
+void lora_utils_generate_random_key(void)
 {
     // Generate random encryption key
     esp_fill_random(encryption_key, sizeof(encryption_key));
     
     #ifdef POLYCAST5_DEBUG
-        ESP_LOG_BUFFER_HEX("LORA KEY GENERATED", encryption_key, sizeof(encryption_key));
+    ESP_LOG_BUFFER_HEX("LORA KEY GENERATED", encryption_key, sizeof(encryption_key));
     #endif
     
     if (xQueueSend(xEspSendEncKeyQueue, encryption_key, pdMS_TO_TICKS(100)) != pdPASS) {
@@ -51,7 +51,7 @@ void lora_generate_random_key(void)
     }
 }
 
-void lora_set_rx_mode(void) // Call once to set RX mode and receive on EXTI8
+void lora_utils_set_rx_mode(void) // Call once to set RX mode and receive on EXTI8
 {
     #define RTC_FREQ_HZ 32768U
     #define MS_TO_RTC_STEP(ms) ((uint32_t)(((uint64_t)(ms) * RTC_FREQ_HZ) / 1000U))
@@ -71,7 +71,7 @@ void lora_set_rx_mode(void) // Call once to set RX mode and receive on EXTI8
     }
 }
 
-void lora_tx(uint8_t tx_data[], uint8_t data_len)
+void lora_utils_transmit(uint8_t tx_data[], uint8_t data_len)
 {
     // Poll for SX1262 to be ready
     while (gpio_get_level(SX126X_BUSY_PIN) == 1) {
@@ -91,7 +91,7 @@ void lora_tx(uint8_t tx_data[], uint8_t data_len)
     }
 }
 
-void lora_process_received_message(uint8_t *message, size_t message_len) {
+void lora_utils_process_received_message(uint8_t *message, size_t message_len) {
     // Verify that the message length is at least 16 bytes (for IV) + 16 bytes
     // (minimum ciphertext)
     if (message_len < 32) {
@@ -112,7 +112,7 @@ void lora_process_received_message(uint8_t *message, size_t message_len) {
     memcpy(ciphertext, message + LORA_IV_LENGTH, LORA_CYPHERTEXT_LENGTH); // Extract the ciphertext (remaining 64 bytes)
 
     #ifdef POLYCAST5_DEBUG
-        ESP_LOG_BUFFER_HEX(TAG, iv, LORA_IV_LENGTH);
+    ESP_LOG_BUFFER_HEX(TAG, iv, LORA_IV_LENGTH);
     #endif
     
     // Initialize the AES context with the key and received IV.
@@ -126,7 +126,7 @@ void lora_process_received_message(uint8_t *message, size_t message_len) {
     
     // 'cyphertext' is now decrypted
     #ifdef POLYCAST5_DEBUG
-        ESP_LOGI(TAG, "Decrypted text: %s\n", ciphertext);
+    ESP_LOGI(TAG, "Decrypted text: %s\n", ciphertext);
     #endif
     
     uint32_t received_rx_id;
@@ -135,7 +135,7 @@ void lora_process_received_message(uint8_t *message, size_t message_len) {
     if (sscanf((char*)ciphertext, "PolyCast_Command_Value_Received:%" SCNu32, &received_rx_id) == 1) {
         if (received_rx_id == expected_rx_id) {
             #ifdef POLYCAST5_DEBUG
-                ESP_LOGI(TAG, "ACK matches id=%" PRIu32, received_rx_id);
+            ESP_LOGI(TAG, "ACK matches id=%" PRIu32, received_rx_id);
             #endif
             
             xQueueReset(xLoraSendEncQueue); // Clear pending commands
@@ -144,17 +144,17 @@ void lora_process_received_message(uint8_t *message, size_t message_len) {
             xSemaphoreGive(xLoraReceiptValidSemaphore);
         } else {
             #ifdef POLYCAST5_DEBUG
-                ESP_LOGW(TAG, "ACK ID wrong (got=%" PRIu32 ", want=%" PRIu32 ")", received_rx_id, expected_rx_id);
+            ESP_LOGW(TAG, "ACK ID wrong (got=%" PRIu32 ", want=%" PRIu32 ")", received_rx_id, expected_rx_id);
             #endif
         }
     } else {
         #ifdef POLYCAST5_DEBUG
-            ESP_LOGI(TAG, "Decrypted text does NOT match. Got: \"%s\"", ciphertext);
+        ESP_LOGI(TAG, "Decrypted text does NOT match. Got: \"%s\"", ciphertext);
         #endif
     }
 }
 
-void lora_encrypt_and_transmit(uint8_t plaintext[])
+void lora_utils_encrypt_and_transmit(uint8_t plaintext[])
 {
     // Measure how many bytes of real data we have, up to the max
     size_t plaintext_len = strnlen((char*)plaintext, LORA_CYPHERTEXT_LENGTH + 1);
@@ -197,5 +197,5 @@ void lora_encrypt_and_transmit(uint8_t plaintext[])
     }
     ESP_LOGE(TAG, "\n");*/
 
-    lora_tx(message, sizeof(message)); // Send the data
+    lora_utils_transmit(message, sizeof(message)); // Send the data
 }

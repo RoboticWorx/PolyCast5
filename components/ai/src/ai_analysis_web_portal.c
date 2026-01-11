@@ -14,7 +14,7 @@
 #include "esp_http_server.h"
 #include "esp_netif_ip_addr.h" // IPSTR/IP2STR
 
-#include "ai_funcs.h"
+#include "ai_utils.h"
 #include "ai_analysis_web_portal.h"
 
 #define TAG "AI_ANALYSIS_PORTAL"

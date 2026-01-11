@@ -1,5 +1,5 @@
-#ifndef BLUETOOTH_FUNCS_H
-#define BLUETOOTH_FUNCS_H
+#ifndef BLUETOOTH_UTILS_H
+#define BLUETOOTH_UTILS_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -193,17 +193,17 @@ typedef enum {
 /** 
  * @brief Initialize bluetooth and start advertising to connect with last known
  */
-void bluetooth_init(void);
+void bluetooth_utils_init(void);
 
 /** 
  * @brief Deinitialize bluetooth
  */
-void bluetooth_deinit(void);
+void bluetooth_utils_deinit(void);
 
 /** 
  * @brief Forgets all bluetooth peers so nothing auto-connects
  */
-void bluetooth_forget_all_peers(void);
+void bluetooth_utils_forget_all_peers(void);
 
 /** 
  * @brief Send a media command over bluetooth
@@ -211,7 +211,7 @@ void bluetooth_forget_all_peers(void);
  * @param [in] cmd Command to send
  * @param [in] key_pressed Bool to simulate press
  */
-void bluetooth_send_media(uint8_t key_cmd, bool key_pressed);
+void bluetooth_utils_send_media(uint8_t key_cmd, bool key_pressed);
 
 /** 
  * @brief Send a keyboard string over bluetooth
@@ -219,14 +219,14 @@ void bluetooth_send_media(uint8_t key_cmd, bool key_pressed);
  * @param [in] s String to send
  * @param [in] tap_ms Delay between characters
  */
-void bluetooth_send_script(const char *s, uint32_t tap_ms);
+void bluetooth_utils_send_script(const char *s, uint32_t tap_ms);
 
 /** 
  * @brief Sends the battery level to the connected device
  *
  * @param [in] percent The battery level percentage to send
  */
-void bluetooth_set_battery_level(uint8_t percent);
+void bluetooth_utils_set_battery_level(uint8_t percent);
 
 /** 
  * @brief Sets a given bluetooth peer as the preferred in NVS
@@ -235,7 +235,7 @@ void bluetooth_set_battery_level(uint8_t percent);
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_set_preferred_peer_nvs(const ble_addr_t *peer);
+esp_err_t bluetooth_utils_set_preferred_peer_nvs(const ble_addr_t *peer);
 
 /** 
  * @brief Gets the preferred bluetooth peer from NVS
@@ -245,7 +245,7 @@ esp_err_t bluetooth_set_preferred_peer_nvs(const ble_addr_t *peer);
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_get_preferred_peer_nvs(ble_addr_t *out, bool *found);
+esp_err_t bluetooth_utils_get_preferred_peer_nvs(ble_addr_t *out, bool *found);
 
 /** 
  * @brief Load all bluetooth peers from NVS
@@ -255,14 +255,14 @@ esp_err_t bluetooth_get_preferred_peer_nvs(ble_addr_t *out, bool *found);
  *
  * @returns Number of peers found
  */
-int bluetooth_get_peers_list_nvs(bluetooth_peer_info_t *out, int max);
+int bluetooth_utils_get_peers_list_nvs(bluetooth_peer_info_t *out, int max);
 
 /** 
  * @brief Add a peer to the main peer list in NVS
  *
  * @param [in] peer Peer to add
  */
-void bluetooth_add_to_peers_list_nvs(const ble_addr_t *peer);
+void bluetooth_utils_add_to_peers_list_nvs(const ble_addr_t *peer);
 
 /** 
  * @brief Clears all bluetooth peers in NVS
@@ -271,7 +271,7 @@ void bluetooth_add_to_peers_list_nvs(const ble_addr_t *peer);
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_clear_peers_list_nvs(bool preferred_only);
+esp_err_t bluetooth_utils_clear_peers_list_nvs(bool preferred_only);
 
 /** 
  * @brief Save the Bluetooth pairing key to NVS
@@ -280,7 +280,7 @@ esp_err_t bluetooth_clear_peers_list_nvs(bool preferred_only);
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_pairing_key_save_nvs(uint32_t key);
+esp_err_t bluetooth_utils_pairing_key_save_nvs(uint32_t key);
 
 /** 
  * @brief Load the Bluetooth pairing key from NVS
@@ -289,7 +289,7 @@ esp_err_t bluetooth_pairing_key_save_nvs(uint32_t key);
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_pairing_key_load_nvs(uint32_t *key);
+esp_err_t bluetooth_utils_pairing_key_load_nvs(uint32_t *key);
 
 /* =============== For naming labels =============== */
 
@@ -302,7 +302,7 @@ esp_err_t bluetooth_pairing_key_load_nvs(uint32_t *key);
  *
  * @returns True on success
  */
-bool bluetooth_get_peer_label_nvs(const ble_addr_t *addr, char *out, size_t out_sz);
+bool bluetooth_utils_get_peer_label_nvs(const ble_addr_t *addr, char *out, size_t out_sz);
 
 /** 
  * @brief Sets peer name label to NVS
@@ -312,7 +312,7 @@ bool bluetooth_get_peer_label_nvs(const ble_addr_t *addr, char *out, size_t out_
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_set_peer_label_nvs(const ble_addr_t *addr, const char *label);
+esp_err_t bluetooth_utils_set_peer_label_nvs(const ble_addr_t *addr, const char *label);
 
 /** 
  * @brief Remove a peer from NVS
@@ -321,7 +321,7 @@ esp_err_t bluetooth_set_peer_label_nvs(const ble_addr_t *addr, const char *label
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_remove_peer_nvs(const ble_addr_t *addr);
+esp_err_t bluetooth_utils_remove_peer_nvs(const ble_addr_t *addr);
 
 
-#endif // BLUETOOTH_FUNCS_H
+#endif // BLUETOOTH_UTILS_H

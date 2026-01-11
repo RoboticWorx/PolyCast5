@@ -16,7 +16,7 @@
 #include "bluetooth_task.h"
 
 #include "ai_prompts.h"
-#include "ai_funcs.h"
+#include "ai_utils.h"
 
 #define TAG "AI_TASK"
 
@@ -134,16 +134,12 @@ static void ai_task(void *pvParameters)
         if (cmd.type == AI_CMD_NORMAL) {
             // Build autotype prompt (NVS override; fallback to compiled default)
             memset(prompt_buf, 0, sizeof(prompt_buf)); // Zero out previous contents
-            const char *prompt = ai_get_autokey_prompt(prompt_buf, sizeof(prompt_buf));
+            const char *prompt = ai_utils_get_autokey_prompt(prompt_buf, sizeof(prompt_buf));
 
             // 'ai_response' output
-            err = xai_send_command(prompt, cmd.msg, ai_response, sizeof(ai_response), cmd.reasoning);
-
-            #ifdef USING_CHATGPT // UNTESTED!
-            err = openai_send_command(cmd.msg, ai_response, sizeof(ai_response));
-            #endif
+            err = ai_utils_send_command_xai(prompt, cmd.msg, ai_response, sizeof(ai_response), cmd.reasoning);
         } else if (cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD) { // Username or password command
-            err = ai_lookup_creds(cmd.type, query, ai_response, sizeof(ai_response));
+            err = ai_utils_lookup_creds(cmd.type, query, ai_response, sizeof(ai_response));
         } else if (cmd.type == AI_CMD_RAW_FRAMES) { // Organizing raw Wi-Fi frames
             #ifdef POLYCAST5_DEBUG
             size_t msg_len = (cmd.msg_len != 0) ? cmd.msg_len : strlen(cmd.msg);
@@ -151,7 +147,7 @@ static void ai_task(void *pvParameters)
             #endif
 
             // 'ai_response' output
-            err = xai_send_command(AI_PROMPT_RAW_FRAMES, cmd.msg, ai_response, sizeof(ai_response), cmd.reasoning);
+            err = ai_utils_send_command_xai(AI_PROMPT_RAW_FRAMES, cmd.msg, ai_response, sizeof(ai_response), cmd.reasoning);
         }
 
         if (err == ESP_OK) {

@@ -1,5 +1,5 @@
-#ifndef INFRARED_FUNCS_H
-#define INFRARED_FUNCS_H
+#ifndef INFRARED_UTILS_H
+#define INFRARED_UTILS_H
 
 #include "driver/rmt_rx.h"
 #include "driver/rmt_tx.h"
@@ -45,22 +45,22 @@ extern size_t ir_current_remote;
 /** 
  * @brief Initialise RMT RX
  */
-void infrared_init_rx(void);
+void infrared_utils_init_rx(void);
 
 /** 
  * @brief Initialise RMT TX
  */
-void infrared_init_tx(void);
+void infrared_utils_init_tx(void);
 
 /** 
  * @brief Restart and re-initialize RX config
  */
-void infrared_restart_rx(void);
+void infrared_utils_restart_rx(void);
 
 /** 
  * @brief Disable RX config
  */
-void infrared_disable_rx(void);
+void infrared_utils_disable_rx(void);
 
 /**
  * @brief Transmit infrared signal
@@ -68,17 +68,17 @@ void infrared_disable_rx(void);
  * @param [in] rmt_symbol_word_t Signal to transmit
  * @param [in] length Length of signal to transmit
  */
-void infrared_transmit_ir(rmt_symbol_word_t *signal, size_t length);
+void infrared_utils_transmit_ir(rmt_symbol_word_t *signal, size_t length);
 
 /** 
  * @brief Ensure there is enough space to add a new signals
  */
-bool infrared_ensure_capacity(void);
+bool infrared_utils_ensure_capacity(void);
 
 /** 
  * @brief Loads remotes and signals from NVS flash
  */
-void infrared_nvs_load_remotes(void);
+void infrared_utils_load_remotes_nvs(void);
 
 /** 
  * @brief Saves a specific signal blob and name for a remote to NVS
@@ -88,26 +88,26 @@ void infrared_nvs_load_remotes(void);
  * @param sig The signal data
  * @param name The signal name
  */
-void infrared_nvs_save_signal_to_remote(size_t remote_idx, size_t sig_idx, ir_signal_t *sig, const char *name);
+void infrared_utils_save_signal_to_remote_nvs(size_t remote_idx, size_t sig_idx, ir_signal_t *sig, const char *name);
 
 /** 
  * @brief Saves the number of signals for a remote to NVS
  *
  * @param remote_idx Index of the remote
  */
-void infrared_nvs_save_remote_nsig(size_t remote_idx);
+void infrared_utils_save_remote_nsig_nvs(size_t remote_idx);
 
 /** 
  * @brief Saves a remote's name to NVS
  *
  * @param remote_idx Index of the remote
  */
-void infrared_nvs_save_remote_name(size_t remote_idx);
+void infrared_utils_save_remote_name_nvs(size_t remote_idx);
 
 /** 
  * @brief Saves all remotes and signals to NVS
  */
-void infrared_nvs_save_all_remotes(void);
+void infrared_utils_save_all_remotes_nvs(void);
 
 /** 
  * @brief Deletes a given signal from a given remote over NVS
@@ -115,18 +115,18 @@ void infrared_nvs_save_all_remotes(void);
  * @param remote_idx Index of the remote
  * @param sig_idx Index of the signal to delete
  */
-void infrared_nvs_delete_signal_from_remote(size_t remote_idx, size_t sig_idx);
+void infrared_utils_delete_signal_from_remote_nvs(size_t remote_idx, size_t sig_idx);
 
 /** 
  * @brief Deletes a given remote from NVS
  *
  * @param remote_idx Index of the remote to delete
  */
-void infrared_nvs_delete_remote(size_t remote_idx);
+void infrared_utils_delete_remote_nvs(size_t remote_idx);
 
 /** 
  * @brief Clear all IR data from NVS
  */
-void infrared_clear_nvs(void);
+void infrared_utils_clear_nvs(void);
 
-#endif // INFRARED_FUNCS_H
+#endif // INFRARED_UTILS_H

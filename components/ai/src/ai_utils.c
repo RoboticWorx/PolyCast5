@@ -14,17 +14,17 @@
 #include "nvs.h"
 
 #include "wifi_utils.h"
-#include "gpio_funcs.h"
-#include "bluetooth_funcs.h"
+#include "gpio_utils.h"
+#include "bluetooth_utils.h"
 #include "bluetooth_web_portal.h"
 
 #include "wifi_task.h"
 #include "gpio_task.h"
-#include "ai_funcs.h"
+#include "ai_utils.h"
 #include "ai_prompts.h"
 #include "ai_task.h"
 
-#define TAG "AI_FUNCS"
+#define TAG "AI_UTILS"
 
 // Hard ceiling so a bad response doesn't eat all RAM
 #define AI_HTTP_BODY_MAX_CAP (128 * 1024)
@@ -48,56 +48,8 @@ POLYCAST5_USE_PSRAM static char user_cred_msg[2048];
 #define AI_PROMPT_NS "ai"
 #define AI_PROMPT_KEY "prompt"
 
-#ifdef USING_CHATGPT
-// Save API key string to NVS
-esp_err_t openai_save_api_key_nvs(const char *api_key)
-{
-    nvs_handle_t h;
-
-    // Open NVS namespace
-    esp_err_t err = nvs_open(OPENAI_NS, NVS_READWRITE, &h);
-    if (err != ESP_OK) {
-        return err;
-    }
-
-    // Save the API key string
-    err = nvs_set_str(h, OPENAI_KEY, api_key);
-
-    // Commit only on success
-    if (err == ESP_OK) {
-        err = nvs_commit(h);
-    }
-
-    // Close handle
-    nvs_close(h);
-
-    return err;
-}
-
-// Load API key string from NVS
-esp_err_t openai_load_api_key_nvs(char *out, size_t out_sz)
-{
-    nvs_handle_t h;
-
-    // Open NVS namespace
-    esp_err_t err = nvs_open(OPENAI_NS, NVS_READONLY, &h);
-    if (err != ESP_OK) {
-        return err;
-    }
-
-    // Read the API key string
-    size_t sz = out_sz;
-    err = nvs_get_str(h, OPENAI_KEY, out, &sz);
-
-    // Close handle
-    nvs_close(h);
-
-    return err;
-}
-#endif // USING_CHATGPT
-
 // Save xAI API key string to NVS
-esp_err_t xai_save_api_key_nvs(const char *api_key)
+esp_err_t ai_utils_save_api_key_nvs(const char *api_key)
 {
     nvs_handle_t h;
 
@@ -120,7 +72,7 @@ esp_err_t xai_save_api_key_nvs(const char *api_key)
 }
 
 // Load xAI API key string from NVS
-esp_err_t xai_load_api_key_nvs(char *out, size_t out_sz)
+esp_err_t ai_utils_load_api_key_nvs(char *out, size_t out_sz)
 {
     nvs_handle_t h;
 
@@ -226,78 +178,6 @@ static void strip_wrappers_inplace(char *s)
 
 
 /* Responses API parsing helpers */
-
-#ifdef USING_CHATGPT
-// The "text" field can be a string OR {"value":"..."} depending on output shape
-static const char *json_text_string_or_value_obj(cJSON *text_item)
-{
-    // Simple string case: "text":"..."
-    if (cJSON_IsString(text_item)) {
-        return text_item->valuestring;
-    }
-
-    // Object case: "text":{"value":"..."}
-    if (cJSON_IsObject(text_item)) {
-        cJSON *val = cJSON_GetObjectItem(text_item, "value");
-        if (cJSON_IsString(val)) {
-            return val->valuestring;
-        }
-    }
-
-    return NULL;
-}
-
-// Extract assistant output text from a /v1/responses JSON payload
-static const char *openai_extract_text(cJSON *json)
-{
-    if (!json) {
-        return NULL;
-    }
-
-    // Fast path: sometimes there's a convenience "output_text" field
-    cJSON *out_text = cJSON_GetObjectItem(json, "output_text");
-    if (cJSON_IsString(out_text) && out_text->valuestring && out_text->valuestring[0]) {
-        return out_text->valuestring;
-    }
-
-    // Common REST shape: output: [ { content:[{type:"output_text", text:"..."}] }, ... ]
-    cJSON *output = cJSON_GetObjectItem(json, "output");
-    if (!cJSON_IsArray(output)) {
-        return NULL;
-    }
-
-    cJSON *item = NULL;
-    cJSON_ArrayForEach(item, output) {
-        // Some items include "content" array
-        cJSON *content = cJSON_GetObjectItem(item, "content");
-        if (!cJSON_IsArray(content)) {
-            continue;
-        }
-
-        cJSON *part = NULL;
-        cJSON_ArrayForEach(part, content) {
-            // Preferred: { "type":"output_text", "text":"..." }
-            cJSON *ptype = cJSON_GetObjectItem(part, "type");
-            if (cJSON_IsString(ptype) && strcmp(ptype->valuestring, "output_text") == 0) {
-                cJSON *t = cJSON_GetObjectItem(part, "text");
-                const char *s = json_text_string_or_value_obj(t);
-                if (s && s[0]) {
-                    return s;
-                }
-            }
-
-            // Fallback: sometimes a part might just have "text":"..."
-            cJSON *t2 = cJSON_GetObjectItem(part, "text");
-            const char *s2 = json_text_string_or_value_obj(t2);
-            if (s2 && s2[0]) {
-                return s2;
-            }
-        }
-    }
-
-    return NULL;
-}
-#endif // USING_CHATGPT
 
 // xAI (Grok) chat-completions parsing helper
 static const char *xai_extract_text(cJSON *json)
@@ -522,7 +402,7 @@ static esp_err_t http_evt(esp_http_client_event_t *evt)
     return ESP_OK;
 }
 
-const char *ai_get_autokey_prompt(char *buf, size_t buf_sz)
+const char *ai_utils_get_autokey_prompt(char *buf, size_t buf_sz)
 {
     // If no buffer provided, fall back to compiled default
     if (!buf || buf_sz == 0) {
@@ -533,228 +413,13 @@ const char *ai_get_autokey_prompt(char *buf, size_t buf_sz)
     buf[0] = '\0';
 
     // Try to load override from NVS; fall back to compiled default if missing/empty
-    if (ai_prompt_load_nvs(buf, buf_sz) != ESP_OK || buf[0] == '\0') {
+    if (ai_utils_prompt_load_nvs(buf, buf_sz) != ESP_OK || buf[0] == '\0') {
         return AI_PROMPT_AUTOKEY;
     }
 
     // Use NVS override
     return buf;
 }
-
-#ifdef USING_CHATGPT
-// Send a user command to OpenAI Responses API and return the generated HID script
-esp_err_t openai_send_command(const char *command, char *response_buf, size_t buf_sz)
-{
-    // Validate args
-    if (!command || !response_buf || buf_sz == 0) {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    // Default output to empty
-    response_buf[0] = '\0';
-
-    // Load API key from NVS
-    char api_key[AI_API_KEY_MAX_LEN] = {0};
-    if (openai_load_api_key_nvs(api_key, sizeof(api_key)) != ESP_OK || api_key[0] == '\0') {
-        ESP_LOGE(TAG, "Failed to load OpenAI API key from NVS");
-        return ESP_FAIL;
-    }
-
-    // Build prompt (NVS override; fallback to compiled default)
-    memset(prompt_buf, 0, sizeof(prompt_buf)); // Zero out previous contents
-    const char *prompt = ai_prompt_get_for_request(prompt_buf, sizeof(prompt_buf));
-
-    // Create JSON payload root
-    cJSON *root = cJSON_CreateObject();
-    if (!root) {
-        return ESP_ERR_NO_MEM;
-    }
-
-    // Model
-    cJSON_AddStringToObject(root, "model", "gpt-5-nano");
-
-    // Output token budget (keep moderate so replies stay small)
-    cJSON_AddNumberToObject(root, "max_output_tokens", 2048);
-
-    // Force plain text output (reduces chance of tool output / weird formats)
-    cJSON *text = cJSON_AddObjectToObject(root, "text");
-    cJSON *format = cJSON_AddObjectToObject(text, "format");
-    cJSON_AddStringToObject(format, "type", "text");
-    cJSON_AddStringToObject(text, "verbosity", "medium");
-
-    // Reduce chance 'all tokens go to reasoning; no message output'
-    cJSON *reasoning = cJSON_AddObjectToObject(root, "reasoning");
-    cJSON_AddStringToObject(reasoning, "effort", "low");
-
-    // Build input message array
-    cJSON *input = cJSON_AddArrayToObject(root, "input");
-
-    // Developer message (instructions)
-    cJSON *dev = cJSON_CreateObject();
-    cJSON_AddStringToObject(dev, "role", "developer");
-    cJSON_AddStringToObject(dev, "content", prompt);
-    cJSON_AddItemToArray(input, dev);
-
-    // User message (the actual command)
-    cJSON *usr = cJSON_CreateObject();
-    cJSON_AddStringToObject(usr, "role", "user");
-    cJSON_AddStringToObject(usr, "content", command);
-    cJSON_AddItemToArray(input, usr);
-
-    // Serialize JSON payload
-    char *payload = cJSON_PrintUnformatted(root);
-
-    // Root no longer needed after serialization
-    cJSON_Delete(root);
-
-    // Bail on allocation failure
-    if (!payload) {
-        return ESP_ERR_NO_MEM;
-    }
-
-    // Initialize HTTP body accumulator
-    http_accum_t acc;
-    if (!acc_init(&acc, 2048)) {
-        free(payload);
-        return ESP_ERR_NO_MEM;
-    }
-
-    // Configure HTTPS request
-    esp_http_client_config_t config = {
-        .url = "https://api.openai.com/v1/responses",
-        .method = HTTP_METHOD_POST,
-
-        // Use ESP-IDF CA bundle
-        .crt_bundle_attach = esp_crt_bundle_attach,
-
-        // Reasonable timeout for cellular/hotspot too
-        .timeout_ms = 20000,
-
-        // Capture response body via callback
-        .event_handler = http_evt,
-        .user_data = &acc,
-    };
-
-    // Create client
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (!client) {
-        free(payload);
-        acc_free(&acc);
-        return ESP_FAIL;
-    }
-
-    // Build Authorization header
-    char auth_header[512];
-    snprintf(auth_header, sizeof(auth_header), "Bearer %s", api_key);
-
-    // Set headers
-    esp_http_client_set_header(client, "Authorization", auth_header);
-    esp_http_client_set_header(client, "Content-Type", "application/json");
-    esp_http_client_set_header(client, "Accept", "application/json");
-
-    // Attach POST body
-    esp_http_client_set_post_field(client, payload, strlen(payload));
-
-    // Perform the request
-    esp_err_t err = esp_http_client_perform(client);
-
-    // Read HTTP status code
-    int status = esp_http_client_get_status_code(client);
-
-    // Cleanup request resources
-    free(payload);
-    esp_http_client_cleanup(client);
-
-    // Network/TLS/HTTP failure
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "HTTP POST failed: %s", esp_err_to_name(err));
-
-        acc_free(&acc);
-        return err;
-    }
-
-    // Empty body means something went wrong upstream
-    if (acc.len == 0 || !acc.buf) {
-        ESP_LOGE(TAG, "Empty HTTP body (len=0) from OpenAI");
-
-        acc_free(&acc);
-        return ESP_FAIL;
-    }
-
-    // Log a safe snippet for debugging
-    const int snip = (acc.len > 300) ? 300 : (int)acc.len;
-    ESP_LOGI(TAG, "OpenAI HTTP %d body[0:%d]=%.*s%s",
-            status,
-            snip,
-            snip,
-            acc.buf,
-            (acc.len > (size_t)snip) ? "..." : "");
-
-    // Non-200 still might include useful error JSON in body (already logged)
-    if (status != 200) {
-        acc_free(&acc);
-        return ESP_FAIL;
-    }
-
-    // If we ran out of memory or hit the cap, don't try to parse partial JSON
-    if (acc.oom || acc.truncated) {
-        ESP_LOGE(TAG, "HTTP body too large/failed to grow (len=%u cap=%u) oom=%d trunc=%d",
-                (unsigned)acc.len,
-                (unsigned)acc.cap,
-                acc.oom,
-                acc.truncated);
-
-        acc_free(&acc);
-        return ESP_ERR_NO_MEM;
-    }
-
-    // Parse JSON response
-    cJSON *json = cJSON_ParseWithLength(acc.buf, acc.len);
-    if (!json) {
-        ESP_LOGE(TAG, "JSON parse failed (body_len=%u)", (unsigned)acc.len);
-
-        acc_free(&acc);
-        return ESP_FAIL;
-    }
-
-    // Extract output text from Responses API payload
-    const char *extracted_text = openai_extract_text(json);
-
-    // Handle no-output cases with better logging
-    if (!extracted_text || !extracted_text[0]) {
-        cJSON *st  = cJSON_GetObjectItem(json, "status");
-        cJSON *inc = cJSON_GetObjectItem(json, "incomplete_details");
-
-        const bool inc_present = (inc && !cJSON_IsNull(inc));
-
-        ESP_LOGE(TAG, "No output. status=%s incomplete_details=%s",
-                cJSON_IsString(st) ? st->valuestring : "(none)",
-                inc_present ? "(present)" : "(null/none)");
-
-        cJSON_Delete(json);
-        acc_free(&acc);
-        return ESP_FAIL;
-    }
-
-    // Copy extracted text to user buffer
-    strncpy(response_buf, extracted_text, buf_sz - 1);
-    response_buf[buf_sz - 1] = '\0';
-
-    // Cleanup JSON + HTTP body
-    cJSON_Delete(json);
-    acc_free(&acc);
-
-    // Strip quotes/fences and trim whitespace
-    strip_wrappers_inplace(response_buf);
-
-    // If we ended up empty after stripping, treat as error
-    if (response_buf[0] == '\0') {
-        return ESP_FAIL;
-    }
-
-    return ESP_OK;
-}
-#endif // USING_CHATGPT
 
 // Replace any "\u0000" sequences in JSON text with "\u0020" (space) in-place
 // This avoids embedded NUL characters after JSON unescaping, which would truncate C strings
@@ -775,7 +440,7 @@ static int json_sanitize_u0000_inplace(char *s)
 }
 
 // xAI (Grok) request (Chat Completions API)
-esp_err_t xai_send_command(const char *system_prompt, const char *command, char *response_buf, size_t buf_sz, bool reasoning)
+esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *command, char *response_buf, size_t buf_sz, bool reasoning)
 {
     // Validate args
     if (!system_prompt || !command || !response_buf || buf_sz == 0) {
@@ -787,7 +452,7 @@ esp_err_t xai_send_command(const char *system_prompt, const char *command, char 
 
     // Load xAI API key from NVS
     char api_key[AI_API_KEY_MAX_LEN] = {0};
-    if (xai_load_api_key_nvs(api_key, sizeof(api_key)) != ESP_OK || api_key[0] == '\0') {
+    if (ai_utils_load_api_key_nvs(api_key, sizeof(api_key)) != ESP_OK || api_key[0] == '\0') {
         ESP_LOGE(TAG, "Failed to load xAI API key from NVS");
         return ESP_FAIL;
     }
@@ -1016,7 +681,7 @@ esp_err_t xai_send_command(const char *system_prompt, const char *command, char 
     return ESP_OK;
 }
 
-esp_err_t ai_prompt_save_nvs(const char *prompt)
+esp_err_t ai_utils_prompt_save_nvs(const char *prompt)
 {
     // NVS handle
     nvs_handle_t h;
@@ -1045,7 +710,7 @@ esp_err_t ai_prompt_save_nvs(const char *prompt)
     return err;
 }
 
-esp_err_t ai_prompt_load_nvs(char *out, size_t out_sz)
+esp_err_t ai_utils_prompt_load_nvs(char *out, size_t out_sz)
 {
     // NVS handle
     nvs_handle_t h;
@@ -1138,12 +803,12 @@ static bool is_cred_candidate(const char *cat_name)
             strcasestr_local_bool(cat, "user names");
 }
 
-esp_err_t ai_lookup_creds(ai_cmd_type_t type, const char *query, char *out_script, size_t out_sz)
+esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out_script, size_t out_sz)
 {
     // Validate
     if (!query || !out_script || out_sz == 0) {
         #ifdef POLYCAST5_DEBUG
-        ESP_LOGW(TAG, "ai_lookup_creds: invalid arg(s)");
+        ESP_LOGW(TAG, "ai_utils_lookup_creds: invalid arg(s)");
         #endif
         return ESP_ERR_INVALID_ARG;
     }
@@ -1154,7 +819,7 @@ esp_err_t ai_lookup_creds(ai_cmd_type_t type, const char *query, char *out_scrip
     uint8_t total = bluetooth_script_count_get_nvs(); // Get total saved scripts
     if (total == 0) {
         #ifdef POLYCAST5_DEBUG
-        ESP_LOGW(TAG, "ai_lookup_creds: no saved BT scripts");
+        ESP_LOGW(TAG, "ai_utils_lookup_creds: no saved BT scripts");
         #endif
         return ESP_ERR_NOT_FOUND;
     }
@@ -1218,7 +883,7 @@ esp_err_t ai_lookup_creds(ai_cmd_type_t type, const char *query, char *out_scrip
 
     // Ask Grok for best matching global index
     char model_reply[64] = {0};
-    esp_err_t err = xai_send_command(AI_PROMPT_CREDS, user_cred_msg, model_reply, sizeof(model_reply), false);
+    esp_err_t err = ai_utils_send_command_xai(AI_PROMPT_CREDS, user_cred_msg, model_reply, sizeof(model_reply), false);
     if (err != ESP_OK) {
         return err;
     }

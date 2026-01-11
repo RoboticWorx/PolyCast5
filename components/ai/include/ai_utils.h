@@ -1,16 +1,9 @@
-#ifndef AI_FUNCS_H
-#define AI_FUNCS_H
+#ifndef AI_UTILS_H
+#define AI_UTILS_H
 
 #include "esp_err.h"
 #include <stdbool.h>
 #include <stddef.h>
-
-#define USING_GROK 1
-//#define USING_CHATGPT 1 // UNTESTED!
-
-// NVS keys for OpenAI API key
-#define OPENAI_NS "openai"
-#define OPENAI_KEY "api_key"
 
 // NVS keys for xAI (Grok) API key
 #define XAI_NS "xai"
@@ -41,27 +34,6 @@ typedef struct {
     bool reasoning;
 } ai_cmd_t;
 
-#ifdef USING_CHATGPT
-/** 
- * @brief Save OpenAI API key to NVS
- *
- * @param [in] api_key The API key string to save
- *
- * @returns ESP error status
- */
-esp_err_t openai_save_api_key_nvs(const char *api_key);
-
-/** 
- * @brief Save OpenAI API key to NVS
- *
- * @param [out] out Buffer to store the loaded API key
- * @param [in] out_sz Size of the output buffer
- *
- * @returns ESP error status
- */
-esp_err_t openai_load_api_key_nvs(char *out, size_t out_sz);
-#endif // USING_CHATGPT
-
 /** 
  * @brief Save xAI API key to NVS
  *
@@ -69,7 +41,7 @@ esp_err_t openai_load_api_key_nvs(char *out, size_t out_sz);
  *
  * @returns ESP error status
  */
-esp_err_t xai_save_api_key_nvs(const char *api_key);
+esp_err_t ai_utils_save_api_key_nvs(const char *api_key);
 
 /** 
  * @brief Save xAI API key to NVS
@@ -79,20 +51,7 @@ esp_err_t xai_save_api_key_nvs(const char *api_key);
  *
  * @returns ESP error status
  */
-esp_err_t xai_load_api_key_nvs(char *out, size_t out_sz);
-
-#ifdef USING_CHATGPT
-/** 
- * @brief Send command to ChatGPT and get keyboard script response
- *
- * @param [in] command The user command string to send
- * @param [out] response_buf Buffer to store the ChatGPT response script
- * @param [in] buf_sz Size of the response buffer
- *
- * @returns ESP error status
- */
-esp_err_t openai_send_command(const char *command, char *response_buf, size_t buf_sz);
-#endif // USING_CHATGPT
+esp_err_t ai_utils_load_api_key_nvs(char *out, size_t out_sz);
 
 /** 
  * @brief Send command to xAI Grok and get autokey script response
@@ -105,7 +64,7 @@ esp_err_t openai_send_command(const char *command, char *response_buf, size_t bu
  *
  * @returns ESP error status
  */
-esp_err_t xai_send_command(const char *system_prompt, const char *command, char *response_buf, size_t buf_sz, bool reasoning);
+esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *command, char *response_buf, size_t buf_sz, bool reasoning);
 
 /** 
  * @brief Lookup credentials via AI and get the corresponding Bluetooth script
@@ -117,7 +76,7 @@ esp_err_t xai_send_command(const char *system_prompt, const char *command, char 
  *
  * @returns ESP error status
  */
-esp_err_t ai_lookup_creds(ai_cmd_type_t type, const char *query, char *out_script, size_t out_sz);
+esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out_script, size_t out_sz);
 
 /**
  * @brief Save AI prompt override to NVS (empty string => use compiled default)
@@ -126,7 +85,7 @@ esp_err_t ai_lookup_creds(ai_cmd_type_t type, const char *query, char *out_scrip
  *
  * @returns ESP error status
  */
-esp_err_t ai_prompt_save_nvs(const char *prompt);
+esp_err_t ai_utils_prompt_save_nvs(const char *prompt);
 
 /**
  * @brief Load AI prompt override from NVS
@@ -136,7 +95,7 @@ esp_err_t ai_prompt_save_nvs(const char *prompt);
  *
  * @returns ESP error status
  */
-esp_err_t ai_prompt_load_nvs(char *out, size_t out_sz);
+esp_err_t ai_utils_prompt_load_nvs(char *out, size_t out_sz);
 
 /** 
  * @brief Get the autotype prompt, either from NVS override or compiled default
@@ -146,6 +105,6 @@ esp_err_t ai_prompt_load_nvs(char *out, size_t out_sz);
  *
  * @returns Pointer to the prompt string (either buf or compiled default)
  */
-const char *ai_get_autokey_prompt(char *buf, size_t buf_sz);
+const char *ai_utils_get_autokey_prompt(char *buf, size_t buf_sz);
 
-#endif // AI_FUNCS_H
+#endif // AI_UTILS_H

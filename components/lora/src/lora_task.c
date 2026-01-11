@@ -11,7 +11,7 @@
 #include "sx126x.h"
 
 #include "lora_task.h"
-#include "lora_funcs.h"
+#include "lora_utils.h"
 
 #define MAX_RETRIES 2
 
@@ -200,7 +200,7 @@ static void lora_task(void *pvParameters) {
     for (;;) {
         // Generate encryption key requested
         if (xSemaphoreTake(xLoraGenerateEncKeySemaphore, 0) == pdTRUE) {
-            lora_generate_random_key();
+            lora_utils_generate_random_key();
         }
         
         // If retrying from no receipt
@@ -210,7 +210,7 @@ static void lora_task(void *pvParameters) {
             #endif
             
             // Encrypt and send the same payload again
-            lora_encrypt_and_transmit((uint8_t *)payload);
+            lora_utils_encrypt_and_transmit((uint8_t *)payload);
             
             need_to_retry = false;
         }
@@ -221,7 +221,7 @@ static void lora_task(void *pvParameters) {
             memcpy(encryption_key, lora_cmd.key, LORA_ENC_KEY_LEN);
             
             // Create unique message ID
-            uint32_t msg_id = lora_create_msg_id();
+            uint32_t msg_id = lora_utils_create_msg_id();
             expected_rx_id = msg_id;
             
             retry_count = 0; // Reset count
@@ -241,7 +241,7 @@ static void lora_task(void *pvParameters) {
             #endif
             
             // Encrypt and send over
-            lora_encrypt_and_transmit((uint8_t *)payload);
+            lora_utils_encrypt_and_transmit((uint8_t *)payload);
         }
 
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -263,7 +263,7 @@ static void lora_event_handler_task(void *pvParameters) {
                 #endif
                 
                 sx126x_clear_irq_status(NULL, SX126X_IRQ_TX_DONE);
-                lora_set_rx_mode(); // Listen for receipt from receiver
+                lora_utils_set_rx_mode(); // Listen for receipt from receiver
             } else if (irq_flags & SX126X_IRQ_RX_DONE) { // Else if receive complete
                 // Read the received packet
                 
@@ -287,7 +287,7 @@ static void lora_event_handler_task(void *pvParameters) {
                 #endif
 
                 // Process received
-                lora_process_received_message(rx_buffer, rx_size);
+                lora_utils_process_received_message(rx_buffer, rx_size);
 
                 // Clear IRQ
                 sx126x_clear_irq_status(NULL, SX126X_IRQ_RX_DONE);

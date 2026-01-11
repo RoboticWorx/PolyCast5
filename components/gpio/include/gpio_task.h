@@ -43,7 +43,7 @@ extern QueueHandle_t xLEDCQueue;
 
 /**
  * @brief  Create the GPIO expander task.
- *         Internally it calls GPIO_Init(), then
+ *         Internally it calls gpio_utils_init(), then
  *         polls P0.0–P0.7 and mirrors each bit to P1.0–P1.7.
  */
 void gpio_task_create(void);

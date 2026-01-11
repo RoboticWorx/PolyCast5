@@ -1,5 +1,5 @@
-#ifndef LORA_FUNCS_H
-#define LORA_FUNCS_H
+#ifndef LORA_UTILS_H
+#define LORA_UTILS_H
 
 #include "aes.h"
 #include "sx126x_hal.h"
@@ -30,19 +30,19 @@ extern uint8_t encryption_key[LORA_ENC_KEY_LEN];
 /** 
  * @brief Generate random LoRa encryption key
  */
-void lora_generate_random_key(void);
+void lora_utils_generate_random_key(void);
 
 /** 
  * @brief Generate random LoRa message ID for receipt confirmation
  *
  * @returns The ID created
  */
-uint32_t lora_create_msg_id(void);
+uint32_t lora_utils_create_msg_id(void);
 
 /** 
  * @brief Sets SX1262 radio in receive mode
  */
-void lora_set_rx_mode(void);
+void lora_utils_set_rx_mode(void);
 
 /** 
  * @brief Process the received LoRa message (decrypt, etc.)
@@ -50,7 +50,7 @@ void lora_set_rx_mode(void);
  * @param [in] message The message received
  * @param [in] message_len Length of the message received
  */
-void lora_process_received_message(uint8_t *message, size_t message_len);
+void lora_utils_process_received_message(uint8_t *message, size_t message_len);
 
 /** 
  * @brief Transmits the data over LoRa
@@ -58,13 +58,13 @@ void lora_process_received_message(uint8_t *message, size_t message_len);
  * @param [in] tx_data Data to transmit
  * @param [in] data_len Length of data to transmit
  */
-void lora_tx(uint8_t tx_data[], uint8_t data_len);
+void lora_utils_transmit(uint8_t tx_data[], uint8_t data_len);
 
 /** 
- * @brief Encrypts the data then transmits via lora_tx
+ * @brief Encrypts the data then transmits via lora_utils_transmit
  *
  * @param [in] plaintext Data to encrypt and transmit
  */
-void lora_encrypt_and_transmit(uint8_t plaintext[]);
+void lora_utils_encrypt_and_transmit(uint8_t plaintext[]);
 
-#endif // LORA_FUNCS_H
+#endif // LORA_UTILS_H

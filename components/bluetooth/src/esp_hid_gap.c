@@ -10,7 +10,7 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
-#include "bluetooth_funcs.h"
+#include "bluetooth_utils.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -861,7 +861,7 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
         // If a valid peer -> save
         if (rc == 0) {
             // Save this as a bonded peer
-            bluetooth_add_to_peers_list_nvs(&desc.peer_id_addr);
+            bluetooth_utils_add_to_peers_list_nvs(&desc.peer_id_addr);
             
             #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Saving a valid peer");
@@ -870,16 +870,16 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
             // If no preferred peer exists, set this one by default
             bool found = false;
             ble_addr_t pref;
-            if (bluetooth_get_preferred_peer_nvs(&pref, &found) != ESP_OK || !found) {
+            if (bluetooth_utils_get_preferred_peer_nvs(&pref, &found) != ESP_OK || !found) {
                 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Saving as preferred peer");
                 #endif
             
                 // Save preferred peer to whitelist
-                esp_err_t err = bluetooth_set_preferred_peer_nvs(&desc.peer_id_addr);
+                esp_err_t err = bluetooth_utils_set_preferred_peer_nvs(&desc.peer_id_addr);
                 #ifdef POLYCAST5_DEBUG
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "bluetooth_set_preferred_peer_nvs failed: %s", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "bluetooth_utils_set_preferred_peer_nvs failed: %s", esp_err_to_name(err));
                 }
                 #endif
             }
@@ -923,7 +923,7 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
             
             // Load pairing key from NVS
             uint32_t pairing_key;
-            bluetooth_pairing_key_load_nvs(&pairing_key);
+            bluetooth_utils_pairing_key_load_nvs(&pairing_key);
             pkey.passkey = pairing_key; // This is the passkey to be entered on peer
             
             #ifdef POLYCAST5_PASS_DEBUG
@@ -950,7 +950,7 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
             
             // Load pairing key from NVS
             uint32_t pairing_key;
-            bluetooth_pairing_key_load_nvs(&pairing_key);
+            bluetooth_utils_pairing_key_load_nvs(&pairing_key);
             pkey.passkey = pairing_key;
             
             #ifdef POLYCAST5_PASS_DEBUG
@@ -966,7 +966,7 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
 }
 
 // Forward to NVS helper
-extern esp_err_t bluetooth_get_preferred_peer_nvs(ble_addr_t *out, bool *found);
+extern esp_err_t bluetooth_utils_get_preferred_peer_nvs(ble_addr_t *out, bool *found);
 
 esp_err_t esp_hid_ble_gap_adv_start(void)
 {
@@ -997,11 +997,11 @@ esp_err_t esp_hid_ble_gap_adv_start(void)
     // Load preferred peer (identity address saved)
     ble_addr_t pref = {0};
     bool found = false;
-    esp_err_t err = bluetooth_get_preferred_peer_nvs(&pref, &found);
+    esp_err_t err = bluetooth_utils_get_preferred_peer_nvs(&pref, &found);
     
     #ifdef POLYCAST5_DEBUG
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "bluetooth_get_preferred_peer_nvs failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "bluetooth_utils_get_preferred_peer_nvs failed: %s", esp_err_to_name(err));
     }
     #endif
     

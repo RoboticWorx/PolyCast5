@@ -24,11 +24,11 @@
 #include "wifi_deauth.h"
 #include "wifi_ota_update.h"
 #include "espnow_task.h"
-#include "espnow_funcs.h"
+#include "espnow_utils.h"
 #include "gpio_task.h"
 #include "lcd_utils.h"
 #include "ai_task.h"
-#include "ai_funcs.h"
+#include "ai_utils.h"
 #include "ai_analysis_web_portal.h"
 
 #define TAG "LCD_WIFI"

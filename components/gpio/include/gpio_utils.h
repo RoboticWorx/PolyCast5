@@ -64,7 +64,7 @@ enum {
 /** 
  * @brief Initialise NVS flash
  */
-void gpio_init_nvs(void);
+void gpio_utils_init_nvs(void);
 
 /**
  * @brief Initialize the TCA9535 I2C expander and configure:
@@ -73,7 +73,7 @@ void gpio_init_nvs(void);
  *
  * @return ESP_OK on success
  */
-esp_err_t gpio_init(void);
+esp_err_t gpio_utils_init(void);
 
 /**
  * @brief Read one pin on Port 0 (0…7)
@@ -82,7 +82,7 @@ esp_err_t gpio_init(void);
  *
  * @return 0 or 1 state, or –1 if invalid pin
  */
-int gpio_read_input(uint8_t pin);
+int gpio_utils_read_input(uint8_t pin);
 
 /**
  * @brief Drive one pin on Port 1 (0…7)
@@ -92,29 +92,29 @@ int gpio_read_input(uint8_t pin);
  *
  * @return ESP_OK on success
  */
-esp_err_t gpio_write_output(uint8_t pin, bool level);
+esp_err_t gpio_utils_write_output(uint8_t pin, bool level);
 
 /** 
  * @brief Cycle through the RGB LED to make sure it is working
  */
-void gpio_cycle_rgb(void);
+void gpio_utils_cycle_rgb(void);
 
 /** 
  * @brief Initalize battery ADC
  */
-void gpio_init_battery_adc(void);
+void gpio_utils_init_battery_adc(void);
 
 /** 
  * @brief De-initalize battery ADC to save power
  */
-void gpio_deinit_battery_adc(void);
+void gpio_utils_deinit_battery_adc(void);
 
 /** 
  * @brief Get the raw battery voltage with software averaging
  *
  * @return The value in volts
  */
-float gpio_get_battery_voltage(void);
+float gpio_utils_get_battery_voltage(void);
 
 /** 
  * @brief Convert the raw voltage to a state-of-charge percentage 0-100 based on a typical LiPo discharge curve
@@ -123,20 +123,20 @@ float gpio_get_battery_voltage(void);
  *
  * @return The value in percent
  */
-uint8_t gpio_volts_to_soc(float voltage);
+uint8_t gpio_utils_volts_to_soc(float voltage);
 
 /** 
  * @brief Spins the haptic motor for a given duration
  *
  * @param [in] ms Time on in milliseconds
  */
-void gpio_spin_haptic(uint32_t ms);
+void gpio_utils_spin_haptic(uint32_t ms);
 
 /** 
  * @brief Indicate HW state via the built-in RGB LED
  *
  * @param [in] rgb_data The state to indicate
  */
-void gpio_rgb_indicate(uint8_t rgb_data);
+void gpio_utils_rgb_indicate(uint8_t rgb_data);
 
 #endif // GPIO_FUNCS_H

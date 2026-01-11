@@ -7,8 +7,10 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 
-#include "infrared_funcs.h"
+#include "infrared_utils.h"
 #include "infrared_task.h"
+
+#define TAG "IR_UTILS"
 
 // NVS keys
 #define IR_NS "ir_data"
@@ -28,8 +30,6 @@ extern volatile bool restart_rx_pending;
 size_t ir_signal_length;
 
 // Statics
-static const char *TAG = "IR_FUNCS";
-
 static rmt_channel_handle_t rx_channel = NULL;
 static rmt_channel_handle_t tx_channel = NULL;
 static rmt_encoder_handle_t tx_encoder = NULL;
@@ -70,7 +70,7 @@ static bool IRAM_ATTR infrared_rx_callback(rmt_channel_handle_t channel, const r
     return (xHigherPriorityTaskWoken == pdTRUE);
 }
 
-void infrared_init_rx(void)
+void infrared_utils_init_rx(void)
 {
     // Configure rmt RX channel
     rmt_rx_channel_config_t rx_config = {
@@ -100,7 +100,7 @@ void infrared_init_rx(void)
     ESP_ERROR_CHECK(rmt_enable(rx_channel));
 }
 
-void infrared_init_tx(void)
+void infrared_utils_init_tx(void)
 {
     // Configure rmt TX channel
     rmt_tx_channel_config_t tx_config = {
@@ -135,7 +135,7 @@ void infrared_init_tx(void)
     ESP_ERROR_CHECK(rmt_enable(tx_channel));
 }
 
-void infrared_restart_rx(void)
+void infrared_utils_restart_rx(void)
 {
     // Ensure initialized
     if (rx_channel == NULL) {
@@ -160,7 +160,7 @@ void infrared_restart_rx(void)
     ESP_ERROR_CHECK(rmt_receive(rx_channel, ir_signal, sizeof(rmt_symbol_word_t) * MAX_PULSES, &rx_receive_config));
 }
 
-void infrared_disable_rx(void)
+void infrared_utils_disable_rx(void)
 {
     // Ensure initialized
     if (rx_channel == NULL) {
@@ -175,7 +175,7 @@ void infrared_disable_rx(void)
     rmt_disable(rx_channel);
 }
 
-void infrared_transmit_ir(rmt_symbol_word_t *signal, size_t length)
+void infrared_utils_transmit_ir(rmt_symbol_word_t *signal, size_t length)
 {
     // Error checks
     if (signal == NULL || length == 0 || length > MAX_PULSES) {
@@ -217,7 +217,7 @@ void infrared_transmit_ir(rmt_symbol_word_t *signal, size_t length)
     rmt_enable(rx_channel);
 }
 
-bool infrared_ensure_capacity(void)
+bool infrared_utils_ensure_capacity(void)
 {
     size_t total = 0;
     
@@ -238,7 +238,7 @@ bool infrared_ensure_capacity(void)
     return false;
 }
 
-void infrared_nvs_load_remotes(void)
+void infrared_utils_load_remotes_nvs(void)
 {
     nvs_handle_t h;
     
@@ -257,7 +257,7 @@ void infrared_nvs_load_remotes(void)
     }
     
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "infrared_nvs_load_remotes open failed: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "infrared_utils_load_remotes_nvs open failed: %s", esp_err_to_name(ret));
         return;
     }
 
@@ -348,7 +348,7 @@ void infrared_nvs_load_remotes(void)
     nvs_close(h);
 }
 
-void infrared_nvs_save_signal_to_remote(size_t remote_idx, size_t sig_idx, ir_signal_t *sig, const char *name)
+void infrared_utils_save_signal_to_remote_nvs(size_t remote_idx, size_t sig_idx, ir_signal_t *sig, const char *name)
 {
     nvs_handle_t h;
     
@@ -386,7 +386,7 @@ void infrared_nvs_save_signal_to_remote(size_t remote_idx, size_t sig_idx, ir_si
     nvs_close(h);
 }
 
-void infrared_nvs_save_remote_nsig(size_t remote_idx) {
+void infrared_utils_save_remote_nsig_nvs(size_t remote_idx) {
     nvs_handle_t h;
     
     // Open NVS
@@ -409,7 +409,7 @@ void infrared_nvs_save_remote_nsig(size_t remote_idx) {
     nvs_close(h);
 }
 
-void infrared_nvs_save_remote_name(size_t remote_idx)
+void infrared_utils_save_remote_name_nvs(size_t remote_idx)
 {
     nvs_handle_t h;
     
@@ -433,7 +433,7 @@ void infrared_nvs_save_remote_name(size_t remote_idx)
     nvs_close(h);
 }
 
-void infrared_nvs_save_all_remotes(void)
+void infrared_utils_save_all_remotes_nvs(void)
 {
     nvs_handle_t h;
     
@@ -483,7 +483,7 @@ void infrared_nvs_save_all_remotes(void)
     nvs_close(h);
 }
 
-void infrared_nvs_delete_signal_from_remote(size_t remote_idx, size_t sig_idx)
+void infrared_utils_delete_signal_from_remote_nvs(size_t remote_idx, size_t sig_idx)
 {
     // Ensure valid signal
     if (remote_idx >= num_remotes || sig_idx >= remotes[remote_idx].num_signals) {
@@ -557,7 +557,7 @@ void infrared_nvs_delete_signal_from_remote(size_t remote_idx, size_t sig_idx)
     #endif
 }
 
-void infrared_nvs_delete_remote(size_t remote_idx)
+void infrared_utils_delete_remote_nvs(size_t remote_idx)
 {
     // Ensure valid
     if (remote_idx >= num_remotes) {
@@ -581,10 +581,10 @@ void infrared_nvs_delete_remote(size_t remote_idx)
     num_remotes--;
 
     // Resave to NVS
-    infrared_nvs_save_all_remotes();
+    infrared_utils_save_all_remotes_nvs();
 }
 
-void infrared_clear_nvs(void)
+void infrared_utils_clear_nvs(void)
 {
     nvs_handle_t h;
     

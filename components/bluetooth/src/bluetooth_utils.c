@@ -19,13 +19,13 @@
 #include "esp_log.h"
 #include "esp_err.h"
 
-#include "bluetooth_funcs.h"
-#include "gpio_funcs.h"
+#include "bluetooth_utils.h"
+#include "gpio_utils.h"
 #include "gpio_task.h"
 #include "bluetooth_task.h"
 #include "wifi_task.h"
 
-#define TAG "BLUETOOTH_FUNCS"
+#define TAG "BLUETOOTH_UTILS"
 
 // Note: Security Level 2 in menuconfig 'BLE SM' required for iOS pairing!
 #define DEVICE_NAME "PolyCast5"
@@ -191,7 +191,7 @@ static inline void cc_send_usage(uint16_t usage, bool key_pressed)
     esp_hidd_dev_input_set(ble_hid_param.hid_dev, 0, HID_RPT_ID_CC_IN, rpt, sizeof(rpt));
 }
 
-void bluetooth_send_media(uint8_t cmd, bool key_pressed)
+void bluetooth_utils_send_media(uint8_t cmd, bool key_pressed)
 {
     uint16_t usage = 0;
 
@@ -913,7 +913,7 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
 }
 
 // Send script
-void bluetooth_send_script(const char *script, uint32_t tap_ms)
+void bluetooth_utils_send_script(const char *script, uint32_t tap_ms)
 {
     // Make sure exists
     if (!script) {
@@ -943,7 +943,7 @@ void bluetooth_send_script(const char *script, uint32_t tap_ms)
     kbd_state_clear();
 }
 
-void bluetooth_set_battery_level(uint8_t percent)
+void bluetooth_utils_set_battery_level(uint8_t percent)
 {
     // Cap at max
     if (percent > 100) {
@@ -954,7 +954,7 @@ void bluetooth_set_battery_level(uint8_t percent)
     ble_svc_bas_battery_level_set(percent);
 }
 
-void bluetooth_forget_all_peers(void)
+void bluetooth_utils_forget_all_peers(void)
 {
     int rc;
 
@@ -1024,7 +1024,7 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
             uint8_t rgb_state = RGB_SET_BLUE;
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
 
-            bluetooth_set_battery_level(100); // Default start
+            bluetooth_utils_set_battery_level(100); // Default start
 
             break;
         }
@@ -1066,10 +1066,10 @@ void ble_store_config_init(void);
     Please see https://github.com/RoboticWorx/PolyCast5/blob/main/components/bluetooth/README.md
 */
 
-void bluetooth_init(void)
+void bluetooth_utils_init(void)
 {
     #ifdef POLYCAST5_DEBUG
-    ESP_LOGI(TAG, "bluetooth_init() starting, state=%d", bluetooth_state);
+    ESP_LOGI(TAG, "bluetooth_utils_init() starting, state=%d", bluetooth_state);
     ESP_LOGI(TAG, "BT controller status before init: %d",
             esp_bt_controller_get_status()); // IDLE, INITED, ENABLED, NUM
     #endif
@@ -1114,10 +1114,10 @@ void bluetooth_init(void)
 // Declare self-implemented function
 extern esp_err_t esp_hid_gap_deinit(void);
 
-void bluetooth_deinit(void)
+void bluetooth_utils_deinit(void)
 {
     #ifdef POLYCAST5_DEBUG
-    ESP_LOGI(TAG, "bluetooth_deinit() starting, state=%d", bluetooth_state);
+    ESP_LOGI(TAG, "bluetooth_utils_deinit() starting, state=%d", bluetooth_state);
     ESP_LOGI(TAG, "BT controller status before deinit: %d",
             esp_bt_controller_get_status()); // IDLE, INITED, ENABLED, NUM
     #endif
@@ -1188,7 +1188,7 @@ int bluetooth_list_bonded_peers(bluetooth_peer_info_t *out, int max)
 }
 
 // Load cached peers
-int bluetooth_get_peers_list_nvs(bluetooth_peer_info_t *out, int max)
+int bluetooth_utils_get_peers_list_nvs(bluetooth_peer_info_t *out, int max)
 {
     // Guard
     if (!out || max <= 0) {
@@ -1228,7 +1228,7 @@ int bluetooth_get_peers_list_nvs(bluetooth_peer_info_t *out, int max)
 }
 
 // Add peer to cache (idempotent; ring if full)
-void bluetooth_add_to_peers_list_nvs(const ble_addr_t *peer)
+void bluetooth_utils_add_to_peers_list_nvs(const ble_addr_t *peer)
 {
     // Guard
     if (!peer) {
@@ -1275,7 +1275,7 @@ void bluetooth_add_to_peers_list_nvs(const ble_addr_t *peer)
 }
 
 // Clear all nvs peers
-esp_err_t bluetooth_clear_peers_list_nvs(bool preferred_only)
+esp_err_t bluetooth_utils_clear_peers_list_nvs(bool preferred_only)
 {
     nvs_handle_t h;
     esp_err_t err;
@@ -1322,7 +1322,7 @@ esp_err_t bluetooth_clear_peers_list_nvs(bool preferred_only)
 }
 
 // Save preferred peer (type + 6 bytes) to NVS
-esp_err_t bluetooth_set_preferred_peer_nvs(const ble_addr_t *peer)
+esp_err_t bluetooth_utils_set_preferred_peer_nvs(const ble_addr_t *peer)
 {
     // Open NVS
     nvs_handle_t h;
@@ -1346,7 +1346,7 @@ esp_err_t bluetooth_set_preferred_peer_nvs(const ble_addr_t *peer)
 }
 
 // Load preferred peer from NVS
-esp_err_t bluetooth_get_preferred_peer_nvs(ble_addr_t *out, bool *found)
+esp_err_t bluetooth_utils_get_preferred_peer_nvs(ble_addr_t *out, bool *found)
 {
     // Default
     if (found) {
@@ -1381,7 +1381,7 @@ esp_err_t bluetooth_get_preferred_peer_nvs(ble_addr_t *out, bool *found)
 
 /* =============== Pairing key =============== */
 
-esp_err_t bluetooth_pairing_key_save_nvs(uint32_t key)
+esp_err_t bluetooth_utils_pairing_key_save_nvs(uint32_t key)
 {
     nvs_handle_t h;
     esp_err_t err;
@@ -1405,7 +1405,7 @@ esp_err_t bluetooth_pairing_key_save_nvs(uint32_t key)
     return err;
 }
 
-esp_err_t bluetooth_pairing_key_load_nvs(uint32_t *key)
+esp_err_t bluetooth_utils_pairing_key_load_nvs(uint32_t *key)
 {
     nvs_handle_t h;
     esp_err_t err;
@@ -1432,7 +1432,7 @@ static void bt_label_key_from_addr(const ble_addr_t *a, char *out, size_t out_sz
             a->val[5], a->val[4], a->val[3], a->val[2], a->val[1], a->val[0]);
 }
 
-esp_err_t bluetooth_set_peer_label_nvs(const ble_addr_t *addr, const char *label)
+esp_err_t bluetooth_utils_set_peer_label_nvs(const ble_addr_t *addr, const char *label)
 {
     // Guard
     if (!addr) {
@@ -1472,7 +1472,7 @@ esp_err_t bluetooth_set_peer_label_nvs(const ble_addr_t *addr, const char *label
     return err;
 }
 
-bool bluetooth_get_peer_label_nvs(const ble_addr_t *addr, char *out, size_t out_sz)
+bool bluetooth_utils_get_peer_label_nvs(const ble_addr_t *addr, char *out, size_t out_sz)
 {
     // Guard
     if (!addr || !out || out_sz == 0) {
@@ -1507,7 +1507,7 @@ bool bluetooth_get_peer_label_nvs(const ble_addr_t *addr, char *out, size_t out_
     return false;
 }
 
-esp_err_t bluetooth_remove_peer_nvs(const ble_addr_t *addr)
+esp_err_t bluetooth_utils_remove_peer_nvs(const ble_addr_t *addr)
 {
     // Guard
     if (!addr) {
@@ -1569,14 +1569,14 @@ esp_err_t bluetooth_remove_peer_nvs(const ble_addr_t *addr)
     }
 
     // Drop per-address label
-    bluetooth_set_peer_label_nvs(addr, NULL); // Passing NULL erases the label key
+    bluetooth_utils_set_peer_label_nvs(addr, NULL); // Passing NULL erases the label key
 
     // Clear preferred if it matches the removed peer
     ble_addr_t pref = {0};
     bool found = false;
-    bluetooth_get_preferred_peer_nvs(&pref, &found);
+    bluetooth_utils_get_preferred_peer_nvs(&pref, &found);
     if (found && pref.type == addr->type && memcmp(pref.val, addr->val, 6) == 0) {
-        bluetooth_clear_peers_list_nvs(true); // Only delete BT_PEERS_KEY
+        bluetooth_utils_clear_peers_list_nvs(true); // Only delete BT_PEERS_KEY
     }
 
     // Unpair from NimBLE so it won't auto-reconnect

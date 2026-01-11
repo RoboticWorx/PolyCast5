@@ -10,7 +10,7 @@
 #include "esp_log.h"
 
 #include "infrared_task.h"
-#include "infrared_funcs.h"
+#include "infrared_utils.h"
 
 static const char *TAG = "IR_TASK";
 
@@ -58,16 +58,16 @@ static void infrared_task(void *pvParameters) {
     ESP_LOGI(TAG, "Initializing IR system...");
     #endif
     
-    infrared_init_rx();
-    infrared_init_tx();
+    infrared_utils_init_rx();
+    infrared_utils_init_tx();
     
     // Load remotes from NVS
     #ifdef POLYCAST5_IR_NVS_CLEAR
-    infrared_clear_nvs();
+    infrared_utils_clear_nvs();
     #endif    
     
     // Load remotes and signals from NVS (includes names)
-    infrared_nvs_load_remotes();
+    infrared_utils_load_remotes_nvs();
     
     #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Loaded %zu remotes from NVS", num_remotes);
@@ -76,12 +76,12 @@ static void infrared_task(void *pvParameters) {
     while (1) {        
         // When user selects to add new signal
         if (xSemaphoreTake(xInfraredStartRxSemaphore, 0) == pdTRUE) {
-            infrared_restart_rx();
+            infrared_utils_restart_rx();
         }
         
         // When user canceled adding new signal
         if (xSemaphoreTake(xInfraredDisableSemaphore, 0) == pdTRUE) {
-            infrared_disable_rx();
+            infrared_utils_disable_rx();
         }
         
         // If received garbage in cb, restart
@@ -89,7 +89,7 @@ static void infrared_task(void *pvParameters) {
             #ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Invalid IR signal, restarting RX");
             #endif
-            infrared_restart_rx();
+            infrared_utils_restart_rx();
             restart_rx_pending = false;
         }
         
@@ -102,9 +102,9 @@ static void infrared_task(void *pvParameters) {
             #endif
             
             // Check if space available
-            if (!infrared_ensure_capacity()) {
+            if (!infrared_utils_ensure_capacity()) {
                 ESP_LOGW(TAG, "Max signals reached, dropping new signal");
-                infrared_restart_rx();
+                infrared_utils_restart_rx();
                 
                 xSemaphoreGive(xInfraredDataMutex); // Release IR
                 continue;
@@ -127,7 +127,7 @@ static void infrared_task(void *pvParameters) {
             ir_signal_t *sig = malloc(alloc_size);
             if (!sig) {
                 ESP_LOGE(TAG, "Out of heap for new signal");
-                infrared_restart_rx();
+                infrared_utils_restart_rx();
                 
                 xSemaphoreGive(xInfraredDataMutex); // Release IR
                 continue;
@@ -152,8 +152,8 @@ static void infrared_task(void *pvParameters) {
             remotes[ir_current_remote].num_signals++; // Now one more signal
             
             // Save the signal blob and update num_signals in NVS
-            infrared_nvs_save_signal_to_remote(ir_current_remote, ns, sig, ""); // Empty name for now
-            infrared_nvs_save_remote_nsig(ir_current_remote);
+            infrared_utils_save_signal_to_remote_nvs(ir_current_remote, ns, sig, ""); // Empty name for now
+            infrared_utils_save_remote_nsig_nvs(ir_current_remote);
             
             #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Saved signal index %zu for remote %zu (%zu pulses)", ns, ir_current_remote, sig->length);
@@ -164,7 +164,7 @@ static void infrared_task(void *pvParameters) {
             xSemaphoreGive(xInfraredSignalSavedSemaphore); // Notify LCD we got and saved a valid signal
 
             // Disable until next signal
-            infrared_disable_rx();
+            infrared_utils_disable_rx();
         }
         
         // Transmit a specific signal (index menu_idx)
@@ -176,7 +176,7 @@ static void infrared_task(void *pvParameters) {
                 menu_idx = -menu_idx; // Make positive
                 size_t sig_idx = (size_t) menu_idx - 3; // Offset for 0-based
                 
-                infrared_nvs_delete_signal_from_remote(ir_current_remote, sig_idx);
+                infrared_utils_delete_signal_from_remote_nvs(ir_current_remote, sig_idx);
             } else { // Else send the signal at that index
                 size_t sig_idx = (size_t) menu_idx - 3; // Offset for 0-based
             
@@ -188,7 +188,7 @@ static void infrared_task(void *pvParameters) {
                 #endif
                 
                 // Send
-                infrared_transmit_ir(sig->pulses, sig->length);
+                infrared_utils_transmit_ir(sig->pulses, sig->length);
             }
             
             xSemaphoreGive(xInfraredDataMutex); // Release IR

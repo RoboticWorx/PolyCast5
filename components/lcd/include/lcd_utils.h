@@ -15,7 +15,7 @@
 #include "lcd_bluetooth.h"
 #include "lcd_gpio.h"
 
-#include "gpio_funcs.h"
+#include "gpio_utils.h"
 
 #include "wifi_task.h" // icon_state_t
 

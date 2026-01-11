@@ -1007,7 +1007,7 @@ void lcd_tools_pomodoro_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
                 
                 // Haptic buzz to indicate switch
                 xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics
-                gpio_spin_haptic(500);
+                gpio_utils_spin_haptic(500);
                 xSemaphoreGive(xHapticsMutex); // Release haptics        
             }
         }

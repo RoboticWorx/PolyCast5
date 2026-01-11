@@ -10,7 +10,7 @@
 #include "esp_log.h"
 
 #include "gpio_task.h"
-#include "gpio_funcs.h"
+#include "gpio_utils.h"
 
 #define TAG "GPIO_TASK"
 
@@ -116,14 +116,14 @@ static void adc_task(void *arg)
     static uint8_t last_percentage = 100;
     
     // Get battery charge on start
-    gpio_init_battery_adc();
-    float v = gpio_get_battery_voltage();
+    gpio_utils_init_battery_adc();
+    float v = gpio_utils_get_battery_voltage();
     #ifdef POLYCAST5_DEBUG_ADC
     ESP_LOGI(TAG, "Startup voltage: %f", v);
     #endif
-    gpio_deinit_battery_adc();
+    gpio_utils_deinit_battery_adc();
         
-    uint8_t percentage = gpio_volts_to_soc(v);
+    uint8_t percentage = gpio_utils_volts_to_soc(v);
     #ifdef POLYCAST5_DEBUG_ADC
     ESP_LOGI(TAG, "Startup percentage: %u%%", percentage);
     #endif
@@ -142,11 +142,11 @@ static void adc_task(void *arg)
         if ((xTaskGetTickCount() - adc_timer_last >= adc_timer_interval) || (xSemaphoreTake(xStartAdcBatSemaphore, 0) == pdTRUE)) {
             adc_timer_last = xTaskGetTickCount();
                 
-            gpio_init_battery_adc();
-            float v = gpio_get_battery_voltage();
-            gpio_deinit_battery_adc();
+            gpio_utils_init_battery_adc();
+            float v = gpio_utils_get_battery_voltage();
+            gpio_utils_deinit_battery_adc();
                         
-            uint8_t percentage = gpio_volts_to_soc(v);
+            uint8_t percentage = gpio_utils_volts_to_soc(v);
             
             #ifdef POLYCAST5_DEBUG_ADC
             ESP_LOGI(TAG, "Battery voltage: %f", v);
@@ -224,17 +224,17 @@ static void gpio_task(void *arg)
     xLEDQueue = xQueueCreate(1, sizeof(uint8_t));
     configASSERT(xLEDQueue);
     
-    gpio_write_output(RED_RGB_LED_PIN, 0); // Red LED
-    gpio_write_output(GREEN_RGB_LED_PIN, 0); // Green LED
-    gpio_write_output(BLUE_RGB_LED_PIN, 0); // Blue LED
-    gpio_write_output(3, 0); // NC
-    gpio_write_output(4, 0); // NC
-    gpio_write_output(5, 0); // NC
-    gpio_write_output(6, 0); // NC
-    gpio_write_output(7, 0); // NC
+    gpio_utils_write_output(RED_RGB_LED_PIN, 0); // Red LED
+    gpio_utils_write_output(GREEN_RGB_LED_PIN, 0); // Green LED
+    gpio_utils_write_output(BLUE_RGB_LED_PIN, 0); // Blue LED
+    gpio_utils_write_output(3, 0); // NC
+    gpio_utils_write_output(4, 0); // NC
+    gpio_utils_write_output(5, 0); // NC
+    gpio_utils_write_output(6, 0); // NC
+    gpio_utils_write_output(7, 0); // NC
     
     #ifdef POLYCAST5_CYCLE_RGB_ON_BOOT
-    gpio_cycle_rgb();
+    gpio_utils_cycle_rgb();
     #endif
     
     if (xTaskCreate(adc_task, "adc_task", 1024 * 2, NULL, POLYCAST5_PRIORITY_LOW, NULL) != pdPASS) {
@@ -242,14 +242,14 @@ static void gpio_task(void *arg)
     }
     
     // Get opposite initial charging state to update once
-    bool was_charging = !(gpio_read_input(CHG_IND_PIN) == 0);
+    bool was_charging = !(gpio_utils_read_input(CHG_IND_PIN) == 0);
     
     while (1) 
     {
         // Press + auto-repeat state machine
         for (size_t i = 0; i < 6; i++) {
             btn_state_t *b = &buttons[i]; // Get the button
-            bool level = gpio_read_input(b->pin); // Read its state: 0 = pressed, 1 = released
+            bool level = gpio_utils_read_input(b->pin); // Read its state: 0 = pressed, 1 = released
 
             // Track held state for SELECT (buttons[0])
             if (i == 0) {
@@ -267,7 +267,7 @@ static void gpio_task(void *arg)
                     // Give haptic feedback if button is enabled
                     xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics
                     if (haptic_btns[i]) {
-                        gpio_spin_haptic(haptic_len_ms);
+                        gpio_utils_spin_haptic(haptic_len_ms);
                     }
                     xSemaphoreGive(xHapticsMutex); // Release haptics
                 } else { // Else long-press
@@ -314,12 +314,12 @@ static void gpio_task(void *arg)
         }
         
         // Go to sleep requested
-        if (gpio_read_input(USER_BUTTON_POWER) == 0) {
+        if (gpio_utils_read_input(USER_BUTTON_POWER) == 0) {
             xSemaphoreGive(xPowerButtonSemaphore);
         }
         
         // Update LCD based on if charging or not
-        bool is_charging = (gpio_read_input(CHG_IND_PIN) == 0);
+        bool is_charging = (gpio_utils_read_input(CHG_IND_PIN) == 0);
         if (is_charging != was_charging) { // Only update on state change
             // LiPo is charging    
             if (is_charging) {
@@ -334,7 +334,7 @@ static void gpio_task(void *arg)
         
         // RGB LED handling
         if (xQueueReceive(xLEDQueue, &rgb_data, 0) == pdTRUE) {
-            gpio_rgb_indicate(rgb_data);
+            gpio_utils_rgb_indicate(rgb_data);
         }
         
         // Update LEDC
@@ -362,7 +362,7 @@ static void gpio_task(void *arg)
         
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
         
-        //gpio_cycle_rgb(); // Test RGB LED
+        //gpio_utils_cycle_rgb(); // Test RGB LED
     }
 }
 

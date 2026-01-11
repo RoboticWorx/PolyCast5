@@ -15,10 +15,10 @@
 
 #include "tca9535.h"
 
-#include "gpio_funcs.h"
+#include "gpio_utils.h"
 #include "gpio_task.h"
 
-#define TAG "GPIO_FUNCS"
+#define TAG "GPIO_UTILS"
 
 #define ADC_CH ADC_CHANNEL_4
 #define NUM_ADC_SAMPLES 16384
@@ -51,7 +51,7 @@ static const soc_point_t soc_table[] = { // {V, %}
 };
 static const int TABLE_LEN = sizeof(soc_table) / sizeof(soc_table[0]);
 
-void gpio_init_nvs(void)
+void gpio_utils_init_nvs(void)
 {
     // Initialize flash
     esp_err_t ret = nvs_flash_init();
@@ -82,25 +82,25 @@ static void IRAM_ATTR rgb_blink_cb(TimerHandle_t xTimer)
     // Turn the LEDs on or off based on rgb_blink_color + state
     switch(rgb_blink_color) {
         case RGB_SET_RED:
-            gpio_write_output(RED_RGB_LED_PIN, rgb_blink_state);
+            gpio_utils_write_output(RED_RGB_LED_PIN, rgb_blink_state);
             break;
         
         case RGB_SET_GREEN:
-            gpio_write_output(GREEN_RGB_LED_PIN, rgb_blink_state);
+            gpio_utils_write_output(GREEN_RGB_LED_PIN, rgb_blink_state);
             break;
             
         case RGB_SET_BLUE:
-            gpio_write_output(BLUE_RGB_LED_PIN, rgb_blink_state);
+            gpio_utils_write_output(BLUE_RGB_LED_PIN, rgb_blink_state);
             break;
             
         case RGB_SET_PURPLE:
-            gpio_write_output(RED_RGB_LED_PIN, rgb_blink_state);
-            gpio_write_output(BLUE_RGB_LED_PIN, rgb_blink_state);
+            gpio_utils_write_output(RED_RGB_LED_PIN, rgb_blink_state);
+            gpio_utils_write_output(BLUE_RGB_LED_PIN, rgb_blink_state);
             break;
             
         case RGB_SET_TEAL:
-            gpio_write_output(GREEN_RGB_LED_PIN, rgb_blink_state);
-            gpio_write_output(BLUE_RGB_LED_PIN, rgb_blink_state);
+            gpio_utils_write_output(GREEN_RGB_LED_PIN, rgb_blink_state);
+            gpio_utils_write_output(BLUE_RGB_LED_PIN, rgb_blink_state);
             break;
             
         default:
@@ -114,9 +114,9 @@ static void IRAM_ATTR rgb_blink_stop_cb(TimerHandle_t xTimer)
     xTimerStop(rgb_blink_timer, portMAX_DELAY);
 
     // Ensure all LEDs off
-    gpio_write_output(RED_RGB_LED_PIN, 0);
-    gpio_write_output(GREEN_RGB_LED_PIN, 0);
-    gpio_write_output(BLUE_RGB_LED_PIN, 0);
+    gpio_utils_write_output(RED_RGB_LED_PIN, 0);
+    gpio_utils_write_output(GREEN_RGB_LED_PIN, 0);
+    gpio_utils_write_output(BLUE_RGB_LED_PIN, 0);
 }
 
 static void init_ledc_pwm(void)
@@ -154,7 +154,7 @@ static void init_ledc_pwm(void)
     }
 }
 
-esp_err_t gpio_init(void)
+esp_err_t gpio_utils_init(void)
 {
     // Configure outputs
     gpio_config_t io_conf_out = {
@@ -237,7 +237,7 @@ esp_err_t gpio_init(void)
     return ret;
 }
 
-int gpio_read_input(uint8_t pin)
+int gpio_utils_read_input(uint8_t pin)
 {
     if (pin > 7) {
         ESP_LOGE(TAG, "Invalid input pin %d", pin);
@@ -251,7 +251,7 @@ int gpio_read_input(uint8_t pin)
     return (inputs >> pin) & 0x1;
 }
 
-esp_err_t gpio_write_output(uint8_t pin, bool level)
+esp_err_t gpio_utils_write_output(uint8_t pin, bool level)
 {
     if (pin > 7) {
         ESP_LOGE(TAG, "Invalid output pin %d", pin);
@@ -275,7 +275,7 @@ esp_err_t gpio_write_output(uint8_t pin, bool level)
     return err;
 }
 
-void gpio_init_battery_adc(void)
+void gpio_utils_init_battery_adc(void)
 {
     // Init one-shot ADC
     adc_oneshot_unit_init_cfg_t unit_cfg = {
@@ -304,7 +304,7 @@ void gpio_init_battery_adc(void)
     ESP_ERROR_CHECK(adc_cali_create_scheme_curve_fitting(&cfg, &cali_handle));
 }
 
-void gpio_deinit_battery_adc(void)
+void gpio_utils_deinit_battery_adc(void)
 {
     // Deinit cali_handle
     if (cali_handle) {
@@ -319,7 +319,7 @@ void gpio_deinit_battery_adc(void)
     }
 }
 
-float gpio_get_battery_voltage(void)
+float gpio_utils_get_battery_voltage(void)
 {
     uint32_t sum = 0;
     
@@ -365,7 +365,7 @@ float gpio_get_battery_voltage(void)
     return (Vadc + off) / gain;
 }
 
-uint8_t gpio_volts_to_soc(float voltage)
+uint8_t gpio_utils_volts_to_soc(float voltage)
 {
     voltage = voltage + 0.09; // Add expected offset (users want to see it at 100%): Actual ~ +.04
 
@@ -403,7 +403,7 @@ uint8_t gpio_volts_to_soc(float voltage)
     return 0;
 }
 
-void gpio_spin_haptic(uint32_t ms)
+void gpio_utils_spin_haptic(uint32_t ms)
 {
     // Cap
     if (ms < HAPTIC_MIN_MS) {
@@ -427,7 +427,7 @@ void gpio_spin_haptic(uint32_t ms)
     // Haptic OFF when timer expires
 }
 
-void gpio_rgb_indicate(uint8_t rgb_data)
+void gpio_utils_rgb_indicate(uint8_t rgb_data)
 {
     xSemaphoreTake(xRgbLedMutex, portMAX_DELAY); // Lock RGB LED
     // Skip if invalid (pdMS_TO_TICKS rounds down to 0)
@@ -459,32 +459,32 @@ void gpio_rgb_indicate(uint8_t rgb_data)
     xSemaphoreGive(xRgbLedMutex); // Release RGB LED
     
     // All LEDs OFF to start
-    gpio_write_output(RED_RGB_LED_PIN, 0);
-    gpio_write_output(GREEN_RGB_LED_PIN, 0);
-    gpio_write_output(BLUE_RGB_LED_PIN, 0);
+    gpio_utils_write_output(RED_RGB_LED_PIN, 0);
+    gpio_utils_write_output(GREEN_RGB_LED_PIN, 0);
+    gpio_utils_write_output(BLUE_RGB_LED_PIN, 0);
 
     switch(rgb_data) {
         // Solid color cases
         case RGB_SET_RED:
-            gpio_write_output(RED_RGB_LED_PIN, 1);
+            gpio_utils_write_output(RED_RGB_LED_PIN, 1);
             break;
             
         case RGB_SET_GREEN:
-            gpio_write_output(GREEN_RGB_LED_PIN, 1);
+            gpio_utils_write_output(GREEN_RGB_LED_PIN, 1);
             break;
             
         case RGB_SET_BLUE:
-            gpio_write_output(BLUE_RGB_LED_PIN, 1);
+            gpio_utils_write_output(BLUE_RGB_LED_PIN, 1);
             break;
             
         case RGB_SET_PURPLE:
-            gpio_write_output(BLUE_RGB_LED_PIN, 1);
-            gpio_write_output(RED_RGB_LED_PIN, 1);
+            gpio_utils_write_output(BLUE_RGB_LED_PIN, 1);
+            gpio_utils_write_output(RED_RGB_LED_PIN, 1);
             break;
             
         case RGB_SET_TEAL:
-            gpio_write_output(BLUE_RGB_LED_PIN, 1);
-            gpio_write_output(GREEN_RGB_LED_PIN, 1);
+            gpio_utils_write_output(BLUE_RGB_LED_PIN, 1);
+            gpio_utils_write_output(GREEN_RGB_LED_PIN, 1);
             break;
 
         // Blink cases: start timers
@@ -525,31 +525,31 @@ void gpio_rgb_indicate(uint8_t rgb_data)
 
         default:
             // Unknown code, LEDs off
-            gpio_write_output(RED_RGB_LED_PIN, 0);
-            gpio_write_output(GREEN_RGB_LED_PIN, 0);
-            gpio_write_output(BLUE_RGB_LED_PIN, 0);
+            gpio_utils_write_output(RED_RGB_LED_PIN, 0);
+            gpio_utils_write_output(GREEN_RGB_LED_PIN, 0);
+            gpio_utils_write_output(BLUE_RGB_LED_PIN, 0);
             break;
     }
 }
 
-void gpio_cycle_rgb(void)
+void gpio_utils_cycle_rgb(void)
 {
-    gpio_write_output(RED_RGB_LED_PIN, 1);
-    gpio_write_output(GREEN_RGB_LED_PIN, 0);
-    gpio_write_output(BLUE_RGB_LED_PIN, 0);
+    gpio_utils_write_output(RED_RGB_LED_PIN, 1);
+    gpio_utils_write_output(GREEN_RGB_LED_PIN, 0);
+    gpio_utils_write_output(BLUE_RGB_LED_PIN, 0);
     vTaskDelay(pdMS_TO_TICKS(333));
         
-    gpio_write_output(RED_RGB_LED_PIN, 0);
-    gpio_write_output(GREEN_RGB_LED_PIN, 1);
-    gpio_write_output(BLUE_RGB_LED_PIN, 0);
+    gpio_utils_write_output(RED_RGB_LED_PIN, 0);
+    gpio_utils_write_output(GREEN_RGB_LED_PIN, 1);
+    gpio_utils_write_output(BLUE_RGB_LED_PIN, 0);
     vTaskDelay(pdMS_TO_TICKS(333));
         
-    gpio_write_output(RED_RGB_LED_PIN, 0);
-    gpio_write_output(GREEN_RGB_LED_PIN, 0);
-    gpio_write_output(BLUE_RGB_LED_PIN, 1);
+    gpio_utils_write_output(RED_RGB_LED_PIN, 0);
+    gpio_utils_write_output(GREEN_RGB_LED_PIN, 0);
+    gpio_utils_write_output(BLUE_RGB_LED_PIN, 1);
     vTaskDelay(pdMS_TO_TICKS(333));
         
-    gpio_write_output(RED_RGB_LED_PIN, 0);
-    gpio_write_output(GREEN_RGB_LED_PIN, 0);
-    gpio_write_output(BLUE_RGB_LED_PIN, 0);
+    gpio_utils_write_output(RED_RGB_LED_PIN, 0);
+    gpio_utils_write_output(GREEN_RGB_LED_PIN, 0);
+    gpio_utils_write_output(BLUE_RGB_LED_PIN, 0);
 }
