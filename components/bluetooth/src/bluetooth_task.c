@@ -27,7 +27,7 @@ extern volatile bluetooth_state_t bluetooth_state;
 
 char bt_wifi_portal_pass[64];
 
-EXT_RAM_BSS_ATTR static char send_buf[2048];
+POLYCAST5_USE_PSRAM static char send_buf[2048];
 static char *ai_script;
 
 static uint16_t bluetooth_cmd = 0;

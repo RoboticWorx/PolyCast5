@@ -41,8 +41,8 @@ typedef struct {
     bool caps_alloc; // True if allocated via heap_caps_* (PSRAM/8BIT), false if malloc/realloc
 } http_accum_t;
 
-EXT_RAM_BSS_ATTR static char canidate_creds[1536];
-EXT_RAM_BSS_ATTR static char user_cred_msg[2048];
+POLYCAST5_USE_PSRAM static char canidate_creds[1536];
+POLYCAST5_USE_PSRAM static char user_cred_msg[2048];
 
 // NVS keys for AI prompt override
 #define AI_PROMPT_NS "ai"

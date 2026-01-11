@@ -27,7 +27,7 @@
 char btc_wifi_portal_pass[64];
 
 static wifi_scan_t wifi_scan[WIFI_MAX_NETWORKS];
-static wifi_scan_deauth_t wifi_scan_deauth[WIFI_MAX_NETWORKS];
+POLYCAST5_USE_PSRAM static wifi_scan_deauth_t wifi_scan_deauth[WIFI_MAX_NETWORKS];
 
 static deauth_target_t deauth_target = {0};
 static wifi_login_t selected_network = {0};
@@ -63,6 +63,19 @@ QueueHandle_t xWifiOtaPctQueue;
 
 static EventBits_t last_portal_bits = 0;
 static EventBits_t last_wifi_event_bits = 0;
+
+static TaskHandle_t wifi_time_task_handle = NULL;
+
+static void wifi_time_task(void *param)
+{
+	(void)param;
+
+	wifi_funcs_get_current_date_time();
+
+	// Mark not running and exit
+	wifi_time_task_handle = NULL;
+	vTaskDelete(NULL);
+}
 
 static void wifi_task(void *param)
 {
@@ -207,18 +220,7 @@ static void wifi_task(void *param)
         
         // Send data over MQTT
         if (xQueueReceive(xWifiMqttCmdQueue, &wifi_mqtt, 0) == pdTRUE) {
-            // Build the topic string
-            char topic[128];
-            int len = snprintf(
-                topic, sizeof(topic),
-                "polycast5/%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X/cmd",
-                wifi_mqtt.key[0], wifi_mqtt.key[1], wifi_mqtt.key[2], wifi_mqtt.key[3],
-                wifi_mqtt.key[4], wifi_mqtt.key[5], wifi_mqtt.key[6], wifi_mqtt.key[7],
-                wifi_mqtt.key[8], wifi_mqtt.key[9], wifi_mqtt.key[10], wifi_mqtt.key[11],
-                wifi_mqtt.key[12], wifi_mqtt.key[13], wifi_mqtt.key[14], wifi_mqtt.key[15]
-            );
-            strlcpy(topic, topic, len + 1);
-             
+            // wifi_funcs_mqtt_client_publish() builds the topic safely
             wifi_funcs_mqtt_client_publish(wifi_mqtt.payload, wifi_mqtt.key);
         }
         
@@ -236,9 +238,9 @@ static void wifi_task(void *param)
 
         // Received target to deauth
         if (xQueueReceive(xWifiDeauthTargetQueue, &deauth_target, 0) == pdTRUE) {
-            esp_err_t err = wifi_funcs_deauth_for_duration(deauth_target.duration_sec, deauth_target.bssid, deauth_target.channel); // Seconds, BSSID, channel
+            esp_err_t err = wifi_funcs_deauth_for_duration(&deauth_target);
             if (err != ESP_OK) {
-                ESP_LOGE(TAG, "WIFI_DEAUTH_BIT: wifi_funcs_send_deauth failed: %s", esp_err_to_name(err));
+                ESP_LOGE(TAG, "xWifiDeauthTargetQueue: wifi_funcs_deauth_for_duration failed: %s", esp_err_to_name(err));
             }
         }
 
@@ -354,7 +356,14 @@ static void wifi_task(void *param)
             }
             // If Wi-Fi get date and time bit transitioned 0 -> 1
             if ((wifi_event_bits & WIFI_GET_DATE_TIME_BIT) && !(last_wifi_event_bits & WIFI_GET_DATE_TIME_BIT)) {
-                wifi_funcs_get_current_date_time();
+                // Run time sync in a dedicated task (TLS/HTTP client + JSON parsing stack can be deep)
+                if (wifi_time_task_handle == NULL) {
+                    if (xTaskCreate(wifi_time_task, "wifi_time_task", 1024 * 6, NULL,
+                            POLYCAST5_PRIORITY_MEDIUM, &wifi_time_task_handle) != pdPASS) {
+                        ESP_LOGE(TAG, "Failed to start wifi_time_task");
+                        wifi_time_task_handle = NULL;
+                    }
+                }
                 xEventGroupClearBits(xWifiEventGroup, WIFI_GET_DATE_TIME_BIT); // Reset for next time
             }
 
@@ -443,7 +452,7 @@ static void wifi_task(void *param)
 
 void wifi_task_create(void)
 {
-    if (xTaskCreate(wifi_task, "wifi_task", 1024 * 3, NULL, POLYCAST5_PRIORITY_MEDIUM, NULL) != pdPASS) {
+    if (xTaskCreate(wifi_task, "wifi_task", 1024 * 4, NULL, POLYCAST5_PRIORITY_MEDIUM, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start wifi_task");
     }
 }

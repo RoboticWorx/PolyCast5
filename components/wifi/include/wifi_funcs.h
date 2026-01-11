@@ -2,6 +2,7 @@
 #define WIFI_FUNCS_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "esp_err.h"
 
@@ -44,14 +45,36 @@ typedef struct {
 
 typedef struct {
     char ssid[33];
-    uint8_t bssid[6];
+    uint8_t bssid[WIFI_MAX_NETWORKS][6];
+    uint8_t channels[WIFI_MAX_NETWORKS]; // Channel for each BSSID
+    uint8_t bssid_count; // Number of BSSIDs stored for this SSID
     int8_t rssi;
-    uint8_t channel;
+    uint8_t channel; // Channel of the strongest AP (for display)
     uint8_t auth;
     bool pmf_required; // True if PMF is required (not attackable)
-    bool pmf_capable;  // True if PMF is capable
-    int freq_mhz;      // Frequency in MHz for 2.4/5GHz display
+    bool pmf_capable; // True if PMF is capable
+    int freq_mhz; // Frequency in MHz for 2.4/5GHz display
 } wifi_scan_deauth_t;
+
+typedef struct {
+    // Copied from wifi_scan_deauth_t entry
+    uint8_t bssid[WIFI_MAX_NETWORKS][6];
+    uint8_t bssid_count;
+    uint8_t channels[WIFI_MAX_NETWORKS]; // Channel for each BSSID
+    uint8_t channel; // Currently active channel (updated during attack)
+    char ssid[33];
+
+    // Handled by deauth function
+    uint32_t frames_sent;
+    uint32_t duration_sec;
+    uint16_t seq_nums[WIFI_MAX_NETWORKS]; // Sequence number for each BSSID
+} deauth_target_t;
+
+typedef struct {
+    bool deauthing;
+    uint32_t frames_sent;
+    uint32_t duration_sec;
+} deauth_stats_t;
 
 typedef struct {
     char ssid[33];
@@ -118,21 +141,6 @@ typedef struct {
     uint32_t rate;
     uint32_t channel;
 } wifi_data_t;
-
-typedef struct {
-    uint8_t bssid[6];
-    char ssid[33];
-    uint8_t channel;
-    uint32_t packets_sent; // TODO: Technically frames
-    uint16_t seq_num;
-    uint32_t duration_sec;
-} deauth_target_t;
-
-typedef struct {
-    bool deauthing;
-    uint32_t packets_sent; // TODO: Technically frames
-    uint32_t duration_sec;
-} deauth_stats_t;
 
 typedef struct {
     uint8_t key[16];
@@ -255,13 +263,11 @@ esp_err_t wifi_funcs_scan_deauth(wifi_scan_deauth_t *wifi_scan_deauth);
 /**
  * @brief Sends deauthentication frames for a specified duration
  *
- * @param [in] duration_sec Duration to send deauthentication frames for in seconds
- * @param [in] target_bssid Target's AP BSSID address
- * @param [in] channel Wi-Fi channel to send on
+ * @param [in] deauth_target Pointer to deauth target configuration
  * 
  * @returns ESP error status
  */
-esp_err_t wifi_funcs_deauth_for_duration(uint32_t duration_sec, const uint8_t *target_bssid, uint8_t channel);
+esp_err_t wifi_funcs_deauth_for_duration(deauth_target_t *deauth_target);
 
 /**
  * @brief Gets the current date and time from pool.ntp

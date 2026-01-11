@@ -46,7 +46,7 @@ static uint8_t current_category = 0;
 
 static char bt_name_buf[MAX_BT_NAME_LEN + 1] = {0};
 
-EXT_RAM_BSS_ATTR static char script_labels[MAX_KEYBOARD_SCRIPTS][BT_SCRIPT_LABEL_MAX_LEN + 1];
+POLYCAST5_USE_PSRAM static char script_labels[MAX_KEYBOARD_SCRIPTS][BT_SCRIPT_LABEL_MAX_LEN + 1];
 
 bluetooth_keyboard_menu_t bluetooth_keyboard_submenu = {
     .options = {NULL}, // Dynamically populated

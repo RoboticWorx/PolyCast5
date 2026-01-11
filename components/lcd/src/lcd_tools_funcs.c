@@ -413,7 +413,7 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
     
     static lv_obj_t *cont_roll_log;
     static lv_obj_t *lbl_roll_log;
-    EXT_RAM_BSS_ATTR static char roll_log_buf[2048];
+    POLYCAST5_USE_PSRAM static char roll_log_buf[2048];
     
     static lv_style_t style_dice;
     

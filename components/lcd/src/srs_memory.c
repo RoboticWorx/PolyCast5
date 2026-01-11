@@ -9,6 +9,8 @@ trying to memorize new things. This is based on the Ebbinghaus forgetting curve,
 learned materials is better remembered by reviewing them at increasing intervals for ideal
 LTP of synapses between neurons in the brain.
 
+Please see https://polycast5.com/blogs/docs/srs-memory-planner
+
 */
 
 #include "freertos/projdefs.h"
@@ -42,8 +44,8 @@ LTP of synapses between neurons in the brain.
 const uint16_t srs_days[] = {1, 3, 7, 14, 30, 90, 180, 365};
 
 // Use PSRAM instead
-EXT_RAM_BSS_ATTR srs_entry_t srs_tbl[SRS_MAX_ENTRIES];
-EXT_RAM_BSS_ATTR static int srs_tmp_idx[SRS_MAX_ENTRIES];
+POLYCAST5_USE_PSRAM srs_entry_t srs_tbl[SRS_MAX_ENTRIES];
+POLYCAST5_USE_PSRAM static int srs_tmp_idx[SRS_MAX_ENTRIES];
 
 static uint16_t srs_cnt = 0;
 static uint16_t srs_last_page = 0;

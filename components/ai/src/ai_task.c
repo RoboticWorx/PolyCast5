@@ -26,8 +26,8 @@ QueueHandle_t xAiCmdQueue;
 
 char ai_wifi_portal_pass[64];
 
-EXT_RAM_BSS_ATTR static char prompt_buf[AI_PROMPT_NVS_MAX_LEN] = {0};
-EXT_RAM_BSS_ATTR static char ai_response[AI_RESPONSE_MAX_LEN] = {0}; // TODO: Increase MAX_LEN here and for BT
+POLYCAST5_USE_PSRAM static char prompt_buf[AI_PROMPT_NVS_MAX_LEN] = {0};
+POLYCAST5_USE_PSRAM static char ai_response[AI_RESPONSE_MAX_LEN] = {0}; // TODO: Increase MAX_LEN here and for BT
 
 static ai_cmd_type_t parse_kind_and_query(const char *in, const char **query_out)
 {
