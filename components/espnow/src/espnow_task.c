@@ -74,13 +74,13 @@ static void espnow_task(void *param)
         if (xQueueReceive(xEspSendEncKeyQueue, received_enc_key, 0) == pdPASS) {
             // Start radio and initialize ESP-NOW
             ESP_ERROR_CHECK(espnow_utils_wifi_radio_start(WIFI_CHANNEL));
-            ESP_ERROR_CHECK(espnow_utils_init(UNIVERSAL_MAC, WIFI_CHANNEL, false, NULL));
+            ESP_ERROR_CHECK(espnow_utils_espnow_init(UNIVERSAL_MAC, WIFI_CHANNEL, false, NULL));
             
             // Send the data
             espnow_utils_send_data(UNIVERSAL_MAC, received_enc_key, LORA_ENC_KEY_LEN);
             
             // Stop radio and de-initialize ESP-NOW
-            ESP_ERROR_CHECK(espnow_utils_deinit());
+            ESP_ERROR_CHECK(espnow_utils_espnow_deinit());
             ESP_ERROR_CHECK(espnow_utils_wifi_radio_stop());
             
             // Send the data to LCD task to save to NVS under given option
@@ -93,7 +93,7 @@ static void espnow_task(void *param)
             
             // Start radio and initialize ESP-NOW
             ESP_ERROR_CHECK(espnow_utils_wifi_radio_start(WIFI_CHANNEL));
-            ESP_ERROR_CHECK(espnow_utils_init(UNIVERSAL_MAC, WIFI_CHANNEL, false, NULL));
+            ESP_ERROR_CHECK(espnow_utils_espnow_init(UNIVERSAL_MAC, WIFI_CHANNEL, false, NULL));
             
             // Combine the info into a single string
             char payload[134];
@@ -117,7 +117,7 @@ static void espnow_task(void *param)
             espnow_utils_send_data(UNIVERSAL_MAC, (uint8_t*)payload, len);
             
             // Stop radio and de-initialize ESP-NOW
-            ESP_ERROR_CHECK(espnow_utils_deinit());
+            ESP_ERROR_CHECK(espnow_utils_espnow_deinit());
             ESP_ERROR_CHECK(espnow_utils_wifi_radio_stop());
             
             // Reconnect to previous network
@@ -128,11 +128,11 @@ static void espnow_task(void *param)
         if (xQueueReceive(xEspSendCmdQueue, &espnow_cmd, 0) == pdPASS) {
             // Start radio and initialize ESP-NOW
             ESP_ERROR_CHECK(espnow_utils_wifi_radio_start(WIFI_CHANNEL));
-            if (espnow_utils_init(espnow_cmd.mac_selected, WIFI_CHANNEL, espnow_cmd.enc, espnow_cmd.enc ? espnow_cmd.lmk : NULL) != ESP_OK) {
+            if (espnow_utils_espnow_init(espnow_cmd.mac_selected, WIFI_CHANNEL, espnow_cmd.enc, espnow_cmd.enc ? espnow_cmd.lmk : NULL) != ESP_OK) {
                 xSemaphoreGive(xEspCmdTxFailedSemaphore); // Mark as failed TX for LCD
                 
                 // Stop radio and de-initialize ESP-NOW
-                ESP_ERROR_CHECK(espnow_utils_deinit());
+                ESP_ERROR_CHECK(espnow_utils_espnow_deinit());
                 ESP_ERROR_CHECK(espnow_utils_wifi_radio_stop());
             
                 continue;
@@ -167,7 +167,7 @@ static void espnow_task(void *param)
             vTaskDelay(pdMS_TO_TICKS(100));
             
             // Stop radio and de-initialize ESP-NOW
-            ESP_ERROR_CHECK(espnow_utils_deinit());
+            ESP_ERROR_CHECK(espnow_utils_espnow_deinit());
             ESP_ERROR_CHECK(espnow_utils_wifi_radio_stop());
         }
     

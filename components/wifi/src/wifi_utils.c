@@ -3,7 +3,7 @@
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
-#include <string.h>
+
 #include <stdlib.h>
 #include <ctype.h>
 
@@ -827,7 +827,7 @@ esp_err_t wifi_utils_radio_start(const char *ssid, const uint8_t* bssid, const c
 
 esp_err_t wifi_utils_radio_stop(void)
 {
-    // Stop promiscuous sniffing if enabled (ignore errors if not started)
+    // Stop promiscuous sniffing if enabled
     (void)esp_wifi_set_promiscuous(false);
     (void)esp_wifi_set_promiscuous_rx_cb(NULL);
 
@@ -837,10 +837,8 @@ esp_err_t wifi_utils_radio_stop(void)
     }
 
     esp_err_t err = esp_wifi_disconnect(); // Disconnect if connected
-    if (err != ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
-        ESP_LOGW(TAG, "wifi_utils_radio_stop esp_wifi_disconnect failed, should be okay: %s", esp_err_to_name(err));
-        #endif
+    if (err != ESP_OK && err != ESP_ERR_WIFI_NOT_STARTED) {
+        ESP_LOGE(TAG, "wifi_utils_radio_stop esp_wifi_disconnect error: %s", esp_err_to_name(err));
     }
     
     // Stop Wi-Fi
@@ -852,7 +850,7 @@ esp_err_t wifi_utils_radio_stop(void)
         ESP_LOGI(TAG, "wifi_utils_radio_stop success");
         #endif
     } else {
-        ESP_LOGE(TAG, "wifi_utils_radio_stop error: %d", err);
+        ESP_LOGE(TAG, "wifi_utils_radio_stop esp_wifi_stop error: %s", esp_err_to_name(err));
     }
     
     xSemaphoreGive(xWifiCanSleepSemaphore);

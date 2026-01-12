@@ -54,14 +54,14 @@ esp_err_t espnow_utils_wifi_radio_stop(void);
  *
  * @return ESP_OK on success
  */
-esp_err_t espnow_utils_init(const uint8_t *mac, uint8_t channel, bool encrypt, const uint8_t *lmk);
+esp_err_t espnow_utils_espnow_init(const uint8_t *mac, uint8_t channel, bool encrypt, const uint8_t *lmk);
 
 /**
  * @brief De-initialize ESP-NOW
  *
  * @return ESP_OK on success
  */
-esp_err_t espnow_utils_deinit(void);
+esp_err_t espnow_utils_espnow_deinit(void);
 
 /**
  * @brief Send data via ESP-NOW

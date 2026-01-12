@@ -81,6 +81,8 @@ static deauth_stats_t deauth_stats = {0};
 static uint8_t mqtt_key[16];
 static bool wifi_menu_overwrite = false;
 
+static bool scan_deauth_page_initialized = false;
+
 // Character vars for user input
 static char mqtt_name_buf[MAX_PASSWORD_LEN + 1] = {0};
 static const char* char_rows[NUM_CHAR_ROWS] = {
@@ -738,7 +740,6 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
 void lcd_wifi_scan_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {
     static lv_obj_t *lbl_wait;
-    static bool initialized = false;
     static bool scanned = false;
     
     // Store full info for each displayed entry
@@ -746,7 +747,7 @@ void lcd_wifi_scan_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu
     static int deauth_scan_count = 0;
     
     // Do once
-    if (!initialized) {
+    if (!scan_deauth_page_initialized) {
         // Clear any previous states
         xQueueReset(xWifiDeauthScanQueue);
         lv_obj_clean(wifi_menu->scan_menu.main_list);
@@ -776,7 +777,8 @@ void lcd_wifi_scan_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu
         // Start scan
         xEventGroupSetBits(xWifiEventGroup, WIFI_SCAN_DEAUTH_BIT);
         
-        initialized = true;
+        scan_deauth_page_initialized = true;
+        scanned = false;
     }
 
     // When networks have been scanned
@@ -874,12 +876,9 @@ void lcd_wifi_scan_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
         // Reset
-        initialized = false;
+        scan_deauth_page_initialized = false;
         scanned = false;
         deauth_scan_count = 0;
-
-        wifi_menu->scan_menu.size = 0;
-        wifi_menu->scan_menu.index = 0;
 
         // Clear children
         lv_obj_clean(wifi_menu->scan_menu.main_list);
@@ -908,7 +907,7 @@ void lcd_wifi_scan_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
         // Reset
-        initialized = false;
+        scan_deauth_page_initialized = false;
         scanned = false;
         deauth_scan_count = 0;
 
@@ -957,17 +956,6 @@ void lcd_wifi_scan_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu
             #endif
             
             /* Exit */
-
-            // Reset
-            initialized = false;
-            scanned = false;
-            deauth_scan_count = 0;
-
-            wifi_menu->scan_menu.size = 0;
-            wifi_menu->scan_menu.index = 0;
-
-            // Clear children
-            lv_obj_clean(wifi_menu->scan_menu.main_list);
 
             // Hide scan menu
             lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
@@ -1094,7 +1082,7 @@ void lcd_wifi_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *w
     } else if (ui_btns->up_btn == 1) { // Increase time by 1 second
         deauth_target.duration_sec++;
 
-        // 17.06667min max (1024 seconds)
+        // 17.06667 min max (1024 seconds)
         if (deauth_target.duration_sec > 1024) {
             deauth_target.duration_sec = 1;
         }
@@ -1112,7 +1100,7 @@ void lcd_wifi_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *w
         // Display new value
         lv_label_set_text_fmt(lbl_sec, "%" PRIu32 "s", deauth_target.duration_sec);
     } else if (ui_btns->select_btn == 1) { // Increase time by 3 seconds
-        deauth_target.duration_sec += 3;
+        deauth_target.duration_sec -= 3;
 
         // Display new value
         lv_label_set_text_fmt(lbl_sec, "%" PRIu32 "s", deauth_target.duration_sec);
@@ -1132,8 +1120,11 @@ void lcd_wifi_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *w
 
         lcd_loading_anim_stop();
 
-        // Show Wi-Fi menu
-        lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        // Stop deauth if ongoing
+        xEventGroupSetBits(xWifiEventGroup, WIFI_STOP_DEAUTH_BIT);
+
+        // Show scan menu
+        lv_obj_remove_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
 
         // Show top and bottom arrows
         lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
@@ -1142,9 +1133,34 @@ void lcd_wifi_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *w
         // Hide right arrow
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
-        ui_menu->page = WIFI_PAGE;
+        ui_menu->page = WIFI_SCAN_DEAUTH_PAGE;
+    } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off
+        // Delete objects
+        lv_obj_delete(lbl_sec);
+        lv_obj_delete(lbl_sec_box);
+        lv_obj_delete(lbl_send);
+        lv_obj_delete(lbl_sec_up);
+        lv_obj_delete(lbl_sec_down);
+        lv_obj_delete(lbl_sec_ins);
+        lv_obj_delete(lbl_stats);
 
-        // TODO: Cancel deauth if still sending
+        // Reset statics
+        init = true;
+        lbl_sec = lbl_sec_box = lbl_send = lbl_sec_up = lbl_sec_down = lbl_sec_ins = lbl_stats = NULL;
+
+        // Clear scan menu
+        lv_obj_clean(wifi_menu->scan_menu.main_list);
+        lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+
+        lcd_loading_anim_stop();
+
+        // Reinit scan_deauth_page on next visit
+        scan_deauth_page_initialized = false;
+
+        // Stop deauth if ongoing
+        xEventGroupSetBits(xWifiEventGroup, WIFI_STOP_DEAUTH_BIT);
+
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -3365,103 +3381,103 @@ esp_err_t lcd_wifi_topic_keys_nvs_load(wifi_menu_t *menu)
 }
 
 #ifdef POLYCAST5_WIFI_DUMP_NVS
-    void lcd_wifi_dump_menu_nvs(void)
-    {
-        // Open NVS
-        nvs_handle_t h;
-        esp_err_t err = nvs_open(WIFI_MENU_NS, NVS_READONLY, &h);
-        if (err != ESP_OK) {
-            ESP_LOGI(TAG, "WIFI_MENU_NS open err %s", esp_err_to_name(err));
-            return;
-        }
-    
-        // Get user entries
-        uint8_t user_cnt = 0;
-        err = nvs_get_u8(h, WIFI_MENU_KEY_COUNT, &user_cnt);
-        if (err == ESP_OK) {
-            ESP_LOGI(TAG, "Saved menu entry count = %u", user_cnt);
-        } else {
-            ESP_LOGW(TAG, "No count key or err=%s", esp_err_to_name(err));
-        }
-    
-        // For every entry
-        for (int i = 0; i < user_cnt; ++i) {
-            char key[16];
-            snprintf(key, sizeof(key), WIFI_MENU_KEY_FMT, i);
-    
-            // First find out how long the string is
-            size_t len = 0;
-            err = nvs_get_str(h, key, NULL, &len);
-            if (err == ESP_OK && len > 0) {
-                // Allocate a buffer and read it back
-                char *buf = malloc(len);
-                if (buf) {
-                    if (nvs_get_str(h, key, buf, &len) == ESP_OK) {
-                        ESP_LOGI(TAG, "slot %02d: '%s'", i, buf);
-                    } else {
-                        ESP_LOGI(TAG, "slot %02d: <read err %s>", i, esp_err_to_name(err));
-                    }
-                    free(buf);
+void lcd_wifi_dump_menu_nvs(void)
+{
+    // Open NVS
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(WIFI_MENU_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+        ESP_LOGI(TAG, "WIFI_MENU_NS open err %s", esp_err_to_name(err));
+        return;
+    }
+
+    // Get user entries
+    uint8_t user_cnt = 0;
+    err = nvs_get_u8(h, WIFI_MENU_KEY_COUNT, &user_cnt);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "Saved menu entry count = %u", user_cnt);
+    } else {
+        ESP_LOGW(TAG, "No count key or err=%s", esp_err_to_name(err));
+    }
+
+    // For every entry
+    for (int i = 0; i < user_cnt; ++i) {
+        char key[16];
+        snprintf(key, sizeof(key), WIFI_MENU_KEY_FMT, i);
+
+        // First find out how long the string is
+        size_t len = 0;
+        err = nvs_get_str(h, key, NULL, &len);
+        if (err == ESP_OK && len > 0) {
+            // Allocate a buffer and read it back
+            char *buf = malloc(len);
+            if (buf) {
+                if (nvs_get_str(h, key, buf, &len) == ESP_OK) {
+                    ESP_LOGI(TAG, "slot %02d: '%s'", i, buf);
                 } else {
-                    ESP_LOGI(TAG, "slot %02d: <malloc failed>", i);
+                    ESP_LOGI(TAG, "slot %02d: <read err %s>", i, esp_err_to_name(err));
                 }
-            } else if (err == ESP_ERR_NVS_NOT_FOUND) {
-                ESP_LOGI(TAG, "slot %02d: <empty>", i);
+                free(buf);
             } else {
-                ESP_LOGI(TAG, "slot %02d: err=%s", i, esp_err_to_name(err));
+                ESP_LOGI(TAG, "slot %02d: <malloc failed>", i);
             }
-        }
-    
-        // Close NVS
-        nvs_close(h);
-    }
-
-
-    void lcd_wifi_dump_wifi_topic_nvs(void)
-    {
-        // Open NVS
-        nvs_handle_t h;
-        esp_err_t err = nvs_open(WIFI_TOPIC_NS, NVS_READONLY, &h);
-        if (err != ESP_OK) {
-            ESP_LOGI(TAG, "WIFI_TOPIC_NS open err %s", esp_err_to_name(err));
-            return;
-        }
-    
-        // Get the saved count
-        uint8_t count = 0;
-        err = nvs_get_u8(h, WIFI_TOPIC_KEY_COUNT, &count);
-        if (err == ESP_OK) {
-            ESP_LOGI(TAG, "Saved topic_key count = %u\n", count);
+        } else if (err == ESP_ERR_NVS_NOT_FOUND) {
+            ESP_LOGI(TAG, "slot %02d: <empty>", i);
         } else {
-            ESP_LOGW(TAG, "No count key or err=%s\n", esp_err_to_name(err));
+            ESP_LOGI(TAG, "slot %02d: err=%s", i, esp_err_to_name(err));
         }
-    
-        // Loop every possible slot
-        for (int i = 0; i < MAX_WIFI_OPTIONS; ++i) {
-            // Format key
-            char key[16];
-            snprintf(key, sizeof(key), WIFI_TOPIC_KEY_FMT, i);
-    
-            size_t len = sizeof(((wifi_menu_t *)0)->topic_keys[0]);
-            uint8_t buf[len];
-            
-            // Get entry
-            err = nvs_get_blob(h, key, buf, &len);
-            if (err == ESP_OK && len == sizeof(buf)) {
-                ESP_LOGI(TAG, "slot %02d: ", i);
-                
-                for (int b = 0; b < len; b++) {
-                    ESP_LOGI(TAG, "%02X", buf[b]);
-                }
-            } else if (err == ESP_ERR_NVS_NOT_FOUND) {
-                 ESP_LOGI(TAG, "slot %02d: <empty>\n", i);
-            } else {
-                 ESP_LOGI(TAG, "slot %02d: err=%s\n", i, esp_err_to_name(err));
-            }
-        }
-    
-        // Close NVS
-        nvs_close(h);
     }
+
+    // Close NVS
+    nvs_close(h);
+}
+
+
+void lcd_wifi_dump_wifi_topic_nvs(void)
+{
+    // Open NVS
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(WIFI_TOPIC_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+        ESP_LOGI(TAG, "WIFI_TOPIC_NS open err %s", esp_err_to_name(err));
+        return;
+    }
+
+    // Get the saved count
+    uint8_t count = 0;
+    err = nvs_get_u8(h, WIFI_TOPIC_KEY_COUNT, &count);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "Saved topic_key count = %u\n", count);
+    } else {
+        ESP_LOGW(TAG, "No count key or err=%s\n", esp_err_to_name(err));
+    }
+
+    // Loop every possible slot
+    for (int i = 0; i < MAX_WIFI_OPTIONS; ++i) {
+        // Format key
+        char key[16];
+        snprintf(key, sizeof(key), WIFI_TOPIC_KEY_FMT, i);
+
+        size_t len = sizeof(((wifi_menu_t *)0)->topic_keys[0]);
+        uint8_t buf[len];
+        
+        // Get entry
+        err = nvs_get_blob(h, key, buf, &len);
+        if (err == ESP_OK && len == sizeof(buf)) {
+            ESP_LOGI(TAG, "slot %02d: ", i);
+            
+            for (int b = 0; b < len; b++) {
+                ESP_LOGI(TAG, "%02X", buf[b]);
+            }
+        } else if (err == ESP_ERR_NVS_NOT_FOUND) {
+                ESP_LOGI(TAG, "slot %02d: <empty>\n", i);
+        } else {
+                ESP_LOGI(TAG, "slot %02d: err=%s\n", i, esp_err_to_name(err));
+        }
+    }
+
+    // Close NVS
+    nvs_close(h);
+}
 #endif
 

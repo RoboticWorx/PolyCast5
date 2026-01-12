@@ -67,7 +67,7 @@ static void send_cb(const wifi_tx_info_t *info, esp_now_send_status_t status)
     }
 }
 
-esp_err_t espnow_utils_init(const uint8_t *mac, uint8_t channel, bool encrypt, const uint8_t *lmk)
+esp_err_t espnow_utils_espnow_init(const uint8_t *mac, uint8_t channel, bool encrypt, const uint8_t *lmk)
 {
     esp_err_t err;
 
@@ -108,7 +108,7 @@ esp_err_t espnow_utils_init(const uint8_t *mac, uint8_t channel, bool encrypt, c
     return ESP_OK;
 }
 
-esp_err_t espnow_utils_deinit(void)
+esp_err_t espnow_utils_espnow_deinit(void)
 {
     // De-initialize ESP-NOW
     esp_err_t err = esp_now_deinit();

@@ -629,7 +629,16 @@ static void deauth_send_task(void *pvParameters)
 
         // Check if duration expired
         if (time_elapsed >= deauth_target->duration_sec) {
+            #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "deauth_send_task duration expired");
+            #endif
+            break;
+        }
+        if (xEventGroupGetBits(xWifiEventGroup) & WIFI_STOP_DEAUTH_BIT) {
+            #ifdef POLYCAST5_DEBUG
+            ESP_LOGI(TAG, "deauth_send_task stop requested: WIFI_STOP_DEAUTH_BIT set");
+            #endif
+            xEventGroupClearBits(xWifiEventGroup, WIFI_STOP_DEAUTH_BIT);
             break;
         }
 
@@ -738,6 +747,9 @@ esp_err_t wifi_deauth_send_for_duration(deauth_target_t *deauth_target)
         ESP_LOGE(TAG, "wifi_utils_deauth_for_duration: invalid channel: %d", deauth_target->channel);
         return ESP_ERR_INVALID_ARG;
     }
+
+    // Clear any previous stop requests
+    xEventGroupClearBits(xWifiEventGroup, WIFI_STOP_DEAUTH_BIT);
 
     // Populate fields
     deauth_target->frames_sent = 0;

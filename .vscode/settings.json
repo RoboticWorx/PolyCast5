@@ -17,4 +17,5 @@
     "--compile-commands-dir=${workspaceFolder}\\build"
   ],
   "C_Cpp.errorSquiggles": "enabled",
+  "diffEditor.renderSideBySide": false
 }
