@@ -1099,8 +1099,13 @@ void lcd_wifi_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *w
 
         // Display new value
         lv_label_set_text_fmt(lbl_sec, "%" PRIu32 "s", deauth_target.duration_sec);
-    } else if (ui_btns->select_btn == 1) { // Increase time by 3 seconds
+    } else if (ui_btns->select_btn == 1) { // Decrease time by 3 seconds
         deauth_target.duration_sec -= 3;
+
+        // Can't be less than 1 second
+        if (deauth_target.duration_sec < 1 || deauth_target.duration_sec > 1024) { // > if overflowed
+            deauth_target.duration_sec = 1024;
+        }
 
         // Display new value
         lv_label_set_text_fmt(lbl_sec, "%" PRIu32 "s", deauth_target.duration_sec);

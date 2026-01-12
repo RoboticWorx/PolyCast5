@@ -12,6 +12,7 @@
 #include "bluetooth_utils.h"
 #include "portmacro.h"
 #include "bluetooth_task.h"
+#include "bluetooth_nvs.h"
 #include "gpio_task.h"
 #include "gpio_utils.h"
 #include "ai_utils.h"
@@ -78,12 +79,12 @@ static void bluetooth_task(void *arg)
 
     // If 6 digit BT pairing passkey NVS doesn't exist yet, set that too
     uint32_t pairing_key = 0; // To be random 6 digit passkey
-    if (bluetooth_utils_pairing_key_load_nvs(&pairing_key) != ESP_OK) {
+    if (bluetooth_nvs_pairing_key_load(&pairing_key) != ESP_OK) {
         // Create first time
         pairing_key = esp_random() % 1000000;
         
         // Save that version to NVS
-        bluetooth_utils_pairing_key_save_nvs(pairing_key);
+        bluetooth_nvs_pairing_key_save(pairing_key);
         
         #ifdef POLYCAST5_PASS_DEBUG
         ESP_LOGW(TAG, "Setting first time BT pairing key: %d", pairing_key);
@@ -107,9 +108,9 @@ static void bluetooth_task(void *arg)
                 bluetooth_utils_forget_all_peers();
 
                 // Clear remembered NVS
-                esp_err_t err = bluetooth_utils_clear_peers_list_nvs(false); // Clear all
+                esp_err_t err = bluetooth_nvs_clear_peers_list(false); // Clear all
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "bluetooth_utils_clear_peers_list_nvs error: %s", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "bluetooth_nvs_clear_peers_list error: %s", esp_err_to_name(err));
                 }
 
                 bluetooth_utils_deinit();
@@ -118,9 +119,9 @@ static void bluetooth_task(void *arg)
                 bluetooth_utils_forget_all_peers();
 
                 // Clear remembered NVS
-                esp_err_t err = bluetooth_utils_clear_peers_list_nvs(false); // Clear all
+                esp_err_t err = bluetooth_nvs_clear_peers_list(false); // Clear all
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "bluetooth_utils_clear_peers_list_nvs error: %s", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "bluetooth_nvs_clear_peers_list error: %s", esp_err_to_name(err));
                 }
 
                 bluetooth_utils_deinit();
