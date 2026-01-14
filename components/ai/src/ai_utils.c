@@ -45,8 +45,9 @@ POLYCAST5_USE_PSRAM static char canidate_creds[1536];
 POLYCAST5_USE_PSRAM static char user_cred_msg[2048];
 
 // NVS keys for AI prompt override
-#define AI_PROMPT_NS "ai"
-#define AI_PROMPT_KEY "prompt"
+#define AI_PROMPT_NS "ai_prompt"
+#define AI_PROMPT_KEYBOARD_KEY "keyb_prompt"
+#define AI_PROMPT_PKT_ANALYSIS_KEY "ana_prompt"
 
 // Save xAI API key string to NVS
 esp_err_t ai_utils_save_api_key_nvs(const char *api_key)
@@ -413,8 +414,33 @@ const char *ai_utils_get_autokey_prompt(char *buf, size_t buf_sz)
     buf[0] = '\0';
 
     // Try to load override from NVS; fall back to compiled default if missing/empty
-    if (ai_utils_prompt_load_nvs(buf, buf_sz) != ESP_OK || buf[0] == '\0') {
+    if (ai_utils_keyboard_prompt_load_nvs(buf, buf_sz) != ESP_OK || buf[0] == '\0') {
+        #ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "ai_utils_keyboard_prompt_load_nvs: Using default prompt");
+        #endif
         return AI_PROMPT_AUTOKEY;
+    }
+
+    // Use NVS override
+    return buf;
+}
+
+const char *ai_utils_get_pkt_analysis_prompt(char *buf, size_t buf_sz)
+{
+    // If no buffer provided, fall back to compiled default
+    if (!buf || buf_sz == 0) {
+        return AI_PROMPT_PKT_ANALYSIS;
+    }
+
+    // Default to empty
+    buf[0] = '\0';
+
+    // Try to load override from NVS; fall back to compiled default if missing/empty
+    if (ai_utils_pkt_analysis_prompt_load_nvs(buf, buf_sz) != ESP_OK || buf[0] == '\0') {
+        #ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "ai_utils_pkt_analysis_prompt_load_nvs: Using default prompt");
+        #endif
+        return AI_PROMPT_PKT_ANALYSIS;
     }
 
     // Use NVS override
@@ -500,8 +526,8 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
     cJSON_AddStringToObject(usr, "content", command);
     cJSON_AddItemToArray(messages, usr);
 
-    // Reasonable token limit – similar scale to the OpenAI call
-    cJSON_AddNumberToObject(root, "max_tokens", (1024 * 8));
+    // Reasonable token limit
+    cJSON_AddNumberToObject(root, "max_tokens", (1024 * 2));
 
     // Serialize JSON payload
     char *payload = cJSON_PrintUnformatted(root);
@@ -553,6 +579,12 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
     // Attach POST body
     esp_http_client_set_post_field(client, payload, strlen(payload));
 
+    #ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "Free heap before esp_http_client_perform: free=%u LFB=%u",
+            (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+            (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+    #endif
+
     // Perform the request
     esp_err_t err = esp_http_client_perform(client);
 
@@ -561,6 +593,7 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
 
     // Cleanup request resources
     free(payload);
+    esp_http_client_close(client);
     esp_http_client_cleanup(client);
 
     // Network/TLS/HTTP failure
@@ -681,7 +714,7 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
     return ESP_OK;
 }
 
-esp_err_t ai_utils_prompt_save_nvs(const char *prompt)
+esp_err_t ai_utils_keyboard_prompt_save_nvs(const char *prompt)
 {
     // NVS handle
     nvs_handle_t h;
@@ -698,7 +731,7 @@ esp_err_t ai_utils_prompt_save_nvs(const char *prompt)
     }
 
     // Save prompt string
-    err = nvs_set_str(h, AI_PROMPT_KEY, prompt);
+    err = nvs_set_str(h, AI_PROMPT_KEYBOARD_KEY, prompt);
 
     // Commit only on success
     if (err == ESP_OK) {
@@ -710,7 +743,7 @@ esp_err_t ai_utils_prompt_save_nvs(const char *prompt)
     return err;
 }
 
-esp_err_t ai_utils_prompt_load_nvs(char *out, size_t out_sz)
+esp_err_t ai_utils_keyboard_prompt_load_nvs(char *out, size_t out_sz)
 {
     // NVS handle
     nvs_handle_t h;
@@ -728,7 +761,61 @@ esp_err_t ai_utils_prompt_load_nvs(char *out, size_t out_sz)
 
     // Read prompt string (sz is in/out)
     size_t sz = out_sz;
-    err = nvs_get_str(h, AI_PROMPT_KEY, out, &sz);
+    err = nvs_get_str(h, AI_PROMPT_KEYBOARD_KEY, out, &sz);
+
+    // Close handle
+    nvs_close(h);
+    return err;
+}
+
+esp_err_t ai_utils_pkt_analysis_prompt_save_nvs(const char *prompt)
+{
+    // NVS handle
+    nvs_handle_t h;
+
+    // Treat NULL as empty (empty => "use default" semantics)
+    if (!prompt) {
+        prompt = "";
+    }
+
+    // Open NVS namespace
+    esp_err_t err = nvs_open(AI_PROMPT_NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    // Save prompt string
+    err = nvs_set_str(h, AI_PROMPT_PKT_ANALYSIS_KEY, prompt);
+
+    // Commit only on success
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+
+    // Close handle
+    nvs_close(h);
+    return err;
+}
+
+esp_err_t ai_utils_pkt_analysis_prompt_load_nvs(char *out, size_t out_sz)
+{
+    // NVS handle
+    nvs_handle_t h;
+
+    // Validate output buffer
+    if (!out || out_sz == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Open NVS namespace
+    esp_err_t err = nvs_open(AI_PROMPT_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    // Read prompt string (sz is in/out)
+    size_t sz = out_sz;
+    err = nvs_get_str(h, AI_PROMPT_PKT_ANALYSIS_KEY, out, &sz);
 
     // Close handle
     nvs_close(h);

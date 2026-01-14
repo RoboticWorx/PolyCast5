@@ -80,7 +80,7 @@ static void lcd_task(void *pvParameters)
     
     uint8_t battery_percentage;
 
-    //lcd_ns_nvs_clear("keyb_menu");
+    //lcd_ns_nvs_clear("ai");
     //lcd_ns_nvs_clear("bt_portal");
     //lcd_ns_nvs_clear("keyb_sel");
     //lcd_ns_nvs_clear("first_boot");
@@ -345,6 +345,9 @@ static void lcd_task(void *pvParameters)
                     break;
                 case WIFI_SCAN_DEAUTH_PAGE:
                     lcd_wifi_scan_deauth_page(&ui_btns, &ui_menu, &wifi_menu);
+                    break;
+                case WIFI_AI_CONFIG_PAGE:
+                    lcd_wifi_ai_config_page(&ui_btns, &ui_menu, &wifi_menu);
                     break;
                 case WIFI_AI_PACKET_PAGE:
                     lcd_wifi_ai_packet_page(&ui_btns, &ui_menu, &wifi_menu);

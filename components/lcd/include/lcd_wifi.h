@@ -89,6 +89,15 @@ void lcd_wifi_update_menu(wifi_menu_t *wifi_menu);
 void lcd_wifi_scan_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
 
 /**
+ * @brief Configures AI web portal (Wi-Fi version) to get xAI API key and allow editing of system prompts
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] wifi_menu Wi-Fi menu structure
+ */
+void lcd_wifi_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
+
+/**
  * @brief Sniffs network frames and sends it to Grok for analysis
  *
  * @param [in] ui_btns UI input structure

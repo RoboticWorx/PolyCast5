@@ -84,18 +84,17 @@ const char AI_PROMPT_CREDS[] =
   "Do not output any other text.";
 
 // AI dev prompt string for analyzing raw network frames
-const char AI_PROMPT_RAW_FRAMES[] =
-  "You are a WiFi protocol expert."
+const char AI_PROMPT_PKT_ANALYSIS[] =
+  "You are a WiFi protocol expert.\n"
   "\n"
   "Given a list of raw 802.11 frames in hex format (each frame prefixed with 'Frame N: '), "
   "organize them by type/subtype, explain the key fields (e.g., MAC addresses, SSID, security, timestamp), "
-  "infer network details (e.g., channel, encryption), network weaknesses (e.g., known vulnerabilities, software/hardware issues, "
+  "infer network details (e.g., channel, encryption, PMF), network weaknesses (e.g., known vulnerabilities, software/hardware issues, "
   "design flaws), how they can be exploited (e.g., attack methods, tools, techniques), the device and hardware used (e.g., type of device, "
-  "model, manufacturer), and highlight any anomalies or insights. If detected, you MUST point out: "
-  "If PMF (Protected Management Frames) is enabled/supported for a network, deauthentication frames, handshakes."
+  "model, manufacturer), and highlight any anomalies or insights.\n"
   "\n"
   "Respond concisely and detailed, but also make sure it is easy to follow, "
-  "understand, and would be useful for network admin."
+  "understand, and would be useful for network admin.\n"
   "\n"
   "Respond with markdown formatting. Never say you are certain an attack is "
   "happening, only highlight suspicious behavior. Note these are raw frames captured over the air. NEVER USE EMOJIS.";

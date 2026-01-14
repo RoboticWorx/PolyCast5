@@ -1645,7 +1645,7 @@ static void system_build_info(char *buf, size_t n)
     size_t heap_min_free_total = esp_get_minimum_free_heap_size(); // Lowest value heap_free_total has ever reached since boot (watermark)
     
     size_t heap_free_int = heap_caps_get_free_size(MALLOC_CAP_INTERNAL); // Internal (on-chip) RAM only
-    size_t heap_largest_int    = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL); // Size of the largest single contiguous free block in internal RAM
+    size_t heap_largest_int = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL); // Size of the largest single contiguous free block in internal RAM
 
     size_t heap_free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM); // External PSRAM only
     size_t heap_largest_psram = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM); // Largest contiguous PSRAM block

@@ -29,7 +29,7 @@
 
 char btc_wifi_portal_pass[64];
 
-static wifi_scan_t wifi_scan[WIFI_MAX_NETWORKS];
+POLYCAST5_USE_PSRAM static wifi_scan_t wifi_scan[WIFI_MAX_NETWORKS];
 POLYCAST5_USE_PSRAM static wifi_scan_deauth_t wifi_scan_deauth[WIFI_MAX_NETWORKS];
 
 static deauth_target_t deauth_target = {0};
@@ -379,33 +379,33 @@ static void wifi_task(void *param)
             esp_err_t err;
 
             // If AI web portal bit transitioned 0 -> 1
-            if ((current_portal_bits & WIFI_PORTAL_START_AI_BIT) &&
-                    !(last_portal_bits & WIFI_PORTAL_START_AI_BIT)) {
-                err = ai_portal_start();
+            if ((current_portal_bits & WIFI_PORTAL_AI_KEY_START_BIT) &&
+                    !(last_portal_bits & WIFI_PORTAL_AI_KEY_START_BIT)) {
+                err = ai_key_portal_start();
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "ai_portal_start failed: %s", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "ai_key_portal_start failed: %s", esp_err_to_name(err));
                 }
             }
             // If AI web portal bit transitioned 1 -> 0
-            if ((last_portal_bits & WIFI_PORTAL_START_AI_BIT) &&
-                    !(current_portal_bits & WIFI_PORTAL_START_AI_BIT)) {
-                err = ai_portal_stop();
+            if ((last_portal_bits & WIFI_PORTAL_AI_KEY_START_BIT) &&
+                    !(current_portal_bits & WIFI_PORTAL_AI_KEY_START_BIT)) {
+                err = ai_key_portal_stop();
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "ai_portal_stop failed: %s", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "ai_key_portal_stop failed: %s", esp_err_to_name(err));
                 }
             }
 
             // If AI packet analysis web portal bit transitioned 0 -> 1
-            if ((current_portal_bits & WIFI_PORTAL_START_AI_PKT_ANALYSIS_BIT) &&
-                    !(last_portal_bits & WIFI_PORTAL_START_AI_PKT_ANALYSIS_BIT)) {
+            if ((current_portal_bits & WIFI_PORTAL_AI_PKT_ANALYSIS_START_BIT) &&
+                    !(last_portal_bits & WIFI_PORTAL_AI_PKT_ANALYSIS_START_BIT)) {
                 err = ai_analysis_portal_start();
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "ai_analysis_portal_start failed: %s", esp_err_to_name(err));
                 }
             }
             // If AI packet analysis web portal bit transitioned 1 -> 0
-            if ((last_portal_bits & WIFI_PORTAL_START_AI_PKT_ANALYSIS_BIT) &&
-                    !(current_portal_bits & WIFI_PORTAL_START_AI_PKT_ANALYSIS_BIT)) {
+            if ((last_portal_bits & WIFI_PORTAL_AI_PKT_ANALYSIS_START_BIT) &&
+                    !(current_portal_bits & WIFI_PORTAL_AI_PKT_ANALYSIS_START_BIT)) {
                 err = ai_analysis_portal_stop();
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "ai_analysis_portal_stop failed: %s", esp_err_to_name(err));
@@ -413,16 +413,16 @@ static void wifi_task(void *param)
             }
 
             // If BTC web portal bit transitioned 0 -> 1
-            if ((current_portal_bits & WIFI_PORTAL_START_BTC_BIT) &&
-                    !(last_portal_bits & WIFI_PORTAL_START_BTC_BIT)) {
+            if ((current_portal_bits & WIFI_PORTAL_BTC_START_BIT) &&
+                    !(last_portal_bits & WIFI_PORTAL_BTC_START_BIT)) {
                 err = wifi_btc_portal_start();
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "wifi_btc_portal_start failed: %s", esp_err_to_name(err));
                 }
             }
             // If BTC web portal bit transitioned 1 -> 0
-            if ((last_portal_bits & WIFI_PORTAL_START_BTC_BIT) &&
-                    !(current_portal_bits & WIFI_PORTAL_START_BTC_BIT)) {
+            if ((last_portal_bits & WIFI_PORTAL_BTC_START_BIT) &&
+                    !(current_portal_bits & WIFI_PORTAL_BTC_START_BIT)) {
                 err = wifi_btc_portal_stop();
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "wifi_btc_portal_stop failed: %s", esp_err_to_name(err));
@@ -430,16 +430,16 @@ static void wifi_task(void *param)
             }
             
             // If BT web portal bit transitioned 0 -> 1
-            if ((current_portal_bits & WIFI_PORTAL_START_BT_BIT) &&
-                    !(last_portal_bits & WIFI_PORTAL_START_BT_BIT)) {
+            if ((current_portal_bits & WIFI_PORTAL_BT_START_BIT) &&
+                    !(last_portal_bits & WIFI_PORTAL_BT_START_BIT)) {
                 err = bluetooth_web_portal_start();
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "bluetooth_web_portal_start failed: %s", esp_err_to_name(err));
                 }
             }
             // If BT web portal bit transitioned 1 -> 0
-            if ((last_portal_bits & WIFI_PORTAL_START_BT_BIT) &&
-                    !(current_portal_bits & WIFI_PORTAL_START_BT_BIT)) {
+            if ((last_portal_bits & WIFI_PORTAL_BT_START_BIT) &&
+                    !(current_portal_bits & WIFI_PORTAL_BT_START_BIT)) {
                 err = bluetooth_web_portal_stop();
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "bluetooth_web_portal_stop failed: %s", esp_err_to_name(err));

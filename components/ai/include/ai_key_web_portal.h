@@ -8,29 +8,29 @@
  *
  * @returns ESP error status
  */
-esp_err_t ai_portal_start(void);
+esp_err_t ai_key_portal_start(void);
 
 /**
  * @brief Stops the AI key web portal
  * 
  * @returns ESP error status
  */
-esp_err_t ai_portal_stop(void);
+esp_err_t ai_key_portal_stop(void);
 
 /**
  * @brief Get AI key web portal SSID
  */
-const char *ai_portal_get_ssid(void);
+const char *ai_key_portal_get_ssid(void);
 
 /**
  * @brief Get AI key web portal password
  */
-const char *ai_portal_get_pass(void);
+const char *ai_key_portal_get_pass(void);
 
 /**
  * @brief Get AI key web portal IP address
  */
-const char *ai_portal_get_ip(void);
+const char *ai_key_portal_get_ip(void);
 
 /**
  * @brief Save a randomly generated portal Wi-Fi password to NVS
@@ -39,7 +39,7 @@ const char *ai_portal_get_ip(void);
  *
  * @returns ESP error status
  */
-esp_err_t ai_wifi_pass_save_nvs(const char *val);
+esp_err_t ai_key_portal_pass_save_nvs(const char *val);
 
 /**
  * @brief Load the randomly generated portal Wi-Fi password from NVS
@@ -49,6 +49,6 @@ esp_err_t ai_wifi_pass_save_nvs(const char *val);
  *
  * @returns ESP error status
  */
-esp_err_t ai_wifi_pass_load_nvs(char *out, size_t out_sz);
+esp_err_t ai_key_portal_pass_load_nvs(char *out, size_t out_sz);
 
 #endif // AI_WEB_PORTAL_H

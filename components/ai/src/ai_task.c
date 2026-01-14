@@ -20,8 +20,6 @@
 
 #define TAG "AI_TASK"
 
-#define AI_PROMPT_NVS_MAX_LEN 4096
-
 QueueHandle_t xAiCmdQueue;
 
 char ai_wifi_portal_pass[64];
@@ -71,7 +69,7 @@ static void ai_task(void *pvParameters)
     esp_err_t err = ESP_OK;
 
     // If Wi-Fi AI portal password NVS doesn't exist yet, set it
-    if (ai_wifi_pass_load_nvs(ai_wifi_portal_pass, sizeof(ai_wifi_portal_pass)) != ESP_OK) {
+    if (ai_key_portal_pass_load_nvs(ai_wifi_portal_pass, sizeof(ai_wifi_portal_pass)) != ESP_OK) {
         // Random chars to pick from
         static const char alphabet[] =
                 "ABCDEFGHJKLMNPQRSTUVWXYZ"
@@ -89,7 +87,7 @@ static void ai_task(void *pvParameters)
         ai_wifi_portal_pass[PASS_LEN] = '\0';
         
         // Save that version to NVS
-        ai_wifi_pass_save_nvs(ai_wifi_portal_pass);
+        ai_key_portal_pass_save_nvs(ai_wifi_portal_pass);
         
         #ifdef POLYCAST5_PASS_DEBUG
         ESP_LOGW(TAG, "Setting first time AI Wi-Fi portal password: %s", ai_wifi_portal_pass);
@@ -146,8 +144,12 @@ static void ai_task(void *pvParameters)
             ESP_LOGI(TAG, "AI_CMD_RAW_FRAMES payload len=%u", (unsigned)msg_len);
             #endif
 
+            // Build autotype prompt (NVS override; fallback to compiled default)
+            memset(prompt_buf, 0, sizeof(prompt_buf)); // Zero out previous contents
+            const char *prompt = ai_utils_get_pkt_analysis_prompt(prompt_buf, sizeof(prompt_buf));
+
             // 'ai_response' output
-            err = ai_utils_send_command_xai(AI_PROMPT_RAW_FRAMES, cmd.msg, ai_response, sizeof(ai_response), cmd.reasoning);
+            err = ai_utils_send_command_xai(prompt, cmd.msg, ai_response, sizeof(ai_response), cmd.reasoning);
         }
 
         if (err == ESP_OK) {
@@ -187,7 +189,7 @@ static void ai_task(void *pvParameters)
 
 void ai_task_create(void)
 {
-		if (xTaskCreate(ai_task, "ai_task", 1024 * 6, NULL, POLYCAST5_PRIORITY_MEDIUM, NULL) != pdPASS) {
+    if (xTaskCreate(ai_task, "ai_task", 1024 * 6, NULL, POLYCAST5_PRIORITY_MEDIUM, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start ai_task");
     }
 }

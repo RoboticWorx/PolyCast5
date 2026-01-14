@@ -1729,7 +1729,7 @@ void lcd_tools_btc_addr_setup_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools
         lv_timer_handler();
         
         // Start portal
-        xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_BTC_BIT);
+        xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_BTC_START_BIT);
 
         init = true;
     }
@@ -1749,7 +1749,7 @@ void lcd_tools_btc_addr_setup_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools
         init = false;
         
         // Stop portal
-        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_BTC_BIT);
+        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_BTC_START_BIT);
         
         // Show tools menu
         lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -1766,7 +1766,7 @@ void lcd_tools_btc_addr_setup_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools
         init = false;
         
         // Stop portal
-        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_BTC_BIT);
+        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_BTC_START_BIT);
         
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }

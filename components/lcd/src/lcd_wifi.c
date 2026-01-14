@@ -29,6 +29,7 @@
 #include "lcd_utils.h"
 #include "ai_task.h"
 #include "ai_utils.h"
+#include "ai_key_web_portal.h"
 #include "ai_analysis_web_portal.h"
 
 #define TAG "LCD_WIFI"
@@ -1169,9 +1170,105 @@ void lcd_wifi_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *w
     }
 }
 
-// TODO: Make system prompt editable
+void lcd_wifi_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
+{
+    #define WIFI_AI_CONFIG_Y_OFFSET 40
+    
+    // Statics
+    static bool init = false;
+    
+    static lv_obj_t *cont = NULL;
+    static lv_obj_t *title_lbl = NULL;
+    static lv_obj_t *instr_lbl = NULL;
+    
+    if (!init) {
+        // Create a scrollable container for the instructions
+        cont = lv_obj_create(ACTIVE_SCR);
+        lv_obj_set_size(cont, 210, 106);
+        lv_obj_center(cont);
+        lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+        lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+        lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+        lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
+
+        // Title label
+        title_lbl = lv_label_create(cont);
+        lv_label_set_text(title_lbl, "How to Setup:");
+        lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+        lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+        // Instructions label (scrollable if text is long)
+        instr_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+        lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+
+        // Set custom text based on hotkey index
+        const char *instr_text = 
+                "To utilize the power of AI, an API key is needed. Don't worry, it's easy to get!\n\n"
+                "Please connect to the following Wi-Fi network:\n\n"
+                "SSID: %s\nPass: %s\n\n"
+                "Then search in your web browser:\n\n"
+                "%s\n\n"
+                "Do NOT leave this page until you're done! When you are done, simply go back and try again.";
+        
+        lv_label_set_text_fmt(instr_lbl, instr_text, ai_key_portal_get_ssid(), ai_key_portal_get_pass(), ai_key_portal_get_ip());
+
+        lv_timer_handler();
+        
+        // Start portal
+        xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_AI_KEY_START_BIT);
+
+        init = true;
+    }
+    
+    // Scroll up
+    if (ui_btns->up_btn == 1) {
+        lv_obj_scroll_by_bounded(cont, 0, WIFI_AI_CONFIG_Y_OFFSET, LV_ANIM_ON);
+    } else if (ui_btns->down_btn == 1) { // Scroll down
+        lv_obj_scroll_by_bounded(cont, 0, -WIFI_AI_CONFIG_Y_OFFSET, LV_ANIM_ON);
+    } else if (ui_btns->left_btn) { // Go back
+        // Delete objects
+        lv_obj_delete(cont); // Deletes children
+        
+        // Reset statics
+        cont = NULL;
+        title_lbl = instr_lbl = NULL;
+        init = false;
+        
+        // Stop portal
+        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_AI_KEY_START_BIT);
+        
+        // Show Wi-Fi menu
+        lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        
+        // Switch back
+        ui_menu->page = WIFI_PAGE;
+    } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
+        // Delete objects
+        lv_obj_delete(cont); // Deletes children
+        
+        // Reset statics
+        cont = NULL;
+        title_lbl = instr_lbl = NULL;
+        init = false;
+        
+        // Stop portal
+        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_AI_KEY_START_BIT);
+        
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
+}
+
 // TODO: Add MAC spoofing
-// TODO: Handle going it without xAI API key set (prompt to get key)
 void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {
     #define WIFI_AI_PKT_CONN_FAILED_TXT "Connection failed!\nPlease connect to your\nWi-Fi network at least\nonce in the 'Wi-Fi'\nmenu and make sure\nyou are in range."
@@ -1200,6 +1297,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 
     static bool init = true;
     static lv_obj_t *lbl_ins = NULL;
+    static lv_obj_t *lbl_config = NULL;
     static uint8_t channel = 6; // Default channel
     static size_t channel_idx = 0;
 
@@ -1216,12 +1314,29 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 		// Ensure disconnected at start
 		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
+        // Check for API key
+        char api_key[AI_API_KEY_MAX_LEN] = {0};
+        esp_err_t err = ai_utils_load_api_key_nvs(api_key, AI_API_KEY_MAX_LEN);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to load xAI API key from NVS: err=%s, switching to AI config page.", esp_err_to_name(err));
+
+            // Switch pages
+            ui_menu->page = WIFI_AI_CONFIG_PAGE;
+            return;
+        }
+
 		// Clear any previous sniffed frames
 		xQueueReset(xWifiAiRawSniffQueue);
 
         lbl_ins = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_ins, "", user_secondary_color,
                 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+
+        // Show config option
+        lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        lbl_config = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_config, LV_SYMBOL_SETTINGS, user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -15, 0);
 
         // Find default channel in the list
         for (size_t i = 0; i < (sizeof(wifi_ai_pkt_channels) / sizeof(wifi_ai_pkt_channels[0])); ++i) {
@@ -1268,7 +1383,12 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
         xSemaphoreGive(xWifiRawFramesMutex); // Release raw sniffed frames
 
         last_frames_shown = 0;
+
+        // Hide config option
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(lbl_config, LV_OBJ_FLAG_HIDDEN);
         
+        // Update instruction label
         char buf[64];
         lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_18, 0);
         snprintf(buf, sizeof(buf), WIFI_AI_PKT_CAPTURE_TXT, (unsigned)0, (unsigned)WIFI_MAX_RAW_FRAMES);
@@ -1461,6 +1581,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 
         // Delete objects
         lv_obj_delete(lbl_ins);
+        lv_obj_delete(lbl_config);
 
         // Reset capture state
         state = AI_PKT_IDLE;
@@ -1469,10 +1590,39 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 
         // Reset statics
         init = true;
-        lbl_ins = NULL;
+        lbl_ins = lbl_config = NULL;
 
         // Switch to results page
         ui_menu->page = WIFI_AI_PACKET_RESULTS_PAGE;
+    } else if (ui_btns->right_btn && state == AI_PKT_IDLE) { // Go to config page
+		// Stop loading animation
+		lcd_loading_anim_stop();
+		
+        // Hide right arrow
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        // Show top and bottom arrows
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+        // Delete objects
+        lv_obj_delete(lbl_ins);
+        lv_obj_delete(lbl_config);
+
+        // Reset capture state
+        state = AI_PKT_IDLE;
+        last_select = false;
+        reconnect_sent = false;
+
+        // Reset statics
+        init = true;
+        lbl_ins = lbl_config = NULL;
+
+        // Switch to config page
+        ui_menu->page = WIFI_AI_CONFIG_PAGE;
+
+        // Disable Wi-Fi
+        xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
     } else if (ui_btns->left_btn) { // Go back
 		// Stop loading animation
 		lcd_loading_anim_stop();
@@ -1486,6 +1636,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 
         // Delete objects
         lv_obj_delete(lbl_ins);
+        lv_obj_delete(lbl_config);
 
         // Reset capture state
         state = AI_PKT_IDLE;
@@ -1494,7 +1645,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 
         // Reset statics
         init = true;
-        lbl_ins = NULL;
+        lbl_ins = lbl_config = NULL;
 
         // Show Wi-Fi menu
         lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -1507,6 +1658,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
     } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
         // Delete objects
         lv_obj_delete(lbl_ins);
+        lv_obj_delete(lbl_config);
 
         // Reset capture state
         state = AI_PKT_IDLE;
@@ -1515,12 +1667,12 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 
         // Reset statics
         init = true;
-        lbl_ins = NULL;
+        lbl_ins = lbl_config = NULL;
         
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 
         // Stop the analysis portal if running
-        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_PKT_ANALYSIS_BIT);
+        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_AI_PKT_ANALYSIS_START_BIT);
     }
 }
 
@@ -1575,7 +1727,7 @@ void lcd_wifi_ai_packet_results_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wif
         ai_analysis_portal_set_result(res);
 
         // Activate web portal
-        xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_PKT_ANALYSIS_BIT);
+        xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_AI_PKT_ANALYSIS_START_BIT);
 
         char instr_text[512];
         snprintf(instr_text, sizeof(instr_text),
@@ -1617,7 +1769,7 @@ void lcd_wifi_ai_packet_results_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wif
         ui_menu->page = WIFI_PAGE;
 
         // Disable portal and Wi-Fi (extra safety)
-        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_PKT_ANALYSIS_BIT);
+        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_AI_PKT_ANALYSIS_START_BIT);
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
     } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
         // Delete objects
@@ -1631,7 +1783,7 @@ void lcd_wifi_ai_packet_results_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wif
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 
         // Stop the analysis portal if running
-        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_PKT_ANALYSIS_BIT);
+        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_AI_PKT_ANALYSIS_START_BIT);
     }
 }
 

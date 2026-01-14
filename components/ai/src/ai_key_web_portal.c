@@ -14,6 +14,7 @@
 #include "esp_http_server.h"
 #include "esp_netif_ip_addr.h" // For IPSTR/IP2STR
 
+#include "ai_key_portal_html.h" // AI_PORTAL_HTML
 #include "ai_key_web_portal.h"
 #include "ai_utils.h"
 #include "ai_prompts.h"
@@ -25,9 +26,10 @@
 #define AI_PASS_KEY "pass"
 
 #define MAX_KEY_BODY 1024
-#define MAX_PROMPT_BODY 4608
 
 extern char ai_wifi_portal_pass[];
+
+POLYCAST5_USE_PSRAM char prompt_buf[AI_PROMPT_NVS_MAX_LEN + 1];
 
 // Default AP info (replace with your existing portal creds when desired)
 static httpd_handle_t ai_server = NULL;
@@ -36,53 +38,13 @@ static esp_netif_t *ai_ap_netif = NULL;
 static char ai_portal_ssid[32] = "PolyCast5-AI-Portal"; // AP SSID
 static char ai_portal_ip[16] = "192.168.4.1"; // AP IP cached
 
-// HTML (single page)
-static const char *HTML =
-"<!doctype html><meta charset=utf-8>"
-"<meta name=viewport content='width=device-width,initial-scale=1'>"
-"<title>PolyCast5 AI Portal</title>"
-"<style>body{font-family:system-ui,Arial,sans-serif;margin:16px;max-width:640px}"
-"label{display:block;margin:8px 0 4px}input,textarea{width:100%;font-size:16px;padding:8px}"
-"textarea{height:240px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px}</style>"
-"<h2>PolyCast5 AI Portal</h2>"
-"<p>Paste your <b>Grok (xAI)</b> API key below and click save. (Typically starts with <code>xai-</code>)</p>"
-"<p>If you don't have an API key, visit <a href='https://console.x.ai'>console.x.ai</a> to get one for cheap ($5).</p>"
-"<p><small>For security, the key is not displayed after saving.</small></p>"
-"<label>Grok API key</label><input id=key placeholder='xai-...'>"
-"<p><button id=save_key>Save key</button> <span id=msg_key></span></p>"
-"<p>Below is the default AI system prompt. Feel free to edit it to tweak responses, create custom commands, or anything else!</p>"
-"<label>System prompt</label><textarea id=prompt></textarea>"
-"<p><button id=save_prompt>Save prompt</button> <span id=msg_prompt></span></p>"
-"<script>"
-"async function load(){"
-"let r=await fetch('/api/key');if(r.ok){let j=await r.json();document.getElementById('key').value='';"
-"document.getElementById('msg_key').textContent=j.has_key?('Saved (hint: '+(j.key_hint||'')+')'):'No key saved';}"
-"let p=await fetch('/api/prompt');if(p.ok){let j=await p.json();document.getElementById('prompt').value=j.prompt||'';}"
-"}"
-"async function save_key(){"
-"let api_key=document.getElementById('key').value.trim();"
-"if(!api_key){document.getElementById('msg_key').textContent='Enter a key';return;}"
-"let rk=await fetch('/api/key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({api_key})});"
-"document.getElementById('key').value='';"
-"document.getElementById('msg_key').textContent=rk.ok?'Saved!':'Save failed';"
-"}"
-"async function save_prompt(){"
-"let prompt=document.getElementById('prompt').value;"
-"let rp=await fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});"
-"document.getElementById('msg_prompt').textContent=rp.ok?'Saved!':'Save failed';"
-"}"
-"document.getElementById('save_key').onclick=save_key;"
-"document.getElementById('save_prompt').onclick=save_prompt;"
-"load();"
-"</script>";
-
 /* =============== HTTP handlers =============== */
 
 static esp_err_t root_get(httpd_req_t *req)
 {
     // Serve HTML
     httpd_resp_set_type(req, "text/html");
-    return httpd_resp_send(req, HTML, HTTPD_RESP_USE_STRLEN);
+    return httpd_resp_send(req, AI_PORTAL_HTML, HTTPD_RESP_USE_STRLEN);
 }
 
 static void trim_ascii(char *s)
@@ -248,15 +210,15 @@ static esp_err_t key_post(httpd_req_t *req)
     return httpd_resp_sendstr(req, "{\"ok\":true}");
 }
 
-static esp_err_t prompt_get(httpd_req_t *req)
+static esp_err_t keyboard_prompt_get(httpd_req_t *req)
 {
     // Return current prompt (NVS override if set; else compiled default)
-    char prompt[4096] = {0};
-    esp_err_t e = ai_utils_prompt_load_nvs(prompt, sizeof(prompt));
+    memset(prompt_buf, 0, sizeof(prompt_buf)); // Clear buffer
+    esp_err_t e = ai_utils_keyboard_prompt_load_nvs(prompt_buf, sizeof(prompt_buf));
 
-    if (e != ESP_OK || prompt[0] == '\0') {
-        strncpy(prompt, AI_PROMPT_AUTOKEY, sizeof(prompt) - 1);
-        prompt[sizeof(prompt) - 1] = '\0';
+    if (e != ESP_OK || prompt_buf[0] == '\0') {
+        strncpy(prompt_buf, AI_PROMPT_AUTOKEY, sizeof(prompt_buf) - 1);
+        prompt_buf[sizeof(prompt_buf) - 1] = '\0';
     }
 
     cJSON *root = cJSON_CreateObject();
@@ -264,7 +226,7 @@ static esp_err_t prompt_get(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
     }
 
-    cJSON_AddStringToObject(root, "prompt", prompt);
+    cJSON_AddStringToObject(root, "prompt", prompt_buf);
 
     char *txt = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
@@ -278,10 +240,10 @@ static esp_err_t prompt_get(httpd_req_t *req)
     return ret;
 }
 
-static esp_err_t prompt_post(httpd_req_t *req)
+static esp_err_t keyboard_prompt_post(httpd_req_t *req)
 {
     // Bound content length
-    if (req->content_len > MAX_PROMPT_BODY) {
+    if (req->content_len > AI_PROMPT_NVS_MAX_LEN) {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "too big");
     }
 
@@ -315,12 +277,93 @@ static esp_err_t prompt_post(httpd_req_t *req)
     }
 
     // Limit prompt size (keep a hard ceiling)
-    char prompt[4096] = {0};
-    strncpy(prompt, jp->valuestring, sizeof(prompt) - 1);
+    memset(prompt_buf, 0, sizeof(prompt_buf)); // Clear buffer
+    strncpy(prompt_buf, jp->valuestring, sizeof(prompt_buf) - 1);
 
     // Allow empty string to mean "use default" (saved empty)
-    esp_err_t e = ai_utils_prompt_save_nvs(prompt);
+    esp_err_t e = ai_utils_keyboard_prompt_save_nvs(prompt_buf);
+    cJSON_Delete(j);
 
+    if (e != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "nvs");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, "{\"ok\":true}");
+}
+
+static esp_err_t pkt_analysis_prompt_get(httpd_req_t *req)
+{
+    // Return current RAW_FRAMES prompt (NVS override if set; else compiled default)
+    memset(prompt_buf, 0, sizeof(prompt_buf)); // Clear buffer
+    esp_err_t e = ai_utils_pkt_analysis_prompt_load_nvs(prompt_buf, sizeof(prompt_buf));
+
+    if (e != ESP_OK || prompt_buf[0] == '\0') {
+        strncpy(prompt_buf, AI_PROMPT_PKT_ANALYSIS, sizeof(prompt_buf) - 1);
+        prompt_buf[sizeof(prompt_buf) - 1] = '\0';
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    if (!root) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+    }
+
+    cJSON_AddStringToObject(root, "prompt", prompt_buf);
+
+    char *txt = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (!txt) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t ret = httpd_resp_sendstr(req, txt);
+    free(txt);
+    return ret;
+}
+
+static esp_err_t pkt_analysis_prompt_post(httpd_req_t *req)
+{
+    // Bound content length
+    if (req->content_len > AI_PROMPT_NVS_MAX_LEN) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "too big");
+    }
+
+    // Read body
+    char *buf = (char*)calloc(1, (size_t)req->content_len + 1);
+    if (!buf) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+    }
+
+    size_t r = 0;
+    while (r < (size_t)req->content_len) {
+        int g = httpd_req_recv(req, buf + r, req->content_len - (int)r);
+        if (g <= 0) {
+            free(buf);
+            return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "recv");
+        }
+        r += (size_t)g;
+    }
+
+    // Parse JSON
+    cJSON *j = cJSON_Parse(buf);
+    free(buf);
+    if (!j) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad json");
+    }
+
+    const cJSON *jp = cJSON_GetObjectItemCaseSensitive(j, "prompt");
+    if (!cJSON_IsString(jp) || !jp->valuestring) {
+        cJSON_Delete(j);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad prompt");
+    }
+
+    // Hard ceiling buffer (same as keyboard prompt)
+    memset(prompt_buf, 0, sizeof(prompt_buf)); // Clear buffer
+    strncpy(prompt_buf, jp->valuestring, sizeof(prompt_buf) - 1);
+
+    // Save (empty string is allowed => means "use default" in your semantics)
+    esp_err_t e = ai_utils_pkt_analysis_prompt_save_nvs(prompt_buf);
     cJSON_Delete(j);
 
     if (e != ESP_OK) {
@@ -349,31 +392,39 @@ static httpd_handle_t ai_httpd_start(void)
     httpd_uri_t u_root = {
         .uri="/", .method = HTTP_GET, .handler = root_get, .user_ctx = NULL
     };
-    httpd_uri_t u_get  = {
+    httpd_uri_t u_key_get  = {
         .uri="/api/key", .method = HTTP_GET, .handler = key_get, .user_ctx = NULL
     };
-    httpd_uri_t u_post = {
+    httpd_uri_t u_key_post = {
         .uri="/api/key", .method = HTTP_POST, .handler = key_post, .user_ctx = NULL
     };
-    httpd_uri_t u_pget = {
-        .uri="/api/prompt", .method = HTTP_GET, .handler = prompt_get, .user_ctx = NULL
+    httpd_uri_t u_keyboard_get = {
+        .uri="/api/ai_keyboard_prompt", .method = HTTP_GET, .handler = keyboard_prompt_get, .user_ctx = NULL
     };
-    httpd_uri_t u_ppost = {
-        .uri="/api/prompt", .method = HTTP_POST, .handler = prompt_post, .user_ctx = NULL
+    httpd_uri_t u_keyboard_post = {
+        .uri="/api/ai_keyboard_prompt", .method = HTTP_POST, .handler = keyboard_prompt_post, .user_ctx = NULL
+    };
+    httpd_uri_t u_pkt_analysis_get = {
+        .uri="/api/pkt_analysis_prompt", .method = HTTP_GET, .handler = pkt_analysis_prompt_get, .user_ctx = NULL
+    };
+    httpd_uri_t u_pkt_analysis_post = {
+        .uri="/api/pkt_analysis_prompt", .method = HTTP_POST, .handler = pkt_analysis_prompt_post, .user_ctx = NULL
     };
 
     httpd_register_uri_handler(h, &u_root);
-    httpd_register_uri_handler(h, &u_get);
-    httpd_register_uri_handler(h, &u_post);
-    httpd_register_uri_handler(h, &u_pget);
-    httpd_register_uri_handler(h, &u_ppost);
+    httpd_register_uri_handler(h, &u_key_get);
+    httpd_register_uri_handler(h, &u_key_post);
+    httpd_register_uri_handler(h, &u_keyboard_get);
+    httpd_register_uri_handler(h, &u_keyboard_post);
+    httpd_register_uri_handler(h, &u_pkt_analysis_get);
+    httpd_register_uri_handler(h, &u_pkt_analysis_post);
 
     return h;
 }
 
 /* =============== Wi-Fi AP bring-up =============== */
 
-esp_err_t ai_portal_start(void)
+esp_err_t ai_key_portal_start(void)
 {
     // If server already running, nothing to do
     if (ai_server) {
@@ -446,7 +497,7 @@ esp_err_t ai_portal_start(void)
     return ESP_OK;
 }
 
-esp_err_t ai_portal_stop(void)
+esp_err_t ai_key_portal_stop(void)
 {
     // Stop httpd if running
     if (ai_server) {
@@ -472,19 +523,19 @@ esp_err_t ai_portal_stop(void)
 
 /* =============== Public variables =============== */
 
-const char *ai_portal_get_ssid(void)
+const char *ai_key_portal_get_ssid(void)
 {
     // Return SSID
     return ai_portal_ssid;
 }
 
-const char *ai_portal_get_pass(void)
+const char *ai_key_portal_get_pass(void)
 {
     // Return password
     return ai_wifi_portal_pass;
 }
 
-const char *ai_portal_get_ip(void)
+const char *ai_key_portal_get_ip(void)
 {
     // Return IP
     return ai_portal_ip;
@@ -492,7 +543,7 @@ const char *ai_portal_get_ip(void)
 
 /* =============== NVS =============== */
 
-esp_err_t ai_wifi_pass_save_nvs(const char *val)
+esp_err_t ai_key_portal_pass_save_nvs(const char *val)
 {
     nvs_handle_t h;
     esp_err_t err;
@@ -516,7 +567,7 @@ esp_err_t ai_wifi_pass_save_nvs(const char *val)
     return err;
 }
 
-esp_err_t ai_wifi_pass_load_nvs(char *out, size_t out_sz)
+esp_err_t ai_key_portal_pass_load_nvs(char *out, size_t out_sz)
 {
     nvs_handle_t h;
     esp_err_t err;

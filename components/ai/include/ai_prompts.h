@@ -5,6 +5,6 @@
 
 extern const char AI_PROMPT_AUTOKEY[];
 extern const char AI_PROMPT_CREDS[];
-extern const char AI_PROMPT_RAW_FRAMES[];
+extern const char AI_PROMPT_PKT_ANALYSIS[];
 
 #endif // AI_PROMPTS_H

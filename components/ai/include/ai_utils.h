@@ -9,6 +9,8 @@
 #define XAI_NS "xai"
 #define XAI_KEY "api_key"
 
+#define AI_PROMPT_NVS_MAX_LEN (1024 * 8)
+
 #define AI_RESPONSE_MAX_LEN (1024 * 64)
 #define AI_CMD_MAX_LEN (1024 * 256) // Large to send raw frames
 #define AI_API_KEY_MAX_LEN 256
@@ -79,23 +81,42 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
 esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out_script, size_t out_sz);
 
 /**
- * @brief Save AI prompt override to NVS (empty string => use compiled default)
+ * @brief Save AI keyboard prompt override to NVS (empty string => use compiled default)
  *
  * @param [in] prompt Prompt text to save
  *
  * @returns ESP error status
  */
-esp_err_t ai_utils_prompt_save_nvs(const char *prompt);
+esp_err_t ai_utils_keyboard_prompt_save_nvs(const char *prompt);
 
 /**
- * @brief Load AI prompt override from NVS
+ * @brief Load AI keyboard prompt override from NVS
  *
  * @param [out] out Buffer to store the loaded prompt
  * @param [in] out_sz Size of the output buffer
  *
  * @returns ESP error status
  */
-esp_err_t ai_utils_prompt_load_nvs(char *out, size_t out_sz);
+esp_err_t ai_utils_keyboard_prompt_load_nvs(char *out, size_t out_sz);
+
+/**
+ * @brief Save AI packet analysis prompt override to NVS (empty string => use compiled default)
+ *
+ * @param [in] prompt Prompt text to save
+ *
+ * @returns ESP error status
+ */
+esp_err_t ai_utils_pkt_analysis_prompt_save_nvs(const char *prompt);
+
+/**
+ * @brief Load AI packet analysis prompt override from NVS
+ *
+ * @param [out] out Buffer to store the loaded prompt
+ * @param [in] out_sz Size of the output buffer
+ *
+ * @returns ESP error status
+ */
+esp_err_t ai_utils_pkt_analysis_prompt_load_nvs(char *out, size_t out_sz);
 
 /** 
  * @brief Get the autotype prompt, either from NVS override or compiled default
@@ -106,5 +127,15 @@ esp_err_t ai_utils_prompt_load_nvs(char *out, size_t out_sz);
  * @returns Pointer to the prompt string (either buf or compiled default)
  */
 const char *ai_utils_get_autokey_prompt(char *buf, size_t buf_sz);
+
+/** 
+ * @brief Get the packet analysis prompt, either from NVS override or compiled default
+ *
+ * @param [out] buf Buffer to store the prompt (if provided)
+ * @param [in] buf_sz Size of the buffer
+ *
+ * @returns Pointer to the prompt string (either buf or compiled default)
+ */
+const char *ai_utils_get_pkt_analysis_prompt(char *buf, size_t buf_sz);
 
 #endif // AI_UTILS_H

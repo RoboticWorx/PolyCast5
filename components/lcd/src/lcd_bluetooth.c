@@ -1249,7 +1249,7 @@ void lcd_bluetooth_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blueto
 
         // Title label
         title_lbl = lv_label_create(cont);
-        lv_label_set_text(title_lbl, "How To Setup:");
+        lv_label_set_text(title_lbl, "How to Setup:");
         lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
         lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
         lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
@@ -1262,18 +1262,21 @@ void lcd_bluetooth_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blueto
         lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
         lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
+        // TODO: Write this article
         // Set custom text based on hotkey index
         const char *instr_text = 
-                "Everything you need to know is below!\n\n"
+                "To utilize the power of AI, an API key is needed. Don't worry, it's easy to get!\n\n"
+                "Please follow the instructions in the article below:\n\n"
                 "polycast5.com/blogs\n/docs/ai-keyboard\n\n"
-                "SSID: %s\nPassword: %s";
+                "SSID: %s\nPass: %s\n\n"
+                "Do NOT leave this page until you're done!";
         
-        lv_label_set_text_fmt(instr_lbl, instr_text, ai_portal_get_ssid(), ai_portal_get_pass());
+        lv_label_set_text_fmt(instr_lbl, instr_text, ai_key_portal_get_ssid(), ai_key_portal_get_pass());
 
         lv_timer_handler();
         
         // Start portal
-        xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_BIT);
+        xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_AI_KEY_START_BIT);
 
         init = true;
     }
@@ -1293,7 +1296,7 @@ void lcd_bluetooth_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blueto
         init = false;
         
         // Stop portal
-        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_BIT);
+        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_AI_KEY_START_BIT);
         
         // Show bluetooth menu
         lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -1310,9 +1313,9 @@ void lcd_bluetooth_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blueto
         init = false;
         
         // Stop portal
-        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_AI_BIT);
+        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_AI_KEY_START_BIT);
         
-         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -1808,7 +1811,7 @@ void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
         lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
         // Start SoftAP and web portal
-        xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_BT_BIT);
+        xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_BT_START_BIT);
 
         char msg[64];
         snprintf(msg, sizeof(msg), "http://%s", bluetooth_web_portal_get_ip());
@@ -1831,7 +1834,7 @@ void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
         lv_obj_scroll_by_bounded(cont, 0, -SCRIPT_ADD_Y_OFFSET, LV_ANIM_ON);
     } else if (ui_btns->left_btn) { // Go back
         // Turn off web portal
-        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_BT_BIT);
+        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_BT_START_BIT);
         
         // Hide right arrow
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -1851,7 +1854,7 @@ void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
         ui_menu->page = BLUETOOTH_PAGE;
     } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
         // Turn off web portal
-        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_START_BT_BIT);
+        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_BT_START_BIT);
 
         // Delete objects
         lv_obj_delete(cont); // Deletes children

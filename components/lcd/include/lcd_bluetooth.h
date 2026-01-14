@@ -89,7 +89,7 @@ void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_me
 void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu, uint8_t type);
 
 /**
- * @brief Starts web portal and uses it to prompt user for desired AI configuration
+ * @brief Configures AI web portal (Bluetooth version) to get xAI API key and allow editing of system prompts
  *
  * @param [in] ui_btns UI input structure
  * @param [in] ui_menu UI menu structure
