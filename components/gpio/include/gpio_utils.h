@@ -7,29 +7,8 @@
 #include "esp_err.h"
 #include "driver/ledc.h"
 
-#define SPI_MISO_PIN 2 // MISO for SX126x
-#define SPI_MOSI_PIN 7 // SPI2 MOSI
-#define SPI_SCLK_PIN 6 // SPI2 SCLK
-#define ST7789_CS_PIN 1 // CS
-#define ST7789_DC_PIN 8 // D/C
-#define ST7789_RST_PIN 9 // RESET
-#define ST7789_LEDA_PIN 3 // Backlight
-
-#define USER_BUTTON_LEFT 3
-#define USER_BUTTON_UP 1
-#define USER_BUTTON_RIGHT 5
-#define USER_BUTTON_HOME 2
-#define USER_BUTTON_DOWN 6
-#define USER_BUTTON_SELECT 4
-#define USER_BUTTON_POWER 0
-#define CHG_IND_PIN 7
-
-#define RED_RGB_LED_PIN 0
-#define GREEN_RGB_LED_PIN 1
-#define BLUE_RGB_LED_PIN 2
-
-#define HAPTIC_PIN 10
-#define ADC_PIN 5
+#define LCD_BL_STATE_ON 0 // Active low
+#define LCD_BL_STATE_OFF 1 // Active low
 
 #define LCD_LEDC_RESOLUTION LEDC_TIMER_10_BIT // 0-1023
 #define LCD_LEDC_FREQ_HZ 5000 // 5kHz PWM

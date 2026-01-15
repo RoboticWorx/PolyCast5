@@ -55,11 +55,7 @@ extern "C" {
  * --- PUBLIC MACROS -----------------------------------------------------------
  */
 
-// Define GPIO pins for SX1262
-#define SX126X_NRST_PIN  25  // Reset pin
-#define SX126X_BUSY_PIN  26  // Busy pin
-#define SX126X_DIO1_PIN  0  // DIO1 pin for IRQ
-#define SX126X_CS_PIN 11 // CS for SX126x
+// Pins defined in polycast5_gpios.h
 
 /*
  * -----------------------------------------------------------------------------

@@ -1,6 +1,8 @@
 #ifndef INFRARED_UTILS_H
 #define INFRARED_UTILS_H
 
+#include "polycast5_gpios.h"
+
 #include "driver/rmt_rx.h"
 #include "driver/rmt_tx.h"
 #include "freertos/FreeRTOS.h"
@@ -8,8 +10,6 @@
 #include <stddef.h>
 
 // Configuration macros
-#define RMT_RX_GPIO 24
-#define RMT_TX_GPIO 12
 #define RMT_RESOLUTION_HZ 1000000 // 1us resolution
 
 #define MAX_PULSES 128

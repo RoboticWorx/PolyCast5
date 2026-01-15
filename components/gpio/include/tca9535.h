@@ -15,10 +15,7 @@ typedef enum {
     TCA9535_CONFIG_REG1    =    0x07        /*!< Configuration register. BIT = '1' sets port to input BIT = '0' sets port to output */
 } tca9535_reg_t;
 
-// Please assign this to actual pins on your board
-#define I2C_MASTER_SCL_IO          23                /*!< gpio number for I2C master clock */
-#define I2C_MASTER_SDA_IO          27               /*!< gpio number for I2C master data  */
-#define TCA9535_INT_GPIO           4
+// Pins defined in polycast5_gpios.h
 
 #define I2C_MASTER_NUM             I2C_NUM_0        /*!< I2C port number for master dev */
 #define I2C_MASTER_TX_BUF_DISABLE  0                /*!< I2C master do not need buffer */

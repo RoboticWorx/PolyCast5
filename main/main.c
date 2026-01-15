@@ -1,6 +1,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "polycast5_gpios.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
 #include "freertos/task.h"
@@ -56,8 +58,8 @@ static void spi_sx126x_init()
     assert(ret == ESP_OK);
 }
 
-void app_main(void) {
-
+void app_main(void)
+{
     #ifdef POLYCAST5_DEBUG_RAM
     // Prints PSRAM chip size
     size_t psram_size = esp_psram_get_size();
@@ -81,19 +83,29 @@ void app_main(void) {
     ESP_ERROR_CHECK(espnow_utils_wifi_radio_stop());
     
     // Isolate and configure sleep wake up
-    //ESP_ERROR_CHECK(rtc_gpio_isolate(USER_BUTTON_POWER));
-    //ESP_ERROR_CHECK(rtc_gpio_set_direction(USER_BUTTON_POWER, RTC_GPIO_MODE_INPUT_ONLY));
-    //ESP_ERROR_CHECK(rtc_gpio_pullup_dis(USER_BUTTON_POWER));
-    //ESP_ERROR_CHECK(rtc_gpio_pulldown_dis(USER_BUTTON_POWER));
+    //ESP_ERROR_CHECK(rtc_gpio_isolate(TCA9535_USER_BUTTON_POWER_PIN));
+    //ESP_ERROR_CHECK(rtc_gpio_set_direction(TCA9535_USER_BUTTON_POWER_PIN, RTC_GPIO_MODE_INPUT_ONLY));
+    //ESP_ERROR_CHECK(rtc_gpio_pullup_dis(TCA9535_USER_BUTTON_POWER_PIN));
+    //ESP_ERROR_CHECK(rtc_gpio_pulldown_dis(TCA9535_USER_BUTTON_POWER_PIN));
     //ESP_ERROR_CHECK(esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON));
     #ifdef POLYCAST5_DEBUG
     //ESP_ERROR_CHECKesp_sleep_pd_config(ESP_PD_DOMAIN_MAX, ESP_PD_OPTION_ON));
     #endif
-    ESP_ERROR_CHECK(esp_sleep_enable_ext1_wakeup(1ULL << TCA9535_INT_GPIO, ESP_EXT1_WAKEUP_ANY_LOW));
+    ESP_ERROR_CHECK(esp_sleep_enable_ext1_wakeup(1ULL << TCA9535_INT_PIN, ESP_EXT1_WAKEUP_ANY_LOW));
 
     // Reference so sleep code is pulled in now
     if (false) {
         ESP_ERROR_CHECK(esp_light_sleep_start());
+    }
+
+    // Create I2C bus mutex (used in gpio_utils_init)
+    xI2CBusMutex = xSemaphoreCreateMutex();
+    configASSERT(xI2CBusMutex);
+
+    esp_err_t err = gpio_utils_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "gpio_utils_init failed: %s", esp_err_to_name(err));
+        return;
     }
     
     // Initialize various
@@ -104,8 +116,6 @@ void app_main(void) {
     // Create Mutexes used at boot
     xSPIBusMutex = xSemaphoreCreateMutex();
     configASSERT(xSPIBusMutex); // Ensure success
-    xI2CBusMutex = xSemaphoreCreateMutex();
-    configASSERT(xI2CBusMutex);
     xHapticsMutex = xSemaphoreCreateMutex();
     configASSERT(xHapticsMutex);
     xRgbLedMutex = xSemaphoreCreateMutex();
@@ -115,12 +125,6 @@ void app_main(void) {
     
     xPowerButtonSemaphore = xSemaphoreCreateBinary();
     configASSERT(xPowerButtonSemaphore);
-    
-    esp_err_t err = gpio_utils_init();
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "gpio_utils_init failed: %s", esp_err_to_name(err));
-        return;
-    }
     
     // Initialize the SX126x HAL with the SPI handle
     sx126x_hal_init(spi_sx126x);

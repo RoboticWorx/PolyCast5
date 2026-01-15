@@ -1,5 +1,6 @@
 #include "freertos/idf_additions.h"
 #include "polycast5_macros.h"
+#include "polycast5_gpios.h"
 
 #include "freertos/projdefs.h"
 #include "portmacro.h"
@@ -52,18 +53,8 @@ static const soc_point_t soc_table[] = { // {V, %}
 static const int TABLE_LEN = sizeof(soc_table) / sizeof(soc_table[0]);
 
 void gpio_utils_init_nvs(void)
-{
-    // Initialize flash
-    esp_err_t ret = nvs_flash_init();
-    
-    // Error check
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_LOGW(TAG, "Erasing NVS partition...");
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    
-    ESP_ERROR_CHECK(ret);
+{    
+    ESP_ERROR_CHECK(nvs_flash_init());
     
     #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "NVS initialized");
@@ -72,7 +63,7 @@ void gpio_utils_init_nvs(void)
 }
 static void IRAM_ATTR haptic_off_cb(TimerHandle_t xTimer)
 {
-    gpio_set_level(HAPTIC_PIN, 0);
+    gpio_utils_write_output(TCA9535_HAPTIC_PIN, 0);
 }
 
 // Called every RGB_BLINK_PERIOD_MS to toggle the LED
@@ -82,25 +73,25 @@ static void IRAM_ATTR rgb_blink_cb(TimerHandle_t xTimer)
     // Turn the LEDs on or off based on rgb_blink_color + state
     switch(rgb_blink_color) {
         case RGB_SET_RED:
-            gpio_utils_write_output(RED_RGB_LED_PIN, rgb_blink_state);
+            gpio_utils_write_output(TCA9535_RED_RGB_LED_PIN, rgb_blink_state);
             break;
         
         case RGB_SET_GREEN:
-            gpio_utils_write_output(GREEN_RGB_LED_PIN, rgb_blink_state);
+            gpio_utils_write_output(TCA9535_GREEN_RGB_LED_PIN, rgb_blink_state);
             break;
             
         case RGB_SET_BLUE:
-            gpio_utils_write_output(BLUE_RGB_LED_PIN, rgb_blink_state);
+            gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, rgb_blink_state);
             break;
             
         case RGB_SET_PURPLE:
-            gpio_utils_write_output(RED_RGB_LED_PIN, rgb_blink_state);
-            gpio_utils_write_output(BLUE_RGB_LED_PIN, rgb_blink_state);
+            gpio_utils_write_output(TCA9535_RED_RGB_LED_PIN, rgb_blink_state);
+            gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, rgb_blink_state);
             break;
             
         case RGB_SET_TEAL:
-            gpio_utils_write_output(GREEN_RGB_LED_PIN, rgb_blink_state);
-            gpio_utils_write_output(BLUE_RGB_LED_PIN, rgb_blink_state);
+            gpio_utils_write_output(TCA9535_GREEN_RGB_LED_PIN, rgb_blink_state);
+            gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, rgb_blink_state);
             break;
             
         default:
@@ -114,9 +105,9 @@ static void IRAM_ATTR rgb_blink_stop_cb(TimerHandle_t xTimer)
     xTimerStop(rgb_blink_timer, portMAX_DELAY);
 
     // Ensure all LEDs off
-    gpio_utils_write_output(RED_RGB_LED_PIN, 0);
-    gpio_utils_write_output(GREEN_RGB_LED_PIN, 0);
-    gpio_utils_write_output(BLUE_RGB_LED_PIN, 0);
+    gpio_utils_write_output(TCA9535_RED_RGB_LED_PIN, 0);
+    gpio_utils_write_output(TCA9535_GREEN_RGB_LED_PIN, 0);
+    gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, 0);
 }
 
 static void init_ledc_pwm(void)
@@ -156,12 +147,35 @@ static void init_ledc_pwm(void)
 
 esp_err_t gpio_utils_init(void)
 {
+    esp_err_t ret = TCA9535Init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "TCA9535Init failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    // TCA9535 configuration register bit meaning:
+    // 1 = input
+    // 0 = output
+
+    // Port0 = all inputs (0xFF)
+    ret = TCA9535WriteSingleRegister(TCA9535_CONFIG_REG0, 0xFF);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Config0 write failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
+    // Port1: pin 2 input, others output
+    // bit7 bit6 bit5 bit4 bit3 bit2 bit1 bit0
+    //    0    0    0    0    0    1    0    0    = 0x04
+    ret = TCA9535WriteSingleRegister(TCA9535_CONFIG_REG1, 0x04);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Config1 write failed: %s", esp_err_to_name(ret));
+    }
+
     // Configure outputs
     gpio_config_t io_conf_out = {
         .pin_bit_mask = (1ULL << ST7789_LEDA_PIN) |
-                        (1ULL << ST7789_DC_PIN)   |
-                        (1ULL << ST7789_RST_PIN)  |
-                          (1ULL << HAPTIC_PIN),
+                        (1ULL << ST7789_DC_PIN),
         .mode = GPIO_MODE_OUTPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -170,8 +184,12 @@ esp_err_t gpio_utils_init(void)
     gpio_config(&io_conf_out);
     
     // Default states
-    gpio_set_level(ST7789_LEDA_PIN, 0); // LCD BL high on start
-    gpio_set_level(HAPTIC_PIN, 0); // Hapic motor low on start
+    gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_ON); // LCD BL high
+    gpio_utils_write_output(TCA9535_HAPTIC_PIN, 0); // Haptic motor low 
+    gpio_utils_write_output(TCA9535_RED_RGB_LED_PIN, 0); // Red LED off
+    gpio_utils_write_output(TCA9535_GREEN_RGB_LED_PIN, 0); // Green LED off
+    gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, 0); // Blue LED off
+    gpio_utils_write_output(TCA9535_TSOP_EN_PIN, 0); // TSOP ON (active low)
     
     // Configure inputs
     /*gpio_config_t io_conf_in = {
@@ -185,7 +203,7 @@ esp_err_t gpio_utils_init(void)
     
     // Configure interrupts
     /*gpio_config_t io_conf_int = {
-        .pin_bit_mask = (1ULL << USER_BUTTON_POWER),
+        .pin_bit_mask = (1ULL << TCA9535_USER_BUTTON_POWER_PIN),
         .mode = GPIO_MODE_INPUT,
         .intr_type = GPIO_INTR_NEGEDGE,
         .pull_up_en = GPIO_PULLUP_DISABLE,
@@ -196,7 +214,7 @@ esp_err_t gpio_utils_init(void)
 
     // ISR service
     gpio_install_isr_service(0);
-    //gpio_isr_handler_add(TCA9535_INT_GPIO, tca9535_int_isr, NULL);    
+    //gpio_isr_handler_add(TCA9535_INT_PIN, tca9535_int_isr, NULL);    
     
     init_ledc_pwm();
     
@@ -212,27 +230,6 @@ esp_err_t gpio_utils_init(void)
     // Create the one-shot blink stop timer
     rgb_blink_stop_timer = xTimerCreate("rgb_blink_stop", pdMS_TO_TICKS(rgb_blink_total_ms), pdFALSE, NULL, rgb_blink_stop_cb);
     configASSERT(rgb_blink_stop_timer);
-    
-    esp_err_t ret = TCA9535Init();
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "TCA9535Init failed: %s", esp_err_to_name(ret));
-        return ret;
-    }
-
-    // Port0 = all inputs (0xFF)
-    ret = TCA9535WriteSingleRegister(TCA9535_CONFIG_REG0, 0xFF);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Config0 write failed: %s", esp_err_to_name(ret));
-        return ret;
-    }
-    
-    // Port1: pins 0–2 outputs, pins 3–7 inputs.
-    // bit7 bit6 bit5 bit4 bit3 bit2 bit1 bit0
-    //    1    1    1    1    1    0    0    0    = 0xF8
-    ret = TCA9535WriteSingleRegister(TCA9535_CONFIG_REG1, 0xF8);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Config1 write failed: %s", esp_err_to_name(ret));
-    }
     
     return ret;
 }
@@ -271,6 +268,10 @@ esp_err_t gpio_utils_write_output(uint8_t pin, bool level)
     xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
     esp_err_t err = TCA9535WriteSingleRegister(TCA9535_OUTPUT_REG1, out);
     xSemaphoreGive(xI2CBusMutex); // Release I2C bus
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "gpio_utils_write_output: Failed to write output pin %d: %s", pin, esp_err_to_name(err));
+    }
     
     return err;
 }
@@ -418,7 +419,7 @@ void gpio_utils_spin_haptic(uint32_t ms)
         ticks = 1; // Can't be 0
     }
     
-    gpio_set_level(HAPTIC_PIN, 1); // Haptic ON
+    gpio_utils_write_output(TCA9535_HAPTIC_PIN, 1); // Haptic ON
     
     // Re-arm the timer with the new period
     xTimerChangePeriod(haptic_timer, ticks, portMAX_DELAY);
@@ -459,32 +460,32 @@ void gpio_utils_rgb_indicate(uint8_t rgb_data)
     xSemaphoreGive(xRgbLedMutex); // Release RGB LED
     
     // All LEDs OFF to start
-    gpio_utils_write_output(RED_RGB_LED_PIN, 0);
-    gpio_utils_write_output(GREEN_RGB_LED_PIN, 0);
-    gpio_utils_write_output(BLUE_RGB_LED_PIN, 0);
+    gpio_utils_write_output(TCA9535_RED_RGB_LED_PIN, 0);
+    gpio_utils_write_output(TCA9535_GREEN_RGB_LED_PIN, 0);
+    gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, 0);
 
     switch(rgb_data) {
         // Solid color cases
         case RGB_SET_RED:
-            gpio_utils_write_output(RED_RGB_LED_PIN, 1);
+            gpio_utils_write_output(TCA9535_RED_RGB_LED_PIN, 1);
             break;
             
         case RGB_SET_GREEN:
-            gpio_utils_write_output(GREEN_RGB_LED_PIN, 1);
+            gpio_utils_write_output(TCA9535_GREEN_RGB_LED_PIN, 1);
             break;
             
         case RGB_SET_BLUE:
-            gpio_utils_write_output(BLUE_RGB_LED_PIN, 1);
+            gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, 1);
             break;
             
         case RGB_SET_PURPLE:
-            gpio_utils_write_output(BLUE_RGB_LED_PIN, 1);
-            gpio_utils_write_output(RED_RGB_LED_PIN, 1);
+            gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, 1);
+            gpio_utils_write_output(TCA9535_RED_RGB_LED_PIN, 1);
             break;
             
         case RGB_SET_TEAL:
-            gpio_utils_write_output(BLUE_RGB_LED_PIN, 1);
-            gpio_utils_write_output(GREEN_RGB_LED_PIN, 1);
+            gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, 1);
+            gpio_utils_write_output(TCA9535_GREEN_RGB_LED_PIN, 1);
             break;
 
         // Blink cases: start timers
@@ -525,31 +526,31 @@ void gpio_utils_rgb_indicate(uint8_t rgb_data)
 
         default:
             // Unknown code, LEDs off
-            gpio_utils_write_output(RED_RGB_LED_PIN, 0);
-            gpio_utils_write_output(GREEN_RGB_LED_PIN, 0);
-            gpio_utils_write_output(BLUE_RGB_LED_PIN, 0);
+            gpio_utils_write_output(TCA9535_RED_RGB_LED_PIN, 0);
+            gpio_utils_write_output(TCA9535_GREEN_RGB_LED_PIN, 0);
+            gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, 0);
             break;
     }
 }
 
 void gpio_utils_cycle_rgb(void)
 {
-    gpio_utils_write_output(RED_RGB_LED_PIN, 1);
-    gpio_utils_write_output(GREEN_RGB_LED_PIN, 0);
-    gpio_utils_write_output(BLUE_RGB_LED_PIN, 0);
+    gpio_utils_write_output(TCA9535_RED_RGB_LED_PIN, 1);
+    gpio_utils_write_output(TCA9535_GREEN_RGB_LED_PIN, 0);
+    gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, 0);
     vTaskDelay(pdMS_TO_TICKS(333));
         
-    gpio_utils_write_output(RED_RGB_LED_PIN, 0);
-    gpio_utils_write_output(GREEN_RGB_LED_PIN, 1);
-    gpio_utils_write_output(BLUE_RGB_LED_PIN, 0);
+    gpio_utils_write_output(TCA9535_RED_RGB_LED_PIN, 0);
+    gpio_utils_write_output(TCA9535_GREEN_RGB_LED_PIN, 1);
+    gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, 0);
     vTaskDelay(pdMS_TO_TICKS(333));
         
-    gpio_utils_write_output(RED_RGB_LED_PIN, 0);
-    gpio_utils_write_output(GREEN_RGB_LED_PIN, 0);
-    gpio_utils_write_output(BLUE_RGB_LED_PIN, 1);
+    gpio_utils_write_output(TCA9535_RED_RGB_LED_PIN, 0);
+    gpio_utils_write_output(TCA9535_GREEN_RGB_LED_PIN, 0);
+    gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, 1);
     vTaskDelay(pdMS_TO_TICKS(333));
         
-    gpio_utils_write_output(RED_RGB_LED_PIN, 0);
-    gpio_utils_write_output(GREEN_RGB_LED_PIN, 0);
-    gpio_utils_write_output(BLUE_RGB_LED_PIN, 0);
+    gpio_utils_write_output(TCA9535_RED_RGB_LED_PIN, 0);
+    gpio_utils_write_output(TCA9535_GREEN_RGB_LED_PIN, 0);
+    gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, 0);
 }

@@ -1,4 +1,5 @@
 #include "polycast5_macros.h"
+#include "polycast5_gpios.h"
 
 #include <string.h>
 

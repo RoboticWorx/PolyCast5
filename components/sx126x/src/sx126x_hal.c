@@ -6,11 +6,13 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "esp_log.h"           // For logging
+#include "esp_log.h" // For logging
 #include "freertos/FreeRTOS.h" // For vTaskDelay
-#include "freertos/task.h"       // For task delays
+#include "freertos/task.h" // For task delays
 
+#include "polycast5_gpios.h"
 #include "gpio_task.h"
+#include "gpio_utils.h"
 
 // Logging tag for debugging
 static const char *TAG = "SX126X_HAL";
@@ -24,7 +26,7 @@ void sx126x_hal_init(spi_device_handle_t spi) {
 
     // Configure GPIO pins
     gpio_config_t io_conf = {
-        .pin_bit_mask = (1ULL << SX126X_CS_PIN) | (1ULL << SX126X_NRST_PIN),
+        .pin_bit_mask = (1ULL << SX126X_CS_PIN),
         .mode = GPIO_MODE_OUTPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -34,16 +36,14 @@ void sx126x_hal_init(spi_device_handle_t spi) {
 
     io_conf.pin_bit_mask = (1ULL << SX126X_BUSY_PIN) | (1ULL << SX126X_DIO1_PIN);
     io_conf.mode = GPIO_MODE_INPUT;
-    io_conf.pull_up_en =
-        GPIO_PULLUP_ENABLE; // Optional: enable pull-up for stability
+    io_conf.pull_up_en = GPIO_PULLUP_ENABLE; // Optional: enable pull-up for stability
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    io_conf.intr_type = GPIO_INTR_DISABLE; // Interrupts will be handled
-                                           // separately in lora_task.c
+    io_conf.intr_type = GPIO_INTR_DISABLE; // Interrupts handled separately in lora_task.c
     gpio_config(&io_conf);
 
     // Set initial states
-    gpio_set_level(SX126X_CS_PIN, 1);    // CS high (inactive)
-    gpio_set_level(SX126X_NRST_PIN, 1); // Reset high (inactive)
+    gpio_set_level(SX126X_CS_PIN, 1); // CS high (inactive)
+    gpio_utils_write_output(TCA9535_SX126X_NRST_PIN, 1); // Enable (active low)
 }
 
 // Reset the SX126x chip
@@ -52,11 +52,11 @@ sx126x_hal_status_t sx126x_hal_reset(const void *context) {
     (void)context;
 
     // Set reset pin low
-    gpio_set_level(SX126X_NRST_PIN, 0);
+    gpio_utils_write_output(TCA9535_SX126X_NRST_PIN, 0);
     vTaskDelay(pdMS_TO_TICKS(10)); // Delay 10ms
 
     // Set reset pin high
-    gpio_set_level(SX126X_NRST_PIN, 1);
+    gpio_utils_write_output(TCA9535_SX126X_NRST_PIN, 1);
     vTaskDelay(pdMS_TO_TICKS(10)); // Delay 10ms
 
     return SX126X_HAL_STATUS_OK;

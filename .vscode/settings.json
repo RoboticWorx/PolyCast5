@@ -5,7 +5,7 @@
   "idf.openOcdConfigs": [
     "board/esp32c5-builtin.cfg"
   ],
-  "idf.portWin": "COM7",
+  "idf.portWin": "COM3",
   "idf.toolsPathWin": "c:\\Espressif",
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32c5"
@@ -17,5 +17,6 @@
     "--compile-commands-dir=${workspaceFolder}\\build"
   ],
   "C_Cpp.errorSquiggles": "enabled",
-  "diffEditor.renderSideBySide": false
+  "diffEditor.renderSideBySide": false,
+  "idf.flashType": "UART",
 }

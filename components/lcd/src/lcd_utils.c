@@ -1,4 +1,5 @@
 #include "polycast5_macros.h"
+#include "polycast5_gpios.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -281,7 +282,7 @@ static void st7789_flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_
         remaining -= chunk;
     }
 
-    // Tell LVGL we’re done
+    // Tell LVGL we're done
     lv_disp_flush_ready(d);
     
     xSemaphoreGive(xSPIBusMutex); // Release SPI bus
@@ -329,10 +330,10 @@ void lcd_device_sleep(void)
     xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
     
     lcd_panel_sleep(); // Put ST7789 to sleep
-    gpio_set_level(ST7789_LEDA_PIN, 1); // BL low
+    gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_OFF); // BL low
     
     // Don't auto wake
-    while (gpio_utils_read_input(USER_BUTTON_POWER) != 1) {
+    while (gpio_utils_read_input(TCA9535_USER_BUTTON_POWER_PIN) != 1) {
         vTaskDelay(pdMS_TO_TICKS(25));
         lv_timer_handler();
     }
@@ -353,12 +354,12 @@ void lcd_device_sleep(void)
     xSemaphoreGive(xI2CBusMutex); // Release I2C bus
 
     lcd_panel_wake(); // Wake up ST7789
-    gpio_set_level(ST7789_LEDA_PIN, 0); // BL high
+    gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_ON); // BL high
     
     xSemaphoreGive(xStartAdcBatSemaphore); // Start new battery ADC reading
     
     // Don't auto sleep
-    while (gpio_utils_read_input(USER_BUTTON_POWER) != 1) {
+    while (gpio_utils_read_input(TCA9535_USER_BUTTON_POWER_PIN) != 1) {
         vTaskDelay(pdMS_TO_TICKS(25));
         lv_timer_handler();
     }
@@ -379,11 +380,8 @@ void lcd_device_sleep(void)
 
 void lcd_init_driver(void)
 {
-    // Panel power-up delay (50 ms)
-    vTaskDelay(pdMS_TO_TICKS(50));
-
     // SPI bus + device init
-    spi_master_init(&tft, SPI_MOSI_PIN, SPI_SCLK_PIN, ST7789_CS_PIN, ST7789_DC_PIN, ST7789_RST_PIN, ST7789_LEDA_PIN);
+    spi_master_init(&tft, SPI_MOSI_PIN, SPI_SCLK_PIN, ST7789_CS_PIN, ST7789_DC_PIN, ST7789_LEDA_PIN);
     spi_clock_speed(40 * 1000 * 1000);  // 40 MHz
 
     // ST7789 panel init
@@ -1673,7 +1671,7 @@ void lcd_boot_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu)
         ui_menu->page = HOME_PAGE;
     } else if (ui_btns->pwr_btn == 1) { // Power off without switching pages (stay on BOOT_PAGE)        
         // Transition to sleep
-        gpio_set_level(ST7789_LEDA_PIN, 0); // BL low so user doesn't see redraw
+        gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_OFF); // BL low so user doesn't see redraw
         
         go_to_sleep = true;
     }
@@ -2373,7 +2371,7 @@ void lcd_transition_back(bool home, ui_menu_t *ui_menu)
 
         ui_menu->page = HOME_PAGE;
     } else { // Transition to sleep
-        gpio_set_level(ST7789_LEDA_PIN, 0); // BL low so user doesn't see redraw
+        gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_OFF); // BL low so user doesn't see redraw
     
         start_animation();
 

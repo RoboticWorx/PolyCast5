@@ -1,5 +1,6 @@
 #include "freertos/idf_additions.h"
 #include "polycast5_macros.h"
+#include "polycast5_gpios.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -77,12 +78,12 @@ static const uint32_t lcd_max_duty = (1 << LCD_LEDC_RESOLUTION) - 1;
 
 // Buttons and states: same order as buttonSemaphores
 static btn_state_t buttons[6] = {
-    {USER_BUTTON_SELECT, 0, 1, 0, false},
-    {USER_BUTTON_HOME,   0, 1, 0, false},
-    {USER_BUTTON_UP,     0, 1, 0, false},
-    {USER_BUTTON_DOWN,   0, 1, 0, false},
-    {USER_BUTTON_LEFT,   0, 1, 0, false},
-    {USER_BUTTON_RIGHT,  0, 1, 0, false},
+    {TCA9535_USER_BUTTON_SELECT_PIN, 0, 1, 0, false},
+    {TCA9535_USER_BUTTON_HOME_PIN,   0, 1, 0, false},
+    {TCA9535_USER_BUTTON_UP_PIN,     0, 1, 0, false},
+    {TCA9535_USER_BUTTON_DOWN_PIN,   0, 1, 0, false},
+    {TCA9535_USER_BUTTON_LEFT_PIN,   0, 1, 0, false},
+    {TCA9535_USER_BUTTON_RIGHT_PIN,  0, 1, 0, false},
 };
 
 static SemaphoreHandle_t *shortSems[6] = {
@@ -223,15 +224,8 @@ static void gpio_task(void *arg)
     configASSERT(xAdcBatBluetoothQueue);
     xLEDQueue = xQueueCreate(1, sizeof(uint8_t));
     configASSERT(xLEDQueue);
-    
-    gpio_utils_write_output(RED_RGB_LED_PIN, 0); // Red LED
-    gpio_utils_write_output(GREEN_RGB_LED_PIN, 0); // Green LED
-    gpio_utils_write_output(BLUE_RGB_LED_PIN, 0); // Blue LED
-    gpio_utils_write_output(3, 0); // NC
-    gpio_utils_write_output(4, 0); // NC
-    gpio_utils_write_output(5, 0); // NC
-    gpio_utils_write_output(6, 0); // NC
-    gpio_utils_write_output(7, 0); // NC
+
+    // Default states set in gpio_utils_init()
     
     #ifdef POLYCAST5_CYCLE_RGB_ON_BOOT
     gpio_utils_cycle_rgb();
@@ -242,12 +236,12 @@ static void gpio_task(void *arg)
     }
     
     // Get opposite initial charging state to update once
-    bool was_charging = !(gpio_utils_read_input(CHG_IND_PIN) == 0);
+    bool was_charging = !(gpio_utils_read_input(TCA9535_CHG_IND_PIN) == 0);
     
     while (1) 
     {
         // Press + auto-repeat state machine
-        for (size_t i = 0; i < 6; i++) {
+        for (size_t i = 0; i < 6; ++i) {
             btn_state_t *b = &buttons[i]; // Get the button
             bool level = gpio_utils_read_input(b->pin); // Read its state: 0 = pressed, 1 = released
 
@@ -314,12 +308,12 @@ static void gpio_task(void *arg)
         }
         
         // Go to sleep requested
-        if (gpio_utils_read_input(USER_BUTTON_POWER) == 0) {
+        if (gpio_utils_read_input(TCA9535_USER_BUTTON_POWER_PIN) == 0) {
             xSemaphoreGive(xPowerButtonSemaphore);
         }
         
         // Update LCD based on if charging or not
-        bool is_charging = (gpio_utils_read_input(CHG_IND_PIN) == 0);
+        bool is_charging = (gpio_utils_read_input(TCA9535_CHG_IND_PIN) == 0);
         if (is_charging != was_charging) { // Only update on state change
             // LiPo is charging    
             if (is_charging) {

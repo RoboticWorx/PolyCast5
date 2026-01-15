@@ -809,22 +809,20 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
         payload = tmp + 3;
     }
 
-    /* IF NEEDED LATER:
-    // If is <text=x>
-    if (!strncasecmp(tmp, "text=", 5)) {
-        const char *payload = tmp + 5;
+    // // If is <text=x>
+    // if (!strncasecmp(tmp, "text=", 5)) {
+    //     const char *payload = tmp + 5;
 
-        // Stream via existing per-char typer:
-        while (*payload) {
-            // Typed via internal helper; see bluetooth_send_string()/kbd_type_char()
-            // It presses & releases a single key with delays :contentReference[oaicite:1]{index=1}
-            kbd_type_char(*payload++, tap_ms);
-        }
+    //     // Stream via existing per-char typer:
+    //     while (*payload) {
+    //         // Typed via internal helper; see bluetooth_send_string()/kbd_type_char()
+    //         // It presses & releases a single key with delays :contentReference[oaicite:1]{index=1}
+    //         kbd_type_char(*payload++, tap_ms);
+    //     }
 
-        *consumed_end = gt;
-        return true;
-    }
-    */
+    //     *consumed_end = gt;
+    //     return true;
+    // }
 
     // If is <...+...> / <...>: Split on '+'
     uint8_t mods = 0;

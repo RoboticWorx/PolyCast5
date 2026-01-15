@@ -187,7 +187,7 @@ static void lcd_task(void *pvParameters)
         // Redundant
         ui_menu.page = HOME_PAGE;
     }
-    
+
     while (1)
     {
         if (xTaskGetTickCount() - btn_timer_last >= btn_timer_interval) {

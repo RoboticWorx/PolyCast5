@@ -2726,7 +2726,11 @@ void lcd_settings_uptime_nvs_load(uint64_t *uptime_seconds)
     // Open NVS
     esp_err_t err = nvs_open(SETTINGS_UPTIME_NS, NVS_READONLY, &h);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "lcd_settings_uptime_nvs_load: open failed: %s", esp_err_to_name(err));
+        if (err == ESP_ERR_NVS_NOT_FOUND) {
+            ESP_LOGW(TAG, "lcd_settings_uptime_nvs_load: open failed: %s", esp_err_to_name(err));
+        } else {
+            ESP_LOGE(TAG, "lcd_settings_uptime_nvs_load: open failed: %s", esp_err_to_name(err));
+        }
         return;
     }
     

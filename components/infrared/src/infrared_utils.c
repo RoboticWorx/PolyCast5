@@ -74,7 +74,7 @@ void infrared_utils_init_rx(void)
 {
     // Configure rmt RX channel
     rmt_rx_channel_config_t rx_config = {
-        .gpio_num = RMT_RX_GPIO,
+        .gpio_num = RMT_RX_GPIO_PIN,
         .clk_src = RMT_CLK_SRC_DEFAULT,
         .resolution_hz = RMT_RESOLUTION_HZ,
         .mem_block_symbols = PULSE_BLOCK,
@@ -89,7 +89,7 @@ void infrared_utils_init_rx(void)
     }
     
     // Set RX pin (TSOP OUT) as pull-up resistor to lower the source impedance for sharper edges
-    ESP_ERROR_CHECK(gpio_set_pull_mode(RMT_RX_GPIO, GPIO_PULLUP_ONLY));
+    ESP_ERROR_CHECK(gpio_set_pull_mode(RMT_RX_GPIO_PIN, GPIO_PULLUP_ONLY));
 
     // Initialize RX callback
     rmt_rx_event_callbacks_t callbacks = {
@@ -104,7 +104,7 @@ void infrared_utils_init_tx(void)
 {
     // Configure rmt TX channel
     rmt_tx_channel_config_t tx_config = {
-        .gpio_num = RMT_TX_GPIO,
+        .gpio_num = RMT_TX_GPIO_PIN,
         .clk_src = RMT_CLK_SRC_DEFAULT,
         .resolution_hz = RMT_RESOLUTION_HZ,
         .mem_block_symbols = PULSE_BLOCK,

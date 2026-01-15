@@ -4,6 +4,8 @@
 #include "esp_log.h"
 #include "string.h"
 
+#include "polycast5_gpios.h" // I2C pins
+
 // ****************************************************************************
 //! @brief        Initializes the I2C interface
 //! @param        None
@@ -19,9 +21,9 @@ esp_err_t TCA9535Init(void)
     i2c_config_t conf = {0};
 
     conf.mode = I2C_MODE_MASTER;
-    conf.sda_io_num = I2C_MASTER_SDA_IO;
+    conf.sda_io_num = I2C_MASTER_SDA_PIN;
     conf.sda_pullup_en = GPIO_PULLUP_ENABLE;
-    conf.scl_io_num = I2C_MASTER_SCL_IO;
+    conf.scl_io_num = I2C_MASTER_SCL_PIN;
     conf.scl_pullup_en = GPIO_PULLUP_ENABLE;
     conf.master.clk_speed = I2C_MASTER_FREQ_HZ;
     i2c_param_config(i2c_master_port, &conf);

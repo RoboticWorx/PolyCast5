@@ -11,6 +11,8 @@
 
 #include "st7789.h"
 #include "lcd_utils.h"
+#include "gpio_utils.h"
+#include "polycast5_gpios.h"
 
 #define TAG "ST7789"
 #define    _DEBUG_ 0
@@ -39,7 +41,7 @@ void spi_clock_speed(int speed) {
     clock_speed_hz = speed;
 }
 
-void spi_master_init(TFT_t * dev, int16_t GPIO_MOSI, int16_t GPIO_SCLK, int16_t GPIO_CS, int16_t GPIO_DC, int16_t GPIO_RESET, int16_t GPIO_BL)
+void spi_master_init(TFT_t * dev, int16_t GPIO_MOSI, int16_t GPIO_SCLK, int16_t GPIO_CS, int16_t GPIO_DC, int16_t GPIO_BL)
 {
     esp_err_t ret;
 
@@ -57,26 +59,15 @@ void spi_master_init(TFT_t * dev, int16_t GPIO_MOSI, int16_t GPIO_SCLK, int16_t 
     gpio_set_direction( GPIO_DC, GPIO_MODE_OUTPUT );
     gpio_set_level( GPIO_DC, 0 );
 
-    ESP_LOGI(TAG, "GPIO_RESET=%d",GPIO_RESET);
-    if ( GPIO_RESET >= 0 ) {
-        //gpio_pad_select_gpio( GPIO_RESET );
-        gpio_reset_pin( GPIO_RESET );
-        gpio_set_direction( GPIO_RESET, GPIO_MODE_OUTPUT );
-        gpio_set_level( GPIO_RESET, 1 );
-        delayMS(100);
-        gpio_set_level( GPIO_RESET, 0 );
-        delayMS(100);
-        gpio_set_level( GPIO_RESET, 1 );
-        delayMS(100);
-    }
+    // Toggle display reset
+    gpio_utils_write_output(TCA9535_LCD_NRST_PIN, 1);
+    delayMS(10);
+    gpio_utils_write_output(TCA9535_LCD_NRST_PIN, 0);
+    delayMS(10);
+    gpio_utils_write_output(TCA9535_LCD_NRST_PIN, 1);
+    delayMS(10);
 
     ESP_LOGI(TAG, "GPIO_BL=%d",GPIO_BL);
-    if ( GPIO_BL >= 0 ) {
-        //gpio_pad_select_gpio(GPIO_BL);
-        gpio_reset_pin(GPIO_BL);
-        gpio_set_direction( GPIO_BL, GPIO_MODE_OUTPUT );
-        gpio_set_level( GPIO_BL, 1 );
-    }
 
     ESP_LOGI(TAG, "GPIO_MOSI=%d",GPIO_MOSI);
     ESP_LOGI(TAG, "GPIO_SCLK=%d",GPIO_SCLK);
@@ -114,7 +105,7 @@ void spi_master_init(TFT_t * dev, int16_t GPIO_MOSI, int16_t GPIO_SCLK, int16_t 
     ESP_LOGD(TAG, "spi_bus_add_device=%d",ret);
     assert(ret==ESP_OK);
     dev->_dc = GPIO_DC;
-    dev->_bl = GPIO_BL;
+    //dev->_bl = GPIO_BL;
     dev->_SPIHandle = handle;
 }
 
