@@ -33,11 +33,11 @@
 char ota_update_url[512] = {0};
 char ota_update_info[512] = {0};
 
-static char url_buf[1024]; // URL buffer
+POLYCAST5_USE_PSRAM static char url_buf[1024]; // URL buffer
 static TaskHandle_t ota_task_handle = NULL;
 
 static TaskHandle_t ota_check_task_handle = NULL; // Only one check at a time
-static char manifest_url_buf[512]; // Manifest URL buffer
+POLYCAST5_USE_PSRAM static char manifest_url_buf[512]; // Manifest URL buffer
 
 static char pending_manifest_ver[64];
 static int manifest_size_bytes = -1;
@@ -267,7 +267,8 @@ static void ota_check_task(void *_)
     // Free heap before HTTPS manifest fetch
     wifi_mqtt_client_stop();
 
-    char buf[2048];
+    POLYCAST5_USE_PSRAM static char buf[2048];
+    memset(buf, 0, sizeof(buf));
     
     // Get the full, safe string for parsing
     // (download manifest.json into buf)

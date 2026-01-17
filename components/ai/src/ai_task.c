@@ -17,6 +17,7 @@
 
 #include "ai_prompts.h"
 #include "ai_utils.h"
+#include "ai_voice.h"
 
 #define TAG "AI_TASK"
 
@@ -24,8 +25,11 @@ QueueHandle_t xAiCmdQueue;
 
 char ai_wifi_portal_pass[64];
 
+volatile bool mic_recording = false; // To lcd_bluetooth.c
+
 POLYCAST5_USE_PSRAM static char prompt_buf[AI_PROMPT_NVS_MAX_LEN] = {0};
 POLYCAST5_USE_PSRAM static char ai_response[AI_RESPONSE_MAX_LEN] = {0}; // TODO: Increase MAX_LEN here and for BT
+POLYCAST5_USE_PSRAM static char user_transcript[1024];
 
 static ai_cmd_type_t parse_kind_and_query(const char *in, const char **query_out)
 {
@@ -57,7 +61,7 @@ static ai_cmd_type_t parse_kind_and_query(const char *in, const char **query_out
     // Fallback to full command
     *query_out = in;
 
-    return AI_CMD_NORMAL;
+    return AI_CMD_KEYBOARD_DONE_REC;
 }
 
 static void ai_task(void *pvParameters)
@@ -98,6 +102,8 @@ static void ai_task(void *pvParameters)
         #endif
     }
 
+    ai_voice_pcm_t pcm = {0};
+
     while (1) {
         ai_cmd_t cmd = {0};
 
@@ -110,34 +116,65 @@ static void ai_task(void *pvParameters)
         ESP_LOGI(TAG, "AI task received command type=%d, msg_len=%u, reasoning=%d", (int)cmd.type, (unsigned)cmd.msg_len, cmd.reasoning);
         #endif
 
-        if (!cmd.msg) {
-            ESP_LOGW(TAG, "AI cmd missing msg pointer");
-            if (cmd.free_on_done && cmd.free_ptr) {
-                free(cmd.free_ptr);
-            }
-            continue;    
-        }
-
         // Clear ai_response buffer
         memset(ai_response, 0, sizeof(ai_response));
 
         const char *query = NULL;
 
-        // If bt query, parse type of query
-        if (cmd.type == AI_CMD_NORMAL || cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD) {
-            cmd.type = parse_kind_and_query(cmd.msg, &query);
-        }
+        if (cmd.type == AI_CMD_KEYBOARD_START_REC) {
+            if (!mic_recording) {
+                #ifdef POLYCAST5_DEBUG
+                ESP_LOGW(TAG, "START_REC received but mic_recording is false; ignoring");
+                #endif
+                continue;
+            }
 
-        // Auto keyboard command
-        if (cmd.type == AI_CMD_NORMAL) {
-            // Build autotype prompt (NVS override; fallback to compiled default)
-            memset(prompt_buf, 0, sizeof(prompt_buf)); // Zero out previous contents
-            const char *prompt = ai_utils_get_autokey_prompt(prompt_buf, sizeof(prompt_buf));
+            // Enable mic
+            ESP_ERROR_CHECK(ai_voice_init());
 
-            // 'ai_response' output
-            err = ai_utils_send_command_xai(prompt, cmd.msg, ai_response, sizeof(ai_response), cmd.reasoning);
-        } else if (cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD) { // Username or password command
-            err = ai_utils_lookup_creds(cmd.type, query, ai_response, sizeof(ai_response));
+            #ifdef POLYCAST5_DEBUG
+            ESP_LOGI(TAG, "Starting ai_voice_record_pcm16_16k");
+            #endif
+
+            ESP_ERROR_CHECK(ai_voice_record_pcm16_16k(&mic_recording, &pcm));
+            continue;
+        } else if (cmd.type == AI_CMD_KEYBOARD_DONE_REC) { // Process transcription
+            memset(user_transcript, 0, sizeof(user_transcript)); // Clear previous contents
+
+            #ifdef POLYCAST5_DEBUG
+            ESP_LOGI(TAG, "WS STT uploading PCM: samples=%u", (unsigned)pcm.samples);
+            #endif
+
+            // Transcribe via xAI WebSocket STT
+            esp_err_t err = ai_voice_stt_ws_transcribe_pcm16_xai(pcm.pcm16, pcm.samples, user_transcript, sizeof(user_transcript));
+
+            if (err == ESP_OK) {
+                #ifdef POLYCAST5_DEBUG
+                ESP_LOGI(TAG, "Realtime Transcript: %s", user_transcript);
+                #endif
+
+                // Check if username or password query
+                cmd.type = parse_kind_and_query(user_transcript, &query);
+                if (cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD) {
+                    // Lookup credentials via AI
+                    err = ai_utils_lookup_creds(cmd.type, query, ai_response, sizeof(ai_response));
+                } else { // Regular AI keyboard request
+                    // Load autokey prompt
+                    memset(prompt_buf, 0, sizeof(prompt_buf)); // Zero out previous contents
+                    const char *prompt = ai_utils_get_autokey_prompt(prompt_buf, sizeof(prompt_buf));
+
+                    // Call chat API with non-reasoning
+                    err = ai_utils_send_command_xai(prompt, user_transcript, ai_response, sizeof(ai_response), false);
+                }
+            } else {
+                ESP_LOGE(TAG, "Realtime STT failed: %s", esp_err_to_name(err));
+            }
+            // Clean up
+            xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_AI_KEYBOARD_DONE_BIT);
+
+            // Disable mic
+            ai_voice_free_pcm(&pcm); // Free PCM buffer
+            ESP_ERROR_CHECK(ai_voice_deinit());
         } else if (cmd.type == AI_CMD_RAW_FRAMES) { // Organizing raw Wi-Fi frames
             #ifdef POLYCAST5_DEBUG
             size_t msg_len = (cmd.msg_len != 0) ? cmd.msg_len : strlen(cmd.msg);
@@ -152,10 +189,11 @@ static void ai_task(void *pvParameters)
             err = ai_utils_send_command_xai(prompt, cmd.msg, ai_response, sizeof(ai_response), cmd.reasoning);
         }
 
+        // If good, log and send to bluetooth task
         if (err == ESP_OK) {
-            if (cmd.type == AI_CMD_NORMAL) {
+            if (cmd.type == AI_CMD_KEYBOARD_DONE_REC) {
                 #ifdef POLYCAST5_DEBUG
-                ESP_LOGI(TAG, "AI script: %s", ai_response);
+                ESP_LOGI(TAG, "AI keyboard script resolved: %s", ai_response);
                 #endif
 
                 char *ai_script_ptr = ai_response;
@@ -189,7 +227,45 @@ static void ai_task(void *pvParameters)
 
 void ai_task_create(void)
 {
-    if (xTaskCreate(ai_task, "ai_task", 1024 * 6, NULL, POLYCAST5_PRIORITY_MEDIUM, NULL) != pdPASS) {
+    if (xTaskCreate(ai_task, "ai_task", 1024 * 4, NULL, POLYCAST5_PRIORITY_MEDIUM, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start ai_task");
     }
 }
+
+// void ai_task_create(void)
+// {
+//     // 1024 * 5 = 5120 words => 5120 * 4 = 20480 bytes (20KB)
+//     #define AI_TASK_STACK_SIZE (1024 * 5)
+
+//     // Allocate stack in PSRAM
+//     StackType_t *task_stack = (StackType_t *)heap_caps_malloc(AI_TASK_STACK_SIZE * sizeof(StackType_t), MALLOC_CAP_SPIRAM);
+//     if (task_stack == NULL) {
+//         ESP_LOGE(TAG, "ai_task_create: Failed to allocate PSRAM stack");
+//         return;
+//     }
+
+//     // Allocate TCB in internal SRAM for performance
+//     StaticTask_t *task_buffer = (StaticTask_t *)heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL);
+//     if (task_buffer == NULL) {
+//         heap_caps_free(task_stack); // Clean up
+//         ESP_LOGE(TAG, "ai_task_create: Failed to allocate TCB");
+//         return;
+//     }
+
+//     // Create the task
+//     TaskHandle_t task_handle = xTaskCreateStatic(
+//         ai_task,                   // Task function
+//         "ai_task",                 // Name
+//         AI_TASK_STACK_SIZE,        // Stack depth (in words)
+//         NULL,                      // Parameters
+//         POLYCAST5_PRIORITY_MEDIUM, // Priority
+//         task_stack,                // Pre-allocated stack
+//         task_buffer                // Pre-allocated TCB
+//     );
+
+//     if (task_handle == NULL) {
+//         heap_caps_free(task_stack);
+//         heap_caps_free(task_buffer);
+//         ESP_LOGE(TAG, "ai_task_create: Failed to create ai_task");
+//     }
+// }

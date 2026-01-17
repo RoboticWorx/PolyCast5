@@ -3,7 +3,8 @@
 
 #include "freertos/idf_additions.h"
 
-#define BLUETOOTH_CONNECTED_BIT (1U << 0)
+#define BLUETOOTH_CONNECTED_BIT        (1U << 0)
+#define BLUETOOTH_AI_KEYBOARD_DONE_BIT (1U << 1)
 extern EventGroupHandle_t xBluetoothEventGroup;
 
 extern QueueHandle_t xBluetoothMediaCmdQueue;

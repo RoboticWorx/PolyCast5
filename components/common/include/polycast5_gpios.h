@@ -19,23 +19,6 @@
 #define ST7789_LEDA_PIN 2 // Backlight
 
 
-/* ADC */
-// ADC pin for battery voltage reading
-#define ADC_PIN 5
-
-
-/* Infrared */
-// RMT infrared pins for IR transmit and receive
-#define RMT_RX_GPIO_PIN 6
-#define RMT_TX_GPIO_PIN 7
-
-
-/* I2C */
-// I2C pins for TCA9535 GPIO expander, scanner, etc.
-#define I2C_MASTER_SCL_PIN 0
-#define I2C_MASTER_SDA_PIN 3
-
-
 /* TCA9535 GPIO expander */
 // Interrupt pin for TCA9535
 #define TCA9535_INT_PIN 1
@@ -58,6 +41,29 @@
 #define TCA9535_BLUE_RGB_LED_PIN 5
 #define TCA9535_SX126X_NRST_PIN 6
 #define TCA9535_LCD_NRST_PIN 7
+
+
+/* Infrared */
+// RMT infrared pins for IR transmit and receive
+#define RMT_RX_GPIO_PIN 6
+#define RMT_TX_GPIO_PIN 7
+
+
+/* I2C */
+// I2C pins for TCA9535 GPIO expander, scanner, etc.
+#define I2C_MASTER_SCL_PIN 0
+#define I2C_MASTER_SDA_PIN 3
+
+
+/* ADC */
+// ADC pin for battery voltage reading
+#define ADC_PIN 5
+
+
+/* I2S T5848 */
+#define I2S_T5848_SCK_PIN 8
+#define I2S_T5848_SD_PIN 9
+#define I2S_T5848_WS_PIN 10
 
 
 #endif // POLYCAST5_GPIOS_H

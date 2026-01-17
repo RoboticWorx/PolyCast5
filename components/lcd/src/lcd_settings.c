@@ -511,7 +511,8 @@ void lcd_settings_ota_confirm_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
                 "\n\nMore update info below:\n\n%s";
         
         // Combine into single string
-        char buf[1024];
+        POLYCAST5_USE_PSRAM static char buf[1024];
+        memset(buf, 0, sizeof(buf));
         snprintf(buf, sizeof(buf), instr_text, ota_update_info);
         
         lv_label_set_text(instr_lbl, buf);
@@ -1782,7 +1783,8 @@ static void system_refresh_cb(lv_timer_t *t)
 {
     lv_obj_t *label = (lv_obj_t *)lv_timer_get_user_data(t);
     
-    static char text[512];
+    POLYCAST5_USE_PSRAM static char text[512];
+    memset(text, 0, sizeof(text));
     system_build_info(text, sizeof(text));
     
     lv_label_set_text(label, text);
@@ -2027,7 +2029,7 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 {
     #define ADJ_LCD_INS_TXT "LCD brightness:"
     #define ADJ_LCD_TXT "%d%%"
-    #define ADJ_LCD_SAVINGS_TXT "+%d%% ON life"
+    #define ADJ_LCD_SAVINGS_TXT "+%d%% battery life"
     
     #define LCD_LEDC_MAX 100
     #define LCD_LEDC_MIN 0

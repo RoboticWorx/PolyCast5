@@ -43,6 +43,7 @@
 #include "gpio_task.h"
 #include "lora_task.h"
 #include "espnow_task.h"
+#include "ai_utils.h"
 
 #define DRAW_LINES 20
 #define FLUSH_CHUNK 2
@@ -345,7 +346,7 @@ void lcd_device_sleep(void)
     xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
 
     #ifdef POLYCAST5_DEBUG
-    ESP_LOGI(TAG, "Entering light sleep");
+    ESP_LOGI(TAG, "Entering light sleep: esp_light_sleep_start");
     #endif
 
     ESP_ERROR_CHECK(esp_light_sleep_start());
@@ -3500,15 +3501,24 @@ void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t
         // Reset static
         do_once = false;
 
-        // Show right arrow
-        lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        char api_key[AI_API_KEY_MAX_LEN] = {0};
+        esp_err_t err = ai_utils_load_api_key_nvs(api_key, AI_API_KEY_MAX_LEN);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to load xAI API key from NVS: err %s, switching to AI config page.", esp_err_to_name(err));
 
-        // Hide top and bottom arrows
-        lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+            // Switch pages
+            ui_menu->page = BLUETOOTH_AI_CONFIG_PAGE;
+        } else {
+            // Show right arrow
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
-        // Switch pages
-        ui_menu->page = BLUETOOTH_AI_KEYBOARD_PAGE;
+            // Hide top and bottom arrows
+            lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+            // Switch pages
+            ui_menu->page = BLUETOOTH_AI_KEYBOARD_PAGE;
+        }
     } else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 3) { // Media controller selected
         // Hide bluetooth menu
         lv_obj_add_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);

@@ -1088,6 +1088,8 @@ void bluetooth_utils_init(void)
     ret = esp_nimble_enable(ble_hid_device_host_task);
     if (ret) {
         ESP_LOGE(TAG, "esp_nimble_enable failed: %d", ret);
+        bluetooth_state = BT_STATE_OFF;
+        return;
     }
 
     #ifdef POLYCAST5_DEBUG
