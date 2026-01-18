@@ -11,7 +11,7 @@ E (x) wifi:unsupport frame type: 0c0
 E (x) esp_wifi_80211_tx failed: ESP_ERR_INVALID_ARG
 ```
 
-The pre-patched `libnet80211.a` file attached in `components/wifi/patch` disables this sanity check, allowing raw packet injection to succeed.
+The pre-patched `libnet80211.a` file attached in `components/wifi/patch` allows subtype 0x0C frames (0xC0 shifted) to pass this sanity check and therefore be sent. This is done by switching `bVar7 == 0xd0` to `bVar7 == 0xc0` in `ieee80211_raw_frame_sanity_check`.
 
 **Warning: This patch is unofficial and not supported by Espressif**. It may cause instability, crashes, or violate local wireless regulations (e.g., FCC rules on intentional interference). Use **only** for authorized testing on networks you own or have explicit permission to test. Always test in an isolated environment.
 

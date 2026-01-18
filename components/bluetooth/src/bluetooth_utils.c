@@ -909,6 +909,8 @@ void bluetooth_utils_send_script(const char *script, uint32_t tap_ms)
 
     const char *s = script;
 
+    uint16_t cmd_buf; // Does nothing, just for xQueuePeek
+
     // Check the script for tokens
     while (*s) {
         // If found command start
@@ -924,10 +926,17 @@ void bluetooth_utils_send_script(const char *script, uint32_t tap_ms)
 
         // Ordinary text path, keep typing
         kbd_type_char(*s++, tap_ms);
+
+        // Media command pending (init/deinit): abort typing
+        if (xQueuePeek(xBluetoothMediaCmdQueue, &cmd_buf, 0) == pdTRUE) {
+            break;
+        }
     }
 
     // Safety: release anything left down by <down:...> tags
     kbd_state_clear();
+
+    xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT);
 }
 
 void bluetooth_utils_set_battery_level(uint8_t percent)

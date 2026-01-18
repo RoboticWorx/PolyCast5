@@ -74,7 +74,7 @@ git clone https://github.com/RoboticWorx/PolyCast5.git
 
 ## Build
 
-Set the microcontroller target:
+Set the microcontroller target (if needed):
 
 ```shell
 idf.py set-target esp32c5
@@ -97,7 +97,7 @@ idf.py build
 Flash the full code:
 
 ```shell
-idf.py -p PORT flash
+idf.py -p YOUR_PORT flash
 ```
 
 # Patches

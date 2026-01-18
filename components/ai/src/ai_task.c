@@ -17,11 +17,16 @@
 
 #include "ai_prompts.h"
 #include "ai_utils.h"
+#include "ai_task.h"
 #include "ai_voice.h"
 
 #define TAG "AI_TASK"
 
 QueueHandle_t xAiCmdQueue;
+
+EventGroupHandle_t xAiEventGroup;
+
+SemaphoreHandle_t xAiSoundHeardSemaphore;
 
 char ai_wifi_portal_pass[64];
 
@@ -40,9 +45,9 @@ static ai_cmd_type_t parse_kind_and_query(const char *in, const char **query_out
 
     // If password query
     if ((!strncasecmp(in, "password", 8) && (in[8] == ' ' || in[8] == '\t')) ||
-        (!strncasecmp(in, "pass", 4) && (in[4] == ' ' || in[4] == '\t'))) {
+        (!strncasecmp(in, "passwords", 9) && (in[9] == ' ' || in[9] == '\t'))) {
 
-        *query_out = in + (!strncasecmp(in, "pass", 4) ? 4 : 8); // Move past prefix
+        *query_out = in + (!strncasecmp(in, "passwords", 9) ? 9 : 8); // Move past prefix
         while (**query_out == ' ' || **query_out == '\t') (*query_out)++; // Trim any spaces
 
         return AI_CMD_CRED_PASSWORD;
@@ -50,9 +55,9 @@ static ai_cmd_type_t parse_kind_and_query(const char *in, const char **query_out
 
     // If username query
     if ((!strncasecmp(in, "username", 8) && (in[8] == ' ' || in[8] == '\t')) ||
-        (!strncasecmp(in, "user", 4) && (in[4] == ' ' || in[4] == '\t'))) {
+        (!strncasecmp(in, "usernames", 9) && (in[9] == ' ' || in[9] == '\t'))) {
 
-        *query_out = in + (!strncasecmp(in, "user", 4) ? 4 : 8); // Move past prefix
+        *query_out = in + (!strncasecmp(in, "usernames", 9) ? 9 : 8); // Move past prefix
         while (**query_out == ' ' || **query_out == '\t') (*query_out)++; // Trim any spaces
 
         return AI_CMD_CRED_USERNAME;
@@ -69,6 +74,12 @@ static void ai_task(void *pvParameters)
     // Holds actual command text
     xAiCmdQueue = xQueueCreate(1, sizeof(ai_cmd_t));
     configASSERT(xAiCmdQueue);
+
+    xAiSoundHeardSemaphore = xSemaphoreCreateBinary();
+    configASSERT(xAiSoundHeardSemaphore);
+
+    xAiEventGroup = xEventGroupCreate();
+    configASSERT(xAiEventGroup);
 
     esp_err_t err = ESP_OK;
 
@@ -103,6 +114,11 @@ static void ai_task(void *pvParameters)
     }
 
     ai_voice_pcm_t pcm = {0};
+
+    err = ai_voice_force_sleep_pins_low();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "ai_task: ai_voice_force_sleep_pins_low failed: %s", esp_err_to_name(err));
+    }
 
     while (1) {
         ai_cmd_t cmd = {0};
@@ -166,12 +182,15 @@ static void ai_task(void *pvParameters)
                     // Call chat API with non-reasoning
                     err = ai_utils_send_command_xai(prompt, user_transcript, ai_response, sizeof(ai_response), false);
                 }
+
+                // Signal done thinking
+                xEventGroupSetBits(xAiEventGroup, AI_DONE_THINKING_BIT);
             } else {
                 ESP_LOGE(TAG, "Realtime STT failed: %s", esp_err_to_name(err));
-            }
-            // Clean up
-            xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_AI_KEYBOARD_DONE_BIT);
 
+                // Signal error
+                xEventGroupSetBits(xAiEventGroup, AI_THINKING_FAILED_BIT);
+            }
             // Disable mic
             ai_voice_free_pcm(&pcm); // Free PCM buffer
             ESP_ERROR_CHECK(ai_voice_deinit());

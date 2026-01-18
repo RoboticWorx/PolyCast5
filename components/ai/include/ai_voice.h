@@ -44,6 +44,13 @@ esp_err_t ai_voice_record_pcm16_16k(volatile bool *keep_recording, ai_voice_pcm_
 void ai_voice_free_pcm(ai_voice_pcm_t *p);
 
 /**
+ * @brief Sets the microphone I2S pins low to put T5848 mic into sleep mode
+ * 
+ * @returns ESP error status
+ */
+esp_err_t ai_voice_force_sleep_pins_low(void);
+
+/**
  * @brief Send PCM16 mono 16kHz to xAI realtime WebSocket STT and return the transcript
  * 
  * @param pcm16 Pointer to PCM16 samples

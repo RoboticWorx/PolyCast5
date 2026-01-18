@@ -10,6 +10,7 @@
 #include "polycast5_macros.h"
 #include "polycast5_gpios.h"
 
+#include "driver/gpio.h"
 #include "esp_log.h"
 #include "esp_err.h"
 #include "esp_timer.h"
@@ -23,6 +24,7 @@
 #include "cJSON.h"
 #include "mbedtls/base64.h"
 
+#include "ai_task.h"
 #include "ai_voice.h"
 #include "ai_utils.h"
 
@@ -38,6 +40,8 @@
 #define AI_VOICE_ENABLE_NORMALIZE      1
 #define AI_VOICE_NORMALIZE_TARGET_PEAK 12000
 #define AI_VOICE_NORMALIZE_MAX_GAIN    20.0f
+
+#define SOUND_ANIM_THRESHOLD 200
 
 // xAI realtime WS
 #define XAI_REALTIME_URI         "wss://api.x.ai/v1/realtime"
@@ -144,9 +148,35 @@ esp_err_t ai_voice_init(void)
         return ESP_OK;
     }
 
+    esp_err_t err;
+
+    // Release any pin holds
+    err = gpio_hold_dis(I2S_T5848_SCK_PIN);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "ai_voice_init: gpio_hold_dis(I2S_T5848_SCK_PIN) failed: %s", esp_err_to_name(err));
+        return err;
+    }
+    err = gpio_hold_dis(I2S_T5848_WS_PIN);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "ai_voice_init: gpio_hold_dis(I2S_T5848_WS_PIN) failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    // Reset pins to default state
+    err = gpio_reset_pin(I2S_T5848_SCK_PIN);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "ai_voice_init: gpio_reset_pin(I2S_T5848_SCK_PIN) failed: %s", esp_err_to_name(err));
+        return err;
+    }
+    err = gpio_reset_pin(I2S_T5848_WS_PIN);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "ai_voice_init: gpio_reset_pin(I2S_T5848_WS_PIN) failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
     // Create an RX channel
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
-    esp_err_t err = i2s_new_channel(&chan_cfg, NULL, &i2s_rx_channel);
+    err = i2s_new_channel(&chan_cfg, NULL, &i2s_rx_channel);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "ai_voice_init: i2s_new_channel failed: %s", esp_err_to_name(err));
         return err;
@@ -220,6 +250,44 @@ esp_err_t ai_voice_deinit(void)
     }
 
     voice_inited = false;
+
+    esp_err_t sleep_err = ai_voice_force_sleep_pins_low();
+    if (sleep_err != ESP_OK) {
+        ESP_LOGE(TAG, "ai_voice_deinit: ai_voice_force_sleep_pins_low failed: %s", esp_err_to_name(sleep_err));
+    }
+
+    #ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "Mic deinit successful.");
+    #endif
+
+    return err;
+}
+
+esp_err_t ai_voice_force_sleep_pins_low(void)
+{
+    esp_err_t err = ESP_OK;
+
+    gpio_config_t io = {
+        .pin_bit_mask = (1ULL << I2S_T5848_SCK_PIN) | (1ULL << I2S_T5848_WS_PIN),
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+
+    err = gpio_config(&io);
+
+    err = gpio_set_level(I2S_T5848_SCK_PIN, 0);
+    err = gpio_set_level(I2S_T5848_WS_PIN, 0);
+
+    // For light/deep sleep
+    err = gpio_hold_en(I2S_T5848_SCK_PIN);
+    err = gpio_hold_en(I2S_T5848_WS_PIN);
+
+    #ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "ai_voice_force_sleep_pins_low successful.");
+    #endif
+
     return err;
 }
 
@@ -296,6 +364,8 @@ esp_err_t ai_voice_record_pcm16_16k(volatile bool *keep_recording, ai_voice_pcm_
             capacity = new_capacity;
         }
 
+        int16_t block_peak = 0; // Peak tracker for this block
+        
         // Convert frames in groups of 3:
         // - Use left slot only (index 0)
         // - Average 3 consecutive samples
@@ -303,7 +373,22 @@ esp_err_t ai_voice_record_pcm16_16k(volatile bool *keep_recording, ai_voice_pcm_
             int32_t l0 = i2s_words[(f + 0) * 2 + 0];
             int32_t l1 = i2s_words[(f + 1) * 2 + 0];
             int32_t l2 = i2s_words[(f + 2) * 2 + 0];
-            pcm16[out_idx++] = decim3_avg(l0, l1, l2);
+
+            // Decimate by 3 with averaging
+            int16_t sample = decim3_avg(l0, l1, l2);
+            pcm16[out_idx++] = sample;
+
+            // -32768 can't be negated in int16 safely, so clamp it
+            int16_t abs_mag = (sample == (int16_t)-32768) ? 32767 : (sample < 0 ? (int16_t)-sample : sample);
+
+            // Track the max magnitude seen in this block
+            if (abs_mag > block_peak) {
+                block_peak = abs_mag;
+            }
+        }
+        // If sound detected, notify LCD
+        if (block_peak > SOUND_ANIM_THRESHOLD) {
+            xSemaphoreGive(xAiSoundHeardSemaphore);
         }
 
         // Note: Any remaining frames (<3) are discarded (~1-2 frames max, <1.25ms @48kHz)
