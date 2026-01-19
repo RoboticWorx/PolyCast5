@@ -362,7 +362,7 @@ static void gpio_task(void *arg)
 
 void gpio_task_create(void)
 {
-    if (xTaskCreate(gpio_task, "gpio_task", 1024 * 1, NULL, POLYCAST5_PRIORITY_MEDIUM, NULL) != pdPASS) {
+    if (xTaskCreate(gpio_task, "gpio_task", 1024 * 2, NULL, POLYCAST5_PRIORITY_MEDIUM, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start gpio_task");
     }
 }

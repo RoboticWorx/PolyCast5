@@ -108,7 +108,7 @@ enum {
     SETTINGS_HELP_PAGE,
     SETTINGS_SLEEP_TIMER_PAGE,
     
-    BLUETOOTH_HOW_PAGE,
+    BLUETOOTH_PAIRING_PAGE,
     BLUETOOTH_FORGET_ALL_PAGE,
     BLUETOOTH_MEDIA_CLASSIC_PAGE,
     BLUETOOTH_MEDIA_SCROLL_PAGE,
@@ -231,8 +231,8 @@ void lcd_transition_back(bool home, ui_menu_t *ui_menu);
  * @param [in] color Label color
  * @param [in] font Label font
  * @param [in] alignment Alignment via LVGL function
- * @param [in] x_offset X position offset
- * @param [in] y_offset Y position offset
+ * @param [in] x_offset X offset from alignment (positive = right)
+ * @param [in] y_offset Y offset from alignment (positive = down)
  */
 void lcd_format_label(lv_obj_t *label, const char *text, lv_color_t  color, const lv_font_t *font, lv_align_t  alignment, lv_coord_t  x_offset, lv_coord_t  y_offset);
 

@@ -80,7 +80,7 @@ static void lcd_task(void *pvParameters)
     
     uint8_t battery_percentage;
 
-    //lcd_ns_nvs_clear("ai");
+    //lcd_ns_nvs_clear("ai_prompt");
     //lcd_ns_nvs_clear("bt_portal");
     //lcd_ns_nvs_clear("keyb_sel");
     //lcd_ns_nvs_clear("first_boot");
@@ -188,6 +188,8 @@ static void lcd_task(void *pvParameters)
         ui_menu.page = HOME_PAGE;
     }
 
+    bool dont_sleep_on_this_page = false;
+
     while (1)
     {
         if (xTaskGetTickCount() - btn_timer_last >= btn_timer_interval) {
@@ -258,13 +260,16 @@ static void lcd_task(void *pvParameters)
                 lcd_clear_pending_inputs = false;
             }
             
+            dont_sleep_on_this_page = false; // Reset flag
             // All LCD pages
             switch (ui_menu.page) {
                 case BOOT_PAGE:
                     lcd_boot_page(&ui_btns, &ui_menu);
+                    dont_sleep_on_this_page = true; // Sleep handled separately
                     break;
                 case HOME_PAGE:
                     lcd_home_page(&ui_btns, &ui_menu, &settings_menu);
+                    dont_sleep_on_this_page = true; // Sleep handled separately
                     break;
                 case UNLOCK_PAGE:
                     lcd_unlock_page(&ui_btns, &ui_menu, &settings_menu);
@@ -348,12 +353,14 @@ static void lcd_task(void *pvParameters)
                     break;
                 case WIFI_AI_CONFIG_PAGE:
                     lcd_wifi_ai_config_page(&ui_btns, &ui_menu, &wifi_menu);
+                    dont_sleep_on_this_page = true;
                     break;
                 case WIFI_AI_PACKET_PAGE:
                     lcd_wifi_ai_packet_page(&ui_btns, &ui_menu, &wifi_menu);
                     break;
                 case WIFI_AI_PACKET_RESULTS_PAGE:
                     lcd_wifi_ai_packet_results_page(&ui_btns, &ui_menu, &wifi_menu);
+                    dont_sleep_on_this_page = true;
                     break;
                 case WIFI_PASSWORD_PAGE:
                     lcd_wifi_get_password(&ui_btns, &ui_menu, &wifi_menu);
@@ -403,12 +410,15 @@ static void lcd_task(void *pvParameters)
                     break;
                 case TOOLS_BTC_ADDR_SETUP_PAGE:
                     lcd_tools_btc_addr_setup_page(&ui_btns, &ui_menu, &tools_menu);
+                    dont_sleep_on_this_page = true;
                     break;
                 case TOOLS_POMODORO_PAGE:
                     lcd_tools_pomodoro_page(&ui_btns, &ui_menu, &tools_menu);
+                    dont_sleep_on_this_page = true;
                     break;
                 case TOOLS_SRS_PAGE:
                     lcd_tools_srs_page(&ui_btns, &ui_menu, &tools_menu);
+                    dont_sleep_on_this_page = true;
                     break;
                 // Settings pages
                 case SETTINGS_OTA_CONFIRM_PAGE:
@@ -416,6 +426,7 @@ static void lcd_task(void *pvParameters)
                     break;
                 case SETTINGS_OTA_UPDATING_PAGE:
                     lcd_settings_ota_updating_page(&ui_btns, &ui_menu, &settings_menu);
+                    dont_sleep_on_this_page = true;
                     break;
                 case SETTINGS_PAGE:
                     lcd_settings_page(&ui_btns, &ui_menu, &settings_menu);
@@ -454,38 +465,48 @@ static void lcd_task(void *pvParameters)
                 case BLUETOOTH_PAGE:
                     lcd_bluetooth_page(&ui_btns, &ui_menu, &bluetooth_menu);
                     break;
-                case BLUETOOTH_HOW_PAGE:
-                    lcd_bluetooth_how_page(&ui_btns, &ui_menu, &bluetooth_menu);
+                case BLUETOOTH_PAIRING_PAGE:
+                    lcd_bluetooth_pairing_page(&ui_btns, &ui_menu, &bluetooth_menu);
+                    dont_sleep_on_this_page = true;
                     break;
                 case BLUETOOTH_MEDIA_CLASSIC_PAGE:
                     lcd_bluetooth_media_page(&ui_btns, &ui_menu, &bluetooth_menu, BLUETOOTH_MEDIA_CLASSIC_PAGE);
+                    dont_sleep_on_this_page = true;
                     break;
                 case BLUETOOTH_MEDIA_SCROLL_PAGE:
                     lcd_bluetooth_media_page(&ui_btns, &ui_menu, &bluetooth_menu, BLUETOOTH_MEDIA_SCROLL_PAGE);
+                    dont_sleep_on_this_page = true;
                     break;
                 case BLUETOOTH_MEDIA_PRESENTATION_PAGE:
                     lcd_bluetooth_media_page(&ui_btns, &ui_menu, &bluetooth_menu, BLUETOOTH_MEDIA_PRESENTATION_PAGE);
+                    dont_sleep_on_this_page = true;
                     break;
                 case BLUETOOTH_MEDIA_CAMERA_PAGE:
                     lcd_bluetooth_media_page(&ui_btns, &ui_menu, &bluetooth_menu, BLUETOOTH_MEDIA_CAMERA_PAGE);
+                    dont_sleep_on_this_page = true;
                     break;
                 case BLUETOOTH_MEDIA_SOCIALS_PAGE:
                     lcd_bluetooth_media_page(&ui_btns, &ui_menu, &bluetooth_menu, BLUETOOTH_MEDIA_SOCIALS_PAGE);
+                    dont_sleep_on_this_page = true;
                     break;
                 case BLUETOOTH_KEYBOARD_PAGE:
                     lcd_bluetooth_keyboard_page(&ui_btns, &ui_menu, &bluetooth_menu);
+                    dont_sleep_on_this_page = true;
                     break;
                 case BLUETOOTH_AI_KEYBOARD_PAGE:
                     lcd_bluetooth_ai_keyboard_page(&ui_btns, &ui_menu, &bluetooth_menu);
+                    dont_sleep_on_this_page = true;
                     break;
                 case BLUETOOTH_AI_CONFIG_PAGE:
                     lcd_bluetooth_ai_config_page(&ui_btns, &ui_menu, &bluetooth_menu);
+                    dont_sleep_on_this_page = true;
                     break;
                 case BLUETOOTH_KEYBOARD_SUB_PAGE:
                     lcd_bluetooth_keyboard_sub_page(&ui_btns, &ui_menu, &bluetooth_menu);
                     break;
                 case BLUETOOTH_SCRIPT_ADD_PAGE:
                     lcd_bluetooth_add_script_page(&ui_btns, &ui_menu, &bluetooth_menu);
+                    dont_sleep_on_this_page = true;
                     break;
                 case BLUETOOTH_FORGET_ALL_PAGE:
                     lcd_bluetooth_forget_all_page(&ui_btns, &ui_menu, &bluetooth_menu);
@@ -495,6 +516,7 @@ static void lcd_task(void *pvParameters)
                     break;
                 case BLUETOOTH_PAIR_NEW_PAGE:
                     lcd_bluetooth_pair_new_page(&ui_btns, &ui_menu, &bluetooth_menu);
+                    dont_sleep_on_this_page = true;
                     break;
                 case BLUETOOTH_RENAME_PEER_PAGE:
                     lcd_bluetooth_rename_peer_page(&ui_btns, &ui_menu, &bluetooth_menu);
@@ -508,6 +530,7 @@ static void lcd_task(void *pvParameters)
                     break;
                 case GPIO_TERMINAL_PAGE:
                     lcd_gpio_terminal_page(&ui_btns, &ui_menu, &gpio_menu);
+                    dont_sleep_on_this_page = true;
                     break;
                 case GPIO_SCANNER_PAGE:
                     lcd_gpio_scanner_page(&ui_btns, &ui_menu, &gpio_menu);
@@ -533,9 +556,7 @@ static void lcd_task(void *pvParameters)
             sleep_timer_last = xTaskGetTickCount();
         
         // Else if not home and device_sleep_after_s has passed without intervention
-        } else if ((ui_menu.page != HOME_PAGE) && (ui_menu.page != BOOT_PAGE) && (ui_menu.page != TOOLS_POMODORO_PAGE) &&
-                (ui_menu.page != TOOLS_SRS_PAGE) &&
-                (xTaskGetTickCount() - sleep_timer_last >= pdMS_TO_TICKS((uint32_t)device_sleep_after_s * 1000U))) {
+        } else if (!dont_sleep_on_this_page && (xTaskGetTickCount() - sleep_timer_last >= pdMS_TO_TICKS((uint32_t)device_sleep_after_s * 1000U))) {
             sleeping_from_home = false; // Sleeping from device doesn't require pin reentry
             lcd_device_sleep();
             

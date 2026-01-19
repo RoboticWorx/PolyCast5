@@ -168,11 +168,13 @@ static void bluetooth_task(void *arg)
             
                 // "Test" at menu index 1, handle it specially
                 if (menu_idx == 1) {
-                    #define TEST_TXT_LN1 "Thanks for choosing PolyCast5! As you can see, this autotype feature can be quite handy. "
-                    #define TEST_TXT_LN2 "It's perfect for funny pranks, auto-filling long passwords, speeding up typing, coding, you name it! "
-                    #define TEST_TXT_LN3 "If you see yourself more an ethical hacker, this is also basically a Bluetooth USB Rubber Ducky. "
-                    #define TEST_TXT_LN4 "To start adding your own text scripts, just go to 'Add/Edit Script' and follow the few simple instructions.\n"
-                    bluetooth_utils_send_script(TEST_TXT_LN1 TEST_TXT_LN2 TEST_TXT_LN3 TEST_TXT_LN4, 1);
+                    const char *TEST_TXT =
+                            "Thanks for choosing PolyCast5! As you can see, this autotype feature can be quite handy. "
+                            "It's perfect for funny pranks, auto-filling long passwords, speeding up typing, coding, you name it! "
+                            "If you see yourself more an ethical hacker, this is also basically a Bluetooth USB Rubber Ducky. "
+                            "To start adding your own text scripts, just go to 'Add/Edit Script' and follow the few simple instructions.\n";
+
+                    bluetooth_utils_send_script(TEST_TXT, 1);
                     continue;
                 }
                 /* If presentation mode command */

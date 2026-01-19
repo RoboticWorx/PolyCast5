@@ -619,7 +619,7 @@ static void update_known_devices_menu(bluetooth_peer_menu_t *menu)
     }
 }
 
-void lcd_bluetooth_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
+void lcd_bluetooth_pairing_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
 {
     #define HOW_Y_OFFSET 40
     
@@ -1268,7 +1268,7 @@ void lcd_bluetooth_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blueto
         // Set custom text based on hotkey index
         const char *instr_text = 
                 "To utilize the power of AI, an API key is needed. Don't worry, it's easy to get!\n\n"
-                "Through this menu you can also edit the Bluetooth system prompts for customization.\n\n"
+                "Here you can add/edit your API key as well as adjust the AI keyboard system prompt for customization.\n\n"
                 "Please follow the instructions in the article below:\n\n"
                 "polycast5.com/blogs\n/docs/ai-keyboard\n\n"
                 "SSID: %s\nPass: %s\n\n"
@@ -1322,21 +1322,25 @@ void lcd_bluetooth_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blueto
     }
 }
 
-// todo: fix animation here. 'thinking' mode
+// TODO: do STT live so dont have to wait until the end -> faster
+// TODO: check and order correct button size and color
 void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
 {
     #define AI_BT_FAILED_TXT "Connection failed!\nPlease pair to a\nBluetooth device at\nleast once and make\nsure you are in range."
     #define AI_WIFI_FAILED_TXT "Connection failed!\nPlease connect to your\nWi-Fi network at least\nonce in the 'Wi-Fi'\nmenu and make sure\nyou are in range."
 
-    #define AI_KEYB_WIFI_CONNECTING "Connecting to Wi-Fi..."
-    #define AI_KEYB_BLE_CONNECTING "Connecting with BLE..."
-    #define AI_KEYB_HOLD_TALK "Hold & talk!"
-    #define AI_KEYB_THINKING "Thinking..."
-    #define AI_KEYB_DONE "Done! Typing..."
+    #define AI_KEYB_WIFI_CONNECTING_TXT "Connecting to Wi-Fi..."
+    #define AI_KEYB_BLE_CONNECTING_TXT "Connecting with BLE..."
+    #define AI_KEYB_HOLD_TALK_TXT "Hold & talk!"
+    #define AI_KEYB_NONREASONING_TXT "Use: non-reasoning"
+    #define AI_KEYB_REASONING_TXT "Use: reasoning"
+    #define AI_KEYB_THINKING_TXT "Thinking..."
+    #define AI_KEYB_DONE_TXT "Done! Typing..."
     #define AI_KEYB_READY_FONT lv_font_montserrat_22
 
     typedef enum {
-        AI_KEYB_IDLE = 0,
+        AI_KEYB_NONE = 0,
+        AI_KEYB_IDLE,
         AI_KEYB_RECORDING,
         AI_KEYB_RESPONSE_WAITING,
         AI_KEYB_TYPING_WAITING,
@@ -1346,12 +1350,14 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     // Statics
     static bool do_once = false;
     static lv_obj_t *lbl_ins = NULL;
+    static lv_obj_t *lbl_reasoning = NULL;
     static lv_obj_t *lbl_config = NULL;
     static lv_obj_t *ai_orb = NULL;
     static int16_t orb_angle = 0; // 0.1 degree units
 
     static ai_keyb_state_t state = AI_KEYB_IDLE;
     static bool last_select = false;
+    static bool use_reasoning = false;
     
     // Only execute once
     if (!do_once) {
@@ -1361,11 +1367,21 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT);
         xQueueReset(xAiSoundHeardSemaphore);
 
+        // Default to non-reasoning (faster and cheaper, but less accurate)
+        use_reasoning = false;
+
         LCD_LOADING_ANIM_START_DEFAULT();
         
         lbl_ins = lv_label_create(ACTIVE_SCR);
-        lcd_format_label(lbl_ins, AI_KEYB_WIFI_CONNECTING, user_secondary_color,
+        lcd_format_label(lbl_ins, AI_KEYB_WIFI_CONNECTING_TXT, user_secondary_color,
                 &lv_font_montserrat_16, LV_ALIGN_CENTER, -10, 0);
+
+        // Show reasoning label
+        lbl_reasoning = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_reasoning, "", user_secondary_color,
+                &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, -14);
+        lv_label_set_text(lbl_reasoning, use_reasoning ? AI_KEYB_REASONING_TXT : AI_KEYB_NONREASONING_TXT);
+        lv_obj_add_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
 
         ai_orb = lv_image_create(ACTIVE_SCR);
         lv_img_set_src(ai_orb, &img_ai_orb_1);
@@ -1393,9 +1409,11 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         lv_timer_handler();
         vTaskDelay(pdMS_TO_TICKS(50)); // Allow time to render
 
+        state = AI_KEYB_NONE;
+
         // Already connected to Wi-Fi
         if (xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT) {
-            lv_label_set_text(lbl_ins, AI_KEYB_BLE_CONNECTING);
+            lv_label_set_text(lbl_ins, AI_KEYB_BLE_CONNECTING_TXT);
             lv_timer_handler();
 
             // Connect to BLE
@@ -1404,9 +1422,16 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 
             // Wait up to 6s for bluetooth to connect
             if ((xEventGroupWaitBits(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(6000)) & BLUETOOTH_CONNECTED_BIT) != 0) {
-                lv_label_set_text(lbl_ins, AI_KEYB_HOLD_TALK);
+                lv_label_set_text(lbl_ins, AI_KEYB_HOLD_TALK_TXT);
                 lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
                 lv_obj_set_style_text_font(lbl_ins, &AI_KEYB_READY_FONT, 0);
+
+                // Show reasoning label
+                lv_obj_remove_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+                // Enable use
+                state = AI_KEYB_IDLE;
             } else {
                 // Hide unused and center error label
                 lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
@@ -1421,7 +1446,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     
             // Wait up to WIFI_CONN_TIMEOUT_MS for Wi-Fi to connect
             if ((xEventGroupWaitBits(xWifiEventGroup, WIFI_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(WIFI_CONN_TIMEOUT_MS)) & WIFI_CONNECTED_BIT) != 0) {
-                lv_label_set_text(lbl_ins, AI_KEYB_BLE_CONNECTING);
+                lv_label_set_text(lbl_ins, AI_KEYB_BLE_CONNECTING_TXT);
                 lv_timer_handler();
     
                 // Connect to BLE
@@ -1430,9 +1455,16 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     
                 // Wait up to 15s for bluetooth to connect
                 if ((xEventGroupWaitBits(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(15000)) & BLUETOOTH_CONNECTED_BIT) != 0) {
-                    lv_label_set_text(lbl_ins, AI_KEYB_HOLD_TALK);
+                    lv_label_set_text(lbl_ins, AI_KEYB_HOLD_TALK_TXT);
                     lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
                     lv_obj_set_style_text_font(lbl_ins, &AI_KEYB_READY_FONT, 0);
+
+                    // Show reasoning label
+                    lv_obj_remove_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+                    // Enable use
+                    state = AI_KEYB_IDLE;
                 } else {
                     // Hide unused and center error label
                     lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
@@ -1452,7 +1484,6 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         }
 
         // Default states
-        state = AI_KEYB_IDLE;
         last_select = false;
         
         do_once = true;
@@ -1476,6 +1507,10 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         // Show error
         lv_label_set_text(lbl_ins, "Thinking failed!\nPlease try again.");
 
+        // Show reasoning
+        lv_obj_remove_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
         // Clear bit
         xEventGroupClearBits(xAiEventGroup, AI_THINKING_FAILED_BIT);
 
@@ -1497,8 +1532,10 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         // Show orb
         lv_obj_remove_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
 
-        // Hide instructions
+        // Hide text labels
         lv_obj_add_flag(lbl_ins, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 
         state = AI_KEYB_RECORDING;
     }
@@ -1515,6 +1552,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
             mic_recording = false;
             ai_cmd_t cmd = {
                 .type = AI_CMD_KEYBOARD_DONE_REC,
+                .reasoning = use_reasoning,
             };
 
             // Actually send it
@@ -1529,9 +1567,9 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
             // Show instructions
             lv_obj_remove_flag(lbl_ins, LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_text_font(lbl_ins, &AI_KEYB_READY_FONT, 0);
-            lv_label_set_text(lbl_ins, AI_KEYB_THINKING);
+            lv_label_set_text(lbl_ins, AI_KEYB_THINKING_TXT);
 
-            // Switched to AI_KEYB_DONE in xQueueReceive xWifiAiRawSniffQueue
+            // Switched to AI_KEYB_DONE_TXT in xQueueReceive xWifiAiRawSniffQueue
             state = AI_KEYB_RESPONSE_WAITING; // Waiting for analysis to complete
         }
     }
@@ -1551,7 +1589,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 
     // When AI has finished thinking
     if ((xEventGroupGetBits(xAiEventGroup) & AI_DONE_THINKING_BIT) && state == AI_KEYB_RESPONSE_WAITING) {
-        lv_label_set_text(lbl_ins, AI_KEYB_DONE);
+        lv_label_set_text(lbl_ins, AI_KEYB_DONE_TXT);
 
         // Clear bit
         xEventGroupClearBits(xAiEventGroup, AI_DONE_THINKING_BIT);
@@ -1561,10 +1599,14 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     }
     // When AI has finished typing
     if ((xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_DONE_TYPING_BIT) && state == AI_KEYB_TYPING_WAITING) {
-        lv_label_set_text(lbl_ins, AI_KEYB_HOLD_TALK);
+        lv_label_set_text(lbl_ins, AI_KEYB_HOLD_TALK_TXT);
 
         // Clear bit
         xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT);
+
+        // Show reasoning
+        lv_obj_remove_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 
         // Reset state to start
         state = AI_KEYB_IDLE;
@@ -1573,8 +1615,9 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     /* User input */
     if (ui_btns->up_btn == 1) { // Up button pressed
 
-    } else if (ui_btns->down_btn == 1) { // Down button pressed
-        
+    } else if (ui_btns->down_btn == 1 && state == AI_KEYB_IDLE) { // Down button pressed - toggle reasoning mode
+        use_reasoning = !use_reasoning;
+        lv_label_set_text(lbl_reasoning, use_reasoning ? AI_KEYB_REASONING_TXT : AI_KEYB_NONREASONING_TXT);
     } else if (ui_btns->right_btn == 1) { // Config page selected
         // Disconnect from Wi-Fi
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
@@ -1587,12 +1630,13 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         
         // Delete objects
         lv_obj_delete(lbl_ins);
+        lv_obj_delete(lbl_reasoning);
         lv_obj_delete(ai_orb);
         lv_obj_delete(lbl_config);
         
         // Reset statics
         do_once = false;
-        lbl_ins = ai_orb = lbl_config = NULL;
+        lbl_ins = lbl_reasoning = ai_orb = lbl_config = NULL;
 
         // Hide right arrow
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -1615,12 +1659,13 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 
         // Delete objects
         lv_obj_delete(lbl_ins);
+        lv_obj_delete(lbl_reasoning);
         lv_obj_delete(ai_orb);
         lv_obj_delete(lbl_config);
         
         // Reset statics
         do_once = false;
-        lbl_ins = ai_orb = lbl_config = NULL;
+        lbl_ins = lbl_reasoning = ai_orb = lbl_config = NULL;
 
         // Hide right arrow
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -1643,12 +1688,13 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         
         // Delete objects
         lv_obj_delete(lbl_ins);
+        lv_obj_delete(lbl_reasoning);
         lv_obj_delete(ai_orb);
         lv_obj_delete(lbl_config);
         
         // Reset statics
         do_once = false;
-        lbl_ins = ai_orb = lbl_config = NULL;
+        lbl_ins = lbl_reasoning = ai_orb = lbl_config = NULL;
         
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }

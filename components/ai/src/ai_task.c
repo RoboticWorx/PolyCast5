@@ -179,8 +179,16 @@ static void ai_task(void *pvParameters)
                     memset(prompt_buf, 0, sizeof(prompt_buf)); // Zero out previous contents
                     const char *prompt = ai_utils_get_autokey_prompt(prompt_buf, sizeof(prompt_buf));
 
+                    #ifdef POLYCAST5_DEBUG
+                    if (cmd.reasoning) {
+                        ESP_LOGI(TAG, "Sending xAI cmd WITH reasoning");
+                    } else {
+                        ESP_LOGI(TAG, "Sending xAI cmd WITHOUT reasoning");
+                    }
+                    #endif
+
                     // Call chat API with non-reasoning
-                    err = ai_utils_send_command_xai(prompt, user_transcript, ai_response, sizeof(ai_response), false);
+                    err = ai_utils_send_command_xai(prompt, user_transcript, ai_response, sizeof(ai_response), cmd.reasoning);
                 }
 
                 // Signal done thinking
