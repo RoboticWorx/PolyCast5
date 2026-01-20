@@ -28,12 +28,14 @@ typedef struct {
 
 typedef struct {
     uint8_t active_idx;
-    bool has_lora[MAX_HOTKEY_OPTIONS]; // Hot0-Hot5
+    bool has_lora[MAX_HOTKEY_OPTIONS]; // Key0-Key5
     bool has_espnow[MAX_HOTKEY_OPTIONS];
     bool has_ir[MAX_HOTKEY_OPTIONS];
+    bool is_page[MAX_HOTKEY_OPTIONS];
     lora_cmd_t lora_cmd[MAX_HOTKEY_OPTIONS];
     espnow_cmd_t espnow_cmd[MAX_HOTKEY_OPTIONS];
     ir_cmd_t ir_cmd[MAX_HOTKEY_OPTIONS];
+    int selected_page[MAX_HOTKEY_OPTIONS];
 } hotkey_cmd_t;
 
 extern hotkey_menu_t hotkey_menu;
@@ -52,6 +54,13 @@ void lcd_hotkey_setup_page(hotkey_menu_t *hotkey_menu);
  * @param [in] hotkey_menu Hotkey menu structure
  */
 void lcd_hotkey_update_menu(hotkey_menu_t *hotkey_menu);
+
+/**
+ * @brief Save the current page as a hotkey
+ *
+ * @param [in] ui_menu UI menu structure
+ */
+void lcd_hotkey_save_page_as_hotkey(ui_menu_t *ui_menu);
 
 /**
  * @brief Executes the selected hotkey configuration option

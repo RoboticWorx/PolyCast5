@@ -907,6 +907,11 @@ void lcd_tools_pomodoro_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
 
     // Do once
     if (!init) {
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+
         // Arc (full -> empty)
         arc = lv_arc_create(ACTIVE_SCR);
         lv_obj_set_size(arc, 110, 110);
@@ -1100,6 +1105,9 @@ void lcd_tools_pomodoro_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
         // Show tools menu
         lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
+        // Hide right arrow
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
         ui_menu->page = TOOLS_PAGE;
     } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
         // Delete objects
@@ -1267,6 +1275,11 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
     
     // Initialize
     if (!do_once) {
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+        
         // Hide arrows to start
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);

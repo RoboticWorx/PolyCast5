@@ -929,7 +929,7 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
             // Zero out at start
             memset(&hotkey_cmd.lora_cmd[hotkey_cmd.active_idx], 0, sizeof(lora_cmd_t));
             
-            // Save into hotkey struct under selected "Hotx"
+            // Save into hotkey struct under selected "Keyx"
             hotkey_cmd.lora_cmd[hotkey_cmd.active_idx].index = lora_menu->submenu.index;
             memcpy(hotkey_cmd.lora_cmd[hotkey_cmd.active_idx].key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
             
@@ -938,9 +938,10 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
             // Remove others
             hotkey_cmd.has_espnow[hotkey_cmd.active_idx] = false;
             hotkey_cmd.has_ir[hotkey_cmd.active_idx] = false;
+            hotkey_cmd.is_page[hotkey_cmd.active_idx] = false;
             
             // Hide hotkey icon
-            lv_obj_add_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN);
+            xEventGroupClearBits(xConnectionIconEventGroup, ICON_BIT_HOTKEY_ACTIVE);
             
             // Persist to NVS
             lcd_hotkey_nvs_save(&hotkey_cmd);

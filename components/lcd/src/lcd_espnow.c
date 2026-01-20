@@ -1153,7 +1153,7 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
             // Zero out at start
             memset(&hotkey_cmd.espnow_cmd[hotkey_cmd.active_idx], 0, sizeof(espnow_cmd_t));
             
-            // Save into hotkey struct under selected "Hotx"
+            // Save into hotkey struct under selected "Keyx"
             hotkey_cmd.espnow_cmd[hotkey_cmd.active_idx].cmd_to_send = espnow_menu->espnow_submenu.cmd_to_send;
             memcpy(hotkey_cmd.espnow_cmd[hotkey_cmd.active_idx].mac_selected, espnow_menu->rx_mac[espnow_menu->index], ESPNOW_MAC_SIZE);
             
@@ -1169,9 +1169,10 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
             // Remove others
             hotkey_cmd.has_lora[hotkey_cmd.active_idx] = false;
             hotkey_cmd.has_ir[hotkey_cmd.active_idx] = false;
+            hotkey_cmd.is_page[hotkey_cmd.active_idx] = false;
             
             // Hide hotkey icon
-            lv_obj_add_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN);
+            xEventGroupClearBits(xConnectionIconEventGroup, ICON_BIT_HOTKEY_ACTIVE);
             
             // Persist to NVS
             lcd_hotkey_nvs_save(&hotkey_cmd);

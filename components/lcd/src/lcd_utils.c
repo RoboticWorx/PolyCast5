@@ -1727,6 +1727,53 @@ void lcd_update_icons(icon_state_t *icon_state, ui_menu_t *ui_menu)
     }
 }
 
+static void go_to_page_from_hotkey(ui_menu_t *ui_menu)
+{
+    stop_animations();
+
+    // Show arrows that would be shown on selection page
+    lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+    
+    // Handle the specific page selected
+    switch (ui_menu->page) {
+        case BLUETOOTH_AI_KEYBOARD_PAGE:
+            char api_key[AI_API_KEY_MAX_LEN] = {0};
+            esp_err_t err = ai_utils_load_api_key_nvs(api_key, AI_API_KEY_MAX_LEN);
+            if (err != ESP_OK) {
+                ESP_LOGW(TAG, "Failed to load xAI API key from NVS: err %s, switching to AI config page.", esp_err_to_name(err));
+
+                // Switch pages
+                ui_menu->page = BLUETOOTH_AI_CONFIG_PAGE;
+            } else {
+                // Show right arrow
+                lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+                // Hide top and bottom arrows
+                lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+                // ui_menu->page already set
+            }
+            break;
+        case TOOLS_POMODORO_PAGE:
+            // Show right arrow
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            
+            // ui_menu->page already set
+            break;
+        case TOOLS_SRS_PAGE:
+            // Show right arrow
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            
+            // ui_menu->page already set
+            break;
+        default:
+            break;
+    }
+}
+
 void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
     if (ui_btns->up_btn == 1) {
@@ -1833,8 +1880,8 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
     
     // Long press home
     else if (xHomeButtonLongSemaphore && xSemaphoreTake(xHomeButtonLongSemaphore, 0) == pdTRUE) {
-        // If LoRa command exists
-        if (hotkey_cmd.has_lora[HOTKEY_LONG_HOME_IDX]) {
+        /* Check for commands */
+        if (hotkey_cmd.has_lora[HOTKEY_LONG_HOME_IDX]) { // If LoRa command exists
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_TEAL;
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
@@ -1860,6 +1907,12 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             
             // Send the command
             xQueueSend(xInfraredSignalToTxQueue, &hotkey_cmd.ir_cmd[HOTKEY_LONG_HOME_IDX].index, portMAX_DELAY);
+        } else if (hotkey_cmd.is_page[HOTKEY_LONG_HOME_IDX]) { // Else a menu page
+            // Update the page
+            ui_menu->page = hotkey_cmd.selected_page[HOTKEY_LONG_HOME_IDX];
+
+            // Go to it
+            go_to_page_from_hotkey(ui_menu);
         } else {
             #ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Long home hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_HOME_IDX,
@@ -1869,8 +1922,8 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
     }
     // Long press left
     else if (xLeftButtonLongSemaphore && xSemaphoreTake(xLeftButtonLongSemaphore, 0) == pdTRUE) {
-        // If LoRa command exists
-        if (hotkey_cmd.has_lora[HOTKEY_LONG_LEFT_IDX]) {
+        /* Check for commands */
+        if (hotkey_cmd.has_lora[HOTKEY_LONG_LEFT_IDX]) { // If LoRa command exists
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_TEAL;
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
@@ -1896,6 +1949,12 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             
             // Send the command
             xQueueSend(xInfraredSignalToTxQueue, &hotkey_cmd.ir_cmd[HOTKEY_LONG_LEFT_IDX].index, portMAX_DELAY);
+        } else if (hotkey_cmd.is_page[HOTKEY_LONG_LEFT_IDX]) { // Else a menu page
+            // Update the page
+            ui_menu->page = hotkey_cmd.selected_page[HOTKEY_LONG_LEFT_IDX];
+
+            // Go to it
+            go_to_page_from_hotkey(ui_menu);
         } else {
             #ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Long left hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_LEFT_IDX,
@@ -1905,8 +1964,8 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
     }
     // Long press right
     else if (xRightButtonLongSemaphore && xSemaphoreTake(xRightButtonLongSemaphore, 0) == pdTRUE) {
-        // If LoRa command exists
-        if (hotkey_cmd.has_lora[HOTKEY_LONG_RIGHT_IDX]) {
+        /* Check for commands */
+        if (hotkey_cmd.has_lora[HOTKEY_LONG_RIGHT_IDX]) { // If LoRa command exists
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_TEAL;
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
@@ -1932,6 +1991,12 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             
             // Send the command
             xQueueSend(xInfraredSignalToTxQueue, &hotkey_cmd.ir_cmd[HOTKEY_LONG_RIGHT_IDX].index, portMAX_DELAY);
+        } else if (hotkey_cmd.is_page[HOTKEY_LONG_RIGHT_IDX]) { // Else a menu page
+            // Update the page
+            ui_menu->page = hotkey_cmd.selected_page[HOTKEY_LONG_RIGHT_IDX];
+
+            // Go to it
+            go_to_page_from_hotkey(ui_menu);
         } else {
             #ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Long right hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_RIGHT_IDX,
@@ -1941,8 +2006,8 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
     }
     // Long press select
     else if (xSelectButtonLongSemaphore && xSemaphoreTake(xSelectButtonLongSemaphore, 0) == pdTRUE) {
-        // If LoRa command exists
-        if (hotkey_cmd.has_lora[HOTKEY_LONG_SELECT_IDX]) {
+        /* Check for commands */
+        if (hotkey_cmd.has_lora[HOTKEY_LONG_SELECT_IDX]) { // If LoRa command exists
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_TEAL;
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
@@ -1968,6 +2033,12 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             
             // Send the command
             xQueueSend(xInfraredSignalToTxQueue, &hotkey_cmd.ir_cmd[HOTKEY_LONG_SELECT_IDX].index, portMAX_DELAY);
+        } else if (hotkey_cmd.is_page[HOTKEY_LONG_SELECT_IDX]) { // Else a menu page
+            // Update the page
+            ui_menu->page = hotkey_cmd.selected_page[HOTKEY_LONG_SELECT_IDX];
+
+            // Go to it
+            go_to_page_from_hotkey(ui_menu);
         } else {
             #ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Long select hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_SELECT_IDX,
@@ -1975,8 +2046,8 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             #endif
         }
     } else if (ui_btns->home_btn == 1) { // Short press home
-        // If LoRa command exists
-        if (hotkey_cmd.has_lora[HOTKEY_SHORT_HOME_IDX]) {
+        /* Check for commands */
+        if (hotkey_cmd.has_lora[HOTKEY_SHORT_HOME_IDX]) { // If LoRa command exists
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_TEAL;
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
@@ -2002,6 +2073,12 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             
             // Send the command
             xQueueSend(xInfraredSignalToTxQueue, &hotkey_cmd.ir_cmd[HOTKEY_SHORT_HOME_IDX].index, portMAX_DELAY);
+        } else if (hotkey_cmd.is_page[HOTKEY_SHORT_HOME_IDX]) { // Else a menu page
+            // Update the page
+            ui_menu->page = hotkey_cmd.selected_page[HOTKEY_SHORT_HOME_IDX];
+
+            // Go to it
+            go_to_page_from_hotkey(ui_menu);
         } else {
             #ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Short home hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_SHORT_HOME_IDX,
@@ -2009,8 +2086,8 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             #endif
         }
     } else if (ui_btns->right_btn == 1) { // Short press right
-        // If LoRa command exists
-        if (hotkey_cmd.has_lora[HOTKEY_SHORT_RIGHT_IDX]) {
+        /* Check for commands */
+        if (hotkey_cmd.has_lora[HOTKEY_SHORT_RIGHT_IDX]) { // If LoRa command exists
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_TEAL;
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
@@ -2036,6 +2113,12 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             
             // Send the command
             xQueueSend(xInfraredSignalToTxQueue, &hotkey_cmd.ir_cmd[HOTKEY_SHORT_RIGHT_IDX].index, portMAX_DELAY);
+        } else if (hotkey_cmd.is_page[HOTKEY_SHORT_RIGHT_IDX]) { // Else a menu page
+            // Update the page
+            ui_menu->page = hotkey_cmd.selected_page[HOTKEY_SHORT_RIGHT_IDX];
+
+            // Go to it
+            go_to_page_from_hotkey(ui_menu);
         } else {
             #ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Short right hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_SHORT_RIGHT_IDX,
@@ -2439,7 +2522,7 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
             // Zero out at start
             memset(&hotkey_cmd.ir_cmd[hotkey_cmd.active_idx], 0, sizeof(ir_cmd_t));
             
-            // Save into hotkey struct under selected "Hotx"
+            // Save into hotkey struct under selected "Keyx"
             xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
             hotkey_cmd.ir_cmd[hotkey_cmd.active_idx].index = ir_menu->index; // Save signal index
             hotkey_cmd.ir_cmd[hotkey_cmd.active_idx].current_remote = ir_current_remote; // Save remote used
@@ -2450,6 +2533,7 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
             // Remove others
             hotkey_cmd.has_espnow[hotkey_cmd.active_idx] = false;
             hotkey_cmd.has_lora[hotkey_cmd.active_idx] = false;
+            hotkey_cmd.is_page[hotkey_cmd.active_idx] = false;
             
             // Hide hotkey icon
             //lv_obj_add_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN);

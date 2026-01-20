@@ -19,7 +19,7 @@
 #define HOTKEY_KEY "data" // Data blob
 
 hotkey_menu_t hotkey_menu = {
-    .options = {"Hot1", "Hot2", "Hot3", "Hot4", "Hot5", "Hot6"},
+    .options = {"Key1", "Key2", "Key3", "Key4", "Key5", "Key6"},
     .size = MAX_HOTKEY_OPTIONS,
     .index = 0,
     .cont = NULL,
@@ -118,6 +118,31 @@ void lcd_hotkey_update_menu(hotkey_menu_t *menu)
     lv_obj_add_style(menu->btns[menu->index], &menu->sel_style, 0);
 }
 
+void lcd_hotkey_save_page_as_hotkey(ui_menu_t *ui_menu)
+{
+    // Zero out at start
+    memset(&hotkey_cmd.selected_page[hotkey_cmd.active_idx], 0, sizeof(int));
+    
+    // Save into hotkey struct under selected "Keyx"
+    hotkey_cmd.selected_page[hotkey_cmd.active_idx] = ui_menu->page;
+    
+    // Flag that the page exists
+    hotkey_cmd.is_page[hotkey_cmd.active_idx] = true;
+    // Remove others
+    hotkey_cmd.has_lora[hotkey_cmd.active_idx] = false;
+    hotkey_cmd.has_espnow[hotkey_cmd.active_idx] = false;
+    hotkey_cmd.has_ir[hotkey_cmd.active_idx] = false;
+    
+    // Hide hotkey icon
+    xEventGroupClearBits(xConnectionIconEventGroup, ICON_BIT_HOTKEY_ACTIVE);
+
+    // Refresh display
+    lv_timer_handler();
+    
+    // Persist to NVS
+    lcd_hotkey_nvs_save(&hotkey_cmd);
+}
+
 void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotkey_menu)
 {
     #define HOTKEY_Y_OFFSET 40
@@ -126,6 +151,8 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
     static lv_obj_t *cont = NULL;
     static lv_obj_t *title_lbl = NULL;
     static lv_obj_t *instr_lbl = NULL;
+    static lv_obj_t *config_lbl = NULL;
+    static lv_obj_t *ending_lbl = NULL;
     
     if (!init) {
         // Create a scrollable container for the instructions
@@ -144,7 +171,7 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
 
         // Title label
         title_lbl = lv_label_create(cont);
-        lv_label_set_text_fmt(title_lbl, "%s Hotkey", hotkey_menu->options[hotkey_menu->index]);
+        lv_label_set_text_fmt(title_lbl, "Configure Hotkey %d:", hotkey_menu->index + 1);
         lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
         lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
         lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
@@ -161,34 +188,94 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
         const char *instr_text = "";
         
         /* Set instruction text */
-        // Hot1
-        if (hotkey_menu->index == 0) {
-            instr_text = "How to configure your command for Hot1:\n\nThis hotkey is triggered when SHORT pressing the "
-            "HOME button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
-            "ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to represent waiting for a command.";
-        } else if (hotkey_menu->index == 1) { // Hot2
-            instr_text = "How to configure your command for Hot2:\n\nThis hotkey is triggered when LONG pressing the "
-            "HOME button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
-            "ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to represent waiting for a command.";
-        } else if (hotkey_menu->index == 2) { // Hot3
-            instr_text = "How to configure your command for Hot3:\n\nThis hotkey is triggered when LONG pressing the "
-            "LEFT button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
-            "ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to represent waiting for a command.";
-        } else if (hotkey_menu->index == 3) { // Hot4
-            instr_text = "How to configure your command for Hot4:\n\nThis hotkey is triggered when LONG pressing the "
-            "SELECT button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
-            "ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to represent waiting for a command.";
-        } else if (hotkey_menu->index == 4) { // Hot5
-            instr_text = "How to configure your command for Hot5:\n\nThis hotkey is triggered when SHORT pressing the "
-            "RIGHT button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
-            "ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to represent waiting for a command.";
-        } else if (hotkey_menu->index == 5) { // Hot6
-            instr_text = "How to configure your command for Hot6:\n\nThis hotkey is triggered when LONG pressing the "
-            "RIGHT button while on the home page.\n\nTo configure this command, click the right button then send any PolyPlug (SEND), "
-            "ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to represent waiting for a command.";
+        switch (hotkey_menu->index) {
+            case 0:
+                instr_text =  "Hotkey 1 will trigger from home when you:";
+                break;
+            case 1:
+                instr_text =  "Hotkey 2 will trigger from home when you:";
+                break;
+            case 2:
+                instr_text =  "Hotkey 3 will trigger from home when you:";
+                break;
+            case 3:
+                instr_text =  "Hotkey 4 will trigger from home when you:";
+                break;
+            case 4:
+                instr_text =  "Hotkey 5 will trigger from home when you:";
+                break;
+            case 5:
+                instr_text =  "Hotkey 6 will trigger from home when you:";
+                break;
+            default:
+                break;
+            
         }
         lv_label_set_text(instr_lbl, instr_text);
-    
+
+        // Pairing pin label
+        config_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(config_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(config_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(config_lbl, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_color(config_lbl, user_secondary_color, 0);
+        lv_obj_align_to(config_lbl, instr_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+
+        const char *config_text = "%s press %s";
+        char button_press[6]; // Longest is 5 chars
+        char button_name[7]; // Longest is 6 chars
+
+        // Set text based on hotkey index
+        switch(hotkey_menu->index) {
+            case 0:
+                strcpy(button_press, "SHORT");
+                strcpy(button_name, "HOME");
+                break;
+            case 1:
+                strcpy(button_press, "LONG");
+                strcpy(button_name, "HOME");
+                break;
+            case 2:
+                strcpy(button_press, "LONG");
+                strcpy(button_name, "LEFT");
+                break;
+            case 3:
+                strcpy(button_press, "LONG");
+                strcpy(button_name, "SELECT");
+                break;
+            case 4:
+                strcpy(button_press, "SHORT");
+                strcpy(button_name, "RIGHT");
+                break;
+            case 5:
+                strcpy(button_press, "LONG");
+                strcpy(button_name, "RIGHT");
+                break;
+            default:
+                break;
+        }
+        lv_label_set_text_fmt(config_lbl, config_text, button_press, button_name);
+
+        ending_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(ending_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(ending_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(ending_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(ending_lbl, user_secondary_color, 0);
+        lv_obj_align_to(ending_lbl, config_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 15);
+
+        // Set custom text
+        const char *ending_text =
+                "This means when you are on the home page, simply %s press the %s button to send the "
+                "command linked to this hotkey.\n\nTo link a command, click the right arrow button now then send any PolyPlug "
+                "(SEND), ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to represent waiting for a command.\n\n"
+                "The following pages are also eligible to be linked as a hotkey:\n"
+                " - AI Keyboard\n"
+                " - SRS Planner\n"
+                " - Pomodoro Timer\n"
+                "";
+
+        lv_label_set_text_fmt(ending_lbl, ending_text, button_press, button_name);        
+        
         init = true;
     }
     
@@ -199,7 +286,7 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
         
         // Reset statics
         cont = NULL;
-        title_lbl = instr_lbl = NULL;
+        title_lbl = instr_lbl = config_lbl = ending_lbl = NULL;
         init = false;
         
         // Show hotkey page
@@ -220,7 +307,7 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
         
         // Reset statics
         cont = NULL;
-        title_lbl = instr_lbl = NULL;
+        title_lbl = instr_lbl = config_lbl = ending_lbl = NULL;
         init = false;
         
         // Hide arrows
@@ -244,7 +331,7 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
         
         // Reset statics
         cont = NULL;
-        title_lbl = instr_lbl = NULL;
+        title_lbl = instr_lbl = config_lbl = ending_lbl = NULL;
         init = false;
         
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
@@ -253,11 +340,11 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
 
 void lcd_hotkey_nvs_save(const hotkey_cmd_t *src)
 {
-     nvs_handle_t h;
+    nvs_handle_t h;
 
     // Open NVS
-     esp_err_t err = nvs_open(HOTKEY_NS, NVS_READWRITE, &h);
-     if (err != ESP_OK) {
+    esp_err_t err = nvs_open(HOTKEY_NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) {
         ESP_LOGW(TAG, "lcd_hotkey_nvs_save nvs_open failed: %s", esp_err_to_name(err));
         return;
     }
@@ -272,16 +359,16 @@ void lcd_hotkey_nvs_save(const hotkey_cmd_t *src)
     }
 
     // Close NVS
-     nvs_close(h);
+    nvs_close(h);
 }
 
 void lcd_hotkey_nvs_load(hotkey_cmd_t *dst)
 {
-     nvs_handle_t h;
+    nvs_handle_t h;
 
     // Open NVS
-     esp_err_t err = nvs_open(HOTKEY_NS, NVS_READONLY, &h);
-     if (err != ESP_OK) {
+    esp_err_t err = nvs_open(HOTKEY_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
         #ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "lcd_hotkey_nvs_load nvs_open failed: %s", esp_err_to_name(err));
         #endif
@@ -290,10 +377,10 @@ void lcd_hotkey_nvs_load(hotkey_cmd_t *dst)
         return;
     }
 
-     size_t sz = sizeof(*dst);
+    size_t sz = sizeof(*dst);
 
     // Get data blob
-     err = nvs_get_blob(h, HOTKEY_KEY, dst, &sz);
+    err = nvs_get_blob(h, HOTKEY_KEY, dst, &sz);
 
     // Check if first boot
     if (err == ESP_ERR_NVS_NOT_FOUND) {
@@ -304,6 +391,6 @@ void lcd_hotkey_nvs_load(hotkey_cmd_t *dst)
     }
 
     // Close NVS
-     nvs_close(h);
+    nvs_close(h);
 }
 

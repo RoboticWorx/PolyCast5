@@ -20,6 +20,7 @@
 
 #include "lcd_utils.h"
 #include "lcd_bluetooth.h"
+#include "lcd_hotkey.h"
 #include "bluetooth_utils.h"
 #include "wifi_utils.h"
 #include "ai_utils.h"
@@ -1361,6 +1362,11 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     
     // Only execute once
     if (!do_once) {
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+
         // Clear any previous states
         xEventGroupClearBits(xAiEventGroup, AI_DONE_THINKING_BIT);
         xEventGroupClearBits(xAiEventGroup, AI_THINKING_FAILED_BIT);
