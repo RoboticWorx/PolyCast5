@@ -118,7 +118,6 @@ extern volatile bool gpio_waiting_for_left; // gpio_task.c
 
 extern wifi_login_t selected_network;
 extern bool monitoring_packets;
-extern bool sleeping_from_home;
 
 uint32_t pin_attempts = 0;
 bool pin_signing_in = false;
@@ -371,12 +370,10 @@ void lcd_device_sleep(void)
     xQueueReset(xPowerButtonSemaphore); // Clear xPowerButtonSemaphore
     
     go_to_sleep = false; // Clear sleep flag
-    lcd_clear_pending_inputs = true; // Clear if action button pressed to wake
+    lcd_clear_pending_inputs = true; // Clear if action button pressed to wake/reset pwr_btn
     
     // Require pin re-entry if sleeping from home page
-    if (sleeping_from_home) {
-        settings_menu.pin_menu.prompt_pin = true;
-    }
+    settings_menu.pin_menu.prompt_pin = true;
     
     // TODO: Noticable delay on LCD
     //xSemaphoreGive(xWifiCycleSemaphore); // Cycle Wi-Fi radio on wake
@@ -1765,6 +1762,7 @@ uint8_t lcd_wait_for_bit_better(EventGroupHandle_t event_group, EventBits_t bit,
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 
+    // Exit
     xSemaphoreTake(xGpioLeftBtnMutex, portMAX_DELAY); // Lock left button mutex
     gpio_left_to_exit = false; // Reset flag
     gpio_waiting_for_left = false; // Reset flag
@@ -2593,7 +2591,7 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
         
         // Transmit signal at index
         xQueueSend(xInfraredSignalToTxQueue, &ir_menu->index, portMAX_DELAY);
-        // todo: right arrow press hotkey to page triggers setup wrongly + while non blocking in ai keyb (func?) + so back btn works 
+        
         // RGB indicator
         uint8_t rgb_state = RGB_BLINK_PURPLE;
         xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);

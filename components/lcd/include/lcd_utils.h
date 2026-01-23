@@ -380,7 +380,8 @@ void lcd_update_icons(icon_state_t *icon_state, ui_menu_t *ui_menu);
  * @param [in] bit Bit to wait for
  * @param [in] timeout_ms Timeout in milliseconds
  *
- * @returns 0 on success, 1 on timeout, 2 on left button exit
+ * @returns LCD_WAIT_FOR_BIT_BETTER_SUCCESS on success, LCD_WAIT_FOR_BIT_BETTER_TIMEOUT on timeout,
+ *          LCD_WAIT_FOR_BIT_BETTER_EXIT on left button exit
  */
 uint8_t lcd_wait_for_bit_better(EventGroupHandle_t event_group, EventBits_t bit, uint32_t timeout_ms);
 
