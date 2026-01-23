@@ -17,6 +17,7 @@ typedef struct {
 } bluetooth_peer_info_t;
 
 #define BT_MAX_PEERS 20
+#define BT_CONN_TIMEOUT_MS 6000
 
 // Report IDs
 #define HID_RPT_ID_KB_IN 1 // Keyboard input

@@ -9,6 +9,7 @@ extern SemaphoreHandle_t xI2CBusMutex;
 extern SemaphoreHandle_t xHapticsMutex;
 extern SemaphoreHandle_t xRgbLedMutex;
 extern SemaphoreHandle_t xLEDCMutex;
+extern SemaphoreHandle_t xGpioLeftBtnMutex;
 
 // Regular
 extern SemaphoreHandle_t xPowerButtonSemaphore;

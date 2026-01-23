@@ -25,6 +25,7 @@ SemaphoreHandle_t xI2CBusMutex;
 SemaphoreHandle_t xHapticsMutex;
 SemaphoreHandle_t xRgbLedMutex;
 SemaphoreHandle_t xLEDCMutex;
+SemaphoreHandle_t xGpioLeftBtnMutex;
 
 SemaphoreHandle_t xPowerButtonSemaphore;
 SemaphoreHandle_t xStartAdcBatSemaphore;
@@ -67,6 +68,8 @@ volatile bool haptic_btns[6] = {true, false, false, false, false, false}; // Def
 
 // True while the physical SELECT button is held (0 = pressed, 1 = released)
 volatile bool gpio_select_btn_held = false;
+volatile bool gpio_left_to_exit = false;
+volatile bool gpio_waiting_for_left = false;
 
 int8_t lcd_ledc_brightness = 100;
 
@@ -217,6 +220,9 @@ static void gpio_task(void *arg)
     
     xLEDCSemaphore = xSemaphoreCreateBinary();
     configASSERT(xLEDCSemaphore);
+
+    xGpioLeftBtnMutex = xSemaphoreCreateMutex();
+    configASSERT(xGpioLeftBtnMutex);
     
     xAdcBatReadingQueue = xQueueCreate(1, sizeof(uint8_t));
     configASSERT(xAdcBatReadingQueue);
@@ -296,7 +302,14 @@ static void gpio_task(void *arg)
                 
                 // If wasn't a long press, give short press
                 if (!b->long_press_fired) {
-                    give_short(i);
+                    xSemaphoreTake(xGpioLeftBtnMutex, portMAX_DELAY); // Lock left button mutex
+                    if (gpio_waiting_for_left && i == 4) { // Left button special case to exit lcd loop
+                        gpio_left_to_exit = true;
+                    } else {
+                        give_short(i);
+                        gpio_left_to_exit = false;
+                    }
+                    xSemaphoreGive(xGpioLeftBtnMutex); // Release left button mutex
                     #ifdef POLYCAST5_DEBUG_GPIO
                     ESP_LOGI(TAG, "Btn release give short");
                     #endif

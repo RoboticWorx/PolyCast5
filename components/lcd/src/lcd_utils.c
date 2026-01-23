@@ -113,6 +113,9 @@ enum
     #endif
 };
 
+extern volatile bool gpio_left_to_exit; // gpio_task.c
+extern volatile bool gpio_waiting_for_left; // gpio_task.c
+
 extern wifi_login_t selected_network;
 extern bool monitoring_packets;
 extern bool sleeping_from_home;
@@ -1727,6 +1730,51 @@ void lcd_update_icons(icon_state_t *icon_state, ui_menu_t *ui_menu)
     }
 }
 
+uint8_t lcd_wait_for_bit_better(EventGroupHandle_t event_group, EventBits_t bit, uint32_t timeout_ms)
+{
+    static TickType_t start_tick = 0;
+    start_tick = xTaskGetTickCount();
+
+    xSemaphoreTake(xGpioLeftBtnMutex, portMAX_DELAY); // Lock left button mutex
+    gpio_waiting_for_left = true;
+    xSemaphoreGive(xGpioLeftBtnMutex); // Release left button mutex
+
+    uint8_t status = LCD_WAIT_FOR_BIT_BETTER_SUCCESS;
+
+    // Wait until bit is set or timeout
+    while ((xEventGroupGetBits(event_group) & bit) == 0) {
+        // If left button pressed, exit early
+        xSemaphoreTake(xGpioLeftBtnMutex, portMAX_DELAY); // Lock left button mutex
+        if (gpio_left_to_exit) {
+            #ifdef POLYCAST5_DEBUG
+            ESP_LOGE(TAG, "Left button pressed, exiting lcd_wait_for_bit_better");
+            #endif
+            status = LCD_WAIT_FOR_BIT_BETTER_EXIT;
+            xSemaphoreGive(xGpioLeftBtnMutex); // Release left button mutex
+            break;
+        }
+        xSemaphoreGive(xGpioLeftBtnMutex); // Release left button mutex
+        
+        // Check for timeout
+        if (xTaskGetTickCount() - start_tick > pdMS_TO_TICKS(timeout_ms)) {
+            status = LCD_WAIT_FOR_BIT_BETTER_TIMEOUT;
+            break;
+        }
+
+        lv_timer_handler();
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    xSemaphoreTake(xGpioLeftBtnMutex, portMAX_DELAY); // Lock left button mutex
+    gpio_left_to_exit = false; // Reset flag
+    gpio_waiting_for_left = false; // Reset flag
+    xSemaphoreGive(xGpioLeftBtnMutex); // Release left button mutex
+    lcd_clear_pending_inputs = true;
+
+    // Got bit
+    return status;
+}
+
 static void go_to_page_from_hotkey(ui_menu_t *ui_menu)
 {
     stop_animations();
@@ -2545,7 +2593,7 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
         
         // Transmit signal at index
         xQueueSend(xInfraredSignalToTxQueue, &ir_menu->index, portMAX_DELAY);
-        
+        // todo: right arrow press hotkey to page triggers setup wrongly + while non blocking in ai keyb (func?) + so back btn works 
         // RGB indicator
         uint8_t rgb_state = RGB_BLINK_PURPLE;
         xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);

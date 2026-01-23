@@ -1426,8 +1426,9 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
             uint16_t cmd = BLUETOOTH_CMD_INIT;
             xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-            // Wait up to 6s for bluetooth to connect
-            if ((xEventGroupWaitBits(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(6000)) & BLUETOOTH_CONNECTED_BIT) != 0) {
+            // Wait up to BT_CONN_TIMEOUT_MS for bluetooth to connect
+            uint8_t status = lcd_wait_for_bit_better(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT, BT_CONN_TIMEOUT_MS);
+            if (status == LCD_WAIT_FOR_BIT_BETTER_SUCCESS) { // Success
                 lv_label_set_text(lbl_ins, AI_KEYB_HOLD_TALK_TXT);
                 lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
                 lv_obj_set_style_text_font(lbl_ins, &AI_KEYB_READY_FONT, 0);
@@ -1438,20 +1439,23 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 
                 // Enable use
                 state = AI_KEYB_IDLE;
-            } else {
+            } else if (status == LCD_WAIT_FOR_BIT_BETTER_TIMEOUT) { // Timeout
                 // Hide unused and center error label
                 lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
                 lv_obj_add_flag(lbl_config, LV_OBJ_FLAG_HIDDEN);
 
                 lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
                 lv_label_set_text(lbl_ins, AI_BT_FAILED_TXT);
+            } else if (status == LCD_WAIT_FOR_BIT_BETTER_EXIT) { // Exit
+                ui_btns->left_btn = 1; // Simulate left press to go back
             }
         } else { // Connect to Wi-Fi and BLE
             // Connect to previous Wi-Fi network
             xEventGroupSetBits(xWifiEventGroup, WIFI_RECONNECT_BIT);
     
             // Wait up to WIFI_CONN_TIMEOUT_MS for Wi-Fi to connect
-            if ((xEventGroupWaitBits(xWifiEventGroup, WIFI_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(WIFI_CONN_TIMEOUT_MS)) & WIFI_CONNECTED_BIT) != 0) {
+            uint8_t status = lcd_wait_for_bit_better(xWifiEventGroup, WIFI_CONNECTED_BIT, WIFI_CONN_TIMEOUT_MS);
+            if (status == LCD_WAIT_FOR_BIT_BETTER_SUCCESS) { // Success
                 lv_label_set_text(lbl_ins, AI_KEYB_BLE_CONNECTING_TXT);
                 lv_timer_handler();
     
@@ -1459,8 +1463,9 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
                 uint16_t cmd = BLUETOOTH_CMD_INIT;
                 xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
     
-                // Wait up to 15s for bluetooth to connect
-                if ((xEventGroupWaitBits(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(15000)) & BLUETOOTH_CONNECTED_BIT) != 0) {
+                // Wait up to BT_CONN_TIMEOUT_MS for bluetooth to connect
+                uint8_t status = lcd_wait_for_bit_better(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT, BT_CONN_TIMEOUT_MS);
+                if (status == LCD_WAIT_FOR_BIT_BETTER_SUCCESS) { // Success
                     lv_label_set_text(lbl_ins, AI_KEYB_HOLD_TALK_TXT);
                     lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
                     lv_obj_set_style_text_font(lbl_ins, &AI_KEYB_READY_FONT, 0);
@@ -1471,21 +1476,25 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 
                     // Enable use
                     state = AI_KEYB_IDLE;
-                } else {
+                } else if (status == LCD_WAIT_FOR_BIT_BETTER_TIMEOUT) { // Timeout
                     // Hide unused and center error label
                     lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
                     lv_obj_add_flag(lbl_config, LV_OBJ_FLAG_HIDDEN);
                     
                     lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
                     lv_label_set_text(lbl_ins, AI_BT_FAILED_TXT);
+                } else if (status == LCD_WAIT_FOR_BIT_BETTER_EXIT) { // Exit
+                    ui_btns->left_btn = 1; // Simulate left press to go back
                 }
-            } else {
+            } else if (status == LCD_WAIT_FOR_BIT_BETTER_TIMEOUT) { // Timeout
                 // Hide unused and center error label
                 lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
                 lv_obj_add_flag(lbl_config, LV_OBJ_FLAG_HIDDEN);
 
                 lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
                 lv_label_set_text(lbl_ins, AI_WIFI_FAILED_TXT);
+            } else if (status == LCD_WAIT_FOR_BIT_BETTER_EXIT) { // Exit
+                ui_btns->left_btn = 1; // Simulate left press to go back
             }
         }
 
@@ -1679,6 +1688,11 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         // Show top and bottom arrows
         lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+        // Show bluetooth menu
+        lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        bluetooth_menu->index = 2; // Set to AI Keyboard index
+        lcd_bluetooth_update_menu(bluetooth_menu); // Update
         
         // Switch pages
         ui_menu->page = BLUETOOTH_PAGE;

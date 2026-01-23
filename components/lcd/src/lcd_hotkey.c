@@ -267,7 +267,7 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
         const char *ending_text =
                 "This means when you are on the home page, simply %s press the %s button to send the "
                 "command linked to this hotkey.\n\nTo link a command, click the right arrow button now then send any PolyPlug "
-                "(SEND), ESP32, or Infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to represent waiting for a command.\n\n"
+                "(SEND), ESP32, or infrared signal. The " LV_SYMBOL_EYE_OPEN " icon will appear to represent waiting for a command.\n\n"
                 "The following pages are also eligible to be linked as a hotkey:\n"
                 " - AI Keyboard\n"
                 " - SRS Planner\n"

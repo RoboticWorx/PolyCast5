@@ -35,6 +35,10 @@
 #define OPTION_TOOLS "Tools"
 #define OPTION_SETTINGS "Settings"
 
+#define LCD_WAIT_FOR_BIT_BETTER_SUCCESS 0
+#define LCD_WAIT_FOR_BIT_BETTER_TIMEOUT 1
+#define LCD_WAIT_FOR_BIT_BETTER_EXIT    2
+
 // Define each sequentially (0, 1, 2, ...)
 enum {
     BOOT_PAGE,
@@ -368,6 +372,17 @@ void lcd_loading_anim_stop(void);
  * @param [in] ui_menu UI menu structure
  */
 void lcd_update_icons(icon_state_t *icon_state, ui_menu_t *ui_menu);
+
+/**
+ * @brief Wait for a bit to be set in an event group with timeout and exit option
+ *
+ * @param [in] event_group Event group handle
+ * @param [in] bit Bit to wait for
+ * @param [in] timeout_ms Timeout in milliseconds
+ *
+ * @returns 0 on success, 1 on timeout, 2 on left button exit
+ */
+uint8_t lcd_wait_for_bit_better(EventGroupHandle_t event_group, EventBits_t bit, uint32_t timeout_ms);
 
 /**
  * @brief Show one time boot up page with some starter info

@@ -41,7 +41,7 @@
 #define AI_VOICE_NORMALIZE_TARGET_PEAK 12000
 #define AI_VOICE_NORMALIZE_MAX_GAIN    20.0f
 
-#define SOUND_ANIM_THRESHOLD 200
+#define SOUND_ANIM_THRESHOLD 100
 
 // xAI realtime WS
 #define XAI_REALTIME_URI         "wss://api.x.ai/v1/realtime"
