@@ -18,13 +18,15 @@
 
 #define TAG "BLUETOOTH_WEB_PORTAL"
 
-#define WIFI_PASS_NS "wifi_pass"
+#define WIFI_PASS_NS "wifi_pass" // TODO: change to "bt_wifi"
 #define WIFI_PASS_KEY "pass"
 
 // All indexed by the same global script index: BT_SCRIPT_KEY_FMT, BT_SCRIPT_CAT_KEY_FMT, BT_SCRIPT_MENU_KEY_FMT
 #define BT_SCRIPT_NS "bt_portal"
 #define BT_SCRIPT_KEY_FMT "script_%02d"
 #define BT_SCRIPT_CAT_KEY_FMT "cat_%02d"
+#define BT_SCRIPT_CAT_COUNT "cat_count"
+#define BT_SCRIPT_CAT_NAME_FMT "cat_name_%02d"
 
 #define BT_SCRIPT_MENU_NS "keyb_menu"
 #define BT_SCRIPT_MENU_KEY_COUNT "count"
@@ -266,7 +268,7 @@ uint8_t bluetooth_category_count_get_nvs(void)
     esp_err_t err = nvs_open(BT_SCRIPT_NS, NVS_READONLY, &h);
     if (err == ESP_OK) {
         // Get count
-        if (nvs_get_u8(h, "cat_count", &count) != ESP_OK) {
+        if (nvs_get_u8(h, BT_SCRIPT_CAT_COUNT, &count) != ESP_OK) {
             // 0 if DNE
             count = 0;
         }
@@ -348,7 +350,7 @@ esp_err_t bluetooth_category_name_get_nvs(uint8_t idx, char *buf, size_t buflen)
     }
     
     char key[16];
-    snprintf(key, sizeof(key), "cat_name_%02d", idx);
+    snprintf(key, sizeof(key), BT_SCRIPT_CAT_NAME_FMT, idx);
     
     size_t len = buflen;
     err = nvs_get_str(h, key, buf, &len);
@@ -370,12 +372,12 @@ esp_err_t bluetooth_category_set_nvs(uint8_t idx, const char *name)
     
     // Get current count
     uint8_t count = 0;
-    nvs_get_u8(h, "cat_count", &count);
+    nvs_get_u8(h, BT_SCRIPT_CAT_COUNT, &count);
     
     // If idx >= count, it's an add: update count
     if (idx >= count) {
         count = idx + 1;
-        err = nvs_set_u8(h, "cat_count", count);
+        err = nvs_set_u8(h, BT_SCRIPT_CAT_COUNT, count);
         if (err != ESP_OK) {
             nvs_close(h);
             return err;
@@ -384,7 +386,7 @@ esp_err_t bluetooth_category_set_nvs(uint8_t idx, const char *name)
     
     // Set name
     char key[16];
-    snprintf(key, sizeof(key), "cat_name_%02d", idx);
+    snprintf(key, sizeof(key), BT_SCRIPT_CAT_NAME_FMT, idx);
     err = nvs_set_str(h, key, name);
     
     // Commit if success
@@ -409,7 +411,7 @@ esp_err_t bluetooth_category_delete_nvs(uint8_t idx)
     
     // Get current count
     uint8_t count = 0;
-    nvs_get_u8(h, "cat_count", &count);
+    nvs_get_u8(h, BT_SCRIPT_CAT_COUNT, &count);
     if (idx >= count) {
         nvs_close(h);
         return ESP_ERR_NOT_FOUND;
@@ -417,18 +419,18 @@ esp_err_t bluetooth_category_delete_nvs(uint8_t idx)
     
     // Delete the category name
     char key[16];
-    snprintf(key, sizeof(key), "cat_name_%02d", idx);
+    snprintf(key, sizeof(key), BT_SCRIPT_CAT_NAME_FMT, idx);
     nvs_erase_key(h, key);
     
     // Shift higher categories down
-    for (uint8_t i = idx + 1; i < count; i++) {
+    for (uint8_t i = idx + 1; i < count; ++i) {
         char old_key[16];
-        snprintf(old_key, sizeof(old_key), "cat_name_%02d", i);
+        snprintf(old_key, sizeof(old_key), BT_SCRIPT_CAT_NAME_FMT, i);
         
         size_t len = BT_CAT_LABEL_MAX_LEN + 1;
         char buf[BT_CAT_LABEL_MAX_LEN + 1];
         if (nvs_get_str(h, old_key, buf, &len) == ESP_OK) {
-            snprintf(key, sizeof(key), "cat_name_%02d", i - 1);
+            snprintf(key, sizeof(key), BT_SCRIPT_CAT_NAME_FMT, i - 1);
             nvs_set_str(h, key, buf);
             nvs_erase_key(h, old_key);
         }
@@ -436,11 +438,11 @@ esp_err_t bluetooth_category_delete_nvs(uint8_t idx)
     
     // Decrement count
     count--;
-    nvs_set_u8(h, "cat_count", count);
+    nvs_set_u8(h, BT_SCRIPT_CAT_COUNT, count);
     
     // Update all script categories: decrement if > idx
     uint8_t script_count = bluetooth_script_count_get_nvs();
-    for (uint8_t s = 0; s < script_count; s++) {
+    for (uint8_t s = 0; s < script_count; ++s) {
         char cat_key[16];
         snprintf(cat_key, sizeof(cat_key), BT_SCRIPT_CAT_KEY_FMT, s);
         uint8_t cat;
@@ -515,7 +517,7 @@ esp_err_t bluetooth_wifi_pass_load_nvs(char *out, size_t out_sz)
 static esp_err_t root_get(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/html");
-     
+    
     return httpd_resp_send(req, BLUETOOTH_WEB_PORTAL_HTML, HTTPD_RESP_USE_STRLEN);
 }
 
@@ -538,15 +540,15 @@ static esp_err_t scripts_list_get(httpd_req_t *req)
     cJSON *labels = cJSON_AddArrayToObject(root, "labels");
 
     // Loop over each saved script index
-    for (uint8_t i = 0; i < count; i++) {
-         char lbl[BT_SCRIPT_LABEL_MAX_LEN + 1] = {0}; // Buffer
-         
-         // Add the label or "" to the array
-         if ((bluetooth_script_label_get_nvs(i, lbl, sizeof(lbl)) == ESP_OK) && (lbl[0] != '\0')) {
-              cJSON_AddItemToArray(labels, cJSON_CreateString(lbl));
-         } else {
-              cJSON_AddItemToArray(labels, cJSON_CreateString(""));
-         }
+    for (uint8_t i = 0; i < count; ++i) {
+        char lbl[BT_SCRIPT_LABEL_MAX_LEN + 1] = {0}; // Buffer
+        
+        // Add the label or "" to the array
+        if ((bluetooth_script_label_get_nvs(i, lbl, sizeof(lbl)) == ESP_OK) && (lbl[0] != '\0')) {
+             cJSON_AddItemToArray(labels, cJSON_CreateString(lbl));
+        } else {
+             cJSON_AddItemToArray(labels, cJSON_CreateString(""));
+        }
     }
 
     // Serialize the JSON tree into a compact string then free the cJSON tree
@@ -584,7 +586,7 @@ static bool resolve_global_index_for_local(uint8_t cat, uint8_t local_index, boo
     
     // Count how many scripts belong to 'cat' and remember their global positions in order.
     uint8_t seen = 0;
-    for (uint8_t i = 0; i < total; i++) {
+    for (uint8_t i = 0; i < total; ++i) {
         uint8_t c = 0;
         (void)bluetooth_script_cat_idx_get_nvs(i, &c);
 
@@ -947,7 +949,7 @@ static esp_err_t script_one_delete(httpd_req_t *req)
     size_t blen = 0;
     uint8_t next_cat = 0;
 
-    for (uint8_t i = global_idx; i + 1 < count; i++) {
+    for (uint8_t i = global_idx; i + 1 < count; ++i) {
         // Read from next slot
         next_label[0] = '\0';
         blen = 0;
@@ -1000,7 +1002,7 @@ static esp_err_t categories_get(httpd_req_t *req)
     }
 
     // Populate names
-    for (uint8_t i = 0; i < count; i++) {
+    for (uint8_t i = 0; i < count; ++i) {
         char buf[BT_CAT_LABEL_MAX_LEN + 1];
 
         if (bluetooth_category_name_get_nvs(i, buf, sizeof(buf)) == ESP_OK) {

@@ -41,6 +41,7 @@ _PolyCast5 also comes with cool, customizable homescreen animations and hotkeys!
 * `bin` - Precompiled binaries of the latest release for OTA/updater.
 * `scripts` - Bluetooth keystroke injection (autotype) examples as well as a few miscellaneous developement scripts.
 * `components` - The various pieces of the application code broken into folders.
+  * `ai` - Interacts with AI APIs to receive AI responses to query requests.
   * `bluetooth` - Communicates with a connected BLE device as a Human Interface Device (HID) to behave as a media controller and autotype keyboard.
   * `common` - Shared macros across the entirety of the program used for build and debugging.
   * `espnow` - Sends instantaneous low-power ESP-NOW commands to external ESP32 devices for interacting with custom builds or anything else. (e.g. light switcher, etc.)
