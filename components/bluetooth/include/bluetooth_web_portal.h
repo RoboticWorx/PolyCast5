@@ -142,4 +142,18 @@ esp_err_t bluetooth_wifi_pass_save_nvs(const char *val);
  */
 esp_err_t bluetooth_wifi_pass_load_nvs(char *out, size_t out_sz);
 
+/** 
+ * @brief Gets the SSID for the bluetooth web portal
+ *
+ * @returns SSID string
+ */
+const char *bluetooth_web_portal_get_ssid(void);
+
+/** 
+ * @brief Gets the password for the bluetooth web portal
+ *
+ * @returns Password string
+ */
+const char *bluetooth_web_portal_get_pass(void);
+
 #endif // BLUETOOTH_WEB_PORTAL_H

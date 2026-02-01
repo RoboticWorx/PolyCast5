@@ -495,12 +495,13 @@ static void lcd_task(void *pvParameters)
                     lcd_bluetooth_ai_keyboard_page(&ui_btns, &ui_menu, &bluetooth_menu);
                     dont_sleep_on_this_page = true;
                     break;
+                case BLUETOOTH_KEYBOARD_SUB_PAGE:
+                    lcd_bluetooth_keyboard_sub_page(&ui_btns, &ui_menu, &bluetooth_menu);
+                    dont_sleep_on_this_page = true;
+                    break;
                 case BLUETOOTH_AI_CONFIG_PAGE:
                     lcd_bluetooth_ai_config_page(&ui_btns, &ui_menu, &bluetooth_menu);
                     dont_sleep_on_this_page = true;
-                    break;
-                case BLUETOOTH_KEYBOARD_SUB_PAGE:
-                    lcd_bluetooth_keyboard_sub_page(&ui_btns, &ui_menu, &bluetooth_menu);
                     break;
                 case BLUETOOTH_SCRIPT_ADD_PAGE:
                     lcd_bluetooth_add_script_page(&ui_btns, &ui_menu, &bluetooth_menu);
