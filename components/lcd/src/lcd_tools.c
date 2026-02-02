@@ -1256,12 +1256,12 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
     #define SRS_MAX_TO_SHOW 3
     //#define SRS_CALIBRATING 1
     
-    #ifdef SRS_CALIBRATING // To easily add days to retrieve notebook entries
+#ifdef SRS_CALIBRATING // To easily add days to retrieve notebook entries
     static int calibrate = -133; // Initial offset (days since start date)
     // Add first then go to next and start clear cycle - make sure to disconnect from port and restart the device first for fresh Wi-Fi fetch
-    #else
+#else
     static int calibrate = 0; // No offset - present day
-    #endif
+#endif
     
     // Statics
     static bool do_once = false;
@@ -1383,11 +1383,11 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
             int idx = due_idx[g];
             int days_since_added = (int)(today - srs_tbl[idx].start_day);
 
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             int current_step = (int)srs_days[srs_tbl[idx].step];
             ESP_LOGI(TAG, "Pg. %u is on: interval %d | step %d | added %d days ago",
                     srs_tbl[idx].page, current_step, srs_tbl[idx].step, days_since_added);
-            #endif
+#endif
 
             char line[32];
             if (days_since_added > 1) {
@@ -1429,11 +1429,11 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
         lv_label_set_text(lbl_hint, msg);
     }
     
-    #ifdef SRS_CALIBRATING
+#ifdef SRS_CALIBRATING
     if (ui_btns->up_btn == 1) {
         calibrate++; // Move day up to speed run entries
     }
-    #endif
+#endif
 
     /* User input */
     // Increment selected
@@ -1583,9 +1583,9 @@ void lcd_tools_btc_addr_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
     
             lv_label_set_text_fmt(instr_lbl, instr_text, btc_addr);
         } else {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGE(TAG, "btc_addr_get failed: %s", esp_err_to_name(err));
-            #endif
+#endif
     
             // Instructions label (scrollable if text is long)
             instr_lbl = lv_label_create(cont);
@@ -1881,9 +1881,9 @@ static void tetris_high_score_nvs_save(uint32_t score)
         // Commit to flash
         err = nvs_commit(h);
         
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Saved Tetris high score: %" PRIu32, score);
-        #endif
+#endif
     } else {
         ESP_LOGE(TAG, "Failed to tetris_high_score_nvs_save nvs_set_u32: %" PRIu32, score);
     }
@@ -1901,22 +1901,22 @@ static uint32_t tetris_high_score_nvs_load(void)
     // Open NVS
     esp_err_t err = nvs_open(HIGH_SCORE_NS, NVS_READONLY, &h);
     if (err != ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "tetris_high_score_nvs_load NS DNE");
-        #endif
+#endif
     }
     
     // Get the uint32
     uint32_t score = 0;
     err = nvs_get_u32(h, HIGH_SCORE_KEY, &score);
     if (err != ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGE(TAG, "Failed tetris_high_score_nvs_load nvs_get_u32");
-        #endif
+#endif
     } else {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Loaded Tetris high score: %" PRIu32, score);
-        #endif
+#endif
     }
     
     // Close NVS

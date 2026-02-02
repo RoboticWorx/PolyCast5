@@ -270,9 +270,9 @@ static void i2c_scan(uint8_t found_addrs[], int *found_count)
             found_addrs[*found_count] = addr;
             (*found_count)++;
             
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "I2C device found at 0x%02X", addr);
-            #endif
+#endif
         }
     }
 

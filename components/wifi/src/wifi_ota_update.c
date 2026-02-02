@@ -44,22 +44,22 @@ static int manifest_size_bytes = -1;
 
 static void ota_task(void *_)
 {
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Pre-OTA heap: free=%u, internal=%u, min=%u",
             esp_get_free_heap_size(),
             heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
             esp_get_minimum_free_heap_size());
-    #endif
+#endif
 
     // Free some internal heap
     wifi_mqtt_client_destroy();
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Pre-OTA heap after MQTT deinit: free=%u, internal=%u, min=%u",
             esp_get_free_heap_size(),
             heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
             esp_get_minimum_free_heap_size());
-    #endif
+#endif
     
     // Configure the HTTP(S) client
     esp_http_client_config_t http_cfg = {
@@ -80,9 +80,9 @@ static void ota_task(void *_)
 
     esp_https_ota_handle_t h = NULL;
     
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "OTA total size: %d", manifest_size_bytes);
-    #endif
+#endif
     
     // Opens the URL, validates TLS, selects the inactive OTA partition, and prepares to stream
     esp_err_t err = esp_https_ota_begin(&ota_cfg, &h);
@@ -92,7 +92,7 @@ static void ota_task(void *_)
         goto out;
     }
 
-    #ifdef OTA_CHECK_PROJ_DESC
+#ifdef OTA_CHECK_PROJ_DESC
     /* Reject if same version */
     // Already checked above in ota_check_task
     const esp_app_desc_t *running = esp_app_get_description();
@@ -111,7 +111,7 @@ static void ota_task(void *_)
             goto out;
         }
     }
-    #endif
+#endif
 
     /* Download and write loop */
     size_t last = 0;
@@ -139,9 +139,9 @@ static void ota_task(void *_)
                     pct = 0;
                 }
                 
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Update %d%% (%u/%d)", pct, (unsigned)read, manifest_size_bytes);
-                #endif
+#endif
             }
 
             // Send percentage to LCD
@@ -150,9 +150,9 @@ static void ota_task(void *_)
             if (read - last >= 64 * 1024) {
                 last = read;
                 
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Downloaded %u B", (unsigned)read);
-                #endif
+#endif
             }
         }
         
@@ -173,9 +173,9 @@ static void ota_task(void *_)
     // If OTA completed successfully
     err = esp_https_ota_finish(h);
     if (err == ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "OTA OK, rebooting...");
-        #endif
+#endif
 
         // Save the new version to NVS if exists
         if (pending_manifest_ver[0]) {
@@ -183,9 +183,9 @@ static void ota_task(void *_)
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "wifi_ota_update_set_nvs_version failed: %s", esp_err_to_name(err));
             } else {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Saved new FW version to NVS: %s", pending_manifest_ver);
-                #endif
+#endif
             }
         }
         
@@ -277,9 +277,9 @@ static void ota_check_task(void *_)
         goto done;
     }
     
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "http_get_small string='%s'", buf);
-    #endif
+#endif
 
     // Parse the JSON text into a DOM
     cJSON *root = cJSON_Parse(buf);
@@ -315,16 +315,16 @@ static void ota_check_task(void *_)
 
     // Copy update info to global buffer
     strlcpy(ota_update_info, jinfo->valuestring, sizeof(ota_update_info));
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "ota_update_info: %s", ota_update_info);
     ESP_LOGI(TAG, "Current ver: %s | Available: %s", current_ver, new_ver);
-    #endif
+#endif
 
     // If different version -> update from extracted URL
     if (strcmp(current_ver, new_ver) != 0) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "New version found -> Considering OTA from %s", ota_update_url);
-        #endif
+#endif
 
         // Save the pending version to global buffer
         strlcpy(pending_manifest_ver, new_ver, sizeof(pending_manifest_ver));
@@ -332,9 +332,9 @@ static void ota_check_task(void *_)
         // OTA update is available
         xEventGroupSetBits(xWifiEventGroup, WIFI_OTA_AVAILABLE_BIT);
     } else {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Already up-to-date");
-        #endif
+#endif
 
         // No OTA available
         xEventGroupClearBits(xWifiEventGroup, WIFI_OTA_AVAILABLE_BIT);
@@ -396,9 +396,9 @@ bool wifi_ota_update_start(const char *url)
         return false;
     }
     
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Starting OTA: %s", url);
-    #endif
+#endif
     return true;
 }
 
@@ -410,10 +410,10 @@ static void log_versions(const esp_app_desc_t *running, const esp_app_desc_t *in
         return;
     }
     
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Running : %s (%s %s)", running->version, running->date, running->time);
     ESP_LOGI(TAG, "Incoming : %s (%s %s)", incoming->version, incoming->date, incoming->time);
-    #endif
+#endif
 }
 #endif
 
@@ -424,15 +424,15 @@ bool wifi_ota_update_in_progress(void)
 
 void wifi_ota_update_mark_app_valid(void)
 {
-    #if CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
+#ifdef CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
     esp_err_t err = esp_ota_mark_app_valid_cancel_rollback();
 
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Marked app valid");
     }
-    #else
+#else
     ESP_LOGE(TAG, "APP ROLLBACK NOT ENABLED: Please enable in menuconfig");
-    #endif
+#endif
 }
 
 esp_err_t wifi_ota_update_set_nvs_version(const char *val)

@@ -764,9 +764,9 @@ void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu
     } else if (ui_btns->select_btn == 1) { // Save
         settings_menu->pin_menu.unlock_pin[num_filled] = '\0'; // Ensure termination
             
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Entered pin: %s", settings_menu->pin_menu.unlock_pin);
-        #endif
+#endif
         
         // Update menu text and flag
         settings_menu->options[0] = SETTINGS_REMOVE_LOCK_TXT;
@@ -2323,9 +2323,9 @@ void lcd_settings_pin_nvs_load(settings_menu_t *menu)
     if (err == ESP_ERR_NVS_NOT_FOUND || err == ESP_ERR_NVS_NOT_INITIALIZED) {
         menu->pin_menu.pin_set = false;
         menu->pin_menu.unlock_pin[0] = '\0';
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "lcd_settings_pin_nvs_load nvs_open failed: %s", esp_err_to_name(err));
-        #endif
+#endif
         
         return;
     }
@@ -2342,9 +2342,9 @@ void lcd_settings_pin_nvs_load(settings_menu_t *menu)
         menu->pin_menu.pin_set = (u8 != 0);
     } else if (err == ESP_ERR_NVS_NOT_FOUND) {
         menu->pin_menu.pin_set = false;
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "lcd_settings_pin_nvs_load nvs_get_u8 ESP_ERR_NVS_NOT_FOUND");
-        #endif
+#endif
     } else {
         goto out;
     }
@@ -2358,9 +2358,9 @@ void lcd_settings_pin_nvs_load(settings_menu_t *menu)
     // If DNE
     if (err == ESP_ERR_NVS_NOT_FOUND) {
         menu->pin_menu.unlock_pin[0] = '\0';
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "lcd_settings_pin_nvs_load nvs_get_str ESP_ERR_NVS_NOT_FOUND");
-        #endif
+#endif
     } else if (err == ESP_OK) {
         // Stored string too long for our buffer
         if (required_size > sizeof(menu->pin_menu.unlock_pin)) {
@@ -2396,9 +2396,9 @@ void lcd_settings_pin_attempts_nvs_save(void)
         // Commit to flash
         err = nvs_commit(h);
         
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Saved pin attempts: %" PRIu32, pin_attempts);
-        #endif
+#endif
     } else {
         ESP_LOGE(TAG, "Failed to save pin attempts: %s", esp_err_to_name(err));
     }
@@ -2415,9 +2415,9 @@ void lcd_settings_pin_attempts_nvs_load(void)
     // Open NVS
     esp_err_t err = nvs_open(SETTINGS_ATTEMPTS_NS, NVS_READONLY, &h);
     if (err != ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "Pin attempts nvs_open failed: %s", esp_err_to_name(err));
-        #endif
+#endif
         
         goto out;
     }
@@ -2437,9 +2437,9 @@ void lcd_settings_pin_attempts_nvs_load(void)
             break;
     }
     
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Loaded pin attempts: %" PRIu32, stored);
-    #endif
+#endif
     
     // Close NVS
     out:
@@ -2558,9 +2558,9 @@ void lcd_settings_sleep_timer_nvs_load(void)
     uint16_t len;
     if (nvs_get_u16(h, SETTINGS_SLEEP_TIMER_KEY, &len) == ESP_OK) {
         home_sleep_after_s = len;
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Loaded sleep timer: %u sec", home_sleep_after_s);
-        #endif
+#endif
     }
     
     // Close NVS
@@ -2615,17 +2615,17 @@ void lcd_settings_rgb_led_nvs_load(void)
     int16_t len;
     if (nvs_get_i16(h, SETTINGS_RGB_LED_PERIOD_KEY, &len) == ESP_OK) {
         rbg_blink_period_ms = len;
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Loaded RGB LED period: %d ms", rbg_blink_period_ms);
-        #endif
+#endif
     }
     
     // Load the RGB LED total duration
     if (nvs_get_i16(h, SETTINGS_RGB_LED_TOTAL_KEY, &len) == ESP_OK) {
         rgb_blink_total_ms = len;
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Loaded RGB LED total duration: %d ms", rgb_blink_total_ms);
-        #endif
+#endif
     }
     
     // Close NVS
@@ -2667,9 +2667,9 @@ void lcd_settings_lcd_ledc_nvs_load(void)
     esp_err_t err = nvs_open(SETTINGS_LCD_LEDC_NS, NVS_READONLY, &h);
     if (err != ESP_OK) {
         // First boot or NS doesn't exist: return default
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "LCD brightness NS not found, using default %d%%", lcd_ledc_brightness);
-        #endif
+#endif
         return;
     }
 
@@ -2678,14 +2678,14 @@ void lcd_settings_lcd_ledc_nvs_load(void)
     err = nvs_get_i8(h, SETTINGS_LCD_LEDC_KEY, &loaded);
     if (err == ESP_OK) {
         lcd_ledc_brightness = loaded;
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Loaded LCD brightness: %d%%", lcd_ledc_brightness);
-        #endif
+#endif
     } else if (err == ESP_ERR_NVS_NOT_FOUND) {
         // Key not found: use default
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "LCD brightness key not found, using default 100%%");
-        #endif
+#endif
     } else {
         ESP_LOGE(TAG, "lcd_settings_lcd_ledc_nvs_load: get failed (%s)", esp_err_to_name(err));
     }

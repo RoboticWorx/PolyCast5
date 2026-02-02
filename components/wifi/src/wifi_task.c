@@ -153,13 +153,13 @@ static void wifi_task(void *param)
         // Save that version to NVS
         wifi_btc_pass_save_nvs(btc_wifi_portal_pass);
         
-        #ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_PASS_DEBUG
         ESP_LOGW(TAG, "Setting first time BTC Wi-Fi portal password: %s", btc_wifi_portal_pass);
-        #endif
+#endif
     } else {
-        #ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_PASS_DEBUG
         ESP_LOGI(TAG, "Using pre-set BTC Wi-Fi portal password: '%s'", btc_wifi_portal_pass);
-        #endif
+#endif
     }
 
     // Let everything else initialize
@@ -179,13 +179,13 @@ static void wifi_task(void *param)
         // Save that version to NVS
         wifi_ota_update_set_nvs_version(cur);
         
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "Setting first time FW version: %s", cur);
-        #endif
+#endif
     } else {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Using pre-set PolyCast5 FW version '%s'", dummy);
-        #endif
+#endif
     }
     
     while (1) {
@@ -199,17 +199,17 @@ static void wifi_task(void *param)
         
         // Specific network to connect selected
         if (xQueueReceive(xWifiSelectedNetworkQueue, &selected_network, 0) == pdTRUE) {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "xWifiSelectedNetworkQueue received: ssid='%s', pass='%s'", selected_network.ssid, selected_network.password);
             ESP_LOGI(TAG, "xWifiSelectedNetworkQueue received: bssid='%02x:%02x:%02x:%02x:%02x:%02x'",
                     selected_network.bssid[0], selected_network.bssid[1], selected_network.bssid[2],
                     selected_network.bssid[3], selected_network.bssid[4], selected_network.bssid[5]);
-            #endif
+#endif
             
             if (selected_network.prev && strlen(selected_network.ssid) == 0) {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGW(TAG, "No previous network to connect to");
-                #endif
+#endif
                 
                 xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_CONNECTING_BIT); // Not connected / not connecting
             } else {
@@ -229,12 +229,12 @@ static void wifi_task(void *param)
         
         // Received channel to sniff
         if (xQueueReceive(xWifiSniffQueue, &sniff_network, 0) == pdTRUE) {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "xWifiSniffQueue received: mask='%d', channel='%u'", sniff_network.mask, sniff_network.channel);
             ESP_LOGI(TAG, "xWifiSniffQueue received: bssid='%02x:%02x:%02x:%02x:%02x:%02x'",
                     sniff_network.target_bssid[0], sniff_network.target_bssid[1], sniff_network.target_bssid[2],
                     sniff_network.target_bssid[3], sniff_network.target_bssid[4], sniff_network.target_bssid[5]);
-            #endif
+#endif
             
             wifi_utils_init_promiscuous(&sniff_network);
         }
@@ -251,9 +251,9 @@ static void wifi_task(void *param)
         if (xSemaphoreTake(xWifiPingSemaphore, 0) == pdTRUE) {
             // If not connected to Wi-Fi, skip pings
             if (!(xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT)) {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGW(TAG, "xWifiPingSemaphore: Skipping ping, not connected to Wi-Fi");
-                #endif
+#endif
                 continue;
             }
 
@@ -265,17 +265,17 @@ static void wifi_task(void *param)
             if (err != ESP_OK) {
                 ESP_LOGW(TAG, "Initial gateway ping failed: %s", esp_err_to_name(err));
             } else {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Initial gateway ping RTT: %d ms", wifi_ping.rtt_gateway);
-                #endif
+#endif
             }
 
             // Ping a public DNS server
             err = wifi_ping_dns("8.8.8.8", &wifi_ping.rtt_dns); // Google Public DNS
             if (err == ESP_OK) {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Ping 8.8.8.8: %ld ms", (long)wifi_ping.rtt_dns);
-                #endif
+#endif
             } else {
                 ESP_LOGW(TAG, "Ping to 8.8.8.8 failed : %s", esp_err_to_name(err));
             }
@@ -291,9 +291,9 @@ static void wifi_task(void *param)
         if (wifi_event_bits != last_wifi_event_bits) { // Only act on changes
             esp_err_t err;
 
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Received Wi-Fi event: %u", (unsigned int)wifi_event_bits);
-            #endif
+#endif
 
             // If Wi-Fi reconnect bit transitioned 0 -> 1
             if ((wifi_event_bits & WIFI_RECONNECT_BIT) && !(last_wifi_event_bits & WIFI_RECONNECT_BIT)) {
@@ -315,9 +315,9 @@ static void wifi_task(void *param)
             }
             // If Wi-Fi disconnect bit transitioned 0 -> 1
             if ((wifi_event_bits & WIFI_DISCONNECT_BIT) && !(last_wifi_event_bits & WIFI_DISCONNECT_BIT)) {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Disconnecting Wi-Fi...");
-                #endif
+#endif
 
                 err = wifi_utils_radio_stop();
                 if (err != ESP_OK) {

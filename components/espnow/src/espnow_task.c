@@ -108,10 +108,10 @@ static void espnow_task(void *param)
                     espnow_mqtt.key[12], espnow_mqtt.key[13], espnow_mqtt.key[14], espnow_mqtt.key[15]
             );
             
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOG_BUFFER_HEX("Sending MQTT KEY", espnow_mqtt.key, 16);
             ESP_LOGI(TAG, "Sending MQTT: %s", payload);
-            #endif
+#endif
             
             // Send the data
             espnow_utils_send_data(UNIVERSAL_MAC, (uint8_t*)payload, len);
@@ -147,13 +147,13 @@ static void espnow_task(void *param)
                 tx_payload_len = 0;
             }
             
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Sending: %s", tx_payload);
             ESP_LOG_BUFFER_HEX("To MAC", espnow_cmd.mac_selected, ESPNOW_MAC_SIZE);
             if (espnow_cmd.enc) {
                 ESP_LOG_BUFFER_HEX("LMK", espnow_cmd.lmk, LMK_LEN);
             }
-            #endif
+#endif
             
             // Send the data
             if (espnow_utils_send_data(espnow_cmd.mac_selected, (uint8_t*)tx_payload, tx_payload_len) == ESP_OK) {

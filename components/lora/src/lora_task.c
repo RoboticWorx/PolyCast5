@@ -206,9 +206,9 @@ static void lora_task(void *pvParameters) {
         
         // If retrying from no receipt
         if (need_to_retry) {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "RETRYING: %s", payload);
-            #endif
+#endif
             
             // Encrypt and send the same payload again
             lora_utils_encrypt_and_transmit((uint8_t *)payload);
@@ -236,10 +236,10 @@ static void lora_task(void *pvParameters) {
             // Format command into string
             snprintf(payload, sizeof(payload), "PolyCast_Command_Value:%" PRIu32 ":%d:%s", expected_rx_id, lora_cmd.index, lora_cmd.instr);
             
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "SENDING ACTUAL: %s", payload);
             ESP_LOG_BUFFER_HEX("LORA_TASK: Using encryption_key", encryption_key, LORA_ENC_KEY_LEN); // Format appends ": "
-            #endif
+#endif
             
             // Encrypt and send over
             lora_utils_encrypt_and_transmit((uint8_t *)payload);
@@ -259,9 +259,9 @@ static void lora_event_handler_task(void *pvParameters) {
 
             // If transmission complete
             if (irq_flags & SX126X_IRQ_TX_DONE) {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Transmission completed");
-                #endif
+#endif
                 
                 sx126x_clear_irq_status(NULL, SX126X_IRQ_TX_DONE);
                 lora_utils_set_rx_mode(); // Listen for receipt from receiver
@@ -283,9 +283,9 @@ static void lora_event_handler_task(void *pvParameters) {
                 sx126x_read_buffer(NULL, rx_status.buffer_start_pointer,
                                    rx_buffer, rx_size);
                 
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Received packet of size %d", rx_size);
-                #endif
+#endif
 
                 // Process received
                 lora_utils_process_received_message(rx_buffer, rx_size);
@@ -295,9 +295,9 @@ static void lora_event_handler_task(void *pvParameters) {
             }
 
             if (irq_flags & SX126X_IRQ_TIMEOUT) {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGW(TAG, "RX timeout occurred");
-                #endif
+#endif
                 
                 sx126x_clear_irq_status(NULL, SX126X_IRQ_TIMEOUT);
                 sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
@@ -310,16 +310,16 @@ static void lora_event_handler_task(void *pvParameters) {
                     xQueueReset(xLoraSendEncQueue); // Clear pending commands
                     waiting_for_ack = false;
                     
-                    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                     ESP_LOGW(TAG, "Hit max LoRa retires");
-                    #endif
+#endif
                 }
             }
 
             if (irq_flags & SX126X_IRQ_HEADER_ERROR) {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGE(TAG, "Header error in received packet");
-                #endif
+#endif
                 
                 sx126x_clear_irq_status(NULL, SX126X_IRQ_HEADER_ERROR);
                 sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
@@ -332,16 +332,16 @@ static void lora_event_handler_task(void *pvParameters) {
                     xQueueReset(xLoraSendEncQueue); // Clear pending commands
                     waiting_for_ack = false;
                     
-                    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                     ESP_LOGW(TAG, "Hit max LoRa retires");
-                    #endif
+#endif
                 }
             }
 
             if (irq_flags & SX126X_IRQ_CRC_ERROR) {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGE(TAG, "CRC error in received packet");
-                #endif
+#endif
                 
                 sx126x_clear_irq_status(NULL, SX126X_IRQ_CRC_ERROR);
                 sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
@@ -354,9 +354,9 @@ static void lora_event_handler_task(void *pvParameters) {
                     xQueueReset(xLoraSendEncQueue); // Clear pending commands
                     waiting_for_ack = false;
                     
-                    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                     ESP_LOGW(TAG, "Hit max LoRa retires");
-                    #endif
+#endif
                 }
             }
         }

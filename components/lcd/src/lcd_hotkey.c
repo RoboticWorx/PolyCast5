@@ -369,9 +369,9 @@ void lcd_hotkey_nvs_load(hotkey_cmd_t *dst)
     // Open NVS
     esp_err_t err = nvs_open(HOTKEY_NS, NVS_READONLY, &h);
     if (err != ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "lcd_hotkey_nvs_load nvs_open failed: %s", esp_err_to_name(err));
-        #endif
+#endif
 
         memset(dst, 0, sizeof(*dst)); // Make state deterministic
         return;

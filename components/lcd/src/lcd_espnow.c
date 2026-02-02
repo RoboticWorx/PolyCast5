@@ -807,9 +807,9 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
         name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
         memcpy(saved_name, name_buf, MAX_CUSTOM_NAME_LEN + 1);
         
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "%s", saved_name);
-        #endif
+#endif
         
         // Delete labels since no longer used
         lv_obj_delete(lbl_user_in);

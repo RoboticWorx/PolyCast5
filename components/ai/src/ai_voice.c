@@ -220,9 +220,9 @@ esp_err_t ai_voice_init(void)
     }
 
     voice_inited = true;
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Mic init OK (48k stereo, 32-bit slots).");
-    #endif
+#endif
     return ESP_OK;
 }
 
@@ -256,9 +256,9 @@ esp_err_t ai_voice_deinit(void)
         ESP_LOGE(TAG, "ai_voice_deinit: ai_voice_force_sleep_pins_low failed: %s", esp_err_to_name(sleep_err));
     }
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Mic deinit successful.");
-    #endif
+#endif
 
     return err;
 }
@@ -284,9 +284,9 @@ esp_err_t ai_voice_force_sleep_pins_low(void)
     err = gpio_hold_en(I2S_T5848_SCK_PIN);
     err = gpio_hold_en(I2S_T5848_WS_PIN);
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "ai_voice_force_sleep_pins_low successful.");
-    #endif
+#endif
 
     return err;
 }
@@ -530,9 +530,9 @@ static void ws_event_handler(void *handler_args, esp_event_base_t base, int32_t 
         return;
     }
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "WS event type=%s", t);
-    #endif
+#endif
 
     // If server sends an error object, fail immediately
     const cJSON *err = cJSON_GetObjectItem(j, "error");

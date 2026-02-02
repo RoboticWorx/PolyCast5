@@ -74,9 +74,9 @@ esp_err_t wifi_utils_scan(wifi_scan_t *wifi_scan)
 
     // If no networks found
     if (ap_num == 0) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "esp_wifi_scan_get_ap_num: No access points found");
-        #endif
+#endif
 
         wifi_scan_t sentinel = {0};
 
@@ -107,7 +107,7 @@ esp_err_t wifi_utils_scan(wifi_scan_t *wifi_scan)
         return err;
     }
     
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Found %d access point(s):", ap_num);
     for (int i = 0; i < ap_num; ++i) {
         ESP_LOGI(TAG,
@@ -122,7 +122,7 @@ esp_err_t wifi_utils_scan(wifi_scan_t *wifi_scan)
                 ap_list[i].authmode
         );
     }
-    #endif
+#endif
 
     // Build a list of unique SSIDs, keeping the strongest RSSI for each
     size_t unique_count = 0;
@@ -272,9 +272,9 @@ static void tz_apply_fixed_posix_from_offsets(int raw_offset_s, int dst_offset_s
     tzset();
 
     // Log the applied fixed-offset TZ
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI("AUTO_TZ", "Applied fixed-offset TZ: %s", tzbuf);
-    #endif
+#endif
 }
 
 // Simple retrying HTTP GET (chunk-safe). Returns true with malloc'd body on HTTP 200
@@ -488,9 +488,9 @@ esp_err_t wifi_utils_apply_timezone_auto(void)
                     tzset();
 
                     // Log success
-                    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                     ESP_LOGI("AUTO_TZ", "Applied TZ: IANA='%s' -> POSIX='%s'", iana, posix);
-                    #endif
+#endif
 
                     // Mark success
                     ret = ESP_OK;
@@ -546,9 +546,9 @@ esp_err_t wifi_utils_apply_timezone_auto(void)
                     tzset();
 
                     // Log success (ip-api path)
-                    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                     ESP_LOGI("AUTO_TZ", "Applied TZ: IANA='%s' -> POSIX='%s' (ip-api)", iana, posix);
-                    #endif
+#endif
 
                     // Mark success
                     ret = ESP_OK;
@@ -584,9 +584,9 @@ esp_err_t wifi_utils_apply_timezone_auto(void)
                 tzset();
 
                 // Log success (ipapi path)
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGI("AUTO_TZ", "Applied TZ: IANA='%s' -> POSIX='%s' (ipapi)", body, posix);
-                #endif
+#endif
 
                 // Mark success
                 ret = ESP_OK;
@@ -657,16 +657,16 @@ void wifi_utils_get_current_date_time(void)
     // Render it as 'YYYY-MM-DD HH:MM:SS' into our buffer
     strftime(strftime_buf, sizeof(strftime_buf), "%Y-%m-%d %H:%M:%S", &timeinfo);
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Current date/time 24h: %s", strftime_buf);
-    #endif
+#endif
     
     // 12-hour format with AM/PM:
     strftime(strftime_buf, sizeof(strftime_buf), "%Y-%m-%d %I:%M:%S %p", &timeinfo);
     
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Current date/time 12h: %s", strftime_buf);
-    #endif
+#endif
 
     // Notify time acquired
     xEventGroupSetBits(xWifiEventGroup, WIFI_GOT_DATE_TIME_BIT); // Set got time
@@ -692,9 +692,9 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
         wifi_event_sta_disconnected_t* d = (wifi_event_sta_disconnected_t*)data;
 
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "Disconnected, reason=%d (%s)", d->reason, wifi_disconnect_reason_str(d->reason));
-        #endif
+#endif
 
         wifi_utils_radio_stop();
 
@@ -710,11 +710,11 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) { // Connected event
         ip_event_got_ip_t* e = (ip_event_got_ip_t*)data;
         
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Got IP: " IPSTR ", GW: " IPSTR,
                 IP2STR(&e->ip_info.ip),
                 IP2STR(&e->ip_info.gw));
-        #endif
+#endif
         
         // Save gateway so we can ping it later
         sta_gw = e->ip_info.gw;
@@ -761,9 +761,9 @@ esp_err_t wifi_utils_connect(void)
     // Wait for connection or timeout
     if (xEventGroupWaitBits(xWifiEventGroup, WIFI_CONNECTED_BIT,
             pdFALSE, pdFALSE, pdMS_TO_TICKS(WIFI_CONN_TIMEOUT_MS)) & WIFI_CONNECTED_BIT) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Wi-Fi connected and got IP!");
-        #endif
+#endif
         
         // wifi_mqtt_client_start() called after checking for OTA update
     } else {
@@ -799,13 +799,13 @@ esp_err_t wifi_utils_radio_start(const char *ssid, const uint8_t* bssid, const c
     
     cfg.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK; // Weakest auth mode to accept in the fast scan mode 
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Setting Wi-Fi config SSID='%s'", ssid);
     ESP_LOGI(TAG, "Setting Wi-Fi config BSSID=%02x:%02x:%02x:%02x:%02x:%02x",
             bssid[0], bssid[1], bssid[2],
             bssid[3], bssid[4], bssid[5]);
     ESP_LOGI(TAG, "Setting Wi-Fi config password='%s'", password);
-    #endif
+#endif
     
     // Set mode
     esp_err_t err = esp_wifi_set_mode(WIFI_MODE_STA);
@@ -846,9 +846,9 @@ esp_err_t wifi_utils_radio_stop(void)
     if (err == ESP_OK) {
         xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT);
         xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // No longer trying to connect
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "wifi_utils_radio_stop success");
-        #endif
+#endif
     } else {
         ESP_LOGE(TAG, "wifi_utils_radio_stop esp_wifi_stop error: %s", esp_err_to_name(err));
     }
@@ -868,9 +868,9 @@ esp_err_t wifi_utils_radio_cycle(void)
     // If Wi-Fi has never been initialized, bail out quickly
     err = esp_wifi_get_mode(&mode);
     if (err != ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "wifi_utils_radio_cycle: esp_wifi_get_mode failed: %s", esp_err_to_name(err));
-        #endif
+#endif
         return err;
     }
 
@@ -881,16 +881,16 @@ esp_err_t wifi_utils_radio_cycle(void)
 
     // Do a minimal start/stop cycle - no need to actually connect to an AP
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "wifi_utils_radio_cycle: nudging Wi-Fi driver after sleep");
-    #endif
+#endif
 
     // Start Wi-Fi
     err = esp_wifi_start();
     if (err != ESP_OK && err != ESP_ERR_WIFI_CONN) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "wifi_utils_radio_cycle: esp_wifi_start: %s", esp_err_to_name(err));
-        #endif
+#endif
         return err;
     }
 
@@ -899,9 +899,9 @@ esp_err_t wifi_utils_radio_cycle(void)
     // Stop Wi-Fi
     err = esp_wifi_stop();
     if (err != ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "wifi_utils_radio_cycle: esp_wifi_stop: %s", esp_err_to_name(err));
-        #endif
+#endif
         return err;
     }
 
@@ -1066,11 +1066,11 @@ static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
     static volatile uint32_t frames_seen = 0;
     frames_seen++;
     
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     if (frames_seen % 100 == 0) { // Every 100 frames
         ESP_LOGI(TAG, "sniffer: %u frames so far\r\n", frames_seen);
     }
-    #endif
+#endif
 
     // Make sure only management frames
     if (type != WIFI_PKT_MGMT) {
@@ -1257,12 +1257,12 @@ static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
     // Get SNR
     int snr_db = pkt->rx_ctrl.rssi - pkt->rx_ctrl.noise_floor;
     
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "SSID: %s | Channel: %d (%d MHz) | RSSI: %d dBm | SNR: %d dB | Encryption: %s | TS=%llu days | intvl=%u ms | cap=0x%04x",
             ssid, channel, freq_mhz, pkt->rx_ctrl.rssi, snr_db,
             has_rsn ? "WPA2/3" : has_wpa ? "WPA" : (cap_info & 0x10) ? "WEP" : "Open",
             timestamp_days, interval, cap_info);
-    #endif
+#endif
     
     // Populate and send
     strlcpy((char*)beacon.ssid, ssid, sizeof(beacon.ssid));
@@ -1276,9 +1276,9 @@ static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
     beacon.interval = interval;
     beacon.timestamp = timestamp_seconds;
     if (xQueueSend(xWifiBeaconQueue, &beacon, 0) != pdTRUE) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "xWifiBeaconQueue send failed");
-        #endif
+#endif
     }
     
     /*
@@ -1331,11 +1331,11 @@ static void record_client(const uint8_t *mac, int8_t rssi) {
         wifi_data.clients[wifi_data.client_count].rssi = rssi;
         wifi_data.client_count++;
         
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "New MAC found: %02x:%02x:%02x:%02x:%02x:%02x",
                 mac[0], mac[1], mac[2],
                 mac[3], mac[4], mac[5]);
-        #endif
+#endif
     }
 }
 
@@ -1491,9 +1491,9 @@ static void wifi_sniffer_raw_cb(void *buf, wifi_promiscuous_pkt_type_t type)
         return;
     }
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Captured frame %u (%u bytes)", (unsigned)raw_frames_captured, (unsigned)frame_len);
-    #endif
+#endif
 
     xSemaphoreGive(xWifiRawFramesMutex); // Release raw sniffed frames
     return;
@@ -1534,15 +1534,15 @@ void wifi_utils_init_promiscuous(wifi_sniff_t *network)
 
     // If sniffing a target network
     if (network->mask != WIFI_PROMIS_FILTER_MASK_RAW_USEFUL) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Sniffer initialized; filtering beacon frames from %02x:%02x:%02x:%02x:%02x:%02x",
                 network->target_bssid[0], network->target_bssid[1],
                 network->target_bssid[2], network->target_bssid[3],
                 network->target_bssid[4], network->target_bssid[5]);
-        #endif
+#endif
     } else { // Else the kitchen sink
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Sniffer initialized; sniffing the kitchen sink.");
-        #endif
+#endif
     }
 }

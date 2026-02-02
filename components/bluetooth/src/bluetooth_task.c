@@ -68,13 +68,13 @@ static void bluetooth_task(void *arg)
         // Save that version to NVS
         bluetooth_wifi_pass_save_nvs(bt_wifi_portal_pass);
         
-        #ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_PASS_DEBUG
         ESP_LOGW(TAG, "Setting first time BT Wi-Fi portal password: %s", bt_wifi_portal_pass);
-        #endif
+#endif
     } else {
-        #ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_PASS_DEBUG
         ESP_LOGI(TAG, "Using pre-set BT Wi-Fi portal password: '%s'", bt_wifi_portal_pass);
-        #endif
+#endif
     }
 
     // If 6 digit BT pairing passkey NVS doesn't exist yet, set that too
@@ -86,13 +86,13 @@ static void bluetooth_task(void *arg)
         // Save that version to NVS
         bluetooth_nvs_pairing_key_save(pairing_key);
         
-        #ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_PASS_DEBUG
         ESP_LOGW(TAG, "Setting first time BT pairing key: %d", pairing_key);
-        #endif
+#endif
     } else {
-        #ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_PASS_DEBUG
         ESP_LOGI(TAG, "Using pre-set BT pairing key: '%d'", pairing_key);
-        #endif
+#endif
     }
     
     while (1) {
@@ -162,9 +162,9 @@ static void bluetooth_task(void *arg)
                 // Menu index that was encoded by the UI
                 uint16_t menu_idx = (uint16_t)(bluetooth_cmd - BLUETOOTH_SCRIPT_OFFSET);
 
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Received cmd index: %u -> menu index: %u", (unsigned)bluetooth_cmd, (unsigned)menu_idx);
-                #endif
+#endif
             
                 // "Test" at menu index 1, handle it specially
                 if (menu_idx == 1) {
@@ -231,22 +231,22 @@ static void bluetooth_task(void *arg)
                     esp_err_t err = bluetooth_script_body_get_nvs(script_idx, send_buf, sizeof(send_buf), &blen);
                     if (err == ESP_OK && blen > 0 && send_buf[0] != '\0') {
                         // NVS returns a C-string: Just send it
-                        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                         ESP_LOGI(TAG, "Sending script: %s", send_buf);
-                        #endif
+#endif
 
                         // Send the script
                         bluetooth_utils_send_script(send_buf, 1);
                     } else {
-                        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                         ESP_LOGW(TAG, "Failed/no script body at idx=%u (err=%s, blen=%u)",
                                 (unsigned)script_idx, esp_err_to_name(err), (unsigned)blen);
-                        #endif
+#endif
                     }
                 } else {
-                    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                     ESP_LOGW(TAG, "Unhandled menu_idx=%u for BLUETOOTH_SCRIPT_OFFSET", (unsigned)menu_idx);
-                    #endif
+#endif
                 }
             }
         }

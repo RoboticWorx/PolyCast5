@@ -60,7 +60,7 @@ static void spi_sx126x_init()
 
 void app_main(void)
 {
-    #ifdef POLYCAST5_DEBUG_RAM
+#ifdef POLYCAST5_DEBUG_RAM
     // Prints PSRAM chip size
     size_t psram_size = esp_psram_get_size();
     ESP_LOGI("PSRAM", "Detected PSRAM size = %u KB", psram_size / 1024);
@@ -72,7 +72,7 @@ void app_main(void)
     // Also show internal
     size_t free_int = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
     ESP_LOGI("PSRAM", "Free internal heap = %u KB", free_int / 1024);
-    #endif
+#endif
     
     // Initialize NVS flash
     gpio_utils_init_nvs();
@@ -88,9 +88,9 @@ void app_main(void)
     //ESP_ERROR_CHECK(rtc_gpio_pullup_dis(TCA9535_USER_BUTTON_POWER_PIN));
     //ESP_ERROR_CHECK(rtc_gpio_pulldown_dis(TCA9535_USER_BUTTON_POWER_PIN));
     //ESP_ERROR_CHECK(esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON));
-    #ifdef POLYCAST5_DEBUG
-    //ESP_ERROR_CHECKesp_sleep_pd_config(ESP_PD_DOMAIN_MAX, ESP_PD_OPTION_ON));
-    #endif
+#ifdef POLYCAST5_DEBUG
+    //ESP_ERROR_CHECK(esp_sleep_pd_config(ESP_PD_DOMAIN_MAX, ESP_PD_OPTION_ON));
+#endif
     ESP_ERROR_CHECK(esp_sleep_enable_ext1_wakeup(1ULL << TCA9535_INT_PIN, ESP_EXT1_WAKEUP_ANY_LOW));
 
     // Reference so sleep code is pulled in now
@@ -150,7 +150,7 @@ void app_main(void)
     bluetooth_task_create();
     ai_task_create();
     
-    #ifdef POLYCAST5_DEBUG_RAM
+#ifdef POLYCAST5_DEBUG_RAM
     // Wait for tasks to allocate
     vTaskDelay(pdMS_TO_TICKS(8000));
     
@@ -162,9 +162,9 @@ void app_main(void)
     // Also show internal
     free_int = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
     ESP_LOGI("AFTER PSRAM", "Free internal heap = %u KB", free_int / 1024);
-    #endif
+#endif
     
-    #ifdef POLYCAST5_DEBUG_SPIFFS
+#ifdef POLYCAST5_DEBUG_SPIFFS
     // Wait for tasks to allocate
     vTaskDelay(pdMS_TO_TICKS(2000));
     
@@ -178,10 +178,10 @@ void app_main(void)
     } else {
         ESP_LOGE(TAG, "Failed to get SPIFFS info (%s)", esp_err_to_name(ret));
     }
-    #endif
+#endif
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Main initialized and tasks created");
-    #endif
+#endif
     
 }

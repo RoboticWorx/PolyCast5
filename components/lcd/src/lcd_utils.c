@@ -108,9 +108,9 @@ enum
     CITY,
     BLACK_HOLE,
     MATRIX_RAIN,
-    #ifdef POLYCAST5_EN_PYRAMID_ANIM
+#ifdef POLYCAST5_EN_PYRAMID_ANIM
     PYRAMID
-    #endif
+#endif
 };
 
 extern volatile bool gpio_left_to_exit; // gpio_task.c
@@ -347,9 +347,9 @@ void lcd_device_sleep(void)
     xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
     xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Entering light sleep: esp_light_sleep_start");
-    #endif
+#endif
 
     ESP_ERROR_CHECK(esp_light_sleep_start());
 
@@ -472,9 +472,9 @@ void lcd_lvgl_init(void)
     warm_anim(city_paths, CITY_FRAME_CNT);
     warm_anim(black_hole_paths, BLACK_HOLE_FRAME_CNT);
     warm_anim(matrix_rain_paths, MATRIX_RAIN_FRAME_CNT);
-    #ifdef POLYCAST5_EN_PYRAMID_ANIM
+#ifdef POLYCAST5_EN_PYRAMID_ANIM
     warm_anim(pyramid_paths, PYRAMID_FRAME_CNT);
-    #endif
+#endif
     
     // Pre-load images too
     warm_img(IMG_DICE_1);
@@ -683,9 +683,9 @@ static esp_err_t lcd_anim_nvs_save(void)
         // Commit to flash
         err = nvs_commit(h);
         
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Saved NVS animation: %u", anim_active);
-        #endif
+#endif
     } else {
         ESP_LOGE(TAG, "Failed to save NVS animation");
     }
@@ -722,9 +722,9 @@ static esp_err_t lcd_anim_nvs_load(void)
             break;
     }
     
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Loaded NVS animation: %u", anim_active);
-    #endif
+#endif
     
     // Close NVS
     nvs_close(h);
@@ -812,7 +812,7 @@ void lcd_init_images()
     }
     
     /* Pyramid */
-    #ifdef POLYCAST5_EN_PYRAMID_ANIM
+#ifdef POLYCAST5_EN_PYRAMID_ANIM
     // Create image
     pyramid_anim.img = lv_img_create(ACTIVE_SCR);
     lv_img_set_src(pyramid_anim.img, pyramid_anim.frames[0]);
@@ -826,7 +826,7 @@ void lcd_init_images()
         lv_obj_add_flag(pyramid_anim.img, LV_OBJ_FLAG_HIDDEN);
         lv_timer_pause(pyramid_anim.timer);
     }
-    #endif
+#endif
 }
 
 #ifdef POLYCAST5_PERSIST_SELECTION_INDEX
@@ -1116,9 +1116,9 @@ static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t *ir_menu, lo
         lv_obj_remove_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         ui_menu->page = GPIO_PAGE;
     } else {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "Invalid menu option selected");
-        #endif
+#endif
     }
 }
 
@@ -1141,9 +1141,9 @@ esp_err_t lcd_save_first_boot(void)
         // Commit to flash
         err = nvs_commit(h);
         
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Saved first boot ESP_OK");
-        #endif
+#endif
     } else {
         ESP_LOGE(TAG, "lcd_save_first_boot nvs_set_u8 failed: %s", esp_err_to_name(err));
     }
@@ -1161,9 +1161,9 @@ bool lcd_is_first_boot(void)
     // Open NVS
     esp_err_t err = nvs_open(LCD_FIRST_BOOT_NS, NVS_READONLY, &h);
     if (err != ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "lcd_is_first_boot nvs_open failed: %s", esp_err_to_name(err));
-        #endif
+#endif
 
         // Failed to open -> DNE
         return true;
@@ -1173,9 +1173,9 @@ bool lcd_is_first_boot(void)
     uint8_t stored = 0;
     err = nvs_get_u8(h, LCD_FIRST_BOOT_KEY, &stored);
     if (err != ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "lcd_is_first_boot nvs_get_u8 failed: %s", esp_err_to_name(err));
-        #endif
+#endif
 
         // Close NVS
         nvs_close(h);
@@ -1183,9 +1183,9 @@ bool lcd_is_first_boot(void)
         return true;
     }
     
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Loaded lcd_is_first_boot: %d", stored);
-    #endif
+#endif
     
     // Close NVS
     nvs_close(h);
@@ -1205,12 +1205,12 @@ static void start_animation(void)
         lv_obj_remove_flag(matrix_rain_anim.img,  LV_OBJ_FLAG_HIDDEN);
         lv_timer_resume(matrix_rain_anim.timer);
     }
-    #ifdef POLYCAST5_EN_PYRAMID_ANIM
+#ifdef POLYCAST5_EN_PYRAMID_ANIM
     else if (anim_active == PYRAMID) {
         lv_obj_remove_flag(pyramid_anim.img,  LV_OBJ_FLAG_HIDDEN);
         lv_timer_resume(pyramid_anim.timer);
     }
-    #endif
+#endif
 }
 
 static void pause_animations(void)
@@ -1219,9 +1219,9 @@ static void pause_animations(void)
     lv_timer_pause(city_anim.timer);
     lv_timer_pause(black_hole_anim.timer);
     lv_timer_pause(matrix_rain_anim.timer);
-    #ifdef POLYCAST5_EN_PYRAMID_ANIM
+#ifdef POLYCAST5_EN_PYRAMID_ANIM
     lv_timer_pause(pyramid_anim.timer);
-    #endif
+#endif
 }
 
 static void stop_animations(void)
@@ -1232,9 +1232,9 @@ static void stop_animations(void)
     lv_obj_add_flag(city_anim.img, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(black_hole_anim.img, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(matrix_rain_anim.img, LV_OBJ_FLAG_HIDDEN);
-    #ifdef POLYCAST5_EN_PYRAMID_ANIM
+#ifdef POLYCAST5_EN_PYRAMID_ANIM
     lv_obj_add_flag(pyramid_anim.img, LV_OBJ_FLAG_HIDDEN);
-    #endif
+#endif
 }
 
 static void transition_animation(bool dir)
@@ -1510,9 +1510,9 @@ void lcd_loading_anim_start(lv_align_t align, lv_coord_t x_off, lv_coord_t y_off
     if (loading_anim_cont) {
         // Stop and recreate
         lcd_loading_anim_stop();
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "lcd_loading_anim_start: Loading animation already running, restarting"); 
-        #endif
+#endif
     }
 
     const lv_coord_t min_sz = 6;
@@ -1743,9 +1743,9 @@ uint8_t lcd_wait_for_bit_better(EventGroupHandle_t event_group, EventBits_t bit,
         // If left button pressed, exit early
         xSemaphoreTake(xGpioLeftBtnMutex, portMAX_DELAY); // Lock left button mutex
         if (gpio_left_to_exit) {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGE(TAG, "Left button pressed, exiting lcd_wait_for_bit_better");
-            #endif
+#endif
             status = LCD_WAIT_FOR_BIT_BETTER_EXIT;
             xSemaphoreGive(xGpioLeftBtnMutex); // Release left button mutex
             break;
@@ -1831,10 +1831,10 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
         
         // Go to selection page if pin not set
         if (!settings_menu->pin_menu.pin_set || !settings_menu->pin_menu.prompt_pin) {
-            #ifndef POLYCAST5_PERSIST_SELECTION_INDEX
+#ifndef POLYCAST5_PERSIST_SELECTION_INDEX
             ui_menu->index = SELECTION_DEFAULT_IDX; // Default start
             lcd_selection_sync_labels(ui_menu); // Sync menu from here
-            #endif
+#endif
 
             // Show selection page
             lcd_unhide_selection_widgets(ui_menu);
@@ -1960,10 +1960,10 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             // Go to it
             go_to_page_from_hotkey(ui_menu);
         } else {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Long home hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_HOME_IDX,
                     hotkey_cmd.has_lora[HOTKEY_LONG_HOME_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_HOME_IDX]);
-            #endif
+#endif
         }
     }
     // Long press left
@@ -2002,10 +2002,10 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             // Go to it
             go_to_page_from_hotkey(ui_menu);
         } else {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Long left hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_LEFT_IDX,
                     hotkey_cmd.has_lora[HOTKEY_LONG_LEFT_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_LEFT_IDX]);
-            #endif
+#endif
         }
     }
     // Long press right
@@ -2044,10 +2044,10 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             // Go to it
             go_to_page_from_hotkey(ui_menu);
         } else {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Long right hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_RIGHT_IDX,
                     hotkey_cmd.has_lora[HOTKEY_LONG_RIGHT_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_RIGHT_IDX]);
-            #endif
+#endif
         }
     }
     // Long press select
@@ -2086,10 +2086,10 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             // Go to it
             go_to_page_from_hotkey(ui_menu);
         } else {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Long select hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_SELECT_IDX,
                     hotkey_cmd.has_lora[HOTKEY_LONG_SELECT_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_SELECT_IDX]);
-            #endif
+#endif
         }
     } else if (ui_btns->home_btn == 1) { // Short press home
         /* Check for commands */
@@ -2126,10 +2126,10 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             // Go to it
             go_to_page_from_hotkey(ui_menu);
         } else {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Short home hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_SHORT_HOME_IDX,
                     hotkey_cmd.has_lora[HOTKEY_SHORT_HOME_IDX], hotkey_cmd.has_espnow[HOTKEY_SHORT_HOME_IDX]);
-            #endif
+#endif
         }
     } else if (ui_btns->right_btn == 1) { // Short press right
         /* Check for commands */
@@ -2166,10 +2166,10 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             // Go to it
             go_to_page_from_hotkey(ui_menu);
         } else {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Short right hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_SHORT_RIGHT_IDX,
                     hotkey_cmd.has_lora[HOTKEY_SHORT_RIGHT_IDX], hotkey_cmd.has_espnow[HOTKEY_SHORT_RIGHT_IDX]);
-            #endif
+#endif
         }
     }
 }
@@ -2232,19 +2232,19 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
     } else if (ui_btns->select_btn == 1) { // Check against actual
         input_pin[num_filled] = '\0'; // Ensure termination
             
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Got pin: %s", input_pin);
-        #endif
+#endif
 
-        #ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_PASS_DEBUG
         ESP_LOGI(TAG, "Need pin: %s", settings_menu->pin_menu.unlock_pin);
-        #endif
+#endif
         
         // If PIN is correct
         if (strcmp(input_pin, settings_menu->pin_menu.unlock_pin) == 0) {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "PIN accepted");
-            #endif
+#endif
             
             // Hide pin prompt
             lv_obj_add_flag(settings_menu->pin_menu.pin_container, LV_OBJ_FLAG_HIDDEN);
@@ -2274,10 +2274,10 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
                 // Hide right
                 lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
-                #ifndef POLYCAST5_PERSIST_SELECTION_INDEX
+#ifndef POLYCAST5_PERSIST_SELECTION_INDEX
                 ui_menu->index = SELECTION_DEFAULT_IDX; // Default start
                 lcd_selection_sync_labels(ui_menu); // Sync menu from here
-                #endif
+#endif
 
                 // Show selection page
                 lcd_unhide_selection_widgets(ui_menu);
@@ -2293,9 +2293,9 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
                 ui_menu->page = HOTKEY_PAGE;
             }
         } else {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "PIN denied");
-            #endif
+#endif
             
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_RED;
@@ -2444,9 +2444,9 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
         if (scrolling_up) {
             ui_menu->index = (ui_menu->index + 1) % ui_menu->size;
 
-            #ifdef POLYCAST5_PERSIST_SELECTION_INDEX
+#ifdef POLYCAST5_PERSIST_SELECTION_INDEX
             lcd_selection_index_nvs_save(ui_menu); // Save the index
-            #endif
+#endif
 
             const char *next_bottom = ui_menu->options[(ui_menu->index + 1) % ui_menu->size];
             lcd_scroll_anim(ui_menu, next_bottom, scrolling_up, SCROLL_SPEED);
@@ -2459,9 +2459,9 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
         } else {
             ui_menu->index = (ui_menu->index + ui_menu->size - 1) % ui_menu->size;
 
-            #ifdef POLYCAST5_PERSIST_SELECTION_INDEX
+#ifdef POLYCAST5_PERSIST_SELECTION_INDEX
             lcd_selection_index_nvs_save(ui_menu); // Save the index
-            #endif
+#endif
 
             const char *next_top = ui_menu->options[(ui_menu->index + ui_menu->size - 1) % ui_menu->size];
             lcd_scroll_anim(ui_menu, next_top, scrolling_up, SCROLL_SPEED);
@@ -2537,9 +2537,9 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
     } else if (ui_btns->select_btn == 1 && ir_menu->index == 2) { // Add new signal selected
         // Abort if we've reached the maximum number of peers
         if (ir_menu->size >= MAX_IR_OPTIONS) {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Max IR menu options reached");
-            #endif
+#endif
             
             // Hide IR menu
             lv_obj_add_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -2667,9 +2667,9 @@ void lcd_lora_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_men
         // Abort if we've reached the maximum number of peers
         // Compare with total user plugs: Total size - "Add PolyPlug" + 1 (since not yet size++) -> just lora_menu->size
         if (lora_menu->size >= MAX_LORA_OPTIONS) {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Max LoRa PolyPlug entries reached");
-            #endif
+#endif
             
             // Hide LoRa menu
             lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -2771,9 +2771,9 @@ void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espn
     } else if (ui_btns->select_btn == 1 && espnow_menu->index == 0) { // Add ESP32 selected
         // Abort if we've reached the maximum number of peers
         if (espnow_menu->size >= MAX_ESPNOW_OPTIONS) {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Max ESP-NOW entries reached");
-            #endif
+#endif
             
             // Hide ESP-NOW menu
             lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -2932,7 +2932,7 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
         last_wifi_event_bits = wifi_event_bits;
     }
 
-    #ifdef POLYCAST5_CHECK_OTA_ON_CONN
+#ifdef POLYCAST5_CHECK_OTA_ON_CONN
     // If OTA update is available -> confirm page
     if (xEventGroupGetBits(xWifiEventGroup) & WIFI_OTA_AVAILABLE_BIT) {
         // Hide Wi-Fi menu
@@ -2955,7 +2955,7 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
         // Clear for next time
         xEventGroupClearBits(xWifiEventGroup, WIFI_OTA_AVAILABLE_BIT);
     } else { // Else normal Wi-Fi page
-    #endif
+#endif
         // Up button pressed
         if (ui_btns->up_btn == 1) {
             // Update selection
@@ -3118,9 +3118,9 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
                 lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
             }
         } else if (ui_btns->right_btn == 1) { // Ping network
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Requesting Wi-Fi ping");
-            #endif
+#endif
 
             xSemaphoreGive(xWifiPingSemaphore);
         } else if (ui_btns->left_btn == 1) { // Back selected
@@ -3154,9 +3154,9 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
             
             lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
         }
-    #ifdef POLYCAST5_CHECK_OTA_ON_CONN
+#ifdef POLYCAST5_CHECK_OTA_ON_CONN
     }
-    #endif
+#endif
 }
 
 void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)

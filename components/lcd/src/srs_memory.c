@@ -97,9 +97,9 @@ bool srs_sync_time_over_wifi(void)
 {
     // Check if RTC synced
     if (rtc_synced()) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Time already synced");
-        #endif
+#endif
         return true; // No need for Wi-Fi if already synced
     }
 
@@ -112,15 +112,15 @@ bool srs_sync_time_over_wifi(void)
     lv_timer_handler();
     vTaskDelay(pdMS_TO_TICKS(100)); // Allow render
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Getting day via Wi-Fi");
-    #endif
+#endif
 
     // If Wi-Fi already connected
     if (xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Wi-Fi already connected");
-        #endif
+#endif
 
         // Request to get date and time
         xEventGroupSetBits(xWifiEventGroup, WIFI_GET_DATE_TIME_BIT);
@@ -376,10 +376,10 @@ uint32_t srs_days_since_epoch_local(int calibrate)
 
     time_t local_midnight_epoch = mktime(&lt);
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "0-based srs_days_since_epoch now = %" PRId64 "s", (int64_t)local_midnight_epoch); // Seconds
     ESP_LOGI(TAG, "0-based srs_days_since_epoch now = %" PRIu32 "d", (uint32_t)(local_midnight_epoch / 86400)); // Days
-    #endif
+#endif
 
     // Round down by 86400 -> today index
     return (uint32_t)((local_midnight_epoch / 86400) + calibrate); // 0-based
@@ -391,9 +391,9 @@ void srs_nvs_load(void)
     
     // Open NVS
     if (nvs_open(SRS_NS, NVS_READONLY, &h) != ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "srs_nvs_load nvs_open failed");
-        #endif
+#endif
 
         // Set defaults
         srs_cnt = 0;
@@ -405,9 +405,9 @@ void srs_nvs_load(void)
     uint16_t cnt = 0;
     esp_err_t err = nvs_get_u16(h, SRS_CNT_KEY, &cnt);
     if (err != ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGE(TAG, "srs_nvs_load nvs_get_u16 CNT failed");
-        #endif
+#endif
     }
 
     srs_cnt = 0;
@@ -416,9 +416,9 @@ void srs_nvs_load(void)
     uint16_t lastp = 0;
     err = nvs_get_u16(h, SRS_LAST_PAGE_KEY, &lastp);
     if (err != ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGE(TAG, "srs_nvs_load nvs_get_u16 PAGE failed");
-        #endif
+#endif
     }
 
     srs_last_page = lastp;
@@ -436,9 +436,9 @@ void srs_nvs_load(void)
             // If good srs_cnt++ into srs_tbl
             srs_tbl[srs_cnt++] = tmp;
         } else {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGE(TAG, "srs_nvs_load nvs_get_blob failed at i=%d", i);
-            #endif
+#endif
         }
     }
     
@@ -452,25 +452,25 @@ void srs_nvs_save(void)
     
     // Open NVS
     if (nvs_open(SRS_NS, NVS_READWRITE, &h) != ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "srs_nvs_save nvs_open failed");
-        #endif
+#endif
         return;
     }
 
     // Set count and last used page
     esp_err_t err = nvs_set_u16(h, SRS_CNT_KEY, srs_cnt);
     if (err != ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGE(TAG, "srs_nvs_load nvs_set_u16 CNT failed");
-        #endif
+#endif
     }
 
     err = nvs_set_u16(h, SRS_LAST_PAGE_KEY, srs_last_page);
     if (err != ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGE(TAG, "srs_nvs_load nvs_set_u16 PAGE failed");
-        #endif
+#endif
     }
 
     // Save each entry
@@ -482,9 +482,9 @@ void srs_nvs_save(void)
         // Save srs_entry_t blob
         err = nvs_set_blob(h, key, &srs_tbl[i], sizeof(srs_entry_t));
         if (err != ESP_OK) {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGE(TAG, "srs_nvs_load nvs_set_blob failed");
-            #endif
+#endif
         }
     }
     

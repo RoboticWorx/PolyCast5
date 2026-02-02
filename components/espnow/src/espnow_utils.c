@@ -54,13 +54,13 @@ esp_err_t espnow_utils_wifi_radio_stop(void)
 
 static void send_cb(const wifi_tx_info_t *info, esp_now_send_status_t status)
 {
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG,
             "Send to %02X:%02X:%02X:%02X:%02X:%02X | %s",
             info->des_addr[0], info->des_addr[1], info->des_addr[2],
             info->des_addr[3], info->des_addr[4], info->des_addr[5],
             status == ESP_NOW_SEND_SUCCESS ? "OK" : "FAIL");
-    #endif
+#endif
     
     if (status == ESP_NOW_SEND_SUCCESS) {
         xSemaphoreGive(xEspCmdRxStatusSemaphore);

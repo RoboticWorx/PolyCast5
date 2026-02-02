@@ -238,10 +238,10 @@ void bluetooth_utils_send_media(uint8_t cmd, bool key_pressed)
     }
 
     if (usage) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         uint8_t dbg[2] = {(uint8_t)(usage & 0xFF), (uint8_t)(usage >> 8)};
         ESP_LOG_BUFFER_HEX("HID_CC_USAGE", dbg, 2);
-        #endif
+#endif
 
         cc_send_usage(usage, key_pressed);
     }
@@ -957,15 +957,15 @@ void bluetooth_utils_forget_all_peers(void)
     // Stop advertising to prevent incoming connections during the reset
     rc = ble_gap_adv_stop();
     if (rc != 0 && rc != BLE_HS_EALREADY) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGE(TAG, "Failed to stop advertising; rc=%d", rc);
-        #endif
+#endif
         // Continue anyway, but aware of potential race conditions
     }
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Deleting Bluetooth peer bonding keys...");
-    #endif
+#endif
 
     ble_addr_t peers[16];
     int peer_count = 0;
@@ -977,19 +977,19 @@ void bluetooth_utils_forget_all_peers(void)
         for (int i = 0; i < peer_count; ++i) {
             rc = ble_gap_unpair(&peers[i]);
             if (rc == 0) {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Unpaired peer %d", i);
-                #endif
+#endif
             } else {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGW(TAG, "Failed to unpair peer %d; rc=%d", i, rc);
-                #endif
+#endif
             }
         }
     } else {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "No bonded peers found to delete.");
-        #endif
+#endif
     }
 }
 
@@ -1064,11 +1064,11 @@ void ble_store_config_init(void);
 
 void bluetooth_utils_init(void)
 {
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "bluetooth_utils_init() starting, state=%d", bluetooth_state);
     ESP_LOGI(TAG, "BT controller status before init: %d",
             esp_bt_controller_get_status()); // IDLE, INITED, ENABLED, NUM
-    #endif
+#endif
 
     // If already on or initing, exit
     if (bluetooth_state == BT_STATE_INITING || bluetooth_state == BT_STATE_RUNNING) {
@@ -1101,10 +1101,10 @@ void bluetooth_utils_init(void)
         return;
     }
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "BT controller status after init: %d",
             esp_bt_controller_get_status()); // IDLE, INITED, ENABLED, NUM
-    #endif
+#endif
 
     bluetooth_state = BT_STATE_RUNNING;
 }
@@ -1114,11 +1114,11 @@ extern esp_err_t esp_hid_gap_deinit(void);
 
 void bluetooth_utils_deinit(void)
 {
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "bluetooth_utils_deinit() starting, state=%d", bluetooth_state);
     ESP_LOGI(TAG, "BT controller status before deinit: %d",
             esp_bt_controller_get_status()); // IDLE, INITED, ENABLED, NUM
-    #endif
+#endif
 
     // If already off or deiniting, exit
     if (bluetooth_state == BT_STATE_OFF || bluetooth_state == BT_STATE_DEINITING) {
@@ -1146,11 +1146,11 @@ void bluetooth_utils_deinit(void)
         ble_hid_param.hid_dev = NULL;
     }
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Bluetooth fully disabled");
     ESP_LOGI(TAG, "BT controller status after deinit: %d",
             esp_bt_controller_get_status()); // IDLE, INITED, ENABLED, NUM
-    #endif
+#endif
 
     bluetooth_state = BT_STATE_OFF;
 }

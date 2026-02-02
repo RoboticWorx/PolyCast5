@@ -603,9 +603,9 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
         name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
         memcpy(saved_name, name_buf, MAX_CUSTOM_NAME_LEN + 1);
         
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "%s", saved_name);
-        #endif
+#endif
         
         // Delete labels since no longer used
         lv_obj_delete(lbl_user_in);
@@ -662,10 +662,10 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
                 // Save to keys at next available position
                 lora_menu->keys[lora_menu->size - 1] = slot;
                 
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Key saved at slot %d:", lora_menu->size - 1);
                 ESP_LOG_BUFFER_HEX("SAVED IN QUEUE", lora_menu->keys[lora_menu->size - 1], LORA_ENC_KEY_LEN);
-                #endif
+#endif
                 
                 lcd_lora_key_nvs_save(lora_menu);
             }
@@ -954,9 +954,9 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
         uint8_t rgb_state = RGB_BLINK_TEAL;
         xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
         
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         //ESP_LOG_BUFFER_HEX("SENDING WITH KEY", lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
-        #endif
+#endif
         
         // Reset receipt label
         lv_label_set_text(lora_menu->submenu.lbl_receipt, "");
@@ -1626,9 +1626,9 @@ void lcd_lora_plan_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
         }
         plan_selected_days[pos] = '\0'; // Terminate
         
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Days selected = '%s'", plan_selected_days);
-        #endif
+#endif
         
         // Reset all labels and days
         for (int i = 0; i < 7; ++i) {
@@ -1954,9 +1954,9 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
     
     // Confirm
     if (ui_btns->right_btn == 1 && selected_digit == 11) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Confirmed: start_time = '%s', end_time = '%s'", start_time, end_time);
-        #endif
+#endif
         
         // Reset objects
         lv_obj_delete(lbl_subpage_times);
@@ -2242,9 +2242,9 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
         memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
         snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "away %s", away_menu->options[away_menu->index]);
         
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Sending LoRa AWAY cmd instr '%s'", lora_cmd.instr);
-        #endif
+#endif
 
         // Confirmation text
         lv_obj_t *lbl_send_conf = lv_label_create(ACTIVE_SCR); // Create and format label
@@ -2408,9 +2408,9 @@ void lcd_lora_away_custom_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_m
         memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
         snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "away %d-%dm ON/OFF", min_val, max_val); // Keep formatting
         
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Sending LoRa AWAY cmd instr '%s'", lora_cmd.instr);
-        #endif
+#endif
 
         // Confirmation text
         lv_obj_t *lbl_send_conf = lv_label_create(ACTIVE_SCR); // Create and format label

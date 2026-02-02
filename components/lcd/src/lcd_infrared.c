@@ -552,9 +552,9 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
         name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
         memcpy(saved_name, name_buf, MAX_CUSTOM_NAME_LEN + 1);
         
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "%s", saved_name);
-        #endif
+#endif
         
         // Delete objects
         lv_obj_delete(lbl_user_in);
@@ -786,9 +786,9 @@ void lcd_ir_build_current_menu(ir_menu_t *menu, size_t c)
     menu->index = 0;
     menu->size = 3 + remotes[c].num_signals;
     
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Building '%u' signals for remote '%u'", remotes[c].num_signals, c);
-    #endif
+#endif
 
     // Set remote name button
     menu->btns[0] = lv_list_add_btn(menu->main_list, NULL, remotes[c].name);

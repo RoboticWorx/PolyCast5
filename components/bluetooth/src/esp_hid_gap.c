@@ -864,25 +864,25 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
             // Save this as a bonded peer
             bluetooth_nvs_add_to_peers_list(&desc.peer_id_addr);
             
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Saving a valid peer");
-            #endif
+#endif
             
             // If no preferred peer exists, set this one by default
             bool found = false;
             ble_addr_t pref;
             if (bluetooth_nvs_get_preferred_peer(&pref, &found) != ESP_OK || !found) {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Saving as preferred peer");
-                #endif
+#endif
             
                 // Save preferred peer to whitelist
                 esp_err_t err = bluetooth_nvs_set_preferred_peer(&desc.peer_id_addr);
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "bluetooth_nvs_set_preferred_peer failed: %s", esp_err_to_name(err));
                 }
-                #endif
+#endif
             }
         }
         
@@ -927,9 +927,9 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
             bluetooth_nvs_pairing_key_load(&pairing_key);
             pkey.passkey = pairing_key; // This is the passkey to be entered on peer
             
-            #ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_PASS_DEBUG
             ESP_LOGI(TAG, "Enter passkey %" PRIu32 " on the peer side", pkey.passkey);
-            #endif
+#endif
             rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
             ESP_LOGI(TAG, "ble_sm_inject_io result: %d", rc);
         } else if (event->passkey.params.action == BLE_SM_IOACT_NUMCMP) {
@@ -954,9 +954,9 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
             bluetooth_nvs_pairing_key_load(&pairing_key);
             pkey.passkey = pairing_key;
             
-            #ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_PASS_DEBUG
             ESP_LOGI(TAG, "Input not supported passing -> %d", pairing_key);
-            #endif
+#endif
 
             rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
             ESP_LOGI(TAG, "ble_sm_inject_io result: %d", rc);
@@ -1000,11 +1000,11 @@ esp_err_t esp_hid_ble_gap_adv_start(void)
     bool found = false;
     esp_err_t err = bluetooth_nvs_get_preferred_peer(&pref, &found);
     
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "bluetooth_nvs_get_preferred_peer failed: %s", esp_err_to_name(err));
     }
-    #endif
+#endif
     
     // Preferred peer found -> directed advertising
     if (found && (pref.type == BLE_ADDR_PUBLIC || pref.type == BLE_ADDR_RANDOM)) {
@@ -1031,12 +1031,12 @@ esp_err_t esp_hid_ble_gap_adv_start(void)
         rc = ble_gap_adv_start(own_addr_type, NULL, 30000, &adv,
                 nimble_hid_gap_event, NULL);
 
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG,
                 "WL_ONLY advertising to preferred (type=%u %02x:%02x:%02x:%02x:%02x:%02x), rc=%d",
                 pref.type, pref.val[0],pref.val[1],pref.val[2],
                 pref.val[3],pref.val[4],pref.val[5], rc);
-        #endif
+#endif
         
         return rc;
     }
@@ -1050,9 +1050,9 @@ esp_err_t esp_hid_ble_gap_adv_start(void)
         return rc;
     }
     
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Attempting to pair to default device");
-    #endif
+#endif
 
     rc = ble_gap_adv_start(own_addr_type, NULL, adv_duration_ms, &adv,
             nimble_hid_gap_event, NULL);

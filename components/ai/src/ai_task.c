@@ -104,13 +104,13 @@ static void ai_task(void *pvParameters)
         // Save that version to NVS
         ai_key_portal_pass_save_nvs(ai_wifi_portal_pass);
         
-        #ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_PASS_DEBUG
         ESP_LOGW(TAG, "Setting first time AI Wi-Fi portal password: %s", ai_wifi_portal_pass);
-        #endif
+#endif
     } else {
-        #ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_PASS_DEBUG
         ESP_LOGI(TAG, "Using pre-set AI Wi-Fi portal password: '%s'", ai_wifi_portal_pass);
-        #endif
+#endif
     }
 
     ai_voice_pcm_t pcm = {0};
@@ -128,9 +128,9 @@ static void ai_task(void *pvParameters)
             continue;
         }
 
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "AI task received command type=%d, msg_len=%u, reasoning=%d", (int)cmd.type, (unsigned)cmd.msg_len, cmd.reasoning);
-        #endif
+#endif
 
         // Clear ai_response buffer
         memset(ai_response, 0, sizeof(ai_response));
@@ -139,35 +139,35 @@ static void ai_task(void *pvParameters)
 
         if (cmd.type == AI_CMD_KEYBOARD_START_REC) {
             if (!mic_recording) {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGW(TAG, "START_REC received but mic_recording is false; ignoring");
-                #endif
+#endif
                 continue;
             }
 
             // Enable mic
             ESP_ERROR_CHECK(ai_voice_init());
 
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Starting ai_voice_record_pcm16_16k");
-            #endif
+#endif
 
             ESP_ERROR_CHECK(ai_voice_record_pcm16_16k(&mic_recording, &pcm));
             continue;
         } else if (cmd.type == AI_CMD_KEYBOARD_DONE_REC) { // Process transcription
             memset(user_transcript, 0, sizeof(user_transcript)); // Clear previous contents
 
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "WS STT uploading PCM: samples=%u", (unsigned)pcm.samples);
-            #endif
+#endif
 
             // Transcribe via xAI WebSocket STT
             esp_err_t err = ai_voice_stt_ws_transcribe_pcm16_xai(pcm.pcm16, pcm.samples, user_transcript, sizeof(user_transcript));
 
             if (err == ESP_OK) {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Realtime Transcript: %s", user_transcript);
-                #endif
+#endif
 
                 // Check if username or password query
                 cmd.type = parse_kind_and_query(user_transcript, &query);
@@ -179,13 +179,13 @@ static void ai_task(void *pvParameters)
                     memset(prompt_buf, 0, sizeof(prompt_buf)); // Zero out previous contents
                     const char *prompt = ai_utils_get_autokey_prompt(prompt_buf, sizeof(prompt_buf));
 
-                    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                     if (cmd.reasoning) {
                         ESP_LOGI(TAG, "Sending xAI cmd WITH reasoning");
                     } else {
                         ESP_LOGI(TAG, "Sending xAI cmd WITHOUT reasoning");
                     }
-                    #endif
+#endif
 
                     // Call chat API with non-reasoning
                     err = ai_utils_send_command_xai(prompt, user_transcript, ai_response, sizeof(ai_response), cmd.reasoning);
@@ -203,10 +203,10 @@ static void ai_task(void *pvParameters)
             ai_voice_free_pcm(&pcm); // Free PCM buffer
             ESP_ERROR_CHECK(ai_voice_deinit());
         } else if (cmd.type == AI_CMD_RAW_FRAMES) { // Organizing raw Wi-Fi frames
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             size_t msg_len = (cmd.msg_len != 0) ? cmd.msg_len : strlen(cmd.msg);
             ESP_LOGI(TAG, "AI_CMD_RAW_FRAMES payload len=%u", (unsigned)msg_len);
-            #endif
+#endif
 
             // Build autotype prompt (NVS override; fallback to compiled default)
             memset(prompt_buf, 0, sizeof(prompt_buf)); // Zero out previous contents
@@ -219,23 +219,23 @@ static void ai_task(void *pvParameters)
         // If good, log and send to bluetooth task
         if (err == ESP_OK) {
             if (cmd.type == AI_CMD_KEYBOARD_DONE_REC) {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "AI keyboard script resolved: %s", ai_response);
-                #endif
+#endif
 
                 char *ai_script_ptr = ai_response;
                 xQueueSend(xBluetoothAiCmdQueue, &ai_script_ptr, portMAX_DELAY);
             } else if (cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD) {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Credential script resolved (len=%u)", (unsigned)strlen(ai_response));
-                #endif
+#endif
 
                 char *ai_script_ptr = ai_response;
                 xQueueSend(xBluetoothAiCmdQueue, &ai_script_ptr, portMAX_DELAY);
             } else if (cmd.type == AI_CMD_RAW_FRAMES) {
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Raw frames sniff resolved with response. Grok analysis of raw frames: %s", ai_response);
-                #endif
+#endif
 
                 char *ai_script_ptr = ai_response;
                 xQueueSend(xWifiAiRawSniffQueue, &ai_script_ptr, portMAX_DELAY);

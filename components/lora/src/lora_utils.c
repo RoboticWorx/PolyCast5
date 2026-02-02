@@ -43,9 +43,9 @@ void lora_utils_generate_random_key(void)
     // Generate random encryption key
     esp_fill_random(encryption_key, sizeof(encryption_key));
     
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOG_BUFFER_HEX("LORA KEY GENERATED", encryption_key, sizeof(encryption_key));
-    #endif
+#endif
     
     if (xQueueSend(xEspSendEncKeyQueue, encryption_key, pdMS_TO_TICKS(100)) != pdPASS) {
         ESP_LOGE("LORA", "Failed to queue encryption key");
@@ -112,9 +112,9 @@ void lora_utils_process_received_message(uint8_t *message, size_t message_len) {
     uint8_t ciphertext[LORA_CYPHERTEXT_LENGTH]; // Buffer to hold cyphertext
     memcpy(ciphertext, message + LORA_IV_LENGTH, LORA_CYPHERTEXT_LENGTH); // Extract the ciphertext (remaining 64 bytes)
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOG_BUFFER_HEX(TAG, iv, LORA_IV_LENGTH);
-    #endif
+#endif
     
     // Initialize the AES context with the key and received IV.
     struct AES_ctx ctx;
@@ -126,32 +126,32 @@ void lora_utils_process_received_message(uint8_t *message, size_t message_len) {
     ciphertext[sizeof(ciphertext) - 1] = '\0'; // Ensure NULL termination
     
     // 'cyphertext' is now decrypted
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Decrypted text: %s\n", ciphertext);
-    #endif
+#endif
     
     uint32_t received_rx_id;
     
     // If received valid receipt
     if (sscanf((char*)ciphertext, "PolyCast_Command_Value_Received:%" SCNu32, &received_rx_id) == 1) {
         if (received_rx_id == expected_rx_id) {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "ACK matches id=%" PRIu32, received_rx_id);
-            #endif
+#endif
             
             xQueueReset(xLoraSendEncQueue); // Clear pending commands
             waiting_for_ack = false;
             
             xSemaphoreGive(xLoraReceiptValidSemaphore);
         } else {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "ACK ID wrong (got=%" PRIu32 ", want=%" PRIu32 ")", received_rx_id, expected_rx_id);
-            #endif
+#endif
         }
     } else {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Decrypted text does NOT match. Got: \"%s\"", ciphertext);
-        #endif
+#endif
     }
 }
 

@@ -50,9 +50,9 @@ static esp_err_t bluetooth_script_body_set_nvs(uint8_t idx, const char *body)
     // Open NVS
     esp_err_t err = nvs_open(BT_SCRIPT_NS, NVS_READWRITE, &h);
     if (err != ESP_OK) {
-       #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
        ESP_LOGE(TAG, "bluetooth_script_body_set nvs_open failed: %s", esp_err_to_name(err));
-       #endif
+#endif
        
        return err;
     }
@@ -67,9 +67,9 @@ static esp_err_t bluetooth_script_body_set_nvs(uint8_t idx, const char *body)
        // Commit changes on success
        err = nvs_commit(h);
     } else {
-       #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
        ESP_LOGE(TAG, "bluetooth_script_body_set nvs_set_str failed: %s", esp_err_to_name(err));
-       #endif
+#endif
     }
     
     // Close NVS
@@ -90,9 +90,9 @@ static esp_err_t bluetooth_script_count_set_nvs(uint8_t count)
     // Open NVS
     esp_err_t err = nvs_open(BT_SCRIPT_MENU_NS, NVS_READWRITE, &h);
     if (err != ESP_OK) {
-       #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
        ESP_LOGE(TAG, "bluetooth_script_count_set nvs_open failed: %s", esp_err_to_name(err));
-       #endif
+#endif
        
        return err;
     }
@@ -103,9 +103,9 @@ static esp_err_t bluetooth_script_count_set_nvs(uint8_t count)
        // Commit changes on success
        err = nvs_commit(h);
     } else {
-       #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
        ESP_LOGE(TAG, "bluetooth_script_count_set nvs_set_u8 failed: %s", esp_err_to_name(err));
-       #endif
+#endif
     }
     
     // Close NVS
@@ -121,9 +121,9 @@ static esp_err_t bluetooth_script_label_set_nvs(uint8_t idx, const char *label)
     // Open NVS
     esp_err_t err = nvs_open(BT_SCRIPT_MENU_NS, NVS_READWRITE, &h);
     if (err != ESP_OK) {
-       #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
        ESP_LOGE(TAG, "bluetooth_script_label_set nvs_open failed: %s", esp_err_to_name(err));
-       #endif
+#endif
        
          return err;
     }
@@ -138,9 +138,9 @@ static esp_err_t bluetooth_script_label_set_nvs(uint8_t idx, const char *label)
        // Commit changes on success
          err = nvs_commit(h);
     } else {
-       #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
        ESP_LOGE(TAG, "bluetooth_script_label_set nvs_set_str failed: %s", esp_err_to_name(err));
-       #endif
+#endif
     }
     
     // Close NVS
@@ -157,22 +157,22 @@ uint8_t bluetooth_script_count_get_nvs(void)
     // Open NVS
     esp_err_t err = nvs_open(BT_SCRIPT_MENU_NS, NVS_READONLY, &h);
     if (err == ESP_OK) {
-       // Get count
-         if (nvs_get_u8(h, BT_SCRIPT_MENU_KEY_COUNT, &count) != ESP_OK) {
-           // 0 if DNE
-              count = 0;
+        // Get count
+        if (nvs_get_u8(h, BT_SCRIPT_MENU_KEY_COUNT, &count) != ESP_OK) {
+            // 0 if DNE
+            count = 0;
               
-              #ifdef POLYCAST5_DEBUG
-           ESP_LOGE(TAG, "bluetooth_script_count_get nvs_get_u8 failed: %s", esp_err_to_name(err));
-           #endif
-         }
+#ifdef POLYCAST5_DEBUG
+            ESP_LOGE(TAG, "bluetooth_script_count_get nvs_get_u8 failed: %s", esp_err_to_name(err));
+#endif
+        }
          
-         // Close NVS
-         nvs_close(h);
+        // Close NVS
+        nvs_close(h);
     } else {
-       #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
        ESP_LOGE(TAG, "bluetooth_script_count_get nvs_open failed: %s", esp_err_to_name(err));
-       #endif
+#endif
     }
     
     if (count > MAX_KEYBOARD_SCRIPTS) {
@@ -191,9 +191,9 @@ esp_err_t bluetooth_script_label_get_nvs(uint8_t idx, char *buf, size_t buflen)
     // Open NVS
     esp_err_t err = nvs_open(BT_SCRIPT_MENU_NS, NVS_READONLY, &h);
     if (err != ESP_OK) {
-       #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
        ESP_LOGE(TAG, "bluetooth_script_label_get nvs_open failed: %s", esp_err_to_name(err));
-       #endif
+#endif
     }
     
     // Format key
@@ -205,9 +205,9 @@ esp_err_t bluetooth_script_label_get_nvs(uint8_t idx, char *buf, size_t buflen)
     // Get the label string
     err = nvs_get_str(h, key, buf, &need);
     if (err != ESP_OK) {
-       #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
        ESP_LOGW(TAG, "bluetooth_script_label_get nvs_get_str failed: %s", esp_err_to_name(err));
-       #endif
+#endif
     }
     
     // Close NVS
@@ -224,9 +224,9 @@ esp_err_t bluetooth_script_body_get_nvs(uint8_t idx, char *buf, size_t buflen, s
     // Open NVS
     esp_err_t err = nvs_open(BT_SCRIPT_NS, NVS_READONLY, &h);
     if (err != ESP_OK) {
-       #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
        ESP_LOGE(TAG, "bluetooth_script_body_get nvs_open failed: %s", esp_err_to_name(err));
-       #endif
+#endif
        
          return err;
     }
@@ -249,9 +249,9 @@ esp_err_t bluetooth_script_body_get_nvs(uint8_t idx, char *buf, size_t buflen, s
               *outlen = need;
          }
     } else {
-       #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
        ESP_LOGE(TAG, "bluetooth_script_body_get string parameters wrong or NVS failed: %s", esp_err_to_name(err));
-       #endif
+#endif
     }
     
     // Close NVS
@@ -290,9 +290,9 @@ esp_err_t bluetooth_script_cat_idx_set_nvs(uint8_t idx, uint8_t cat)
     // Open NVS
     esp_err_t err = nvs_open(BT_SCRIPT_NS, NVS_READWRITE, &h);
     if (err != ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGE(TAG, "bluetooth_script_cat_set nvs_open failed: %s", esp_err_to_name(err));
-        #endif
+#endif
         return err;
     }
 
@@ -306,9 +306,9 @@ esp_err_t bluetooth_script_cat_idx_set_nvs(uint8_t idx, uint8_t cat)
         // Commit changes on success
         err = nvs_commit(h);
     } else {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGE(TAG, "bluetooth_script_cat_set nvs_set_u8 failed: %s", esp_err_to_name(err));
-        #endif
+#endif
     }
 
     // Close NVS
@@ -568,9 +568,9 @@ static esp_err_t scripts_list_get(httpd_req_t *req)
     free(txt);
     
     if (err != ESP_OK) {
-       #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
        ESP_LOGE(TAG, "scripts_list_get httpd_resp_sendstr failed: %s", esp_err_to_name(err));
-       #endif
+#endif
     }
      
     return err;
@@ -1252,9 +1252,9 @@ esp_err_t bluetooth_web_portal_start(void)
 {
     // If already running, do nothing
     if (bt_server != NULL) {
-         #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
          ESP_LOGW(TAG, "Portal already running at http://%s", s_ip);
-         #endif
+#endif
          
          return ESP_OK;
     }
@@ -1271,9 +1271,9 @@ esp_err_t bluetooth_web_portal_start(void)
     wifi_init_config_t wcfg = WIFI_INIT_CONFIG_DEFAULT();
     esp_err_t err = esp_wifi_init(&wcfg);
     if ((err != ESP_OK) && (err != ESP_ERR_WIFI_INIT_STATE)) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "esp_wifi_init error: %s", esp_err_to_name(err));
-        #endif
+#endif
          
         return err;
     }
@@ -1308,16 +1308,16 @@ esp_err_t bluetooth_web_portal_start(void)
     // Bring up HTTP server and register endpoints.
     bt_server = start_http();
     if (bt_server == NULL) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGE(TAG, "start_http failed");
-        #endif
+#endif
          
         return ESP_FAIL;
     }
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Portal running at http://%s (SSID: " BT_PORTAL_SSID ")", s_ip);
-    #endif
+#endif
     
     return ESP_OK;
 }

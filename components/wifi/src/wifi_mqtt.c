@@ -28,9 +28,9 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     esp_mqtt_event_handle_t event = event_data;
     switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Connected to MQTT");
-            #endif
+#endif
             
             // Subscribe to any polycast5/.../ack
             esp_mqtt_client_subscribe(event->client, "polycast5/+/ack", 0);
@@ -39,24 +39,24 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             break;
             
         case MQTT_EVENT_DISCONNECTED:
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Disconnected from MQTT");
-            #endif
+#endif
             
             xEventGroupClearBits(xWifiEventGroup, WIFI_MQTT_CONNECTED_BIT); // Notify LCD we disconnected
             break;
             
         case MQTT_EVENT_PUBLISHED:
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Broker ACKed message ID %d on topic %.*s", event->msg_id, event->topic_len, event->topic);
-            #endif
+#endif
             
             break;
             
         case MQTT_EVENT_DATA:
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "MQTT_EVENT_DATA triggered");
-            #endif
+#endif
 
             // If received on active topic
             if (event->topic_len == strlen(mqtt_active_ack_topic) && strncmp(event->topic, mqtt_active_ack_topic, event->topic_len) == 0) {
@@ -65,22 +65,22 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 memcpy(payload, event->data, event->data_len);
                 payload[event->data_len] = '\0';
                 
-                #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Received MQTT receipt='%s'", payload);
-                #endif
+#endif
                 
                 // If matches expected format
                 if (strcmp(payload, EXPECTED_MQTT_RX) == 0) {
-                    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                     ESP_LOGI(TAG, "Received MQTT receipt matches!");
-                    #endif
+#endif
 
                     // Notify user of successful send
                     xEventGroupSetBits(xWifiEventGroup, WIFI_MQTT_SUCCESS_BIT);
                 } else {
-                    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
                     ESP_LOGI(TAG, "Received MQTT receipt did not match (len=%d)", event->data_len);
-                    #endif
+#endif
                 }
             }
             break;
@@ -153,18 +153,18 @@ void wifi_mqtt_client_publish(char *payload, const uint8_t key[16])
             key[8],  key[9],  key[10], key[11],
             key[12], key[13], key[14], key[15]);
     
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Active MQTT ACK:%s", mqtt_active_ack_topic);
-    #endif
+#endif
     
     // Send the data
     int msg_id = esp_mqtt_client_publish(mqtt_client, topic_cmd, payload, 0, 0, 0);
     
     if (msg_id != -1) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "MQTT send success: %d", msg_id);
         ESP_LOGI(TAG, "Sent '%s' to topic '%s'", payload, topic_cmd);
-        #endif
+#endif
     } else {
         ESP_LOGE(TAG, "MQTT send FAILED: %d", msg_id);
     }

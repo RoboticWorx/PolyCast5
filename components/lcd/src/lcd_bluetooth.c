@@ -1868,9 +1868,9 @@ void lcd_bluetooth_keyboard_sub_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blu
     } else if (ui_btns->select_btn == 1) { // Select script
         // If no scripts in this category, ignore select
         if (bluetooth_keyboard_submenu.size <= 0) {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "No scripts in selected category");
-            #endif
+#endif
         
             return;
         }
@@ -2086,11 +2086,11 @@ static void prompt_rename_or_del(ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth
         if (xSemaphoreTake(xRightButtonSemaphore, 0) == pdTRUE) {            
             // Save preferred peer to whitelist
             esp_err_t err = bluetooth_nvs_set_preferred_peer(&bluetooth_menu->bluetooth_peer_menu.peers[bluetooth_menu->bluetooth_peer_menu.index]);
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "bluetooth_nvs_set_preferred_peer failed: %s", esp_err_to_name(err));
             }
-            #endif
+#endif
             
             lv_obj_delete(lbl_exit);
             lv_obj_delete(lbl_name);
@@ -2665,9 +2665,9 @@ void lcd_bluetooth_rename_peer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         bt_name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
         memcpy(saved_name, bt_name_buf, MAX_CUSTOM_NAME_LEN + 1);
         
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Device name: %s", saved_name);
-        #endif
+#endif
         
         // Delete labels since no longer used
         lv_obj_delete(lbl_user_in);
@@ -2799,9 +2799,9 @@ esp_err_t lcd_bluetooth_script_selected_set(uint8_t idx)
      // Open NVS
      esp_err_t err = nvs_open(KEYBOARD_SELECTED_IDX_NS, NVS_READWRITE, &h);
      if (err != ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGE(TAG, "lcd_bluetooth_script_selected_set nvs_open failed: %s", esp_err_to_name(err));
-        #endif
+#endif
         
           return err;
      }
@@ -2812,9 +2812,9 @@ esp_err_t lcd_bluetooth_script_selected_set(uint8_t idx)
         // Commit changes on success
           err = nvs_commit(h);
      } else {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGE(TAG, "lcd_bluetooth_script_selected_set nvs_set_u8 failed: %s", esp_err_to_name(err));
-        #endif
+#endif
     }
     
     // Close NVS
@@ -2836,17 +2836,17 @@ uint8_t lcd_bluetooth_script_selected_get(void)
             // 0 if DNE
                sel = 0;
                
-               #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGE(TAG, "lcd_bluetooth_script_selected_set nvs_get_u8 failed: %s", esp_err_to_name(err));
-            #endif
+#endif
           }
           
           // Close NVS
           nvs_close(h);
      } else {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "lcd_bluetooth_script_selected_set nvs_open failed: %s", esp_err_to_name(err));
-        #endif
+#endif
     }
     
     return sel;

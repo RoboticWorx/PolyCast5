@@ -415,9 +415,9 @@ const char *ai_utils_get_autokey_prompt(char *buf, size_t buf_sz)
 
     // Try to load override from NVS; fall back to compiled default if missing/empty
     if (ai_utils_keyboard_prompt_load_nvs(buf, buf_sz) != ESP_OK || buf[0] == '\0') {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "ai_utils_keyboard_prompt_load_nvs: Using default prompt");
-        #endif
+#endif
         return AI_PROMPT_AUTOKEY;
     }
 
@@ -437,9 +437,9 @@ const char *ai_utils_get_pkt_analysis_prompt(char *buf, size_t buf_sz)
 
     // Try to load override from NVS; fall back to compiled default if missing/empty
     if (ai_utils_pkt_analysis_prompt_load_nvs(buf, buf_sz) != ESP_OK || buf[0] == '\0') {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "ai_utils_pkt_analysis_prompt_load_nvs: Using default prompt");
-        #endif
+#endif
         return AI_PROMPT_PKT_ANALYSIS;
     }
 
@@ -579,11 +579,11 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
     // Attach POST body
     esp_http_client_set_post_field(client, payload, strlen(payload));
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Free heap before esp_http_client_perform: free=%u LFB=%u",
             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
-    #endif
+#endif
 
     // Perform the request
     esp_err_t err = esp_http_client_perform(client);
@@ -654,7 +654,7 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
     // Extract assistant output text from xAI payload
     const char *extracted_text = xai_extract_text(json);
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     // Warn if the model stopped due to length (common cause of cut off responses)
     const char *finish_reason = xai_finish_reason(json);
     if (finish_reason && strcmp(finish_reason, "length") == 0) {
@@ -669,7 +669,7 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
     } else if (finish_reason) {
         ESP_LOGI(TAG, "xAI finish_reason=%s out_len=(none)", finish_reason);
     }
-    #endif // POLYCAST5_DEBUG
+#endif // POLYCAST5_DEBUG
 
     if (!extracted_text || !extracted_text[0]) {
         // Rrror logging
@@ -894,9 +894,9 @@ esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out
 {
     // Validate
     if (!query || !out_script || out_sz == 0) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "ai_utils_lookup_creds: invalid arg(s)");
-        #endif
+#endif
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -905,9 +905,9 @@ esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out
     // Build a compact catalog of saved BT scripts (global order)
     uint8_t total = bluetooth_script_count_get_nvs(); // Get total saved scripts
     if (total == 0) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "ai_utils_lookup_creds: no saved BT scripts");
-        #endif
+#endif
         return ESP_ERR_NOT_FOUND;
     }
 
@@ -987,9 +987,9 @@ esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out
     if (idx < 0 || idx >= total) {
         if (idx == -1) {
             // -1 is Grok indicates no suitable match found
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Grok indicates no suitable match found");
-            #endif
+#endif
         }
 
         ESP_LOGE(TAG, "Grok reply index out of range: '%s'", model_reply);
@@ -1004,9 +1004,9 @@ esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out
         return ESP_ERR_NOT_FOUND;
     }
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Grok chose index %ld; script_len=%u", idx, (unsigned)blen);
-    #endif
+#endif
 
     return ESP_OK;
 }

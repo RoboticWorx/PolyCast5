@@ -84,22 +84,21 @@ static void lcd_task(void *pvParameters)
     //lcd_ns_nvs_clear("first_boot");
     //lcd_ns_nvs_clear(ESPNOW_LMK_NS);
     
-    #ifdef POLYCAST5_IR_NVS_CLEAR
+#ifdef POLYCAST5_IR_NVS_CLEAR
     lcd_ns_nvs_clear(A_IR_REMOTE_NS);
-    #endif
+#endif
     
-    #ifdef POLYCAST5_WIFI_NVS_CLEAR
+#ifdef POLYCAST5_WIFI_NVS_CLEAR
     lcd_ns_nvs_clear(WIFI_MENU_NS);
     lcd_ns_nvs_clear(WIFI_TOPIC_NS);
-    #endif
+#endif
     
     // Create common items
-    #ifdef POLYCAST5_PERSIST_SELECTION_INDEX
+#ifdef POLYCAST5_PERSIST_SELECTION_INDEX
     lcd_selection_index_nvs_load(&ui_menu); // Load selection menu previous index
-    #endif
+#endif
     
     lcd_init_selection_labels(&ui_menu);
-
 
     // Set brightness at boot
     xSemaphoreTake(xLEDCMutex, portMAX_DELAY); // Lock LEDC
@@ -161,14 +160,14 @@ static void lcd_task(void *pvParameters)
     // Create periodic timer to save uptime every 60s
     lcd_create_uptime_timer();
     
-    #ifdef POLYCAST5_ESPNOW_DUMP_NVS
+#ifdef POLYCAST5_ESPNOW_DUMP_NVS
     lcd_espnow_dump_nvs();
-    #endif
+#endif
     
-    #ifdef POLYCAST5_WIFI_DUMP_NVS
+#ifdef POLYCAST5_WIFI_DUMP_NVS
     lcd_wifi_dump_menu_nvs();
     lcd_wifi_dump_wifi_topic_nvs();
-    #endif
+#endif
     
     /* Check if first boot */
     // If yes, show BOOT_PAGE first (some starter info)
@@ -178,10 +177,9 @@ static void lcd_task(void *pvParameters)
 
         // Save first boot only if right arrow pressed
     } else {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "NOT First boot, setting to HOME_PAGE");
-        #endif
-
+#endif
         // Redundant
         ui_menu.page = HOME_PAGE;
     }
@@ -540,11 +538,11 @@ static void lcd_task(void *pvParameters)
         }
         
         // Sleep condition
-        #ifdef POLYCAST5_DIS_SLEEP_TIMER
+#ifdef POLYCAST5_DIS_SLEEP_TIMER
         if ((ui_menu.page == HOME_PAGE) && go_to_sleep) {
             lcd_device_sleep();
         }
-        #else
+#else
         TickType_t home_sleep_timer_interval = pdMS_TO_TICKS((uint32_t)home_sleep_after_s * 1000U); // home_sleep_after_s is extern
         // If home and home_sleep_timer_interval has passed without intervention
         if (((ui_menu.page == HOME_PAGE) || (ui_menu.page == BOOT_PAGE)) &&
@@ -559,7 +557,7 @@ static void lcd_task(void *pvParameters)
             
             sleep_timer_last = xTaskGetTickCount();
         }
-        #endif
+#endif
         
         // Update battery text
         if (xIsChargingSemaphore && xSemaphoreTake(xIsChargingSemaphore, 0) == pdTRUE) {

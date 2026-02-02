@@ -382,10 +382,10 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
     while (xQueueReceive(xWifiScanQueue, &result, 0) == pdPASS) {
         // If no networks found
         if (result.auth == 0xFF) { // (Impossible auth type)
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             // This needs to be tested as an edge case!
             ESP_LOGW(TAG, "xWifiScanQueue: Received impossible auth type (%d): TEST EDGE CASE.", result.auth);
-            #endif
+#endif
 
             // Done scanning
             scanning = false;
@@ -415,9 +415,9 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
 
         // Cap menu size to avoid overflowing local arrays/buttons
         if (wifi_menu->scan_menu.size >= WIFI_MAX_NETWORKS) {
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "lcd_wifi_scan_page: Too many networks; dropping '%s'", (char *)result.ssid);
-            #endif
+#endif
             continue;
         }
         
@@ -595,10 +595,10 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
         selected_network = wifi_utils_get_prev(); // Loads boot state saved network info
         selected_network.prev = true; // Connecting to previous
 
-        #ifdef POLYCAST5_CHECK_OTA_ON_CONN
+#ifdef POLYCAST5_CHECK_OTA_ON_CONN
         // Check for OTA on connect
         xEventGroupSetBits(xWifiEventGroup, WIFI_CHECK_OTA_ON_CONN_BIT);
-        #endif
+#endif
         
         if (xQueueSend(xWifiSelectedNetworkQueue, &selected_network, portMAX_DELAY) != pdPASS) {
             ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue previous_network");
@@ -947,14 +947,14 @@ void lcd_wifi_scan_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu
             strncpy(deauth_target.ssid, deauth_scan_result[idx].ssid, sizeof(deauth_target.ssid) - 1);
             deauth_target.ssid[(sizeof(deauth_target.ssid) - 1)] = '\0'; // Ensure null-termination
 
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Selected deauth target: SSID=%s, Ch=%d, first BSSID=%02X:%02X:%02X:%02X:%02X:%02X, BSSID count=%d",
                     deauth_target.ssid, deauth_target.channel,
                     deauth_target.bssid[0][0], deauth_target.bssid[0][1],
                     deauth_target.bssid[0][2], deauth_target.bssid[0][3],
                     deauth_target.bssid[0][4], deauth_target.bssid[0][5],
                     deauth_target.bssid_count);
-            #endif
+#endif
             
             /* Exit */
 
@@ -1421,10 +1421,10 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
         }
         if (hex_len >= (AI_CMD_MAX_LEN - 64)) {
             full = true;
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "lcd_wifi_ai_packet_page: Stopping sniff early: raw hex buffer full (len=%u cap=%u)",
                     (unsigned)hex_len, (unsigned)AI_CMD_MAX_LEN);
-            #endif
+#endif
         }
 
         // When done capturing
@@ -1516,12 +1516,12 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
                     (unsigned)src_len, (unsigned)copy_len);
         }
 
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Sending raw frames to Grok for analysis (len=%u)", (unsigned)copy_len);
         
         // This is usually a lot of data :)
         //ESP_LOGI(TAG, "Raw frames being sent:\n%s", frames_copy);
-        #endif
+#endif
 
         // Format AI cmd
         ai_cmd_t cmd = {
@@ -2843,9 +2843,9 @@ void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_m
         mqtt_name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
         memcpy(saved_name, mqtt_name_buf, MAX_CUSTOM_NAME_LEN + 1);
         
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "%s", saved_name);
-        #endif
+#endif
         
         // Delete labels since no longer used
         lv_obj_delete(lbl_user_in);

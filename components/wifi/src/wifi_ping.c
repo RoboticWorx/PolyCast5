@@ -40,10 +40,10 @@ static void ping_on_end(esp_ping_handle_t hdl, void *args)
         ping_avg_ms = -1;
     }
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "ping end: tx=%"PRIu32" rx=%"PRIu32" avg=%"PRIu32" ms",
             transmitted, received, (uint32_t)(ping_avg_ms < 0 ? 0 : ping_avg_ms));
-    #endif
+#endif
 }
 
 // Generic ping IPv4 helper
@@ -79,9 +79,9 @@ static esp_err_t wifi_ping_ip4(const esp_ip4_addr_t *ip4, int32_t *rtt_ms)
     esp_ping_handle_t ping;
     esp_err_t err = esp_ping_new_session(&cfg, &cbs, &ping);
     if (err != ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGE(TAG, "esp_ping_new_session failed: %s", esp_err_to_name(err));
-        #endif
+#endif
         return err;
     }
 
@@ -90,9 +90,9 @@ static esp_err_t wifi_ping_ip4(const esp_ip4_addr_t *ip4, int32_t *rtt_ms)
     // Start pinging
     err = esp_ping_start(ping);
     if (err != ESP_OK) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGE(TAG, "esp_ping_start failed: %s", esp_err_to_name(err));
-        #endif
+#endif
         esp_ping_delete_session(ping);
         return err;
     }
@@ -111,9 +111,9 @@ static esp_err_t wifi_ping_ip4(const esp_ip4_addr_t *ip4, int32_t *rtt_ms)
     esp_ping_delete_session(ping);
 
     if (ping_avg_ms < 0) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "No replies from target");
-        #endif
+#endif
         return ESP_ERR_TIMEOUT;
     }
 
@@ -125,15 +125,15 @@ esp_err_t wifi_ping_gateway(int32_t *rtt_ms)
 {
     // Error check
     if (!sta_gw_valid) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "Gateway unknown; not connected yet?");
-        #endif
+#endif
         return ESP_FAIL;
     }
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Pinging gateway: " IPSTR, IP2STR(&sta_gw));
-    #endif
+#endif
 
     return wifi_ping_ip4(&sta_gw, rtt_ms);
 }
@@ -153,9 +153,9 @@ esp_err_t wifi_ping_dns(const char *host, int32_t *rtt_ms)
         // Note: IPADDR_NONE is 0xFFFFFFFF -> this fails only for 255.255.255.255
         ip4.addr = addr;
 
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Pinging numeric host %s", host);
-        #endif
+#endif
 
         return wifi_ping_ip4(&ip4, rtt_ms);
     }
@@ -169,9 +169,9 @@ esp_err_t wifi_ping_dns(const char *host, int32_t *rtt_ms)
     struct addrinfo *res = NULL;
     int err = getaddrinfo(host, NULL, &hints, &res);
     if (err != 0 || res == NULL) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGE(TAG, "getaddrinfo failed for '%s': %d", host, err);
-        #endif
+#endif
 
         if (res) {
             freeaddrinfo(res);
@@ -183,9 +183,9 @@ esp_err_t wifi_ping_dns(const char *host, int32_t *rtt_ms)
     struct sockaddr_in *addr4 = (struct sockaddr_in *)res->ai_addr;
     ip4.addr = addr4->sin_addr.s_addr;
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Pinging host %s -> %s", host, inet_ntoa(addr4->sin_addr));
-    #endif
+#endif
 
     freeaddrinfo(res);
 

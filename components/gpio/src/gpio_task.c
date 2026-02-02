@@ -122,15 +122,15 @@ static void adc_task(void *arg)
     // Get battery charge on start
     gpio_utils_init_battery_adc();
     float v = gpio_utils_get_battery_voltage();
-    #ifdef POLYCAST5_DEBUG_ADC
+#ifdef POLYCAST5_DEBUG_ADC
     ESP_LOGI(TAG, "Startup voltage: %f", v);
-    #endif
+#endif
     gpio_utils_deinit_battery_adc();
         
     uint8_t percentage = gpio_utils_volts_to_soc(v);
-    #ifdef POLYCAST5_DEBUG_ADC
+#ifdef POLYCAST5_DEBUG_ADC
     ESP_LOGI(TAG, "Startup percentage: %u%%", percentage);
-    #endif
+#endif
     
     last_percentage = percentage;
     
@@ -152,10 +152,10 @@ static void adc_task(void *arg)
                         
             uint8_t percentage = gpio_utils_volts_to_soc(v);
             
-            #ifdef POLYCAST5_DEBUG_ADC
+#ifdef POLYCAST5_DEBUG_ADC
             ESP_LOGI(TAG, "Battery voltage: %f", v);
             ESP_LOGI(TAG, "Battery percentage: %u%%", percentage);
-            #endif
+#endif
             
             // If fluctuating by one, ignore
             if (percentage == last_percentage + 1) {
@@ -164,9 +164,9 @@ static void adc_task(void *arg)
                 last_percentage = percentage;
             }
             
-            #ifdef POLYCAST5_DEBUG_ADC
+#ifdef POLYCAST5_DEBUG_ADC
             ESP_LOGI(TAG, "NEW battery percentage: %u%%", percentage);
-            #endif
+#endif
             
             // Send value to LCD
             if (xQueueSend(xAdcBatReadingQueue, &percentage, portMAX_DELAY) != pdPASS) {
@@ -233,9 +233,9 @@ static void gpio_task(void *arg)
 
     // Default states set in gpio_utils_init()
     
-    #ifdef POLYCAST5_CYCLE_RGB_ON_BOOT
+#ifdef POLYCAST5_CYCLE_RGB_ON_BOOT
     gpio_utils_cycle_rgb();
-    #endif
+#endif
     
     if (xTaskCreate(adc_task, "adc_task", 1024 * 2, NULL, POLYCAST5_PRIORITY_LOW, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start adc_task");
@@ -280,18 +280,18 @@ static void gpio_task(void *arg)
                         if (held >= pdMS_TO_TICKS(LONG_PRESS_THRESHOLD_MS)) {
                             b->long_press_fired = true;
                             give_long(i);
-                            #ifdef POLYCAST5_DEBUG_GPIO
+#ifdef POLYCAST5_DEBUG_GPIO
                             ESP_LOGI(TAG, "Long press fired");
-                            #endif
+#endif
                         }
                     }
                     // Auto-repeat short-press every b->ticks
                     if (b->ticks == 0) {
                         give_short(i);
                         b->ticks = REPEAT_NEXT_MS / POLL_MS;
-                        #ifdef POLYCAST5_DEBUG_GPIO
+#ifdef POLYCAST5_DEBUG_GPIO
                         ESP_LOGI(TAG, "Auto repeat give short");
-                        #endif
+#endif
                     } else {
                         b->ticks--;
                     }
@@ -310,9 +310,9 @@ static void gpio_task(void *arg)
                         gpio_left_to_exit = false;
                     }
                     xSemaphoreGive(xGpioLeftBtnMutex); // Release left button mutex
-                    #ifdef POLYCAST5_DEBUG_GPIO
+#ifdef POLYCAST5_DEBUG_GPIO
                     ESP_LOGI(TAG, "Btn release give short");
-                    #endif
+#endif
                 }
             }
             
@@ -361,9 +361,9 @@ static void gpio_task(void *arg)
             ledc_set_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CHANNEL, duty);
             ledc_update_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CHANNEL);
             
-            #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Brightness set to %u%% (duty: %u)\n", lcd_ledc_brightness, duty);
-            #endif
+#endif
             xSemaphoreGive(xLEDCMutex); // Release LEDC
         }
         

@@ -62,7 +62,7 @@ static bool IRAM_ATTR infrared_rx_callback(rmt_channel_handle_t channel, const r
     ESP_LOGD(TAG, "RX last symbol: level0=%d, duration0=%d, level1=%d, duration1=%d",
             ir_signal[len - 1].level0, ir_signal[len - 1].duration0,
             ir_signal[len - 1].level1, ir_signal[len - 1].duration1);
-    #endif*/
+#endif*/
 
     // Notify semaphore that a signal was received
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -139,9 +139,9 @@ void infrared_utils_restart_rx(void)
 {
     // Ensure initialized
     if (rx_channel == NULL) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGE(TAG, "Cannot restart RX: channel not initialized");
-        #endif
+#endif
         
         return;
     }
@@ -164,9 +164,9 @@ void infrared_utils_disable_rx(void)
 {
     // Ensure initialized
     if (rx_channel == NULL) {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGE(TAG, "Cannot disable RX: channel not initialized");
-        #endif
+#endif
         
         return;
     }
@@ -187,11 +187,11 @@ void infrared_utils_transmit_ir(rmt_symbol_word_t *signal, size_t length)
         return;
     }
     
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "TX symbol: level0=%d, duration0=%d, level1=%d, duration1=%d",
             signal[length - 1].level0, signal[length - 1].duration0,
             signal[length - 1].level1, signal[length - 1].duration1);
-    #endif
+#endif
 
     // Make sure not to pick up our own transmission
     rmt_disable(rx_channel);
@@ -208,9 +208,9 @@ void infrared_utils_transmit_ir(rmt_symbol_word_t *signal, size_t length)
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Transmit failed: %s", esp_err_to_name(ret));
     } else {
-        #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Transmission complete (%d pulses)", length);
-        #endif
+#endif
     }
 
     // Re-enable RX channel
@@ -231,9 +231,9 @@ bool infrared_utils_ensure_capacity(void)
         return true;
     }
     
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGW(TAG, "Storage full (%zu signals)", total);
-    #endif
+#endif
     
     return false;
 }
@@ -552,9 +552,9 @@ void infrared_utils_delete_signal_from_remote_nvs(size_t remote_idx, size_t sig_
     // Close NVS
     nvs_close(h);
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Deleted signal %zu from remote %zu", sig_idx, remote_idx);
-    #endif
+#endif
 }
 
 void infrared_utils_delete_remote_nvs(size_t remote_idx)

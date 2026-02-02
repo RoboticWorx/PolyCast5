@@ -350,9 +350,9 @@ esp_err_t ai_analysis_portal_start(void)
         return ESP_FAIL;
     }
 
-    #ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "AI analysis portal up: SSID='%s' (open) IP=%s", s_ssid, s_ip);
-    #endif
+#endif
 
     return ESP_OK;
 }
