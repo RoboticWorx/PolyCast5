@@ -143,12 +143,7 @@ bool srs_sync_time_over_wifi(void)
     }
 
     /* If not synced */
-    // Ask Wi-Fi to reconnect to the last used network
-    wifi_login_t selected_network = wifi_utils_get_prev(); // Loads boot state saved network info
-    selected_network.prev = true; // Connecting to previous
-    if (xQueueSend(xWifiSelectedNetworkQueue, &selected_network, portMAX_DELAY) != pdPASS) {
-        ESP_LOGE(TAG, "Failed srs_sync_time_over_wifi: xWifiSelectedNetworkQueue");
-    }
+    xEventGroupSetBits(xWifiEventGroup, WIFI_RECONNECT_BIT); // Reconnect to previous Wi-Fi network
 
     // Wait up to WIFI_CONN_TIMEOUT_MS for connection
     TickType_t start = xTaskGetTickCount();

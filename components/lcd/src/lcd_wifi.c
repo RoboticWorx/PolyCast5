@@ -68,9 +68,9 @@ wifi_menu_t wifi_menu = {
     .cont = NULL,
 };
 
-wifi_login_t selected_network = {0};
-
 bool monitoring_packets = false;
+
+static wifi_login_t selected_network = {0};
 
 static char *raw_frames_ai_response;
 
@@ -386,7 +386,6 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
             // This needs to be tested as an edge case!
             ESP_LOGW(TAG, "xWifiScanQueue: Received impossible auth type (%d): TEST EDGE CASE.", result.auth);
 #endif
-
             // Done scanning
             scanning = false;
             scanned = false;
@@ -591,18 +590,11 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
             lv_obj_delete(lbl_option);
             lbl_option = NULL;
         }
-        
-        selected_network = wifi_utils_get_prev(); // Loads boot state saved network info
-        selected_network.prev = true; // Connecting to previous
-
 #ifdef POLYCAST5_CHECK_OTA_ON_CONN
         // Check for OTA on connect
         xEventGroupSetBits(xWifiEventGroup, WIFI_CHECK_OTA_ON_CONN_BIT);
 #endif
-        
-        if (xQueueSend(xWifiSelectedNetworkQueue, &selected_network, portMAX_DELAY) != pdPASS) {
-            ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue previous_network");
-        }
+        xEventGroupSetBits(xWifiEventGroup, WIFI_RECONNECT_BIT); // Reconnect to previous Wi-Fi network
         
         // Reset
         monitoring_packets = false;
@@ -631,8 +623,6 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
     } else if (scanned && ui_btns->select_btn == 1) { // Network selected
         // Connecting to usual network
         if (!monitoring_packets) {
-            selected_network.prev = false; // Connecting to new
-            
             // Copy over SSID
             lv_obj_t *btn = wifi_menu->scan_menu.btns[wifi_menu->scan_menu.index];
             lv_obj_t *lbl = lv_obj_get_child(btn, 0);
@@ -1454,13 +1444,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
             if ((xTaskGetTickCount() - disconnect_tick) < pdMS_TO_TICKS(2000)) {
                 // Do nothing for a bit (non-blocking delay)
             } else {
-                selected_network = wifi_utils_get_prev(); // Loads boot state saved network info
-                selected_network.prev = true; // Connecting to previous
-
-                if (xQueueSend(xWifiSelectedNetworkQueue, &selected_network, portMAX_DELAY) != pdPASS) {
-                    ESP_LOGE(TAG, "lcd_wifi_ai_packet_page: Failed: xWifiSelectedNetworkQueue previous_network");
-                    state = AI_PKT_IDLE;
-                }
+                xEventGroupSetBits(xWifiEventGroup, WIFI_RECONNECT_BIT); // Reconnect to previous Wi-Fi network
 
                 reconnect_start_tick = xTaskGetTickCount();
                 reconnect_sent = true;

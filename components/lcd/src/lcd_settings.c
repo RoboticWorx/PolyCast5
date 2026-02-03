@@ -568,7 +568,7 @@ void lcd_settings_ota_confirm_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
         title_lbl = instr_lbl = NULL;
         init = false;
         
-         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 

@@ -764,7 +764,6 @@ esp_err_t wifi_utils_connect(void)
 #ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Wi-Fi connected and got IP!");
 #endif
-        
         // wifi_mqtt_client_start() called after checking for OTA update
     } else {
         ESP_LOGE(TAG, "wifi_utils_connect: Timeout. Failed to connect.");

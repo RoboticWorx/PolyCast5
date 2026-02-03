@@ -200,17 +200,15 @@ static void wifi_task(void *param)
         // Specific network to connect selected
         if (xQueueReceive(xWifiSelectedNetworkQueue, &selected_network, 0) == pdTRUE) {
 #ifdef POLYCAST5_DEBUG
-            ESP_LOGI(TAG, "xWifiSelectedNetworkQueue received: ssid='%s', pass='%s'", selected_network.ssid, selected_network.password);
-            ESP_LOGI(TAG, "xWifiSelectedNetworkQueue received: bssid='%02x:%02x:%02x:%02x:%02x:%02x'",
+            ESP_LOGI(TAG, "xWifiSelectedNetworkQueue received: SSID='%s', pass='%s'", selected_network.ssid, selected_network.password);
+            ESP_LOGI(TAG, "xWifiSelectedNetworkQueue received: BSSID='%02x:%02x:%02x:%02x:%02x:%02x'",
                     selected_network.bssid[0], selected_network.bssid[1], selected_network.bssid[2],
                     selected_network.bssid[3], selected_network.bssid[4], selected_network.bssid[5]);
 #endif
-            
-            if (selected_network.prev && strlen(selected_network.ssid) == 0) {
+            if (strlen(selected_network.ssid) == 0) {
 #ifdef POLYCAST5_DEBUG
-                ESP_LOGW(TAG, "No previous network to connect to");
+                ESP_LOGW(TAG, "selected_network.ssid is empty, skipping connect");
 #endif
-                
                 xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_CONNECTING_BIT); // Not connected / not connecting
             } else {
                 xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // Tell LCD we're trying
@@ -231,11 +229,10 @@ static void wifi_task(void *param)
         if (xQueueReceive(xWifiSniffQueue, &sniff_network, 0) == pdTRUE) {
 #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "xWifiSniffQueue received: mask='%d', channel='%u'", sniff_network.mask, sniff_network.channel);
-            ESP_LOGI(TAG, "xWifiSniffQueue received: bssid='%02x:%02x:%02x:%02x:%02x:%02x'",
+            ESP_LOGI(TAG, "xWifiSniffQueue received: BSSID='%02x:%02x:%02x:%02x:%02x:%02x'",
                     sniff_network.target_bssid[0], sniff_network.target_bssid[1], sniff_network.target_bssid[2],
                     sniff_network.target_bssid[3], sniff_network.target_bssid[4], sniff_network.target_bssid[5]);
 #endif
-            
             wifi_utils_init_promiscuous(&sniff_network);
         }
 
@@ -294,7 +291,6 @@ static void wifi_task(void *param)
 #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Received Wi-Fi event: %u", (unsigned int)wifi_event_bits);
 #endif
-
             // If Wi-Fi reconnect bit transitioned 0 -> 1
             if ((wifi_event_bits & WIFI_RECONNECT_BIT) && !(last_wifi_event_bits & WIFI_RECONNECT_BIT)) {
                 // Get previous network credentials
@@ -318,7 +314,6 @@ static void wifi_task(void *param)
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Disconnecting Wi-Fi...");
 #endif
-
                 err = wifi_utils_radio_stop();
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "WIFI_DISCONNECT_BIT: wifi_utils_radio_stop failed: %s", esp_err_to_name(err));

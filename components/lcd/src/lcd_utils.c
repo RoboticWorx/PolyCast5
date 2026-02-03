@@ -116,7 +116,6 @@ enum
 extern volatile bool gpio_left_to_exit; // gpio_task.c
 extern volatile bool gpio_waiting_for_left; // gpio_task.c
 
-extern wifi_login_t selected_network;
 extern bool monitoring_packets;
 
 uint32_t pin_attempts = 0;
@@ -2915,6 +2914,8 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
         // If Wi-Fi connected bit transitioned 0 -> 1
         if ((wifi_event_bits & WIFI_CONNECTED_BIT) && !(last_wifi_event_bits & WIFI_CONNECTED_BIT)) {
             char buf[44];
+
+            wifi_login_t selected_network = wifi_utils_get_prev();
             snprintf(buf, sizeof(buf), "Connected: %s", selected_network.ssid);
             
             lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
@@ -3341,25 +3342,25 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
         lv_obj_t *lbl_check = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_check, "Connecting to Wi-Fi...", user_secondary_color,
                 &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
+        
+        LCD_LOADING_ANIM_START_DEFAULT();
         lv_timer_handler();
 
         // Check for OTA on connect
         xEventGroupSetBits(xWifiEventGroup, WIFI_CHECK_OTA_ON_CONN_BIT);
 
         // Connect to previous Wi-Fi network
-        wifi_login_t prev_network = wifi_utils_get_prev(); // Loads boot state saved network info
-        prev_network.prev = true; // Connecting to previous
-        if (xQueueSend(xWifiSelectedNetworkQueue, &prev_network, portMAX_DELAY) != pdPASS) {
-            ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue previous_network");
-        }
+        xEventGroupSetBits(xWifiEventGroup, WIFI_RECONNECT_BIT);
 
-        // Wait up to WIFI_CONN_TIMEOUT_MS to connect to Wi-Fi
-        if ((xEventGroupWaitBits(xWifiEventGroup, WIFI_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(WIFI_CONN_TIMEOUT_MS)) & WIFI_CONNECTED_BIT) != 0) {
+        // Wait up to WIFI_CONN_TIMEOUT_MS for Wi-Fi to connect
+        uint8_t status = lcd_wait_for_bit_better(xWifiEventGroup, WIFI_CONNECTED_BIT, WIFI_CONN_TIMEOUT_MS);
+        if (status == LCD_WAIT_FOR_BIT_BETTER_SUCCESS) { // Success
             lv_label_set_text(lbl_check, "Checking for updates...");
             lv_timer_handler();
 
-            // Wait up to 10s for OTA update
-            if ((xEventGroupWaitBits(xWifiEventGroup, WIFI_OTA_AVAILABLE_BIT, pdTRUE, pdFALSE, pdMS_TO_TICKS(10000)) & WIFI_OTA_AVAILABLE_BIT) != 0) {
+            // Wait up to 10000ms for OTA update (WIFI_OTA_AVAILABLE_BIT)
+            uint8_t ota_status = lcd_wait_for_bit_better(xWifiEventGroup, WIFI_OTA_AVAILABLE_BIT, 10000);
+            if (ota_status == LCD_WAIT_FOR_BIT_BETTER_SUCCESS) { // Success
                 lv_label_set_text(lbl_check, "Update found!");
                 lv_timer_handler();
                 vTaskDelay(pdMS_TO_TICKS(500));
@@ -3375,6 +3376,8 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
                 lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
                 lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 
+                lcd_loading_anim_stop();
+
                 // Reset objects
                 lv_obj_delete(lbl_check);
                 lbl_check = NULL;
@@ -3384,6 +3387,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
                 return;
             } else {
                 lv_label_set_text(lbl_check, "No new updates.");
+                lcd_loading_anim_stop();
                 lv_timer_handler();
 
                 // Wait for left button to be pressed
@@ -3392,6 +3396,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
             }
         } else {
             lv_label_set_text(lbl_check, OTA_CONN_FAILED_TXT);
+            lcd_loading_anim_stop();
             lv_timer_handler();
 
             // Wait for left button to be pressed

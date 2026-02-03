@@ -55,7 +55,6 @@ typedef struct {
     uint8_t bssid[6];
     char password[65];
     bool locked; // If network requires a password
-    bool prev; // If connecting to the last known network
 } wifi_login_t;
 
 typedef struct {
