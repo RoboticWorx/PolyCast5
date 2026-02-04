@@ -89,6 +89,14 @@ void gpio_utils_init_battery_adc(void);
 void gpio_utils_deinit_battery_adc(void);
 
 /** 
+ * @brief Enable or disable the TSOP infrared receiver.
+ *        This must be enabled in order to receive IR signals, but is turned off to save power otherwise
+ *
+ * @param [in] enable true = enable, false = disable
+ */
+void gpio_utils_en_tsop_receiver(bool enable);
+
+/** 
  * @brief Get the raw battery voltage with software averaging
  *
  * @return The value in volts

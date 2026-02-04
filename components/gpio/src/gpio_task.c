@@ -217,7 +217,7 @@ static void gpio_task(void *arg)
     
     xStartAdcBatSemaphore = xSemaphoreCreateBinary();
     configASSERT(xStartAdcBatSemaphore);
-    
+
     xLEDCSemaphore = xSemaphoreCreateBinary();
     configASSERT(xLEDCSemaphore);
 

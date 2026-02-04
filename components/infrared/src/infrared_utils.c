@@ -167,7 +167,6 @@ void infrared_utils_disable_rx(void)
 #ifdef POLYCAST5_DEBUG
         ESP_LOGE(TAG, "Cannot disable RX: channel not initialized");
 #endif
-        
         return;
     }
     

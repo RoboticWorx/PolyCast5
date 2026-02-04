@@ -59,8 +59,8 @@ void gpio_utils_init_nvs(void)
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "NVS initialized");
 #endif
-    
 }
+
 static void IRAM_ATTR haptic_off_cb(TimerHandle_t xTimer)
 {
     gpio_utils_write_output(TCA9535_HAPTIC_PIN, 0);
@@ -189,7 +189,7 @@ esp_err_t gpio_utils_init(void)
     gpio_utils_write_output(TCA9535_RED_RGB_LED_PIN, 0); // Red LED off
     gpio_utils_write_output(TCA9535_GREEN_RGB_LED_PIN, 0); // Green LED off
     gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, 0); // Blue LED off
-    gpio_utils_write_output(TCA9535_TSOP_EN_PIN, 0); // TSOP ON (active low)
+    gpio_utils_write_output(TCA9535_TSOP_EN_PIN, 1); // TSOP OFF (active low)
     
     // Configure inputs
     /*gpio_config_t io_conf_in = {
@@ -210,7 +210,6 @@ esp_err_t gpio_utils_init(void)
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
     };
     gpio_config(&io_conf_int);*/
-
 
     // ISR service
     gpio_install_isr_service(0);
@@ -318,6 +317,12 @@ void gpio_utils_deinit_battery_adc(void)
         ESP_ERROR_CHECK(adc_oneshot_del_unit(adc1_handle));
         adc1_handle = NULL;
     }
+}
+
+void gpio_utils_en_tsop_receiver(bool enable)
+{
+    // TSOP_EN_PIN is active low
+    gpio_utils_write_output(TCA9535_TSOP_EN_PIN, !enable);
 }
 
 float gpio_utils_get_battery_voltage(void)

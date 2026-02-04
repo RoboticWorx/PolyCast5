@@ -9,6 +9,7 @@
 
 #include "esp_log.h"
 
+#include "gpio_utils.h"
 #include "infrared_task.h"
 #include "infrared_utils.h"
 
@@ -33,8 +34,7 @@ size_t ir_current_remote = 0;
 
 volatile bool restart_rx_pending = false; // Global restart flag
 
-int menu_idx; // Index received from menu
-
+static int ir_menu_sig_idx; // Index received from menu
 
 static void infrared_task(void *pvParameters) {
     // Create semaphores
@@ -77,11 +77,13 @@ static void infrared_task(void *pvParameters) {
         // When user selects to add new signal
         if (xSemaphoreTake(xInfraredStartRxSemaphore, 0) == pdTRUE) {
             infrared_utils_restart_rx();
+            gpio_utils_en_tsop_receiver(true);
         }
         
         // When user canceled adding new signal
         if (xSemaphoreTake(xInfraredDisableSemaphore, 0) == pdTRUE) {
             infrared_utils_disable_rx();
+            gpio_utils_en_tsop_receiver(false);
         }
         
         // If received garbage in cb, restart
@@ -100,7 +102,6 @@ static void infrared_task(void *pvParameters) {
 #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Received IR signal (%zu pulses)", ir_signal_length);
 #endif
-            
             // Check if space available
             if (!infrared_utils_ensure_capacity()) {
                 ESP_LOGW(TAG, "Max signals reached, dropping new signal");
@@ -158,27 +159,27 @@ static void infrared_task(void *pvParameters) {
 #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Saved signal index %zu for remote %zu (%zu pulses)", ns, ir_current_remote, sig->length);
 #endif
-            
             xSemaphoreGive(xInfraredDataMutex); // Release IR
             
             xSemaphoreGive(xInfraredSignalSavedSemaphore); // Notify LCD we got and saved a valid signal
 
             // Disable until next signal
             infrared_utils_disable_rx();
+            gpio_utils_en_tsop_receiver(false);
         }
         
-        // Transmit a specific signal (index menu_idx)
-        if (xQueueReceive(xInfraredSignalToTxQueue, &menu_idx, 0) == pdTRUE) {
+        // Transmit a specific signal (index ir_menu_sig_idx)
+        if (xQueueReceive(xInfraredSignalToTxQueue, &ir_menu_sig_idx, 0) == pdTRUE) {
             xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
             
-            // Negative means delete index menu_idx
-            if (menu_idx < 0) {
-                menu_idx = -menu_idx; // Make positive
-                size_t sig_idx = (size_t) menu_idx - 3; // Offset for 0-based
+            // Negative means delete index ir_menu_sig_idx
+            if (ir_menu_sig_idx < 0) {
+                ir_menu_sig_idx = -ir_menu_sig_idx; // Make positive
+                size_t sig_idx = (size_t) ir_menu_sig_idx - 3; // Offset for 0-based
                 
                 infrared_utils_delete_signal_from_remote_nvs(ir_current_remote, sig_idx);
             } else { // Else send the signal at that index
-                size_t sig_idx = (size_t) menu_idx - 3; // Offset for 0-based
+                size_t sig_idx = (size_t) ir_menu_sig_idx - 3; // Offset for 0-based
             
                 // Get signal from current remote
                 ir_signal_t *sig = remotes[ir_current_remote].signals[sig_idx];
@@ -186,7 +187,6 @@ static void infrared_task(void *pvParameters) {
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Replaying signal %zu for remote %zu (%zu pulses)", sig_idx, ir_current_remote, sig->length);
 #endif
-                
                 // Send
                 infrared_utils_transmit_ir(sig->pulses, sig->length);
             }
