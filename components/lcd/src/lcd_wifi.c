@@ -53,6 +53,8 @@
 #define MQTT_SENDING_TXT "Sending via\nMQTT broker..." 
 #define MQTT_CONNECTING_TXT "Please wait...\nConnecting..."
 
+#define DATA_CHART_MIN_PKTS 10
+
 // wifi_utils.c
 extern char raw_frames_hex_buf[]; // Accumulated hex strings
 extern size_t raw_frames_hex_len; // Current length
@@ -83,6 +85,8 @@ static uint8_t mqtt_key[16];
 static bool wifi_menu_overwrite = false;
 
 static bool scan_deauth_page_initialized = false;
+
+static int data_chart_max_count = DATA_CHART_MIN_PKTS; // Updated dynamically
 
 // Character vars for user input
 static char mqtt_name_buf[MAX_PASSWORD_LEN + 1] = {0};
@@ -916,7 +920,7 @@ void lcd_wifi_scan_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu
             lbl_wait = NULL;
         }
 
-        lcd_transition_back(ui_btns->home_btn == 1, ui_menu);
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     } else if (scanned && ui_btns->select_btn == 1) { // Network selected
         int idx = wifi_menu->scan_menu.index;
         
@@ -1878,7 +1882,7 @@ void lcd_wifi_get_password(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t 
         // Show Wi-Fi menu
         lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         
-        // Switch pages
+        // Switch back
         ui_menu->page = WIFI_PAGE;
         
         return;
@@ -1978,7 +1982,15 @@ static void beacon_chart_draw_cb(lv_event_t * e)
     int32_t *y_array = lv_chart_get_y_array(chart, ser);
 
     uint32_t pc = lv_chart_get_point_count(chart);
+    if (pc == 0) {
+        return;
+    }
+
     uint32_t idx = base->id2; // Column being painted
+    if (idx >= pc) {
+        return;
+    }
+
     uint32_t logical = (ser->start_point + idx) % pc; // Real slot
     int32_t v = y_array[logical]; // SNR 0-50
     if (v > 50) { // Cap
@@ -2297,7 +2309,6 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
     }
 }
 
-
 // Colors bar more green or red based on value
 static void data_chart_draw_cb(lv_event_t * e)
 {
@@ -2324,40 +2335,48 @@ static void data_chart_draw_cb(lv_event_t * e)
     int32_t *y_array = lv_chart_get_y_array(chart, ser);
 
     uint32_t pc = lv_chart_get_point_count(chart);
-    uint32_t idx = base->id2; // Column being painted
-    uint32_t logical = (ser->start_point + idx) % pc; // Real slot
-    
-    int32_t  rssi_db = y_array[logical];       // e.g. –40
-
-    if (rssi_db == LV_CHART_POINT_NONE) {
+    if (pc == 0) {
         return;
     }
 
-    // Given your chart range is MIN=-100, MAX=0:
-    const int32_t MIN_DB = -100;
-    const int32_t MAX_DB = -40;
-    const uint32_t RANGE = (uint32_t)(MAX_DB - MIN_DB);
-    
-    // rssi_db is something between MIN_DB...MAX_DB
-    // Shift into 0..RANGE
-    uint32_t strength = (uint32_t)(rssi_db - MIN_DB); // e.g. –40->60, –100->0, 0->100
-    
-    // Cap at max
-    if (strength > RANGE) {
-        strength = RANGE;
+    uint32_t idx = base->id2; // Column being painted
+    if (idx >= pc) {
+        return;
     }
-    
-    // Compute mix 0...255
-    uint8_t mix = (uint8_t)((strength * 255u) / RANGE);
-    
-    // Create color
+
+    uint32_t logical = (ser->start_point + idx) % pc; // Real slot
+    int32_t v = y_array[logical]; // Packet count
+    if (v == LV_CHART_POINT_NONE) {
+        return;
+    }
+
+    int32_t maxv = (data_chart_max_count > 0) ? data_chart_max_count : 1;
+
+    if (v < 0) {
+        v = 0;
+    } else if (v > maxv) {
+        v = maxv;
+    }
+
+    uint8_t mix = (uint8_t)(((uint32_t)v * 255u) / (uint32_t)maxv);
     fill->color = lv_color_mix(lv_palette_main(LV_PALETTE_GREEN), lv_palette_main(LV_PALETTE_RED), mix);
 }
 
-static int cmp_rssi(const void *a, const void *b)
+// Sort by packet count descending, then RSSI descending
+// B->pkt_count > A->pkt_count => return 1
+// B->pkt_count < A->pkt_count => return -1
+static int cmp_pkt_count(const void *a, const void *b)
 {
     const wifi_data_clients_t *A = a, *B = b;
-    return B->rssi - A->rssi; // Descending (-30 dBm above -70 dBm)
+
+    if (B->pkt_count > A->pkt_count) {
+        return 1;
+    }
+    if (B->pkt_count < A->pkt_count) {
+        return -1;
+    }
+
+    return B->rssi - A->rssi;
 }
 
 void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
@@ -2392,7 +2411,7 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
         lv_obj_set_style_bg_color(chart, lv_color_black(), LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_chart_set_type(chart, LV_CHART_TYPE_BAR);
         lv_chart_set_point_count(chart, MAX_BARS);
-        lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, -100, -30);
+        lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, 0, data_chart_max_count); // Starting value
         lv_chart_set_update_mode(chart, LV_CHART_UPDATE_MODE_SHIFT);
         
         // Bar
@@ -2442,8 +2461,8 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
         snprintf(top_buf, sizeof(top_buf), "%" PRIu32 " users on Ch%" PRIu32 "@%" PRIu32 "Mbps\n", wifi_data->client_count, wifi_data->channel, wifi_data->rate);
         lv_label_set_text(lbl_clients, top_buf);
         
-        // Sort by RSSI
-        qsort(wifi_data->clients, wifi_data->client_count, sizeof(wifi_data->clients[0]), cmp_rssi);
+        // Sort by packet count
+        qsort(wifi_data->clients, wifi_data->client_count, sizeof(wifi_data->clients[0]), cmp_pkt_count);
 
         // Rebuild chart
         uint32_t bars = MIN(wifi_data->client_count, MAX_BARS); // Cap at MAX_BARS
@@ -2451,28 +2470,53 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
         // Resize the chart’s internal point buffer so you never draw empty slots
         lv_chart_set_point_count(chart, bars);
         
+        // Compute max count among displayed bars for range scaling
+        uint32_t max_count = 1;
+        for (uint32_t i = 0; i < bars; ++i) {
+            if (wifi_data->clients[i].pkt_count > max_count) {
+                max_count = wifi_data->clients[i].pkt_count;
+            }
+        }
+
+        if (max_count < DATA_CHART_MIN_PKTS) {
+            max_count = DATA_CHART_MIN_PKTS;
+        }
+
+        data_chart_max_count = (max_count > (uint32_t)INT32_MAX) ? INT32_MAX : (int32_t)max_count;
+        lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, 0, data_chart_max_count);
+
         // Get the raw Y-array pointer for your series.
         int32_t *ya = lv_chart_get_y_array(chart, series);
-        
-        // Copy each client’s latest RSSI into that array in sorted order
+
+        // Copy each client's packet count into the array (sorted)
         for (uint32_t i = 0; i < bars; ++i) {
-            ya[i] = wifi_data->clients[i].rssi;
+            uint32_t c = wifi_data->clients[i].pkt_count;
+            ya[i] = (c > (uint32_t)INT32_MAX) ? INT32_MAX : (int32_t)c;
         }
 
         // Redraw
         lv_chart_refresh(chart);
 
         // Rebuild info text
-        char buf[512];
+        POLYCAST5_USE_PSRAM static char buf[8192];
+        memset(buf, 0, sizeof(buf)); // Fresh start each time
+
         size_t off = 0;
-        
         off += snprintf(buf, sizeof(buf), "Unique users (MACs):\n");
 
         for (uint32_t i = 0; i < wifi_data->client_count && off < sizeof(buf); ++i) {
             const uint8_t *m = wifi_data->clients[i].mac;
-            off += snprintf(buf + off, sizeof(buf) - off, "%02X:%02X:%02X:%02X:%02X:%02X @%3d\n",
-                    m[0],m[1],m[2],m[3],m[4],m[5],
-                    wifi_data->clients[i].rssi);
+            if (wifi_data->clients[i].pkt_count > 1) {
+                off += snprintf(buf + off, sizeof(buf) - off,
+                        "%02X:%02X:%02X:%02X:%02X:%02X: %" PRIu32 "pkts\n",
+                        m[0], m[1], m[2], m[3], m[4], m[5],
+                        wifi_data->clients[i].pkt_count);
+            } else {
+                off += snprintf(buf + off, sizeof(buf) - off,
+                        "%02X:%02X:%02X:%02X:%02X:%02X: %" PRIu32 "pkt\n",
+                        m[0], m[1], m[2], m[3], m[4], m[5],
+                        wifi_data->clients[i].pkt_count);
+            }
         }
         lv_label_set_text(lbl_info, buf);
     }
@@ -2481,7 +2525,7 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
     if (ui_btns->down_btn) {
         lv_obj_scroll_by_bounded(cont, 0, -SCROLL_STEP, true);
     } else if (ui_btns->up_btn) { // Scroll up
-        lv_obj_scroll_by_bounded(cont, 0,  SCROLL_STEP, true);
+        lv_obj_scroll_by_bounded(cont, 0, SCROLL_STEP, true);
     } else if (ui_btns->left_btn) { // Back to beacon
         lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
          

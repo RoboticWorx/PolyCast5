@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <ctype.h>
+#include <stdint.h>
 
 #include "esp_log.h"
 #include "esp_wifi.h"
@@ -1312,24 +1313,32 @@ static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
     */
 }
 
-static void record_client(const uint8_t *mac, int8_t rssi) {
-    
+static void record_client(const uint8_t *mac, int8_t rssi)
+{
     // Check if exists
     for (int i = 0; i < wifi_data.client_count; ++i) {
+        // If found existing
         if (memcmp(wifi_data.clients[i].mac, mac, 6) == 0) {
-            // If it does, update the rssi then exit
+            // Update to latest RSSI
             wifi_data.clients[i].rssi = rssi;
-            
+
+            // Increment packet count up to max
+            if (wifi_data.clients[i].pkt_count != UINT32_MAX) {
+                wifi_data.clients[i].pkt_count++;
+            }
             return;
         }
     }
+
     // Else add new
     if (wifi_data.client_count < MAX_MAC_CLIENTS) {
         memcpy(wifi_data.clients[wifi_data.client_count].mac, mac, 6);
-        
+
         wifi_data.clients[wifi_data.client_count].rssi = rssi;
+        wifi_data.clients[wifi_data.client_count].pkt_count = 1;
+
         wifi_data.client_count++;
-        
+
 #ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "New MAC found: %02x:%02x:%02x:%02x:%02x:%02x",
                 mac[0], mac[1], mac[2],
@@ -1504,15 +1513,15 @@ void wifi_utils_init_promiscuous(wifi_sniff_t *network)
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 
     ESP_ERROR_CHECK(esp_wifi_start());
-    
+
     // Fix the channel to the target AP: set channel (0 = auto/current)
     ESP_ERROR_CHECK(esp_wifi_set_channel(network->channel, WIFI_SECOND_CHAN_NONE));
-    
+
     // Only selected frame(s)
     wifi_promiscuous_filter_t filter = {
         .filter_mask = network->mask
     };
-    
+
     // target_bssid not checked unless beacon_cb
     memcpy(target_bssid, network->target_bssid, 6);
     
@@ -1524,6 +1533,7 @@ void wifi_utils_init_promiscuous(wifi_sniff_t *network)
         ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_beacon_cb)); // Sniff beacon frames
     } else if (network->mask == WIFI_PROMIS_FILTER_MASK_DATA) {
         ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_data_cb)); // Sniff data frames
+        memset(&wifi_data, 0, sizeof(wifi_data)); // Reset counts so chart reflects this session
     } else if (network->mask == WIFI_PROMIS_FILTER_MASK_RAW_USEFUL) {
         ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_raw_cb)); // Sniff everything
     } else {

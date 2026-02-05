@@ -105,7 +105,8 @@ typedef struct {
 
 typedef struct {
     uint8_t mac[6];
-    int8_t  rssi;
+    int8_t rssi;
+    uint32_t pkt_count; // Number of sniffed data frames attributed to this MAC
 } wifi_data_clients_t;
 
 typedef struct {
