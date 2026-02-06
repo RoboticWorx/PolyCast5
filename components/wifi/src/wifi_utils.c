@@ -19,6 +19,7 @@
 #include "cJSON.h"
 
 #include "wifi_utils.h"
+#include "wifi_autoconnect.h"
 #include "wifi_mqtt.h"
 #include "wifi_ping.h"
 #include "gpio_utils.h"
@@ -37,6 +38,10 @@
 extern esp_ip4_addr_t sta_gw;
 extern bool sta_gw_valid;
 
+extern bool last_known_network_conn_failed; // wifi_autoconnect.c
+
+volatile bool wifi_reconnect_with_scan = false;
+
 // extern to lcd_wifi.c
 POLYCAST5_USE_PSRAM char raw_frames_hex_buf[RAW_HEX_BUF_CAP]; // Accumulated hex strings
 size_t raw_frames_hex_len = 0; // Current length
@@ -44,7 +49,7 @@ uint32_t raw_frames_captured = 0; // Counter
 
 static uint8_t target_bssid[6] = {0};
 
-static wifi_data_t wifi_data;
+POLYCAST5_USE_PSRAM static wifi_data_t wifi_data;
 
 esp_err_t wifi_utils_scan(wifi_scan_t *wifi_scan)
 {
@@ -696,7 +701,6 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 #ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "Disconnected, reason=%d (%s)", d->reason, wifi_disconnect_reason_str(d->reason));
 #endif
-
         wifi_utils_radio_stop();
 
         // Notify we disconnected
@@ -716,7 +720,6 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
                 IP2STR(&e->ip_info.ip),
                 IP2STR(&e->ip_info.gw));
 #endif
-        
         // Save gateway so we can ping it later
         sta_gw = e->ip_info.gw;
         sta_gw_valid = true;
@@ -731,7 +734,9 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
         // RGB indicator
         uint8_t rgb_state = RGB_SET_GREEN;
         xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-        
+
+        wifi_autoconnect_remember_current_network();
+
         // If WIFI_CHECK_OTA_ON_CONN_BIT is set, check for OTA firmware update on this connection
         if (xEventGroupGetBits(xWifiEventGroup) & WIFI_CHECK_OTA_ON_CONN_BIT) {
             // Check for new firmware version and update if so
@@ -745,11 +750,9 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 
 void wifi_utils_wifi_event_init(void)
 {
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler,
-            NULL, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler, NULL, NULL));
                  
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, wifi_event_handler,
-            NULL, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, wifi_event_handler, NULL, NULL));
 }
 
 esp_err_t wifi_utils_connect(void)
@@ -765,16 +768,30 @@ esp_err_t wifi_utils_connect(void)
 #ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Wi-Fi connected and got IP!");
 #endif
+        last_known_network_conn_failed = false;
+        wifi_reconnect_with_scan = false;
         // wifi_mqtt_client_start() called after checking for OTA update
     } else {
         ESP_LOGE(TAG, "wifi_utils_connect: Timeout. Failed to connect.");
 
-        // Notify LCD
-        // WIFI_CONNECTING_FAILED_BIT for LCD "Connecting..." to change state
-        xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTING_FAILED_BIT);
+        last_known_network_conn_failed = true;
+        if (!wifi_reconnect_with_scan) {
+            wifi_reconnect_with_scan = true;
+#ifdef POLYCAST5_DEBUG
+            ESP_LOGI(TAG, "Connection failed. Will retry connection with a scan.");
+#endif
+        } else {
+            // Notify LCD we failed to connect
+            // WIFI_CONNECTING_FAILED_BIT for LCD "Connecting..." to change state
+            xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTING_FAILED_BIT);
 
-        // No longer trying to connect
-        xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTING_BIT);
+            // No longer trying to connect
+            xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // No longer trying to connect
+#ifdef POLYCAST5_DEBUG
+            ESP_LOGW(TAG, "Connection failed. Exiting...");
+#endif
+            wifi_reconnect_with_scan = false;
+        }
 
         wifi_utils_radio_stop();
     }
@@ -791,8 +808,8 @@ esp_err_t wifi_utils_radio_start(const char *ssid, const uint8_t* bssid, const c
     strlcpy((char*)cfg.sta.password, password, sizeof(cfg.sta.password));
     
     // Copy BSSID
-    //cfg.sta.bssid_set = true;
-    //memcpy(cfg.sta.bssid, bssid, sizeof(cfg.sta.bssid));
+    // cfg.sta.bssid_set = true;
+    // memcpy(cfg.sta.bssid, bssid, sizeof(cfg.sta.bssid));
 
     cfg.sta.channel = 0; // Don't lock to a specific channel
     cfg.sta.scan_method = WIFI_FAST_SCAN; // First matching SSID (vs WIFI_ALL_CHANNEL_SCAN)
@@ -801,9 +818,9 @@ esp_err_t wifi_utils_radio_start(const char *ssid, const uint8_t* bssid, const c
 
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Setting Wi-Fi config SSID='%s'", ssid);
-    ESP_LOGI(TAG, "Setting Wi-Fi config BSSID=%02x:%02x:%02x:%02x:%02x:%02x",
-            bssid[0], bssid[1], bssid[2],
-            bssid[3], bssid[4], bssid[5]);
+    // ESP_LOGI(TAG, "Setting Wi-Fi config BSSID=%02x:%02x:%02x:%02x:%02x:%02x",
+    //         bssid[0], bssid[1], bssid[2],
+    //         bssid[3], bssid[4], bssid[5]);
     ESP_LOGI(TAG, "Setting Wi-Fi config password='%s'", password);
 #endif
     

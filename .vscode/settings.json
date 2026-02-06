@@ -19,4 +19,5 @@
   "C_Cpp.errorSquiggles": "enabled",
   "diffEditor.renderSideBySide": false,
   "idf.flashType": "UART",
+  "chatgpt.commentCodeLensEnabled": false,
 }

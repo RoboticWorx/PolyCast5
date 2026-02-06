@@ -17,7 +17,7 @@
 #include "wifi_ping.h"
 #include "wifi_mqtt.h"
 #include "wifi_deauth.h"
-#include "wifi_task.h"
+#include "wifi_autoconnect.h"
 #include "wifi_ota_update.h"
 #include "esp_app_desc.h"
 #include "wifi_btc_web_portal.h"
@@ -25,7 +25,11 @@
 #include "bluetooth_web_portal.h"
 #include "ai_analysis_web_portal.h"
 
+#include "wifi_task.h"
+
 #define TAG "WIFI_TASK"
+
+extern volatile bool wifi_reconnect_with_scan; // wifi_utils.c
 
 char btc_wifi_portal_pass[64];
 
@@ -131,6 +135,7 @@ static void wifi_task(void *param)
     // Initialize MQTT client
     wifi_utils_wifi_event_init();
     wifi_mqtt_client_init();
+    wifi_autoconnect_init();
 
     // If Wi-Fi BTC portal password NVS doesn't exist yet, set it
     if (wifi_btc_pass_load_nvs(btc_wifi_portal_pass, sizeof(btc_wifi_portal_pass)) != ESP_OK) {
@@ -285,27 +290,47 @@ static void wifi_task(void *param)
 
         // Check for Wi-Fi events
         EventBits_t wifi_event_bits = xEventGroupGetBits(xWifiEventGroup);
-        if (wifi_event_bits != last_wifi_event_bits) { // Only act on changes
+        if ((wifi_event_bits != last_wifi_event_bits) || wifi_reconnect_with_scan) { // Only act on changes
             esp_err_t err;
 
 #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Received Wi-Fi event: %u", (unsigned int)wifi_event_bits);
+            if (wifi_reconnect_with_scan) {
+                ESP_LOGI(TAG, "wifi_reconnect_with_scan flag is set");
+            }
 #endif
             // If Wi-Fi reconnect bit transitioned 0 -> 1
-            if ((wifi_event_bits & WIFI_RECONNECT_BIT) && !(last_wifi_event_bits & WIFI_RECONNECT_BIT)) {
-                // Get previous network credentials
-                selected_network = wifi_utils_get_prev();
-
-                xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // Tell LCD we're trying
-
-                // Start radio and connect
-                err = wifi_utils_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password);
+            if (((wifi_event_bits & WIFI_RECONNECT_BIT) && !(last_wifi_event_bits & WIFI_RECONNECT_BIT))
+                    || wifi_reconnect_with_scan) {
+#ifdef POLYCAST5_DEBUG
+                ESP_LOGI(TAG, "Reconnecting to known network...");
+#endif
+                // Use cached known network or scan if failed attempt
+                esp_err_t err = wifi_autoconnect_pick_known_network(&selected_network);
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "WIFI_RECONNECT_BIT: wifi_utils_radio_start failed: %s", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "WIFI_RECONNECT_BIT: wifi_autoconnect_pick_known_network failed: %s. Falling back.", esp_err_to_name(err));
+                    selected_network = wifi_utils_get_prev();
                 }
-                err = wifi_utils_connect();
-                if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "WIFI_RECONNECT_BIT: wifi_utils_connect failed: %s", esp_err_to_name(err));
+
+                // Skip reconnect if no SSID available
+                if (strlen(selected_network.ssid) == 0) {
+#ifdef POLYCAST5_DEBUG
+                    ESP_LOGW(TAG, "WIFI_RECONNECT_BIT: No SSID available");
+#endif
+                    wifi_reconnect_with_scan = false;
+                    xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_CONNECTING_BIT);
+                } else {
+                    xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // Tell LCD we're trying
+
+                    // Start radio and connect
+                    err = wifi_utils_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password);
+                    if (err != ESP_OK) {
+                        ESP_LOGE(TAG, "WIFI_RECONNECT_BIT: wifi_utils_radio_start failed: %s", esp_err_to_name(err));
+                    }
+                    err = wifi_utils_connect();
+                    if (err != ESP_OK) {
+                        ESP_LOGE(TAG, "WIFI_RECONNECT_BIT: wifi_utils_connect failed: %s", esp_err_to_name(err));
+                    }
                 }
                 xEventGroupClearBits(xWifiEventGroup, WIFI_RECONNECT_BIT); // Reset for next time
             }
