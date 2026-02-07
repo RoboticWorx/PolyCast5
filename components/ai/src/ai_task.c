@@ -168,7 +168,6 @@ static void ai_task(void *pvParameters)
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Realtime Transcript: %s", user_transcript);
 #endif
-
                 // Check if username or password query
                 cmd.type = parse_kind_and_query(user_transcript, &query);
                 if (cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD) {
@@ -207,7 +206,6 @@ static void ai_task(void *pvParameters)
             size_t msg_len = (cmd.msg_len != 0) ? cmd.msg_len : strlen(cmd.msg);
             ESP_LOGI(TAG, "AI_CMD_RAW_FRAMES payload len=%u", (unsigned)msg_len);
 #endif
-
             // Build autotype prompt (NVS override; fallback to compiled default)
             memset(prompt_buf, 0, sizeof(prompt_buf)); // Zero out previous contents
             const char *prompt = ai_utils_get_pkt_analysis_prompt(prompt_buf, sizeof(prompt_buf));
@@ -222,21 +220,18 @@ static void ai_task(void *pvParameters)
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "AI keyboard script resolved: %s", ai_response);
 #endif
-
                 char *ai_script_ptr = ai_response;
                 xQueueSend(xBluetoothAiCmdQueue, &ai_script_ptr, portMAX_DELAY);
             } else if (cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD) {
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Credential script resolved (len=%u)", (unsigned)strlen(ai_response));
 #endif
-
                 char *ai_script_ptr = ai_response;
                 xQueueSend(xBluetoothAiCmdQueue, &ai_script_ptr, portMAX_DELAY);
             } else if (cmd.type == AI_CMD_RAW_FRAMES) {
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Raw frames sniff resolved with response. Grok analysis of raw frames: %s", ai_response);
 #endif
-
                 char *ai_script_ptr = ai_response;
                 xQueueSend(xWifiAiRawSniffQueue, &ai_script_ptr, portMAX_DELAY);
             }

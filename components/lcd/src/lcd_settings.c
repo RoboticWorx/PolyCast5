@@ -355,7 +355,7 @@ void lcd_settings_setup_pin_page(settings_menu_t *menu)
     }
     
     // Update text based on NVS load
-    menu->options[0] = menu->pin_menu.pin_set ? SETTINGS_REMOVE_LOCK_TXT : SETTINGS_SET_LOCK_TXT;
+    menu->options[SETTINGS_LOCK_IDX] = menu->pin_menu.pin_set ? SETTINGS_REMOVE_LOCK_TXT : SETTINGS_SET_LOCK_TXT;
     
     static lv_style_t container_style;
     static int zero = 0;
@@ -769,8 +769,8 @@ void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu
 #endif
         
         // Update menu text and flag
-        settings_menu->options[0] = SETTINGS_REMOVE_LOCK_TXT;
-        lv_list_set_button_text(settings_menu->main_list, settings_menu->btns[0], settings_menu->options[0]);
+        settings_menu->options[SETTINGS_LOCK_IDX] = SETTINGS_REMOVE_LOCK_TXT;
+        lv_list_set_button_text(settings_menu->main_list, settings_menu->btns[SETTINGS_LOCK_IDX], settings_menu->options[SETTINGS_LOCK_IDX]);
         settings_menu->pin_menu.pin_set = true;
         
         // Save to NVS

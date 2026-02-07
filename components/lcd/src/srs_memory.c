@@ -141,7 +141,7 @@ bool srs_sync_time_over_wifi(void)
     
         return true;
     }
-
+// todo: sync using hardcoded dates provided instead of button
     /* If not synced */
     xEventGroupSetBits(xWifiEventGroup, WIFI_RECONNECT_BIT); // Reconnect to previous Wi-Fi network
 

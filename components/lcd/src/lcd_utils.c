@@ -1753,6 +1753,9 @@ uint8_t lcd_wait_for_bit_better(EventGroupHandle_t event_group, EventBits_t bit,
         
         // Check for timeout
         if (xTaskGetTickCount() - start_tick > pdMS_TO_TICKS(timeout_ms)) {
+#ifdef POLYCAST5_DEBUG
+            ESP_LOGE(TAG, "Timeout, exiting lcd_wait_for_bit_better");
+#endif
             status = LCD_WAIT_FOR_BIT_BETTER_TIMEOUT;
             break;
         }
@@ -2256,14 +2259,13 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
             pin_attempts = 0;
             lcd_settings_pin_attempts_nvs_save(); // Saves pin_attempts global
             memset(input_pin, 0, sizeof(input_pin));
-            lcd_settings_rebuild_pin_boxes(settings_menu->pin_menu.pin_container, unlock_labels,
-                input_pin, &num_boxes, num_filled);
+            lcd_settings_rebuild_pin_boxes(settings_menu->pin_menu.pin_container, unlock_labels, input_pin, &num_boxes, num_filled);
                 
             pin_signing_in = false;
     
             // Update options text
-            settings_menu->options[0] = SETTINGS_REMOVE_LOCK_TXT;
-            lv_list_set_button_text(settings_menu->main_list, settings_menu->btns[0], settings_menu->options[0]);
+            settings_menu->options[SETTINGS_LOCK_IDX] = SETTINGS_REMOVE_LOCK_TXT;
+            lv_list_set_button_text(settings_menu->main_list, settings_menu->btns[SETTINGS_LOCK_IDX], settings_menu->options[SETTINGS_LOCK_IDX]);
             
             // Won't prompt again unless power off
             settings_menu->pin_menu.prompt_pin = false;
@@ -3387,18 +3389,30 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
                 return;
             } else {
                 lv_label_set_text(lbl_check, "No new updates.");
+                lv_timer_handler();
                 lcd_loading_anim_stop();
                 lv_timer_handler();
+                lv_refr_now(NULL); // Force refresh
+                vTaskDelay(pdMS_TO_TICKS(50));
 
+#ifdef POLYCAST5_DEBUG
+                ESP_LOGE(TAG, "Waiting for left btn press: no OTA available");
+#endif
                 // Wait for left button to be pressed
                 xSemaphoreTake(xLeftButtonSemaphore, portMAX_DELAY);
                 lcd_clear_pending_inputs = true; // Clear any button presses during wait
             }
         } else {
             lv_label_set_text(lbl_check, OTA_CONN_FAILED_TXT);
+            lv_timer_handler();
             lcd_loading_anim_stop();
             lv_timer_handler();
+            lv_refr_now(NULL); // Force refresh
+            vTaskDelay(pdMS_TO_TICKS(50));
 
+#ifdef POLYCAST5_DEBUG
+            ESP_LOGE(TAG, "Waiting for left btn press: failed to connect to Wi-Fi");
+#endif
             // Wait for left button to be pressed
             xSemaphoreTake(xLeftButtonSemaphore, portMAX_DELAY);
             lcd_clear_pending_inputs = true; // Clear any button presses during wait
@@ -3427,9 +3441,9 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
         
         // Removing set pin
         if (settings_menu->pin_menu.pin_set) {
-            settings_menu->options[0] = SETTINGS_SET_LOCK_TXT;
+            settings_menu->options[SETTINGS_LOCK_IDX] = SETTINGS_SET_LOCK_TXT;
             settings_menu->pin_menu.pin_set = false;
-            lv_list_set_button_text(settings_menu->main_list, settings_menu->btns[0], settings_menu->options[0]);
+            lv_list_set_button_text(settings_menu->main_list, settings_menu->btns[SETTINGS_LOCK_IDX], settings_menu->options[SETTINGS_LOCK_IDX]);
             
             // Update NVS
             memset(settings_menu->pin_menu.unlock_pin, 0, sizeof(settings_menu->pin_menu.unlock_pin));

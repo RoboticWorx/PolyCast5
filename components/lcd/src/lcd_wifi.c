@@ -1510,7 +1510,6 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
         // This is usually a lot of data :)
         //ESP_LOGI(TAG, "Raw frames being sent:\n%s", frames_copy);
 #endif
-
         // Format AI cmd
         ai_cmd_t cmd = {
             .type = AI_CMD_RAW_FRAMES,

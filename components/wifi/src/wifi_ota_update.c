@@ -335,7 +335,6 @@ static void ota_check_task(void *_)
 #ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Already up-to-date");
 #endif
-
         // No OTA available
         xEventGroupClearBits(xWifiEventGroup, WIFI_OTA_AVAILABLE_BIT);
 

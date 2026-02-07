@@ -19,5 +19,5 @@
   "C_Cpp.errorSquiggles": "enabled",
   "diffEditor.renderSideBySide": false,
   "idf.flashType": "UART",
-  "chatgpt.commentCodeLensEnabled": false,
+  "idf.currentSetup": "c:\\Espressif\\frameworks\\esp-idf-v5.5.2",
 }

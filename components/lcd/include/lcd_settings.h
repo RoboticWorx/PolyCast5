@@ -11,6 +11,8 @@
 #define SETTINGS_REMOVE_LOCK_TXT "Remove Unlock PIN"
 #define SETTINGS_SET_LOCK_TXT "Set Unlock PIN"
 
+#define SETTINGS_LOCK_IDX 1
+
 #define MAX_SETTINGS_OPTIONS 20
 
 // Forward-declare structs (from lcd_utils.h)

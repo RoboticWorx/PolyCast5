@@ -24,7 +24,7 @@ You can find some relevant links below:
 
 # Functionality
 
-* **Outlet actuator**  - Turn on and off outlets/applicances wirelessly and set schedules, timers, and modes.
+* **Outlet actuator**  - Turn on and off outlets/appliances wirelessly and set schedules, timers, and modes.
 * **Bluetooth controller** - Send media and autotype commands to instantly type out repetitive text, control volume, etc.
 * **Infrared remote** - Save and replay infrared signals for TVs, air conditioners, lamps, etc.
 * **ESP32 commander** - Use [ESP-NOW](https://www.espressif.com/en/solutions/low-power-solutions/esp-now) to send instant commands for controlling custom builds such as with Arduino. (It's really easy and Arduino IDE compatible.)
@@ -41,7 +41,7 @@ _PolyCast5 also comes with cool, customizable homescreen animations and hotkeys!
 * `bin` - Precompiled binaries of the latest release for OTA/updater.
 * `scripts` - Bluetooth keystroke injection (autotype) examples as well as a few miscellaneous developement scripts.
 * `components` - The various pieces of the application code broken into folders.
-  * `ai` - Interacts with AI APIs to receive AI responses to query requests.
+  * `ai` - Interacts with AI APIs to receive responses to query requests.
   * `bluetooth` - Communicates with a connected BLE device as a Human Interface Device (HID) to behave as a media controller and autotype keyboard.
   * `common` - Shared macros across the entirety of the program used for build and debugging.
   * `espnow` - Sends instantaneous low-power ESP-NOW commands to external ESP32 devices for interacting with custom builds or anything else. (e.g. light switcher, etc.)

@@ -22,7 +22,7 @@
 #define NVS_KEY_COUNT "count"
 #define NVS_KEY_LIST "list"
 
-bool last_known_network_conn_failed = true;
+bool last_known_network_conn_failed = false;
 
 POLYCAST5_USE_PSRAM static wifi_login_t known_networks[MAX_KNOWN_NETWORKS];
 static size_t known_network_count = 0;
@@ -120,7 +120,6 @@ void wifi_autoconnect_init(void)
     }
     strlcpy(last_known_pick.ssid, (char *)current.sta.ssid, sizeof(last_known_pick.ssid));
     strlcpy(last_known_pick.password, (char *)current.sta.password, sizeof(last_known_pick.password)); 
-    last_known_network_conn_failed = false;
 
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "wifi_autoconnect_init: Loaded %u known Wi-Fi network(s) from NVS", (unsigned int)known_network_count);
