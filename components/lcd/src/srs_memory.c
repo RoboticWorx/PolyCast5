@@ -141,7 +141,7 @@ bool srs_sync_time_over_wifi(void)
     
         return true;
     }
-// todo: sync using hardcoded dates provided instead of button
+
     /* If not synced */
     xEventGroupSetBits(xWifiEventGroup, WIFI_RECONNECT_BIT); // Reconnect to previous Wi-Fi network
 
@@ -352,7 +352,7 @@ int srs_build_due_list(int *out_idx, int max_out, uint32_t today)
 }
 
 // Converts Unix seconds to whole days
-uint32_t srs_days_since_epoch_local(int calibrate)
+uint32_t srs_days_since_epoch_local(void)
 {
     tzset(); // Redundant
 
@@ -377,7 +377,7 @@ uint32_t srs_days_since_epoch_local(int calibrate)
 #endif
 
     // Round down by 86400 -> today index
-    return (uint32_t)((local_midnight_epoch / 86400) + calibrate); // 0-based
+    return (uint32_t)(local_midnight_epoch / 86400); // 0-based
 }
 
 void srs_nvs_load(void)
@@ -389,7 +389,6 @@ void srs_nvs_load(void)
 #ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "srs_nvs_load nvs_open failed");
 #endif
-
         // Set defaults
         srs_cnt = 0;
         srs_last_page = 0;
@@ -489,3 +488,196 @@ void srs_nvs_save(void)
     // Close NVS
     nvs_close(h);
 }
+
+#ifdef POLYCAST5_SRS_CALIBRATING
+/* ========== Calibration Functions ========== */
+
+// Hardcoded list of pages with their dates to autofill previous entries on a new PC5 notebook
+const srs_calibration_entry_t srs_calibration_data[] = {
+    // Example: {1, "09/12/2025"} means page 1 was added on September 12, 2025
+    {1, "09/12/2025"},
+    {2, "09/13/2025"},
+    {3, "09/14/2025"},
+    {4, "09/15/2025"},
+    {5, "09/16/2025"},
+    {6, "09/17/2025"},
+    {7, "09/18/2025"},
+    {8, "09/19/2025"},
+    {9, "09/20/2025"},
+    {10, "09/21/2025"},
+    {11, "09/22/2025"},
+    {12, "09/24/2025"},
+    {13, "09/25/2025"},
+    {14, "09/26/2025"},
+    {15, "09/27/2025"},
+    {16, "09/28/2025"},
+    {17, "09/29/2025"},
+    {18, "09/30/2025"},
+    {19, "10/02/2025"},
+    {20, "10/04/2025"},
+    {21, "10/05/2025"},
+    {22, "10/06/2025"},
+    {23, "10/08/2025"},
+    {24, "10/10/2025"},
+    {25, "10/11/2025"},
+    {26, "10/12/2025"},
+    {27, "10/13/2025"},
+    {28, "10/15/2025"},
+    {29, "10/16/2025"},
+    {30, "10/17/2025"},
+    {31, "10/18/2025"},
+    {32, "10/20/2025"},
+    {33, "10/21/2025"},
+    {34, "10/26/2025"},
+    {35, "10/27/2025"},
+    {36, "10/28/2025"},
+    {37, "10/29/2025"},
+    {38, "10/30/2025"},
+    {39, "11/01/2025"},
+    {40, "11/02/2025"},
+    {41, "11/03/2025"},
+    {42, "11/04/2025"},
+    {43, "11/05/2025"},
+    {44, "11/06/2025"},
+    {45, "11/07/2025"},
+    {46, "11/08/2025"},
+    {47, "11/09/2025"},
+    {48, "11/10/2025"},
+    {49, "11/11/2025"},
+    {50, "11/13/2025"},
+    {51, "11/14/2025"},
+    {52, "11/15/2025"},
+    {53, "11/18/2025"},
+    {54, "11/19/2025"},
+    {55, "11/20/2025"},
+    {56, "11/22/2025"},
+    {57, "11/23/2025"},
+    {58, "11/24/2025"},
+    {59, "11/25/2025"},
+    {60, "11/30/2025"},
+    {61, "12/01/2025"},
+    {62, "12/02/2025"},
+    {63, "12/03/2025"},
+    {64, "12/04/2025"},
+    {65, "12/06/2025"},
+    {66, "12/10/2025"},
+    {67, "12/11/2025"},
+    {68, "12/12/2025"},
+    {69, "12/13/2025"},
+    {70, "12/14/2025"},
+    {71, "12/15/2025"},
+    {72, "12/16/2025"},
+    {73, "12/18/2025"},
+    {74, "12/21/2025"},
+    {75, "12/22/2025"},
+    {76, "12/23/2025"},
+    {77, "12/27/2025"},
+    {78, "12/28/2025"},
+    {79, "12/29/2025"},
+    {80, "12/30/2025"},
+    {81, "01/06/2026"},
+    {82, "01/07/2026"},
+    {83, "01/08/2026"},
+    {84, "01/11/2026"},
+    {85, "01/13/2026"},
+    {86, "01/14/2026"},
+    {87, "01/15/2026"},
+    {88, "01/17/2026"},
+    {89, "01/18/2026"},
+    {90, "01/19/2026"},
+    {91, "01/20/2026"},
+    {92, "01/21/2026"},
+    {93, "01/22/2026"},
+    {94, "01/25/2026"},
+    {95, "01/26/2026"},
+    {96, "01/27/2026"},
+    {97, "01/28/2026"},
+    {98, "01/30/2026"},
+    {99, "01/31/2026"},
+    {100, "02/01/2026"},
+    {101, "02/02/2026"},
+    {102, "02/03/2026"},
+    {103, "02/06/2026"},
+};
+
+const int srs_calibration_count = sizeof(srs_calibration_data) / sizeof(srs_calibration_data[0]);
+
+// Helper to convert "MM/DD/YYYY" to days since epoch
+static uint32_t parse_date_to_days(const char *date_str)
+{
+    int month, day, year;
+    if (sscanf(date_str, "%d/%d/%d", &month, &day, &year) != 3) {
+        ESP_LOGE(TAG, "Invalid date format: %s", date_str);
+        return 0;
+    }
+    
+    struct tm t = {0};
+    t.tm_year = year - 1900;
+    t.tm_mon = month - 1;
+    t.tm_mday = day;
+    t.tm_hour = 0;
+    t.tm_min = 0;
+    t.tm_sec = 0;
+    t.tm_isdst = -1;
+    
+    time_t epoch = mktime(&t);
+    if (epoch <= 0) {
+        ESP_LOGE(TAG, "Failed to convert date: %s", date_str);
+        return 0;
+    }
+    
+    return (uint32_t)(epoch / 86400); // Convert to days
+}
+
+void srs_batch_load_from_dates(const srs_calibration_entry_t *entries, int count)
+{
+    ESP_LOGI(TAG, "Processing %d calibration entries...", count);
+    
+    // Get today's date for step calculation
+    uint32_t today = srs_days_since_epoch_local();
+    
+    for (int i = 0; i < count; ++i) {
+        uint16_t page = entries[i].page;
+        uint32_t start_day = parse_date_to_days(entries[i].date);
+        
+        if (start_day > 0) {
+            // Calculate days since this page was added
+            int32_t days_since = (int32_t)(today - start_day);
+            
+            // Determine step based on next scheduled interval
+            uint8_t step = 0;
+            if (days_since > 0) {
+                while (step + 1 < SRS_NUM_STEPS && (uint32_t)days_since > srs_days[step]) {
+                    step++;
+                }
+            }
+
+            // Find if page already exists
+            int idx = srs_find_by_page(page);
+            if (idx >= 0) {
+                // Update existing
+                srs_tbl[idx].start_day = start_day;
+                srs_tbl[idx].step = step;
+            } else if (srs_cnt < SRS_MAX_ENTRIES) {
+                // Add new
+                srs_tbl[srs_cnt].page = page;
+                srs_tbl[srs_cnt].step = step;
+                srs_tbl[srs_cnt].start_day = start_day;
+                srs_cnt++;
+            }
+            
+            // Update last page tracker
+            if (page > srs_last_page) {
+                srs_last_page = page;
+            }
+            
+            ESP_LOGI(TAG, "Added Pg. %u: start_day=%" PRIu32 " (%s), days_since=%d, step=%d", 
+                    page, start_day, entries[i].date, days_since, step);
+        }
+    }
+    
+    // Save all at once
+    srs_nvs_save();
+    ESP_LOGI(TAG, "Calibration batch complete, %d entries loaded", srs_cnt);
+}
+#endif

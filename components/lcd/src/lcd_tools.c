@@ -1254,13 +1254,11 @@ void lcd_tools_how_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
 void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
 {
     #define SRS_MAX_TO_SHOW 3
-    //#define SRS_CALIBRATING 1
     
-#ifdef SRS_CALIBRATING // To easily add days to retrieve notebook entries
-    static int calibrate = -133; // Initial offset (days since start date)
-    // Add first then go to next and start clear cycle - make sure to disconnect from port and restart the device first for fresh Wi-Fi fetch
-#else
-    static int calibrate = 0; // No offset - present day
+#ifdef POLYCAST5_SRS_CALIBRATING
+    extern const srs_calibration_entry_t srs_calibration_data[]; // srs_memory.c
+    extern int srs_calibration_count; // srs_memory.c
+    static bool calibration_done = false;
 #endif
     
     // Statics
@@ -1308,6 +1306,38 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
         // Load saved pages
         srs_nvs_load();
 
+#ifdef POLYCAST5_SRS_CALIBRATING
+        // If first run, process calibration batch
+        if (!calibration_done) {
+            srs_batch_load_from_dates(srs_calibration_data, srs_calibration_count);
+            calibration_done = true;
+
+            // Hide left and right arrows
+            lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            
+            // Show confirmation
+            lv_obj_t *lbl_cal_info = lv_label_create(ACTIVE_SCR);
+            lcd_format_label(lbl_cal_info, "Calibration loaded!\nPress SELECT to continue.", 
+                    user_secondary_color, &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
+            lv_timer_handler();
+            
+            // Wait for user confirmation
+            while (xSemaphoreTake(xSelectButtonSemaphore, pdMS_TO_TICKS(10)) != pdPASS) {
+                lv_timer_handler();
+                vTaskDelay(pdMS_TO_TICKS(10));
+            }
+            lcd_clear_pending_inputs = true;
+
+            // Show left and right arrows
+            lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            
+            lv_obj_delete(lbl_cal_info);
+            lv_timer_handler();
+        }
+#endif
+
         // Build labels
         lbl_title = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_title, "SRS Planner", user_secondary_color,
@@ -1334,7 +1364,7 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
     }
 
     // Recompute today and the due queue
-    today = srs_days_since_epoch_local(calibrate);
+    today = srs_days_since_epoch_local();
 
     // Build entries due
     due_total = srs_build_due_list(due_idx, SRS_NUM_STEPS, today); // SRS_NUM_STEPS cap
@@ -1428,12 +1458,6 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
         }
         lv_label_set_text(lbl_hint, msg);
     }
-    
-#ifdef SRS_CALIBRATING
-    if (ui_btns->up_btn == 1) {
-        calibrate++; // Move day up to speed run entries
-    }
-#endif
 
     /* User input */
     // Increment selected

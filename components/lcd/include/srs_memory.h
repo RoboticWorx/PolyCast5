@@ -32,6 +32,14 @@ extern srs_entry_t srs_tbl[SRS_MAX_ENTRIES];
 
 extern const uint16_t srs_days[];
 
+#ifdef POLYCAST5_SRS_CALIBRATING
+// Calibration entry structure for batch loading
+typedef struct {
+    uint16_t page;
+    const char *date; // Format: "MM/DD/YYYY"
+} srs_calibration_entry_t;
+#endif
+
 /** 
  * @brief Saves SRS struct to NVS
  */
@@ -49,7 +57,7 @@ void srs_nvs_load(void);
  *
  * @returns Days since epoch
  */
-uint32_t srs_days_since_epoch_local(int calibrate);
+uint32_t srs_days_since_epoch_local(void);
 
 /** 
  * @brief Build list of due SRS pages
@@ -90,5 +98,15 @@ uint16_t srs_next_default_page(void);
  * @returns True on success
  */
 bool srs_sync_time_over_wifi(void);
+
+#ifdef POLYCAST5_SRS_CALIBRATING
+/** 
+ * @brief Batch load calibration entries from date strings
+ *
+ * @param [in] entries Array of calibration entries
+ * @param [in] count Number of entries in the array
+ */
+void srs_batch_load_from_dates(const srs_calibration_entry_t *entries, int count);
+#endif
 
 #endif // SRS_MEMORY_H
