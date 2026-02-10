@@ -175,7 +175,7 @@ static void lcd_task(void *pvParameters)
         // Show BOOT_PAGE first
         ui_menu.page = BOOT_PAGE;
 
-        // Save first boot only if right arrow pressed
+    // Save first boot only if right arrow pressed
     } else {
 #ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "NOT First boot, setting to HOME_PAGE");

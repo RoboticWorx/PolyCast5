@@ -190,22 +190,22 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
         /* Set instruction text */
         switch (hotkey_menu->index) {
             case 0:
-                instr_text =  "Hotkey 1 will trigger from home when you:";
+                instr_text = "Hotkey 1 will trigger from home when you:";
                 break;
             case 1:
-                instr_text =  "Hotkey 2 will trigger from home when you:";
+                instr_text = "Hotkey 2 will trigger from home when you:";
                 break;
             case 2:
-                instr_text =  "Hotkey 3 will trigger from home when you:";
+                instr_text = "Hotkey 3 will trigger from home when you:";
                 break;
             case 3:
-                instr_text =  "Hotkey 4 will trigger from home when you:";
+                instr_text = "Hotkey 4 will trigger from home when you:";
                 break;
             case 4:
-                instr_text =  "Hotkey 5 will trigger from home when you:";
+                instr_text = "Hotkey 5 will trigger from home when you:";
                 break;
             case 5:
-                instr_text =  "Hotkey 6 will trigger from home when you:";
+                instr_text = "Hotkey 6 will trigger from home when you:";
                 break;
             default:
                 break;

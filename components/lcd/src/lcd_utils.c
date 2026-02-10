@@ -1582,17 +1582,18 @@ void lcd_loading_anim_stop(void)
 
 void lcd_boot_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu)
 {
-    #define BOOT_PAGE_Y_OFFSET 40
+    #define BOOT_PAGE_Y_OFFSET 41
     
     // Statics
     static bool init = false;
     static lv_obj_t *cont = NULL;
     static lv_obj_t *title_lbl = NULL;
     static lv_obj_t *instr_lbl = NULL;
-    static lv_obj_t *qr_active;
+    static lv_obj_t *ending_lbl = NULL;
+    static lv_obj_t *qr_active = NULL;
     
     if (!init) {
-        pause_animations();
+        stop_animations();
 
         // Create a scrollable container for the instructions
         cont = lv_obj_create(ACTIVE_SCR);
@@ -1623,24 +1624,33 @@ void lcd_boot_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu)
         lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
         lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
-        // Create QR (Artboard = 60x60)
-        qr_active = lv_img_create(cont);
-        lv_img_set_src(qr_active, QR_PC5_BOOT);
-        lv_obj_align_to(qr_active, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 233);
-
         // Set instruction text
         const char *instr_text = 
-                                "Hello, welcome to PolyCast5! Press the down arrow to scroll.\n\n"
-                                "Below is some quick info to help you get started!\n\n"
-                                "To get the most out of your PolyCast5, check out polycast5.com:\n\n"
-                                "\n\n\n"
-                                "It has a lot of docs and tutorials to help you unleash this device's full potential.\n\n"
-                                "Also, in the unlikely case that anything should ever be glitchy, you can do a safe hardware reboot by pressing "
-                                "the home and right buttons at the same time.\n\n"
-                                "To continue, please push the right arrow button. This menu will not appear again."
-                                "";
+                "Hello, welcome to PolyCast5! Press the down arrow to scroll.\n\n"
+                "Below is some quick info to help you get started!\n\n"
+                "To get the most out of your PolyCast5, check out polycast5.com:";
         
         lv_label_set_text(instr_lbl, instr_text);
+
+        // Create QR (Artboard = 90x90)
+        qr_active = lv_img_create(cont);
+        lv_img_set_src(qr_active, QR_PC5_BOOT);
+        lv_obj_align_to(qr_active, instr_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 13);
+
+        ending_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(ending_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(ending_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(ending_lbl, &lv_font_montserrat_16, 0);
+        lv_obj_set_style_text_color(ending_lbl, user_secondary_color, 0);
+        lv_obj_align_to(ending_lbl, qr_active, LV_ALIGN_OUT_BOTTOM_MID, 0, 15);
+
+        const char *ending_text =
+                "It has a lot of docs and tutorials to help you unleash this device's full potential.\n\n"
+                "Also, in the unlikely case that anything should ever be glitchy, you can do a safe hardware reboot by pressing "
+                "the home and right buttons at the same time.\n\n"
+                "To continue, please push the right arrow button. This menu will not appear again.";
+
+        lv_label_set_text(ending_lbl, ending_text);    
     
         init = true;
     }
@@ -1661,7 +1671,7 @@ void lcd_boot_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu)
         
         // Reset statics
         cont = NULL;
-        title_lbl = instr_lbl = NULL;
+        title_lbl = instr_lbl = ending_lbl = NULL;
         qr_active = NULL;
         init = false;
         
@@ -1669,10 +1679,7 @@ void lcd_boot_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu)
         
         // Go home
         ui_menu->page = HOME_PAGE;
-    } else if (ui_btns->pwr_btn == 1) { // Power off without switching pages (stay on BOOT_PAGE)        
-        // Transition to sleep
-        gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_OFF); // BL low so user doesn't see redraw
-        
+    } else if (ui_btns->pwr_btn == 1) { // Power off without switching pages (stay on BOOT_PAGE)
         go_to_sleep = true;
     }
 }
