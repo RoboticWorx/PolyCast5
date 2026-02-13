@@ -1376,6 +1376,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         // Default to non-reasoning (faster and cheaper, but less accurate)
         use_reasoning = false;
         lcd_anim_label_x_animate_reset();
+        lcd_anim_label_y_animate_reset();
 
         LCD_LOADING_ANIM_START_DEFAULT();
         
@@ -1396,7 +1397,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 
         lbl_config = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_config, LV_SYMBOL_SETTINGS, user_secondary_color,
-                &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -15, 0);
+                &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -16, 0);
 
         lv_obj_update_layout(ai_orb); // Save current layout
 
@@ -1431,8 +1432,8 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
             uint8_t status = lcd_wait_for_bit_better(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT, BT_CONN_TIMEOUT_MS);
             if (status == LCD_WAIT_FOR_BIT_BETTER_SUCCESS) { // Success
                 lv_label_set_text(lbl_ins, AI_KEYB_HOLD_TALK_TXT);
-                lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
                 lv_obj_set_style_text_font(lbl_ins, &AI_KEYB_READY_FONT, 0);
+                lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
 
                 // Show reasoning label
                 lv_obj_remove_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
@@ -1445,8 +1446,8 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
                 lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
                 lv_obj_add_flag(lbl_config, LV_OBJ_FLAG_HIDDEN);
 
-                lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
                 lv_label_set_text(lbl_ins, AI_BT_FAILED_TXT);
+                lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
             } else if (status == LCD_WAIT_FOR_BIT_BETTER_EXIT) { // Exit
                 ui_btns->left_btn = 1; // Simulate left press to go back
             }
@@ -1457,7 +1458,20 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
             // Wait up to WIFI_CONN_TIMEOUT_MS for Wi-Fi to connect
             uint8_t status = lcd_wait_for_bit_better(xWifiEventGroup, WIFI_CONNECTED_BIT, WIFI_CONN_TIMEOUT_MS);
             if (status == LCD_WAIT_FOR_BIT_BETTER_SUCCESS) { // Success
-                lv_label_set_text(lbl_ins, AI_KEYB_BLE_CONNECTING_TXT);
+                // Animate text change
+                lv_coord_t start_y_top = LCD_ANIM_DEFAULT_Y_EDGE_BOTTOM;
+                lv_coord_t end_y_bottom = LCD_ANIM_DEFAULT_Y_EDGE_TOP;
+                if (!lcd_anim_label_y_animate_is_busy()) {
+                    lbl_ins = lcd_anim_animate_label_y(
+                        lbl_ins,
+                        AI_KEYB_BLE_CONNECTING_TXT,
+                        lv_obj_get_style_text_font(lbl_ins, LV_PART_MAIN),
+                        start_y_top,
+                        end_y_bottom
+                    );
+                } else {
+                    lv_label_set_text(lbl_ins, AI_KEYB_BLE_CONNECTING_TXT);
+                }
                 lv_timer_handler();
     
                 // Connect to BLE
@@ -1468,8 +1482,8 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
                 uint8_t status = lcd_wait_for_bit_better(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT, BT_CONN_TIMEOUT_MS);
                 if (status == LCD_WAIT_FOR_BIT_BETTER_SUCCESS) { // Success
                     lv_label_set_text(lbl_ins, AI_KEYB_HOLD_TALK_TXT);
-                    lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
                     lv_obj_set_style_text_font(lbl_ins, &AI_KEYB_READY_FONT, 0);
+                    lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
 
                     // Show reasoning label
                     lv_obj_remove_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
@@ -1481,9 +1495,9 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
                     // Hide unused and center error label
                     lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
                     lv_obj_add_flag(lbl_config, LV_OBJ_FLAG_HIDDEN);
-                    
-                    lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
+
                     lv_label_set_text(lbl_ins, AI_BT_FAILED_TXT);
+                    lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
                 } else if (status == LCD_WAIT_FOR_BIT_BETTER_EXIT) { // Exit
                     ui_btns->left_btn = 1; // Simulate left press to go back
                 }
@@ -1492,8 +1506,8 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
                 lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
                 lv_obj_add_flag(lbl_config, LV_OBJ_FLAG_HIDDEN);
 
-                lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
                 lv_label_set_text(lbl_ins, AI_WIFI_FAILED_TXT);
+                lv_obj_align(lbl_ins, LV_ALIGN_CENTER, 0, 0);
             } else if (status == LCD_WAIT_FOR_BIT_BETTER_EXIT) { // Exit
                 ui_btns->left_btn = 1; // Simulate left press to go back
             }
@@ -1635,8 +1649,8 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
             use_reasoning = !use_reasoning;
 
             // Animate reasoning label text change
-            lv_coord_t start_x_left = LCD_DEFAULT_X_EDGE_LEFT;
-            lv_coord_t end_x_right = LCD_DEFAULT_X_EDGE_RIGHT;
+            lv_coord_t start_x_left = LCD_ANIM_DEFAULT_X_EDGE_LEFT;
+            lv_coord_t end_x_right = LCD_ANIM_DEFAULT_X_EDGE_RIGHT;
             lbl_reasoning = lcd_anim_animate_label_x(
                 lbl_reasoning, // Label
                 use_reasoning ? AI_KEYB_REASONING_TXT : AI_KEYB_NONREASONING_TXT, // Text
@@ -1664,6 +1678,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         do_once = false;
         lbl_ins = lbl_reasoning = ai_orb = lbl_config = NULL;
         lcd_anim_label_x_animate_reset();
+        lcd_anim_label_y_animate_reset();
 
         // Hide right arrow
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -1694,6 +1709,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         do_once = false;
         lbl_ins = lbl_reasoning = ai_orb = lbl_config = NULL;
         lcd_anim_label_x_animate_reset();
+        lcd_anim_label_y_animate_reset();
 
         // Hide right arrow
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -1729,6 +1745,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         do_once = false;
         lbl_ins = lbl_reasoning = ai_orb = lbl_config = NULL;
         lcd_anim_label_x_animate_reset();
+        lcd_anim_label_y_animate_reset();
         
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }

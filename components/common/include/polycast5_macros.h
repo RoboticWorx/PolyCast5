@@ -34,7 +34,7 @@
 // After switching EN macro, deleted the disabled folder from assets/anim/... and copy the new there from anims/...
 // #define POLYCAST5_EN_CITY_ANIM 1 // Enables city night homescreen animation (60 frames)
 #define POLYCAST5_EN_BLACK_HOLE_ANIM 1 // Enables black hole homescreen animation (18 frames)
-#define POLYCAST5_EN_MATRIX_ANIM 1 // Enables matrix rain homescreen animation (42 frames)
+#define POLYCAST5_EN_MATRIX_RAIN_ANIM 1 // Enables matrix rain homescreen animation (42 frames)
 #define POLYCAST5_EN_PYRAMID_ANIM 1 // Enables pyramid-alien homescreen animation (56 frames)
 
 // Settings/testing

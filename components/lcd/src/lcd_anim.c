@@ -18,9 +18,11 @@
 #include "widgets/label/lv_label.h"
 #include "misc/lv_timer.h"
 
+#include "lcd_anim.h"
 #include "lcd_utils.h"
 
 static bool label_x_anim_busy = false;
+static bool label_y_anim_busy = false;
 
 static void animate_label_x_delete_cb(lv_anim_t *a)
 {
@@ -48,7 +50,7 @@ void lcd_anim_label_x_animate_reset(void)
 
 lv_obj_t *lcd_anim_animate_label_x(lv_obj_t *old_lbl, const char *new_text, const lv_font_t *cur_font, lv_coord_t start_x_left, lv_coord_t end_x_right)
 {
-    if (!old_lbl) {
+    if (!old_lbl || !new_text || !cur_font) {
         return NULL;
     }
 
@@ -82,7 +84,7 @@ lv_obj_t *lcd_anim_animate_label_x(lv_obj_t *old_lbl, const char *new_text, cons
     lv_anim_init(&a_out);
     lv_anim_set_var(&a_out, old_lbl);
     lv_anim_set_values(&a_out, old_x, end_x_right);
-    lv_anim_set_time(&a_out, 220);
+    lv_anim_set_time(&a_out, LCD_ANIM_DEFAULT_X_TIME);
     lv_anim_set_exec_cb(&a_out, (lv_anim_exec_xcb_t)lv_obj_set_x);
     lv_anim_set_path_cb(&a_out, lv_anim_path_ease_in);
     lv_anim_set_completed_cb(&a_out, animate_label_x_delete_cb);
@@ -94,10 +96,94 @@ lv_obj_t *lcd_anim_animate_label_x(lv_obj_t *old_lbl, const char *new_text, cons
     lv_anim_init(&a_in);
     lv_anim_set_var(&a_in, new_lbl);
     lv_anim_set_values(&a_in, start_x_left, target_x);
-    lv_anim_set_time(&a_in, 220);
+    lv_anim_set_time(&a_in, LCD_ANIM_DEFAULT_X_TIME);
     lv_anim_set_exec_cb(&a_in, (lv_anim_exec_xcb_t)lv_obj_set_x);
     lv_anim_set_path_cb(&a_in, lv_anim_path_ease_out);
     lv_anim_set_completed_cb(&a_in, animate_label_x_done_cb);
+    lv_anim_start(&a_in);
+
+    return new_lbl;
+}
+
+static void animate_label_y_delete_cb(lv_anim_t *a)
+{
+    lv_obj_t *old_lbl = (lv_obj_t *)lv_anim_get_user_data(a);
+    if (old_lbl && lv_obj_is_valid(old_lbl)) {
+        lv_obj_delete(old_lbl);
+    }
+}
+
+static void animate_label_y_done_cb(lv_anim_t *a)
+{
+    (void)a;
+    label_y_anim_busy = false;
+}
+
+bool lcd_anim_label_y_animate_is_busy(void)
+{
+    return label_y_anim_busy;
+}
+
+void lcd_anim_label_y_animate_reset(void)
+{
+    label_y_anim_busy = false;
+}
+
+lv_obj_t *lcd_anim_animate_label_y(lv_obj_t *old_lbl, const char *new_text, const lv_font_t *cur_font, lv_coord_t start_y_top, lv_coord_t end_y_bottom)
+{
+    if (!old_lbl || !new_text || !cur_font) {
+        return old_lbl;
+    }
+
+    // Prevent overlapping animations if button repeats quickly
+    if (label_y_anim_busy) {
+        return old_lbl;
+    }
+    label_y_anim_busy = true;
+
+    lv_obj_t *parent = lv_obj_get_parent(old_lbl);
+    lv_coord_t old_x = lv_obj_get_x(old_lbl);
+    lv_coord_t old_y = lv_obj_get_y(old_lbl);
+    lv_coord_t old_w = lv_obj_get_width(old_lbl);
+    lv_coord_t old_h = lv_obj_get_height(old_lbl);
+
+    // Create incoming label with same style
+    lv_obj_t *new_lbl = lv_label_create(parent);
+    lv_label_set_text(new_lbl, new_text);
+    lv_obj_set_style_text_font(new_lbl, cur_font, 0);
+    lv_obj_set_style_text_color(new_lbl, user_secondary_color, 0);
+    lv_obj_update_layout(new_lbl);
+
+    lv_coord_t new_w = lv_obj_get_width(new_lbl);
+    lv_coord_t new_h = lv_obj_get_height(new_lbl);
+
+    // Keep same visual center as old label
+    lv_coord_t target_x = old_x + (old_w - new_w) / 2;
+    lv_coord_t target_y = old_y + (old_h - new_h) / 2;
+
+    lv_obj_set_pos(new_lbl, target_x, start_y_top);
+
+    // Old label: center -> bottom
+    lv_anim_t a_out;
+    lv_anim_init(&a_out);
+    lv_anim_set_var(&a_out, old_lbl);
+    lv_anim_set_values(&a_out, old_y, end_y_bottom);
+    lv_anim_set_time(&a_out, LCD_ANIM_DEFAULT_Y_TIME);
+    lv_anim_set_exec_cb(&a_out, (lv_anim_exec_xcb_t)lv_obj_set_y);
+    lv_anim_set_path_cb(&a_out, lv_anim_path_ease_in);
+    lv_anim_set_completed_cb(&a_out, animate_label_y_delete_cb);
+    lv_anim_set_user_data(&a_out, old_lbl);
+    lv_anim_start(&a_out);
+
+    // New label: top -> center
+    lv_anim_t a_in;
+    lv_anim_init(&a_in);
+    lv_anim_set_var(&a_in, new_lbl);
+    lv_anim_set_values(&a_in, start_y_top, target_y);
+    lv_anim_set_time(&a_in, LCD_ANIM_DEFAULT_Y_TIME);
+    lv_anim_set_exec_cb(&a_in, (lv_anim_exec_xcb_t)lv_obj_set_y);
+    lv_anim_set_path_cb(&a_in, lv_anim_path_ease_out);
+    lv_anim_set_completed_cb(&a_in, animate_label_y_done_cb);
     lv_anim_start(&a_in);
 
     return new_lbl;

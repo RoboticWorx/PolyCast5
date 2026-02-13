@@ -87,7 +87,7 @@
 #ifdef POLYCAST5_EN_BLACK_HOLE_ANIM
     #define BLACK_HOLE_FRAME_PERIOD 120
 #endif
-#ifdef POLYCAST5_EN_MATRIX_ANIM
+#ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
     #define MATRIX_RAIN_FRAME_PERIOD 100
 #endif
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
@@ -105,7 +105,7 @@
 #else
     #define BLACK_HOLE_FRAME_CNT 0
 #endif
-#ifdef POLYCAST5_EN_MATRIX_ANIM
+#ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
     #define MATRIX_RAIN_FRAME_CNT 42
 #else
     #define MATRIX_RAIN_FRAME_CNT 0
@@ -125,7 +125,7 @@ enum
 #ifdef POLYCAST5_EN_BLACK_HOLE_ANIM
     BLACK_HOLE,
 #endif
-#ifdef POLYCAST5_EN_MATRIX_ANIM
+#ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
     MATRIX_RAIN,
 #endif
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
@@ -204,7 +204,7 @@ const char *black_hole_paths[BLACK_HOLE_FRAME_CNT] = {
 };
 #endif
 
-#ifdef POLYCAST5_EN_MATRIX_ANIM
+#ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
 const char *matrix_rain_paths[MATRIX_RAIN_FRAME_CNT] = {
     ANIM_MATRIX_RAIN_1, ANIM_MATRIX_RAIN_2, ANIM_MATRIX_RAIN_3, ANIM_MATRIX_RAIN_4,    ANIM_MATRIX_RAIN_5,
     ANIM_MATRIX_RAIN_6, ANIM_MATRIX_RAIN_7, ANIM_MATRIX_RAIN_8, ANIM_MATRIX_RAIN_9,    ANIM_MATRIX_RAIN_10,
@@ -260,7 +260,7 @@ static anim_t black_hole_anim = {
 };
 #endif
 
-#ifdef POLYCAST5_EN_MATRIX_ANIM
+#ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
 static anim_t matrix_rain_anim = {
     .frames = matrix_rain_paths,
     .frame_cnt = MATRIX_RAIN_FRAME_CNT,
@@ -505,7 +505,7 @@ void lcd_lvgl_init(void)
 #ifdef POLYCAST5_EN_BLACK_HOLE_ANIM
     warm_anim(black_hole_paths, BLACK_HOLE_FRAME_CNT);
 #endif
-#ifdef POLYCAST5_EN_MATRIX_ANIM
+#ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
     warm_anim(matrix_rain_paths, MATRIX_RAIN_FRAME_CNT);
 #endif
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
@@ -755,7 +755,7 @@ static esp_err_t lcd_anim_nvs_load(void)
             anim_active = CITY;
 #elif defined(POLYCAST5_EN_BLACK_HOLE_ANIM)
             anim_active = BLACK_HOLE;
-#elif defined(POLYCAST5_EN_MATRIX_ANIM)
+#elif defined(POLYCAST5_EN_MATRIX_RAIN_ANIM)
             anim_active = MATRIX_RAIN;
 #elif defined(POLYCAST5_EN_PYRAMID_ANIM)
             anim_active = PYRAMID;
@@ -847,7 +847,7 @@ void lcd_init_images()
 #endif
     
     /* Matrix rain */
-#ifdef POLYCAST5_EN_MATRIX_ANIM
+#ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
     // Create image
     matrix_rain_anim.img = lv_img_create(ACTIVE_SCR);
     lv_img_set_src(matrix_rain_anim.img, matrix_rain_anim.frames[0]);
@@ -1259,7 +1259,7 @@ static void start_animation(void)
         lv_timer_resume(black_hole_anim.timer);
     }
 #endif
-#ifdef POLYCAST5_EN_MATRIX_ANIM
+#ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
     if (anim_active == MATRIX_RAIN) {
         lv_obj_remove_flag(matrix_rain_anim.img,  LV_OBJ_FLAG_HIDDEN);
         lv_timer_resume(matrix_rain_anim.timer);
@@ -1282,7 +1282,7 @@ static void pause_animations(void)
 #ifdef POLYCAST5_EN_BLACK_HOLE_ANIM
     lv_timer_pause(black_hole_anim.timer);
 #endif
-#ifdef POLYCAST5_EN_MATRIX_ANIM
+#ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
     lv_timer_pause(matrix_rain_anim.timer);
 #endif
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
@@ -1301,7 +1301,7 @@ static void stop_animations(void)
 #ifdef POLYCAST5_EN_BLACK_HOLE_ANIM
     lv_obj_add_flag(black_hole_anim.img, LV_OBJ_FLAG_HIDDEN);
 #endif
-#ifdef POLYCAST5_EN_MATRIX_ANIM
+#ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
     lv_obj_add_flag(matrix_rain_anim.img, LV_OBJ_FLAG_HIDDEN);
 #endif
 #ifdef POLYCAST5_EN_PYRAMID_ANIM

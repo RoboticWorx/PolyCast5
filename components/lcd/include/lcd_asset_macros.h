@@ -92,7 +92,7 @@
 #endif // POLYCAST5_EN_BLACK_HOLE_ANIM
 
 // Matrix Rain
-#ifdef POLYCAST5_EN_MATRIX_ANIM
+#ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
 #define ANIM_MATRIX_RAIN_1  "A:/anim/matrix_rain/matrix_1.bin"
 #define ANIM_MATRIX_RAIN_2  "A:/anim/matrix_rain/matrix_2.bin"
 #define ANIM_MATRIX_RAIN_3  "A:/anim/matrix_rain/matrix_3.bin"
@@ -135,7 +135,7 @@
 #define ANIM_MATRIX_RAIN_40 "A:/anim/matrix_rain/matrix_40.bin"
 #define ANIM_MATRIX_RAIN_41 "A:/anim/matrix_rain/matrix_41.bin"
 #define ANIM_MATRIX_RAIN_42 "A:/anim/matrix_rain/matrix_42.bin"
-#endif // POLYCAST5_EN_MATRIX_ANIM
+#endif // POLYCAST5_EN_MATRIX_RAIN_ANIM
 
 // Pyramid
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
