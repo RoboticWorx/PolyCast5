@@ -78,36 +78,56 @@
 
 
 /* Animation macros */
-#ifdef POLYCAST5_EN_PYRAMID_ANIM
-#define NUM_ANIMS 4
-#else
 #define NUM_ANIMS 3
+
+// Frame periods (ms)
+#ifdef POLYCAST5_EN_CITY_ANIM
+    #define CITY_FRAME_PERIOD 120 // 160
+#endif
+#ifdef POLYCAST5_EN_BLACK_HOLE_ANIM
+    #define BLACK_HOLE_FRAME_PERIOD 120
+#endif
+#ifdef POLYCAST5_EN_MATRIX_ANIM
+    #define MATRIX_RAIN_FRAME_PERIOD 100
+#endif
+#ifdef POLYCAST5_EN_PYRAMID_ANIM
+    #define PYRAMID_FRAME_PERIOD 120
 #endif
 
-#define CITY_FRAME_PERIOD 120 // 160
-#define BLACK_HOLE_FRAME_PERIOD 120
-#define MATRIX_RAIN_FRAME_PERIOD 100
-
-#ifdef POLYCAST5_EN_PYRAMID_ANIM
-#define PYRAMID_FRAME_PERIOD 120
-#endif
-
-#define CITY_FRAME_CNT 60
-#define BLACK_HOLE_FRAME_CNT 18
-#define MATRIX_RAIN_FRAME_CNT 42
-
-#ifdef POLYCAST5_EN_PYRAMID_ANIM
-#define PYRAMID_FRAME_CNT 56
+// Frame counts
+#ifdef POLYCAST5_EN_CITY_ANIM
+    #define CITY_FRAME_CNT 60
 #else
-#define PYRAMID_FRAME_CNT 0
+    #define CITY_FRAME_CNT 0
+#endif
+#ifdef POLYCAST5_EN_BLACK_HOLE_ANIM
+    #define BLACK_HOLE_FRAME_CNT 18
+#else
+    #define BLACK_HOLE_FRAME_CNT 0
+#endif
+#ifdef POLYCAST5_EN_MATRIX_ANIM
+    #define MATRIX_RAIN_FRAME_CNT 42
+#else
+    #define MATRIX_RAIN_FRAME_CNT 0
+#endif
+#ifdef POLYCAST5_EN_PYRAMID_ANIM
+    #define PYRAMID_FRAME_CNT 56
+#else
+    #define PYRAMID_FRAME_CNT 0
 #endif
 
 // Number each sequentially
 enum
 {
+#ifdef POLYCAST5_EN_CITY_ANIM
     CITY,
+#endif
+#ifdef POLYCAST5_EN_BLACK_HOLE_ANIM
     BLACK_HOLE,
+#endif
+#ifdef POLYCAST5_EN_MATRIX_ANIM
     MATRIX_RAIN,
+#endif
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
     PYRAMID
 #endif
@@ -158,6 +178,7 @@ typedef struct {
 } anim_t;
 
 // Define animation frame paths
+#ifdef POLYCAST5_EN_CITY_ANIM
 const char *city_paths[CITY_FRAME_CNT] = { // 64.84KB each
     ANIM_CITY_1, ANIM_CITY_2, ANIM_CITY_3,    ANIM_CITY_4, ANIM_CITY_5,
     ANIM_CITY_6, ANIM_CITY_7, ANIM_CITY_8,    ANIM_CITY_9, ANIM_CITY_10,
@@ -172,14 +193,18 @@ const char *city_paths[CITY_FRAME_CNT] = { // 64.84KB each
     ANIM_CITY_51, ANIM_CITY_52, ANIM_CITY_53, ANIM_CITY_54, ANIM_CITY_55,
     ANIM_CITY_56, ANIM_CITY_57, ANIM_CITY_58, ANIM_CITY_59, ANIM_CITY_60,
 };
+#endif
 
+#ifdef POLYCAST5_EN_BLACK_HOLE_ANIM
 const char *black_hole_paths[BLACK_HOLE_FRAME_CNT] = {
     ANIM_BLACK_HOLE_1, ANIM_BLACK_HOLE_2, ANIM_BLACK_HOLE_3, ANIM_BLACK_HOLE_4, ANIM_BLACK_HOLE_5,
     ANIM_BLACK_HOLE_6, ANIM_BLACK_HOLE_7, ANIM_BLACK_HOLE_8, ANIM_BLACK_HOLE_9, ANIM_BLACK_HOLE_10,
     ANIM_BLACK_HOLE_11, ANIM_BLACK_HOLE_12, ANIM_BLACK_HOLE_13, ANIM_BLACK_HOLE_14, ANIM_BLACK_HOLE_15,
     ANIM_BLACK_HOLE_16, ANIM_BLACK_HOLE_17, ANIM_BLACK_HOLE_18
 };
-    
+#endif
+
+#ifdef POLYCAST5_EN_MATRIX_ANIM
 const char *matrix_rain_paths[MATRIX_RAIN_FRAME_CNT] = {
     ANIM_MATRIX_RAIN_1, ANIM_MATRIX_RAIN_2, ANIM_MATRIX_RAIN_3, ANIM_MATRIX_RAIN_4,    ANIM_MATRIX_RAIN_5,
     ANIM_MATRIX_RAIN_6, ANIM_MATRIX_RAIN_7, ANIM_MATRIX_RAIN_8, ANIM_MATRIX_RAIN_9,    ANIM_MATRIX_RAIN_10,
@@ -191,6 +216,7 @@ const char *matrix_rain_paths[MATRIX_RAIN_FRAME_CNT] = {
     ANIM_MATRIX_RAIN_36, ANIM_MATRIX_RAIN_37, ANIM_MATRIX_RAIN_38, ANIM_MATRIX_RAIN_39, ANIM_MATRIX_RAIN_40,
     ANIM_MATRIX_RAIN_41, ANIM_MATRIX_RAIN_42
 };
+#endif
 
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
 const char *pyramid_paths[PYRAMID_FRAME_CNT] = {
@@ -210,6 +236,7 @@ const char *pyramid_paths[PYRAMID_FRAME_CNT] = {
 #endif
 
 // Animation structs
+#ifdef POLYCAST5_EN_CITY_ANIM
 static anim_t city_anim = {
     .frames = city_paths,
     .frame_cnt = CITY_FRAME_CNT,
@@ -219,7 +246,9 @@ static anim_t city_anim = {
     .img = NULL,
     .timer = NULL
 };
+#endif
 
+#ifdef POLYCAST5_EN_BLACK_HOLE_ANIM
 static anim_t black_hole_anim = {
     .frames = black_hole_paths,
     .frame_cnt = BLACK_HOLE_FRAME_CNT,
@@ -229,7 +258,9 @@ static anim_t black_hole_anim = {
     .img = NULL,
     .timer = NULL
 };
+#endif
 
+#ifdef POLYCAST5_EN_MATRIX_ANIM
 static anim_t matrix_rain_anim = {
     .frames = matrix_rain_paths,
     .frame_cnt = MATRIX_RAIN_FRAME_CNT,
@@ -239,6 +270,7 @@ static anim_t matrix_rain_anim = {
     .img = NULL,
     .timer = NULL
 };
+#endif
 
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
 static anim_t pyramid_anim = {
@@ -467,9 +499,15 @@ void lcd_lvgl_init(void)
     esp_timer_start_periodic(tick_timer, 1000);
     
     // Pre-load animations for quick access (but longer boot time)
+#ifdef POLYCAST5_EN_CITY_ANIM
     warm_anim(city_paths, CITY_FRAME_CNT);
+#endif
+#ifdef POLYCAST5_EN_BLACK_HOLE_ANIM
     warm_anim(black_hole_paths, BLACK_HOLE_FRAME_CNT);
+#endif
+#ifdef POLYCAST5_EN_MATRIX_ANIM
     warm_anim(matrix_rain_paths, MATRIX_RAIN_FRAME_CNT);
+#endif
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
     warm_anim(pyramid_paths, PYRAMID_FRAME_CNT);
 #endif
@@ -713,7 +751,17 @@ static esp_err_t lcd_anim_nvs_load(void)
             break;
         case ESP_ERR_NVS_NOT_FOUND:
             // First‐boot or key erased -> default
+#ifdef POLYCAST5_EN_CITY_ANIM
             anim_active = CITY;
+#elif defined(POLYCAST5_EN_BLACK_HOLE_ANIM)
+            anim_active = BLACK_HOLE;
+#elif defined(POLYCAST5_EN_MATRIX_ANIM)
+            anim_active = MATRIX_RAIN;
+#elif defined(POLYCAST5_EN_PYRAMID_ANIM)
+            anim_active = PYRAMID;
+#else
+            anim_active = this is an error in lcd_anim_nvs_load;
+#endif
             err = ESP_OK;
             break;
         default:
@@ -765,6 +813,7 @@ void lcd_init_images()
     lcd_anim_nvs_load();
     
     /* City */
+#ifdef POLYCAST5_EN_CITY_ANIM
     // Create image
     city_anim.img = lv_img_create(ACTIVE_SCR);
     lv_img_set_src(city_anim.img, city_anim.frames[0]);
@@ -778,8 +827,10 @@ void lcd_init_images()
         lv_obj_add_flag(city_anim.img, LV_OBJ_FLAG_HIDDEN);
         lv_timer_pause(city_anim.timer);
     }
+#endif
 
     /* Black hole */
+#ifdef POLYCAST5_EN_BLACK_HOLE_ANIM
     // Create image
     black_hole_anim.img = lv_img_create(ACTIVE_SCR);
     lv_img_set_src(black_hole_anim.img, black_hole_anim.frames[0]);
@@ -793,8 +844,10 @@ void lcd_init_images()
         lv_obj_add_flag(black_hole_anim.img, LV_OBJ_FLAG_HIDDEN);
         lv_timer_pause(black_hole_anim.timer);
     }
+#endif
     
     /* Matrix rain */
+#ifdef POLYCAST5_EN_MATRIX_ANIM
     // Create image
     matrix_rain_anim.img = lv_img_create(ACTIVE_SCR);
     lv_img_set_src(matrix_rain_anim.img, matrix_rain_anim.frames[0]);
@@ -808,6 +861,7 @@ void lcd_init_images()
         lv_obj_add_flag(matrix_rain_anim.img, LV_OBJ_FLAG_HIDDEN);
         lv_timer_pause(matrix_rain_anim.timer);
     }
+#endif
     
     /* Pyramid */
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
@@ -1193,18 +1247,26 @@ bool lcd_is_first_boot(void)
 static void start_animation(void)
 {
     // Start the active
+#ifdef POLYCAST5_EN_CITY_ANIM
     if (anim_active == CITY) {
         lv_obj_remove_flag(city_anim.img, LV_OBJ_FLAG_HIDDEN);
         lv_timer_resume(city_anim.timer);
-    } else if (anim_active == BLACK_HOLE) {
+    }
+#endif
+#ifdef POLYCAST5_EN_BLACK_HOLE_ANIM
+    if (anim_active == BLACK_HOLE) {
         lv_obj_remove_flag(black_hole_anim.img,  LV_OBJ_FLAG_HIDDEN);
         lv_timer_resume(black_hole_anim.timer);
-    } else if (anim_active == MATRIX_RAIN) {
+    }
+#endif
+#ifdef POLYCAST5_EN_MATRIX_ANIM
+    if (anim_active == MATRIX_RAIN) {
         lv_obj_remove_flag(matrix_rain_anim.img,  LV_OBJ_FLAG_HIDDEN);
         lv_timer_resume(matrix_rain_anim.timer);
     }
+#endif
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
-    else if (anim_active == PYRAMID) {
+    if (anim_active == PYRAMID) {
         lv_obj_remove_flag(pyramid_anim.img,  LV_OBJ_FLAG_HIDDEN);
         lv_timer_resume(pyramid_anim.timer);
     }
@@ -1214,9 +1276,15 @@ static void start_animation(void)
 static void pause_animations(void)
 {
     // Halt all animations
+#ifdef POLYCAST5_EN_CITY_ANIM
     lv_timer_pause(city_anim.timer);
+#endif
+#ifdef POLYCAST5_EN_BLACK_HOLE_ANIM
     lv_timer_pause(black_hole_anim.timer);
+#endif
+#ifdef POLYCAST5_EN_MATRIX_ANIM
     lv_timer_pause(matrix_rain_anim.timer);
+#endif
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
     lv_timer_pause(pyramid_anim.timer);
 #endif
@@ -1227,9 +1295,15 @@ static void stop_animations(void)
     pause_animations();
 
     // Hide paused animations
+#ifdef POLYCAST5_EN_CITY_ANIM
     lv_obj_add_flag(city_anim.img, LV_OBJ_FLAG_HIDDEN);
+#endif
+#ifdef POLYCAST5_EN_BLACK_HOLE_ANIM
     lv_obj_add_flag(black_hole_anim.img, LV_OBJ_FLAG_HIDDEN);
+#endif
+#ifdef POLYCAST5_EN_MATRIX_ANIM
     lv_obj_add_flag(matrix_rain_anim.img, LV_OBJ_FLAG_HIDDEN);
+#endif
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
     lv_obj_add_flag(pyramid_anim.img, LV_OBJ_FLAG_HIDDEN);
 #endif

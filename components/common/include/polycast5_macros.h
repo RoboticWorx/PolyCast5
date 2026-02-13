@@ -29,9 +29,13 @@
     //#define POLYCAST5_DIS_SLEEP_TIMER 1 // Disable sleep timer
 #endif
 
-// TODO: Make each one selectable via build ifdefs so users can pick
 // Animation settings
-//#define POLYCAST5_EN_PYRAMID_ANIM 1 // Enables pyramid-alien homescreen animation; as of now it doesn't fit with OTA partitions :(
+// EXACTLY 3 MUST BE ENABLED: Default build enables CITY, BLACK_HOLE, and MATRIX. To use PYRAMID, disable CITY and vice versa.
+// After switching EN macro, deleted the disabled folder from assets/anim/... and copy the new there from anims/...
+// #define POLYCAST5_EN_CITY_ANIM 1 // Enables city night homescreen animation (60 frames)
+#define POLYCAST5_EN_BLACK_HOLE_ANIM 1 // Enables black hole homescreen animation (18 frames)
+#define POLYCAST5_EN_MATRIX_ANIM 1 // Enables matrix rain homescreen animation (42 frames)
+#define POLYCAST5_EN_PYRAMID_ANIM 1 // Enables pyramid-alien homescreen animation (56 frames)
 
 // Settings/testing
 //#define POLYCAST5_PERSIST_SELECTION_INDEX 1 // Persist selected menu option across NVS and home

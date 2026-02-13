@@ -2230,6 +2230,7 @@ void lcd_tools_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t 
             lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
             lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
             lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
             ui_menu->page = TOOLS_PAGE;
         }
         return;
