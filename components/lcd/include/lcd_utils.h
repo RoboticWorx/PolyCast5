@@ -278,7 +278,7 @@ void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32
  * @param [in] speed_px_s Speed to move animation
  */
 void lcd_swipe_anim(ui_menu_t *menu, bool swipe_left, uint32_t speed_px_s);
-                              
+
 /**
  * @brief Format main center button for wireless selection page
  *

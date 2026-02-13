@@ -209,7 +209,6 @@ const char *pyramid_paths[PYRAMID_FRAME_CNT] = {
 };
 #endif
 
-
 // Animation structs
 static anim_t city_anim = {
     .frames = city_paths,

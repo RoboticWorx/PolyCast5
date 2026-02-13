@@ -19,6 +19,7 @@
 #include "widgets/label/lv_label.h"
 
 #include "lcd_utils.h"
+#include "lcd_anim.h"
 #include "lcd_bluetooth.h"
 #include "lcd_hotkey.h"
 #include "bluetooth_utils.h"
@@ -1374,6 +1375,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 
         // Default to non-reasoning (faster and cheaper, but less accurate)
         use_reasoning = false;
+        lcd_anim_label_x_animate_reset();
 
         LCD_LOADING_ANIM_START_DEFAULT();
         
@@ -1627,11 +1629,21 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     }
 
     /* User input */
-    if (ui_btns->up_btn == 1) { // Up button pressed
+    if (ui_btns->down_btn == 1 && state == AI_KEYB_IDLE) { // Down button pressed - toggle reasoning mode
+        // Only update if anim not already running
+        if (!lcd_anim_label_x_animate_is_busy()) {
+            use_reasoning = !use_reasoning;
 
-    } else if (ui_btns->down_btn == 1 && state == AI_KEYB_IDLE) { // Down button pressed - toggle reasoning mode
-        use_reasoning = !use_reasoning;
-        lv_label_set_text(lbl_reasoning, use_reasoning ? AI_KEYB_REASONING_TXT : AI_KEYB_NONREASONING_TXT);
+            // Animate reasoning label text change
+            lv_coord_t start_x_left = LCD_DEFAULT_X_EDGE_LEFT;
+            lv_coord_t end_x_right = LCD_DEFAULT_X_EDGE_RIGHT;
+            lbl_reasoning = lcd_anim_animate_label_x(
+                lbl_reasoning, // Label
+                use_reasoning ? AI_KEYB_REASONING_TXT : AI_KEYB_NONREASONING_TXT, // Text
+                &lv_font_montserrat_14, // Font
+                start_x_left, end_x_right // Coords
+            );
+        }
     } else if (ui_btns->right_btn == 1) { // Config page selected
         // Disconnect from Wi-Fi
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
@@ -1651,6 +1663,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         // Reset statics
         do_once = false;
         lbl_ins = lbl_reasoning = ai_orb = lbl_config = NULL;
+        lcd_anim_label_x_animate_reset();
 
         // Hide right arrow
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -1680,6 +1693,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         // Reset statics
         do_once = false;
         lbl_ins = lbl_reasoning = ai_orb = lbl_config = NULL;
+        lcd_anim_label_x_animate_reset();
 
         // Hide right arrow
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -1714,6 +1728,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         // Reset statics
         do_once = false;
         lbl_ins = lbl_reasoning = ai_orb = lbl_config = NULL;
+        lcd_anim_label_x_animate_reset();
         
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
@@ -1871,7 +1886,6 @@ void lcd_bluetooth_keyboard_sub_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blu
 #ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "No scripts in selected category");
 #endif
-        
             return;
         }
 
