@@ -43,6 +43,10 @@
 #define SETTINGS_PIN_KEY "combo" // Stored PIN combination
 #define SETTINGS_PIN_SET_KEY "set" // Whether PIN is enabled (0 or 1)
 
+// Lockout time for incorrect PIN entries
+#define SETTINGS_LOCKOUT_NS "pin_lockout"
+#define SETTINGS_LOCKOUT_KEY "seconds"
+
 // Attempt count settings
 #define SETTINGS_ATTEMPTS_NS "set_attempts" // NVS namespace
 #define SETTINGS_ATTEMPTS_KEY "num_attempts" // Number of wrong entry attempts
@@ -765,7 +769,7 @@ void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu
         settings_menu->pin_menu.unlock_pin[num_filled] = '\0'; // Ensure termination
             
 #ifdef POLYCAST5_DEBUG
-            ESP_LOGI(TAG, "Entered pin: %s", settings_menu->pin_menu.unlock_pin);
+        ESP_LOGI(TAG, "Entered pin: %s", settings_menu->pin_menu.unlock_pin);
 #endif
         
         // Update menu text and flag
@@ -2160,13 +2164,101 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
     }
 }
 
+void lcd_settings_pin_lockout_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
+{
+    // Statics
+    static bool do_once = false;
+    static uint64_t last_tick_us = 0;
+    static uint32_t shown_seconds = UINT32_MAX;
+    
+    static lv_obj_t *lbl_ins = NULL;
+    static lv_obj_t *lbl_time = NULL;
+    static lv_obj_t *lbl_recovery = NULL;
+    
+    // Only execute once
+    if (!do_once) {
+        lbl_ins = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_ins, "Can retry in:", user_secondary_color,
+                &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -35);
+        
+        lbl_time = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_time, "", user_secondary_color,
+                &lv_font_montserrat_30, LV_ALIGN_CENTER, 0, 0);
+        lv_label_set_text_fmt(lbl_time, "%02" PRIu32 ":%02" PRIu32 ":%02" PRIu32,
+                pin_lockout_seconds / 3600U,
+                (pin_lockout_seconds % 3600U) / 60U,
+                pin_lockout_seconds % 60U);
+        
+        lbl_recovery = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_recovery, "Recover at: polycast5.com\n     /pages/recovery-tool", user_secondary_color,
+                &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, -5);
+
+        last_tick_us = esp_timer_get_time();
+        shown_seconds = UINT32_MAX;
+        do_once = true;
+    }
+    
+    // Decrement countdown by elapsed seconds
+    uint64_t now_us = esp_timer_get_time();
+    while (pin_lockout_seconds > 0 && (now_us - last_tick_us) >= 1000000ULL) {
+        pin_lockout_seconds--;
+        last_tick_us += 1000000ULL;
+    }
+
+    // Update UI only when changed
+    if (shown_seconds != pin_lockout_seconds) {
+        lv_label_set_text_fmt(lbl_time, "%02" PRIu32 ":%02" PRIu32 ":%02" PRIu32,
+                pin_lockout_seconds / 3600U,
+                (pin_lockout_seconds % 3600U) / 60U,
+                pin_lockout_seconds % 60U);
+
+        lcd_settings_pin_lockout_s_nvs_save();
+        shown_seconds = pin_lockout_seconds;
+    }
+
+    // Exit automatically after timer expires
+    if (pin_lockout_seconds == 0U) {
+        lcd_settings_pin_lockout_s_nvs_save();
+
+        lv_obj_delete(lbl_ins);
+        lv_obj_delete(lbl_time);
+        lv_obj_delete(lbl_recovery);
+
+        lbl_ins = lbl_time = lbl_recovery = NULL;
+        do_once = false;
+        last_tick_us = 0;
+        shown_seconds = UINT32_MAX;
+
+        // Show arrows
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        // Show pin prompt
+        lv_obj_remove_flag(settings_menu->pin_menu.pin_container, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(settings_menu->pin_menu.lbl_ins, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(settings_menu->pin_menu.lbl_back, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(settings_menu->pin_menu.lbl_attempts, LV_OBJ_FLAG_HIDDEN);
+
+        lcd_clear_pending_inputs = true;
+        
+        // Return to unlock page
+        ui_menu->page = UNLOCK_PAGE;
+        return;
+    }
+
+    // Ignore navigation while counting down
+    (void)ui_btns;
+}
+
 void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
     // Statics
     static bool do_once = false;
     
-    static lv_obj_t *lbl_ins;
-    static lv_obj_t *lbl_note;
+    static lv_obj_t *lbl_ins = NULL;
+    static lv_obj_t *lbl_note = NULL;
     
     // Only execute once
     if (!do_once) {
@@ -2443,6 +2535,72 @@ void lcd_settings_pin_attempts_nvs_load(void)
     
     // Close NVS
     out:
+    nvs_close(h);
+}
+
+void lcd_settings_pin_lockout_s_nvs_save(void)
+{
+    nvs_handle_t h;
+    
+    // Open NVS
+    esp_err_t err = nvs_open(SETTINGS_LOCKOUT_NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) {
+        if (err != ESP_ERR_NVS_NOT_FOUND) {
+            ESP_LOGE(TAG, "lcd_settings_pin_lockout_s_nvs_save NVS open error: %s", esp_err_to_name(err));
+        }
+        return;
+    }
+
+    // Store pin_lockout_seconds as a uint32
+    err = nvs_set_u32(h, SETTINGS_LOCKOUT_KEY, pin_lockout_seconds);
+    if (err == ESP_OK) {
+        // Commit to flash
+        err = nvs_commit(h);
+        
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGI(TAG, "Saved pin lockout seconds: %" PRIu32, pin_lockout_seconds);
+#endif
+    } else {
+        ESP_LOGE(TAG, "Failed to save pin lockout seconds: %s", esp_err_to_name(err));
+    }
+    
+    // Close NVS
+    nvs_close(h);
+}
+
+void lcd_settings_pin_lockout_s_nvs_load(void)
+{
+    nvs_handle_t h;
+    
+    // Open NVS
+    esp_err_t err = nvs_open(SETTINGS_LOCKOUT_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+        if (err != ESP_ERR_NVS_NOT_FOUND) {
+            ESP_LOGE(TAG, "lcd_settings_pin_lockout_s_nvs_load NVS open error: %s", esp_err_to_name(err));
+        }
+        return;
+    }
+    
+    // Get the uint32
+    uint32_t stored = 0;
+    err = nvs_get_u32(h, SETTINGS_LOCKOUT_KEY, &stored);
+    switch (err) {
+        case ESP_OK:
+            pin_lockout_seconds = stored;
+            break;
+        case ESP_ERR_NVS_NOT_FOUND:
+            // First‐boot or key erased: default
+            pin_lockout_seconds = 0;
+            break;
+        default:
+            break;
+    }
+    
+#ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "Loaded pin lockout seconds: %" PRIu32, stored);
+#endif
+    
+    // Close NVS
     nvs_close(h);
 }
 

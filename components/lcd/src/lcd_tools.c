@@ -1899,7 +1899,7 @@ static void tetris_high_score_nvs_save(uint32_t score)
         goto out;
     }
 
-    // Store pin_attempts as a uint32
+    // Store high score as a uint32
     err = nvs_set_u32(h, HIGH_SCORE_KEY, score);
     if (err == ESP_OK) {
         // Commit to flash

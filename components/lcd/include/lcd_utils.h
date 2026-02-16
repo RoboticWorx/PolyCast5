@@ -105,6 +105,7 @@ enum {
     SETTINGS_COLORS_SEL_PAGE,
     SETTINGS_FACTORY_RST_PAGE,
     SETTINGS_PIN_PAGE,
+    SETTINGS_PIN_LOCKOUT_PAGE,
     SETTINGS_HAPTIC_PAGE,
     SETTINGS_RGB_LED_PAGE,
     SETTINGS_LCD_PAGE,
@@ -135,6 +136,7 @@ enum {
 };
 
 extern uint32_t pin_attempts;
+extern uint32_t pin_lockout_seconds; // Remaining lockout duration in seconds after failed PIN attempts
 
 extern lv_color_t user_primary_color;
 extern lv_color_t user_secondary_color;
@@ -349,6 +351,11 @@ uint64_t lcd_get_uptime_seconds(void);
  * @returns 0 on success
  */
 int lcd_draw_qr(lv_obj_t *canvas, const char *text, int size_px, uint8_t **pbuf);
+
+/**
+ * @brief Pause and hide homescreen animations
+ */
+void lcd_stop_animations(void);
 
 /**
  * @brief Generic loading animation (single dot that moves + pulses)

@@ -139,6 +139,7 @@ extern volatile bool gpio_waiting_for_left; // gpio_task.c
 extern bool monitoring_packets;
 
 uint32_t pin_attempts = 0;
+uint32_t pin_lockout_seconds = 0;
 bool pin_signing_in = false;
 
 static bool pin_to_selection_page = true; // Flag on if going to selection or hotkey page from pin
@@ -804,7 +805,7 @@ static void anim_timer_cb(lv_timer_t *t)
     
     // Set frame
     anim->cur = current;
-    lv_img_set_src(anim->img, anim->frames[current]);
+    lv_image_set_src(anim->img, anim->frames[current]);
 }
 
 void lcd_init_images()
@@ -816,7 +817,7 @@ void lcd_init_images()
 #ifdef POLYCAST5_EN_CITY_ANIM
     // Create image
     city_anim.img = lv_img_create(ACTIVE_SCR);
-    lv_img_set_src(city_anim.img, city_anim.frames[0]);
+    lv_image_set_src(city_anim.img, city_anim.frames[0]);
     lv_obj_center(city_anim.img);
     
     // Create timer
@@ -833,7 +834,7 @@ void lcd_init_images()
 #ifdef POLYCAST5_EN_BLACK_HOLE_ANIM
     // Create image
     black_hole_anim.img = lv_img_create(ACTIVE_SCR);
-    lv_img_set_src(black_hole_anim.img, black_hole_anim.frames[0]);
+    lv_image_set_src(black_hole_anim.img, black_hole_anim.frames[0]);
     lv_obj_center(black_hole_anim.img);
     
     // Create timer
@@ -850,7 +851,7 @@ void lcd_init_images()
 #ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
     // Create image
     matrix_rain_anim.img = lv_img_create(ACTIVE_SCR);
-    lv_img_set_src(matrix_rain_anim.img, matrix_rain_anim.frames[0]);
+    lv_image_set_src(matrix_rain_anim.img, matrix_rain_anim.frames[0]);
     lv_obj_center(matrix_rain_anim.img);
     
     // Create timer
@@ -867,7 +868,7 @@ void lcd_init_images()
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
     // Create image
     pyramid_anim.img = lv_img_create(ACTIVE_SCR);
-    lv_img_set_src(pyramid_anim.img, pyramid_anim.frames[0]);
+    lv_image_set_src(pyramid_anim.img, pyramid_anim.frames[0]);
     lv_obj_center(pyramid_anim.img);
     
     // Create timer
@@ -1290,7 +1291,7 @@ static void pause_animations(void)
 #endif
 }
 
-static void stop_animations(void)
+void lcd_stop_animations(void)
 {
     pause_animations();
 
@@ -1311,7 +1312,7 @@ static void stop_animations(void)
 
 static void transition_animation(bool dir)
 {    
-    stop_animations();
+    lcd_stop_animations();
     
     if (dir) {
         anim_active = (anim_active + 1) % NUM_ANIMS; // + 1 with wrap
@@ -1666,7 +1667,7 @@ void lcd_boot_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu)
     static lv_obj_t *qr_active = NULL;
     
     if (!init) {
-        stop_animations();
+        lcd_stop_animations();
 
         // Create a scrollable container for the instructions
         cont = lv_obj_create(ACTIVE_SCR);
@@ -1707,7 +1708,7 @@ void lcd_boot_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu)
 
         // Create QR (Artboard = 90x90)
         qr_active = lv_img_create(cont);
-        lv_img_set_src(qr_active, QR_PC5_BOOT);
+        lv_image_set_src(qr_active, QR_PC5_BOOT);
         lv_obj_align_to(qr_active, instr_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 13);
 
         ending_lbl = lv_label_create(cont);
@@ -1857,7 +1858,7 @@ uint8_t lcd_wait_for_bit_better(EventGroupHandle_t event_group, EventBits_t bit,
 
 static void go_to_page_from_hotkey(ui_menu_t *ui_menu)
 {
-    stop_animations();
+    lcd_stop_animations();
 
     // Show arrows that would be shown on selection page
     lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
@@ -1909,7 +1910,7 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
     } else if (ui_btns->down_btn == 1) {
         transition_animation(false);
     } else if (ui_btns->select_btn == 1) { // Request selection page
-        stop_animations();
+        lcd_stop_animations();
         
         // Go to selection page if pin not set
         if (!settings_menu->pin_menu.pin_set || !settings_menu->pin_menu.prompt_pin) {
@@ -1954,7 +1955,7 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             ui_menu->page = UNLOCK_PAGE;
         }
     } else if (ui_btns->left_btn == 1) { // Request hotkey page
-        stop_animations();
+        lcd_stop_animations();
         
         // Go to hotkey page if pin not set
         if (!settings_menu->pin_menu.pin_set || !settings_menu->pin_menu.prompt_pin) {
@@ -2256,6 +2257,24 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
     }
 }
 
+static void go_to_pin_lockout_page(settings_menu_t *settings_menu, ui_menu_t *ui_menu)
+{
+    // Hide arrows
+    lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+    
+    // Hide pin prompt
+    lv_obj_add_flag(settings_menu->pin_menu.pin_container, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(settings_menu->pin_menu.lbl_ins, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(settings_menu->pin_menu.lbl_back, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(settings_menu->pin_menu.lbl_attempts, LV_OBJ_FLAG_HIDDEN);
+
+    // Go to lockout page
+    ui_menu->page = SETTINGS_PIN_LOCKOUT_PAGE;
+}
+
 void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
     // Statics
@@ -2327,7 +2346,6 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "PIN accepted");
 #endif
-            
             // Hide pin prompt
             lv_obj_add_flag(settings_menu->pin_menu.pin_container, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(settings_menu->pin_menu.lbl_ins, LV_OBJ_FLAG_HIDDEN);
@@ -2359,7 +2377,6 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
                 ui_menu->index = SELECTION_DEFAULT_IDX; // Default start
                 lcd_selection_sync_labels(ui_menu); // Sync menu from here
 #endif
-
                 // Show selection page
                 lcd_unhide_selection_widgets(ui_menu);
                 
@@ -2377,7 +2394,6 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
 #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "PIN denied");
 #endif
-            
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_RED;
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
@@ -2397,6 +2413,44 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
             
             // Show attempts
             lv_obj_remove_flag(settings_menu->pin_menu.lbl_attempts, LV_OBJ_FLAG_HIDDEN);
+
+            // Lockout on certain number of pin attempts to protect if any passwords are stored
+            switch (pin_attempts) {
+                case 4:
+                    pin_lockout_seconds = 60; // 1 minute
+                    go_to_pin_lockout_page(settings_menu, ui_menu);
+                    break;
+                case 5:
+                    pin_lockout_seconds = 300; // 5 minutes
+                    go_to_pin_lockout_page(settings_menu, ui_menu);
+                    break;
+                case 6:
+                    pin_lockout_seconds = 900; // 15 minutes
+                    go_to_pin_lockout_page(settings_menu, ui_menu);
+                    break;
+                case 7:
+                    pin_lockout_seconds = 3600; // 1 hour
+                    go_to_pin_lockout_page(settings_menu, ui_menu);
+                    break;
+                case 8:
+                    pin_lockout_seconds = 10800; // 3 hours
+                    go_to_pin_lockout_page(settings_menu, ui_menu);
+                    break;
+                case 9:
+                    pin_lockout_seconds = 28800; // 8 hours
+                    go_to_pin_lockout_page(settings_menu, ui_menu);
+                    break;
+                case 10:
+                    pin_lockout_seconds = 86400; // 1 day
+                    go_to_pin_lockout_page(settings_menu, ui_menu);
+                    break;
+                case 11:
+                    pin_lockout_seconds = UINT32_MAX; // Forever
+                    go_to_pin_lockout_page(settings_menu, ui_menu);
+                    break;
+                default:
+                    break;
+            }
         }
     } else if (ui_btns->pwr_btn == 1) { // Power off
         // Hide pin prompt
@@ -2408,8 +2462,7 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
         // Reset
         num_filled = num_boxes = 0;
         memset(input_pin, 0, sizeof(input_pin));
-        lcd_settings_rebuild_pin_boxes(settings_menu->pin_menu.pin_container, unlock_labels,
-            input_pin, &num_boxes, num_filled);
+        lcd_settings_rebuild_pin_boxes(settings_menu->pin_menu.pin_container, unlock_labels, input_pin, &num_boxes, num_filled);
         
         lcd_transition_back(false, ui_menu); // True = home, false = sleep
     }

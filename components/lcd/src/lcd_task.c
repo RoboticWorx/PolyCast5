@@ -178,10 +178,18 @@ static void lcd_task(void *pvParameters)
     // Save first boot only if right arrow pressed
     } else {
 #ifdef POLYCAST5_DEBUG
-        ESP_LOGI(TAG, "NOT First boot, setting to HOME_PAGE");
+        ESP_LOGI(TAG, "NOT first boot!");
 #endif
-        // Redundant
-        ui_menu.page = HOME_PAGE;
+        lcd_settings_pin_lockout_s_nvs_load(); // Load pin_lockout_seconds
+
+        // If was locked out, go to lockout page
+        if (pin_lockout_seconds > 0) {
+            lcd_stop_animations();
+            ui_menu.page = SETTINGS_PIN_LOCKOUT_PAGE;
+        } else {
+            // Else go home (redundant)
+            ui_menu.page = HOME_PAGE;
+        }
     }
 
     bool dont_sleep_on_this_page = false;
@@ -432,6 +440,9 @@ static void lcd_task(void *pvParameters)
                     break;
                 case SETTINGS_PIN_PAGE:
                     lcd_settings_pin_page(&ui_btns, &ui_menu, &settings_menu);
+                    break;
+                case SETTINGS_PIN_LOCKOUT_PAGE:
+                    lcd_settings_pin_lockout_page(&ui_btns, &ui_menu, &settings_menu);
                     break;
                 case SETTINGS_COLORS_SEL_PAGE:
                     lcd_settings_colors_sel_page(&ui_btns, &ui_menu, &settings_menu);

@@ -183,6 +183,15 @@ void lcd_settings_system_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_m
  */
 void lcd_settings_help_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
 
+/**
+ * @brief Executes pin lockout page which shows a countdown until the user can try entering their pin again after too many failed attempts
+ *
+ * @param [in] ui_btns User input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] settings_menu Settings menu structure
+ */
+void lcd_settings_pin_lockout_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
+
 /* =============== NVS Functions =============== */
 
 /**
@@ -211,6 +220,16 @@ void lcd_settings_pin_nvs_save(const settings_menu_t *menu);
  * @param [in] settings_menu_t Settings menu structure
  */
 void lcd_settings_pin_nvs_load(settings_menu_t *menu);
+
+/**
+ * @brief Saves the current pin lockout seconds to NVS
+ */
+void lcd_settings_pin_lockout_s_nvs_save(void);
+
+/**
+ * @brief Loads the current pin lockout seconds from NVS
+ */
+void lcd_settings_pin_lockout_s_nvs_load(void);
 
 /**
  * @brief Saves the current pin entry attempts global to NVS
