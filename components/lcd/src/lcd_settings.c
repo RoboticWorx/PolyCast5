@@ -2174,20 +2174,45 @@ void lcd_settings_pin_lockout_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
     static lv_obj_t *lbl_ins = NULL;
     static lv_obj_t *lbl_time = NULL;
     static lv_obj_t *lbl_recovery = NULL;
+    static lv_style_t style_time;
     
     // Only execute once
     if (!do_once) {
         lbl_ins = lv_label_create(ACTIVE_SCR);
-        lcd_format_label(lbl_ins, "Can retry in:", user_secondary_color,
-                &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -35);
+        lcd_format_label(lbl_ins, "Locked out for:", user_secondary_color,
+                &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -38);
         
+        // Lockout time label
         lbl_time = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_time, "", user_secondary_color,
                 &lv_font_montserrat_30, LV_ALIGN_CENTER, 0, 0);
-        lv_label_set_text_fmt(lbl_time, "%02" PRIu32 ":%02" PRIu32 ":%02" PRIu32,
-                pin_lockout_seconds / 3600U,
-                (pin_lockout_seconds % 3600U) / 60U,
-                pin_lockout_seconds % 60U);
+
+        if (pin_lockout_seconds > 86400) {
+            lv_label_set_text(lbl_time, "99:99:99"); // Forever
+        } else {
+            lv_label_set_text_fmt(lbl_time, "%02" PRIu32 ":%02" PRIu32 ":%02" PRIu32,
+                    pin_lockout_seconds / 3600U,
+                    (pin_lockout_seconds % 3600U) / 60U,
+                    pin_lockout_seconds % 60U);
+        }
+        lcd_settings_pin_lockout_s_nvs_save();
+        
+        // Box around lockout time
+        lv_style_init(&style_time);
+
+        lv_style_set_radius(&style_time, 8);
+        lv_style_set_bg_color(&style_time, user_primary_color);
+        lv_style_set_border_width(&style_time, 2);
+        lv_style_set_border_color(&style_time, user_secondary_color);
+        lv_style_set_border_side(&style_time, LV_BORDER_SIDE_FULL);
+        lv_style_set_text_color(&style_time, user_secondary_color);
+        
+        lv_style_set_pad_left(&style_time, 10);
+        lv_style_set_pad_right(&style_time, 10);
+        lv_style_set_pad_top(&style_time, 6);
+        lv_style_set_pad_bottom(&style_time, 6);
+        
+        lv_obj_add_style(lbl_time, &style_time, 0);
         
         lbl_recovery = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_recovery, "Recover at: polycast5.com\n     /pages/recovery-tool", user_secondary_color,
@@ -2196,6 +2221,13 @@ void lcd_settings_pin_lockout_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
         last_tick_us = esp_timer_get_time();
         shown_seconds = UINT32_MAX;
         do_once = true;
+    }
+
+    // Don't count down if locked out forever
+    if (pin_lockout_seconds > 86400) {
+        lv_label_set_text(lbl_time, "99:99:99");
+        lv_timer_handler();
+        return;
     }
     
     // Decrement countdown by elapsed seconds
@@ -2223,6 +2255,7 @@ void lcd_settings_pin_lockout_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
         lv_obj_delete(lbl_ins);
         lv_obj_delete(lbl_time);
         lv_obj_delete(lbl_recovery);
+        lv_style_reset(&style_time);
 
         lbl_ins = lbl_time = lbl_recovery = NULL;
         do_once = false;

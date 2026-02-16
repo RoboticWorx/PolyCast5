@@ -1918,7 +1918,6 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             ui_menu->index = SELECTION_DEFAULT_IDX; // Default start
             lcd_selection_sync_labels(ui_menu); // Sync menu from here
 #endif
-
             // Show selection page
             lcd_unhide_selection_widgets(ui_menu);
                 
@@ -2002,11 +2001,14 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             ui_menu->page = UNLOCK_PAGE;
         }        
     }
+
+    // Don't allow hotkeys if pin is set and must be entered
+    if (settings_menu->pin_menu.pin_set && settings_menu->pin_menu.prompt_pin) {
+        return;
+    }
     
     /* HOTKEYS */
-    // Note: If you'd like it so you can only use hotkeys if the device is unlocked,
-    // simply add '&& (!settings_menu->pin_menu.pin_set || !settings_menu->pin_menu.prompt_pin)' to each hoykey 'else if'
-    
+ 
     // Long press home
     else if (xHomeButtonLongSemaphore && xSemaphoreTake(xHomeButtonLongSemaphore, 0) == pdTRUE) {
         /* Check for commands */
@@ -2445,7 +2447,7 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
                     go_to_pin_lockout_page(settings_menu, ui_menu);
                     break;
                 case 11:
-                    pin_lockout_seconds = UINT32_MAX; // Forever
+                    pin_lockout_seconds = 86411; // Forever (> 86400)
                     go_to_pin_lockout_page(settings_menu, ui_menu);
                     break;
                 default:
