@@ -71,7 +71,7 @@ static void lcd_task(void *pvParameters)
     lv_obj_set_style_bg_opa(ACTIVE_SCR, LV_OPA_COVER, 0); // Ensure the background is fully opaque
                      
     // Create images
-    lcd_init_images();
+    lcd_anim_init_images();
     
     TickType_t btn_timer_last = xTaskGetTickCount();
     TickType_t sleep_timer_last = xTaskGetTickCount();
@@ -184,7 +184,7 @@ static void lcd_task(void *pvParameters)
 
         // If was locked out, go to lockout page
         if (pin_lockout_seconds > 0) {
-            lcd_stop_animations();
+            lcd_anim_stop_animations();
             ui_menu.page = SETTINGS_PIN_LOCKOUT_PAGE;
         } else {
             // Else go home (redundant)

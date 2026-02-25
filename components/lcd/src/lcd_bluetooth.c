@@ -1666,7 +1666,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         uint16_t cmd = BLUETOOTH_CMD_DEINIT;
         xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-        lcd_loading_anim_stop();
+        lcd_anim_loading_stop();
         
         // Delete objects
         lv_obj_delete(lbl_ins);
@@ -1697,7 +1697,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         uint16_t cmd = BLUETOOTH_CMD_DEINIT;
         xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-        lcd_loading_anim_stop();
+        lcd_anim_loading_stop();
 
         // Delete objects
         lv_obj_delete(lbl_ins);
@@ -1733,7 +1733,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         uint16_t cmd = BLUETOOTH_CMD_DEINIT;
         xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
-        lcd_loading_anim_stop();
+        lcd_anim_loading_stop();
         
         // Delete objects
         lv_obj_delete(lbl_ins);

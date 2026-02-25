@@ -2197,7 +2197,7 @@ void lcd_settings_pin_lockout_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
         }
         lcd_settings_pin_lockout_s_nvs_save();
         
-        // Box around lockout time
+        // But a box around the lockout time
         lv_style_init(&style_time);
 
         lv_style_set_radius(&style_time, 8);
@@ -2223,7 +2223,7 @@ void lcd_settings_pin_lockout_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
         do_once = true;
     }
 
-    // Don't count down if locked out forever
+    // Don't count down if locked out forever: must use recovery tool
     if (pin_lockout_seconds > 86400) {
         lv_label_set_text(lbl_time, "99:99:99");
         lv_timer_handler();

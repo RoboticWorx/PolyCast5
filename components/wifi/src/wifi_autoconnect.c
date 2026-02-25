@@ -121,7 +121,7 @@ void wifi_autoconnect_init(void)
     strlcpy(last_known_pick.ssid, (char *)current.sta.ssid, sizeof(last_known_pick.ssid));
     strlcpy(last_known_pick.password, (char *)current.sta.password, sizeof(last_known_pick.password)); 
 
-#ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_WIFI_DUMP_NETWORKS_NVS
     ESP_LOGI(TAG, "wifi_autoconnect_init: Loaded %u known Wi-Fi network(s) from NVS", (unsigned int)known_network_count);
     for (size_t i = 0; i < known_network_count; ++i) {
         ESP_LOGI(TAG, "[%u] SSID='%s', pass='%s'", (unsigned int)i,

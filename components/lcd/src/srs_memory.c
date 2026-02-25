@@ -137,7 +137,7 @@ bool srs_sync_time_over_wifi(void)
         lv_obj_delete(lbl_info);
         lbl_info = NULL;
 
-        lcd_loading_anim_stop();
+        lcd_anim_loading_stop();
     
         return true;
     }
@@ -160,7 +160,7 @@ bool srs_sync_time_over_wifi(void)
         // User cancelled
         if (xSemaphoreTake(xLeftButtonSemaphore, 0) == pdPASS) {
             // Stop loading animation
-            lcd_loading_anim_stop();
+            lcd_anim_loading_stop();
 
             // Delete helper text
             lv_obj_delete(lbl_info);
@@ -196,7 +196,7 @@ bool srs_sync_time_over_wifi(void)
         lcd_clear_pending_inputs = true; // Clear user inputs from wait
     } else {
         // Stop loading animation
-        lcd_loading_anim_stop();
+        lcd_anim_loading_stop();
 
         // Notify user
         lcd_format_label(lbl_info, "Connection failed!\nPlease connect to your\nWi-Fi network at least\nonce in the 'Wi-Fi'\nmenu and make sure\nyou are in range.", user_secondary_color,
@@ -220,7 +220,7 @@ bool srs_sync_time_over_wifi(void)
     }
 
     // Stop loading animation
-    lcd_loading_anim_stop();
+    lcd_anim_loading_stop();
 
     // Delete helper text
     lv_obj_delete(lbl_info);

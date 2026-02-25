@@ -395,7 +395,7 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
             scanned = false;
 
             // Stop loading animation
-            lcd_loading_anim_stop();
+            lcd_anim_loading_stop();
 
             // Ensure wait label exists before updating it
             if (!lbl_wait) {
@@ -431,7 +431,7 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
 			lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 
 			// Stop loading animation
-			lcd_loading_anim_stop();
+			lcd_anim_loading_stop();
 
             lv_obj_delete(lbl_wait);
             lbl_wait = NULL;
@@ -509,7 +509,7 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
 
         // If actively scanning, stop UI + request Wi-Fi stop so the scan task doesn't wedge on a full queue
         if (scanning && !scanned) {
-            lcd_loading_anim_stop();
+            lcd_anim_loading_stop();
             xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
             scanning = false;
         }
@@ -557,7 +557,7 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
         }
 
         if (scanning && !scanned) {
-            lcd_loading_anim_stop();
+            lcd_anim_loading_stop();
             xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
             scanning = false;
         }
@@ -782,7 +782,7 @@ void lcd_wifi_scan_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu
         if (deauth_scan_result[deauth_scan_count].auth == 0xFF) {
             scanned = false;
 
-            lcd_loading_anim_stop();
+            lcd_anim_loading_stop();
 
             if (!lbl_wait) {
                 lbl_wait = lv_label_create(ACTIVE_SCR);
@@ -809,7 +809,7 @@ void lcd_wifi_scan_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu
         lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 
         // Stop loading animation
-        lcd_loading_anim_stop();
+        lcd_anim_loading_stop();
 
         // Clean wait label if exists
         if (lbl_wait) {
@@ -865,7 +865,7 @@ void lcd_wifi_scan_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu
         wifi_menu->scan_menu.index++;
         lcd_wifi_update_scan_menu(&wifi_menu->scan_menu);
     } else if (ui_btns->left_btn == 1) { // Back
-        lcd_loading_anim_stop();
+        lcd_anim_loading_stop();
 
         // Disconnect from Wi-Fi if connected
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
@@ -896,7 +896,7 @@ void lcd_wifi_scan_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu
         // Switch pages
         ui_menu->page = WIFI_PAGE;
     } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power
-        lcd_loading_anim_stop();
+        lcd_anim_loading_stop();
 
         // Disconnect from Wi-Fi if connected
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
@@ -1054,7 +1054,7 @@ void lcd_wifi_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *w
             lcd_format_label(lbl_send, "SEND", user_secondary_color,
                     &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
 
-            lcd_loading_anim_stop();
+            lcd_anim_loading_stop();
         } else { // Deauth in progress
             lv_label_set_text_fmt(lbl_stats, "%" PRIu32 " sent", deauth_stats.frames_sent);
         }
@@ -1118,7 +1118,7 @@ void lcd_wifi_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *w
         init = true;
         lbl_sec = lbl_sec_box = lbl_send = lbl_sec_up = lbl_sec_down = lbl_sec_ins = lbl_stats = NULL;
 
-        lcd_loading_anim_stop();
+        lcd_anim_loading_stop();
 
         // Stop deauth if ongoing
         xEventGroupSetBits(xWifiEventGroup, WIFI_STOP_DEAUTH_BIT);
@@ -1152,7 +1152,7 @@ void lcd_wifi_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *w
         lv_obj_clean(wifi_menu->scan_menu.main_list);
         lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
 
-        lcd_loading_anim_stop();
+        lcd_anim_loading_stop();
 
         // Reinit scan_deauth_page on next visit
         scan_deauth_page_initialized = false;
@@ -1459,7 +1459,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
                 state = AI_PKT_SEND_AI;
             } else if ((xTaskGetTickCount() - reconnect_start_tick) >= pdMS_TO_TICKS(WIFI_CONN_TIMEOUT_MS)) {
 				// Stop loading animation
-				lcd_loading_anim_stop();
+				lcd_anim_loading_stop();
 
 				// Notify user of failure
                 ESP_LOGE(TAG, "lcd_wifi_ai_packet_page: Wi-Fi reconnect timeout after sniff");
@@ -1486,7 +1486,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
             xSemaphoreGive(xWifiRawFramesMutex); // Release raw sniffed frames
 
             ESP_LOGE(TAG, "lcd_wifi_ai_packet_page: Raw frames malloc failed (len=%u)", (unsigned)copy_len);
-            lcd_loading_anim_stop();
+            lcd_anim_loading_stop();
 
             lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
             lv_label_set_text(lbl_ins, "Out of memory.\nPress LEFT to go back.");
@@ -1536,7 +1536,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
         state = AI_PKT_ANALYSIS_COMPLETE;
 
 		// Stop loading animation
-		lcd_loading_anim_stop();
+		lcd_anim_loading_stop();
 
         lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
         lv_label_set_text(lbl_ins, "Analysis complete!\n\nPress RIGHT to\nsee the results.");
@@ -1583,7 +1583,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
         ui_menu->page = WIFI_AI_PACKET_RESULTS_PAGE;
     } else if (ui_btns->right_btn && state == AI_PKT_IDLE) { // Go to config page
 		// Stop loading animation
-		lcd_loading_anim_stop();
+		lcd_anim_loading_stop();
 		
         // Hide right arrow
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -1612,7 +1612,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
     } else if (ui_btns->left_btn) { // Go back
 		// Stop loading animation
-		lcd_loading_anim_stop();
+		lcd_anim_loading_stop();
 		
         // Hide right arrow
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);

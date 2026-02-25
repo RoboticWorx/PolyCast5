@@ -12,7 +12,7 @@
 #define POLYCAST5_USE_PSRAM EXT_RAM_BSS_ATTR
 
 // Debugging
-#define POLYCAST5_DEBUG 1 // If debugging
+#define POLYCAST5_DEBUG 1 // If debugging: enables all ESP_LOGI/W
 
 #ifdef POLYCAST5_DEBUG
     //#define POLYCAST5_DEBUG_GPIO 1 // If debugging user buttons
@@ -22,6 +22,7 @@
     
     //#define POLYCAST5_ESPNOW_DUMP_NVS 1 // Show ESP-NOW NVS state on boot
     //#define POLYCAST5_WIFI_DUMP_NVS 1 // Show Wi-Fi NVS state on boot
+    //#define POLYCAST5_WIFI_DUMP_NETWORKS_NVS 1 // Show Wi-Fi NVS state on boot
     
     //#define POLYCAST5_IR_NVS_CLEAR 1 // Clear all IR namespaces 
     //#define POLYCAST5_WIFI_NVS_CLEAR 1 // Clear all Wi-Fi namespaces
