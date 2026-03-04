@@ -18,10 +18,10 @@ extern int8_t lcd_ledc_brightness;
 
 static const char *TAG = "LCD_TASK";
 
-static volatile bool is_charging = false;
+static bool is_charging = false;
 
 static icon_state_t icon_state = {0};
-static EventBits_t icon_bits = 0;
+static EventBits_t icon_bits = 0U;
 
 static const TickType_t btn_timer_interval = pdMS_TO_TICKS(200);
 

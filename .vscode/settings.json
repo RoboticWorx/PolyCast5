@@ -20,4 +20,5 @@
   "diffEditor.renderSideBySide": false,
   "idf.flashType": "UART",
   "idf.currentSetup": "c:\\Espressif\\frameworks\\esp-idf-v5.5.2",
+  "claudeCode.selectedModel": "opus"
 }
