@@ -714,6 +714,312 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
     return ESP_OK;
 }
 
+// Streaming support for xAI chat completions
+
+typedef struct {
+    // Caller-supplied callback + context
+    ai_stream_cb_t on_delta;
+    void *user_ctx;
+
+    // Final assembled response
+    char *resp_buf;
+    size_t resp_sz;
+    size_t resp_len;
+
+    // SSE line reassembly (TCP chunks don't align to SSE lines)
+    char *line_buf;
+    size_t line_len;
+    size_t line_cap;
+
+    bool aborted; // Set if callback returned an error or OOM
+} stream_ctx_t;
+
+// Extract content delta from a single SSE JSON chunk and forward to callback
+static void stream_process_sse_line(stream_ctx_t *s, const char *line, size_t len)
+{
+    if (!s || len == 0) {
+        return;
+    }
+
+    // SSE lines we care about start with "data: "
+    if (len < 6 || strncmp(line, "data: ", 6) != 0) {
+        return;
+    }
+
+    const char *json_str = line + 6;
+    size_t json_len = len - 6;
+
+    // Stream terminator
+    if (json_len >= 6 && strncmp(json_str, "[DONE]", 6) == 0) {
+        return;
+    }
+
+    // Parse the SSE JSON chunk
+    cJSON *j = cJSON_ParseWithLength(json_str, json_len);
+    if (!j) {
+        return;
+    }
+
+    // Navigate: choices[0].delta.content
+    cJSON *choices = cJSON_GetObjectItem(j, "choices");
+    cJSON *first = cJSON_IsArray(choices) ? cJSON_GetArrayItem(choices, 0) : NULL;
+    cJSON *delta = first ? cJSON_GetObjectItem(first, "delta") : NULL;
+    cJSON *content = delta ? cJSON_GetObjectItem(delta, "content") : NULL;
+
+    if (cJSON_IsString(content) && content->valuestring && content->valuestring[0]) {
+        const char *text = content->valuestring;
+        size_t tlen = strlen(text);
+
+        // Append to assembled response buffer
+        if (s->resp_buf && s->resp_len + tlen < s->resp_sz) {
+            memcpy(s->resp_buf + s->resp_len, text, tlen);
+            s->resp_len += tlen;
+            s->resp_buf[s->resp_len] = '\0';
+        }
+
+        // Forward to caller's streaming callback
+        if (s->on_delta) {
+            esp_err_t cb_err = s->on_delta(text, s->user_ctx);
+            if (cb_err != ESP_OK) {
+                s->aborted = true;
+            }
+        }
+    }
+
+    cJSON_Delete(j);
+}
+
+// Feed raw bytes into the SSE line buffer; process each complete line on '\n'
+static void stream_feed_bytes(stream_ctx_t *s, const char *data, size_t len)
+{
+    if (!s || s->aborted) {
+        return;
+    }
+
+    for (size_t i = 0; i < len; ++i) {
+        char c = data[i];
+
+        // On newline, process the buffered line
+        if (c == '\n') {
+            if (s->line_buf && s->line_len > 0) {
+                s->line_buf[s->line_len] = '\0';
+                stream_process_sse_line(s, s->line_buf, s->line_len);
+            }
+            s->line_len = 0;
+            continue;
+        }
+
+        // Skip carriage returns (SSE uses \r\n)
+        if (c == '\r') {
+            continue;
+        }
+
+        // Grow line buffer if needed
+        if (s->line_len + 1 >= s->line_cap) {
+            size_t nc = s->line_cap ? s->line_cap * 2 : 512;
+            char *nb = (char *)realloc(s->line_buf, nc);
+            if (!nb) {
+                s->aborted = true;
+                return;
+            }
+            s->line_buf = nb;
+            s->line_cap = nc;
+        }
+
+        s->line_buf[s->line_len++] = c;
+    }
+}
+
+// HTTP event handler for SSE streaming
+static esp_err_t http_evt_stream(esp_http_client_event_t *evt)
+{
+    stream_ctx_t *s = (stream_ctx_t *)evt->user_data;
+    if (!s) {
+        return ESP_OK;
+    }
+
+    if (evt->event_id == HTTP_EVENT_ON_CONNECTED) {
+        // Reset state for a new request
+        s->resp_len = 0;
+        s->line_len = 0;
+        if (s->resp_buf && s->resp_sz > 0) {
+            s->resp_buf[0] = '\0';
+        }
+        return ESP_OK;
+    }
+
+    if (evt->event_id == HTTP_EVENT_ON_DATA && evt->data && evt->data_len > 0) {
+        stream_feed_bytes(s, (const char *)evt->data, (size_t)evt->data_len);
+    }
+
+    return ESP_OK;
+}
+
+// Streaming variant of ai_utils_send_command_xai
+esp_err_t ai_utils_send_command_xai_stream(const char *system_prompt, const char *command,
+        char *response_buf, size_t buf_sz, bool reasoning, ai_stream_cb_t on_delta, void *user_ctx)
+{
+    // Validate args
+    if (!system_prompt || !command || !response_buf || buf_sz == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // If no callback, fall back to the non-streaming path
+    if (!on_delta) {
+        return ai_utils_send_command_xai(system_prompt, command, response_buf, buf_sz, reasoning);
+    }
+
+    response_buf[0] = '\0';
+
+    // Load xAI API key from NVS
+    char api_key[AI_API_KEY_MAX_LEN] = {0};
+    if (ai_utils_load_api_key_nvs(api_key, sizeof(api_key)) != ESP_OK || api_key[0] == '\0') {
+        ESP_LOGE(TAG, "Failed to load xAI API key from NVS");
+        return ESP_FAIL;
+    }
+
+    // Build JSON payload (same as non-streaming, but with "stream": true)
+    cJSON *root = cJSON_CreateObject();
+    if (!root) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    // Pick Grok model
+    if (reasoning) {
+        cJSON_AddStringToObject(root, "model", "grok-4-1-fast-reasoning");
+    } else {
+        cJSON_AddStringToObject(root, "model", "grok-4-1-fast-non-reasoning");
+    }
+
+    // Messages array
+    cJSON *messages = cJSON_AddArrayToObject(root, "messages");
+    if (!messages) {
+        cJSON_Delete(root);
+        return ESP_ERR_NO_MEM;
+    }
+
+    // System / developer instructions
+    cJSON *sys_msg = cJSON_CreateObject();
+    cJSON_AddStringToObject(sys_msg, "role", "system");
+    cJSON_AddStringToObject(sys_msg, "content", system_prompt);
+    cJSON_AddItemToArray(messages, sys_msg);
+
+    // User message
+    cJSON *usr_msg = cJSON_CreateObject();
+    cJSON_AddStringToObject(usr_msg, "role", "user");
+    cJSON_AddStringToObject(usr_msg, "content", command);
+    cJSON_AddItemToArray(messages, usr_msg);
+
+    // Reasonable token limit
+    cJSON_AddNumberToObject(root, "max_tokens", (1024 * 2));
+
+    // Enable SSE streaming
+    cJSON_AddTrueToObject(root, "stream");
+
+    // Serialize JSON payload
+    char *payload = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+
+    if (!payload) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    // Initialize streaming context
+    stream_ctx_t sctx = {
+        .on_delta = on_delta,
+        .user_ctx = user_ctx,
+        .resp_buf = response_buf,
+        .resp_sz  = buf_sz,
+        .resp_len = 0,
+        .line_buf = NULL,
+        .line_len = 0,
+        .line_cap = 0,
+        .aborted  = false,
+    };
+
+    // Configure HTTPS request
+    esp_http_client_config_t config = {
+        .url = "https://api.x.ai/v1/chat/completions",
+        .method = HTTP_METHOD_POST,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+        .timeout_ms = 120000,
+        .event_handler = http_evt_stream,
+        .user_data = &sctx,
+    };
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    if (!client) {
+        free(payload);
+        free(sctx.line_buf);
+        return ESP_FAIL;
+    }
+
+    // Build Authorization header: "Bearer <xai_key>"
+    char auth_header[512];
+    snprintf(auth_header, sizeof(auth_header), "Bearer %s", api_key);
+
+    // Set headers
+    esp_http_client_set_header(client, "Authorization", auth_header);
+    esp_http_client_set_header(client, "Content-Type", "application/json");
+    esp_http_client_set_header(client, "Accept", "text/event-stream");
+
+    // Attach POST body
+    esp_http_client_set_post_field(client, payload, strlen(payload));
+
+#ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "Stream: free heap before perform: free=%u LFB=%u",
+            (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+            (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+#endif
+
+    // Perform the request (blocks; SSE chunks arrive via http_evt_stream callback)
+    esp_err_t err = esp_http_client_perform(client);
+
+    // Read HTTP status code
+    int status = esp_http_client_get_status_code(client);
+
+    // Cleanup HTTP resources
+    free(payload);
+    esp_http_client_close(client);
+    esp_http_client_cleanup(client);
+
+    // Free SSE line buffer
+    free(sctx.line_buf);
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Stream: HTTP POST failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    if (status != 200) {
+        ESP_LOGE(TAG, "Stream: HTTP status %d (expected 200)", status);
+        return ESP_FAIL;
+    }
+
+    if (sctx.aborted) {
+        ESP_LOGW(TAG, "Stream: aborted by callback or OOM");
+        return ESP_FAIL;
+    }
+
+    if (response_buf[0] == '\0') {
+        ESP_LOGE(TAG, "Stream: no content deltas received");
+        return ESP_FAIL;
+    }
+
+    // Strip any wrapper quotes/fences from the assembled response
+    strip_wrappers_inplace(response_buf);
+
+    if (response_buf[0] == '\0') {
+        return ESP_FAIL;
+    }
+
+#ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "Stream: assembled response len=%u", (unsigned)strlen(response_buf));
+#endif
+
+    return ESP_OK;
+}
+
 esp_err_t ai_utils_keyboard_prompt_save_nvs(const char *prompt)
 {
     // NVS handle

@@ -23,6 +23,7 @@ EventGroupHandle_t xBluetoothEventGroup;
 
 QueueHandle_t xBluetoothMediaCmdQueue;
 QueueHandle_t xBluetoothAiCmdQueue;
+QueueHandle_t xBluetoothAiStreamQueue;
 
 extern volatile bluetooth_state_t bluetooth_state;
 
@@ -35,6 +36,111 @@ static uint16_t bluetooth_cmd = 0;
 static uint8_t battery_percentage = 100;
 static const TickType_t battery_timer_interval = pdMS_TO_TICKS(1000);
 
+// Buffer for reassembling streamed AI chunks so <tag> tokens and !END! aren't split across chunks
+#define STREAM_BUF_SZ 512
+#define STREAM_END_MARKER "!END!"
+#define STREAM_END_MARKER_LEN 5
+POLYCAST5_USE_PSRAM static char stream_buf[STREAM_BUF_SZ];
+static size_t stream_buf_len = 0;
+static bool stream_end_detected = false;
+
+// Append text to stream_buf, flush complete segments (no partial <tag> or !END!) via send_script
+static void stream_buf_append(const char *text, size_t len)
+{
+    if (stream_end_detected) {
+        return; // Already hit !END!, ignore further chunks
+    }
+
+    // Append as much as fits
+    size_t space = STREAM_BUF_SZ - 1 - stream_buf_len;
+    if (len > space) {
+        len = space;
+    }
+    memcpy(stream_buf + stream_buf_len, text, len);
+    stream_buf_len += len;
+    stream_buf[stream_buf_len] = '\0';
+
+    // Check for complete !END! marker in buffer
+    char *end_marker = strstr(stream_buf, STREAM_END_MARKER);
+    if (end_marker) {
+        // Send everything before !END!
+        if (end_marker > stream_buf) {
+            *end_marker = '\0';
+            bluetooth_utils_send_script(stream_buf, 2);
+        }
+        stream_buf_len = 0;
+        stream_buf[0] = '\0';
+        stream_end_detected = true;
+        xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT); // Signal done typing
+        return;
+    }
+
+    // Find the last '<' that has no matching '>'
+    // Everything before it is safe to send; keep the rest
+    const char *last_open = NULL;
+    for (size_t i = 0; i < stream_buf_len; ++i) {
+        if (stream_buf[i] == '<') {
+            last_open = &stream_buf[i];
+        } else if (stream_buf[i] == '>') {
+            last_open = NULL; // Closed, no longer partial
+        }
+    }
+
+    size_t safe_len = last_open ? (size_t)(last_open - stream_buf) : stream_buf_len;
+
+    // Hold back potential partial !END! prefix at the tail of the safe portion
+    // e.g. "!", "!E", "!EN", "!END" could be the start of !END! split across chunks
+    for (int plen = STREAM_END_MARKER_LEN - 1; plen >= 1; --plen) {
+        if (safe_len >= (size_t)plen && memcmp(stream_buf + safe_len - plen, STREAM_END_MARKER, plen) == 0) {
+            safe_len -= plen;
+            break;
+        }
+    }
+
+    if (safe_len > 0) {
+        // Temporarily NULL-terminate the safe portion and send it
+        char saved = stream_buf[safe_len];
+        stream_buf[safe_len] = '\0';
+        bluetooth_utils_send_script(stream_buf, 2);
+        stream_buf[safe_len] = saved;
+
+        // Shift remainder to front
+        size_t remain = stream_buf_len - safe_len;
+        if (remain > 0) {
+            memmove(stream_buf, stream_buf + safe_len, remain);
+        }
+        stream_buf_len = remain;
+        stream_buf[stream_buf_len] = '\0';
+    }
+}
+
+// Flush whatever is left in stream_buf (called on end-of-stream)
+static void stream_buf_flush(void)
+{
+    if (stream_buf_len > 0) {
+        stream_buf[stream_buf_len] = '\0';
+        bluetooth_utils_send_script(stream_buf, 2);
+        stream_buf_len = 0;
+        stream_buf[0] = '\0';
+    }
+}
+
+// Drop any queued streamed AI chunks and reset local reassembly state
+static void stream_buf_discard_all(void)
+{
+    char *chunk = NULL;
+
+    while (xQueueReceive(xBluetoothAiStreamQueue, &chunk, 0) == pdTRUE) {
+        if (chunk) {
+            free(chunk);
+        }
+    }
+
+    stream_buf_len = 0;
+    stream_buf[0] = '\0';
+    stream_end_detected = false;
+}
+
 static void bluetooth_task(void *arg)
 {
     xBluetoothEventGroup = xEventGroupCreate();
@@ -44,6 +150,8 @@ static void bluetooth_task(void *arg)
     configASSERT(xBluetoothMediaCmdQueue);
     xBluetoothAiCmdQueue = xQueueCreate(1, sizeof(char *));
     configASSERT(xBluetoothAiCmdQueue);
+    xBluetoothAiStreamQueue = xQueueCreate(100, sizeof(char *));
+    configASSERT(xBluetoothAiStreamQueue);
     
     TickType_t battery_timer_last = xTaskGetTickCount();
 
@@ -103,7 +211,10 @@ static void bluetooth_task(void *arg)
             if (bluetooth_cmd == BLUETOOTH_CMD_INIT) {
                 bluetooth_utils_init();
             } else if (bluetooth_cmd == BLUETOOTH_CMD_DEINIT) { // De-initialize command received
+                xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT);
                 bluetooth_utils_deinit();
+                stream_buf_discard_all();
+                xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_CANCEL_TYPING_BIT); // Reset for next session
             } else if (bluetooth_cmd == BLUETOOTH_CMD_UNPAIR_ALL) { // Unpair all devices command received
                 bluetooth_utils_forget_all_peers();
 
@@ -165,7 +276,6 @@ static void bluetooth_task(void *arg)
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Received cmd index: %u -> menu index: %u", (unsigned)bluetooth_cmd, (unsigned)menu_idx);
 #endif
-            
                 // "Test" at menu index 1, handle it specially
                 if (menu_idx == 1) {
                     const char *TEST_TXT =
@@ -234,7 +344,6 @@ static void bluetooth_task(void *arg)
 #ifdef POLYCAST5_DEBUG
                         ESP_LOGI(TAG, "Sending script: %s", send_buf);
 #endif
-
                         // Send the script
                         bluetooth_utils_send_script(send_buf, 1);
                     } else {
@@ -252,11 +361,43 @@ static void bluetooth_task(void *arg)
         }
 
         // If a AI is typing (this is a cool comment lol)
+        // Password type cmd not streamed, send as a whole
         if (xQueueReceive(xBluetoothAiCmdQueue, &ai_script, 0) == pdTRUE) {
             // Send the script
             bluetooth_utils_send_script(ai_script, 2);
+
+            // Notify LCD we're done typing the credential
+            xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT);
         }
-        
+
+        // Drain streamed AI chunks (strdup'd by sender, freed here)
+        // Uses stream_buf to reassemble partial <tag> tokens across chunk boundaries
+        char *stream_chunk = NULL;
+        while (xQueueReceive(xBluetoothAiStreamQueue, &stream_chunk, 0) == pdTRUE) {
+            // Drain the queue and exit if cancel bit is set
+            if (xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_CANCEL_TYPING_BIT) {
+                if (stream_chunk) {
+                    free(stream_chunk); // Free the received chunk if not NULL
+                }
+                stream_buf_discard_all();
+                break;
+            }
+
+            if (stream_chunk) {
+                stream_buf_append(stream_chunk, strlen(stream_chunk));
+                free(stream_chunk);
+            } else {
+                // NULL sentinel = end of stream, flush remaining buffer
+                stream_buf_flush();
+
+                // If !END! was never detected (truncated response), signal done as fallback
+                if (!stream_end_detected) {
+                    xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT);
+                }
+                stream_end_detected = false; // Reset for next stream
+            }
+        }
+
         // Get device battery level
         xQueueReceive(xAdcBatBluetoothQueue, &battery_percentage, 0);
         

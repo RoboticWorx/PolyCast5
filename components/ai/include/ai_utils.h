@@ -70,6 +70,35 @@ esp_err_t ai_utils_load_api_key_nvs(char *out, size_t out_sz);
  */
 esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *command, char *response_buf, size_t buf_sz, bool reasoning);
 
+/**
+ * @brief Callback invoked for each content delta during SSE streaming
+ *
+ * @param [in] delta_text The partial text chunk from the model
+ * @param [in] user_ctx Opaque pointer passed through from the caller
+ *
+ * @returns ESP_OK to continue streaming, any other value to abort
+ */
+typedef esp_err_t (*ai_stream_cb_t)(const char *delta_text, void *user_ctx);
+
+/**
+ * @brief Send command to xAI Grok with SSE streaming, invoking a callback for each content delta
+ *
+ * The full assembled response is also written into response_buf (same as the non-streaming variant).
+ * If on_delta is NULL this behaves identically to ai_utils_send_command_xai().
+ *
+ * @param [in] system_prompt System prompt string
+ * @param [in] command User command string
+ * @param [out] response_buf Buffer to accumulate the full response
+ * @param [in] buf_sz Size of response_buf
+ * @param [in] reasoning True for reasoning model, false for non-reasoning
+ * @param [in] on_delta Callback for each streaming content delta (may be NULL)
+ * @param [in] user_ctx Opaque pointer forwarded to on_delta
+ *
+ * @returns ESP error status
+ */
+esp_err_t ai_utils_send_command_xai_stream(const char *system_prompt, const char *command, char *response_buf, size_t buf_sz,
+        bool reasoning, ai_stream_cb_t on_delta, void *user_ctx);
+
 /** 
  * @brief Lookup credentials via AI and get the corresponding Bluetooth script
  *

@@ -1371,6 +1371,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         xEventGroupClearBits(xAiEventGroup, AI_DONE_THINKING_BIT);
         xEventGroupClearBits(xAiEventGroup, AI_THINKING_FAILED_BIT);
         xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT);
+        xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_CANCEL_TYPING_BIT);
         xQueueReset(xAiSoundHeardSemaphore);
 
         // Default to non-reasoning (faster and cheaper, but less accurate)
@@ -1631,8 +1632,9 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     if ((xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_DONE_TYPING_BIT) && state == AI_KEYB_TYPING_WAITING) {
         lv_label_set_text(lbl_ins, AI_KEYB_HOLD_TALK_TXT);
 
-        // Clear bit
+        // Clear bits
         xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT);
+        xEventGroupClearBits(xAiEventGroup, AI_DONE_THINKING_BIT); // Just in case
 
         // Show reasoning
         lv_obj_remove_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
@@ -1661,6 +1663,9 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     } else if (ui_btns->right_btn == 1) { // Config page selected
         // Disconnect from Wi-Fi
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+
+        // Signal any in-progress AI typing to abort
+        xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_CANCEL_TYPING_BIT);
 
         // Deactivate bluetooth
         uint16_t cmd = BLUETOOTH_CMD_DEINIT;
@@ -1692,6 +1697,9 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     } else if (ui_btns->left_btn == 1) { // Back selected
         // Disconnect from Wi-Fi
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+
+        // Signal any in-progress AI typing to abort
+        xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_CANCEL_TYPING_BIT);
 
         // Deactivate bluetooth
         uint16_t cmd = BLUETOOTH_CMD_DEINIT;
@@ -1728,6 +1736,9 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off selected
         // Disconnect from Wi-Fi
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+
+        // Signal any in-progress AI typing to abort
+        xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_CANCEL_TYPING_BIT);
 
         // Deactivate bluetooth
         uint16_t cmd = BLUETOOTH_CMD_DEINIT;

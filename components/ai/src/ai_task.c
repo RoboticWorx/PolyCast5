@@ -36,6 +36,37 @@ POLYCAST5_USE_PSRAM static char prompt_buf[AI_PROMPT_NVS_MAX_LEN] = {0};
 POLYCAST5_USE_PSRAM static char ai_response[AI_RESPONSE_MAX_LEN] = {0}; // TODO: Increase MAX_LEN here and for BT
 POLYCAST5_USE_PSRAM static char user_transcript[1024];
 
+// Streaming callback: queues each content delta for bluetooth_task to type over BLE
+static esp_err_t stream_to_bluetooth_cb(const char *delta, void *ctx)
+{
+    (void)ctx;
+
+    // If BLE was torn down mid-stream, abort the HTTP request
+    if (xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_CANCEL_TYPING_BIT) {
+        return ESP_FAIL;
+    }
+
+    // Signal done thinking
+    xEventGroupSetBits(xAiEventGroup, AI_DONE_THINKING_BIT);
+
+    if (delta && delta[0]) {
+        char *copy = strdup(delta);
+        if (copy) {
+#ifdef POLYCAST5_DEBUG
+            ESP_LOGI(TAG, "Streaming AI BLE: '%s'", copy);
+#endif
+            // Queue the strdup'd chunk; bluetooth_task drains and free()s it
+            if (xQueueSend(xBluetoothAiStreamQueue, &copy, pdMS_TO_TICKS(5000)) != pdTRUE) {
+#ifdef POLYCAST5_DEBUG
+                ESP_LOGW(TAG, "stream_to_bluetooth_cb timeout: '%s'", copy);
+#endif
+                free(copy); // Queue full/timeout
+            }
+        }
+    }
+    return ESP_OK;
+}
+
 static ai_cmd_type_t parse_kind_and_query(const char *in, const char **query_out)
 {
     // Trim leading spaces
@@ -185,13 +216,16 @@ static void ai_task(void *pvParameters)
                         ESP_LOGI(TAG, "Sending xAI cmd WITHOUT reasoning");
                     }
 #endif
+                    // Call chat API with SSE streaming (types each chunk over BLE as it arrives)
+                    err = ai_utils_send_command_xai_stream(prompt, user_transcript, ai_response, sizeof(ai_response), cmd.reasoning, stream_to_bluetooth_cb, NULL);
 
-                    // Call chat API with non-reasoning
-                    err = ai_utils_send_command_xai(prompt, user_transcript, ai_response, sizeof(ai_response), cmd.reasoning);
+                    // Send NULL sentinel so bluetooth_task flushes any buffered partial tag
+                    // Only on success/normal completion - on abort the queue was already drained
+                    if (!(xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_CANCEL_TYPING_BIT)) {
+                        char *end_marker = NULL;
+                        xQueueSend(xBluetoothAiStreamQueue, &end_marker, pdMS_TO_TICKS(5000));
+                    }
                 }
-
-                // Signal done thinking
-                xEventGroupSetBits(xAiEventGroup, AI_DONE_THINKING_BIT);
             } else {
                 ESP_LOGE(TAG, "Realtime STT failed: %s", esp_err_to_name(err));
 
@@ -218,14 +252,17 @@ static void ai_task(void *pvParameters)
         if (err == ESP_OK) {
             if (cmd.type == AI_CMD_KEYBOARD_DONE_REC) {
 #ifdef POLYCAST5_DEBUG
-                ESP_LOGI(TAG, "AI keyboard script resolved: %s", ai_response);
+                ESP_LOGI(TAG, "AI keyboard script streamed (len=%u): %s", (unsigned)strlen(ai_response), ai_response);
 #endif
-                char *ai_script_ptr = ai_response;
-                xQueueSend(xBluetoothAiCmdQueue, &ai_script_ptr, portMAX_DELAY);
+                // Already streamed to BLE keyboard via stream_to_bluetooth_cb: nothing to queue
             } else if (cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD) {
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Credential script resolved (len=%u)", (unsigned)strlen(ai_response));
 #endif
+                // Signal done thinking
+                xEventGroupSetBits(xAiEventGroup, AI_DONE_THINKING_BIT);
+
+                // Type out the crediential
                 char *ai_script_ptr = ai_response;
                 xQueueSend(xBluetoothAiCmdQueue, &ai_script_ptr, portMAX_DELAY);
             } else if (cmd.type == AI_CMD_RAW_FRAMES) {
