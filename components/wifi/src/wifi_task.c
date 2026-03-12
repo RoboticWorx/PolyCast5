@@ -20,10 +20,10 @@
 #include "wifi_autoconnect.h"
 #include "wifi_ota_update.h"
 #include "esp_app_desc.h"
-#include "wifi_btc_web_portal.h"
-#include "ai_key_web_portal.h"
-#include "bluetooth_web_portal.h"
-#include "ai_analysis_web_portal.h"
+#include "wifi_btc_portal.h"
+#include "ai_key_portal.h"
+#include "bluetooth_portal.h"
+#include "ai_analysis_portal.h"
 
 #include "wifi_task.h"
 

@@ -15,7 +15,8 @@
 #include "esp_netif_ip_addr.h" // IPSTR/IP2STR
 
 #include "ai_utils.h"
-#include "ai_analysis_web_portal.h"
+#include "ai_analysis_portal.h"
+#include "ai_analysis_portal_html.h"
 
 #define TAG "AI_ANALYSIS_PORTAL"
 
@@ -36,143 +37,13 @@ static char s_ip[16] = "192.168.4.1";
 // This avoids lifetime issues with the producer buffer being reused.
 POLYCAST5_USE_PSRAM static char s_result[AI_RESPONSE_MAX_LEN] = {0};
 
-/* =============== HTML UI =============== */
-
-static const char *HTML =
-"<!doctype html><meta charset=utf-8>"
-"<meta name=viewport content='width=device-width,initial-scale=1'>"
-"<title>PolyCast5 AI Packet Analysis</title>"
-"<style>"
-"body{font-family:system-ui,Arial,sans-serif;margin:16px;max-width:900px}"
-".row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}"
-"button{font-size:14px;padding:8px 10px}"
-"small{color:#6e7681}"
-"#out{background:#0b0f14;color:#e6edf3;padding:12px;border-radius:10px;overflow:auto;border:1px solid #30363d}"
-"#out pre{background:#0b0f14;color:#e6edf3;padding:10px;border:1px solid #30363d;border-radius:8px;overflow:auto}"
-"#out code{background:#161b22;padding:2px 4px;border-radius:6px}"
-"#out a{color:#58a6ff}"
-"#out h1,#out h2,#out h3{margin:12px 0 8px}"
-"#out ul{margin:8px 0 8px 20px}"
-"#out table{border-collapse:collapse;width:100%;margin:10px 0}"
-"#out th,#out td{border:1px solid #30363d;padding:6px 8px;vertical-align:top}"
-"#out th{background:#161b22;font-weight:600}"
-"</style>"
-"<h2>PolyCast5 AI Packet Analysis</h2>"
-"<p><small>This page shows an AI analysis of the 802.11 packets captured.</small></p>"
-"<p><small>For your reference, packets captured can be of type: MGMT, CTRL, DATA, MISC, DATA_MPDU, or DATA_AMPDU.</small></p>"
-"<p><small>Please verify important information.</small></p>"
-"<div id=out>Loading...</div>"
-"<script>"
-"function escHtml(s){"
-"return (s||'')"
-".replace(/&/g,'&amp;')"
-".replace(/</g,'&lt;')"
-".replace(/>/g,'&gt;')"
-".replace(/\"/g,'&quot;')"
-".replace(/'/g,'&#39;');"
-"}"
-"function fmtInline(s){"
-"return s"
-".replace(/\\*\\*(.+?)\\*\\*/g,'<strong>$1</strong>')"
-".replace(/\\*(.+?)\\*/g,'<em>$1</em>')"
-".replace(/`([^`]+?)`/g,'<code>$1</code>');"
-"}"
-"function isTableSep(line){"
-"let t=(line||'').trim();"
-"if(!t) return false;"
-"return /^\\|?\\s*:?-+:?\\s*(\\|\\s*:?-+:?\\s*)+\\|?$/.test(t);"
-"}"
-"function splitTableRow(line){"
-"let t=(line||'').trim();"
-"if(t.startsWith('|')) t=t.slice(1);"
-"if(t.endsWith('|')) t=t.slice(0,-1);"
-"return t.split('|').map(c=>c.trim());"
-"}"
-"function looksLikeTableRow(line){"
-"let t=(line||'').trim();"
-"return t.includes('|') && t.replace(/\\|/g,'').trim().length>0;"
-"}"
-"function renderMd(md){"
-"md = (md||'').replace(/\\r\\n/g,'\\n');"
-"let parts = md.split('```');"
-"let out = '';"
-"for(let i=0;i<parts.length;i++){"
-"if(i%2===1){"
-"out += '<pre><code>' + escHtml(parts[i]) + '</code></pre>';"
-"}"
-"else{"
-"let s = escHtml(parts[i]);"
-"let lines = s.split('\\n');"
-"let inList = false;"
-"for(let li=0; li<lines.length; li++){"
-"let line = lines[li];"
-"if(!inList && looksLikeTableRow(line) && (li+1<lines.length) && isTableSep(lines[li+1])){"
-"let head = splitTableRow(line);"
-"li++;"
-"out += '<table><thead><tr>';"
-
-"for(let c=0;c<head.length;c++){ out += '<th>' + fmtInline(head[c]) + '</th>'; }"
-"out += '</tr></thead><tbody>';"
-
-"for(li=li+1; li<lines.length; li++){"
-"let rline = lines[li];"
-"if(!looksLikeTableRow(rline) || rline.trim()===''){ li--; break; }"
-"let row = splitTableRow(rline);"
-"out += '<tr>';"
-
-"for(let c=0;c<row.length;c++){ out += '<td>' + fmtInline(row[c]) + '</td>'; }"
-"out += '</tr>';"
-
-"}"
-"out += '</tbody></table>';"
-
-"continue;"
-"}"
-"if(/^\\s*[-*]\\s+/.test(line)){"
-"if(!inList){ out += '<ul>'; inList=true; }"
-"line = line.replace(/^\\s*[-*]\\s+/, '');"
-"}"
-"else{"
-"if(inList){ out += '</ul>'; inList=false; }"
-"}"
-"if(inList){"
-"line = fmtInline(line);"
-"out += '<li>' + line + '</li>';"
-
-"}"
-"else{"
-"if(/^###\\s+/.test(line)){ out += '<h3>' + line.replace(/^###\\s+/, '') + '</h3>'; continue; }"
-"if(/^##\\s+/.test(line)){ out += '<h2>' + line.replace(/^##\\s+/, '') + '</h2>'; continue; }"
-"if(/^#\\s+/.test(line)){ out += '<h1>' + line.replace(/^#\\s+/, '') + '</h1>'; continue; }"
-"line = fmtInline(line);"
-"if(line.trim()===''){ out += '<br>'; }"
-"else{ out += '<div>' + line + '</div>'; }"
-"}"
-"}"
-"if(inList){ out += '</ul>'; }"
-"}"
-"}"
-"return out;"
-"}"
-"async function load(){"
-"try{"
-"let r=await fetch('/api/result');"
-"if(!r.ok){document.getElementById('out').textContent='HTTP '+r.status;return;}"
-"let j=await r.json();"
-"if(!j.has_result){document.getElementById('out').textContent='No result available.';return;}"
-"document.getElementById('out').innerHTML = renderMd(j.md||'');"
-"}catch(e){document.getElementById('out').textContent='Load failed';}"
-"}"
-"load();"
-"</script>";
-
 /* =============== HTTP handlers =============== */
 
 static esp_err_t root_get(httpd_req_t *req)
 {
     // Serve the single-page UI
     httpd_resp_set_type(req, "text/html");
-    return httpd_resp_send(req, HTML, HTTPD_RESP_USE_STRLEN);
+    return httpd_resp_send(req, AI_ANALYSIS_PORTAL_HTML, HTTPD_RESP_USE_STRLEN);
 }
 
 static esp_err_t result_get(httpd_req_t *req)

@@ -1,5 +1,5 @@
-#ifndef BLUETOOTH_WEB_PORTAL_H
-#define BLUETOOTH_WEB_PORTAL_H
+#ifndef BLUETOOTH_PORTAL_H
+#define BLUETOOTH_PORTAL_H
 
 #include "esp_err.h"
 
@@ -156,4 +156,4 @@ const char *bluetooth_web_portal_get_ssid(void);
  */
 const char *bluetooth_web_portal_get_pass(void);
 
-#endif // BLUETOOTH_WEB_PORTAL_H
+#endif // BLUETOOTH_PORTAL_H

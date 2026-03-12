@@ -15,7 +15,7 @@
 #include "esp_netif_ip_addr.h" // For IPSTR/IP2STR
 
 #include "ai_key_portal_html.h" // AI_PORTAL_HTML
-#include "ai_key_web_portal.h"
+#include "ai_key_portal.h"
 #include "ai_utils.h"
 #include "ai_prompts.h"
 

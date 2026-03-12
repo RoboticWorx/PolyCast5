@@ -13,8 +13,8 @@
 #include "esp_log.h"
 #include "cJSON.h"
 
-#include "bluetooth_web_portal.h"
-#include "bluetooth_web_portal_html.h"
+#include "bluetooth_portal.h"
+#include "bluetooth_portal_html.h"
 
 #define TAG "BLUETOOTH_WEB_PORTAL"
 

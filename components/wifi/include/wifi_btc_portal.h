@@ -1,5 +1,5 @@
-#ifndef WIFI_BTC_WEB_PORTAL_H
-#define WIFI_BTC_WEB_PORTAL_H
+#ifndef WIFI_BTC_PORTAL_H
+#define WIFI_BTC_PORTAL_H
 
 #include "esp_err.h"
 
@@ -71,4 +71,4 @@ esp_err_t wifi_btc_pass_save_nvs(const char *val);
 esp_err_t wifi_btc_pass_load_nvs(char *out, size_t out_sz);
 
 
-#endif // WIFI_BTC_WEB_PORTAL_H
+#endif // WIFI_BTC_PORTAL_H

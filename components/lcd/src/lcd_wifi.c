@@ -29,8 +29,8 @@
 #include "lcd_utils.h"
 #include "ai_task.h"
 #include "ai_utils.h"
-#include "ai_key_web_portal.h"
-#include "ai_analysis_web_portal.h"
+#include "ai_key_portal.h"
+#include "ai_analysis_portal.h"
 
 #define TAG "LCD_WIFI"
 

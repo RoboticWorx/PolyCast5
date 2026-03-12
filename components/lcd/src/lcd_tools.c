@@ -21,7 +21,7 @@
 #include "misc/lv_timer.h"
 #include "widgets/label/lv_label.h"
 
-#include "wifi_btc_web_portal.h"
+#include "wifi_btc_portal.h"
 #include "lcd_asset_macros.h"
 #include "lcd_utils.h"
 

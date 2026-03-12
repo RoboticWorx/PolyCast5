@@ -16,7 +16,7 @@
 #include "wifi_utils.h"
 #include "gpio_utils.h"
 #include "bluetooth_utils.h"
-#include "bluetooth_web_portal.h"
+#include "bluetooth_portal.h"
 
 #include "wifi_task.h"
 #include "gpio_task.h"
