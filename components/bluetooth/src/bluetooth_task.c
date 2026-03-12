@@ -156,7 +156,7 @@ static void bluetooth_task(void *arg)
     TickType_t battery_timer_last = xTaskGetTickCount();
 
     // If Wi-Fi portal password NVS doesn't exist yet, set it
-    if (bluetooth_wifi_pass_load_nvs(bt_wifi_portal_pass, sizeof(bt_wifi_portal_pass)) != ESP_OK) {
+    if (bluetooth_portal_wifi_pass_load_nvs(bt_wifi_portal_pass, sizeof(bt_wifi_portal_pass)) != ESP_OK) {
         // Random chars to pick from
         static const char alphabet[] =
                 "ABCDEFGHJKLMNPQRSTUVWXYZ"
@@ -174,7 +174,7 @@ static void bluetooth_task(void *arg)
         bt_wifi_portal_pass[PASS_LEN] = '\0';
         
         // Save that version to NVS
-        bluetooth_wifi_pass_save_nvs(bt_wifi_portal_pass);
+        bluetooth_portal_wifi_pass_save_nvs(bt_wifi_portal_pass);
         
 #ifdef POLYCAST5_PASS_DEBUG
         ESP_LOGW(TAG, "Setting first time BT Wi-Fi portal password: %s", bt_wifi_portal_pass);
@@ -338,7 +338,7 @@ static void bluetooth_task(void *arg)
                     size_t blen = 0;
 
                     // Ask NVS for the stored body - Pass full sizeof(buf) so there's room for the NUL-terminator
-                    esp_err_t err = bluetooth_script_body_get_nvs(script_idx, send_buf, sizeof(send_buf), &blen);
+                    esp_err_t err = bluetooth_portal_script_body_get_nvs(script_idx, send_buf, sizeof(send_buf), &blen);
                     if (err == ESP_OK && blen > 0 && send_buf[0] != '\0') {
                         // NVS returns a C-string: Just send it
 #ifdef POLYCAST5_DEBUG

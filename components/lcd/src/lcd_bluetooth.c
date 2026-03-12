@@ -150,7 +150,7 @@ static void keyboard_menu_refresh_from_nvs(bluetooth_keyboard_menu_t *km)
     km->options[1] = "Test";
 
     // Read how many categories are stored
-    uint8_t cat_count = bluetooth_category_count_get_nvs();
+    uint8_t cat_count = bluetooth_portal_category_count_get_nvs();
 
     // Cap
     if (cat_count > MAX_CATEGORIES) {
@@ -163,7 +163,7 @@ static void keyboard_menu_refresh_from_nvs(bluetooth_keyboard_menu_t *km)
         km->cat_labels[i][0] = '\0';
 
         // Read name from NVS
-        esp_err_t err = bluetooth_category_name_get_nvs(i, km->cat_labels[i], sizeof(km->cat_labels[i]));
+        esp_err_t err = bluetooth_portal_category_name_get_nvs(i, km->cat_labels[i], sizeof(km->cat_labels[i]));
         if (err != ESP_OK) {
             // On error, show a placeholder
             snprintf(km->cat_labels[i], sizeof(km->cat_labels[i]), "Category %u", (unsigned)i);
@@ -191,7 +191,7 @@ static void keyboard_menu_refresh_from_nvs(bluetooth_keyboard_menu_t *km)
 static void keyboard_submenu_refresh_from_nvs(bluetooth_keyboard_menu_t *km, uint8_t category)
 {
     // Read how many user scripts are stored
-    uint32_t count = bluetooth_script_count_get_nvs();
+    uint32_t count = bluetooth_portal_script_count_get_nvs();
 
     // Cap
     if (count > MAX_KEYBOARD_SCRIPTS) {
@@ -204,7 +204,7 @@ static void keyboard_submenu_refresh_from_nvs(bluetooth_keyboard_menu_t *km, uin
 
     for (uint32_t i = 0; i < count; ++i) {
         uint8_t cat = 0;
-        esp_err_t err = bluetooth_script_cat_idx_get_nvs((uint8_t)i, &cat);
+        esp_err_t err = bluetooth_portal_script_cat_idx_get_nvs((uint8_t)i, &cat);
 
         if (err == ESP_OK && cat == category) {
             // Fill default label first
@@ -212,7 +212,7 @@ static void keyboard_submenu_refresh_from_nvs(bluetooth_keyboard_menu_t *km, uin
 
             // Read label from NVS (namespace/keys match the portal)
             size_t len = sizeof(script_labels[s]);
-            err = bluetooth_script_label_get_nvs((uint8_t)i, script_labels[s], len);
+            err = bluetooth_portal_script_label_get_nvs((uint8_t)i, script_labels[s], len);
             if (err != ESP_OK) {
                 // On error, show a placeholder rather than leaving a blank
                 snprintf(script_labels[s], sizeof(script_labels[s]), "Script %u", (unsigned)i);
@@ -2009,7 +2009,7 @@ void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
         lv_obj_set_style_text_color(wifi_creds_lbl, user_secondary_color, 0);
         lv_obj_align_to(wifi_creds_lbl, instr_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, -23);
         lv_label_set_text_fmt(wifi_creds_lbl, "%s\nPass: %s",
-                bluetooth_web_portal_get_ssid(), bluetooth_web_portal_get_pass());
+                bluetooth_portal_get_ssid(), bluetooth_portal_get_pass());
 
         // Middle label
         middle_lbl = lv_label_create(cont);
@@ -2029,7 +2029,7 @@ void lcd_bluetooth_add_script_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
         lv_obj_set_style_text_font(wifi_ip_lbl, &lv_font_montserrat_24, 0);
         lv_obj_set_style_text_color(wifi_ip_lbl, user_secondary_color, 0);
         lv_obj_align_to(wifi_ip_lbl, middle_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
-        lv_label_set_text_fmt(wifi_ip_lbl, "%s", bluetooth_web_portal_get_ip());
+        lv_label_set_text_fmt(wifi_ip_lbl, "%s", bluetooth_portal_get_ip());
         
         // Ending label
         ending_lbl = lv_label_create(cont);

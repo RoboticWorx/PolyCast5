@@ -1209,7 +1209,7 @@ esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out
     out_script[0] = '\0';
 
     // Build a compact catalog of saved BT scripts (global order)
-    uint8_t total = bluetooth_script_count_get_nvs(); // Get total saved scripts
+    uint8_t total = bluetooth_portal_script_count_get_nvs(); // Get total saved scripts
     if (total == 0) {
 #ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "ai_utils_lookup_creds: no saved BT scripts");
@@ -1230,11 +1230,11 @@ esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out
 
         // i = global script index
         // Get this script's label and category
-        (void)bluetooth_script_label_get_nvs(i, label, sizeof(label));
-        (void)bluetooth_script_cat_idx_get_nvs(i, &cat_idx);
+        (void)bluetooth_portal_script_label_get_nvs(i, label, sizeof(label));
+        (void)bluetooth_portal_script_cat_idx_get_nvs(i, &cat_idx);
 
         // Get cat_name of cat_idx
-        if (bluetooth_category_name_get_nvs(cat_idx, cat_name, sizeof(cat_name)) != ESP_OK) {
+        if (bluetooth_portal_category_name_get_nvs(cat_idx, cat_name, sizeof(cat_name)) != ESP_OK) {
             cat_name[0] = '\0';
         }
 
@@ -1304,7 +1304,7 @@ esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out
 
     // Load the chosen script body
     size_t blen = 0;
-    err = bluetooth_script_body_get_nvs((uint8_t)idx, out_script, out_sz, &blen);
+    err = bluetooth_portal_script_body_get_nvs((uint8_t)idx, out_script, out_sz, &blen);
     if (err != ESP_OK || out_script[0] == '\0') {
         ESP_LOGE(TAG, "Failed to load script body for index %ld", idx);
         return ESP_ERR_NOT_FOUND;
