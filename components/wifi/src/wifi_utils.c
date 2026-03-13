@@ -40,7 +40,7 @@ extern bool sta_gw_valid;
 
 extern bool last_known_network_conn_failed; // wifi_autoconnect.c
 
-volatile bool wifi_reconnect_with_scan = false;
+bool wifi_reconnect_with_scan = false;
 
 // extern to lcd_wifi.c
 POLYCAST5_USE_PSRAM char raw_frames_hex_buf[RAW_HEX_BUF_CAP]; // Accumulated hex strings
@@ -764,7 +764,7 @@ esp_err_t wifi_utils_connect(void)
     
     // Wait for connection or timeout
     if (xEventGroupWaitBits(xWifiEventGroup, WIFI_CONNECTED_BIT,
-            pdFALSE, pdFALSE, pdMS_TO_TICKS(WIFI_CONN_TIMEOUT_MS)) & WIFI_CONNECTED_BIT) {
+            pdFALSE, pdFALSE, pdMS_TO_TICKS(WIFI_CONN_SCAN_TIMEOUT_MS)) & WIFI_CONNECTED_BIT) {
 #ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Wi-Fi connected and got IP!");
 #endif
@@ -775,25 +775,27 @@ esp_err_t wifi_utils_connect(void)
         ESP_LOGE(TAG, "wifi_utils_connect: Timeout. Failed to connect.");
 
         last_known_network_conn_failed = true;
+        wifi_utils_radio_stop();
+
+        // Try again once with scan
         if (!wifi_reconnect_with_scan) {
             wifi_reconnect_with_scan = true;
+
 #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Connection failed. Will retry connection with a scan.");
 #endif
         } else {
-            // Notify LCD we failed to connect
-            // WIFI_CONNECTING_FAILED_BIT for LCD "Connecting..." to change state
-            xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTING_FAILED_BIT);
+            // Both attempts failed
+            wifi_reconnect_with_scan = false;
 
+            // Notify LCD we failed to connect
+            xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTING_FAILED_BIT);
             // No longer trying to connect
-            xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // No longer trying to connect
+            xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTING_BIT);
 #ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Connection failed. Exiting...");
 #endif
-            wifi_reconnect_with_scan = false;
         }
-
-        wifi_utils_radio_stop();
     }
     
     return err;

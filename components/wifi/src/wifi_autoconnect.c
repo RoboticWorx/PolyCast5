@@ -230,6 +230,8 @@ esp_err_t wifi_autoconnect_pick_known_network(wifi_login_t *out)
 #endif
 
     // Scan only after a failed attempt
+
+    // If no known networks, return not found
     if (known_network_count == 0) {
         return ESP_ERR_NOT_FOUND;
     }
@@ -255,7 +257,15 @@ esp_err_t wifi_autoconnect_pick_known_network(wifi_login_t *out)
         .ssid = NULL,
         .bssid = NULL,
         .channel = 0,
-        .show_hidden = true
+        .show_hidden = true,
+        .scan_type = WIFI_SCAN_TYPE_ACTIVE,
+        .scan_time = {
+            .active = {
+                .min = 50, // At least 50ms each channel
+                .max = 120 // At most 120ms each channel
+            },
+            .passive = 50, // 50ms for passive scan
+        },
     };
 
     // Scan for network to connect to
