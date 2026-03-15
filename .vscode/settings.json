@@ -1,7 +1,7 @@
 {
   "C_Cpp.intelliSenseEngine": "default",
-  "idf.espIdfPathWin": "c:\\Espressif\\frameworks\\esp-idf-v5.5.2",
-  "idf.pythonInstallPath": "c:\\Espressif\\tools\\idf-python\\3.11.2\\python.exe",
+  "idf.espIdfPathWin": "C:\\espressif\\.espressif\\v5.5.3\\esp-idf",
+  "idf.pythonInstallPath": "C:\\Espressif\\tools\\python\\v5.5.3\\venv\\Scripts\\python.exe",
   "idf.openOcdConfigs": [
     "board/esp32c5-builtin.cfg"
   ],
@@ -19,6 +19,6 @@
   "C_Cpp.errorSquiggles": "enabled",
   "diffEditor.renderSideBySide": false,
   "idf.flashType": "UART",
-  "idf.currentSetup": "c:\\Espressif\\frameworks\\esp-idf-v5.5.2",
+  "idf.currentSetup": "C:\\espressif\\.espressif\\v5.5.3\\esp-idf",
   "claudeCode.selectedModel": "opus"
 }

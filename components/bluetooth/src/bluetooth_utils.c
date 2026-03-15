@@ -183,6 +183,13 @@ static inline void cc_send_usage(uint16_t usage, bool key_pressed)
 
 void bluetooth_utils_send_media(uint8_t cmd, bool key_pressed)
 {
+    if (bluetooth_state != BT_STATE_RUNNING) {
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "Cannot send media command; Bluetooth not running");
+#endif
+        return;
+    }
+
     uint16_t usage = 0;
 
     switch (cmd) {
@@ -903,8 +910,11 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
 // Send script
 void bluetooth_utils_send_script(const char *script, uint32_t tap_ms)
 {
-    // Make sure exists
-    if (!script) {
+    // Make sure up
+    if (bluetooth_state != BT_STATE_RUNNING || !script) {
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "Cannot send script; Bluetooth not running");
+#endif
         return;
     }
 
@@ -940,6 +950,13 @@ void bluetooth_utils_send_script(const char *script, uint32_t tap_ms)
 
 void bluetooth_utils_set_battery_level(uint8_t percent)
 {
+    if (bluetooth_state != BT_STATE_RUNNING) {
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "Cannot set battery level; Bluetooth not running");
+#endif
+        return;
+    }
+
     // Cap at max
     if (percent > 100) {
         percent = 100;
@@ -1047,30 +1064,32 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 
 static void ble_hid_device_host_task(void *param)
 {
-    // This function will return only when nimble_port_stop() is executed 
+    // nimble_port_run() blocks until nimble_port_stop() sends the stop event
     nimble_port_run();
+
+    // nimble_port_freertos_deinit() -> vTaskDelete(host_task_h) - kills this task immediately
+    // Nothing after this line ever executes
     nimble_port_freertos_deinit(); // esp_nimble_disable
 }
 
 // Declaration of extern esp function
 void ble_store_config_init(void);
 
-/*
-    IMPORTANT: To be able to init and deinit Bluetooth correctly as a HID,
-    an external patch was applied to ESP-IDF. You may have to apply it also.
-    Please see https://github.com/RoboticWorx/PolyCast5/blob/main/components/bluetooth/README.md
-*/
-
 void bluetooth_utils_init(void)
 {
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "bluetooth_utils_init() starting, state=%d", bluetooth_state);
-    ESP_LOGI(TAG, "BT controller status before init: %d",
-            esp_bt_controller_get_status()); // IDLE, INITED, ENABLED, NUM
+    ESP_LOGI(TAG, "BT controller status before init: %d", esp_bt_controller_get_status()); // IDLE = 0, INITED, ENABLED, NUM
 #endif
 
-    // If already on or initing, exit
-    if (bluetooth_state == BT_STATE_INITING || bluetooth_state == BT_STATE_RUNNING) {
+    if (bluetooth_state == BT_STATE_INITING || bluetooth_state == BT_STATE_RUNNING
+            || bluetooth_state == BT_STATE_DEINITING) {
+        return;
+    }
+
+    esp_bt_controller_status_t st = esp_bt_controller_get_status();
+    if (st != ESP_BT_CONTROLLER_STATUS_IDLE) {
+        ESP_LOGE(TAG, "Refusing init: BT controller not idle (status=%d)", st);
         return;
     }
 
@@ -1079,44 +1098,61 @@ void bluetooth_utils_init(void)
     esp_err_t ret;
 
     ret = esp_hid_gap_init(HID_DEV_MODE);
-    ESP_ERROR_CHECK(ret);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_hid_gap_init failed: %s", esp_err_to_name(ret));
+        bluetooth_state = BT_STATE_OFF;
+        return;
+    }
 
     ret = esp_hid_ble_gap_adv_init(ESP_HID_APPEARANCE_KEYBOARD, DEVICE_NAME);
-    ESP_ERROR_CHECK(ret);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_hid_ble_gap_adv_init failed: %s", esp_err_to_name(ret));
+        esp_hid_gap_deinit();
+        bluetooth_state = BT_STATE_OFF;
+        return;
+    }
 
     // Register the standard Battery Service (0x180F)
     ble_svc_bas_init();
 
     ret = esp_hidd_dev_init(&ble_hid_config, ESP_HID_TRANSPORT_BLE, ble_hidd_event_callback, &ble_hid_param.hid_dev);
-    ESP_ERROR_CHECK(ret);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_hidd_dev_init failed: %s", esp_err_to_name(ret));
+        ble_hid_param.hid_dev = NULL;
+        esp_hid_gap_deinit();
+        bluetooth_state = BT_STATE_OFF;
+        return;
+    }
 
     ble_store_config_init();
     ble_hs_cfg.store_status_cb = ble_store_util_status_rr;
 
     ret = esp_nimble_enable(ble_hid_device_host_task);
-    if (ret) {
+    if (ret != ESP_OK) {
         ESP_LOGE(TAG, "esp_nimble_enable failed: %d", ret);
+
+        if (ble_hid_param.hid_dev) {
+            esp_hidd_dev_deinit(ble_hid_param.hid_dev);
+            ble_hid_param.hid_dev = NULL;
+        }
+
+        esp_hid_gap_deinit();
         bluetooth_state = BT_STATE_OFF;
         return;
     }
 
 #ifdef POLYCAST5_DEBUG
-    ESP_LOGI(TAG, "BT controller status after init: %d",
-            esp_bt_controller_get_status()); // IDLE, INITED, ENABLED, NUM
+    ESP_LOGI(TAG, "BT controller status after init: %d", esp_bt_controller_get_status()); // IDLE = 0, INITED, ENABLED, NUM
 #endif
 
     bluetooth_state = BT_STATE_RUNNING;
 }
 
-// Declare self-implemented function
-extern esp_err_t esp_hid_gap_deinit(void);
-
 void bluetooth_utils_deinit(void)
 {
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "bluetooth_utils_deinit() starting, state=%d", bluetooth_state);
-    ESP_LOGI(TAG, "BT controller status before deinit: %d",
-            esp_bt_controller_get_status()); // IDLE, INITED, ENABLED, NUM
+    ESP_LOGI(TAG, "BT controller status before deinit: %d", esp_bt_controller_get_status()); // IDLE = 0, INITED, ENABLED, NUM
 #endif
 
     // If already off or deiniting, exit
@@ -1126,30 +1162,31 @@ void bluetooth_utils_deinit(void)
 
     bluetooth_state = BT_STATE_DEINITING;
 
-    esp_hid_gap_deinit();
-
-    ble_gap_adv_stop(); // Stop advertising
-
-    ble_gatts_reset();
-
-    if (nimble_port_stop()) {
-        ESP_LOGE(TAG, "nimble_port_stop failed");
+    // nimble_port_stop() is BLOCKING: it waits (via semaphores) for
+    // ble_hs_stop() to finish (stops advertising, terminates connections)
+    // and then for the stop event to be processed by nimble_port_run().
+    // By the time it returns, the NimBLE host is fully stopped.
+    int rc = nimble_port_stop();
+    if (rc != 0) {
+        ESP_LOGE(TAG, "nimble_port_stop failed rc=%d", rc);
     }
 
-    if (nimble_port_deinit() != ESP_OK) {
-        ESP_LOGE(TAG, "nimble_port_deinit failed");
-    }
-
+    // Host is stopped - safe to tear down HID and NimBLE
     if (ble_hid_param.hid_dev) {
         esp_hidd_dev_deinit(ble_hid_param.hid_dev);
         ble_hid_param.hid_dev = NULL;
     }
 
+    // Tears down NimBLE (esp_nimble_deinit), BT controller, and semaphores
+    esp_hid_gap_deinit();
+
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Bluetooth fully disabled");
-    ESP_LOGI(TAG, "BT controller status after deinit: %d",
-            esp_bt_controller_get_status()); // IDLE, INITED, ENABLED, NUM
+    ESP_LOGI(TAG, "BT controller status after deinit: %d", esp_bt_controller_get_status()); // IDLE = 0, INITED, ENABLED, NUM
 #endif
+
+    // Signal Bluetooth is disconnected
+    xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT);
 
     bluetooth_state = BT_STATE_OFF;
 }

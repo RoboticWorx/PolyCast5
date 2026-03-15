@@ -211,10 +211,9 @@ static void bluetooth_task(void *arg)
             if (bluetooth_cmd == BLUETOOTH_CMD_INIT) {
                 bluetooth_utils_init();
             } else if (bluetooth_cmd == BLUETOOTH_CMD_DEINIT) { // De-initialize command received
-                xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT);
-                bluetooth_utils_deinit();
                 stream_buf_discard_all();
-                xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_CANCEL_TYPING_BIT); // Reset for next session
+                bluetooth_utils_deinit(); // BLUETOOTH_CONNECTED_BIT cleared in deinit on success
+                xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_CANCEL_TYPING_BIT);
             } else if (bluetooth_cmd == BLUETOOTH_CMD_UNPAIR_ALL) { // Unpair all devices command received
                 bluetooth_utils_forget_all_peers();
 

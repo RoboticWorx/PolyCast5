@@ -783,6 +783,7 @@ esp_err_t esp_hid_ble_gap_adv_init(uint16_t appearance, const char *device_name)
     fields.name_len = strlen(device_name);
     fields.name_is_complete = 1;
 
+    free((void *)fields.uuids16); // Free previous allocation on reinit
     uuid16 = (ble_uuid16_t *)malloc(sizeof(ble_uuid16_t));
     uuid16_1 = (ble_uuid16_t[]) {
         BLE_UUID16_INIT(GATT_SVR_SVC_HID_UUID)
@@ -1132,40 +1133,61 @@ static esp_err_t init_low_level(uint8_t mode)
 #endif /* CONFIG_BT_BLE_ENABLED */
     return ret;
 }
-#endif
 
-#if CONFIG_BT_NIMBLE_ENABLED
-static esp_err_t init_low_level(uint8_t mode)
+static esp_err_t deinit_low_level(void)
 {
     esp_err_t ret;
-    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
-#if CONFIG_IDF_TARGET_ESP32
-    bt_cfg.mode = mode;
-#endif
-    ret = esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
-    if (ret) {
-        ESP_LOGE(TAG, "esp_bt_controller_mem_release failed: %d", ret);
-        return ret;
+
+    if (bt_scan_results) {
+        esp_hid_scan_results_free(bt_scan_results);
+        bt_scan_results = NULL;
+        num_bt_scan_results = 0;
     }
-    ret = esp_bt_controller_init(&bt_cfg);
-    if (ret) {
-        ESP_LOGE(TAG, "esp_bt_controller_init failed: %d", ret);
-        return ret;
+    if (ble_scan_results) {
+        esp_hid_scan_results_free(ble_scan_results);
+        ble_scan_results = NULL;
+        num_ble_scan_results = 0;
     }
 
-    ret = esp_bt_controller_enable(mode);
-    if (ret) {
-        ESP_LOGE(TAG, "esp_bt_controller_enable failed: %d", ret);
-        return ret;
+    ret = esp_bluedroid_disable();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_bluedroid_disable failed: %d", ret);
     }
 
-    ret = esp_nimble_init();
-    if (ret) {
-        ESP_LOGE(TAG, "esp_nimble_init failed: %d", ret);
-        return ret;
+    ret = esp_bluedroid_deinit();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_bluedroid_deinit failed: %d", ret);
+    }
+
+    ret = esp_bt_controller_disable();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_bt_controller_disable failed: %d", ret);
+    }
+
+    ret = esp_bt_controller_deinit();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_bt_controller_deinit failed: %d", ret);
     }
 
     return ret;
+}
+#endif
+
+#if CONFIG_BT_NIMBLE_ENABLED
+// Use the combined nimble_port_init/deinit which correctly handle the
+// BLE_STATIC_TO_DYNAMIC context lifecycle (ble_npl_ctx allocation/free
+// and deinit flag management). Calling esp_bt_controller_init +
+// esp_nimble_init separately fails on reinit because the deinit flag
+// prevents the controller from re-allocating ble_npl_ctx during its init.
+static esp_err_t init_low_level(uint8_t mode)
+{
+    (void)mode; // nimble_port_init() uses ESP_BT_MODE_BLE
+    return nimble_port_init();
+}
+
+static esp_err_t deinit_low_level(void)
+{
+    return nimble_port_deinit();
 }
 #endif
 
@@ -1208,15 +1230,15 @@ esp_err_t esp_hid_gap_init(uint8_t mode)
     return ESP_OK;
 }
 
-/*
-    IMPORTANT: To be able to init and deinit Bluetooth correctly as a HID,
-    an external patch was applied to ESP-IDF. You may have to apply it also.
-    Please see https://github.com/RoboticWorx/PolyCast5/blob/main/components/bluetooth/README.md
-*/
-
-// Self-implemented function to deinit
 esp_err_t esp_hid_gap_deinit(void)
 {
+    esp_err_t ret;
+
+    ret = deinit_low_level();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "deinit_low_level failed: %d", ret);
+    }
+
     if (bt_hidh_cb_semaphore != NULL) {
         vSemaphoreDelete(bt_hidh_cb_semaphore);
         bt_hidh_cb_semaphore = NULL;
