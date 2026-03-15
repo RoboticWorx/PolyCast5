@@ -1,5 +1,5 @@
-#ifndef BLUETOOTH_WEB_PORTAL_H
-#define BLUETOOTH_WEB_PORTAL_H
+#ifndef BLUETOOTH_PORTAL_H
+#define BLUETOOTH_PORTAL_H
 
 #include "esp_err.h"
 
@@ -17,21 +17,21 @@
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_web_portal_start(void);
+esp_err_t bluetooth_portal_start(void);
 
 /** 
  * @brief Stops SoftAP and HTTP server for web bluetooth script entry portal
  * 
  * @returns ESP error status
  */
-esp_err_t bluetooth_web_portal_stop(void);
+esp_err_t bluetooth_portal_stop(void);
 
 /** 
  * @brief Gets the current web portal IP
  *
  * @returns Web portal IP
  */
-const char *bluetooth_web_portal_get_ip(void);
+const char *bluetooth_portal_get_ip(void);
 
 
 /* =============== NVS =============== */
@@ -41,7 +41,7 @@ const char *bluetooth_web_portal_get_ip(void);
  *
  * @returns Number of user added categories
  */
-uint8_t bluetooth_category_count_get_nvs(void);
+uint8_t bluetooth_portal_category_count_get_nvs(void);
 
 /** 
  * @brief Gets the name of a given category
@@ -52,7 +52,7 @@ uint8_t bluetooth_category_count_get_nvs(void);
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_category_name_get_nvs(uint8_t idx, char *buf, size_t buflen);
+esp_err_t bluetooth_portal_category_name_get_nvs(uint8_t idx, char *buf, size_t buflen);
 
 /** 
  * @brief Sets (adds/edits) a category name
@@ -62,7 +62,7 @@ esp_err_t bluetooth_category_name_get_nvs(uint8_t idx, char *buf, size_t buflen)
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_category_set_nvs(uint8_t idx, const char *name);
+esp_err_t bluetooth_portal_category_set_nvs(uint8_t idx, const char *name);
 
 /** 
  * @brief Deletes a category and shifts higher ones down, updating script cats
@@ -71,7 +71,7 @@ esp_err_t bluetooth_category_set_nvs(uint8_t idx, const char *name);
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_category_delete_nvs(uint8_t idx);
+esp_err_t bluetooth_portal_category_delete_nvs(uint8_t idx);
 
 /** 
  * @brief Save the category index for a given script index
@@ -81,7 +81,7 @@ esp_err_t bluetooth_category_delete_nvs(uint8_t idx);
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_script_cat_idx_set_nvs(uint8_t idx, uint8_t cat);
+esp_err_t bluetooth_portal_script_cat_idx_set_nvs(uint8_t idx, uint8_t cat);
 
 /** 
  * @brief Gets the category index of a given script
@@ -91,14 +91,14 @@ esp_err_t bluetooth_script_cat_idx_set_nvs(uint8_t idx, uint8_t cat);
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_script_cat_idx_get_nvs(uint8_t idx, uint8_t *cat);
+esp_err_t bluetooth_portal_script_cat_idx_get_nvs(uint8_t idx, uint8_t *cat);
 
 /** 
  * @brief Gets the number of user-added scripts
  *
  * @returns Number of user added scripts
  */
-uint8_t bluetooth_script_count_get_nvs(void);
+uint8_t bluetooth_portal_script_count_get_nvs(void);
 
 /** 
  * @brief Gets the label of a given script by index
@@ -109,7 +109,7 @@ uint8_t bluetooth_script_count_get_nvs(void);
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_script_label_get_nvs(uint8_t idx, char *buf, size_t buflen);
+esp_err_t bluetooth_portal_script_label_get_nvs(uint8_t idx, char *buf, size_t buflen);
 
 /** 
  * @brief Gets the body of a given script
@@ -121,7 +121,7 @@ esp_err_t bluetooth_script_label_get_nvs(uint8_t idx, char *buf, size_t buflen);
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_script_body_get_nvs(uint8_t idx, char *buf, size_t buflen, size_t *outlen);
+esp_err_t bluetooth_portal_script_body_get_nvs(uint8_t idx, char *buf, size_t buflen, size_t *outlen);
 
 /** 
  * @brief Save a randomly generated Wi-Fi password to NVS
@@ -130,7 +130,7 @@ esp_err_t bluetooth_script_body_get_nvs(uint8_t idx, char *buf, size_t buflen, s
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_wifi_pass_save_nvs(const char *val);
+esp_err_t bluetooth_portal_wifi_pass_save_nvs(const char *val);
 
 /** 
  * @brief Load the randomly generated Wi-Fi password from NVS
@@ -140,20 +140,20 @@ esp_err_t bluetooth_wifi_pass_save_nvs(const char *val);
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_wifi_pass_load_nvs(char *out, size_t out_sz);
+esp_err_t bluetooth_portal_wifi_pass_load_nvs(char *out, size_t out_sz);
 
 /** 
  * @brief Gets the SSID for the bluetooth web portal
  *
  * @returns SSID string
  */
-const char *bluetooth_web_portal_get_ssid(void);
+const char *bluetooth_portal_get_ssid(void);
 
 /** 
  * @brief Gets the password for the bluetooth web portal
  *
  * @returns Password string
  */
-const char *bluetooth_web_portal_get_pass(void);
+const char *bluetooth_portal_get_pass(void);
 
-#endif // BLUETOOTH_WEB_PORTAL_H
+#endif // BLUETOOTH_PORTAL_H

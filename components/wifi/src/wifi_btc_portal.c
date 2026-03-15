@@ -14,7 +14,7 @@
 #include "esp_http_server.h"
 #include "esp_netif_ip_addr.h" // For IPSTR/IP2STR
 
-#include "wifi_btc_web_portal.h"
+#include "wifi_btc_portal.h"
 
 #define TAG "WIFI_BTC_PORTAL"
 

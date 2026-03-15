@@ -12,7 +12,7 @@
 
 #include "wifi_task.h"
 #include "gpio_task.h"
-#include "ai_key_web_portal.h"
+#include "ai_key_portal.h"
 #include "bluetooth_task.h"
 
 #include "ai_prompts.h"

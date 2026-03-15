@@ -1,5 +1,5 @@
-#ifndef AI_ANALYSIS_WEB_PORTAL_H
-#define AI_ANALYSIS_WEB_PORTAL_H
+#ifndef AI_ANALYSIS_PORTAL_H
+#define AI_ANALYSIS_PORTAL_H
 
 #include <stddef.h>
 #include "esp_err.h"
@@ -39,4 +39,4 @@ const char *ai_analysis_portal_get_ssid(void);
 const char *ai_analysis_portal_get_ip(void);
 
 
-#endif // AI_ANALYSIS_WEB_PORTAL_H
+#endif // AI_ANALYSIS_PORTAL_H

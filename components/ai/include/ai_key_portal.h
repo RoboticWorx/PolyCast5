@@ -1,5 +1,5 @@
-#ifndef AI_WEB_PORTAL_H
-#define AI_WEB_PORTAL_H
+#ifndef AI_KEY_PORTAL_H
+#define AI_KEY_PORTAL_H
 
 #include "esp_err.h"
 
@@ -51,4 +51,4 @@ esp_err_t ai_key_portal_pass_save_nvs(const char *val);
  */
 esp_err_t ai_key_portal_pass_load_nvs(char *out, size_t out_sz);
 
-#endif // AI_WEB_PORTAL_H
+#endif // AI_KEY_PORTAL_H

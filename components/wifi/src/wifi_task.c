@@ -20,10 +20,10 @@
 #include "wifi_autoconnect.h"
 #include "wifi_ota_update.h"
 #include "esp_app_desc.h"
-#include "wifi_btc_web_portal.h"
-#include "ai_key_web_portal.h"
-#include "bluetooth_web_portal.h"
-#include "ai_analysis_web_portal.h"
+#include "wifi_btc_portal.h"
+#include "ai_key_portal.h"
+#include "bluetooth_portal.h"
+#include "ai_analysis_portal.h"
 
 #include "wifi_task.h"
 
@@ -452,17 +452,17 @@ static void wifi_task(void *param)
             // If BT web portal bit transitioned 0 -> 1
             if ((current_portal_bits & WIFI_PORTAL_BT_START_BIT) &&
                     !(last_portal_bits & WIFI_PORTAL_BT_START_BIT)) {
-                err = bluetooth_web_portal_start();
+                err = bluetooth_portal_start();
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "bluetooth_web_portal_start failed: %s", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "bluetooth_portal_start failed: %s", esp_err_to_name(err));
                 }
             }
             // If BT web portal bit transitioned 1 -> 0
             if ((last_portal_bits & WIFI_PORTAL_BT_START_BIT) &&
                     !(current_portal_bits & WIFI_PORTAL_BT_START_BIT)) {
-                err = bluetooth_web_portal_stop();
+                err = bluetooth_portal_stop();
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "bluetooth_web_portal_stop failed: %s", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "bluetooth_portal_stop failed: %s", esp_err_to_name(err));
                 }
             }
 
