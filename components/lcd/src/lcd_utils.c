@@ -194,11 +194,32 @@ void lcd_device_sleep(void)
     xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
     xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
 
+    // Hold GPIO states during peripheral power-down in light sleep
+    // SPI bus is idle: MOSI/SCLK LOW, CS lines HIGH (deselected)
+    gpio_hold_en(ST7789_DC_PIN); // D/C line
+    gpio_hold_en(SPI_MOSI_PIN); // SPI MOSI (idle LOW)
+    gpio_hold_en(SPI_SCLK_PIN); // SPI SCLK (idle LOW)
+    gpio_hold_en(ST7789_CS_PIN); // LCD CS (idle HIGH)
+    gpio_hold_en(SX126X_CS_PIN); // SX126x CS (idle HIGH)
+    gpio_hold_en(SX126X_BUSY_PIN); // Preserve input pull-up
+    gpio_hold_en(SX126X_DIO1_PIN); // Preserve input pull-up
+    gpio_hold_en(RMT_TX_GPIO_PIN); // IR TX (idle LOW)
+
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Entering light sleep: esp_light_sleep_start");
 #endif
 
     ESP_ERROR_CHECK(esp_light_sleep_start());
+
+    // Release holds so peripherals can reclaim their pins
+    gpio_hold_dis(ST7789_DC_PIN);
+    gpio_hold_dis(SPI_MOSI_PIN);
+    gpio_hold_dis(SPI_SCLK_PIN);
+    gpio_hold_dis(ST7789_CS_PIN);
+    gpio_hold_dis(SX126X_CS_PIN);
+    gpio_hold_dis(SX126X_BUSY_PIN);
+    gpio_hold_dis(SX126X_DIO1_PIN);
+    gpio_hold_dis(RMT_TX_GPIO_PIN);
 
     xSemaphoreGive(xSPIBusMutex); // Release SPI bus
     xSemaphoreGive(xI2CBusMutex); // Release I2C bus

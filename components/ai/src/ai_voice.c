@@ -349,9 +349,9 @@ esp_err_t ai_voice_record_pcm16_16k(volatile bool *keep_recording, ai_voice_pcm_
         while (out_idx + new_samples > capacity) {
             size_t new_capacity = capacity ? (capacity * 2) : INITIAL_BUFFER_SAMPLES;
             int16_t *new_pcm = (int16_t *)heap_caps_realloc(
-                pcm16,
-                new_capacity * sizeof(int16_t),
-                MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM
+                    pcm16,
+                    new_capacity * sizeof(int16_t),
+                    MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM
             );
             if (!new_pcm) {
                 ESP_LOGE(TAG, "ai_voice_record_pcm16_16k: No mem to resize PCM buffer (%u samples)", (unsigned)new_capacity);
@@ -401,7 +401,7 @@ esp_err_t ai_voice_record_pcm16_16k(volatile bool *keep_recording, ai_voice_pcm_
     }
 #endif
 
-    // Trim buffer to exact size (optional, but saves memory if needed)
+    // Trim buffer to exact size (saves memory if needed)
     if (out_idx < capacity && out_idx > 0) {
         int16_t *trimmed = (int16_t *)heap_caps_realloc(
             pcm16,
