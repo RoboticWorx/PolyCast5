@@ -1268,7 +1268,7 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
     static int top = 0; // Scroll offset: which due item is on the top row
     static int due_total = 0; // Total due today (not just displayed)
     static int due_vis = 0; // How many we're displaying (<= SRS_MAX_TO_SHOW)
-    static int due_idx[SRS_NUM_STEPS]; // Workspace of indices (store more than shown)
+    POLYCAST5_USE_PSRAM static int due_idx[SRS_MAX_ENTRIES]; // Workspace of indices (store more than shown)
     static uint32_t today = 0;
     
     // Initialize
@@ -1367,7 +1367,7 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
     today = srs_days_since_epoch_local();
 
     // Build entries due
-    due_total = srs_build_due_list(due_idx, SRS_NUM_STEPS, today); // SRS_NUM_STEPS cap
+    due_total = srs_build_due_list(due_idx, SRS_MAX_ENTRIES, today);
 
     // Compute how many to show (up to SRS_MAX_TO_SHOW)
     due_vis = (due_total > SRS_MAX_TO_SHOW) ? SRS_MAX_TO_SHOW : due_total;

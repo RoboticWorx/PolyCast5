@@ -1836,7 +1836,8 @@ void lcd_settings_system_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_m
         lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
         lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
-        static char boot_text[512]; // instr_lbl buffer
+        POLYCAST5_USE_PSRAM static char boot_text[512]; // instr_lbl buffer
+        memset(boot_text, 0, sizeof(boot_text));
         system_build_info(boot_text, sizeof(boot_text));
         lv_label_set_text(instr_lbl, boot_text);
 

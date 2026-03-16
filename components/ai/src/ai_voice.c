@@ -174,6 +174,13 @@ esp_err_t ai_voice_init(void)
         return err;
     }
 
+    // Log free internal DMA-capable heap (diagnose ESP_ERR_NO_MEM on I2S init)
+#ifdef POLYCAST5_DEBUG
+    ESP_LOGW(TAG, "ai_voice_init before alloc: Free internal: %u, largest DMA block: %u",
+            (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+            (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DMA));
+#endif
+
     // Create an RX channel
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
     err = i2s_new_channel(&chan_cfg, NULL, &i2s_rx_channel);
@@ -187,11 +194,11 @@ esp_err_t ai_voice_init(void)
         .clk_cfg  = I2S_STD_CLK_DEFAULT_CONFIG(MIC_FS_HZ),
         .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO),
         .gpio_cfg = {
-            .mclk = I2S_GPIO_UNUSED, // No master clock
+            .mclk = I2S_GPIO_UNUSED,   // No master clock
             .bclk = I2S_T5848_SCK_PIN, // Bit clock
-            .ws   = I2S_T5848_WS_PIN, // Word select (LR clock)
-            .dout = I2S_GPIO_UNUSED, // No data out
-            .din  = I2S_T5848_SD_PIN, // Data in
+            .ws   = I2S_T5848_WS_PIN,  // Word select (LR clock)
+            .dout = I2S_GPIO_UNUSED,   // No data out
+            .din  = I2S_T5848_SD_PIN,  // Data in
             // No inversion
             .invert_flags = {
                 .mclk_inv = false,

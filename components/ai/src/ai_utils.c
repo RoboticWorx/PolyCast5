@@ -568,8 +568,8 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
     }
 
     // Build Authorization header: "Bearer <xai_key>"
-    char auth_header[512];
-    snprintf(auth_header, sizeof(auth_header), "Bearer %s", api_key);
+    POLYCAST5_USE_PSRAM static char auth_header[512];
+    snprintf(auth_header, sizeof(auth_header), "Bearer %s", api_key); // NULL terminates
 
     // Set headers
     esp_http_client_set_header(client, "Authorization", auth_header);
@@ -955,8 +955,8 @@ esp_err_t ai_utils_send_command_xai_stream(const char *system_prompt, const char
     }
 
     // Build Authorization header: "Bearer <xai_key>"
-    char auth_header[512];
-    snprintf(auth_header, sizeof(auth_header), "Bearer %s", api_key);
+    POLYCAST5_USE_PSRAM static char auth_header[512];
+    snprintf(auth_header, sizeof(auth_header), "Bearer %s", api_key); // NULL terminates
 
     // Set headers
     esp_http_client_set_header(client, "Authorization", auth_header);

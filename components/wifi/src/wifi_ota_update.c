@@ -30,8 +30,8 @@
 
 //#define OTA_CHECK_PROJ_DESC 1 // Enables project_description.json version check (redundant)
 
-char ota_update_url[512] = {0};
-char ota_update_info[512] = {0};
+POLYCAST5_USE_PSRAM char ota_update_url[512] = {0};
+POLYCAST5_USE_PSRAM char ota_update_info[512] = {0};
 
 POLYCAST5_USE_PSRAM static char url_buf[1024]; // URL buffer
 static TaskHandle_t ota_task_handle = NULL;
