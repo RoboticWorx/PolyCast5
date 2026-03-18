@@ -94,6 +94,15 @@ static ai_cmd_type_t parse_kind_and_query(const char *in, const char **query_out
         return AI_CMD_CRED_USERNAME;
     }
 
+    // If custom command query
+    if (!strncasecmp(in, "custom", 6) && (in[6] == ' ' || in[6] == '\t')) {
+
+        *query_out = in + 6; // Move past prefix
+        while (**query_out == ' ' || **query_out == '\t') (*query_out)++; // Trim any spaces
+
+        return AI_CMD_CUSTOM;
+    }
+
     // Fallback to full command
     *query_out = in;
 
@@ -204,6 +213,9 @@ static void ai_task(void *pvParameters)
                 if (cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD) {
                     // Lookup credentials via AI
                     err = ai_utils_lookup_creds(cmd.type, query, ai_response, sizeof(ai_response));
+                } else if (cmd.type == AI_CMD_CUSTOM) {
+                    // Lookup custom command via AI
+                    err = ai_utils_lookup_custom(query, ai_response, sizeof(ai_response));
                 } else { // Regular AI keyboard request
                     // Load autokey prompt
                     memset(prompt_buf, 0, sizeof(prompt_buf)); // Zero out previous contents
@@ -262,7 +274,17 @@ static void ai_task(void *pvParameters)
                 // Signal done thinking
                 xEventGroupSetBits(xAiEventGroup, AI_DONE_THINKING_BIT);
 
-                // Type out the crediential
+                // Type out the credential
+                char *ai_script_ptr = ai_response;
+                xQueueSend(xBluetoothAiCmdQueue, &ai_script_ptr, portMAX_DELAY);
+            } else if (cmd.type == AI_CMD_CUSTOM) {
+#ifdef POLYCAST5_DEBUG
+                ESP_LOGI(TAG, "Custom command script resolved (len=%u)", (unsigned)strlen(ai_response));
+#endif
+                // Signal done thinking
+                xEventGroupSetBits(xAiEventGroup, AI_DONE_THINKING_BIT);
+
+                // Type out the custom command script
                 char *ai_script_ptr = ai_response;
                 xQueueSend(xBluetoothAiCmdQueue, &ai_script_ptr, portMAX_DELAY);
             } else if (cmd.type == AI_CMD_RAW_FRAMES) {

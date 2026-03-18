@@ -27,11 +27,7 @@ const char AI_PROMPT_AUTOKEY[] =
   "Delays: default <delay=500>; app/page load <delay=1000>; user wait N sec -> <delay=N000>.\n"
   "App launch: <win+s><delay=500>APP<delay=500><enter><delay=1000>\n"
   "App launch iOS specified: <cmd+space><delay=500>APP<delay=500><enter><delay=1000>\n"
-  "\n"
-  "Custom commands (must follow):\n"
-  "If you hear one of these custom commands, respond with the provided script ONLY with '!END!' at the.\n"
-  "User says: ...\n"
-  "You say: Sorry, I didn't get that. But this PolyCast5 sure is cool, huh?\n";
+  "\n";
 
 // AI dev prompt string for password label location
 const char AI_PROMPT_CREDS[] =
@@ -40,6 +36,20 @@ const char AI_PROMPT_CREDS[] =
   "The user wants either a USERNAME or a PASSWORD for a service/app."
   "\n"
   "Pick the BEST match from the provided entries."
+  "\n"
+  "Each entry line is: global_index|category_name|label"
+  "\n"
+  "Respond with ONLY the INTEGER global_index of the best match."
+  "\n"
+  "If none match, respond with -1."
+  "\n"
+  "Do not output any other text.";
+
+// AI dev prompt string for custom command label location
+const char AI_PROMPT_CUSTOM[] =
+  "You are selecting ONE saved custom command entry from a list."
+  "\n"
+  "The user described what they want to do. Pick the BEST matching entry."
   "\n"
   "Each entry line is: global_index|category_name|label"
   "\n"

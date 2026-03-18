@@ -21,6 +21,7 @@ typedef enum {
     AI_CMD_KEYBOARD_DONE_REC,
     AI_CMD_CRED_USERNAME,
     AI_CMD_CRED_PASSWORD,
+    AI_CMD_CUSTOM,
     AI_CMD_RAW_FRAMES,
 } ai_cmd_type_t;
 
@@ -110,6 +111,17 @@ esp_err_t ai_utils_send_command_xai_stream(const char *system_prompt, const char
  * @returns ESP error status
  */
 esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out_script, size_t out_sz);
+
+/**
+ * @brief Lookup a custom command via AI from scripts in the "Custom" category
+ *
+ * @param [in] query The user's description of what they want to do
+ * @param [out] out_script Buffer to store the resulting Bluetooth script
+ * @param [in] out_sz Size of the output script buffer
+ *
+ * @returns ESP error status
+ */
+esp_err_t ai_utils_lookup_custom(const char *query, char *out_script, size_t out_sz);
 
 /**
  * @brief Save AI keyboard prompt override to NVS (empty string => use compiled default)

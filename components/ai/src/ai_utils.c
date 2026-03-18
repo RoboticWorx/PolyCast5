@@ -41,7 +41,7 @@ typedef struct {
     bool caps_alloc; // True if allocated via heap_caps_* (PSRAM/8BIT), false if malloc/realloc
 } http_accum_t;
 
-POLYCAST5_USE_PSRAM static char canidate_creds[1536];
+POLYCAST5_USE_PSRAM static char candidate_creds[1536];
 POLYCAST5_USE_PSRAM static char user_cred_msg[2048];
 
 // NVS keys for AI prompt override
@@ -672,7 +672,7 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
 #endif // POLYCAST5_DEBUG
 
     if (!extracted_text || !extracted_text[0]) {
-        // Rrror logging
+        // Error logging
         cJSON *err_obj = cJSON_GetObjectItem(json, "error");
         if (cJSON_IsObject(err_obj)) {
             cJSON *msg = cJSON_GetObjectItem(err_obj, "message");
@@ -1196,6 +1196,139 @@ static bool is_cred_candidate(const char *cat_name)
             strcasestr_local_bool(cat, "user names");
 }
 
+static bool is_custom_candidate(const char *cat_name)
+{
+    const char *cat = cat_name ? cat_name : "";
+
+    return strcasestr_local_bool(cat, "custom") ||
+            strcasestr_local_bool(cat, "customs") ||
+            strcasestr_local_bool(cat, "custom command") ||
+            strcasestr_local_bool(cat, "custom commands");
+}
+
+esp_err_t ai_utils_lookup_custom(const char *query, char *out_script, size_t out_sz)
+{
+    // Validate
+    if (!query || !out_script || out_sz == 0) {
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "ai_utils_lookup_custom: invalid arg(s)");
+#endif
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    out_script[0] = '\0';
+
+    // Build a compact catalog of saved BT scripts (global order)
+    uint8_t total = bluetooth_portal_script_count_get_nvs();
+    if (total == 0) {
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "ai_utils_lookup_custom: no saved BT scripts");
+#endif
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    // First pass: include only "Custom" category entries
+    candidate_creds[0] = '\0';
+    size_t used = 0;
+
+    // Loop through all saved BT scripts
+    for (uint8_t i = 0; i < total; ++i) {
+        char label[BT_SCRIPT_LABEL_MAX_LEN + 1] = {0};
+        uint8_t cat_idx = 0;
+        char cat_name[BT_CAT_LABEL_MAX_LEN + 1] = {0};
+
+        // i = global script index
+        // Get this script's label and category
+        (void)bluetooth_portal_script_label_get_nvs(i, label, sizeof(label));
+        (void)bluetooth_portal_script_cat_idx_get_nvs(i, &cat_idx);
+
+        // Get cat_name of cat_idx
+        if (bluetooth_portal_category_name_get_nvs(cat_idx, cat_name, sizeof(cat_name)) != ESP_OK) {
+            cat_name[0] = '\0';
+        }
+
+        // Check if should consider: not empty + custom category
+        if (label[0] == '\0') {
+            continue;
+        }
+        if (!is_custom_candidate(cat_name)) {
+            continue;
+        }
+
+        // Append to candidate list: "index|cat_name|label\n"
+        int n = snprintf(candidate_creds + used, sizeof(candidate_creds) - used, "%u|%s|%s\n",
+                (unsigned)i,
+                cat_name[0] ? cat_name : "",
+                label);
+
+        // Check for snprintf errors/truncation
+        if (n <= 0 || (size_t)n >= sizeof(candidate_creds) - used) {
+            ESP_LOGE(TAG, "Custom creds snprintf list truncated at %u entries. n = %d", (unsigned)(used / 64), n);
+            break;
+        }
+
+        used += (size_t)n;
+    }
+
+    if (used == 0) {
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "ai_utils_lookup_custom: no Custom category scripts found");
+#endif
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    int m = snprintf(user_cred_msg, sizeof(user_cred_msg),
+            "query=%s\nentries:\n%s",
+            query,
+            candidate_creds);
+
+    if (m <= 0 || m >= (int)sizeof(user_cred_msg)) {
+        ESP_LOGE(TAG, "Custom user msg snprintf truncated. m = %d", m);
+        return ESP_ERR_NO_MEM;
+    }
+
+    // Ask Grok for best matching global index
+    char model_reply[64] = {0};
+    esp_err_t err = ai_utils_send_command_xai(AI_PROMPT_CUSTOM, user_cred_msg, model_reply, sizeof(model_reply), false);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    // Parse integer index
+    char *endp = NULL;
+    long idx = strtol(model_reply, &endp, 10);
+    if (endp == model_reply) {
+        ESP_LOGE(TAG, "No digits parsed from Grok reply: '%s'", model_reply);
+        return ESP_FAIL;
+    }
+
+    // Validate index range
+    if (idx < 0 || idx >= total) {
+        if (idx == -1) {
+#ifdef POLYCAST5_DEBUG
+            ESP_LOGW(TAG, "Grok indicates no suitable custom command match");
+#endif
+        }
+
+        ESP_LOGE(TAG, "Grok reply index out of range: '%s'", model_reply);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    // Load the chosen script body
+    size_t blen = 0;
+    err = bluetooth_portal_script_body_get_nvs((uint8_t)idx, out_script, out_sz, &blen);
+    if (err != ESP_OK || out_script[0] == '\0') {
+        ESP_LOGE(TAG, "Failed to load script body for index %ld", idx);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+#ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "Grok chose custom index %ld; script_len=%u", idx, (unsigned)blen);
+#endif
+
+    return ESP_OK;
+}
+
 esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out_script, size_t out_sz)
 {
     // Validate
@@ -1219,7 +1352,7 @@ esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out
 
     // First pass: include only likely credential entries
     // If none, fall back to all
-    canidate_creds[0] = '\0'; // Canidate credentials
+    candidate_creds[0] = '\0'; // Candidate credentials
     size_t used = 0;
 
     // Loop through all saved BT scripts
@@ -1246,15 +1379,15 @@ esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out
             continue;
         }
 
-        // Append to canidate list: "index|cat_name|label\n"
-        int n = snprintf(canidate_creds + used, sizeof(canidate_creds) - used, "%u|%s|%s\n",
+        // Append to candidate list: "index|cat_name|label\n"
+        int n = snprintf(candidate_creds + used, sizeof(candidate_creds) - used, "%u|%s|%s\n",
                 (unsigned)i,
                 cat_name[0] ? cat_name : "",
                 label);
 
         // Check for snprintf errors/truncation
-        if (n <= 0 || (size_t)n >= sizeof(canidate_creds) - used) {
-            ESP_LOGE(TAG, "Canidate creds snprintf list truncated at %u entries. n = %d", (unsigned)(used / 64), n);
+        if (n <= 0 || (size_t)n >= sizeof(candidate_creds) - used) {
+            ESP_LOGE(TAG, "Candidate creds snprintf list truncated at %u entries. n = %d", (unsigned)(used / 64), n);
             break;
         }
 
@@ -1267,7 +1400,7 @@ esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out
             "want=%s\nquery=%s\nentries:\n%s",
             want, // Desired credential type
             query, // User prompt query
-            canidate_creds); // List of candidate choices
+            candidate_creds); // List of candidate choices
 
     if (m <= 0 || m >= (int)sizeof(user_cred_msg)) {
         ESP_LOGE(TAG, "User creds snprintf list truncated. m = %d", m);
