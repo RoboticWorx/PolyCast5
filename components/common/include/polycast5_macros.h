@@ -8,8 +8,9 @@
 #define POLYCAST5_PRIORITY_HIGH (tskIDLE_PRIORITY + 2)
 #define POLYCAST5_PRIORITY_INTERRUPT (tskIDLE_PRIORITY + 3)
 
-// Memory control
-#define POLYCAST5_USE_PSRAM EXT_RAM_BSS_ATTR
+// Memory control - SRAM currently: 200610/62.51
+#define POLYCAST5_USE_PSRAM_BSS EXT_RAM_BSS_ATTR // For zero-initialized memory
+#define POLYCAST5_USE_PSRAM_DATA EXT_RAM_ATTR // For non zero-initialized memory (initialized at runtime)
 
 // Debugging
 #define POLYCAST5_DEBUG 1 // If debugging: enables all ESP_LOGI/W

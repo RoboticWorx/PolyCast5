@@ -413,7 +413,7 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
     
     static lv_obj_t *cont_roll_log;
     static lv_obj_t *lbl_roll_log;
-    POLYCAST5_USE_PSRAM static char roll_log_buf[2048];
+    POLYCAST5_USE_PSRAM_BSS static char roll_log_buf[2048];
     
     static lv_style_t style_dice;
     
@@ -1268,7 +1268,7 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
     static int top = 0; // Scroll offset: which due item is on the top row
     static int due_total = 0; // Total due today (not just displayed)
     static int due_vis = 0; // How many we're displaying (<= SRS_MAX_TO_SHOW)
-    POLYCAST5_USE_PSRAM static int due_idx[SRS_MAX_ENTRIES]; // Workspace of indices (store more than shown)
+    POLYCAST5_USE_PSRAM_BSS static int due_idx[SRS_MAX_ENTRIES]; // Workspace of indices (store more than shown)
     static uint32_t today = 0;
     
     // Initialize

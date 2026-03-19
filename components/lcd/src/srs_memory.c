@@ -44,8 +44,8 @@ Please see https://polycast5.com/blogs/docs/srs-memory-planner
 const uint16_t srs_days[] = {1, 3, 7, 14, 30, 90, 180, 365};
 
 // Use PSRAM instead
-POLYCAST5_USE_PSRAM srs_entry_t srs_tbl[SRS_MAX_ENTRIES];
-POLYCAST5_USE_PSRAM static int srs_tmp_idx[SRS_MAX_ENTRIES];
+POLYCAST5_USE_PSRAM_BSS srs_entry_t srs_tbl[SRS_MAX_ENTRIES];
+POLYCAST5_USE_PSRAM_BSS static int srs_tmp_idx[SRS_MAX_ENTRIES];
 
 static uint16_t srs_cnt = 0;
 static uint16_t srs_last_page = 0;

@@ -50,26 +50,11 @@ static uint8_t current_category = 0;
 
 static char bt_name_buf[MAX_BT_NAME_LEN + 1] = {0};
 
-POLYCAST5_USE_PSRAM static char script_labels[MAX_KEYBOARD_SCRIPTS][BT_SCRIPT_LABEL_MAX_LEN + 1];
+POLYCAST5_USE_PSRAM_BSS static char script_labels[BT_MAX_KEYBOARD_SCRIPTS][BT_SCRIPT_LABEL_MAX_LEN + 1];
 
-bluetooth_keyboard_menu_t bluetooth_keyboard_submenu = {
-    .options = {NULL}, // Dynamically populated
-    .btns = {NULL},
-    .size = 0,
-    .index = 0,
-    .main_list = NULL,
-    .cont = NULL,
-    // Styles will be init in setup
-    // cat_labels and script_indices zero-init
-};
-
-bluetooth_menu_t bluetooth_menu = {
-    .options = {"Pair Device", "Auto Keyboard", "AI Keyboard", "Media Controller", "Page Scroller",
-            "PowerPoint Clicker", "Camera Clicker", "Socials Scroller", "Forget All Devices", "Known Devices"},
-    .size = NUM_BLUETOOTH_OPTIONS,
-    .index = 1,
-    .cont = NULL,
-};
+// Initialized in lcd_bluetooth_setup_page
+POLYCAST5_USE_PSRAM_BSS bluetooth_keyboard_menu_t bluetooth_keyboard_submenu = {0};
+POLYCAST5_USE_PSRAM_BSS bluetooth_menu_t bluetooth_menu = {0};
 
 static void keyboard_menu_rebuild_lvlist(bluetooth_keyboard_menu_t *km)
 {
@@ -153,11 +138,11 @@ static void keyboard_menu_refresh_from_nvs(bluetooth_keyboard_menu_t *km)
     uint8_t cat_count = bluetooth_portal_category_count_get_nvs();
 
     // Cap
-    if (cat_count > MAX_CATEGORIES) {
-        cat_count = MAX_CATEGORIES;
+    if (cat_count > BT_MAX_CATEGORIES) {
+        cat_count = BT_MAX_CATEGORIES;
     }
 
-    // Pull names for each category i -> row (i + NUM_KEYBOARD_BASE)
+    // Pull names for each category i -> row (i + BT_NUM_KEYBOARD_BASE)
     for (uint8_t i = 0; i < cat_count; ++i) {
         // Fill default name first
         km->cat_labels[i][0] = '\0';
@@ -169,11 +154,11 @@ static void keyboard_menu_refresh_from_nvs(bluetooth_keyboard_menu_t *km)
             snprintf(km->cat_labels[i], sizeof(km->cat_labels[i]), "Category %u", (unsigned)i);
         }
 
-        km->options[NUM_KEYBOARD_BASE + i] = km->cat_labels[i];
+        km->options[BT_NUM_KEYBOARD_BASE + i] = km->cat_labels[i];
     }
 
     // New total = base + categories (all shown, even empty—user can delete if unwanted)
-    km->size = NUM_KEYBOARD_BASE + (int)cat_count;
+    km->size = BT_NUM_KEYBOARD_BASE + (int)cat_count;
 
     // Update index
     km->index = lcd_bluetooth_script_selected_get();
@@ -194,8 +179,8 @@ static void keyboard_submenu_refresh_from_nvs(bluetooth_keyboard_menu_t *km, uin
     uint32_t count = bluetooth_portal_script_count_get_nvs();
 
     // Cap
-    if (count > MAX_KEYBOARD_SCRIPTS) {
-        count = MAX_KEYBOARD_SCRIPTS;
+    if (count > BT_MAX_KEYBOARD_SCRIPTS) {
+        count = BT_MAX_KEYBOARD_SCRIPTS;
     }
 
     // Pull labels for each user script i that matches category
@@ -415,12 +400,25 @@ static void setup_known_devices_page(bluetooth_peer_menu_t *menu)
 
 void lcd_bluetooth_setup_page(bluetooth_menu_t *menu)
 {
+    // Copy initial options to main bluetooth_menu_t
+    static const char *bt_options[] = {
+        "Pair Device", "Auto Keyboard", "AI Keyboard", "Media Controller",
+        "Page Scroller", "PowerPoint Clicker", "Camera Clicker",
+        "Socials Scroller", "Forget All Devices", "Known Devices"
+    };
+    _Static_assert(sizeof(bt_options) / sizeof(bt_options[0]) == NUM_BLUETOOTH_OPTIONS, "lcd_bluetooth_setup_page: Option count mismatch");
+    memcpy(menu->options, bt_options, sizeof(bt_options));
+
+    menu->size = NUM_BLUETOOTH_OPTIONS;
+    menu->index = 1;
+    menu->cont = NULL;
+
     // Setup bluetooth keyboard menu once
     bluetooth_keyboard_menu_t *km = &menu->bluetooth_keyboard_menu;
     if (km->size <= 0) {
         km->options[0] = "Add/Edit Script";
         km->options[1] = "Test";
-        km->size = NUM_KEYBOARD_BASE; // Final index + 1
+        km->size = BT_NUM_KEYBOARD_BASE; // Final index + 1
         km->index = 1; // Default index
     }
     lcd_bluetooth_setup_keyboard_page(km);
@@ -1873,7 +1871,7 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
             xQueueSend(xBluetoothMediaCmdQueue, &cmd, 0);
         } else { // Category selected
             // Get category index (direct since no filtering)
-            current_category = (uint8_t)(bluetooth_menu->bluetooth_keyboard_menu.index - NUM_KEYBOARD_BASE);
+            current_category = (uint8_t)(bluetooth_menu->bluetooth_keyboard_menu.index - BT_NUM_KEYBOARD_BASE);
             
             // Hide keyboard menu
             lv_obj_add_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
@@ -1919,7 +1917,7 @@ void lcd_bluetooth_keyboard_sub_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blu
 
         // Send the script to type out
         uint8_t script_idx = submenu->script_indices[submenu->index];
-        uint16_t cmd = BLUETOOTH_SCRIPT_OFFSET + NUM_KEYBOARD_BASE + script_idx;
+        uint16_t cmd = BLUETOOTH_SCRIPT_OFFSET + BT_NUM_KEYBOARD_BASE + script_idx;
         xQueueSend(xBluetoothMediaCmdQueue, &cmd, 0);
     } else if (ui_btns->left_btn == 1) { // Back
         // Hide submenu

@@ -33,8 +33,8 @@ extern volatile bool wifi_reconnect_with_scan; // wifi_utils.c
 
 char btc_wifi_portal_pass[64];
 
-POLYCAST5_USE_PSRAM static wifi_scan_t wifi_scan[WIFI_MAX_NETWORKS];
-POLYCAST5_USE_PSRAM static wifi_scan_deauth_t wifi_scan_deauth[WIFI_MAX_NETWORKS];
+POLYCAST5_USE_PSRAM_BSS static wifi_scan_t wifi_scan[WIFI_MAX_NETWORKS];
+POLYCAST5_USE_PSRAM_BSS static wifi_scan_deauth_t wifi_scan_deauth[WIFI_MAX_NETWORKS];
 
 static deauth_target_t deauth_target = {0};
 static wifi_login_t selected_network = {0};

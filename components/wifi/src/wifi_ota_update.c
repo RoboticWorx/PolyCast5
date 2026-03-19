@@ -30,14 +30,14 @@
 
 //#define OTA_CHECK_PROJ_DESC 1 // Enables project_description.json version check (redundant)
 
-POLYCAST5_USE_PSRAM char ota_update_url[512] = {0};
-POLYCAST5_USE_PSRAM char ota_update_info[512] = {0};
+POLYCAST5_USE_PSRAM_BSS char ota_update_url[512] = {0};
+POLYCAST5_USE_PSRAM_BSS char ota_update_info[512] = {0};
 
-POLYCAST5_USE_PSRAM static char url_buf[1024]; // URL buffer
+POLYCAST5_USE_PSRAM_BSS static char url_buf[1024]; // URL buffer
 static TaskHandle_t ota_task_handle = NULL;
 
 static TaskHandle_t ota_check_task_handle = NULL; // Only one check at a time
-POLYCAST5_USE_PSRAM static char manifest_url_buf[512]; // Manifest URL buffer
+POLYCAST5_USE_PSRAM_BSS static char manifest_url_buf[512]; // Manifest URL buffer
 
 static char pending_manifest_ver[64];
 static int manifest_size_bytes = -1;
@@ -267,7 +267,7 @@ static void ota_check_task(void *_)
     // Free heap before HTTPS manifest fetch
     wifi_mqtt_client_stop();
 
-    POLYCAST5_USE_PSRAM static char buf[2048];
+    POLYCAST5_USE_PSRAM_BSS static char buf[2048];
     memset(buf, 0, sizeof(buf));
     
     // Get the full, safe string for parsing

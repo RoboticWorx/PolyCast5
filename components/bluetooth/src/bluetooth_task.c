@@ -29,7 +29,7 @@ extern volatile bluetooth_state_t bluetooth_state;
 
 char bt_wifi_portal_pass[64];
 
-POLYCAST5_USE_PSRAM static char send_buf[2048];
+POLYCAST5_USE_PSRAM_BSS static char send_buf[2048];
 static char *ai_script;
 
 static uint16_t bluetooth_cmd = 0;
@@ -40,7 +40,7 @@ static const TickType_t battery_timer_interval = pdMS_TO_TICKS(1000);
 #define STREAM_BUF_SZ 512
 #define STREAM_END_MARKER "!END!"
 #define STREAM_END_MARKER_LEN 5
-POLYCAST5_USE_PSRAM static char stream_buf[STREAM_BUF_SZ];
+POLYCAST5_USE_PSRAM_BSS static char stream_buf[STREAM_BUF_SZ];
 static size_t stream_buf_len = 0;
 static bool stream_end_detected = false;
 
@@ -331,8 +331,8 @@ static void bluetooth_task(void *arg)
 
                 // Menu has 2 fixed rows before user scripts:
                 // So the first user script is menu_idx == 2 -> NVS index 0
-                if (menu_idx >= NUM_KEYBOARD_BASE) {
-                    uint8_t script_idx = (uint8_t)(menu_idx - NUM_KEYBOARD_BASE); // 0-based NVS slot
+                if (menu_idx >= BT_NUM_KEYBOARD_BASE) {
+                    uint8_t script_idx = (uint8_t)(menu_idx - BT_NUM_KEYBOARD_BASE); // 0-based NVS slot
 
                     size_t blen = 0;
 

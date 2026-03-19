@@ -43,13 +43,13 @@ extern bool last_known_network_conn_failed; // wifi_autoconnect.c
 bool wifi_reconnect_with_scan = false;
 
 // extern to lcd_wifi.c
-POLYCAST5_USE_PSRAM char raw_frames_hex_buf[RAW_HEX_BUF_CAP]; // Accumulated hex strings
+POLYCAST5_USE_PSRAM_BSS char raw_frames_hex_buf[RAW_HEX_BUF_CAP]; // Accumulated hex strings
 size_t raw_frames_hex_len = 0; // Current length
 uint32_t raw_frames_captured = 0; // Counter
 
 static uint8_t target_bssid[6] = {0};
 
-POLYCAST5_USE_PSRAM static wifi_data_t wifi_data;
+POLYCAST5_USE_PSRAM_BSS static wifi_data_t wifi_data;
 
 esp_err_t wifi_utils_scan(wifi_scan_t *wifi_scan)
 {

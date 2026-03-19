@@ -356,7 +356,7 @@ void lcd_gpio_scanner_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *
             lv_obj_remove_flag(addrs_lbl, LV_OBJ_FLAG_HIDDEN); // Show
 
             // Build the comma-separated string
-            POLYCAST5_USE_PSRAM static char i2c_addr_str[256] = {0}; // String buffer: 0-out
+            POLYCAST5_USE_PSRAM_BSS static char i2c_addr_str[256] = {0}; // String buffer: 0-out
             memset(i2c_addr_str, 0, sizeof(i2c_addr_str));
             for (int i = 0; i < found_count; ++i) {
                 char buf[5];
@@ -422,7 +422,7 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
     static lv_obj_t *title_lbl = NULL;
     static lv_obj_t *log_lbl = NULL;
     static uint8_t current_cmd = 0; // Current command number (0-255)
-    POLYCAST5_USE_PSRAM static char log_buffer[2048] = {0}; // Buffer for terminal log (append-only)
+    POLYCAST5_USE_PSRAM_BSS static char log_buffer[2048] = {0}; // Buffer for terminal log (append-only)
  
      // Do once
     if (!init) {
@@ -493,7 +493,7 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
         // Take mutex for I2C access
         if (xSemaphoreTake(xI2CBusMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
             esp_err_t ret = ESP_OK;
-            POLYCAST5_USE_PSRAM static char msg[256]; // Buffer for logging
+            POLYCAST5_USE_PSRAM_BSS static char msg[256]; // Buffer for logging
             memset(msg, 0, sizeof(msg));
     
             // WRITE transaction (send command, end with STOP)

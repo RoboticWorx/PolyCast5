@@ -32,9 +32,9 @@ char ai_wifi_portal_pass[64];
 
 volatile bool mic_recording = false; // To lcd_bluetooth.c
 
-POLYCAST5_USE_PSRAM static char prompt_buf[AI_PROMPT_NVS_MAX_LEN] = {0};
-POLYCAST5_USE_PSRAM static char ai_response[AI_RESPONSE_MAX_LEN] = {0}; // TODO: Increase MAX_LEN here and for BT
-POLYCAST5_USE_PSRAM static char user_transcript[1024];
+POLYCAST5_USE_PSRAM_BSS static char prompt_buf[AI_PROMPT_NVS_MAX_LEN] = {0};
+POLYCAST5_USE_PSRAM_BSS static char ai_response[AI_RESPONSE_MAX_LEN] = {0}; // TODO: Increase MAX_LEN here and for BT
+POLYCAST5_USE_PSRAM_BSS static char user_transcript[1024];
 
 // Streaming callback: queues each content delta for bluetooth_task to type over BLE
 static esp_err_t stream_to_bluetooth_cb(const char *delta, void *ctx)

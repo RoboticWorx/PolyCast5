@@ -24,7 +24,7 @@
 
 bool last_known_network_conn_failed = false;
 
-POLYCAST5_USE_PSRAM static wifi_login_t known_networks[MAX_KNOWN_NETWORKS];
+POLYCAST5_USE_PSRAM_BSS static wifi_login_t known_networks[MAX_KNOWN_NETWORKS];
 static size_t known_network_count = 0;
 
 static wifi_login_t last_known_pick = {0};

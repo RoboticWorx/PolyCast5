@@ -326,7 +326,7 @@ esp_err_t ai_voice_record_pcm16_16k(volatile bool *keep_recording, ai_voice_pcm_
     // Temp read buffer:
     //  - Read stereo frames
     //  - Each frame has 2 x 32-bit words: [L][R]
-    POLYCAST5_USE_PSRAM static int32_t i2s_words[FRAMES_PER_READ * 2];
+    POLYCAST5_USE_PSRAM_BSS static int32_t i2s_words[FRAMES_PER_READ * 2];
     memset(i2s_words, 0, sizeof(i2s_words));
 
     while (*keep_recording) {
@@ -674,7 +674,7 @@ esp_err_t ai_voice_stt_ws_transcribe_pcm16_xai(const int16_t *pcm16, size_t samp
     out_text[0] = '\0';
 
     // Load xAI API key from NVS
-    POLYCAST5_USE_PSRAM static char api_key[AI_API_KEY_MAX_LEN] = {0};
+    POLYCAST5_USE_PSRAM_BSS static char api_key[AI_API_KEY_MAX_LEN] = {0};
     memset(api_key, 0, sizeof(api_key));
     esp_err_t err = ai_utils_load_api_key_nvs(api_key, sizeof(api_key));
     if (err != ESP_OK || api_key[0] == '\0') {
@@ -696,7 +696,7 @@ esp_err_t ai_voice_stt_ws_transcribe_pcm16_xai(const int16_t *pcm16, size_t samp
     stt_ws_clear(&ctx);
 
     // Authorization header required by xAI
-    POLYCAST5_USE_PSRAM static char headers[512];
+    POLYCAST5_USE_PSRAM_BSS static char headers[512];
     memset(headers, 0, sizeof(headers));
     snprintf(headers, sizeof(headers), "Authorization: Bearer %s\r\n", api_key);
 

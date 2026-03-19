@@ -82,9 +82,9 @@ static esp_err_t bluetooth_script_count_set_nvs(uint8_t count)
 {
     nvs_handle_t h;
     
-    if (count > MAX_KEYBOARD_SCRIPTS) {
-       count = MAX_KEYBOARD_SCRIPTS;
-       ESP_LOGW(TAG, "bluetooth_script_count_set MAX_KEYBOARD_SCRIPTS reached: %d", MAX_KEYBOARD_SCRIPTS);
+    if (count > BT_MAX_KEYBOARD_SCRIPTS) {
+       count = BT_MAX_KEYBOARD_SCRIPTS;
+       ESP_LOGW(TAG, "bluetooth_script_count_set BT_MAX_KEYBOARD_SCRIPTS reached: %d", BT_MAX_KEYBOARD_SCRIPTS);
     }
      
     // Open NVS
@@ -175,9 +175,9 @@ uint8_t bluetooth_portal_script_count_get_nvs(void)
 #endif
     }
     
-    if (count > MAX_KEYBOARD_SCRIPTS) {
-        count = MAX_KEYBOARD_SCRIPTS;
-        ESP_LOGW(TAG, "bluetooth_script_count_get MAX_KEYBOARD_SCRIPTS reached: %d", MAX_KEYBOARD_SCRIPTS);
+    if (count > BT_MAX_KEYBOARD_SCRIPTS) {
+        count = BT_MAX_KEYBOARD_SCRIPTS;
+        ESP_LOGW(TAG, "bluetooth_script_count_get BT_MAX_KEYBOARD_SCRIPTS reached: %d", BT_MAX_KEYBOARD_SCRIPTS);
     }
     
     return count;

@@ -3,13 +3,13 @@
 
 #include "esp_err.h"
 
-#define MAX_KEYBOARD_SCRIPTS 255 // Max u8, must change type if increased
-#define NUM_KEYBOARD_BASE 2
+#define BT_MAX_KEYBOARD_SCRIPTS 255 // Max u8, must change type if increased
+#define BT_NUM_KEYBOARD_BASE 2
 #define BT_SCRIPT_LABEL_MAX_LEN 32
 
 #define BT_PORTAL_SSID "PolyCast5-BT-Portal"
 
-#define MAX_CATEGORIES 20
+#define BT_MAX_CATEGORIES 50
 #define BT_CAT_LABEL_MAX_LEN 32
 
 /** 

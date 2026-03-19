@@ -738,7 +738,7 @@ void lcd_wifi_scan_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu
     static bool scanned = false;
     
     // Store full info for each displayed entry
-    POLYCAST5_USE_PSRAM static wifi_scan_deauth_t deauth_scan_result[WIFI_MAX_NETWORKS] = {0};
+    POLYCAST5_USE_PSRAM_BSS static wifi_scan_deauth_t deauth_scan_result[WIFI_MAX_NETWORKS] = {0};
     static int deauth_scan_count = 0;
     
     // Do once
@@ -1716,7 +1716,7 @@ void lcd_wifi_ai_packet_results_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wif
         // Activate web portal
         xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_AI_PKT_ANALYSIS_START_BIT);
 
-        POLYCAST5_USE_PSRAM static char instr_text[512];
+        POLYCAST5_USE_PSRAM_BSS static char instr_text[512];
         memset(instr_text, 0, sizeof(instr_text));
         snprintf(instr_text, sizeof(instr_text),
                     "The results are displayed using a web portal.\nTo access it, please connect to the following Wi-Fi network:\n\n"
@@ -2188,7 +2188,7 @@ void lcd_wifi_beacon_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *
         lv_label_set_text(lbl_rssi, rssi_buf);
         
         // Update other text
-        POLYCAST5_USE_PSRAM static char txt_buf[512];
+        POLYCAST5_USE_PSRAM_BSS static char txt_buf[512];
         memset(txt_buf, 0, sizeof(txt_buf));
 
         // Capability bit 4 = Privacy
@@ -2499,7 +2499,7 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
         lv_chart_refresh(chart);
 
         // Rebuild info text
-        POLYCAST5_USE_PSRAM static char buf[8192];
+        POLYCAST5_USE_PSRAM_BSS static char buf[8192];
         memset(buf, 0, sizeof(buf)); // Fresh start each time
 
         size_t off = 0;

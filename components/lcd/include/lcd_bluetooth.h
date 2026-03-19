@@ -28,16 +28,16 @@ typedef struct {
 } bluetooth_peer_menu_t;
 
 typedef struct {
-    char *options[NUM_KEYBOARD_BASE + MAX_KEYBOARD_SCRIPTS];
-    lv_obj_t *btns[NUM_KEYBOARD_BASE + MAX_KEYBOARD_SCRIPTS];
+    char *options[BT_NUM_KEYBOARD_BASE + BT_MAX_KEYBOARD_SCRIPTS];
+    lv_obj_t *btns[BT_NUM_KEYBOARD_BASE + BT_MAX_KEYBOARD_SCRIPTS];
     int size;
     int index;
     lv_obj_t *main_list;
     lv_style_t btn_style;
     lv_style_t sel_style;
     lv_obj_t *cont;
-    char cat_labels[MAX_CATEGORIES][BT_CAT_LABEL_MAX_LEN + 1]; // For dynamic category names
-    uint8_t script_indices[MAX_KEYBOARD_SCRIPTS]; // For mapping submenu positions to script indices
+    char cat_labels[BT_MAX_CATEGORIES][BT_CAT_LABEL_MAX_LEN + 1]; // For dynamic category names
+    uint8_t script_indices[BT_MAX_KEYBOARD_SCRIPTS]; // For mapping submenu positions to script indices
 } bluetooth_keyboard_menu_t;
 
 typedef struct {

@@ -35,7 +35,7 @@ static char s_ip[16] = "192.168.4.1";
 
 // Latest analysis text (copied from the AI task output buffer).
 // This avoids lifetime issues with the producer buffer being reused.
-POLYCAST5_USE_PSRAM static char s_result[AI_RESPONSE_MAX_LEN] = {0};
+POLYCAST5_USE_PSRAM_BSS static char s_result[AI_RESPONSE_MAX_LEN] = {0};
 
 /* =============== HTTP handlers =============== */
 

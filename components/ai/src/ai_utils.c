@@ -41,8 +41,8 @@ typedef struct {
     bool caps_alloc; // True if allocated via heap_caps_* (PSRAM/8BIT), false if malloc/realloc
 } http_accum_t;
 
-POLYCAST5_USE_PSRAM static char candidate_creds[18432];
-POLYCAST5_USE_PSRAM static char user_cred_msg[18432 + 1024];
+POLYCAST5_USE_PSRAM_BSS static char candidate_creds[18432];
+POLYCAST5_USE_PSRAM_BSS static char user_cred_msg[18432 + 1024];
 
 // NVS keys for AI prompt override
 #define AI_PROMPT_NS "ai_prompt"
@@ -568,7 +568,7 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
     }
 
     // Build Authorization header: "Bearer <xai_key>"
-    POLYCAST5_USE_PSRAM static char auth_header[512];
+    POLYCAST5_USE_PSRAM_BSS static char auth_header[512];
     snprintf(auth_header, sizeof(auth_header), "Bearer %s", api_key); // NULL terminates
 
     // Set headers
@@ -955,7 +955,7 @@ esp_err_t ai_utils_send_command_xai_stream(const char *system_prompt, const char
     }
 
     // Build Authorization header: "Bearer <xai_key>"
-    POLYCAST5_USE_PSRAM static char auth_header[512];
+    POLYCAST5_USE_PSRAM_BSS static char auth_header[512];
     snprintf(auth_header, sizeof(auth_header), "Bearer %s", api_key); // NULL terminates
 
     // Set headers

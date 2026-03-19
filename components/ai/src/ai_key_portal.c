@@ -29,7 +29,7 @@
 
 extern char ai_wifi_portal_pass[];
 
-POLYCAST5_USE_PSRAM char prompt_buf[AI_PROMPT_NVS_MAX_LEN + 1];
+POLYCAST5_USE_PSRAM_BSS char prompt_buf[AI_PROMPT_NVS_MAX_LEN + 1];
 
 // Default AP info (replace with your existing portal creds when desired)
 static httpd_handle_t ai_server = NULL;
