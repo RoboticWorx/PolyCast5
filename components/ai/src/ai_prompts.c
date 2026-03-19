@@ -26,8 +26,7 @@ const char AI_PROMPT_AUTOKEY[] =
   "\n"
   "Delays: default <delay=500>; app/page load <delay=1000>; user wait N sec -> <delay=N000>.\n"
   "App launch: <win+s><delay=500>APP<delay=500><enter><delay=1000>\n"
-  "App launch iOS specified: <cmd+space><delay=500>APP<delay=500><enter><delay=1000>\n"
-  "\n";
+  "App launch iOS specified: <cmd+space><delay=500>APP<delay=500><enter><delay=1000>\n";
 
 // AI dev prompt string for password label location
 const char AI_PROMPT_CREDS[] =
@@ -39,9 +38,7 @@ const char AI_PROMPT_CREDS[] =
   "\n"
   "Each entry line is: global_index|category_name|label"
   "\n"
-  "Respond with ONLY the INTEGER global_index of the best match."
-  "\n"
-  "If none match, respond with -1."
+  "Respond with ONLY the INTEGER global_index of the best match. If none match, respond with -1."
   "\n"
   "Do not output any other text.";
 
@@ -53,9 +50,7 @@ const char AI_PROMPT_CUSTOM[] =
   "\n"
   "Each entry line is: global_index|category_name|label"
   "\n"
-  "Respond with ONLY the INTEGER global_index of the best match."
-  "\n"
-  "If none match, respond with -1."
+  "Respond with ONLY the INTEGER global_index of the best match. If none match, respond with -1."
   "\n"
   "Do not output any other text.";
 
