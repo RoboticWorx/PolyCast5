@@ -33,8 +33,8 @@ char ai_wifi_portal_pass[64];
 volatile bool mic_recording = false; // To lcd_bluetooth.c
 
 POLYCAST5_USE_PSRAM_BSS static char prompt_buf[AI_PROMPT_NVS_MAX_LEN] = {0};
-POLYCAST5_USE_PSRAM_BSS static char ai_response[AI_RESPONSE_MAX_LEN] = {0}; // TODO: Increase MAX_LEN here and for BT
-POLYCAST5_USE_PSRAM_BSS static char user_transcript[1024];
+POLYCAST5_USE_PSRAM_BSS static char ai_response[AI_RESPONSE_MAX_LEN] = {0};
+POLYCAST5_USE_PSRAM_BSS static char user_transcript[AI_USER_TRANSCRIPT_MAX_LEN];
 
 // Streaming callback: queues each content delta for bluetooth_task to type over BLE
 static esp_err_t stream_to_bluetooth_cb(const char *delta, void *ctx)
@@ -67,6 +67,18 @@ static esp_err_t stream_to_bluetooth_cb(const char *delta, void *ctx)
     return ESP_OK;
 }
 
+// True if character is a valid separator after a keyword (space, tab, punctuation from STT)
+static inline bool is_keyword_sep(char c)
+{
+    return c == ' ' || c == '\t' || c == '.' || c == ',' || c == ':' || c == ';' || c == '!' || c == '?';
+}
+
+// Skip past separator characters after a keyword
+static inline void skip_seps(const char **p)
+{
+    while (is_keyword_sep(**p)) (*p)++;
+}
+
 static ai_cmd_type_t parse_kind_and_query(const char *in, const char **query_out)
 {
     // Trim leading spaces
@@ -75,32 +87,42 @@ static ai_cmd_type_t parse_kind_and_query(const char *in, const char **query_out
     // Case-insensitive prefix match
 
     // If password query
-    if ((!strncasecmp(in, "password", 8) && (in[8] == ' ' || in[8] == '\t')) ||
-        (!strncasecmp(in, "passwords", 9) && (in[9] == ' ' || in[9] == '\t'))) {
+    if ((!strncasecmp(in, "password", 8) && is_keyword_sep(in[8])) ||
+        (!strncasecmp(in, "passwords", 9) && is_keyword_sep(in[9]))) {
 
         *query_out = in + (!strncasecmp(in, "passwords", 9) ? 9 : 8); // Move past prefix
-        while (**query_out == ' ' || **query_out == '\t') (*query_out)++; // Trim any spaces
+        skip_seps(query_out);
 
         return AI_CMD_CRED_PASSWORD;
     }
 
     // If username query
-    if ((!strncasecmp(in, "username", 8) && (in[8] == ' ' || in[8] == '\t')) ||
-        (!strncasecmp(in, "usernames", 9) && (in[9] == ' ' || in[9] == '\t'))) {
+    if ((!strncasecmp(in, "username", 8) && is_keyword_sep(in[8])) ||
+        (!strncasecmp(in, "usernames", 9) && is_keyword_sep(in[9]))) {
 
         *query_out = in + (!strncasecmp(in, "usernames", 9) ? 9 : 8); // Move past prefix
-        while (**query_out == ' ' || **query_out == '\t') (*query_out)++; // Trim any spaces
+        skip_seps(query_out);
 
         return AI_CMD_CRED_USERNAME;
     }
 
     // If custom command query
-    if (!strncasecmp(in, "custom", 6) && (in[6] == ' ' || in[6] == '\t')) {
+    if (!strncasecmp(in, "custom", 6) && is_keyword_sep(in[6])) {
 
         *query_out = in + 6; // Move past prefix
-        while (**query_out == ' ' || **query_out == '\t') (*query_out)++; // Trim any spaces
+        skip_seps(query_out);
 
         return AI_CMD_CUSTOM;
+    }
+
+    // If dictate command
+    if ((!strncasecmp(in, "dictate", 7) && is_keyword_sep(in[7])) ||
+        (!strncasecmp(in, "copy", 4) && is_keyword_sep(in[4]))) {
+
+        *query_out = in + (!strncasecmp(in, "copy", 4) ? 4 : 7);
+        skip_seps(query_out);
+
+        return AI_CMD_DICTATE;
     }
 
     // Fallback to full command
@@ -216,6 +238,11 @@ static void ai_task(void *pvParameters)
                 } else if (cmd.type == AI_CMD_CUSTOM) {
                     // Lookup custom command via AI
                     err = ai_utils_lookup_custom(query, ai_response, sizeof(ai_response));
+                } else if (cmd.type == AI_CMD_DICTATE) {
+                    // No AI call - just copy the raw transcript directly
+                    strncpy(ai_response, query, sizeof(ai_response) - 1);
+                    ai_response[sizeof(ai_response) - 1] = '\0';
+                    err = ESP_OK;
                 } else { // Regular AI keyboard request
                     // Load autokey prompt
                     memset(prompt_buf, 0, sizeof(prompt_buf)); // Zero out previous contents
@@ -287,6 +314,16 @@ static void ai_task(void *pvParameters)
                 // Type out the custom command script
                 char *ai_script_ptr = ai_response;
                 xQueueSend(xBluetoothAiCmdQueue, &ai_script_ptr, portMAX_DELAY);
+            } else if (cmd.type == AI_CMD_DICTATE) {
+#ifdef POLYCAST5_DEBUG
+                ESP_LOGI(TAG, "Dictate resolved (len=%u)", (unsigned)strlen(ai_response));
+#endif
+                // Signal done thinking
+                xEventGroupSetBits(xAiEventGroup, AI_DONE_THINKING_BIT);
+
+                // Type out the dictated text literally (no tag parsing, prevents macro injection)
+                char *ai_script_ptr = ai_response;
+                xQueueSend(xBluetoothAiDictateQueue, &ai_script_ptr, portMAX_DELAY);
             } else if (cmd.type == AI_CMD_RAW_FRAMES) {
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Raw frames sniff resolved with response. Grok analysis of raw frames: %s", ai_response);

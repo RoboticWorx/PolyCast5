@@ -15,6 +15,7 @@
 
 #include "bluetooth_portal.h"
 #include "bluetooth_portal_html.h"
+#include "ai_utils.h"
 
 #define TAG "BLUETOOTH_WEB_PORTAL"
 
@@ -32,7 +33,7 @@
 #define BT_SCRIPT_MENU_KEY_COUNT "count"
 #define BT_SCRIPT_MENU_KEY_FMT "item_%02d"
 
-#define MAX_HTTP_BODY_TXT 2048
+#define MAX_HTTP_BODY_TXT AI_RESPONSE_MAX_LEN
 
 extern char bt_wifi_portal_pass[]; // bluetooth_task.c
 
@@ -61,14 +62,15 @@ static esp_err_t bluetooth_script_body_set_nvs(uint8_t idx, const char *body)
     char key[16];
     snprintf(key, sizeof(key), BT_SCRIPT_KEY_FMT, idx);
     
-    // Set body string
-    err = nvs_set_str(h, key, (body != NULL) ? body : ""); // If body NULL, set empty string
+    // Set body blob (blob supports multi-page NVS, str is limited to ~4000 bytes)
+    const char *src = (body != NULL) ? body : "";
+    err = nvs_set_blob(h, key, src, strlen(src) + 1); // +1 for NUL terminator
     if (err == ESP_OK) {
        // Commit changes on success
        err = nvs_commit(h);
     } else {
 #ifdef POLYCAST5_DEBUG
-       ESP_LOGE(TAG, "bluetooth_script_body_set nvs_set_str failed: %s", esp_err_to_name(err));
+       ESP_LOGE(TAG, "bluetooth_script_body_set nvs_set_blob failed: %s", esp_err_to_name(err));
 #endif
     }
     
@@ -82,10 +84,11 @@ static esp_err_t bluetooth_script_count_set_nvs(uint8_t count)
 {
     nvs_handle_t h;
     
-    if (count > BT_MAX_KEYBOARD_SCRIPTS) {
-       count = BT_MAX_KEYBOARD_SCRIPTS;
-       ESP_LOGW(TAG, "bluetooth_script_count_set BT_MAX_KEYBOARD_SCRIPTS reached: %d", BT_MAX_KEYBOARD_SCRIPTS);
-    }
+    // Always false w/ BT_MAX_KEYBOARD_SCRIPTS as max u8
+    // if (count > BT_MAX_KEYBOARD_SCRIPTS) {
+    //    count = BT_MAX_KEYBOARD_SCRIPTS;
+    //    ESP_LOGW(TAG, "bluetooth_script_count_set BT_MAX_KEYBOARD_SCRIPTS reached: %d", BT_MAX_KEYBOARD_SCRIPTS);
+    // }
      
     // Open NVS
     esp_err_t err = nvs_open(BT_SCRIPT_MENU_NS, NVS_READWRITE, &h);
@@ -175,10 +178,11 @@ uint8_t bluetooth_portal_script_count_get_nvs(void)
 #endif
     }
     
-    if (count > BT_MAX_KEYBOARD_SCRIPTS) {
-        count = BT_MAX_KEYBOARD_SCRIPTS;
-        ESP_LOGW(TAG, "bluetooth_script_count_get BT_MAX_KEYBOARD_SCRIPTS reached: %d", BT_MAX_KEYBOARD_SCRIPTS);
-    }
+    // Always false w/ BT_MAX_KEYBOARD_SCRIPTS as max u8
+    // if (count > BT_MAX_KEYBOARD_SCRIPTS) {
+    //     count = BT_MAX_KEYBOARD_SCRIPTS;
+    //     ESP_LOGW(TAG, "bluetooth_script_count_get BT_MAX_KEYBOARD_SCRIPTS reached: %d", BT_MAX_KEYBOARD_SCRIPTS);
+    // }
     
     return count;
 }
@@ -227,8 +231,7 @@ esp_err_t bluetooth_portal_script_body_get_nvs(uint8_t idx, char *buf, size_t bu
 #ifdef POLYCAST5_DEBUG
        ESP_LOGE(TAG, "bluetooth_script_body_get nvs_open failed: %s", esp_err_to_name(err));
 #endif
-       
-         return err;
+       return err;
     }
     
     // Format key
@@ -236,21 +239,23 @@ esp_err_t bluetooth_portal_script_body_get_nvs(uint8_t idx, char *buf, size_t bu
     snprintf(key, sizeof(key), BT_SCRIPT_KEY_FMT, idx);
 
     size_t need = 0;
-    
-    // Get the body string len
-    err = nvs_get_str(h, key, NULL, &need);
-    
+
+    // Get the body blob len (blob supports multi-page NVS, str is limited to ~4000 bytes)
+    err = nvs_get_blob(h, key, NULL, &need);
+
     // If NVS good and size is within allowed
     if ((err == ESP_OK) && (need > 0) && (need <= buflen)) {
-       // Get the actual body string
-         err = nvs_get_str(h, key, buf, &need);
-         if (outlen != NULL) {
-           // Update outlen
-              *outlen = need;
+       // Get the actual body blob
+         err = nvs_get_blob(h, key, buf, &need);
+         if (err == ESP_OK) {
+              buf[need - 1] = '\0'; // Ensure NUL-terminated
+              if (outlen != NULL) {
+                  *outlen = need;
+              }
          }
     } else {
 #ifdef POLYCAST5_DEBUG
-       ESP_LOGE(TAG, "bluetooth_script_body_get string parameters wrong or NVS failed: %s", esp_err_to_name(err));
+       ESP_LOGE(TAG, "bluetooth_script_body_get blob parameters wrong or NVS failed: %s", esp_err_to_name(err));
 #endif
     }
     

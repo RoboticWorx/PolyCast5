@@ -948,6 +948,31 @@ void bluetooth_utils_send_script(const char *script, uint32_t tap_ms)
     kbd_state_clear();
 }
 
+void bluetooth_utils_send_literal(const char *text, uint32_t tap_ms)
+{
+    // Make sure up
+    if (bluetooth_state != BT_STATE_RUNNING || !text) {
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "Cannot send literal; Bluetooth not running");
+#endif
+        return;
+    }
+
+    uint16_t cmd_buf; // Does nothing, just for xQueuePeek
+
+    // Type each character literally, no tag parsing
+    while (*text) {
+        kbd_type_char(*text++, tap_ms);
+
+        // Media command pending (init/deinit) or cancel cmd: abort typing
+        if ((xQueuePeek(xBluetoothMediaCmdQueue, &cmd_buf, 0) == pdTRUE) || (xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_CANCEL_TYPING_BIT)) {
+            break;
+        }
+    }
+
+    kbd_state_clear();
+}
+
 void bluetooth_utils_set_battery_level(uint8_t percent)
 {
     if (bluetooth_state != BT_STATE_RUNNING) {

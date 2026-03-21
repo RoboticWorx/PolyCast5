@@ -23,13 +23,14 @@ EventGroupHandle_t xBluetoothEventGroup;
 
 QueueHandle_t xBluetoothMediaCmdQueue;
 QueueHandle_t xBluetoothAiCmdQueue;
+QueueHandle_t xBluetoothAiDictateQueue;
 QueueHandle_t xBluetoothAiStreamQueue;
 
 extern volatile bluetooth_state_t bluetooth_state;
 
 char bt_wifi_portal_pass[64];
 
-POLYCAST5_USE_PSRAM_BSS static char send_buf[2048];
+POLYCAST5_USE_PSRAM_BSS static char send_buf[AI_RESPONSE_MAX_LEN];
 static char *ai_script;
 
 static uint16_t bluetooth_cmd = 0;
@@ -150,6 +151,8 @@ static void bluetooth_task(void *arg)
     configASSERT(xBluetoothMediaCmdQueue);
     xBluetoothAiCmdQueue = xQueueCreate(1, sizeof(char *));
     configASSERT(xBluetoothAiCmdQueue);
+    xBluetoothAiDictateQueue = xQueueCreate(1, sizeof(char *));
+    configASSERT(xBluetoothAiDictateQueue);
     xBluetoothAiStreamQueue = xQueueCreate(100, sizeof(char *));
     configASSERT(xBluetoothAiStreamQueue);
     
@@ -366,6 +369,12 @@ static void bluetooth_task(void *arg)
             bluetooth_utils_send_script(ai_script, 2);
 
             // Notify LCD we're done typing the credential
+            xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT);
+        }
+
+        // Dictate: literal text, no tag parsing (prevents <enter> etc. in transcripts)
+        if (xQueueReceive(xBluetoothAiDictateQueue, &ai_script, 0) == pdTRUE) {
+            bluetooth_utils_send_literal(ai_script, 2);
             xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT);
         }
 

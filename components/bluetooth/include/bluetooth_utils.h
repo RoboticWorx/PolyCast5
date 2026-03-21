@@ -222,7 +222,15 @@ void bluetooth_utils_send_media(uint8_t key_cmd, bool key_pressed);
  */
 void bluetooth_utils_send_script(const char *s, uint32_t tap_ms);
 
-/** 
+/**
+ * @brief Send a literal text string over bluetooth (no tag parsing)
+ *
+ * @param [in] text String to send
+ * @param [in] tap_ms Delay between characters
+ */
+void bluetooth_utils_send_literal(const char *text, uint32_t tap_ms);
+
+/**
  * @brief Sends the battery level to the connected device
  *
  * @param [in] percent The battery level percentage to send

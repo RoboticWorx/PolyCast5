@@ -10,6 +10,7 @@ extern EventGroupHandle_t xBluetoothEventGroup;
 
 extern QueueHandle_t xBluetoothMediaCmdQueue;
 extern QueueHandle_t xBluetoothAiCmdQueue;
+extern QueueHandle_t xBluetoothAiDictateQueue;
 extern QueueHandle_t xBluetoothAiStreamQueue;
 
 /**

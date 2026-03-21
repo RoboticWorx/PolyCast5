@@ -11,7 +11,11 @@
 
 #define AI_PROMPT_NVS_MAX_LEN (1024 * 8)
 
+// This is also the size of all BT autotype script send buffers!
+// Soft cap for AI responses is now max_tokens in xai_stream
 #define AI_RESPONSE_MAX_LEN (1024 * 64)
+
+#define AI_USER_TRANSCRIPT_MAX_LEN (AI_RESPONSE_MAX_LEN)
 #define AI_CMD_MAX_LEN (1024 * 256) // Large to send raw frames
 #define AI_API_KEY_MAX_LEN 256
 
@@ -22,6 +26,7 @@ typedef enum {
     AI_CMD_CRED_USERNAME,
     AI_CMD_CRED_PASSWORD,
     AI_CMD_CUSTOM,
+    AI_CMD_DICTATE,
     AI_CMD_RAW_FRAMES,
 } ai_cmd_type_t;
 
