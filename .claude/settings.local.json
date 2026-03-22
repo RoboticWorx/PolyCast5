@@ -1,8 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:docs.espressif.com)",
       "WebFetch(domain:espressif.com)",
+      "WebFetch(domain:docs.espressif.com)",
+      "WebFetch(domain:components.espressif.com)",
       "WebFetch(domain:github.com)"
     ]
   }

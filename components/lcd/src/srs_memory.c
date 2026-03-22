@@ -13,6 +13,7 @@ Please see https://polycast5.com/blogs/docs/srs-memory-planner
 
 */
 
+#include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
 #include "lcd_utils.h"
 #include "misc/lv_types.h"

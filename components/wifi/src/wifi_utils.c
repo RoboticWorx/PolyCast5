@@ -683,7 +683,6 @@ static const char* wifi_disconnect_reason_str(uint8_t r)
     switch (r) {
         case WIFI_REASON_AUTH_EXPIRE:            return "AUTH_EXPIRE";
         case WIFI_REASON_AUTH_FAIL:              return "AUTH_FAIL";
-        case WIFI_REASON_ASSOC_EXPIRE:           return "ASSOC_EXPIRE";
         case WIFI_REASON_ASSOC_FAIL:             return "ASSOC_FAIL";
         case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT: return "4WAY_HANDSHAKE_TIMEOUT";
         case WIFI_REASON_HANDSHAKE_TIMEOUT:      return "HANDSHAKE_TIMEOUT";
@@ -833,7 +832,7 @@ esp_err_t wifi_utils_radio_start(const char *ssid, const uint8_t* bssid, const c
     }
 
     // Set config
-    err = esp_wifi_set_config(ESP_IF_WIFI_STA, &cfg);
+    err = esp_wifi_set_config(WIFI_IF_STA, &cfg);
     if (err != ESP_OK) {
         return err;
     }
@@ -930,7 +929,7 @@ esp_err_t wifi_utils_radio_cycle(void)
 wifi_login_t wifi_utils_get_prev(void)
 {
     wifi_config_t current;
-    ESP_ERROR_CHECK(esp_wifi_get_config(ESP_IF_WIFI_STA, &current));
+    ESP_ERROR_CHECK(esp_wifi_get_config(WIFI_IF_STA, &current));
     
     wifi_login_t prev;
     strlcpy(prev.ssid, (char *)current.sta.ssid, sizeof(current.sta.ssid));

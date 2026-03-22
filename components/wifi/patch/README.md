@@ -1,6 +1,6 @@
 # libnet80211.a Patch
 
-This README explains how to apply a pre-patched `libnet80211.a` file to your ESP-IDF v5.5.2 installation for the ESP32-C5 target. This patch is required to bypass internal restrictions in the Wi-Fi stack that prevent sending certain raw IEEE 802.11 frames, such as deauthentication (deauth) frames or beacons. It is intended for education, authorized Wi-Fi penetration testing, or custom protocol development.
+This README explains how to apply a pre-patched `libnet80211.a` file to your ESP-IDF v6.0 installation for the ESP32-C5 target. This patch is required to bypass internal restrictions in the Wi-Fi stack that prevent sending certain raw IEEE 802.11 frames, such as deauthentication (deauth) frames or beacons. It is intended for education, authorized Wi-Fi penetration testing, or custom protocol development.
 
 ## Why This Patch Is Needed
 
@@ -17,7 +17,7 @@ The pre-patched `libnet80211.a` file attached in `components/wifi/patch` allows 
 
 ## Prerequisites
 
-- ESP-IDF v5.5.2 installed (may work for other versions, but is untested).
+- ESP-IDF v6.0 installed (may work for other versions, but is untested).
 - Your project is configured for the **esp32c5** target (`idf.py set-target esp32c5`).
 - The patched `libnet80211.a` file (provided).
 - Administrative access to overwrite files in your ESP-IDF installation directory.
@@ -25,7 +25,7 @@ The pre-patched `libnet80211.a` file attached in `components/wifi/patch` allows 
 ## Step-by-Step
 
 1. **Locate Your ESP-IDF Installation Path**  
-    May be something like `C:\Espressif\frameworks\esp-idf-v5.5.2`.
+    May be something like `C:\esp\.espressif\v6.0\esp-idf`.
 
 2. **Navigate to the Original `libnet80211.a` File**  
     Located in `YOUR_IDF_PATH\components\esp_wifi\lib\esp32c5`.
@@ -62,7 +62,7 @@ Use responsibly and ethically.
 
 ## Disassembled
 
-```shell
+```c
 undefined4 ieee80211_raw_frame_sanity_check(uint param_1,byte *param_2,uint param_3,int param_4)
 {
   byte bVar1;
@@ -87,56 +87,56 @@ undefined4 ieee80211_raw_frame_sanity_check(uint param_1,byte *param_2,uint para
   if (((param_1 != 0) && (iVar4 = _g_osi_funcs_p, param_1 != 1)) || (iVar4 == 0)) {
     wifi_log(1,0x40,1,"invalid interface %d",param_1);
     uVar2 = 0x3004;
-    goto .L1124;
+    goto .L1129;
   }
   bVar1 = *param_2;
   bVar6 = bVar1 & 0xc;
   bVar7 = bVar1 & 0xf0;
   if ((param_2[1] & 0x40) == 0) {
     if (bVar6 == 8) {
-      if (-1 < (char)bVar7) goto .L1128;
+      if (-1 < (char)bVar7) goto .L1133;
       bVar6 = 8;
       pcVar5 = "unsupport QoS frame type: %x%x";
     }
     else {
       if (((bVar1 & 0xc) == 0) && (((bVar7 == 0x80 || ((bVar1 & 0xe0) == 0x40)) || (bVar7 == 0xd0) ))
          ) {
-.L1128:
+.L1133:
         wifi_get_macaddr(param_1 & 0xff,auStack_28);
         iVar3 = memcmp(auStack_28,param_2 + 10,6);
         if (param_1 == 0) {
           if ((*(int *)(iVar4 + 0xe4) == 0) ||
              (iVar4 = memcmp((void *)(*(int *)(iVar4 + 0xe4) + 4),param_2 + 4,6), iVar4 != 0))
-          goto .L1130;
+          goto .L1135;
         }
         else {
           iVar4 = cnx_node_search(param_2 + 4);
-          if (iVar4 == 0) goto .L1130;
+          if (iVar4 == 0) goto .L1135;
         }
-        if (iVar3 != 0) goto .L1130;
+        if (iVar3 != 0) goto .L1135;
         if (param_4 == 0) {
           pcVar5 = "en_sys_seq should be true to avoid side-effect to WiFi connection";
         }
         else if ((param_2[1] & 0x3c) == 0) {
           if ((*param_2 & 0xc) != 8) {
-.L1130:
+.L1135:
             (**(code **)(_g_osi_funcs_p + 0x58))(_g_wifi_global_lock);
             return 0;
           }
           bVar6 = param_2[1] & 3;
           if (param_1 == 0) {
-            if (bVar6 == 1) goto .L1130;
+            if (bVar6 == 1) goto .L1135;
             pcVar5 = "invalid frame control, sta->ap ToDS should be 1, FromDS should be 0";
           }
           else {
-            if (bVar6 == 2) goto .L1130;
+            if (bVar6 == 2) goto .L1135;
             pcVar5 = "invalid frame control, ap->sta ToDS should be 0, FromDS should be 1";
           }
         }
         else {
           pcVar5 = "invalid frame control, retry/power/frag/more data bit should not set";
         }
-        goto .L1144;
+        goto .L1149;
       }
       pcVar5 = "unsupport frame type: %x%x";
     }
@@ -144,17 +144,17 @@ undefined4 ieee80211_raw_frame_sanity_check(uint param_1,byte *param_2,uint para
   }
   else {
     pcVar5 = "invalid frame control, unsupport crypto frame";
-.L1144:
+.L1149:
     wifi_log(1,0x40,1,pcVar5);
   }
   uVar2 = 0x102;
-.L1124:
+.L1129:
   (**(code **)(_g_osi_funcs_p + 0x58))(_g_wifi_global_lock);
   return uVar2;
 }
 ```
 
-```shell
+```c
 int esp_wifi_80211_tx(uint param_1,undefined4 param_2,int param_3,int param_4)
 {
   char cVar1;
@@ -198,12 +198,12 @@ int esp_wifi_80211_tx(uint param_1,undefined4 param_2,int param_3,int param_4)
   if (iStack_38 == 0) {
     if (iVar5 != 2) {
       *(undefined1 *)(puVar8 + 3) = 0;
-      goto .L1152;
+      goto .L1157;
     }
     iVar7 = 0xb;
   }
   *(char *)(puVar8 + 3) = (char)iVar7;
-.L1152:
+.L1157:
   if (iStack_3c == 6) {
     *puVar8 = *puVar8 | 0x80000000;
     *(byte *)((int)puVar8 + 0x2f) =
@@ -231,4 +231,12 @@ int esp_wifi_80211_tx(uint param_1,undefined4 param_2,int param_3,int param_4)
 }
 ```
 
-[Credit for patched ESP32-C5 `libnet80211.a` file](https://github.com/AnvilBrain/esp32-c5-dualband-deauther)
+[Credit for v5.5.2 patched `libnet80211.a` file for which this is based](https://github.com/AnvilBrain/esp32-c5-dualband-deauther)
+
+For developers:
+
+```bash
+ar x libnet80211.a // Extract archive
+ieee80211_output.o // To patch
+ar rcs libnet80211_patched.a *.o // Rebuild archive
+```

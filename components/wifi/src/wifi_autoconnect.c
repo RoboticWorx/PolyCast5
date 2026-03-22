@@ -113,7 +113,7 @@ void wifi_autoconnect_init(void)
 
     // Autofill default with last known
     wifi_config_t current = {0};
-    esp_err_t err = esp_wifi_get_config(ESP_IF_WIFI_STA, &current);
+    esp_err_t err = esp_wifi_get_config(WIFI_IF_STA, &current);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "wifi_autoconnect_init: esp_wifi_get_config failed: %s", esp_err_to_name(err));
         return;
@@ -183,7 +183,7 @@ void wifi_autoconnect_remember_current_network(void)
     wifi_config_t current = {0};
 
     // Get current config
-    esp_err_t err = esp_wifi_get_config(ESP_IF_WIFI_STA, &current);
+    esp_err_t err = esp_wifi_get_config(WIFI_IF_STA, &current);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "wifi_autoconnect_remember_current_network: esp_wifi_get_config failed: %s", esp_err_to_name(err));
         return;

@@ -10,8 +10,8 @@ idf_component_register(
         "include"
     
     REQUIRES
-        common 
-    
+        common esp_driver_ledc
+
     PRIV_REQUIRES
-        esp_adc efuse
+        esp_adc efuse esp_driver_i2c esp_driver_gpio
 )

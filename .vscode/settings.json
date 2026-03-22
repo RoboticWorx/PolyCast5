@@ -1,7 +1,7 @@
 {
   "C_Cpp.intelliSenseEngine": "default",
-  "idf.espIdfPathWin": "C:\\espressif\\.espressif\\v5.5.3\\esp-idf",
-  "idf.pythonInstallPath": "C:\\Espressif\\tools\\python\\v5.5.3\\venv\\Scripts\\python.exe",
+  "idf.espIdfPathWin": "C:\\espressif\\.espressif\\v6.0\\esp-idf",
+  "idf.pythonInstallPath": "C:\\Espressif\\tools\\python\\v6.0\\venv\\Scripts\\python.exe",
   "idf.openOcdConfigs": [
     "board/esp32c5-builtin.cfg"
   ],
@@ -10,15 +10,15 @@
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32c5"
   },
-  "clangd.path": "c:\\Espressif\\tools\\esp-clang\\esp-19.1.2_20250312\\esp-clang\\bin\\clangd.exe",
+  "clangd.path": "c:\\Espressif\\tools\\esp-clang\\esp-20.1.1_20250829\\esp-clang\\bin\\clangd.exe",
   "clangd.arguments": [
     "--background-index",
-    "--query-driver=c:\\Espressif\\tools\\xtensa-esp-elf\\esp-14.2.0_20241119\\xtensa-esp-elf\\bin\\xtensa-esp32-elf-gcc.exe",
+    "--query-driver=c:\\Espressif\\tools\\xtensa-esp-elf\\esp-15.2.0_20251204\\xtensa-esp-elf\\bin\\xtensa-esp32-elf-gcc.exe",
     "--compile-commands-dir=${workspaceFolder}\\build"
   ],
   "C_Cpp.errorSquiggles": "enabled",
   "diffEditor.renderSideBySide": false,
   "idf.flashType": "UART",
-  "idf.currentSetup": "C:\\espressif\\.espressif\\v5.5.3\\esp-idf",
+  "idf.currentSetup": "C:\\Espressif\\.espressif\\v6.0\\esp-idf",
   "claudeCode.selectedModel": "opus"
 }

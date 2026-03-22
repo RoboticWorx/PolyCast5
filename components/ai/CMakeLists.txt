@@ -13,5 +13,5 @@ idf_component_register(
         common
     
     PRIV_REQUIRES
-        gpio wifi bluetooth espnow nvs_flash esp_http_server esp_wifi esp_netif json esp_http_client esp-tls mbedtls lwip tcp_transport http_parser esp_event esp_timer
+        gpio wifi bluetooth espnow nvs_flash esp_http_server esp_wifi esp_netif esp_http_client esp-tls mbedtls lwip tcp_transport http_parser esp_event esp_timer esp_driver_gpio esp_driver_i2s
 )

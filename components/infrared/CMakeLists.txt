@@ -10,8 +10,8 @@ idf_component_register(
         "include"
     
     REQUIRES
-        common
-    
+        common esp_driver_rmt esp_driver_gpio
+
     PRIV_REQUIRES
         gpio
 )

@@ -5,6 +5,7 @@
 #include "core/lv_obj_pos.h"
 #include "core/lv_obj_tree.h"
 #include "font/lv_symbol_def.h"
+#include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
 

@@ -105,8 +105,6 @@ idf.py -p YOUR_PORT flash
 
 Changes to the ESP-IDF framework are required to build the correct code for this device.
 
-Please see the following READMEs:
-
-`https://github.com/RoboticWorx/PolyCast5/blob/main/components/bluetooth/README.md`
+Please see the following README:
 
 `https://github.com/RoboticWorx/PolyCast5/blob/main/components/wifi/patch/README.md`

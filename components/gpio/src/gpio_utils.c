@@ -1,12 +1,14 @@
+#include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
+#include "freertos/projdefs.h"
 #include "polycast5_macros.h"
 #include "polycast5_gpios.h"
 
-#include "freertos/projdefs.h"
 #include "portmacro.h"
 
 #include "nvs_flash.h"
 
+#include "driver/gpio.h"
 #include "driver/ledc.h"
 #include "driver/i2c.h"
 #include "esp_log.h"

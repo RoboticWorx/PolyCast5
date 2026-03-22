@@ -1,5 +1,6 @@
 #include "polycast5_macros.h"
 
+#include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
 

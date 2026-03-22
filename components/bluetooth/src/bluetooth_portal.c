@@ -1275,11 +1275,10 @@ esp_err_t bluetooth_portal_start(void)
     // Init Wi-Fi (tolerate "already init" state)
     wifi_init_config_t wcfg = WIFI_INIT_CONFIG_DEFAULT();
     esp_err_t err = esp_wifi_init(&wcfg);
-    if ((err != ESP_OK) && (err != ESP_ERR_WIFI_INIT_STATE)) {
+    if ((err != ESP_OK) && (err != ESP_ERR_WIFI_INIT_STATE) && (err != ESP_ERR_INVALID_STATE)) {
 #ifdef POLYCAST5_DEBUG
-        ESP_LOGW(TAG, "esp_wifi_init error: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "esp_wifi_init failed: %s", esp_err_to_name(err));
 #endif
-         
         return err;
     }
 

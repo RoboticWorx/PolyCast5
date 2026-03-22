@@ -25,7 +25,13 @@ esp_err_t espnow_utils_wifi_driver_init(void)
     
     // Initialize Wi-Fi driver
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    esp_err_t err = esp_wifi_init(&cfg);
+    if ((err != ESP_OK) && (err != ESP_ERR_WIFI_INIT_STATE) && (err != ESP_ERR_INVALID_STATE)) {
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGE(TAG, "esp_wifi_init failed: %s", esp_err_to_name(err));
+#endif
+        return err;
+    }
     
     // Set as a station
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
@@ -87,7 +93,7 @@ esp_err_t espnow_utils_espnow_init(const uint8_t *mac, uint8_t channel, bool enc
 
     // Configure peer
     esp_now_peer_info_t peer = {
-        .ifidx   = ESP_IF_WIFI_STA,
+        .ifidx   = WIFI_IF_STA,
         .channel = channel,
         .encrypt = encrypt,
     };
