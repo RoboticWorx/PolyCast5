@@ -1155,7 +1155,7 @@ void lcd_tools_how_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
 
         // Title label
         title_lbl = lv_label_create(cont);
-        lv_label_set_text(title_lbl, "How it Works:");
+        lv_label_set_text(title_lbl, "How It Works:");
         lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
         lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
         lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);

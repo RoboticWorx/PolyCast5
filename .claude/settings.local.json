@@ -1,4 +1,5 @@
 {
+  "autoMemoryEnabled": true,
   "permissions": {
     "allow": [
       "WebFetch(domain:espressif.com)",

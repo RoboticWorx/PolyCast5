@@ -1,4 +1,5 @@
 #include "esp_err.h"
+#include "driver/i2c_master.h"
 
 /************************** I2C Address ***************************************/
 #define TCA9535_ADDRESS        0x20         /*!< I2C Address */
@@ -18,18 +19,12 @@ typedef enum {
 // Pins defined in polycast5_gpios.h
 
 #define I2C_MASTER_NUM             I2C_NUM_0        /*!< I2C port number for master dev */
-#define I2C_MASTER_TX_BUF_DISABLE  0                /*!< I2C master do not need buffer */
-#define I2C_MASTER_RX_BUF_DISABLE  0                /*!< I2C master do not need buffer */
 #define I2C_MASTER_FREQ_HZ         100000           /*!< I2C master clock frequency */
 
-#define WRITE_BIT                  I2C_MASTER_WRITE /*!< I2C master write */
-#define READ_BIT                   I2C_MASTER_READ  /*!< I2C master read */
-#define ACK_CHECK_EN               0x1              /*!< I2C master will check ack from slave*/
-#define ACK_CHECK_DIS              0x0              /*!< I2C master will not check ack from slave */
-#define ACK_VAL                    0x0              /*!< I2C ack value */
-#define NACK_VAL                   0x1              /*!< I2C nack value */
-
 #define I2C_LOG_TAG                "[tca9535_i2c]"  /*!< LOG tag */
+
+// I2C bus handle (created in TCA9535Init, shared with other I2C users)
+extern i2c_master_bus_handle_t i2c_bus_handle;
 
 struct TCA9535_sBit{
        uint8_t B0:1;

@@ -6,7 +6,7 @@
 #include "nvs.h"
 #include "esp_log.h"
 #include "esp_err.h"
-#include "driver/i2c.h"
+#include "driver/i2c_master.h"
 
 #include "core/lv_obj_scroll.h"
 #include "font/lv_symbol_def.h"
@@ -23,11 +23,8 @@
 
 #define TAG "LCD_GPIO"
 
-#define I2C_MASTER_FREQ_HZ 100000  // Standard 100kHz; match your existing init
-#define TCA9535_ADDR 0x20  // Adjust to your TCA9535's actual address (exclude from scan if desired)
-
 gpio_menu_t gpio_menu = {
-    .options = {"How it Works", "Terminal", "I2C Scanner"},
+    .options = {"How It Works", "Terminal", "I2C Scanner"},
     .size = 3,
     .index = 1,
     .cont = NULL,
@@ -237,7 +234,6 @@ void lcd_gpio_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio
 static void i2c_scan(uint8_t found_addrs[], int *found_count)
 {
     *found_count = 0;
-    i2c_cmd_handle_t cmd = NULL;
 
     // Wait for then lock I2C bus
     if (xSemaphoreTake(xI2CBusMutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
@@ -247,29 +243,14 @@ static void i2c_scan(uint8_t found_addrs[], int *found_count)
 
     // For all standard I2C addresses
     for (uint8_t addr = 0x03; addr < 0x78; ++addr) {
-        /*
-        // Skip internal TCA9535 address
-        if (addr == TCA9535_ADDR) {
-            continue;
-        }
-        */
-        
-        // Prepare a custom I2C transaction
-        cmd = i2c_cmd_link_create();
-        
-        i2c_master_start(cmd); // START command: begin a transaction and alert all slaves on the bus to listen
-        i2c_master_write_byte(cmd, (addr << 1) | I2C_MASTER_WRITE, true); // Probe the address, expect ACK
-        i2c_master_stop(cmd); // STOP command -> no further data
-
-        // Execute the entire command link
-        esp_err_t ret = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, pdMS_TO_TICKS(50));
-        i2c_cmd_link_delete(cmd); // Done
+        // Probe the address on the shared bus handle
+        esp_err_t ret = i2c_master_probe(i2c_bus_handle, addr, 50);
 
         // If slave at addr ACKed the address byte
         if (ret == ESP_OK) {
             found_addrs[*found_count] = addr;
             (*found_count)++;
-            
+
 #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "I2C device found at 0x%02X", addr);
 #endif
@@ -495,53 +476,56 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
             esp_err_t ret = ESP_OK;
             POLYCAST5_USE_PSRAM_BSS static char msg[256]; // Buffer for logging
             memset(msg, 0, sizeof(msg));
-    
-            // WRITE transaction (send command, end with STOP)
-            i2c_cmd_handle_t cmd_write = i2c_cmd_link_create();
-            i2c_master_start(cmd_write);
-            i2c_master_write_byte(cmd_write, (TERMINAL_SLAVE_ADDR << 1) | I2C_MASTER_WRITE, true);
-            i2c_master_write_byte(cmd_write, current_cmd, true); // Send the command number
-            i2c_master_stop(cmd_write);
-    
-            // Execute write
-            ret = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd_write, pdMS_TO_TICKS(150));
-            i2c_cmd_link_delete(cmd_write);
-    
+
+            // Add terminal slave device to bus
+            i2c_device_config_t dev_cfg = {
+                .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+                .device_address = TERMINAL_SLAVE_ADDR,
+                .scl_speed_hz = I2C_MASTER_FREQ_HZ,
+            };
+            i2c_master_dev_handle_t term_dev = NULL;
+            ret = i2c_master_bus_add_device(i2c_bus_handle, &dev_cfg, &term_dev);
+            if (ret != ESP_OK) {
+                snprintf(msg, sizeof(msg), "Add device failed: %s\n\n", esp_err_to_name(ret));
+                term_log_append(log_buffer, sizeof(log_buffer), msg);
+                xSemaphoreGive(xI2CBusMutex);
+                lv_label_set_text(log_lbl, log_buffer);
+                lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
+                return;
+            }
+
+            // WRITE transaction (send command)
+            uint8_t cmd_byte = current_cmd;
+            ret = i2c_master_transmit(term_dev, &cmd_byte, 1, 150);
+
             // Log confirmation
             snprintf(msg, sizeof(msg), "\nSent: %u (0x%02X) to 0x%X\n", current_cmd, current_cmd, TERMINAL_SLAVE_ADDR);
             term_log_append(log_buffer, sizeof(log_buffer), msg);
-    
+
             if (ret != ESP_OK) {
                 snprintf(msg, sizeof(msg), "Write failed: %s\n\n", esp_err_to_name(ret));
                 term_log_append(log_buffer, sizeof(log_buffer), msg);
-                
+
                 // Early exit on write error
+                i2c_master_bus_rm_device(term_dev);
                 xSemaphoreGive(xI2CBusMutex); // Release I2C bus
                 lv_label_set_text(log_lbl, log_buffer);
                 lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
                 return;
             }
-    
+
             // Delay to allow slave processing time
             vTaskDelay(pdMS_TO_TICKS(50));
-            
+
             uint8_t response_buf[TERMINAL_FIXED_LEN] = {0};
-            
+
             // Single READ transaction (exactly TERMINAL_FIXED_LEN bytes)
-            i2c_cmd_handle_t cmd_read = i2c_cmd_link_create();
-            i2c_master_start(cmd_read);
-            i2c_master_write_byte(cmd_read, (TERMINAL_SLAVE_ADDR << 1) | I2C_MASTER_READ, true);
-            i2c_master_read(cmd_read, response_buf, TERMINAL_FIXED_LEN, I2C_MASTER_LAST_NACK);
-            i2c_master_stop(cmd_read);
-    
-            // Execute read
-            ret = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd_read, pdMS_TO_TICKS(150));
-            i2c_cmd_link_delete(cmd_read);
-    
+            ret = i2c_master_receive(term_dev, response_buf, TERMINAL_FIXED_LEN, 150);
+
             // If read something
             if (ret == ESP_OK) {
                 uint8_t response_len = response_buf[0]; // First byte is length (from receiver example)
-                
+
                 // len == 0 -> empty
                 if (response_len == 0) {
                     snprintf(msg, sizeof(msg), "Empty response.\n\n");
@@ -556,19 +540,21 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
             } else {
                 snprintf(msg, sizeof(msg), "Read failed: %s\n\n", esp_err_to_name(ret));
             }
-            
+
             // Append to log
             term_log_append(log_buffer, sizeof(log_buffer), msg);
-    
+
+            // Remove terminal device from bus
+            i2c_master_bus_rm_device(term_dev);
             xSemaphoreGive(xI2CBusMutex); // Release I2C bus
-    
+
             // Show and scroll to bottom
             lv_label_set_text(log_lbl, log_buffer);
             lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
         } else {
             // Mutex timeout - append error
             term_log_append(log_buffer, sizeof(log_buffer), "\nI2C bus busy - timed out.\n\n");
-    
+
             // Show and scroll to bottom
             lv_label_set_text(log_lbl, log_buffer);
             lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);

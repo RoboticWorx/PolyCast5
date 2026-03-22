@@ -1,10 +1,15 @@
 #include "TCA9535.h"
-#include "driver/i2c.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "string.h"
 
 #include "polycast5_gpios.h" // I2C pins
+
+// Bus handle shared with lcd_gpio.c (scanner, terminal)
+i2c_master_bus_handle_t i2c_bus_handle = NULL;
+
+// Device handle for the on-board TCA9535
+static i2c_master_dev_handle_t tca9535_dev_handle = NULL;
 
 // ****************************************************************************
 //! @brief        Initializes the I2C interface
@@ -13,24 +18,31 @@
 //!             - ESP_OK if erase operation was successful
 //!               - i2c driver error
 // ****************************************************************************
-esp_err_t TCA9535Init(void) 
+esp_err_t TCA9535Init(void)
 {
     esp_err_t ret;
 
-    int i2c_master_port = I2C_MASTER_NUM;
-    i2c_config_t conf = {0};
+    // Create I2C master bus
+    i2c_master_bus_config_t bus_config = {
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .i2c_port = I2C_MASTER_NUM,
+        .scl_io_num = I2C_MASTER_SCL_PIN,
+        .sda_io_num = I2C_MASTER_SDA_PIN,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,
+    };
+    ret = i2c_new_master_bus(&bus_config, &i2c_bus_handle);
+    if (ret != ESP_OK) {
+        return ret;
+    }
 
-    conf.mode = I2C_MODE_MASTER;
-    conf.sda_io_num = I2C_MASTER_SDA_PIN;
-    conf.sda_pullup_en = GPIO_PULLUP_ENABLE;
-    conf.scl_io_num = I2C_MASTER_SCL_PIN;
-    conf.scl_pullup_en = GPIO_PULLUP_ENABLE;
-    conf.master.clk_speed = I2C_MASTER_FREQ_HZ;
-    i2c_param_config(i2c_master_port, &conf);
-
-    ret = i2c_driver_install(i2c_master_port, conf.mode,
-                       I2C_MASTER_RX_BUF_DISABLE,
-                       I2C_MASTER_TX_BUF_DISABLE, 0);
+    // Add TCA9535 device to the bus
+    i2c_device_config_t dev_config = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = TCA9535_ADDRESS,
+        .scl_speed_hz = I2C_MASTER_FREQ_HZ,
+    };
+    ret = i2c_master_bus_add_device(i2c_bus_handle, &dev_config, &tca9535_dev_handle);
 
     return ret;
 }
@@ -40,24 +52,12 @@ esp_err_t TCA9535Init(void)
 //! @param        Register address
 //! @return        Byte from register
 // ****************************************************************************
- /* _________________________________________________________________________________________________________
- * | start | slave_addr + wr_bit +ack | reg_addr + ack | start | slave_addr + rd_bit +nack | reg_data |stop |
- * --------|--------------------------|----------------|-------|---------------------------|----------|-----|
- */
 unsigned char TCA9535ReadSingleRegister(tca9535_reg_t address)
 {
+    uint8_t reg_addr = (uint8_t)address;
     uint8_t reg_data = 0;
 
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, ( TCA9535_ADDRESS << 1 ) | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, address, ACK_CHECK_EN);
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, ( TCA9535_ADDRESS << 1 ) | READ_BIT, ACK_CHECK_EN);
-    i2c_master_read_byte(cmd, &reg_data, NACK_VAL);
-    i2c_master_stop(cmd);
-    i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, 100 / portTICK_PERIOD_MS);
-    i2c_cmd_link_delete(cmd);
+    i2c_master_transmit_receive(tca9535_dev_handle, &reg_addr, 1, &reg_data, 1, 100);
 
     return reg_data;
 }
@@ -65,81 +65,47 @@ unsigned char TCA9535ReadSingleRegister(tca9535_reg_t address)
 // ****************************************************************************
 //! @brief        Writes single byte to specified register
 //! @param        Register address
-//! @return        
+//! @return
 //!             - ESP_OK if erase operation was successful
 //!               - i2c driver error
 // ****************************************************************************
- /* ____________________________________________________________________________________
- * | start | slave_addr + wr_bit + ack | reg_addr + ack | write reg_data + ack  | stop |
- * --------|---------------------------|----------------|-----------------------|------|
- */
 esp_err_t TCA9535WriteSingleRegister(tca9535_reg_t address, unsigned short regVal)
 {
-    esp_err_t ret;
+    uint8_t write_buf[2] = { (uint8_t)address, (uint8_t)regVal };
 
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, ( TCA9535_ADDRESS << 1 ) | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, address, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, regVal, ACK_CHECK_EN);
-
-    i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, 100 / portTICK_PERIOD_MS);
-    i2c_cmd_link_delete(cmd);
-
-    return ret;
+    return i2c_master_transmit(tca9535_dev_handle, write_buf, sizeof(write_buf), 100);
 }
 
 // ****************************************************************************
 //! @brief        Reads whole register and puts result into struct
 //! @param        reg: struct pointer
 //!                reg_num: register type
-//! @return        
+//! @return
 //!             - ESP_OK if erase operation was successful
 //!               - i2c driver error
 // ****************************************************************************
 esp_err_t TCA9535ReadStruct(TCA9535_Register *reg, tca9535_reg_t reg_num)
 {
-    esp_err_t ret;
+    uint8_t reg_addr = (uint8_t)reg_num;
 
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, ( TCA9535_ADDRESS << 1 ) | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, reg_num, ACK_CHECK_EN);
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, ( TCA9535_ADDRESS << 1 ) | READ_BIT, ACK_CHECK_EN);
-    i2c_master_read(cmd, (uint8_t*) &reg->asInt, 2, NACK_VAL);
-    i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, 100 / portTICK_PERIOD_MS);
-    i2c_cmd_link_delete(cmd);
-
-    return ret;
+    return i2c_master_transmit_receive(tca9535_dev_handle, &reg_addr, 1, (uint8_t *)&reg->asInt, 2, 100);
 }
 
 // ****************************************************************************
 //! @brief        Writes whole register with data from struct
 //! @param        reg: struct pointer
 //!                reg_num: register type
-//! @return        
+//! @return
 //!             - ESP_OK if erase operation was successful
 //!               - i2c driver error
 // ****************************************************************************
 esp_err_t TCA9535WriteStruct(TCA9535_Register *reg, tca9535_reg_t reg_num)
 {
-    esp_err_t ret;
-    uint8_t reg_data[2];
+    uint8_t write_buf[3];
+    write_buf[0] = (uint8_t)reg_num;
+    memcpy(&write_buf[1], reg, 2);
 
-    memcpy(reg_data, reg, sizeof(reg_data));
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, ( TCA9535_ADDRESS << 1 ) | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, reg_num, ACK_CHECK_EN);
-    i2c_master_write(cmd, reg_data, 2, ACK_VAL);
-    i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, 100 / portTICK_PERIOD_MS);
-    i2c_cmd_link_delete(cmd);
-
-    return ret;
+    return i2c_master_transmit(tca9535_dev_handle, write_buf, sizeof(write_buf), 100);
 }
 
 esp_err_t TCA9535WriteOutput(TCA9535_Register *reg)
