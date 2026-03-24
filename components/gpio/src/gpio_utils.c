@@ -48,9 +48,9 @@ typedef struct {
 static const soc_point_t soc_table[] = { // {V, %}
     {4.20, 100}, {4.15, 95},  {4.11, 90},  {4.08, 85},  {4.02, 80},
     {3.98, 75},  {3.95, 70},  {3.91, 65},  {3.87, 60},  {3.85, 55},
-   {3.84, 50}, {3.82, 45}, {3.80, 40}, {3.79, 35}, {3.77, 30},
-   {3.75, 25}, {3.73, 20}, {3.69, 15}, {3.61, 10} ,{3.50, 5},
-   {3.27, 0},
+    {3.84, 50},  {3.82, 45},  {3.80, 40},  {3.79, 35},  {3.77, 30},
+    {3.75, 25},  {3.73, 20},  {3.69, 15},  {3.61, 10},  {3.50, 5},
+    {3.27, 0},
 };
 static const int TABLE_LEN = sizeof(soc_table) / sizeof(soc_table[0]);
 
@@ -332,10 +332,18 @@ float gpio_utils_get_battery_voltage(void)
     uint32_t sum = 0;
     
     // Average readings
+    uint32_t valid_samples = 0;
     for (int i = 0; i < NUM_ADC_SAMPLES; i++) {
-        int raw;
-        ESP_ERROR_CHECK(adc_oneshot_read(adc1_handle, ADC_CH, &raw));
+        int raw = 0;
+        esp_err_t ret = adc_oneshot_read(adc1_handle, ADC_CH, &raw);
+        if (ret != ESP_OK) {
+#ifdef POLYCAST5_DEBUG
+            ESP_LOGW(TAG, "ADC read failed: %s", esp_err_to_name(ret));
+#endif
+            continue; // Skip this sample
+        }
         sum += raw;
+        valid_samples++;
         esp_rom_delay_us(5);
 
         // Yield to task_wdt
@@ -343,16 +351,24 @@ float gpio_utils_get_battery_voltage(void)
             vTaskDelay(pdMS_TO_TICKS(1));
         }
     }
+    if (valid_samples == 0) {
+        ESP_LOGE(TAG, "All ADC samples failed");
+        return 0.0f;
+    }
     
-    int avg_raw = sum / NUM_ADC_SAMPLES;
+    int avg_raw = sum / valid_samples;
     
 #ifdef POLYCAST5_DEBUG_ADC
     ESP_LOGI(TAG, "Raw battery reading: %d", avg_raw);
 #endif
     
     // Get pin mV
-    int pin_mv;
-    ESP_ERROR_CHECK(adc_cali_raw_to_voltage(cali_handle, avg_raw, &pin_mv));
+    int pin_mv = 0;
+    esp_err_t ret = adc_cali_raw_to_voltage(cali_handle, avg_raw, &pin_mv);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "ADC calibration failed: %s", esp_err_to_name(ret));
+        return 0.0f;
+    }
     
     float Vadc = pin_mv / 1000.0f; // Convert to volts
     
@@ -384,7 +400,7 @@ uint8_t gpio_utils_volts_to_soc(float voltage)
     
     // Clamp at min
     if (voltage <= soc_table[TABLE_LEN - 1].volt) {
-        return 0;
+        return 1;
     }
 
     // Search for where the voltage lives between on soc_table
@@ -402,13 +418,16 @@ uint8_t gpio_utils_volts_to_soc(float voltage)
             // Linearly interpolate the value (map)
             float soc_f = (voltage - v_lo) * (soc_hi - soc_lo) / (v_hi - v_lo) + soc_lo;
             
-            // Round to nearest % and return
+            // Round to nearest % and clamp to [1, 100]
+            if (soc_f < 1.0f) {
+                soc_f = 1.0f;
+            }
             return (uint8_t)(soc_f + 0.5f);
         }
     }
 
     // Fallback
-    return 0;
+    return 1;
 }
 
 void gpio_utils_spin_haptic(uint32_t ms)

@@ -104,7 +104,7 @@ void gpio_utils_en_tsop_receiver(bool enable);
 float gpio_utils_get_battery_voltage(void);
 
 /** 
- * @brief Convert the raw voltage to a state-of-charge percentage 0-100 based on a typical LiPo discharge curve
+ * @brief Convert the raw voltage to a state-of-charge percentage 1-100 based on a typical LiPo discharge curve
  *
  * @param [in] voltage The voltage value to convert
  *

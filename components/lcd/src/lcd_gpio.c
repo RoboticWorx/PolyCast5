@@ -442,7 +442,7 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
  
         init = true;
     }
- 
+
     /* User input */
     if (ui_btns->up_btn == 1) {
         // Increment cmd with wrap
@@ -468,8 +468,8 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
 
         lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
     } else if (ui_btns->select_btn == 1) {
-        #define TERMINAL_MAX_RESPONSE_LEN 126  // Match slave
-        #define TERMINAL_FIXED_LEN (1 + TERMINAL_MAX_RESPONSE_LEN)  // Fixed read size
+        #define TERMINAL_MAX_RESPONSE_LEN 126 // Match slave
+        #define TERMINAL_FIXED_LEN (1 + TERMINAL_MAX_RESPONSE_LEN) // Fixed read size
     
         // Take mutex for I2C access
         if (xSemaphoreTake(xI2CBusMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
