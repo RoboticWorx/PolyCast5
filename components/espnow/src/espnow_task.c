@@ -11,7 +11,7 @@
 #include "esp_log_buffer.h"
 #include "portmacro.h"
 
-#include "lora_utils.h"
+#include "lora_pcp.h"
 #include "espnow_utils.h"
 #include "espnow_task.h"
 #include "wifi_utils.h"
@@ -24,7 +24,7 @@ static espnow_mqtt_t espnow_mqtt;
 
 static const uint8_t UNIVERSAL_MAC[ESP_NOW_ETH_ALEN] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
-static uint8_t received_enc_key[LORA_ENC_KEY_LEN];
+static uint8_t received_enc_key[LORA_PCP_ENC_KEY_LEN];
 
 SemaphoreHandle_t xEspCmdRxStatusSemaphore;
 SemaphoreHandle_t xEspCmdTxSuccessSemaphore;
@@ -44,13 +44,13 @@ static void espnow_task(void *param)
     xEspCmdTxFailedSemaphore = xSemaphoreCreateBinary();
     configASSERT(xEspCmdTxFailedSemaphore);
     
-    xEspSendEncKeyQueueNVS = xQueueCreate(1, LORA_ENC_KEY_LEN);
+    xEspSendEncKeyQueueNVS = xQueueCreate(1, LORA_PCP_ENC_KEY_LEN);
     if (xEspSendEncKeyQueueNVS == NULL) {
         ESP_LOGE(TAG, "Failed to create xEspSendEncKeyQueueNVS");
     }
     configASSERT(xEspSendEncKeyQueueNVS);
     
-    xEspSendEncKeyQueue = xQueueCreate(1, LORA_ENC_KEY_LEN);
+    xEspSendEncKeyQueue = xQueueCreate(1, LORA_PCP_ENC_KEY_LEN);
     if (xEspSendEncKeyQueue == NULL) {
         ESP_LOGE(TAG, "Failed to create xEspSendEncKeyQueue");
     }
@@ -77,7 +77,7 @@ static void espnow_task(void *param)
             ESP_ERROR_CHECK(espnow_utils_espnow_init(UNIVERSAL_MAC, WIFI_CHANNEL, false, NULL));
             
             // Send the data
-            espnow_utils_send_data(UNIVERSAL_MAC, received_enc_key, LORA_ENC_KEY_LEN);
+            espnow_utils_send_data(UNIVERSAL_MAC, received_enc_key, LORA_PCP_ENC_KEY_LEN);
             
             // Stop radio and de-initialize ESP-NOW
             ESP_ERROR_CHECK(espnow_utils_espnow_deinit());

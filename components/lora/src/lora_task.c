@@ -12,17 +12,15 @@
 #include "sx126x.h"
 
 #include "lora_task.h"
-#include "lora_utils.h"
+#include "lora_pcp.h"
+#include "lora_radio.h"
 
 #define MAX_RETRIES 2
-
-extern uint32_t expected_rx_id;
-extern bool waiting_for_ack;
 
 static volatile bool need_to_retry = false;
 static uint8_t retry_count = 0;
 
-static lora_cmd_t lora_cmd;
+static lora_pcp_cmd_t lora_cmd;
 
 static const char *TAG = "LORA_TASK";
 
@@ -68,7 +66,7 @@ static void lora_task(void *pvParameters)
     }
     configASSERT(xLoraReceiptValidSemaphore);
     
-    xLoraSendEncQueue = xQueueCreate(1, sizeof(lora_cmd_t));
+    xLoraSendEncQueue = xQueueCreate(1, sizeof(lora_pcp_cmd_t));
     if (xLoraSendEncQueue == NULL) {
         ESP_LOGE(TAG, "Failed to create xLoraSendEncQueue queue");
     }
@@ -89,7 +87,7 @@ static void lora_task(void *pvParameters)
     sx126x_pkt_params_lora_t lora_pkt_params = {
         .preamble_len_in_symb = 12,
         .header_type = SX126X_LORA_PKT_EXPLICIT,
-        .pld_len_in_bytes = LORA_PAYLOAD_LENGTH,
+        .pld_len_in_bytes = LORA_PCP_PAYLOAD_LENGTH,
         .crc_is_on = true,
         .invert_iq_is_on = false,
     };
@@ -198,11 +196,11 @@ static void lora_task(void *pvParameters)
     gpio_config(&io_conf);
     gpio_isr_handler_add(SX126X_DIO1_PIN, dio1_isr_handler, NULL);
 
-    lora_cmd_msg_t cmd_msg = {0}; // Hold binary command to send
+    lora_pcp_cmd_msg_t cmd_msg = {0}; // Hold binary command to send
     while (1) {
         // Generate encryption key requested
         if (xSemaphoreTake(xLoraGenerateEncKeySemaphore, 0) == pdTRUE) {
-            lora_utils_generate_random_key();
+            lora_pcp_generate_random_key();
         }
 
         // If retrying from no receipt
@@ -211,7 +209,7 @@ static void lora_task(void *pvParameters)
             ESP_LOGI(TAG, "RETRYING msg_id=%" PRIu32, cmd_msg.msg_id);
 #endif
             // Encrypt and send the same command again
-            if (lora_utils_encrypt_and_transmit((uint8_t *)&cmd_msg, sizeof(cmd_msg))) {
+            if (lora_pcp_encrypt_and_transmit((uint8_t *)&cmd_msg, sizeof(cmd_msg))) {
                 need_to_retry = false;
             } else {
                 ESP_LOGE(TAG, "Retry TX failed, will retry next loop");
@@ -219,10 +217,10 @@ static void lora_task(void *pvParameters)
         }
         // Else if new command
         else if (!waiting_for_ack && xQueuePeek(xLoraSendEncQueue, &lora_cmd, 0) == pdTRUE) {
-            memcpy(encryption_key, lora_cmd.key, LORA_ENC_KEY_LEN);
+            lora_pcp_set_key(lora_cmd.key);
 
             // Create unique message ID
-            uint32_t msg_id = lora_utils_create_msg_id();
+            uint32_t msg_id = lora_pcp_create_msg_id();
             expected_rx_id = msg_id;
 
             retry_count = 0; // Reset count
@@ -234,8 +232,8 @@ static void lora_task(void *pvParameters)
 
             // Build binary command message
             memset(&cmd_msg, 0, sizeof(cmd_msg)); // Clear previous contents
-            cmd_msg.magic = LORA_MSG_MAGIC;
-            cmd_msg.type = LORA_MSG_COMMAND;
+            cmd_msg.magic = LORA_PCP_MAGIC;
+            cmd_msg.type = LORA_PCP_MSG_COMMAND;
             cmd_msg.msg_id = msg_id;
             cmd_msg.index = (uint8_t)lora_cmd.index;
             memcpy(cmd_msg.instr, lora_cmd.instr, sizeof(cmd_msg.instr));
@@ -244,10 +242,10 @@ static void lora_task(void *pvParameters)
             cmd_msg.instr[sizeof(cmd_msg.instr) - 1] = '\0';
 #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "SENDING idx=%d instr=%s msg_id=%" PRIu32, cmd_msg.index, cmd_msg.instr, cmd_msg.msg_id);
-            ESP_LOG_BUFFER_HEX("LORA_TASK: Using encryption_key", encryption_key, LORA_ENC_KEY_LEN);
+            ESP_LOG_BUFFER_HEX("LORA_TASK: Using encryption_key", lora_cmd.key, LORA_PCP_ENC_KEY_LEN);
 #endif
             // Encrypt and send: only block queue on success
-            if (lora_utils_encrypt_and_transmit((uint8_t *)&cmd_msg, sizeof(cmd_msg))) {
+            if (lora_pcp_encrypt_and_transmit((uint8_t *)&cmd_msg, sizeof(cmd_msg))) {
                 waiting_for_ack = true;
             } else {
                 ESP_LOGE(TAG, "TX failed, will retry next loop");
@@ -273,11 +271,11 @@ static void lora_event_handler_task(void *pvParameters)
                 ESP_LOGI(TAG, "Transmission completed");
 #endif
                 sx126x_clear_irq_status(NULL, SX126X_IRQ_TX_DONE);
-                lora_utils_set_rx_mode(); // Listen for receipt from receiver
+                lora_radio_set_rx_mode(); // Listen for receipt from receiver
             } else if (irq_flags & SX126X_IRQ_RX_DONE) { // Else if receive complete
                 // Read the received packet
                 
-                uint8_t rx_buffer[LORA_PAYLOAD_LENGTH];
+                uint8_t rx_buffer[LORA_PCP_PAYLOAD_LENGTH];
                 uint8_t rx_size = 0;
                 
                 sx126x_rx_buffer_status_t rx_status;
@@ -313,7 +311,7 @@ static void lora_event_handler_task(void *pvParameters)
                 ESP_LOGI(TAG, "Received packet of size %d", rx_size);
 #endif
                 // Process received
-                lora_utils_process_received_message(rx_buffer, rx_size);
+                lora_pcp_process_received_message(rx_buffer, rx_size);
 
                 // Clear IRQ
                 sx126x_clear_irq_status(NULL, SX126X_IRQ_RX_DONE);

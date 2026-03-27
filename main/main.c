@@ -21,7 +21,7 @@
 #include "tca9535.h"
 
 #include "lora_task.h"
-#include "lora_utils.h"
+#include "lora_radio.h"
 #include "lcd_utils.h"
 #include "lcd_task.h"
 #include "infrared_task.h"

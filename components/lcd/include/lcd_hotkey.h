@@ -2,7 +2,7 @@
 #define LCD_HOTKEY_H
 
 #include "espnow_utils.h"
-#include "lora_utils.h"
+#include "lora_pcp.h"
 #include "lvgl.h"
 
 // Forward-declare structs (from lcd_utils.h)
@@ -32,7 +32,7 @@ typedef struct {
     bool has_espnow[MAX_HOTKEY_OPTIONS];
     bool has_ir[MAX_HOTKEY_OPTIONS];
     bool is_page[MAX_HOTKEY_OPTIONS];
-    lora_cmd_t lora_cmd[MAX_HOTKEY_OPTIONS];
+    lora_pcp_cmd_t lora_cmd[MAX_HOTKEY_OPTIONS];
     espnow_cmd_t espnow_cmd[MAX_HOTKEY_OPTIONS];
     ir_cmd_t ir_cmd[MAX_HOTKEY_OPTIONS];
     int selected_page[MAX_HOTKEY_OPTIONS];

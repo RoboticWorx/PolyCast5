@@ -18,7 +18,7 @@
 
 #include "lcd_lora.h"
 #include "lora_task.h"
-#include "lora_utils.h"
+#include "lora_pcp.h"
 #include "gpio_task.h"
 #include "lcd_utils.h"
 
@@ -430,7 +430,7 @@ static void update_name_label_lcd(lv_obj_t *lbl_display, char cur_char, int cur_
 
 void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu)
 {
-    static uint8_t received_enc_key_nvs[LORA_ENC_KEY_LEN];
+    static uint8_t received_enc_key_nvs[LORA_PCP_ENC_KEY_LEN];
     
     // Declare statics
     static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
@@ -653,19 +653,19 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
             // Get shared encryption key and do the same under the same index
             if (xQueueReceive(xEspSendEncKeyQueueNVS, received_enc_key_nvs, portMAX_DELAY) == pdPASS) {
                 // Allocate a fresh buffer for this entry
-                uint8_t *slot = malloc(LORA_ENC_KEY_LEN);
+                uint8_t *slot = malloc(LORA_PCP_ENC_KEY_LEN);
                 if (!slot) {
-                    ESP_LOGE(TAG, "Out of memory allocating LORA_ENC_KEY_LEN key");
+                    ESP_LOGE(TAG, "Out of memory allocating LORA_PCP_ENC_KEY_LEN key");
                     return;
                 }
-                memcpy(slot, received_enc_key_nvs, LORA_ENC_KEY_LEN);
+                memcpy(slot, received_enc_key_nvs, LORA_PCP_ENC_KEY_LEN);
                 
                 // Save to keys at next available position
                 lora_menu->keys[lora_menu->size - 1] = slot;
                 
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Key saved at slot %d:", lora_menu->size - 1);
-                ESP_LOG_BUFFER_HEX("SAVED IN QUEUE", lora_menu->keys[lora_menu->size - 1], LORA_ENC_KEY_LEN);
+                ESP_LOG_BUFFER_HEX("SAVED IN QUEUE", lora_menu->keys[lora_menu->size - 1], LORA_PCP_ENC_KEY_LEN);
 #endif
                 
                 lcd_lora_key_nvs_save(lora_menu);
@@ -921,18 +921,18 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
         lcd_lora_update_submenu(lora_menu);
     } else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 0) { // Send selected        
         // Build the packet
-        lora_cmd_t lora_cmd = {}; // Zero out
+        lora_pcp_cmd_t lora_cmd = {0}; // Zero out
         lora_cmd.index = lora_menu->submenu.index;
-        memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
+        memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
         
         // If recording command as hotkey
         if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
             // Zero out at start
-            memset(&hotkey_cmd.lora_cmd[hotkey_cmd.active_idx], 0, sizeof(lora_cmd_t));
+            memset(&hotkey_cmd.lora_cmd[hotkey_cmd.active_idx], 0, sizeof(lora_pcp_cmd_t));
             
             // Save into hotkey struct under selected "Keyx"
             hotkey_cmd.lora_cmd[hotkey_cmd.active_idx].index = lora_menu->submenu.index;
-            memcpy(hotkey_cmd.lora_cmd[hotkey_cmd.active_idx].key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
+            memcpy(hotkey_cmd.lora_cmd[hotkey_cmd.active_idx].key, lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
             
             // Flag that command exists
             hotkey_cmd.has_lora[hotkey_cmd.active_idx] = true;
@@ -956,7 +956,7 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
         xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
         
 #ifdef POLYCAST5_DEBUG
-        //ESP_LOG_BUFFER_HEX("SENDING WITH KEY", lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
+        //ESP_LOG_BUFFER_HEX("SENDING WITH KEY", lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
 #endif
         
         // Reset receipt label
@@ -1148,9 +1148,9 @@ void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
         lbl_bot_time = NULL;
         
         // Send the data to lora_task
-        lora_cmd_t lora_cmd = {}; // Zero out
+        lora_pcp_cmd_t lora_cmd = {0}; // Zero out
         lora_cmd.index = lora_menu->submenu.index;
-        memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
+        memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
         snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "on %s off %s", time_opts[on_idx], time_opts[off_idx]);
 
         // Confirmation text
@@ -1381,9 +1381,9 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
         lv_label_set_text(lbl_send_rx, GPIO_RX_TXT);
         
         // Send the data to lora_task
-        lora_cmd_t lora_cmd = {}; // Zero out
+        lora_pcp_cmd_t lora_cmd = {0}; // Zero out
         lora_cmd.index = lora_menu->submenu.index;
-        memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
+        memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
         snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "gpio %d", cmd_to_send);
         
         xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY); // Send the command
@@ -1968,9 +1968,9 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
         }
         
         // Send the data to lora_task
-        lora_cmd_t lora_cmd = {}; // Zero out
+        lora_pcp_cmd_t lora_cmd = {0}; // Zero out
         lora_cmd.index = lora_menu->submenu.index;
-        memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
+        memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
         // Remove colons
         int h1, m1, s1, h2, m2, s2;
         sscanf(start_time, "%2d:%2d:%2d", &h1,&m1,&s1);
@@ -2238,9 +2238,9 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
         lv_obj_add_flag(away_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         
         // Send the data to lora_task
-        lora_cmd_t lora_cmd = {}; // Zero out
+        lora_pcp_cmd_t lora_cmd = {0}; // Zero out
         lora_cmd.index = lora_menu->submenu.index;
-        memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
+        memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
         snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "away %s", away_menu->options[away_menu->index]);
         
 #ifdef POLYCAST5_DEBUG
@@ -2404,9 +2404,9 @@ void lcd_lora_away_custom_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_m
         lbl_unit = lbl_ins = lbl_min = lbl_max = lbl_val_min = lbl_val_max = lbl_pointer = NULL;
         
         // Send the data to lora_task
-        lora_cmd_t lora_cmd = {}; // Zero out
+        lora_pcp_cmd_t lora_cmd = {0}; // Zero out
         lora_cmd.index = lora_menu->submenu.index;
-        memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_ENC_KEY_LEN);
+        memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
         snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "away %d-%dm ON/OFF", min_val, max_val); // Keep formatting
         
 #ifdef POLYCAST5_DEBUG
@@ -2581,7 +2581,7 @@ esp_err_t lcd_lora_key_nvs_save(const lora_menu_t *menu)
         snprintf(key, sizeof(key), LORA_ENC_KEY_FMT, i);
         
         // Store the key string at each key starting at index 1 to match user options
-        err = nvs_set_blob(h, key, menu->keys[i + 1], LORA_ENC_KEY_LEN);
+        err = nvs_set_blob(h, key, menu->keys[i + 1], LORA_PCP_ENC_KEY_LEN);
         
         // Exit if error
         if (err != ESP_OK)
@@ -2680,19 +2680,19 @@ esp_err_t lcd_lora_key_nvs_load(lora_menu_t *menu)
         char key[16];
         snprintf(key, sizeof(key), LORA_ENC_KEY_FMT, i);
         
-        // Read exactly LORA_ENC_KEY_LEN bytes
-        size_t blob_len = LORA_ENC_KEY_LEN;
+        // Read exactly LORA_PCP_ENC_KEY_LEN bytes
+        size_t blob_len = LORA_PCP_ENC_KEY_LEN;
         
         // First check existence & size
         err = nvs_get_blob(h, key, NULL, &blob_len);
         if (err == ESP_ERR_NVS_NOT_FOUND) {
             continue;
         }
-        if (err != ESP_OK || blob_len != LORA_ENC_KEY_LEN) {
+        if (err != ESP_OK || blob_len != LORA_PCP_ENC_KEY_LEN) {
             break;
         }
 
-        uint8_t *buf = malloc(LORA_ENC_KEY_LEN);
+        uint8_t *buf = malloc(LORA_PCP_ENC_KEY_LEN);
         if (!buf) {
             err = ESP_ERR_NO_MEM;
             break;
@@ -2813,7 +2813,7 @@ esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx)
     }
 
     // Buffer
-    uint8_t tmp[LORA_ENC_KEY_LEN];
+    uint8_t tmp[LORA_PCP_ENC_KEY_LEN];
 
     // Shift all keys down one
     for (uint8_t i = del_idx; i < user_cnt; ++i) {
@@ -2823,15 +2823,15 @@ esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx)
         snprintf(src, sizeof src, LORA_ENC_KEY_FMT, i);
         snprintf(dst, sizeof dst, LORA_ENC_KEY_FMT, i - 1);
 
-        size_t len = LORA_ENC_KEY_LEN;
+        size_t len = LORA_PCP_ENC_KEY_LEN;
         // Get key from src
         err = nvs_get_blob(h, src, tmp, &len);
-        if (err != ESP_OK || len != LORA_ENC_KEY_LEN) {
+        if (err != ESP_OK || len != LORA_PCP_ENC_KEY_LEN) {
             break;
         }
 
         // Set key to new dst
-        err = nvs_set_blob(h, dst, tmp, LORA_ENC_KEY_LEN);
+        err = nvs_set_blob(h, dst, tmp, LORA_PCP_ENC_KEY_LEN);
         if (err != ESP_OK) {
             break;
         }
