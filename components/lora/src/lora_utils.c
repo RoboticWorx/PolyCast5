@@ -72,131 +72,145 @@ void lora_utils_set_rx_mode(void) // Call once to set RX mode and receive on EXT
     }
 }
 
-void lora_utils_transmit(uint8_t tx_data[], uint8_t data_len)
+bool lora_utils_transmit(uint8_t tx_data[], uint8_t data_len)
 {
     // Poll for SX1262 to be ready
     while (gpio_get_level(SX126X_BUSY_PIN) == 1) {
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 
-    sx126x_status_t status = sx126x_write_buffer(NULL, 0, tx_data, data_len);
+    // Update payload length for this transmission
+    sx126x_pkt_params_lora_t pkt_params = {
+        .preamble_len_in_symb = 12,
+        .header_type = SX126X_LORA_PKT_EXPLICIT,
+        .pld_len_in_bytes = data_len,
+        .crc_is_on = true,
+        .invert_iq_is_on = false,
+    };
+    sx126x_status_t status = sx126x_set_lora_pkt_params(NULL, &pkt_params);
     if (status != SX126X_STATUS_OK) {
-        ESP_LOGE(TAG, "Failed to write to buffer\n");
+        ESP_LOGE(TAG, "Failed to set packet params");
+        return false;
+    }
+
+    status = sx126x_write_buffer(NULL, 0, tx_data, data_len);
+    if (status != SX126X_STATUS_OK) {
+        ESP_LOGE(TAG, "Failed to write to buffer");
+        return false;
     }
 
     // Start transmission
     status = sx126x_set_tx(NULL, SX126X_MAX_TIMEOUT_IN_MS);
-
     if (status != SX126X_STATUS_OK) {
-        ESP_LOGE(TAG, "Failed to start transmission\n");
+        ESP_LOGE(TAG, "Failed to start transmission");
+        return false;
     }
+
+    return true;
 }
 
-void lora_utils_process_received_message(uint8_t *message, size_t message_len) {
-    // Verify that the message length is at least 16 bytes (for IV) + 16 bytes
-    // (minimum ciphertext)
-    if (message_len < 32) {
+void lora_utils_process_received_message(uint8_t *message, size_t message_len)
+{
+    // Minimum: 16 bytes IV + 16 bytes ciphertext (one AES block)
+    if (message_len < LORA_IV_LENGTH + 16) {
         ESP_LOGE(TAG, "Received message too short!\n");
         return;
     }
 
-    // The expected message length is 80 bytes (16 IV + 64 cyphertext)
-    if (message_len != LORA_CYPHERTEXT_LENGTH + 16) {
-        ESP_LOGE(TAG, "Unexpected message length: %u bytes\n", (unsigned)message_len);
+    size_t ct_len = message_len - LORA_IV_LENGTH;
+
+    // Ciphertext must be a multiple of 16 (AES block size) and within max
+    if ((ct_len % 16) != 0 || ct_len > LORA_CYPHERTEXT_LENGTH) {
+        ESP_LOGE(TAG, "Invalid ciphertext length: %u bytes\n", (unsigned)ct_len);
         return;
     }
 
     uint8_t iv[LORA_IV_LENGTH]; // To hold IV
     memcpy(iv, message, LORA_IV_LENGTH); // Extract the IV (first 16 bytes)
 
-    uint8_t ciphertext[LORA_CYPHERTEXT_LENGTH]; // Buffer to hold cyphertext
-    memcpy(ciphertext, message + LORA_IV_LENGTH, LORA_CYPHERTEXT_LENGTH); // Extract the ciphertext (remaining 64 bytes)
+    uint8_t ciphertext[LORA_CYPHERTEXT_LENGTH] = {0}; // Buffer to hold cyphertext
+    memcpy(ciphertext, LORA_IV_LENGTH + message, ct_len); // Extract the ciphertext
 
 #ifdef POLYCAST5_DEBUG
     ESP_LOG_BUFFER_HEX(TAG, iv, LORA_IV_LENGTH);
 #endif
-    
+
     // Initialize the AES context with the key and received IV.
     struct AES_ctx ctx;
     AES_init_ctx_iv(&ctx, encryption_key, iv);
 
-    // Decrypt 'ciphertext'
-    AES_CBC_decrypt_buffer(&ctx, ciphertext, sizeof(ciphertext));
+    // Decrypt ciphertext
+    AES_CBC_decrypt_buffer(&ctx, ciphertext, ct_len);
 
-    ciphertext[sizeof(ciphertext) - 1] = '\0'; // Ensure NULL termination
-    
-    // 'cyphertext' is now decrypted
 #ifdef POLYCAST5_DEBUG
-    ESP_LOGI(TAG, "Decrypted text: %s\n", ciphertext);
+    ESP_LOG_BUFFER_HEX("LORA_UTILS: Decrypted", ciphertext, ct_len);
 #endif
-    
-    uint32_t received_rx_id;
-    
-    // If received valid receipt
-    if (sscanf((char*)ciphertext, "PolyCast_Command_Value_Received:%" SCNu32, &received_rx_id) == 1) {
-        if (received_rx_id == expected_rx_id) {
+
+    // Validate magic bytes
+    uint16_t magic;
+    memcpy(&magic, ciphertext, sizeof(magic));
+    if (magic != LORA_MSG_MAGIC) {
 #ifdef POLYCAST5_DEBUG
-            ESP_LOGI(TAG, "ACK matches id=%" PRIu32, received_rx_id);
+        ESP_LOGW(TAG, "Bad magic: 0x%04X", magic);
 #endif
-            
+        return;
+    }
+
+    uint8_t msg_type = ciphertext[2];
+
+    if (msg_type == LORA_MSG_ACK && ct_len == LORA_ACK_CIPHERTEXT_LEN) {
+        lora_ack_msg_t ack;
+        memcpy(&ack, ciphertext, sizeof(ack));
+
+        if (ack.msg_id == expected_rx_id) {
+#ifdef POLYCAST5_DEBUG
+            ESP_LOGI(TAG, "ACK matches id=%" PRIu32, ack.msg_id);
+#endif
             xQueueReset(xLoraSendEncQueue); // Clear pending commands
             waiting_for_ack = false;
-            
+
             xSemaphoreGive(xLoraReceiptValidSemaphore);
         } else {
 #ifdef POLYCAST5_DEBUG
-            ESP_LOGW(TAG, "ACK ID wrong (got=%" PRIu32 ", want=%" PRIu32 ")", received_rx_id, expected_rx_id);
+            ESP_LOGW(TAG, "ACK ID wrong (got=%" PRIu32 ", want=%" PRIu32 ")", ack.msg_id, expected_rx_id);
 #endif
         }
     } else {
 #ifdef POLYCAST5_DEBUG
-        ESP_LOGI(TAG, "Decrypted text does NOT match. Got: \"%s\"", ciphertext);
+        ESP_LOGW(TAG, "Unknown message type: 0x%02X", msg_type);
 #endif
     }
 }
 
-void lora_utils_encrypt_and_transmit(uint8_t plaintext[])
+bool lora_utils_encrypt_and_transmit(uint8_t plaintext[], size_t plaintext_len)
 {
-    // Measure how many bytes of real data we have, up to the max
-    size_t plaintext_len = strnlen((char*)plaintext, LORA_CYPHERTEXT_LENGTH + 1);
-    
+    // Round up to next AES block size (multiple of 16)
+    size_t padded_len = ((plaintext_len + 15) / 16) * 16;
+
     // Check length
-    if (plaintext_len > LORA_CYPHERTEXT_LENGTH) {
+    if (padded_len > LORA_CYPHERTEXT_LENGTH) {
         ESP_LOGE(TAG,
-            "LoRa plaintext too long (%u bytes), max is %u",
+            "LoRa plaintext too long (%u bytes, padded %u), max is %u",
             (unsigned)plaintext_len,
+            (unsigned)padded_len,
             (unsigned)LORA_CYPHERTEXT_LENGTH);
-        return;
+        return false;
     }
-    
-    uint8_t buffer[LORA_CYPHERTEXT_LENGTH] = {0}; // Padded to 64 bytes (must be multiple of 16)
-    memcpy(buffer, plaintext, sizeof(buffer)); // Copy the 64 bytes into buffer
+
+    uint8_t buffer[LORA_CYPHERTEXT_LENGTH] = {0}; // Zero-padded for AES block alignment
+    memcpy(buffer, plaintext, plaintext_len); // Copy only the actual data
 
     uint8_t iv[LORA_IV_LENGTH]; // To hold IV
     generate_random_iv(iv, sizeof(iv)); // Generate random IV into iv[16]
 
-    /*ESP_LOGE(TAG, "Generated IV: ");
-    for (int i = 0; i < 16; i++) {
-        ESP_LOGE(TAG, "%02X ", iv[i]);
-    }
-    ESP_LOGE(TAG, "\n");*/
-
     struct AES_ctx ctx;
-    AES_init_ctx_iv(&ctx, encryption_key,
-                    iv); // Initialize AES context with key and IV
+    AES_init_ctx_iv(&ctx, encryption_key, iv); // Initialize AES context with key and IV
 
-    AES_CBC_encrypt_buffer(&ctx, buffer, sizeof(buffer)); // Encrypt buffer
+    AES_CBC_encrypt_buffer(&ctx, buffer, padded_len); // Encrypt padded data
 
-    uint8_t message[LORA_IV_LENGTH + LORA_CYPHERTEXT_LENGTH]; // New buffer to send
+    uint8_t message[LORA_IV_LENGTH + LORA_CYPHERTEXT_LENGTH]; // Buffer to send
     memcpy(message, iv, LORA_IV_LENGTH); // First 16 bytes are IV
-    memcpy(message + LORA_IV_LENGTH, buffer, LORA_CYPHERTEXT_LENGTH); // Next are the cyphertext
+    memcpy(message + LORA_IV_LENGTH, buffer, padded_len); // Next are the cyphertext
 
-    /*ESP_LOGE(TAG, "Message to send (hex): ");
-    for (int i = 0; i < (int)sizeof(message); i++)
-    {
-        ESP_LOGE(TAG, "%02X ", message[i]);
-    }
-    ESP_LOGE(TAG, "\n");*/
-
-    lora_utils_transmit(message, sizeof(message)); // Send the data
+    return lora_utils_transmit(message, LORA_IV_LENGTH + padded_len);
 }

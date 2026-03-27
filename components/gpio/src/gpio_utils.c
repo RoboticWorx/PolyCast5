@@ -337,7 +337,7 @@ float gpio_utils_get_battery_voltage(void)
         int raw = 0;
         esp_err_t ret = adc_oneshot_read(adc1_handle, ADC_CH, &raw);
         if (ret != ESP_OK) {
-#ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG_ADC
             ESP_LOGW(TAG, "ADC read failed: %s", esp_err_to_name(ret));
 #endif
             continue; // Skip this sample
