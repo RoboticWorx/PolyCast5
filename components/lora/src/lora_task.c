@@ -18,7 +18,7 @@
 #define MAX_RETRIES 2
 
 static volatile bool need_to_retry = false;
-static uint8_t retry_count = 0;
+static volatile uint8_t retry_count = 0;
 
 static lora_pcp_cmd_t lora_cmd;
 
@@ -196,6 +196,7 @@ static void lora_task(void *pvParameters)
     gpio_config(&io_conf);
     gpio_isr_handler_add(SX126X_DIO1_PIN, dio1_isr_handler, NULL);
 
+    lora_pcp_load_msg_id_nvs(); // Load persisted msg_id counter
     lora_pcp_cmd_msg_t cmd_msg = {0}; // Hold binary command to send
     while (1) {
         // Generate encryption key requested
@@ -220,7 +221,7 @@ static void lora_task(void *pvParameters)
             lora_pcp_set_key(lora_cmd.key);
 
             // Create unique message ID
-            uint32_t msg_id = lora_pcp_create_msg_id();
+            uint32_t msg_id = lora_pcp_create_msg_id(); // 1, 2, ...
             expected_rx_id = msg_id;
 
             retry_count = 0; // Reset count
@@ -233,7 +234,7 @@ static void lora_task(void *pvParameters)
             // Build binary command message
             memset(&cmd_msg, 0, sizeof(cmd_msg)); // Clear previous contents
             cmd_msg.magic = LORA_PCP_MAGIC;
-            cmd_msg.type = LORA_PCP_MSG_COMMAND;
+            cmd_msg.type = LORA_PCP_COMMAND;
             cmd_msg.msg_id = msg_id;
             cmd_msg.index = (uint8_t)lora_cmd.index;
             memcpy(cmd_msg.instr, lora_cmd.instr, sizeof(cmd_msg.instr));

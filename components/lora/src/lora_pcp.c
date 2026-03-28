@@ -4,6 +4,7 @@
 
 #include "esp_log.h"
 #include "esp_random.h"
+#include "nvs.h"
 
 #include "lora_pcp.h"
 #include "lora_radio.h"
@@ -15,10 +16,60 @@
 
 static const char *TAG = "LORA_PCP";
 
-uint32_t expected_rx_id = 0;
+volatile uint32_t expected_rx_id = 0;
+static uint32_t msg_id_counter = 0;
 static uint8_t encryption_key[LORA_PCP_ENC_KEY_LEN] = {0};
 
-bool waiting_for_ack = false;
+volatile bool waiting_for_ack = false;
+
+#define PCP_NVS_NS     "pcp"
+#define PCP_NVS_MSG_ID "msg_id"
+
+static void save_msg_id_nvs(void)
+{
+	nvs_handle_t h;
+	esp_err_t err = nvs_open(PCP_NVS_NS, NVS_READWRITE, &h);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "save_msg_id_nvs: NVS open failed: %s", esp_err_to_name(err));
+		return;
+	}
+
+	err = nvs_set_u32(h, PCP_NVS_MSG_ID, msg_id_counter);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "save_msg_id_nvs: NVS set failed: %s", esp_err_to_name(err));
+	}
+
+	err = nvs_commit(h);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "save_msg_id_nvs: NVS commit failed: %s", esp_err_to_name(err));
+	}
+
+	nvs_close(h);
+}
+
+void lora_pcp_load_msg_id_nvs(void)
+{
+	nvs_handle_t h;
+	esp_err_t err = nvs_open(PCP_NVS_NS, NVS_READONLY, &h);
+	if (err == ESP_OK) {
+		err = nvs_get_u32(h, PCP_NVS_MSG_ID, &msg_id_counter);
+		if (err == ESP_ERR_NVS_NOT_FOUND) {
+#ifdef POLYCAST5_DEBUG
+			ESP_LOGI(TAG, "No persisted msg_id_counter, starting at 0");
+#endif
+            msg_id_counter = 0;
+		} else if (err != ESP_OK) {
+			ESP_LOGE(TAG, "lora_pcp_load_msg_id_nvs: NVS get failed: %s", esp_err_to_name(err));
+		}
+		nvs_close(h);
+	} else if (err != ESP_ERR_NVS_NOT_FOUND) {
+		ESP_LOGE(TAG, "lora_pcp_load_msg_id_nvs: NVS open failed: %s", esp_err_to_name(err));
+	}
+
+#ifdef POLYCAST5_DEBUG
+	ESP_LOGI(TAG, "Loaded msg_id_counter=%" PRIu32, msg_id_counter);
+#endif
+}
 
 static void generate_random_iv(uint8_t *iv, size_t length)
 {
@@ -34,12 +85,9 @@ void lora_pcp_set_key(const uint8_t *key)
 
 uint32_t lora_pcp_create_msg_id(void)
 {
-    uint32_t id;
-    do {
-        id = esp_random();
-    } while (id == 0);
-
-    return id;
+    ++msg_id_counter;
+    save_msg_id_nvs();
+    return msg_id_counter;
 }
 
 void lora_pcp_generate_random_key(void)
@@ -105,7 +153,7 @@ void lora_pcp_process_received_message(uint8_t *message, size_t message_len)
 
     uint8_t msg_type = ciphertext[2];
 
-    if (msg_type == LORA_PCP_MSG_ACK && ct_len == LORA_PCP_ACK_CIPHERTEXT_LEN) {
+    if (msg_type == LORA_PCP_ACK && ct_len == LORA_PCP_ACK_CIPHERTEXT_LEN) {
         lora_pcp_ack_msg_t ack;
         memcpy(&ack, ciphertext, sizeof(ack));
 

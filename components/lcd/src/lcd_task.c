@@ -78,7 +78,7 @@ static void lcd_task(void *pvParameters)
     
     uint8_t battery_percentage;
 
-    //lcd_ns_nvs_clear("ai_prompt");
+    //lcd_ns_nvs_clear("pcp");
     //lcd_ns_nvs_clear("bt_portal");
     //lcd_ns_nvs_clear("keyb_sel");
     //lcd_ns_nvs_clear("first_boot");

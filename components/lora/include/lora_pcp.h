@@ -8,7 +8,7 @@
 // │   Random IV    ├────────┬──────┬──────────┬───────┬────────────┬─────────────┤
 // │                │ Magic  │ Type │  Msg ID  │ Index │   Instr    │  Zero Pad   │
 // │                │   2B   │  1B  │    4B    │  1B   │    32B     │     8B      │
-// │                │ 0x5043 │ 0x01 │ uint32   │ uint8 │  char[32]  │  (AES pad)  │
+// │                │ 0x5043 │ 0x01 │  uint32  │ uint8 │  char[32]  │  (AES pad)  │
 // ├────────────────┴────────┴──────┴──────────┴───────┴────────────┴─────────────┤
 // │                        ACK Packet (32 bytes on air)                          │
 // ├────────────────┬─────────────────────────────────────────────────────────────┤
@@ -28,12 +28,12 @@
 
 #define LORA_PCP_IV_LENGTH     16
 #define LORA_PCP_ENC_KEY_LEN   16
-#define LORA_PCP_MAX_INSTR_LEN 32
+#define LORA_PCP_INSTR_MAX_LEN 32
 
 // Binary wire protocol
-#define LORA_PCP_MAGIC       0x5043 // "PC" - brute-force guard
-#define LORA_PCP_MSG_COMMAND 0x01
-#define LORA_PCP_MSG_ACK     0x02
+#define LORA_PCP_MAGIC   0x5043 // "PC" - brute-force guard
+#define LORA_PCP_COMMAND 0x01
+#define LORA_PCP_ACK     0x02
 
 // Command message (40 bytes, padded to 48 for AES-CBC)
 typedef struct __attribute__((packed)) {
@@ -41,7 +41,7 @@ typedef struct __attribute__((packed)) {
     uint8_t  type;
     uint32_t msg_id;
     uint8_t  index;
-    char     instr[LORA_PCP_MAX_INSTR_LEN];
+    char     instr[LORA_PCP_INSTR_MAX_LEN];
 } lora_pcp_cmd_msg_t;
 
 // ACK message (7 bytes, padded to 16 for AES-CBC)
@@ -60,13 +60,18 @@ typedef struct __attribute__((packed)) {
 #define LORA_PCP_PAYLOAD_LENGTH    (LORA_PCP_CIPHERTEXT_LENGTH + LORA_PCP_IV_LENGTH)
 
 typedef struct {
-    char instr[LORA_PCP_MAX_INSTR_LEN];
+    char instr[LORA_PCP_INSTR_MAX_LEN];
     uint8_t key[LORA_PCP_ENC_KEY_LEN];
     int index;
 } lora_pcp_cmd_t;
 
-extern uint32_t expected_rx_id;
-extern bool waiting_for_ack;
+extern volatile uint32_t expected_rx_id;
+extern volatile bool waiting_for_ack;
+
+/**
+ * @brief Loads persisted PCP msg_id counter from NVS
+ */
+void lora_pcp_load_msg_id_nvs(void);
 
 /**
  * @brief Set the PCP encryption key
@@ -81,9 +86,9 @@ void lora_pcp_set_key(const uint8_t *key);
 void lora_pcp_generate_random_key(void);
 
 /**
- * @brief Generate a random non-zero message ID for receipt confirmation
+ * @brief Create a monotonically increasing message ID for replay protection
  *
- * @returns The ID created
+ * @returns The next msg_id
  */
 uint32_t lora_pcp_create_msg_id(void);
 
