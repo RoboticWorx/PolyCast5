@@ -71,13 +71,6 @@ void lora_pcp_load_msg_id_nvs(void)
 #endif
 }
 
-static void generate_random_iv(uint8_t *iv, size_t length)
-{
-    for (size_t i = 0; i < length; i++) {
-        iv[i] = (uint8_t)(esp_random() % (255 + 1)); // Generate number 0 - 255
-    }
-}
-
 void lora_pcp_set_key(const uint8_t *key)
 {
     memcpy(encryption_key, key, LORA_PCP_ENC_KEY_LEN);
@@ -196,7 +189,7 @@ bool lora_pcp_encrypt_and_transmit(uint8_t plaintext[], size_t plaintext_len)
     memcpy(buffer, plaintext, plaintext_len); // Copy only the actual data
 
     uint8_t iv[LORA_PCP_IV_LENGTH]; // To hold IV
-    generate_random_iv(iv, sizeof(iv)); // Generate random IV into iv[16]
+    esp_fill_random(iv, sizeof(iv)); // Generate random IV into iv[16]
 
     struct AES_ctx ctx;
     AES_init_ctx_iv(&ctx, encryption_key, iv); // Initialize AES context with key and IV

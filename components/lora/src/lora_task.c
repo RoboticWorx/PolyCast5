@@ -316,6 +316,18 @@ static void lora_event_handler_task(void *pvParameters)
 
                 // Clear IRQ
                 sx126x_clear_irq_status(NULL, SX126X_IRQ_RX_DONE);
+                sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
+
+                // If ACK wasn't accepted, treat like a failed receive
+                if (waiting_for_ack) {
+                    if (retry_count < MAX_RETRIES) {
+                        need_to_retry = true;
+                        retry_count++;
+                    } else {
+                        xQueueReset(xLoraSendEncQueue);
+                        waiting_for_ack = false;
+                    }
+                }
             }
 
             if (irq_flags & SX126X_IRQ_TIMEOUT) {
