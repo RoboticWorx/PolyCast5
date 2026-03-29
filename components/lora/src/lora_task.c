@@ -233,7 +233,6 @@ static void lora_task(void *pvParameters)
 
             // Build binary command message
             memset(&cmd_msg, 0, sizeof(cmd_msg)); // Clear previous contents
-            cmd_msg.magic = LORA_PCP_MAGIC;
             cmd_msg.type = LORA_PCP_COMMAND;
             cmd_msg.msg_id = msg_id;
             cmd_msg.index = (uint8_t)lora_cmd.index;

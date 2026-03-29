@@ -13,5 +13,5 @@ idf_component_register(
         common sx126x
     
     PRIV_REQUIRES
-        espnow gpio bootloader_support
+        espnow gpio bootloader_support mbedtls
 )

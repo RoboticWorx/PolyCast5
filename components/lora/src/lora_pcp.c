@@ -12,18 +12,21 @@
 #include "espnow_task.h"
 #include "gpio_task.h"
 
-#include "aes.h"
+#include "psa/crypto.h"
 
 static const char *TAG = "LORA_PCP";
 
 volatile uint32_t expected_rx_id = 0;
 static uint32_t msg_id_counter = 0;
 static uint8_t encryption_key[LORA_PCP_ENC_KEY_LEN] = {0};
+static psa_key_id_t pcp_key_id = 0;
 
 volatile bool waiting_for_ack = false;
 
 #define PCP_NVS_NS     "pcp"
 #define PCP_NVS_MSG_ID "msg_id"
+
+#define PCP_CCM_ALG PSA_ALG_AEAD_WITH_SHORTENED_TAG(PSA_ALG_CCM, LORA_PCP_MIC_LENGTH)
 
 static void save_msg_id_nvs(void)
 {
@@ -73,6 +76,35 @@ void lora_pcp_load_msg_id_nvs(void)
 
 void lora_pcp_set_key(const uint8_t *key)
 {
+    // Initialize PSA crypto subsystem (idempotent)
+    psa_status_t status = psa_crypto_init();
+    if (status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "psa_crypto_init failed: %d", (int)status);
+        return;
+    }
+
+    // Import into a temporary ID first - preserve old key on failure
+    psa_key_attributes_t attr = PSA_KEY_ATTRIBUTES_INIT;
+    psa_set_key_usage_flags(&attr, PSA_KEY_USAGE_ENCRYPT | PSA_KEY_USAGE_DECRYPT);
+    psa_set_key_algorithm(&attr, PCP_CCM_ALG);
+    psa_set_key_type(&attr, PSA_KEY_TYPE_AES);
+    psa_set_key_bits(&attr, LORA_PCP_ENC_KEY_LEN * 8);
+
+    psa_key_id_t new_key_id = 0;
+    status = psa_import_key(&attr, key, LORA_PCP_ENC_KEY_LEN, &new_key_id);
+    if (status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "psa_import_key failed: %d, keeping old key", (int)status);
+        return;
+    }
+
+    // Import succeeded - commit all atomically
+    if (pcp_key_id != 0) {
+        status = psa_destroy_key(pcp_key_id);
+        if (status != PSA_SUCCESS) {
+            ESP_LOGE(TAG, "psa_destroy_key failed: %d (key slot leak)", (int)status);
+        }
+    }
+    pcp_key_id = new_key_id;
     memcpy(encryption_key, key, LORA_PCP_ENC_KEY_LEN);
 }
 
@@ -99,56 +131,51 @@ void lora_pcp_generate_random_key(void)
 
 void lora_pcp_process_received_message(uint8_t *message, size_t message_len)
 {
-    // Minimum: 16 bytes IV + 16 bytes ciphertext (one AES block)
-    if (message_len < LORA_PCP_IV_LENGTH + 16) {
-        ESP_LOGE(TAG, "Received message too short!\n");
+    // Minimum valid packet: nonce + ACK ciphertext + MIC
+    size_t min_len = LORA_PCP_NONCE_LENGTH + LORA_PCP_ACK_CIPHERTEXT_LEN + LORA_PCP_MIC_LENGTH;
+    if (message_len < min_len) {
+        ESP_LOGE(TAG, "Received message too short!");
         return;
     }
 
-    size_t ct_len = message_len - LORA_PCP_IV_LENGTH;
-
-    // Ciphertext must be a multiple of 16 (AES block size) and within max
-    if ((ct_len % 16) != 0 || ct_len > LORA_PCP_CIPHERTEXT_LENGTH) {
-        ESP_LOGE(TAG, "Invalid ciphertext length: %u bytes\n", (unsigned)ct_len);
+    if (pcp_key_id == 0) {
+        ESP_LOGE(TAG, "No key set, ignoring message");
         return;
     }
 
-    uint8_t iv[LORA_PCP_IV_LENGTH]; // To hold IV
-    memcpy(iv, message, LORA_PCP_IV_LENGTH); // Extract the IV (first 16 bytes)
+    // Extract nonce (first 13 bytes) and ciphertext+tag (rest)
+    const uint8_t *nonce      = message;
+    const uint8_t *ct_and_tag = message + LORA_PCP_NONCE_LENGTH;
+    size_t ct_and_tag_len     = message_len - LORA_PCP_NONCE_LENGTH;
 
-    uint8_t ciphertext[LORA_PCP_CIPHERTEXT_LENGTH] = {0}; // Buffer to hold ciphertext
-    memcpy(ciphertext, LORA_PCP_IV_LENGTH + message, ct_len); // Extract the ciphertext
+    // Decrypt and authenticate (PSA expects ciphertext || tag as one buffer)
+    uint8_t plaintext[LORA_PCP_CIPHERTEXT_LENGTH] = {0};
+    size_t plaintext_len = 0;
 
+    psa_status_t status = psa_aead_decrypt(
+            pcp_key_id, PCP_CCM_ALG,
+            nonce, LORA_PCP_NONCE_LENGTH,
+            NULL, 0,
+            ct_and_tag, ct_and_tag_len,
+            plaintext, sizeof(plaintext),
+            &plaintext_len);
+
+    if (status != PSA_SUCCESS) {
 #ifdef POLYCAST5_DEBUG
-    ESP_LOG_BUFFER_HEX(TAG, iv, LORA_PCP_IV_LENGTH);
-#endif
-
-    // Initialize the AES context with the key and received IV.
-    struct AES_ctx ctx;
-    AES_init_ctx_iv(&ctx, encryption_key, iv);
-
-    // Decrypt ciphertext
-    AES_CBC_decrypt_buffer(&ctx, ciphertext, ct_len);
-
-#ifdef POLYCAST5_DEBUG
-    ESP_LOG_BUFFER_HEX("LORA_PCP: Decrypted", ciphertext, ct_len);
-#endif
-
-    // Validate magic bytes
-    uint16_t magic;
-    memcpy(&magic, ciphertext, sizeof(magic));
-    if (magic != LORA_PCP_MAGIC) {
-#ifdef POLYCAST5_DEBUG
-        ESP_LOGW(TAG, "Bad magic: 0x%04X", magic);
+        ESP_LOGW(TAG, "CCM auth failed: %d", (int)status);
 #endif
         return;
     }
 
-    uint8_t msg_type = ciphertext[2];
+#ifdef POLYCAST5_DEBUG
+    ESP_LOG_BUFFER_HEX("LORA_PCP: Decrypted", plaintext, plaintext_len);
+#endif
 
-    if (msg_type == LORA_PCP_ACK && ct_len == LORA_PCP_ACK_CIPHERTEXT_LEN) {
+    uint8_t msg_type = plaintext[0];
+
+    if (msg_type == LORA_PCP_ACK && plaintext_len == LORA_PCP_ACK_CIPHERTEXT_LEN) {
         lora_pcp_ack_msg_t ack;
-        memcpy(&ack, ciphertext, sizeof(ack));
+        memcpy(&ack, plaintext, sizeof(ack));
 
         if (ack.msg_id == expected_rx_id) {
 #ifdef POLYCAST5_DEBUG
@@ -172,33 +199,44 @@ void lora_pcp_process_received_message(uint8_t *message, size_t message_len)
 
 bool lora_pcp_encrypt_and_transmit(uint8_t plaintext[], size_t plaintext_len)
 {
-    // Round up to next AES block size (multiple of 16)
-    size_t padded_len = ((plaintext_len + 15) / 16) * 16;
-
-    // Check length
-    if (padded_len > LORA_PCP_CIPHERTEXT_LENGTH) {
-        ESP_LOGE(TAG,
-            "LoRa plaintext too long (%u bytes, padded %u), max is %u",
-            (unsigned)plaintext_len,
-            (unsigned)padded_len,
-            (unsigned)LORA_PCP_CIPHERTEXT_LENGTH);
+    if (plaintext_len > LORA_PCP_CIPHERTEXT_LENGTH) {
+        ESP_LOGE(TAG, "LoRa plaintext too long (%u bytes, max %u)",
+                 (unsigned)plaintext_len,
+                 (unsigned)LORA_PCP_CIPHERTEXT_LENGTH);
         return false;
     }
 
-    uint8_t buffer[LORA_PCP_CIPHERTEXT_LENGTH] = {0}; // Zero-padded for AES block alignment
-    memcpy(buffer, plaintext, plaintext_len); // Copy only the actual data
+    if (pcp_key_id == 0) {
+        ESP_LOGE(TAG, "No key set, cannot transmit");
+        return false;
+    }
 
-    uint8_t iv[LORA_PCP_IV_LENGTH]; // To hold IV
-    esp_fill_random(iv, sizeof(iv)); // Generate random IV into iv[16]
+    uint8_t nonce[LORA_PCP_NONCE_LENGTH];
+    esp_fill_random(nonce, sizeof(nonce));
 
-    struct AES_ctx ctx;
-    AES_init_ctx_iv(&ctx, encryption_key, iv); // Initialize AES context with key and IV
+    // PSA outputs ciphertext || tag concatenated
+    uint8_t ct_and_tag[LORA_PCP_CIPHERTEXT_LENGTH + LORA_PCP_MIC_LENGTH];
+    size_t ct_and_tag_len = 0;
 
-    AES_CBC_encrypt_buffer(&ctx, buffer, padded_len); // Encrypt padded data
+    psa_status_t status = psa_aead_encrypt(
+            pcp_key_id, PCP_CCM_ALG,
+            nonce, LORA_PCP_NONCE_LENGTH,
+            NULL, 0,
+            plaintext, plaintext_len,
+            ct_and_tag, sizeof(ct_and_tag),
+            &ct_and_tag_len);
 
-    uint8_t message[LORA_PCP_IV_LENGTH + LORA_PCP_CIPHERTEXT_LENGTH]; // Buffer to send
-    memcpy(message, iv, LORA_PCP_IV_LENGTH); // First 16 bytes are IV
-    memcpy(message + LORA_PCP_IV_LENGTH, buffer, padded_len); // Next are the ciphertext
+    if (status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "CCM encrypt failed: %d", (int)status);
+        return false;
+    }
 
-    return lora_radio_tx(message, LORA_PCP_IV_LENGTH + padded_len);
+    // Assemble wire message: [nonce | ciphertext | MIC]
+    uint8_t message[LORA_PCP_PAYLOAD_LENGTH];
+    size_t msg_len = LORA_PCP_NONCE_LENGTH + ct_and_tag_len;
+
+    memcpy(message, nonce, LORA_PCP_NONCE_LENGTH);
+    memcpy(message + LORA_PCP_NONCE_LENGTH, ct_and_tag, ct_and_tag_len);
+
+    return lora_radio_tx(message, msg_len);
 }
