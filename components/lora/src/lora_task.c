@@ -395,6 +395,21 @@ static void lora_event_handler_task(void *pvParameters)
     }
 }
 
+void lora_task_abort_pending(void)
+{
+    // Idle the radio first so no further DIO1 IRQs can re-set the flags
+    sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
+    sx126x_clear_irq_status(NULL, SX126X_IRQ_ALL);
+
+    need_to_retry = false;
+    retry_count = 0;
+    waiting_for_ack = false;
+
+    if (xLoraSendEncQueue) {
+        xQueueReset(xLoraSendEncQueue);
+    }
+}
+
 // Function to create the LoRa task
 void lora_task_create(void)
 {

@@ -191,6 +191,8 @@ void lcd_device_sleep(void)
     // Wait for Wi-Fi to shut off if on
     xSemaphoreTake(xWifiCanSleepSemaphore, pdMS_TO_TICKS(1000));
 
+    lora_task_abort_pending(); // Cancel any in-flight LoRa retries and idle the radio
+
     xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
     xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
 
