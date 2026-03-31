@@ -5,6 +5,7 @@
 
 #define AI_DONE_THINKING_BIT   (1U << 0)
 #define AI_THINKING_FAILED_BIT (1U << 1)
+#define AI_RATE_LIMITED_BIT    (1U << 2)
 extern EventGroupHandle_t xAiEventGroup;
 
 extern QueueHandle_t xAiCmdQueue;

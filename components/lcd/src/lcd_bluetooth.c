@@ -1524,8 +1524,18 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     bool select_released = (!select_now && last_select);
     last_select = select_now;
 
+    // If rate limited / out of API credits
+    if (xEventGroupGetBits(xAiEventGroup) & AI_RATE_LIMITED_BIT) {
+        lv_obj_remove_flag(lbl_ins, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
+        lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(lbl_ins, "Out of API credits!\nCheck your usage:\n       console.x.ai");
+        lv_obj_remove_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+        xEventGroupClearBits(xAiEventGroup, AI_RATE_LIMITED_BIT);
+        state = AI_KEYB_IDLE;
     // If thinking error occurred
-    if (xEventGroupGetBits(xAiEventGroup) & AI_THINKING_FAILED_BIT) {
+    } else if (xEventGroupGetBits(xAiEventGroup) & AI_THINKING_FAILED_BIT) {
         // Show instructions label
         lv_obj_remove_flag(lbl_ins, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
@@ -1534,7 +1544,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
 
         // Show error
-        lv_label_set_text(lbl_ins, "Thinking failed!\nPlease try again.");
+        lv_label_set_text(lbl_ins, " Thinking failed!\nPlease try again.");
 
         // Show reasoning
         lv_obj_remove_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);

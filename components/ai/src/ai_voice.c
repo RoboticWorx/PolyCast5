@@ -55,6 +55,7 @@ static bool voice_inited = false;
 typedef struct {
     SemaphoreHandle_t done;
     esp_err_t result;
+    int http_status;
 
     char *out;
     size_t out_sz;
@@ -513,6 +514,13 @@ static void ws_event_handler(void *handler_args, esp_event_base_t base, int32_t 
     if (event_id == WEBSOCKET_EVENT_DISCONNECTED || event_id == WEBSOCKET_EVENT_ERROR) {
         ESP_LOGW(TAG, "ws_event_handler: WebSocket disconnected or error");
         ctx->result = ESP_FAIL;
+
+        // Capture HTTP status from failed WebSocket handshake (e.g. 429 = rate limited / out of credits)
+        if (event_id == WEBSOCKET_EVENT_ERROR && e && e->error_handle.esp_ws_handshake_status_code) {
+            ctx->http_status = e->error_handle.esp_ws_handshake_status_code;
+            ESP_LOGE(TAG, "ws_event_handler: WS handshake HTTP status %d", ctx->http_status);
+        }
+
         xSemaphoreGive(ctx->done);
         return;
     }
@@ -740,8 +748,9 @@ esp_err_t ai_voice_stt_ws_transcribe_pcm16_xai(const int16_t *pcm16, size_t samp
             ESP_LOGE(TAG, "ai_voice_stt_ws_send_pcm16_xai: WS connect timeout");
             esp_websocket_client_stop(ws);
             esp_websocket_client_destroy(ws);
+            esp_err_t ret = (ctx.http_status == 429) ? ESP_ERR_AI_RATE_LIMITED : ESP_FAIL;
             vSemaphoreDelete(ctx.done);
-            return ESP_FAIL;
+            return ret;
         }
     }
 

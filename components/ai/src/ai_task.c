@@ -268,8 +268,12 @@ static void ai_task(void *pvParameters)
             } else {
                 ESP_LOGE(TAG, "Realtime STT failed: %s", esp_err_to_name(err));
 
-                // Signal error
-                xEventGroupSetBits(xAiEventGroup, AI_THINKING_FAILED_BIT);
+                // Signal specific error type
+                if (err == ESP_ERR_AI_RATE_LIMITED) {
+                    xEventGroupSetBits(xAiEventGroup, AI_RATE_LIMITED_BIT);
+                } else {
+                    xEventGroupSetBits(xAiEventGroup, AI_THINKING_FAILED_BIT);
+                }
             }
             // Disable mic
             ai_voice_free_pcm(&pcm); // Free PCM buffer

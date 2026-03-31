@@ -5,6 +5,9 @@
 #include <stddef.h>
 #include "esp_err.h"
 
+// Returned when the API rejects the request with HTTP 429 (out of credits / rate limited)
+#define ESP_ERR_AI_RATE_LIMITED 0x2001
+
 // Audio buffer returned by ai_voice_record_pcm16_16k()
 // Must call ai_voice_free_pcm() when done
 typedef struct {
