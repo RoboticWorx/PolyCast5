@@ -785,6 +785,10 @@ esp_err_t esp_hid_ble_gap_adv_init(uint16_t appearance, const char *device_name)
 
     free((void *)fields.uuids16); // Free previous allocation on reinit
     uuid16 = (ble_uuid16_t *)malloc(sizeof(ble_uuid16_t));
+    if (!uuid16) {
+        ESP_LOGE(TAG, "esp_hid_ble_gap_adv_init: Failed to allocate uuid16");
+        return ESP_ERR_NO_MEM;
+    }
     uuid16_1 = (ble_uuid16_t[]) {
         BLE_UUID16_INIT(GATT_SVR_SVC_HID_UUID)
     };
@@ -857,9 +861,11 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
         MODLOG_DFLT(INFO, "encryption change event; status=%d ",
                 event->enc_change.status);
         rc = ble_gap_conn_find(event->enc_change.conn_handle, &desc);
-        assert(rc == 0);
-        
-        // Added:
+        if (rc != 0) {
+            ESP_LOGE(TAG, "ble_gap_conn_find failed on enc_change: %d", rc);
+            return 0;
+        }
+
         // If a valid peer -> save
         if (rc == 0) {
             // Save this as a bonded peer
@@ -918,14 +924,16 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
     case BLE_GAP_EVENT_PASSKEY_ACTION:
         ESP_LOGI(TAG, "PASSKEY_ACTION_EVENT started");
         struct ble_sm_io pkey = {0};
-        int key = 0;
 
         if (event->passkey.params.action == BLE_SM_IOACT_DISP) {
             pkey.action = event->passkey.params.action;
-            
+
             // Load pairing key from NVS
-            uint32_t pairing_key;
+            uint32_t pairing_key = 0;
             bluetooth_nvs_pairing_key_load(&pairing_key);
+            if (pairing_key == 0) {
+                ESP_LOGE(TAG, "No pairing key found in NVS, this should not happen.");
+            }
             pkey.passkey = pairing_key; // This is the passkey to be entered on peer
             
 #ifdef POLYCAST5_PASS_DEBUG
@@ -936,7 +944,7 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
         } else if (event->passkey.params.action == BLE_SM_IOACT_NUMCMP) {
             ESP_LOGI(TAG, "Accepting passkey..");
             pkey.action = event->passkey.params.action;
-            pkey.numcmp_accept = key;
+            pkey.numcmp_accept = 0;
             rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
             ESP_LOGI(TAG, "ble_sm_inject_io result: %d", rc);
         } else if (event->passkey.params.action == BLE_SM_IOACT_OOB) {
@@ -949,10 +957,13 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
             ESP_LOGI(TAG, "ble_sm_inject_io result: %d", rc);
         } else if (event->passkey.params.action == BLE_SM_IOACT_INPUT) {
             pkey.action = event->passkey.params.action;
-            
+
             // Load pairing key from NVS
-            uint32_t pairing_key;
+            uint32_t pairing_key = 0;
             bluetooth_nvs_pairing_key_load(&pairing_key);
+            if (pairing_key == 0) {
+                ESP_LOGE(TAG, "No pairing key found in NVS, this should not happen.");
+            }
             pkey.passkey = pairing_key;
             
 #ifdef POLYCAST5_PASS_DEBUG

@@ -72,6 +72,7 @@ sx126x_hal_status_t sx126x_hal_wakeup(const void *context) {
 
     if (sx126x_spi == NULL) {
         ESP_LOGE(TAG, "SPI not initialized");
+        xSemaphoreGive(xSPIBusMutex); // Release SPI bus before returning
         return SX126X_HAL_STATUS_ERROR;
     }
 
@@ -123,20 +124,32 @@ sx126x_hal_status_t sx126x_hal_write( const void      *ctx,
     spi_transaction_t t = { 0 };
     t.tx_buffer = cmd;
     t.length    = cmd_len * 8;
-    ESP_ERROR_CHECK_WITHOUT_ABORT(spi_device_polling_transmit(sx126x_spi, &t));
+    esp_err_t ret = spi_device_polling_transmit(sx126x_spi, &t);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "SPI cmd write failed: %s", esp_err_to_name(ret));
+        gpio_set_level(SX126X_CS_PIN, 1);
+        xSemaphoreGive(xSPIBusMutex);
+        return SX126X_HAL_STATUS_ERROR;
+    }
 
     /* --- transmit payload (if any) --- */
     if (data && data_len) {
         spi_transaction_t t2 = { 0 };           /* fresh struct -> rxlength = 0 */
         t2.tx_buffer = data;
         t2.length    = data_len * 8;
-        ESP_ERROR_CHECK_WITHOUT_ABORT(spi_device_polling_transmit(sx126x_spi, &t2));
+        ret = spi_device_polling_transmit(sx126x_spi, &t2);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "SPI data write failed: %s", esp_err_to_name(ret));
+            gpio_set_level(SX126X_CS_PIN, 1);
+            xSemaphoreGive(xSPIBusMutex);
+            return SX126X_HAL_STATUS_ERROR;
+        }
     }
 
     gpio_set_level(SX126X_CS_PIN, 1);           /* ↑CS */
-    
+
     xSemaphoreGive(xSPIBusMutex); // Release SPI bus
-    
+
     return SX126X_HAL_STATUS_OK;
 }
 
@@ -158,7 +171,13 @@ sx126x_hal_status_t sx126x_hal_read( const void    *ctx,
     spi_transaction_t t_cmd = { 0 };
     t_cmd.tx_buffer = cmd;
     t_cmd.length    = cmd_len * 8;
-    ESP_ERROR_CHECK_WITHOUT_ABORT(spi_device_polling_transmit(sx126x_spi, &t_cmd));
+    esp_err_t ret = spi_device_polling_transmit(sx126x_spi, &t_cmd);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "SPI cmd read failed: %s", esp_err_to_name(ret));
+        gpio_set_level(SX126X_CS_PIN, 1);
+        xSemaphoreGive(xSPIBusMutex);
+        return SX126X_HAL_STATUS_ERROR;
+    }
 
     /* clock out ‘data_len’ dummy bytes while reading MISO */
     uint8_t dummy = 0;
@@ -167,11 +186,17 @@ sx126x_hal_status_t sx126x_hal_read( const void    *ctx,
     t_rd.length    = data_len * 8;    /* bits out  */
     t_rd.rx_buffer = data;
     t_rd.rxlength  = data_len * 8;    /* bits in   */
-    ESP_ERROR_CHECK_WITHOUT_ABORT(spi_device_polling_transmit(sx126x_spi, &t_rd));
+    ret = spi_device_polling_transmit(sx126x_spi, &t_rd);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "SPI data read failed: %s", esp_err_to_name(ret));
+        gpio_set_level(SX126X_CS_PIN, 1);
+        xSemaphoreGive(xSPIBusMutex);
+        return SX126X_HAL_STATUS_ERROR;
+    }
 
     gpio_set_level(SX126X_CS_PIN, 1);           /* ↑CS */
-    
+
     xSemaphoreGive(xSPIBusMutex); // Release SPI bus
-    
+
     return SX126X_HAL_STATUS_OK;
 }
