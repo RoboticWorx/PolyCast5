@@ -3,30 +3,23 @@
 // AI dev prompt string for BLE HID keyboard script generation
 // Note: this is the compiled default: runtime override may be loaded from NVS via the web portal
 const char AI_PROMPT_AUTOKEY[] =
-  "Generate a BLE HID keystroke script for Windows 11 (US), Chrome installed.\n"
-  "Output ONLY allowed tokens as ONE LINE. End with !END!\n"
+  "BLE HID keystroke script generator for Windows 11 (US).\n"
+  "Output ONLY allowed tokens, ONE LINE, end with !END!\n"
   "\n"
-  "Allowed tokens:\n"
-  "<delay=MS> <hold:KEY=MS> <enter> <tab> <esc> <space> <bs> <del>\n"
-  "<ctrl> <shift> <alt> <opt> <win> <cmd> <up> <down> <left> <right> <pgup> <pgdn>\n"
-  "<f1>-<f12>\n"
-  "Combos with '+' are also allowed: e.g. <ctrl+c> <ctrl+shift+v> <alt+tab> <win+r> <win+s> <ctrl+t> <ctrl+l> etc.\n"
+  "Tokens: <delay=MS> <hold:KEY=MS> <enter> <tab> <esc> <space> <bs> <del> "
+  "<ctrl> <shift> <alt> <opt> <win> <cmd> <up> <down> <left> <right> <pgup> <pgdn> "
+  "<f1>-<f12> plus combos: <ctrl+c> <ctrl+shift+v> <alt+tab> <win+r> <win+s> <ctrl+t> <ctrl+l>\n"
   "\n"
-  "Rules:\n"
-  "- Execute every requested step in order. Do only what was asked.\n"
-  "- Split steps on: then/and then/after that/next/etc.\n"
-  "- ACTION=UI control (open/close/switch/navigate/scroll/wait/lock/play/pause).\n"
-  "- TYPE=write content. Ambiguous -> TYPE. Never skip explicit ACTIONs.\n"
-  "- Never type narration (e.g. \"open chrome\"). Never output real newlines.\n"
-  "- No quotes/JSON/markdown. Use <enter> instead of newlines.\n"
-  "- Web/search only if explicitly asked. tell/explain/list/write -> TYPE the answer.\n"
-  "- Never drop later ACTION steps; long TYPE content: summarize.\n"
-  "- No app is open unless implied.\n"
-  "- If a different OS is specified, create commands for that OS instead..\n"
+  "Default: TYPE the answer directly into wherever the cursor already is.\n"
+  "Only open apps or navigate if the user EXPLICITLY says to (open/launch/go to/navigate/search for).\n"
+  "tell/explain/list/write/type -> just TYPE the text. Do not open anything.\n"
+  "Assume the user's cursor is already where they want text typed.\n"
   "\n"
-  "Delays: default <delay=500>; app/page load <delay=1000>; user wait N sec -> <delay=N000>.\n"
-  "App launch: <win+s><delay=500>APP<delay=500><enter><delay=1000>\n"
-  "App launch iOS specified: <cmd+space><delay=500>APP<delay=500><enter><delay=1000>\n";
+  "Delays: <delay=500> between steps; <delay=1000> after launching apps.\n"
+  "App launch (only if asked): <win+s><delay=500>APP<delay=500><enter><delay=1000>\n"
+  "App launch macOS: <cmd+space><delay=500>APP<delay=500><enter><delay=1000>\n"
+  "If a different OS is specified, use commands for that OS.\n"
+  "No quotes/JSON/markdown. <enter> for newlines. Summarize long content.\n";
 
 // AI dev prompt string for password label location
 const char AI_PROMPT_CREDS[] =

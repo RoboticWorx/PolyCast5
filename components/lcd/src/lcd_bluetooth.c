@@ -887,7 +887,7 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
             lv_obj_set_style_transform_pivot_x(lbl_right, w / 2, 0);
             lv_obj_set_style_transform_pivot_y(lbl_right, h / 2, 0);
             
-            lv_obj_set_style_transform_angle(lbl_right, 900, 0); // 900 = 90.0 degrees (units are 0.1)
+            lv_obj_set_style_transform_rotation(lbl_right, 900, 0); // 900 = 90.0 degrees (units are 0.1)
             
             // Give LVGL a little extra draw area so the rotated glyph isn't clipped
             lv_obj_set_style_transform_width(lbl_right, 8, 0);
@@ -967,7 +967,7 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
             lv_obj_set_style_transform_pivot_x(lbl_left, w / 2, 0);
             lv_obj_set_style_transform_pivot_y(lbl_left, h / 2, 0);
             
-            lv_obj_set_style_transform_angle(lbl_left, 900, 0); // 900 = 90.0 degrees (units are 0.1)
+            lv_obj_set_style_transform_rotation(lbl_left, 900, 0); // 900 = 90.0 degrees (units are 0.1)
             
             // Give LVGL a little extra draw area so the rotated glyph isn't clipped
             lv_obj_set_style_transform_width(lbl_left, 8, 0);
@@ -1391,7 +1391,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         lv_obj_add_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
 
         ai_orb = lv_image_create(ACTIVE_SCR);
-        lv_img_set_src(ai_orb, &img_ai_orb_1);
+        lv_image_set_src(ai_orb, &img_ai_orb_1);
         lv_obj_align(ai_orb, LV_ALIGN_CENTER, 0, 0);
 
         lbl_config = lv_label_create(ACTIVE_SCR);
@@ -1583,7 +1583,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     if (state == AI_KEYB_RECORDING) {
         // Rotate the orb
         orb_angle = (orb_angle + 50) % 3600; // 5 degrees per frame
-        lv_obj_set_style_transform_angle(ai_orb, orb_angle, 0);
+        lv_obj_set_style_transform_rotation(ai_orb, orb_angle, 0);
 
         // When done capturing
         if (select_released) {
@@ -1616,11 +1616,17 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     // Pulse orb on sound heard
     if ((xSemaphoreTake(xAiSoundHeardSemaphore, 0) == pdPASS) && state == AI_KEYB_RECORDING) {
         for (int i = 0; i < 5; ++i) {
-            if      (i == 0) lv_img_set_src(ai_orb, &img_ai_orb_1);
-            else if (i == 1) lv_img_set_src(ai_orb, &img_ai_orb_2);
-            else if (i == 2) lv_img_set_src(ai_orb, &img_ai_orb_3);
-            else if (i == 3) lv_img_set_src(ai_orb, &img_ai_orb_2);
-            else if (i == 4) lv_img_set_src(ai_orb, &img_ai_orb_1);
+            if      (i == 0) lv_image_set_src(ai_orb, &img_ai_orb_1);
+            else if (i == 1) lv_image_set_src(ai_orb, &img_ai_orb_2);
+            else if (i == 2) lv_image_set_src(ai_orb, &img_ai_orb_3);
+            else if (i == 3) lv_image_set_src(ai_orb, &img_ai_orb_2);
+            else if (i == 4) lv_image_set_src(ai_orb, &img_ai_orb_1);
+            lv_obj_update_layout(ai_orb);
+            int w = lv_obj_get_width(ai_orb);
+            int h = lv_obj_get_height(ai_orb);
+            lv_obj_set_style_transform_pivot_x(ai_orb, w / 2, 0);
+            lv_obj_set_style_transform_pivot_y(ai_orb, h / 2, 0);
+            lv_obj_align(ai_orb, LV_ALIGN_CENTER, 0, 0);
             lv_refr_now(NULL);
             vTaskDelay(1 / portTICK_PERIOD_MS);
         }
