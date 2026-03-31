@@ -585,6 +585,7 @@ void lcd_settings_ota_updating_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, sett
     static lv_obj_t *cont = NULL;
     static lv_obj_t *title_lbl = NULL;
     static lv_obj_t *instr_lbl = NULL;
+    static lv_obj_t *ending_lbl = NULL;
 
     static lv_obj_t *prog_row = NULL;
     static lv_obj_t *prog_bar = NULL;
@@ -614,7 +615,7 @@ void lcd_settings_ota_updating_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, sett
         lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
         lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
 
-        // Instructions
+        // Start instructions label
         instr_lbl = lv_label_create(cont);
         lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
         lv_obj_set_width(instr_lbl, lv_pct(100));
@@ -622,10 +623,7 @@ void lcd_settings_ota_updating_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, sett
         lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
         lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
-        const char *instr_text =
-                "Please do not turn off your device.\n\n\n"
-                "If you get stuck at 0% for any reason, please reboot your device by pressing the HOME and RIGHT buttons at the same time then try again.";
-
+        const char *instr_text = "Please do not turn off your device.";
         lv_label_set_text(instr_lbl, instr_text);
 
         // Progress row
@@ -661,19 +659,37 @@ void lcd_settings_ota_updating_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, sett
         lv_obj_set_style_text_color(pct_lbl, user_secondary_color, 0);
         lv_obj_set_style_text_font(pct_lbl, &lv_font_montserrat_14, 0);
 
+        // Recover instructions label
+        ending_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(ending_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(ending_lbl, lv_pct(100));
+        lv_obj_set_style_text_font(ending_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(ending_lbl, user_secondary_color, 0);
+        lv_obj_align_to(ending_lbl, prog_bar, LV_ALIGN_OUT_BOTTOM_MID, 14, 10);
+
+        const char *ending_text =
+                "If you get stuck at 0% for any reason, please reboot your device "
+                "by pressing the HOME and RIGHT buttons at the same time then try again.";
+                
+        lv_label_set_text(ending_lbl, ending_text);
+
         // Start the OTA update
         wifi_ota_update_start(ota_update_url);
 
         init = true;
     }
-
+    
     // Update progress when OTA task posts a new value
     if (xQueueReceive(xWifiOtaPctQueue, &ota_pct, 0) == pdTRUE) {
         // Success
         if (ota_pct == -1) {
+            const char *instr_text = "Update success! Device will restart...";
+            lv_label_set_text(instr_lbl, instr_text);
             lv_bar_set_value(prog_bar, 100, LV_ANIM_ON);
             lv_label_set_text(pct_lbl, "Done!");
         } else if (ota_pct == -2) { // Fail
+            const char *instr_text = "Update failed. Device will restart. Please try again.";
+            lv_label_set_text(instr_lbl, instr_text);
             lv_bar_set_value(prog_bar, 0, LV_ANIM_ON);
             lv_label_set_text(pct_lbl, "Fail!");
         } else { // Normal percentage

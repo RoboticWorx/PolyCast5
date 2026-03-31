@@ -202,9 +202,6 @@ static void ota_task(void *_)
     
     // Abort process
     out:
-    ota_task_handle = NULL;
-    vTaskDelete(NULL);
-
     ESP_LOGE(TAG, "OTA error! Restarting: %s", esp_err_to_name(err));
 
     int fail = -2;
@@ -213,6 +210,10 @@ static void ota_task(void *_)
 
     vTaskDelay(pdMS_TO_TICKS(2000));
     esp_restart(); // Restart
+
+    // Fallback (should not reach here after restart)
+    ota_task_handle = NULL;
+    vTaskDelete(NULL);
 }
 
 static bool http_get_small(const char *url, char *out, size_t out_sz)
@@ -241,7 +242,16 @@ static bool http_get_small(const char *url, char *out, size_t out_sz)
 
     // Reads response headers and returns content length if present
     int cl = esp_http_client_fetch_headers(h);
-    
+
+    // Reject non-200 responses
+    int status = esp_http_client_get_status_code(h);
+    if (status < 200 || status >= 300) {
+        ESP_LOGE(TAG, "http_get_small: HTTP %d", status);
+        esp_http_client_close(h);
+        esp_http_client_cleanup(h);
+        return false;
+    }
+
     // If the server does report a length and it won't fit, abort
     if (cl > 0 && cl >= (int)out_sz) {
         esp_http_client_close(h);

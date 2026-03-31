@@ -17,11 +17,6 @@ void wifi_mqtt_client_init(void);
 void wifi_mqtt_client_destroy(void);
 
 /**
- * @brief Disconnect the MQTT client
- */
-void wifi_mqtt_client_disconnect(void);
-
-/**
  * @brief Stop the MQTT client
  */
 void wifi_mqtt_client_stop(void);

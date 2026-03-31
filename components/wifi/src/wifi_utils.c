@@ -851,7 +851,7 @@ esp_err_t wifi_utils_radio_stop(void)
 
     // Stop client if started
     if (xEventGroupGetBits(xWifiEventGroup) & WIFI_MQTT_CONNECTED_BIT) {
-        wifi_mqtt_client_disconnect();
+        wifi_mqtt_client_stop();
     }
 
     esp_err_t err = esp_wifi_disconnect(); // Disconnect if connected

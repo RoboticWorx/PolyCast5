@@ -115,11 +115,6 @@ void wifi_mqtt_client_destroy(void)
     }
 }
 
-void wifi_mqtt_client_disconnect(void)
-{
-    esp_mqtt_client_start(mqtt_client);
-}
-
 void wifi_mqtt_client_stop(void)
 {
     esp_mqtt_client_stop(mqtt_client);
