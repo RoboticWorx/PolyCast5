@@ -52,14 +52,12 @@ esp_err_t TCA9535Init(void)
 //! @param        Register address
 //! @return        Byte from register
 // ****************************************************************************
-unsigned char TCA9535ReadSingleRegister(tca9535_reg_t address)
+esp_err_t TCA9535ReadSingleRegister(tca9535_reg_t address, uint8_t *out)
 {
     uint8_t reg_addr = (uint8_t)address;
-    uint8_t reg_data = 0;
+    *out = 0;
 
-    i2c_master_transmit_receive(tca9535_dev_handle, &reg_addr, 1, &reg_data, 1, 100);
-
-    return reg_data;
+    return i2c_master_transmit_receive(tca9535_dev_handle, &reg_addr, 1, out, 1, 100);
 }
 
 // ****************************************************************************

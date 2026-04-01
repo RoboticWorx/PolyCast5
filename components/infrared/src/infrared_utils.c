@@ -522,9 +522,22 @@ void infrared_utils_delete_signal_from_remote_nvs(size_t remote_idx, size_t sig_
     // One less
     remotes[remote_idx].num_signals--;
 
-    // Realloc signals and names
-    remotes[remote_idx].signals = realloc(remotes[remote_idx].signals, remotes[remote_idx].num_signals * sizeof(ir_signal_t *));
-    remotes[remote_idx].signal_names = realloc(remotes[remote_idx].signal_names, remotes[remote_idx].num_signals * sizeof(char *));
+    // Realloc signals and names (free if now empty)
+    if (remotes[remote_idx].num_signals == 0) {
+        free(remotes[remote_idx].signals);
+        free(remotes[remote_idx].signal_names);
+        remotes[remote_idx].signals = NULL;
+        remotes[remote_idx].signal_names = NULL;
+    } else {
+        ir_signal_t **new_sigs = realloc(remotes[remote_idx].signals, remotes[remote_idx].num_signals * sizeof(ir_signal_t *));
+        if (new_sigs) {
+            remotes[remote_idx].signals = new_sigs;
+        }
+        char **new_names = realloc(remotes[remote_idx].signal_names, remotes[remote_idx].num_signals * sizeof(char *));
+        if (new_names) {
+            remotes[remote_idx].signal_names = new_names;
+        }
+    }
 
     /* Update NVS with new indexes */
     nvs_handle_t h;

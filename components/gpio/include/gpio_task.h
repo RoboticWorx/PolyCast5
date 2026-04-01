@@ -40,7 +40,6 @@ extern SemaphoreHandle_t xLEDCSemaphore;
 extern QueueHandle_t xAdcBatReadingQueue;
 extern QueueHandle_t xAdcBatBluetoothQueue;
 extern QueueHandle_t xLEDQueue;
-extern QueueHandle_t xLEDCQueue;
 
 /**
  * @brief  Create the GPIO expander task.

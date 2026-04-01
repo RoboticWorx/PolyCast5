@@ -63,13 +63,13 @@ void gpio_utils_init_nvs(void)
 #endif
 }
 
-static void IRAM_ATTR haptic_off_cb(TimerHandle_t xTimer)
+static void haptic_off_cb(TimerHandle_t xTimer)
 {
     gpio_utils_write_output(TCA9535_HAPTIC_PIN, 0);
 }
 
 // Called every RGB_BLINK_PERIOD_MS to toggle the LED
-static void IRAM_ATTR rgb_blink_cb(TimerHandle_t xTimer)
+static void rgb_blink_cb(TimerHandle_t xTimer)
 {
     rgb_blink_state = !rgb_blink_state;
     // Turn the LEDs on or off based on rgb_blink_color + state
@@ -101,7 +101,7 @@ static void IRAM_ATTR rgb_blink_cb(TimerHandle_t xTimer)
     }
 }
 // Called once after RGB_BLINK_TOTAL_MS to stop blinking
-static void IRAM_ATTR rgb_blink_stop_cb(TimerHandle_t xTimer)
+static void rgb_blink_stop_cb(TimerHandle_t xTimer)
 {
     // Stop the periodic toggle (0 timeout: timer callbacks must not block on their own queue)
     xTimerStop(rgb_blink_timer, 0);
@@ -243,9 +243,15 @@ int gpio_utils_read_input(uint8_t pin)
     }
     
     xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
-    uint8_t inputs = TCA9535ReadSingleRegister(TCA9535_INPUT_REG0);
+    uint8_t inputs = 0xFF; // Default: all released (active-low buttons)
+    esp_err_t err = TCA9535ReadSingleRegister(TCA9535_INPUT_REG0, &inputs);
     xSemaphoreGive(xI2CBusMutex); // Release I2C bus
-    
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "gpio_utils_read_input: I2C read failed: %s", esp_err_to_name(err));
+        return 1; // Default: released (active-low)
+    }
+
     return (inputs >> pin) & 0x1;
 }
 
@@ -258,7 +264,13 @@ esp_err_t gpio_utils_write_output(uint8_t pin, bool level)
     
     xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
 
-    uint8_t out = TCA9535ReadSingleRegister(TCA9535_OUTPUT_REG1);
+    uint8_t out = 0;
+    esp_err_t err = TCA9535ReadSingleRegister(TCA9535_OUTPUT_REG1, &out);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "gpio_utils_write_output: I2C read failed for pin %d: %s", pin, esp_err_to_name(err));
+        xSemaphoreGive(xI2CBusMutex); // Release I2C bus
+        return err;
+    }
 
     if (level) {
         out |= (1 << pin);
@@ -266,14 +278,12 @@ esp_err_t gpio_utils_write_output(uint8_t pin, bool level)
         out &= ~(1 << pin);
     }
 
-    esp_err_t err = TCA9535WriteSingleRegister(TCA9535_OUTPUT_REG1, out);
-
+    err = TCA9535WriteSingleRegister(TCA9535_OUTPUT_REG1, out);
     xSemaphoreGive(xI2CBusMutex); // Release I2C bus
-
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "gpio_utils_write_output: Failed to write output pin %d: %s", pin, esp_err_to_name(err));
     }
-    
+
     return err;
 }
 
