@@ -388,7 +388,12 @@ void lcd_format_center_button(lv_obj_t *btn_mid, lv_color_t user_primary_color, 
     lv_color_t darker_user_primary_color = lv_color_darken(user_primary_color, 40); // % darker 
     lv_color_t darker_user_secondary_color = lv_color_darken(user_secondary_color, 20);
     static lv_style_t lbl_mid_style;
-    lv_style_init(&lbl_mid_style);
+    static bool style_inited = false;
+    if (!style_inited) {
+        lv_style_init(&lbl_mid_style);
+        style_inited = true;
+    }
+    lv_style_reset(&lbl_mid_style);
     lv_style_set_radius(&lbl_mid_style, 8); // rounded corners
     lv_style_set_bg_color(&lbl_mid_style, darker_user_primary_color);
     lv_style_set_bg_grad_color(&lbl_mid_style, user_primary_color);
@@ -446,6 +451,11 @@ void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32
 
     // Allocate and populate callback context
     scroll_ctx_t *ctx = malloc(sizeof(*ctx));
+    if (!ctx) {
+        ESP_LOGE(TAG, "lcd_scroll_anim: Failed to allocate scroll context");
+        already_scrolling = false;
+        return;
+    }
     *ctx = (scroll_ctx_t){
       .top = menu->lbl_top,
       .mid = menu->lbl_mid,
@@ -1244,8 +1254,7 @@ void lcd_update_icons(icon_state_t *icon_state, ui_menu_t *ui_menu)
 
 uint8_t lcd_wait_for_bit_better(EventGroupHandle_t event_group, EventBits_t bit, uint32_t timeout_ms)
 {
-    static TickType_t start_tick = 0;
-    start_tick = xTaskGetTickCount();
+    TickType_t start_tick = xTaskGetTickCount();
 
     xSemaphoreTake(xGpioLeftBtnMutex, portMAX_DELAY); // Lock left button mutex
     gpio_waiting_for_left = true;

@@ -60,8 +60,13 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
             // If received on active topic
             if (event->topic_len == strlen(mqtt_active_ack_topic) && strncmp(event->topic, mqtt_active_ack_topic, event->topic_len) == 0) {
+                // Reject oversized payloads to avoid stack overflow
+                if (event->data_len < 0 || event->data_len > 128) {
+                    ESP_LOGW(TAG, "MQTT payload too large (%d), ignoring", event->data_len);
+                    break;
+                }
                 // Format received
-                char payload[event->data_len + 1];
+                char payload[128 + 1];
                 memcpy(payload, event->data, event->data_len);
                 payload[event->data_len] = '\0';
                 
@@ -117,12 +122,16 @@ void wifi_mqtt_client_destroy(void)
 
 void wifi_mqtt_client_stop(void)
 {
-    esp_mqtt_client_stop(mqtt_client);
+    if (mqtt_client) {
+        esp_mqtt_client_stop(mqtt_client);
+    }
 }
 
 void wifi_mqtt_client_start(void)
 {
-    esp_mqtt_client_start(mqtt_client);
+    if (mqtt_client) {
+        esp_mqtt_client_start(mqtt_client);
+    }
 }
 
 void wifi_mqtt_client_publish(char *payload, const uint8_t key[16])

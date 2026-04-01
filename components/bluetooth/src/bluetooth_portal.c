@@ -224,7 +224,7 @@ esp_err_t bluetooth_portal_script_label_get_nvs(uint8_t idx, char *buf, size_t b
 esp_err_t bluetooth_portal_script_body_get_nvs(uint8_t idx, char *buf, size_t buflen, size_t *outlen)
 {
     nvs_handle_t h;
-    
+
     // Open NVS
     esp_err_t err = nvs_open(BT_SCRIPT_NS, NVS_READONLY, &h);
     if (err != ESP_OK) {
@@ -1143,7 +1143,7 @@ static esp_err_t category_one_post(httpd_req_t *req)
     const char *name = j_name->valuestring;
 
     // Validate values
-    if (index < 0 || name == NULL) {
+    if (index < 0 || index >= BT_MAX_CATEGORIES || name == NULL) {
         cJSON_Delete(j);
         free(buf);
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad fields");

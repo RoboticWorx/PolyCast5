@@ -69,32 +69,54 @@ static void espnow_task(void *param)
     configASSERT(xEspSendMqttQueue);
     
     while (1) {
-
         // Key generated and requesting send for LoRa handshake
         if (xQueueReceive(xEspSendEncKeyQueue, received_enc_key, 0) == pdPASS) {
+            esp_err_t err;
+
             // Start radio and initialize ESP-NOW
-            ESP_ERROR_CHECK(espnow_utils_wifi_radio_start(WIFI_CHANNEL));
-            ESP_ERROR_CHECK(espnow_utils_espnow_init(UNIVERSAL_MAC, WIFI_CHANNEL, false, NULL));
-            
+            err = espnow_utils_wifi_radio_start(WIFI_CHANNEL);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "enc_key: radio_start failed: %s", esp_err_to_name(err));
+                continue;
+            }
+            err = espnow_utils_espnow_init(UNIVERSAL_MAC, WIFI_CHANNEL, false, NULL);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "enc_key: espnow_init failed: %s", esp_err_to_name(err));
+                espnow_utils_wifi_radio_stop();
+                continue;
+            }
+
             // Send the data
             espnow_utils_send_data(UNIVERSAL_MAC, received_enc_key, LORA_PCP_ENC_KEY_LEN);
-            
+
             // Stop radio and de-initialize ESP-NOW
-            ESP_ERROR_CHECK(espnow_utils_espnow_deinit());
-            ESP_ERROR_CHECK(espnow_utils_wifi_radio_stop());
-            
+            espnow_utils_espnow_deinit();
+            espnow_utils_wifi_radio_stop();
+
             // Send the data to LCD task to save to NVS under given option
             xQueueSend(xEspSendEncKeyQueueNVS, received_enc_key, portMAX_DELAY);
         }
-        
+
         // Sharing MAC address as unique token for MQTT commands
         if (xQueueReceive(xEspSendMqttQueue, &espnow_mqtt, 0) == pdPASS) {
+            esp_err_t err;
             wifi_utils_radio_stop();
-            
+
             // Start radio and initialize ESP-NOW
-            ESP_ERROR_CHECK(espnow_utils_wifi_radio_start(WIFI_CHANNEL));
-            ESP_ERROR_CHECK(espnow_utils_espnow_init(UNIVERSAL_MAC, WIFI_CHANNEL, false, NULL));
-            
+            err = espnow_utils_wifi_radio_start(WIFI_CHANNEL);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "mqtt: radio_start failed: %s", esp_err_to_name(err));
+                xEventGroupSetBits(xWifiEventGroup, WIFI_RECONNECT_BIT);
+                continue;
+            }
+            err = espnow_utils_espnow_init(UNIVERSAL_MAC, WIFI_CHANNEL, false, NULL);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "mqtt: espnow_init failed: %s", esp_err_to_name(err));
+                espnow_utils_wifi_radio_stop();
+                xEventGroupSetBits(xWifiEventGroup, WIFI_RECONNECT_BIT);
+                continue;
+            }
+
             // Combine the info into a single string
             char payload[134];
             int len = snprintf(
@@ -107,37 +129,42 @@ static void espnow_task(void *param)
                     espnow_mqtt.key[8], espnow_mqtt.key[9], espnow_mqtt.key[10], espnow_mqtt.key[11],
                     espnow_mqtt.key[12], espnow_mqtt.key[13], espnow_mqtt.key[14], espnow_mqtt.key[15]
             );
-            
+
 #ifdef POLYCAST5_DEBUG
             ESP_LOG_BUFFER_HEX("Sending MQTT KEY", espnow_mqtt.key, 16);
             ESP_LOGI(TAG, "Sending MQTT: %s", payload);
 #endif
-            
+
             // Send the data
             espnow_utils_send_data(UNIVERSAL_MAC, (uint8_t*)payload, len);
-            
+
             // Stop radio and de-initialize ESP-NOW
-            ESP_ERROR_CHECK(espnow_utils_espnow_deinit());
-            ESP_ERROR_CHECK(espnow_utils_wifi_radio_stop());
-            
+            espnow_utils_espnow_deinit();
+            espnow_utils_wifi_radio_stop();
+
             // Reconnect to previous network
             xEventGroupSetBits(xWifiEventGroup, WIFI_RECONNECT_BIT);
         }
-        
+
         // Sending ESP32 -> ESP32 command via ESP-NOW
         if (xQueueReceive(xEspSendCmdQueue, &espnow_cmd, 0) == pdPASS) {
+            esp_err_t err;
+
             // Start radio and initialize ESP-NOW
-            ESP_ERROR_CHECK(espnow_utils_wifi_radio_start(WIFI_CHANNEL));
-            if (espnow_utils_espnow_init(espnow_cmd.mac_selected, WIFI_CHANNEL, espnow_cmd.enc, espnow_cmd.enc ? espnow_cmd.lmk : NULL) != ESP_OK) {
-                xSemaphoreGive(xEspCmdTxFailedSemaphore); // Mark as failed TX for LCD
-                
-                // Stop radio and de-initialize ESP-NOW
-                ESP_ERROR_CHECK(espnow_utils_espnow_deinit());
-                ESP_ERROR_CHECK(espnow_utils_wifi_radio_stop());
-            
+            err = espnow_utils_wifi_radio_start(WIFI_CHANNEL);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "cmd: radio_start failed: %s", esp_err_to_name(err));
+                xSemaphoreGive(xEspCmdTxFailedSemaphore);
                 continue;
             }
-            
+            if (espnow_utils_espnow_init(espnow_cmd.mac_selected, WIFI_CHANNEL, espnow_cmd.enc, espnow_cmd.enc ? espnow_cmd.lmk : NULL) != ESP_OK) {
+                ESP_LOGE(TAG, "cmd: espnow_init failed");
+                xSemaphoreGive(xEspCmdTxFailedSemaphore);
+                espnow_utils_espnow_deinit();
+                espnow_utils_wifi_radio_stop();
+                continue;
+            }
+
             // Build a text payload from the cmd (more secure)
             char tx_payload[ESP_NOW_MAX_DATA_LEN];
             int tx_payload_len = snprintf(tx_payload, sizeof(tx_payload), "PolyCast5_Command_Value: %u", espnow_cmd.cmd_to_send); // Send only number of bytes needed
@@ -146,7 +173,7 @@ static void espnow_task(void *param)
                 ESP_LOGE(TAG, "Payload snprintf failed or too long.");
                 tx_payload_len = 0;
             }
-            
+
 #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Sending: %s", tx_payload);
             ESP_LOG_BUFFER_HEX("To MAC", espnow_cmd.mac_selected, ESPNOW_MAC_SIZE);
@@ -154,7 +181,7 @@ static void espnow_task(void *param)
                 ESP_LOG_BUFFER_HEX("LMK", espnow_cmd.lmk, LMK_LEN);
             }
 #endif
-            
+
             // Send the data
             if (espnow_utils_send_data(espnow_cmd.mac_selected, (uint8_t*)tx_payload, tx_payload_len) == ESP_OK) {
                 // Notify the LCD that the transmission was successful
@@ -162,13 +189,13 @@ static void espnow_task(void *param)
             } else {
                 xSemaphoreGive(xEspCmdTxFailedSemaphore); // Mark as failed TX for LCD
             }
-            
+
             // Wait for ACK frame
             vTaskDelay(pdMS_TO_TICKS(100));
-            
+
             // Stop radio and de-initialize ESP-NOW
-            ESP_ERROR_CHECK(espnow_utils_espnow_deinit());
-            ESP_ERROR_CHECK(espnow_utils_wifi_radio_stop());
+            espnow_utils_espnow_deinit();
+            espnow_utils_wifi_radio_stop();
         }
     
         vTaskDelay(pdMS_TO_TICKS(10));

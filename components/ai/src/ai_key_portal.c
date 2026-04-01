@@ -134,8 +134,8 @@ static esp_err_t key_get(httpd_req_t *req)
 static esp_err_t key_post(httpd_req_t *req)
 {
     // Bound content length
-    if (req->content_len > MAX_KEY_BODY) {
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "too big");
+    if (req->content_len <= 0 || req->content_len > MAX_KEY_BODY) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad length");
     }
 
     // Read body
@@ -243,8 +243,8 @@ static esp_err_t keyboard_prompt_get(httpd_req_t *req)
 static esp_err_t keyboard_prompt_post(httpd_req_t *req)
 {
     // Bound content length
-    if (req->content_len > AI_PROMPT_NVS_MAX_LEN) {
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "too big");
+    if (req->content_len <= 0 || req->content_len > AI_PROMPT_NVS_MAX_LEN) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad length");
     }
 
     // Read body
@@ -325,8 +325,8 @@ static esp_err_t pkt_analysis_prompt_get(httpd_req_t *req)
 static esp_err_t pkt_analysis_prompt_post(httpd_req_t *req)
 {
     // Bound content length
-    if (req->content_len > AI_PROMPT_NVS_MAX_LEN) {
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "too big");
+    if (req->content_len <= 0 || req->content_len > AI_PROMPT_NVS_MAX_LEN) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad length");
     }
 
     // Read body

@@ -217,10 +217,18 @@ static void wifi_task(void *param)
                 xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_CONNECTING_BIT); // Not connected / not connecting
             } else {
                 xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // Tell LCD we're trying
-                
-                ESP_ERROR_CHECK(wifi_utils_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password));
-                
-                ESP_ERROR_CHECK(wifi_utils_connect());
+
+                esp_err_t err = wifi_utils_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password);
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "wifi_utils_radio_start failed: %s", esp_err_to_name(err));
+                    xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_CONNECTING_BIT);
+                    continue;
+                }
+                err = wifi_utils_connect();
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "wifi_utils_connect failed: %s", esp_err_to_name(err));
+                    xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_CONNECTING_BIT);
+                }
             }
         }
         

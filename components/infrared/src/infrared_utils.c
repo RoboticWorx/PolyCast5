@@ -278,7 +278,7 @@ void infrared_utils_load_remotes_nvs(void)
 
         // Get remote name
         size_t len = 0;
-        sprintf(key, IR_REMOTE_NAME_FMT, (int)r);
+        snprintf(key, sizeof(key), IR_REMOTE_NAME_FMT, (int)r);
         ret = nvs_get_str(h, key, NULL, &len);
 
         if (ret != ESP_OK || len == 0) { // If empty or missing
@@ -295,30 +295,45 @@ void infrared_utils_load_remotes_nvs(void)
 
         // Get number of signals
         uint32_t nsig = 0;
-        sprintf(key, IR_REMOTE_NSIG_FMT, (int)r);
+        snprintf(key, sizeof(key), IR_REMOTE_NSIG_FMT, (int)r);
         nvs_get_u32(h, key, &nsig); // If fails, nsig stays 0
 
         remotes[r].num_signals = nsig;
         remotes[r].signals = nsig ? malloc(nsig * sizeof(ir_signal_t *)) : NULL;
         remotes[r].signal_names = nsig ? malloc(nsig * sizeof(char *)) : NULL;
 
+        if (nsig && (!remotes[r].signals || !remotes[r].signal_names)) {
+            ESP_LOGE(TAG, "Out of heap loading remote %zu signals", r);
+            free(remotes[r].signals);
+            free(remotes[r].signal_names);
+            remotes[r].signals = NULL;
+            remotes[r].signal_names = NULL;
+            remotes[r].num_signals = 0;
+            continue;
+        }
+
         // Load every signal
         for (size_t s = 0; s < nsig; s++) {
             // Read signal name (can be empty)
-            sprintf(key, IR_SIGNAL_NAME_FMT, (int)r, (int)s);
+            snprintf(key, sizeof(key), IR_SIGNAL_NAME_FMT, (int)r, (int)s);
             
             len = 0;
             if (nvs_get_str(h, key, NULL, &len) == ESP_OK && len) {
                 // Get actual name
                 remotes[r].signal_names[s] = malloc(len);
-                nvs_get_str(h, key, remotes[r].signal_names[s], &len);
+                if (remotes[r].signal_names[s]) {
+                    nvs_get_str(h, key, remotes[r].signal_names[s], &len);
+                } else {
+                    ESP_LOGE(TAG, "Out of heap loading name for remote %zu signal %zu", r, s);
+                    remotes[r].signal_names[s] = strdup("");
+                }
             } else {
                 // Default empty
                 remotes[r].signal_names[s] = strdup("");
             }
 
             // Read signal blob
-            sprintf(key, IR_SIGNAL_BLOB_FMT, (int)r, (int)s);
+            snprintf(key, sizeof(key), IR_SIGNAL_BLOB_FMT, (int)r, (int)s);
             size_t blob_size = 0;
             
             // If good
@@ -360,7 +375,7 @@ void infrared_utils_save_signal_to_remote_nvs(size_t remote_idx, size_t sig_idx,
 
     // Format name key
     char key[32];
-    sprintf(key, IR_SIGNAL_NAME_FMT, (int)remote_idx, (int)sig_idx);
+    snprintf(key, sizeof(key), IR_SIGNAL_NAME_FMT, (int)remote_idx, (int)sig_idx);
     
     // Save name
     ret = nvs_set_str(h, key, name);
@@ -369,7 +384,7 @@ void infrared_utils_save_signal_to_remote_nvs(size_t remote_idx, size_t sig_idx,
     }
 
     // Format signal key
-    sprintf(key, IR_SIGNAL_BLOB_FMT, (int)remote_idx, (int)sig_idx);
+    snprintf(key, sizeof(key), IR_SIGNAL_BLOB_FMT, (int)remote_idx, (int)sig_idx);
     size_t blob_size = sizeof(ir_signal_t) + (sig->length * sizeof(rmt_symbol_word_t));
     
     // Save signal blob
@@ -396,7 +411,7 @@ void infrared_utils_save_remote_nsig_nvs(size_t remote_idx) {
     
     // Format num_signals key
     char key[32];
-    sprintf(key, IR_REMOTE_NSIG_FMT, (int)remote_idx);
+    snprintf(key, sizeof(key), IR_REMOTE_NSIG_FMT, (int)remote_idx);
     
     // Save num_signals
     ret = nvs_set_u32(h, key, (uint32_t)remotes[remote_idx].num_signals);
@@ -420,7 +435,7 @@ void infrared_utils_save_remote_name_nvs(size_t remote_idx)
     
     // Format remote name key
     char key[32];
-    sprintf(key, IR_REMOTE_NAME_FMT, (int)remote_idx);
+    snprintf(key, sizeof(key), IR_REMOTE_NAME_FMT, (int)remote_idx);
     
     // Save name to NVS
     ret = nvs_set_str(h, key, remotes[remote_idx].name);
@@ -452,24 +467,25 @@ void infrared_utils_save_all_remotes_nvs(void)
     char key[32];
     for (size_t r = 0; r < num_remotes; r++) {
         // Format remote name key
-        sprintf(key, IR_REMOTE_NAME_FMT, (int)r);
+        snprintf(key, sizeof(key), IR_REMOTE_NAME_FMT, (int)r);
         nvs_set_str(h, key, remotes[r].name); // Save
 
         // Format num_signals key
-        sprintf(key, IR_REMOTE_NSIG_FMT, (int)r);
+        snprintf(key, sizeof(key), IR_REMOTE_NSIG_FMT, (int)r);
         nvs_set_u32(h, key, (uint32_t)remotes[r].num_signals); // Save
 
         // Save all signals
         for (size_t s = 0; s < remotes[r].num_signals; s++) {
             // Format signals name key
-            sprintf(key, IR_SIGNAL_NAME_FMT, (int)r, (int)s);
+            snprintf(key, sizeof(key), IR_SIGNAL_NAME_FMT, (int)r, (int)s);
             nvs_set_str(h, key, remotes[r].signal_names[s]); // Save
 
             // Format signals key
-            sprintf(key, IR_SIGNAL_BLOB_FMT, (int)r, (int)s);
+            snprintf(key, sizeof(key), IR_SIGNAL_BLOB_FMT, (int)r, (int)s);
             
             // Get signal size
             ir_signal_t *sig = remotes[r].signals[s];
+            if (!sig) continue; // Skip NULL signals
             size_t blob_size = sizeof(ir_signal_t) + (sig->length * sizeof(rmt_symbol_word_t));
             nvs_set_blob(h, key, sig, blob_size); // Save
         }
@@ -523,26 +539,27 @@ void infrared_utils_delete_signal_from_remote_nvs(size_t remote_idx, size_t sig_
     size_t old_ns = ns; // Previous num_signals
     
     // Erase all signals and names
-    sprintf(key, IR_SIGNAL_NAME_FMT, (int)remote_idx, (int)(old_ns - 1));
+    snprintf(key, sizeof(key), IR_SIGNAL_NAME_FMT, (int)remote_idx, (int)(old_ns - 1));
     nvs_erase_key(h, key);
-    sprintf(key, IR_SIGNAL_BLOB_FMT, (int)remote_idx, (int)(old_ns - 1));
+    snprintf(key, sizeof(key), IR_SIGNAL_BLOB_FMT, (int)remote_idx, (int)(old_ns - 1));
     nvs_erase_key(h, key);
 
     // Rewrite current signals and names
     for (size_t i = 0; i < remotes[remote_idx].num_signals; i++) {
         // Format and save name
-        sprintf(key, IR_SIGNAL_NAME_FMT, (int)remote_idx, (int)i);
+        snprintf(key, sizeof(key), IR_SIGNAL_NAME_FMT, (int)remote_idx, (int)i);
         nvs_set_str(h, key, remotes[remote_idx].signal_names[i]);
 
         // Format and save signal
-        sprintf(key, IR_SIGNAL_BLOB_FMT, (int)remote_idx, (int)i);
+        snprintf(key, sizeof(key), IR_SIGNAL_BLOB_FMT, (int)remote_idx, (int)i);
         ir_signal_t *sig = remotes[remote_idx].signals[i];
+        if (!sig) continue; // Skip NULL signals
         size_t blob_size = sizeof(ir_signal_t) + (sig->length * sizeof(rmt_symbol_word_t));
         nvs_set_blob(h, key, sig, blob_size);
     }
 
     // Update num_signals
-    sprintf(key, IR_REMOTE_NSIG_FMT, (int)remote_idx); // Format key
+    snprintf(key, sizeof(key), IR_REMOTE_NSIG_FMT, (int)remote_idx); // Format key
     nvs_set_u32(h, key, (uint32_t)remotes[remote_idx].num_signals); // Save
 
     // Commit changes

@@ -24,6 +24,8 @@
 #define MAX_STORED_SIGNALS 1650 // 30 signals per remote if 50 (33 - 3 default)
 #define MAX_REMOTES 50
 
+#define IR_NUM_BASE_OPTIONS 3 // Remote name, Edit, Add New
+
 // Stored signal structure
 typedef struct {
     size_t length;

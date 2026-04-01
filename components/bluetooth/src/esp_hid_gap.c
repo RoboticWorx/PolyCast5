@@ -866,23 +866,22 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
             return 0;
         }
 
-        // If a valid peer -> save
-        if (rc == 0) {
-            // Save this as a bonded peer
-            bluetooth_nvs_add_to_peers_list(&desc.peer_id_addr);
-            
+        // Save this as a bonded peer
+        bluetooth_nvs_add_to_peers_list(&desc.peer_id_addr);
+
 #ifdef POLYCAST5_DEBUG
-            ESP_LOGI(TAG, "Saving a valid peer");
+        ESP_LOGI(TAG, "Saving a valid peer");
 #endif
-            
-            // If no preferred peer exists, set this one by default
+
+        // If no preferred peer exists, set this one by default
+        {
             bool found = false;
             ble_addr_t pref;
             if (bluetooth_nvs_get_preferred_peer(&pref, &found) != ESP_OK || !found) {
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Saving as preferred peer");
 #endif
-            
+
                 // Save preferred peer to whitelist
                 esp_err_t err = bluetooth_nvs_set_preferred_peer(&desc.peer_id_addr);
 #ifdef POLYCAST5_DEBUG
@@ -913,7 +912,10 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
 
         /* Delete the old bond. */
         rc = ble_gap_conn_find(event->repeat_pairing.conn_handle, &desc);
-        assert(rc == 0);
+        if (rc != 0) {
+            ESP_LOGE(TAG, "ble_gap_conn_find failed on repeat_pairing: %d", rc);
+            return 0;
+        }
         ble_store_util_delete_peer(&desc.peer_id_addr);
 
         /* Return BLE_GAP_REPEAT_PAIRING_RETRY to indicate that the host should

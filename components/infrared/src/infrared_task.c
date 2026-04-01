@@ -141,12 +141,25 @@ static void infrared_task(void *pvParameters) {
             // Append to the current remote
             size_t ns = remotes[ir_current_remote].num_signals; // Number of signals already in remote
             
-            // Resize the dynamic array to hold another signal
-            remotes[ir_current_remote].signals = realloc(remotes[ir_current_remote].signals, (ns + 1) * sizeof(ir_signal_t *));
-            
-            // Resize the dynamic array to hold another signal name
-            remotes[ir_current_remote].signal_names = realloc(remotes[ir_current_remote].signal_names, (ns + 1) * sizeof(char *));
-            
+            // Resize the dynamic arrays (use temp to avoid losing original on realloc failure)
+            ir_signal_t **new_sigs = realloc(remotes[ir_current_remote].signals, (ns + 1) * sizeof(ir_signal_t *));
+            char **new_names = realloc(remotes[ir_current_remote].signal_names, (ns + 1) * sizeof(char *));
+            if (!new_sigs || !new_names) {
+                ESP_LOGE(TAG, "Out of heap for signal array realloc");
+                if (new_sigs) {
+                    remotes[ir_current_remote].signals = new_sigs;
+                }
+                if (new_names) {
+                    remotes[ir_current_remote].signal_names = new_names;
+                }
+                free(sig);
+                infrared_utils_restart_rx();
+                xSemaphoreGive(xInfraredDataMutex);
+                continue;
+            }
+            remotes[ir_current_remote].signals = new_sigs;
+            remotes[ir_current_remote].signal_names = new_names;
+
             // Save the signal to remote
             remotes[ir_current_remote].signals[ns] = sig;
             remotes[ir_current_remote].signal_names[ns] = strdup(""); // Temporary empty name
@@ -175,15 +188,33 @@ static void infrared_task(void *pvParameters) {
             // Negative means delete index ir_menu_sig_idx
             if (ir_menu_sig_idx < 0) {
                 ir_menu_sig_idx = -ir_menu_sig_idx; // Make positive
-                size_t sig_idx = (size_t) ir_menu_sig_idx - 3; // Offset for 0-based
-                
+                if (ir_menu_sig_idx < IR_NUM_BASE_OPTIONS) {
+                    ESP_LOGE(TAG, "Invalid delete index %d", ir_menu_sig_idx);
+                    xSemaphoreGive(xInfraredDataMutex);
+                    continue;
+                }
+                size_t sig_idx = (size_t) ir_menu_sig_idx - IR_NUM_BASE_OPTIONS; // Offset for 0-based
+
                 infrared_utils_delete_signal_from_remote_nvs(ir_current_remote, sig_idx);
             } else { // Else send the signal at that index
-                size_t sig_idx = (size_t) ir_menu_sig_idx - 3; // Offset for 0-based
-            
+                if (ir_menu_sig_idx < IR_NUM_BASE_OPTIONS) {
+                    ESP_LOGE(TAG, "Invalid TX index %d", ir_menu_sig_idx);
+                    xSemaphoreGive(xInfraredDataMutex);
+                    continue;
+                }
+                size_t sig_idx = (size_t) ir_menu_sig_idx - IR_NUM_BASE_OPTIONS; // Offset for 0-based
+
+                // Bounds check
+                if (sig_idx >= remotes[ir_current_remote].num_signals ||
+                        !remotes[ir_current_remote].signals[sig_idx]) {
+                    ESP_LOGE(TAG, "Signal index %zu out of range for remote %zu", sig_idx, ir_current_remote);
+                    xSemaphoreGive(xInfraredDataMutex);
+                    continue;
+                }
+
                 // Get signal from current remote
                 ir_signal_t *sig = remotes[ir_current_remote].signals[sig_idx];
-                
+
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Replaying signal %zu for remote %zu (%zu pulses)", sig_idx, ir_current_remote, sig->length);
 #endif

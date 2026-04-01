@@ -87,6 +87,12 @@ static int srs_find_by_page(uint16_t page)
 // Check if a page is due
 static bool srs_is_due(const srs_entry_t *e, uint32_t today)
 {
+    // Bounds check against corrupted NVS data
+    if (e->step >= SRS_NUM_STEPS) {
+        ESP_LOGE(TAG, "Invalid step %u for page %u", e->step, e->page);
+        return false;
+    }
+
     // Due if today is later than or on the day added + current step interval
     uint16_t interval = srs_days[e->step];
     return (today >= e->start_day + interval);

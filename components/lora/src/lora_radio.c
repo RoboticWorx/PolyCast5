@@ -16,9 +16,13 @@ void lora_radio_set_rx_mode(void)
     #define RTC_FREQ_HZ 32768U
     #define MS_TO_RTC_STEP(ms) ((uint32_t)(((uint64_t)(ms) * RTC_FREQ_HZ) / 1000U))
 
-    // Poll for SX1262 to be ready
-    while (gpio_get_level(SX126X_BUSY_PIN) == 1) {
-        vTaskDelay(pdMS_TO_TICKS(1));
+    // Wait for SX126x to be ready (BUSY pin goes low)
+    for (int i = 0; i < 1000 && gpio_get_level(SX126X_BUSY_PIN); ++i) {
+        vTaskDelay(1);
+    }
+    if (gpio_get_level(SX126X_BUSY_PIN) == 1) {
+        ESP_LOGE(TAG, "BUSY timeout in lora_radio_set_rx_mode");
+        return;
     }
 
     // Enter RX mode
@@ -33,9 +37,13 @@ void lora_radio_set_rx_mode(void)
 
 bool lora_radio_tx(uint8_t tx_data[], uint8_t data_len)
 {
-    // Poll for SX1262 to be ready
-    while (gpio_get_level(SX126X_BUSY_PIN) == 1) {
-        vTaskDelay(pdMS_TO_TICKS(1));
+    // Wait for SX126x to be ready (BUSY pin goes low)
+    for (int i = 0; i < 1000 && gpio_get_level(SX126X_BUSY_PIN); ++i) {
+        vTaskDelay(1);
+    }
+    if (gpio_get_level(SX126X_BUSY_PIN) == 1) {
+        ESP_LOGE(TAG, "BUSY timeout in lora_radio_tx");
+        return false;
     }
 
     // Update payload length for this transmission

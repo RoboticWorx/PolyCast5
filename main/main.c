@@ -108,14 +108,16 @@ void app_main(void)
         return;
     }
     
+    // Create SPI mutex before any SPI usage
+    xSPIBusMutex = xSemaphoreCreateMutex();
+    configASSERT(xSPIBusMutex);
+
     // Initialize various
     lcd_init_driver();
     lcd_lvgl_init();
     spi_sx126x_init();
-    
-    // Create Mutexes used at boot
-    xSPIBusMutex = xSemaphoreCreateMutex();
-    configASSERT(xSPIBusMutex); // Ensure success
+
+    // Create remaining mutexes
     xHapticsMutex = xSemaphoreCreateMutex();
     configASSERT(xHapticsMutex);
     xRgbLedMutex = xSemaphoreCreateMutex();

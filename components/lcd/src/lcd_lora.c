@@ -626,6 +626,10 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
             // Release old string then reallocate
             free(lora_menu->options[lora_menu->index]);
             lora_menu->options[lora_menu->index] = strdup(saved_name);
+            if (!lora_menu->options[lora_menu->index]) {
+                ESP_LOGE(TAG, "strdup failed for rename");
+                lora_menu->options[lora_menu->index] = strdup("???");
+            }
 
             // Persist to NVS
             lcd_lora_menu_nvs_save(lora_menu);
@@ -647,6 +651,10 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 
             // Save to options, then to NVS
             char *name_copy = strdup(saved_name);
+            if (!name_copy) {
+                ESP_LOGE(TAG, "strdup failed for new remote");
+                name_copy = strdup("???");
+            }
             lora_menu->options[lora_menu->size - 1] = name_copy;
             lcd_lora_menu_nvs_save(lora_menu);
             

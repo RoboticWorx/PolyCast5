@@ -802,8 +802,12 @@ esp_err_t wifi_utils_connect(void)
 
 esp_err_t wifi_utils_radio_start(const char *ssid, const uint8_t* bssid, const char *password)
 {
+    if (!ssid || !password) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
     wifi_config_t cfg = {0};
-    
+
     // Copy in SSID and password
     strlcpy((char*)cfg.sta.ssid, ssid, sizeof(cfg.sta.ssid));
     strlcpy((char*)cfg.sta.password, password, sizeof(cfg.sta.password));
@@ -928,12 +932,16 @@ esp_err_t wifi_utils_radio_cycle(void)
 
 wifi_login_t wifi_utils_get_prev(void)
 {
-    wifi_config_t current;
-    ESP_ERROR_CHECK(esp_wifi_get_config(WIFI_IF_STA, &current));
-    
-    wifi_login_t prev;
-    strlcpy(prev.ssid, (char *)current.sta.ssid, sizeof(current.sta.ssid));
-    strlcpy(prev.password, (char *)current.sta.password, sizeof(current.sta.password));
+    wifi_config_t current = {0};
+    wifi_login_t prev = {0};
+
+    esp_err_t err = esp_wifi_get_config(WIFI_IF_STA, &current);
+	if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get Wi-Fi config: %s", esp_err_to_name(err));
+    } else {
+        strlcpy(prev.ssid, (char *)current.sta.ssid, sizeof(prev.ssid));
+        strlcpy(prev.password, (char *)current.sta.password, sizeof(prev.password));
+    }
     
     return prev;
 }

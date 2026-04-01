@@ -103,8 +103,8 @@ static void IRAM_ATTR rgb_blink_cb(TimerHandle_t xTimer)
 // Called once after RGB_BLINK_TOTAL_MS to stop blinking
 static void IRAM_ATTR rgb_blink_stop_cb(TimerHandle_t xTimer)
 {
-    // Stop the periodic toggle
-    xTimerStop(rgb_blink_timer, portMAX_DELAY);
+    // Stop the periodic toggle (0 timeout: timer callbacks must not block on their own queue)
+    xTimerStop(rgb_blink_timer, 0);
 
     // Ensure all LEDs off
     gpio_utils_write_output(TCA9535_RED_RGB_LED_PIN, 0);
@@ -257,17 +257,17 @@ esp_err_t gpio_utils_write_output(uint8_t pin, bool level)
     }
     
     xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
+
     uint8_t out = TCA9535ReadSingleRegister(TCA9535_OUTPUT_REG1);
-    xSemaphoreGive(xI2CBusMutex); // Release I2C bus
-    
+
     if (level) {
         out |= (1 << pin);
     } else {
         out &= ~(1 << pin);
     }
-    
-    xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
+
     esp_err_t err = TCA9535WriteSingleRegister(TCA9535_OUTPUT_REG1, out);
+
     xSemaphoreGive(xI2CBusMutex); // Release I2C bus
 
     if (err != ESP_OK) {

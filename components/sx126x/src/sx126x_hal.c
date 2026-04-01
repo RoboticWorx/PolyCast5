@@ -90,6 +90,7 @@ sx126x_hal_status_t sx126x_hal_wakeup(const void *context) {
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "SPI transmit failed: %s", esp_err_to_name(ret));
         gpio_set_level(SX126X_CS_PIN, 1); // CS high on failure
+        xSemaphoreGive(xSPIBusMutex); // Release SPI bus before returning
         return SX126X_HAL_STATUS_ERROR;
     }
 
@@ -97,10 +98,15 @@ sx126x_hal_status_t sx126x_hal_wakeup(const void *context) {
     gpio_set_level(SX126X_CS_PIN, 1);
 
     // Wait for SX126x to be ready (BUSY pin goes low)
-    while (gpio_get_level(SX126X_BUSY_PIN) == 1) {
-        vTaskDelay(pdMS_TO_TICKS(1)); // Small delay to avoid busy-waiting
+    for (int i = 0; i < 1000 && gpio_get_level(SX126X_BUSY_PIN); ++i) {
+        vTaskDelay(1);
     }
-    
+    if (gpio_get_level(SX126X_BUSY_PIN) == 1) {
+        ESP_LOGE(TAG, "SX126x BUSY timeout in wakeup");
+        xSemaphoreGive(xSPIBusMutex);
+        return SX126X_HAL_STATUS_ERROR;
+    }
+
     xSemaphoreGive(xSPIBusMutex); // Release SPI bus
 
     return SX126X_HAL_STATUS_OK;
@@ -114,9 +120,17 @@ sx126x_hal_status_t sx126x_hal_write( const void      *ctx,
                                       uint16_t         data_len )
 {
     xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
-    
+
     (void)ctx;
-    while (gpio_get_level(SX126X_BUSY_PIN)) vTaskDelay(1);
+    // Wait for SX126x to be ready (BUSY pin goes low)
+    for (int i = 0; i < 1000 && gpio_get_level(SX126X_BUSY_PIN); ++i) {
+        vTaskDelay(1);
+    }
+    if (gpio_get_level(SX126X_BUSY_PIN) == 1) {
+        ESP_LOGE(TAG, "SX126x BUSY timeout in write");
+        xSemaphoreGive(xSPIBusMutex);
+        return SX126X_HAL_STATUS_ERROR;
+    }
 
     gpio_set_level(SX126X_CS_PIN, 0);           /* ↓CS */
 
@@ -163,7 +177,15 @@ sx126x_hal_status_t sx126x_hal_read( const void    *ctx,
     xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
     
     (void)ctx;
-    while (gpio_get_level(SX126X_BUSY_PIN)) vTaskDelay(1);
+    // Wait for SX126x to be ready (BUSY pin goes low)
+    for (int i = 0; i < 1000 && gpio_get_level(SX126X_BUSY_PIN); ++i) {
+        vTaskDelay(1);
+    }
+    if (gpio_get_level(SX126X_BUSY_PIN) == 1) {
+        ESP_LOGE(TAG, "SX126x BUSY timeout in read");
+        xSemaphoreGive(xSPIBusMutex);
+        return SX126X_HAL_STATUS_ERROR;
+    }
 
     gpio_set_level(SX126X_CS_PIN, 0);           /* ↓CS */
 

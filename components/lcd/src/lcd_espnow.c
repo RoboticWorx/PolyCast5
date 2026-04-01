@@ -176,8 +176,13 @@ void lcd_espnow_update_menu(espnow_menu_t *menu)
     lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
 }
 
-static bool display_mac_and_lmk(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
+static void display_mac_and_lmk(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 {
+    if (espnow_menu->size >= MAX_ESPNOW_OPTIONS) {
+        ESP_LOGE(TAG, "ESP-NOW menu full, cannot add LMK");
+        return;
+    }
+
     // Hide all but right arrow
     lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
@@ -210,26 +215,26 @@ static bool display_mac_and_lmk(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
         }
     }
     *p = '\0'; // Ensure null‐termination
-    
+
     memcpy(espnow_menu->lmk[espnow_menu->size], lmk, LMK_LEN); // Save to struct
     
     // Create and format ins labels
     lv_obj_t *lbl_ins = lv_label_create(ACTIVE_SCR);
     lcd_format_label(lbl_ins, "Write this down!", user_secondary_color,
-                 &lv_font_montserrat_18, LV_ALIGN_TOP_LEFT, 5, 2);
+            &lv_font_montserrat_18, LV_ALIGN_TOP_LEFT, 5, 2);
                  
     lv_obj_t *lbl_ok = lv_label_create(ACTIVE_SCR);
     lcd_format_label(lbl_ok, "OK", user_secondary_color,
-                 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
+            &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
                  
     lv_obj_t *lbl_my_mac = lv_label_create(ACTIVE_SCR);
     lcd_format_label(lbl_my_mac, mac_str, user_secondary_color,
-                 &lv_font_montserrat_18, LV_ALIGN_LEFT_MID, 5, -20);
+            &lv_font_montserrat_18, LV_ALIGN_LEFT_MID, 5, -20);
                  
     lv_obj_t *lbl_lmk = lv_label_create(ACTIVE_SCR);
     lcd_format_label(lbl_lmk, lmk_str, user_secondary_color,
-                 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_LEFT, 5, -2);    
-                    
+            &lv_font_montserrat_18, LV_ALIGN_BOTTOM_LEFT, 5, -2);    
+
     while (1) {
         lv_timer_handler();
         
@@ -251,7 +256,7 @@ static bool display_mac_and_lmk(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
             ui_menu->page = ESPNOW_NAME_PAGE;
             
             // Go back
-            return false;
+            return;
         }
         
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -265,15 +270,15 @@ static bool prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
     // Create and format ins labels
     lv_obj_t *lbl_ask_enc = lv_label_create(ACTIVE_SCR);
     lcd_format_label(lbl_ask_enc, "     Would you like\nto setup encryption?", user_secondary_color,
-                 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+            &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
                  
     lv_obj_t *lbl_enc_yes = lv_label_create(ACTIVE_SCR);
     lcd_format_label(lbl_enc_yes, "YES", user_secondary_color,
-                 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 13);
+            &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 13);
                  
     lv_obj_t *lbl_enc_no = lv_label_create(ACTIVE_SCR);
     lcd_format_label(lbl_enc_no, "NO", user_secondary_color,
-                 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
+            &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
                     
     while (1) {
         lv_timer_handler();
