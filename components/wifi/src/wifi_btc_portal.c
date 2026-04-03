@@ -15,6 +15,7 @@
 #include "esp_netif_ip_addr.h" // For IPSTR/IP2STR
 
 #include "wifi_btc_portal.h"
+#include "wifi_btc_portal_html.h"
 
 #define TAG "WIFI_BTC_PORTAL"
 
@@ -35,34 +36,13 @@ static esp_netif_t *btc_ap_netif = NULL;
 static char btc_portal_ssid[32] = "PolyCast5-BTC-Portal"; // AP SSID
 static char btc_portal_ip[16] = "192.168.4.1"; // AP IP cached
 
-// HTML (single page)
-static const char *HTML =
-"<!doctype html><meta charset=utf-8>"
-"<meta name=viewport content='width=device-width,initial-scale=1'>"
-"<title>PolyCast5 BTC Portal</title>"
-"<style>body{font-family:system-ui,Arial,sans-serif;margin:16px;max-width:640px}"
-"label{display:block;margin:8px 0 4px}input{width:100%;font-size:16px;padding:8px}</style>"
-"<h2>PolyCast5 BTC Portal</h2>"
-"<p>Paste in your <b>public</b> Bitcoin address below and click save. (e.g., <code>bc1q...</code> or <code>bc1p...</code>)</p>"
-"<p>PolyCast5 will then show it as a QR on-screen!</p>"
-"<label>Address</label><input id=addr placeholder='bc1q...'>"
-"<p><button id=save>Save</button> <span id=msg></span></p>"
-"<script>"
-"async function load(){let r=await fetch('/api/address');if(!r.ok)return;let j=await r.json();"
-"document.getElementById('addr').value=j.address||'';}"
-"async function save(){let address=document.getElementById('addr').value.trim();"
-"let r=await fetch('/api/address',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({address})});"
-"document.getElementById('msg').textContent=r.ok?'Saved!':'Save failed';}"
-"document.getElementById('save').onclick=save;load();"
-"</script>";
-
 /* =============== HTTP handlers =============== */
 
 static esp_err_t root_get(httpd_req_t *req)
 {
     // Serve HTML
     httpd_resp_set_type(req, "text/html");
-    return httpd_resp_send(req, HTML, HTTPD_RESP_USE_STRLEN);
+    return httpd_resp_send(req, WIFI_BTC_PORTAL_HTML, HTTPD_RESP_USE_STRLEN);
 }
 
 static esp_err_t addr_get(httpd_req_t *req)

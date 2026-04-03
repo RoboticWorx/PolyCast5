@@ -444,31 +444,97 @@ esp_err_t bluetooth_portal_category_delete_nvs(uint8_t idx)
     // Decrement count
     count--;
     nvs_set_u8(h, BT_SCRIPT_CAT_COUNT, count);
-    
-    // Update all script categories: decrement if > idx
-    uint8_t script_count = bluetooth_portal_script_count_get_nvs();
-    for (uint8_t s = 0; s < script_count; ++s) {
-        char cat_key[16];
-        snprintf(cat_key, sizeof(cat_key), BT_SCRIPT_CAT_KEY_FMT, s);
-        uint8_t cat;
 
-        if (nvs_get_u8(h, cat_key, &cat) == ESP_OK) {
-            if (cat > idx) {
-                cat--;
-                nvs_set_u8(h, cat_key, cat);
-            } else if (cat == idx) {
-                // Optional: set to 0 (default cat) or delete script? Here, set to 0.
-                nvs_set_u8(h, cat_key, 0);
+    // Pre-allocate body buffer BEFORE committing category changes so OOM
+    // cannot leave categories committed with scripts not cleaned up
+    char *body_buf = (char *)malloc(MAX_HTTP_BODY_TXT + 1);
+    if (body_buf == NULL) {
+        nvs_close(h);
+        return ESP_ERR_NO_MEM;
+    }
+
+    // Commit and close before script cleanup (script NVS functions open their own handles)
+    err = nvs_commit(h);
+    nvs_close(h);
+
+    if (err != ESP_OK) {
+        free(body_buf);
+        return err;
+    }
+
+    // Delete scripts belonging to the removed category and update remaining cat indices
+    // Iterate in reverse so that shift operations only affect already-processed positions
+    esp_err_t script_err = ESP_OK;
+    uint8_t sc = bluetooth_portal_script_count_get_nvs();
+    char next_label[BT_SCRIPT_LABEL_MAX_LEN + 1];
+
+    for (int s = (int)sc - 1; s >= 0; --s) {
+        uint8_t cat = 0;
+        if (bluetooth_portal_script_cat_idx_get_nvs((uint8_t)s, &cat) != ESP_OK) {
+            script_err = ESP_FAIL;
+            continue;
+        }
+
+        if (cat == idx) {
+            // Delete this script: shift everything above it down by one
+            // Track per-script success so we only finalize (decrement/clear) on full success
+            bool shift_ok = true;
+
+            for (uint8_t i = (uint8_t)s; i + 1 < sc; ++i) {
+                next_label[0] = '\0';
+                size_t blen = 0;
+                uint8_t next_cat = 0;
+
+                esp_err_t rl = bluetooth_portal_script_label_get_nvs(i + 1, next_label, sizeof(next_label));
+                esp_err_t rb = bluetooth_portal_script_body_get_nvs(i + 1, body_buf, MAX_HTTP_BODY_TXT + 1, &blen);
+                esp_err_t rc = bluetooth_portal_script_cat_idx_get_nvs(i + 1, &next_cat);
+
+                if (rl != ESP_OK || rb != ESP_OK || rc != ESP_OK) {
+                    shift_ok = false;
+                    break; // Abort shift - leave existing data intact
+                }
+
+                if (bluetooth_script_label_set_nvs(i, next_label) != ESP_OK ||
+                        bluetooth_script_body_set_nvs(i, (blen > 0) ? body_buf : "") != ESP_OK ||
+                        bluetooth_portal_script_cat_idx_set_nvs(i, next_cat) != ESP_OK) {
+                    shift_ok = false;
+                    break;
+                }
+            }
+
+            if (shift_ok) {
+                // Shift succeeded - safe to clear tail and decrement count
+                sc--;
+
+                if (bluetooth_script_label_set_nvs(sc, "") != ESP_OK ||
+                        bluetooth_script_body_set_nvs(sc, "") != ESP_OK ||
+                        bluetooth_portal_script_cat_idx_set_nvs(sc, 0) != ESP_OK ||
+                        bluetooth_script_count_set_nvs(sc) != ESP_OK) {
+                    script_err = ESP_FAIL;
+                }
+            } else {
+                // Shift failed - don't decrement or clear, stop further deletions
+                script_err = ESP_FAIL;
+                break;
+            }
+        } else if (cat > idx) {
+            // Category index shifted down, update to match
+            if (bluetooth_portal_script_cat_idx_set_nvs((uint8_t)s, cat - 1) != ESP_OK) {
+                script_err = ESP_FAIL;
             }
         }
     }
-    
-    // Commit
-    err = nvs_commit(h);
-    
-    // Close NVS
-    nvs_close(h);
-    return err;
+
+    free(body_buf);
+
+    // Category deletion was already committed
+    // Script cleanup errors are logged but not surfaced to the caller:
+    // returning failure would invite a retry on the already-shifted index, risking cascading data loss
+    if (script_err != ESP_OK) {
+        ESP_LOGE(TAG, "Category %u deleted but script cleanup had errors", (unsigned)idx);
+    }
+
+    return ESP_OK;
 }
 
 esp_err_t bluetooth_portal_wifi_pass_save_nvs(const char *val)
@@ -608,7 +674,9 @@ static bool resolve_global_index_for_local(uint8_t cat, uint8_t local_index, boo
     // If not found and caller wants to create at the tail of this category,
     // allow appending a brand-new script at the end of the global list
     // when local_index == number of scripts in this category.
-    if (create && local_index == seen) {
+    // Reject if at capacity: total < 255 allows append at index 254 (count->255)
+    // total == 255 would append at 255, and count 255+1 overflows uint8 to 0
+    if (create && local_index == seen && total < BT_MAX_KEYBOARD_SCRIPTS) {
         *out_global = total; // append at tail (new global index)
         return true;
     }
@@ -806,6 +874,14 @@ static esp_err_t script_one_post(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing index/name/body");
     }
 
+    // Validate index range before uint8 cast (254 max: 255 is LCD sentinel,
+    // and appending at 255 would overflow count to 0 via uint8 wrap)
+    if (jidx->valueint < 0 || jidx->valueint > 254) {
+        cJSON_Delete(j);
+        free(buf);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "index out of range");
+    }
+
     // Pull values
     uint8_t idx_local_or_global = (uint8_t)jidx->valueint;
     const char *name_in = jname->valuestring;
@@ -815,6 +891,11 @@ static esp_err_t script_one_post(httpd_req_t *req)
     uint8_t cat = 0;
     bool has_cat = false;
     if (cJSON_IsNumber(jcat)) {
+        if (jcat->valueint < 0 || jcat->valueint >= BT_MAX_CATEGORIES) {
+            cJSON_Delete(j);
+            free(buf);
+            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "cat out of range");
+        }
         cat = (uint8_t)jcat->valueint;
         has_cat = true;
     }
@@ -1006,7 +1087,25 @@ static esp_err_t categories_get(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
     }
 
-    // Populate names
+    // Script counts per category (for authoritative append index)
+    cJSON *script_counts = cJSON_AddArrayToObject(root, "script_counts");
+    if (script_counts == NULL) {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+    }
+
+    // Count scripts per category in a single pass over all scripts
+    uint8_t total_scripts = bluetooth_portal_script_count_get_nvs();
+    uint8_t per_cat[BT_MAX_CATEGORIES] = {0};
+
+    for (uint8_t s = 0; s < total_scripts; ++s) {
+        uint8_t c = 0;
+        if (bluetooth_portal_script_cat_idx_get_nvs(s, &c) == ESP_OK && c < count) {
+            per_cat[c]++;
+        }
+    }
+
+    // Populate names and script counts
     for (uint8_t i = 0; i < count; ++i) {
         char buf[BT_CAT_LABEL_MAX_LEN + 1];
 
@@ -1015,6 +1114,8 @@ static esp_err_t categories_get(httpd_req_t *req)
         } else {
             cJSON_AddItemToArray(names, cJSON_CreateString("(unnamed)"));
         }
+
+        cJSON_AddItemToArray(script_counts, cJSON_CreateNumber(per_cat[i]));
     }
 
     // Serialize
