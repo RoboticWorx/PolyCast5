@@ -282,7 +282,7 @@ const char *BLUETOOTH_WEB_PORTAL_HTML =
 "    <p class=\"small-note\">Category indexes are 0-based (0, 1, 2, ...).</p>\n"
 "    <p>\n"
 "      A tutorial is also available here:\n"
-"      <a href=\"https://polycast5.com/blogs/docs/using-the-bluetooth-auto-keyboard/\" target=\"_blank\" rel=\"noopener noreferrer\">polycast5.com/blogs/docs/using-the-bluetooth-auto-keyboard</a>\n"
+"      <a href=\"https://polycast5.com/blogs/docs/bluetooth-auto-keyboard/\" target=\"_blank\" rel=\"noopener noreferrer\">polycast5.com/blogs/docs/bluetooth-auto-keyboard</a>\n"
 "    </p>\n"
 
 "    <div>\n"

@@ -185,9 +185,8 @@ const char *AI_PORTAL_HTML =
 "    </p>\n"
 "    <p>\n"
 "      If you don't have an API key, visit\n"
-"      <a href=\"https://console.x.ai\" target=\"_blank\" rel=\"noopener noreferrer\">console.x.ai</a>\n"
-"      to get one for cheap ($5). Simply click the link, then go to\n"
-"      'Create an API key', name the key (e.g. 'PolyCast5'), and click 'Create API key'.\n"
+"      <a href=\"https://polycast5.com/blogs/docs/ai-keyboard\" target=\"_blank\" rel=\"noopener noreferrer\">polycast5.com/blogs/docs/ai-keyboard</a>\n"
+"      for a tutorial on how to get one for cheap ($5).\n"
 "    </p>\n"
 "    <p class=\"small-note\">For security, the key is not displayed after saving.</p>\n"
 

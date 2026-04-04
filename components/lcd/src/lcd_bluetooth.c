@@ -1232,6 +1232,10 @@ void lcd_bluetooth_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blueto
     static lv_obj_t *cont = NULL;
     static lv_obj_t *title_lbl = NULL;
     static lv_obj_t *instr_lbl = NULL;
+    static lv_obj_t *wifi_creds_lbl = NULL;
+    static lv_obj_t *middle_lbl = NULL;
+    static lv_obj_t *wifi_ip_lbl = NULL;
+    static lv_obj_t *ending_lbl = NULL;
     
     if (!init) {
         // Create a scrollable container for the instructions
@@ -1261,19 +1265,53 @@ void lcd_bluetooth_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blueto
         lv_obj_set_width(instr_lbl, lv_pct(100)); // Full width for wrapping
         lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
         lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
-        lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
-
-        // TODO: Write this article
-        // Set custom text based on hotkey index
-        const char *instr_text = 
+        lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+        // Set text
+        const char *instr_text =
                 "To utilize the power of AI, an API key is needed. Don't worry, it's easy to get!\n\n"
-                "Here you can add/edit your API key as well as adjust the AI keyboard system prompt for customization.\n\n"
-                "Please follow the instructions in the article below:\n\n"
-                "polycast5.com/blogs\n/docs/ai-keyboard\n\n"
-                "SSID: %s\nPass: %s\n\n"
-                "Do NOT leave this page until you're done!";
+                "Join the following Wi-Fi network using your phone/PC:\n\n";
+        lv_label_set_text(instr_lbl, instr_text);
+
+        // Pairing pin label
+        wifi_creds_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(wifi_creds_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(wifi_creds_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(wifi_creds_lbl, &lv_font_montserrat_16, 0);
+        lv_obj_set_style_text_color(wifi_creds_lbl, user_secondary_color, 0);
+        lv_obj_align_to(wifi_creds_lbl, instr_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, -23);
+        lv_label_set_text_fmt(wifi_creds_lbl, "%s\nPass: %s", ai_key_portal_get_ssid(), ai_key_portal_get_pass());
+
+        // Middle label
+        middle_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(middle_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(middle_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(middle_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(middle_lbl, user_secondary_color, 0);
+        lv_obj_align_to(middle_lbl, wifi_creds_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+        const char *middle_text = "Once connected, open up your internet browser of choice and search:";
+        lv_label_set_text_fmt(middle_lbl, middle_text);
+
+        // IP address label
+        wifi_ip_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(wifi_ip_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(wifi_ip_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(wifi_ip_lbl, &lv_font_montserrat_24, 0);
+        lv_obj_set_style_text_color(wifi_ip_lbl, user_secondary_color, 0);
+        lv_obj_align_to(wifi_ip_lbl, middle_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+        lv_label_set_text_fmt(wifi_ip_lbl, "%s", ai_key_portal_get_ip());
         
-        lv_label_set_text_fmt(instr_lbl, instr_text, ai_key_portal_get_ssid(), ai_key_portal_get_pass());
+        // Ending label
+        ending_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(ending_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(ending_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(ending_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(ending_lbl, user_secondary_color, 0);
+        lv_obj_align_to(ending_lbl, wifi_ip_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+        const char *ending_text =
+                "Then follow the on-screen instructions. "
+                "DO NOT exit this page until you're done!";
+        
+        lv_label_set_text(ending_lbl, ending_text);
 
         lv_timer_handler();
         
@@ -1294,7 +1332,7 @@ void lcd_bluetooth_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blueto
         
         // Reset statics
         cont = NULL;
-        title_lbl = instr_lbl = NULL;
+        title_lbl = instr_lbl = wifi_creds_lbl = middle_lbl = wifi_ip_lbl = ending_lbl = NULL;
         init = false;
         
         // Stop portal
@@ -1311,7 +1349,7 @@ void lcd_bluetooth_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blueto
         
         // Reset statics
         cont = NULL;
-        title_lbl = instr_lbl = NULL;
+        title_lbl = instr_lbl = wifi_creds_lbl = middle_lbl = wifi_ip_lbl = ending_lbl = NULL;
         init = false;
         
         // Stop portal
@@ -1321,8 +1359,6 @@ void lcd_bluetooth_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blueto
     }
 }
 
-// TODO: do STT live so dont have to wait until the end -> faster
-// TODO: check and order correct button size and color
 void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
 {
     #define AI_BT_FAILED_TXT "Connection failed!\nPlease pair to a\nBluetooth device at\nleast once and make\nsure you are in range."
