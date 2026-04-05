@@ -743,6 +743,9 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 
             // Clear the bit now that we've acted on it
             xEventGroupClearBits(xWifiEventGroup, WIFI_CHECK_OTA_ON_CONN_BIT);
+        } else {
+            // No OTA check pending, start MQTT client now
+            wifi_mqtt_client_start();
         }
     }
 }

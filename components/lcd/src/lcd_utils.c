@@ -2619,9 +2619,22 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
         } else if (ui_btns->select_btn == 1 && wifi_menu->index == 4) { // Sync with PolyPlug
             // Hide Wi-Fi menu
             lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-            
+
+            // Abort if we've reached the maximum number of plugs
+            if (wifi_menu->size >= MAX_WIFI_OPTIONS) {
+                lv_obj_t *lbl_full = lv_label_create(ACTIVE_SCR);
+                lcd_format_label(lbl_full, "Max plugs added!", user_secondary_color,
+                        &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+                lv_timer_handler();
+                vTaskDelay(pdMS_TO_TICKS(1000));
+                lv_obj_delete(lbl_full);
+                lcd_clear_pending_inputs = true;
+
+                // Show Wi-Fi menu
+                lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
             // If connected to a network
-            if (xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT) {
+            } else if (xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT) {
                 // Delete ping labels
                 lv_obj_delete(gateway_ping_lbl);
                 lv_obj_delete(dns_ping_lbl);
@@ -2629,10 +2642,10 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
                 // Reset statics
                 do_once = false;
                 gateway_ping_lbl = dns_ping_lbl = NULL;
-                
+
                 // Show right arrow
                 lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-                
+
                 ui_menu->page = WIFI_SYNC_PAGE;
             } else {
                 lbl_conf = lv_label_create(ACTIVE_SCR);

@@ -275,13 +275,13 @@ static void read_the_docs_redraw(lv_obj_t *label, lv_obj_t *canvas, uint8_t **pb
         url = "https://polycast5.com/pages/tutorials";
     } else if (idx == 3) {
         text = "Join Discord:";
-        url = "https://discord.gg/7RqJTnUE";
+        url = "https://discord.gg/yfqn5d69tg";
     } else if (idx == 4) {
         text = "Source Code:";
         url = "https://github.com/RoboticWorx/PolyCast5";
     } else if (idx == 5) {
-        text = "Code Flasher:";
-        url = "https://polycast5.com/pages/firmware-updater";
+        text = "Tools:";
+        url = "https://polycast5.com/pages/tools";
     }
     
     // Set the index text
