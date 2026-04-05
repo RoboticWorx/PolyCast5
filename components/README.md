@@ -18,7 +18,7 @@ First and foremost, Bluetooth!
 
 ## ESP-NOW
 * Speaking of interacting with custom devices, PolyCast5 uses the ESP32-C5 for its MCU which gives it (and therefore you) full access to Espressif technologies such as [ESP-NOW](https://www.espressif.com/en/solutions/low-power-solutions/esp-now). This is likely the best and easiest to use wireless technology for interacting with custom stuff like Arduino devices or anything else via Arduino IDE/others.
-  * All that's needed is for you to grab a $5 off-the-shelf ESP32 dev kit of any kind and upload [this super simple example code](https://polycast5.com/blogs/tutorials/arduino-esp-now-receiver-examples). From there, you can wire it up to any Arduino Uno, STM32, etc. and you'll have a **direct line of wireless communication to use whenever you want**. (E.g. open a door, flip a switch, activate a robotic arm, etc.)
+  * All that's needed is for you to grab a $5 off-the-shelf ESP32 dev kit of any kind and upload [this super simple example code](https://polycast5.com/blogs/tutorials/control-custom-builds). From there, you can wire it up to any Arduino Uno, STM32, etc. and you'll have a **direct line of wireless communication to use whenever you want**. (E.g. open a door, flip a switch, activate a robotic arm, etc.)
   * ESP-NOW is the best for this since it can activate quickly to send the signal at low power, then deactive itself afterwards. It also has a pretty impressive range, maxing out around 200m in an open area.
 
 ## Infrared

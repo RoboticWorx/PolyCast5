@@ -89,6 +89,8 @@ static void espnow_task(void *param)
             // Send the data
             espnow_utils_send_data(UNIVERSAL_MAC, received_enc_key, LORA_PCP_ENC_KEY_LEN);
 
+            vTaskDelay(pdMS_TO_TICKS(100));
+
             // Stop radio and de-initialize ESP-NOW
             espnow_utils_espnow_deinit();
             espnow_utils_wifi_radio_stop();
@@ -138,6 +140,8 @@ static void espnow_task(void *param)
             // Send the data
             espnow_utils_send_data(UNIVERSAL_MAC, (uint8_t*)payload, len);
 
+            vTaskDelay(pdMS_TO_TICKS(100));
+
             // Stop radio and de-initialize ESP-NOW
             espnow_utils_espnow_deinit();
             espnow_utils_wifi_radio_stop();
@@ -167,11 +171,12 @@ static void espnow_task(void *param)
 
             // Build a text payload from the cmd (more secure)
             char tx_payload[ESP_NOW_MAX_DATA_LEN];
-            int tx_payload_len = snprintf(tx_payload, sizeof(tx_payload), "PolyCast5_Command_Value: %u", espnow_cmd.cmd_to_send); // Send only number of bytes needed
+            int tx_payload_len = snprintf(tx_payload, sizeof(tx_payload), ESPNOW_MAGIC "%u", espnow_cmd.cmd_to_send); // Send only number of bytes needed
             // Check payload
             if (tx_payload_len < 0 || tx_payload_len >= sizeof(tx_payload)) {
                 ESP_LOGE(TAG, "Payload snprintf failed or too long.");
                 tx_payload_len = 0;
+                continue;
             }
 
 #ifdef POLYCAST5_DEBUG

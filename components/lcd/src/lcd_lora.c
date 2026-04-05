@@ -344,7 +344,7 @@ void lcd_lora_add_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora
         lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
         // Set instruction text
-        const char *instr_text = "polycast5.com/blogs/ docs/what-is-a-polyplug\n\nHow to quickly add a new PolyPlug:"
+        const char *instr_text = "polycast5.com/blogs/ tutorials/using-polyplugs\n\nHow to quickly add a new PolyPlug:"
             "\n\nFirst, walk toward the PolyPlug you want to add so that you can see it."
             "\n\nThen, with the outlet part facing toward you (power side facing away), press the right-most button on the top of the PolyPlug."
             "\n\nOnce pressed, a light should turn blue to indicate it is ready to pair.When it does, press the right button on this "

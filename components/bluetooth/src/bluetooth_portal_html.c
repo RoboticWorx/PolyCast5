@@ -489,6 +489,7 @@ const char *BLUETOOTH_WEB_PORTAL_HTML =
 "          const browseCategorySelect = getElementByIdSafe('script_browse_category_select');\n"
 
 "          const prevBrowse = browseCategorySelect ? browseCategorySelect.value : '0';\n"
+"          const prevScriptCat = scriptCategorySelect ? scriptCategorySelect.value : '0';\n"
 
 "          if (existingCategoriesListSelect) existingCategoriesListSelect.innerHTML = '';\n"
 "          if (scriptCategorySelect) scriptCategorySelect.innerHTML = '';\n"
@@ -520,6 +521,7 @@ const char *BLUETOOTH_WEB_PORTAL_HTML =
 "            }\n"
 "          }\n"
 
+"          if (scriptCategorySelect) scriptCategorySelect.value = prevScriptCat;\n"
 "          if (browseCategorySelect) {\n"
 "            browseCategorySelect.value = prevBrowse;\n"
 "            refreshScriptsForCategory(parseIntegerOrDefault(browseCategorySelect.value, 0));\n"
@@ -643,6 +645,10 @@ const char *BLUETOOTH_WEB_PORTAL_HTML =
 
 "          if (response.ok) {\n"
 "            setTextIfExists(scriptStatusText, 'Deleted');\n"
+"            const scriptNameInput = getElementByIdSafe('script_name_input');\n"
+"            const scriptPayloadTextarea = getElementByIdSafe('script_payload_textarea');\n"
+"            if (scriptNameInput) scriptNameInput.value = '';\n"
+"            if (scriptPayloadTextarea) scriptPayloadTextarea.value = '';\n"
 "            refreshCategoryLists();\n"
 "          } else {\n"
 "            setTextIfExists(scriptStatusText, 'Error');\n"

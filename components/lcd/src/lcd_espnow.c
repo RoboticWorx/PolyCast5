@@ -382,12 +382,12 @@ void lcd_espnow_get_rx_mac(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t
         // Helper text at the bottom
         lbl_enter_mac = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_enter_mac, "Enter receiver MAC:", user_secondary_color,
-                     &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -56);
+                &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -56);
             
         // Instruction text at the top     
         lbl_how_to = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_how_to, "polycast5.com/blogs\n   /tutorials/get-mac", user_secondary_color,
-                     &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 15);
+                &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 15);
     }
 
     // Iterate digit up
@@ -567,7 +567,7 @@ static void prompt_upload_qr(ui_menu_t *ui_menu)
     lv_obj_align(qr_canvas, LV_ALIGN_CENTER, 0, 12);
     
     // Draw the URL as a QR
-    const char *url = "https://polycast5.com/blogs/tutorials/arduino-esp-now-receiver-examples";
+    const char *url = "https://polycast5.com/blogs/tutorials/control-custom-builds";
     int n = lcd_draw_qr(qr_canvas, url, 100, &qr_buf);
     if (n != 0) {
         ESP_LOGE(TAG, "prompt_upload_qr lcd_draw_qr failed: %d", n);
