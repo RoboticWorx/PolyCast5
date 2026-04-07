@@ -1,3 +1,16 @@
+/*
+ * PolyPlug ESP-NOW Receive Example (No Encryption)
+ * https://polycast5.com
+ *
+ * Unencrypted ESP-NOW Receiver
+ *
+ * Receives commands sent from PolyCast5 over ESP-NOW
+ * without encryption. Data arrives as "PC5: <cmd>"
+ * where <cmd> is an unsigned integer you can act on.
+ *
+ * No pairing or key exchange needed - just flash and go.
+ */
+
 #include <WiFi.h>
 #include <esp_now.h>
 

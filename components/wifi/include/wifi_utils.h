@@ -8,8 +8,8 @@
 
 #define WIFI_MAX_NETWORKS 40
 
-#define WIFI_CONN_TIMEOUT_MS 12000
-#define WIFI_CONN_SCAN_TIMEOUT_MS 6000 // Time until retry connection via scan
+#define WIFI_CONN_TIMEOUT_MS 16000
+#define WIFI_CONN_SCAN_TIMEOUT_MS 8000 // Time until retry connection via scan
 
 #define MAX_MAC_CLIENTS 100
 

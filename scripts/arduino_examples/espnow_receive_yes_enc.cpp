@@ -1,3 +1,18 @@
+/*
+ * PolyPlug ESP-NOW Receive Example (Encrypted)
+ * https://polycast5.com
+ *
+ * Encrypted ESP-NOW Receiver
+ *
+ * Receives commands sent from PolyCast5 over ESP-NOW
+ * with LMK (Local Master Key) encryption enabled.
+ * Data arrives as "PC5: <cmd>" where <cmd> is an
+ * unsigned integer you can act on.
+ *
+ * You must set the local_master_key and polycast5_mac
+ * below to match the values shown on your PolyCast5.
+ */
+
 #include <WiFi.h>
 #include <esp_now.h>
 

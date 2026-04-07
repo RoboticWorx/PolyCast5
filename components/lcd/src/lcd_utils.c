@@ -35,6 +35,8 @@
 #include "lcd_gpio.h"
 #include "lcd_utils.h"
 #include "lcd_anim.h"
+// #include "esp_phy_init.h"
+// #include "esp_private/periph_ctrl.h"
 #include "wifi_utils.h"
 #include "wifi_ping.h"
 #include "wifi_task.h"
@@ -175,19 +177,19 @@ static void lcd_panel_wake(void)
 void lcd_device_sleep(void)
 {
     xQueueReset(xWifiCanSleepSemaphore);
-    
+
     // Disconnect from Wi-Fi if connected
     xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
-    
+
     lcd_panel_sleep(); // Put ST7789 to sleep
     gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_OFF); // BL low
-    
+
     // Don't auto wake
     while (gpio_utils_read_input(TCA9535_USER_BUTTON_POWER_PIN) != 1) {
         vTaskDelay(pdMS_TO_TICKS(25));
         lv_timer_handler();
     }
-    
+
     // Wait for Wi-Fi to shut off if on
     xSemaphoreTake(xWifiCanSleepSemaphore, pdMS_TO_TICKS(1000));
 
@@ -212,6 +214,15 @@ void lcd_device_sleep(void)
 #endif
 
     ESP_ERROR_CHECK(esp_light_sleep_start());
+
+    // IDF-15338 workaround: phy_wakeup_init() on ESP32-C5 doesn't properly
+    // restore RF state after the modem power domain is lost during light sleep.
+    // Force full PHY recalibration so BLE (and WiFi) work after wake.
+    // esp_phy_common_clock_enable();
+    // phy_module_enable();
+    // esp_phy_load_cal_and_init();
+    // phy_module_disable();
+    // esp_phy_common_clock_disable();
 
     // Release holds so peripherals can reclaim their pins
     gpio_hold_dis(ST7789_DC_PIN);
@@ -245,8 +256,6 @@ void lcd_device_sleep(void)
     // Require pin re-entry if sleeping from home page
     settings_menu.pin_menu.prompt_pin = true;
     
-    // TODO: Noticable delay on LCD
-    //xSemaphoreGive(xWifiCycleSemaphore); // Cycle Wi-Fi radio on wake
 }
 
 void lcd_init_driver(void)
