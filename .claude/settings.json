@@ -13,6 +13,7 @@
       
       "Bash(ls:*)",
       "Bash(find:*)",
+      "Bash(type:*)",
       "Bash(git diff:*)"
     ]
   },
