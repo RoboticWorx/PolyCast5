@@ -34,6 +34,7 @@ typedef struct {
 
 static const screen_entry_t screens[] = {
     { "Selection",         screen_selection          },
+    { "Bluetooth",         screen_bluetooth          },
     { "Infrared",          screen_infrared           },
     { "Infrared Add Sig",  screen_infrared_add_signal},
     { "LoRa",              screen_lora               },

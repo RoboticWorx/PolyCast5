@@ -48,4 +48,10 @@ void screen_infrared(void);
  */
 void screen_infrared_add_signal(void);
 
+/**
+ * Render the Bluetooth page.
+ * Shows the vertical menu with Pair Device, Auto Keyboard, AI Keyboard options.
+ */
+void screen_bluetooth(void);
+
 #endif /* SCREENS_H */

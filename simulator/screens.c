@@ -403,6 +403,113 @@ void screen_infrared_add_signal(void)
                  &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
 }
 
+/* ─── Bluetooth page ──────────────────────────────────────────── */
+
+void screen_bluetooth(void)
+{
+    lv_color_t primary   = USER_PRIMARY_COLOR;
+    lv_color_t secondary = USER_SECONDARY_COLOR;
+
+    lv_obj_t *scr = lv_scr_act();
+    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_style_bg_color(scr, primary, 0);
+    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
+
+    /* ── Menu list (from lcd_bluetooth_setup_page) ── */
+    lv_obj_t *main_list = lv_list_create(scr);
+    lv_obj_set_size(main_list, 210, 106);
+
+    lv_obj_set_style_bg_color(main_list, primary, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_align(main_list, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_border_width(main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_scrollbar_mode(main_list, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_scroll_dir(main_list, LV_DIR_VER);
+
+    /* ── Button style (unselected) ── */
+    static lv_style_t bt_btn_style;
+    lv_style_init(&bt_btn_style);
+    lv_style_set_radius(&bt_btn_style, 8);
+    lv_style_set_bg_color(&bt_btn_style, primary);
+    lv_style_set_border_width(&bt_btn_style, 2);
+    lv_style_set_border_color(&bt_btn_style, secondary);
+    lv_style_set_border_side(&bt_btn_style, LV_BORDER_SIDE_FULL);
+    lv_style_set_pad_top(&bt_btn_style, 3);
+    lv_style_set_pad_bottom(&bt_btn_style, 3);
+    lv_style_set_text_font(&bt_btn_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&bt_btn_style, secondary);
+    lv_style_set_text_align(&bt_btn_style, LV_TEXT_ALIGN_CENTER);
+
+    /* ── Selected style ── */
+    static lv_style_t bt_sel_style;
+    lv_style_init(&bt_sel_style);
+    lv_style_set_radius(&bt_sel_style, 8);
+    lv_style_set_bg_color(&bt_sel_style, secondary);
+    lv_style_set_border_width(&bt_sel_style, 2);
+    lv_style_set_border_color(&bt_sel_style, secondary);
+    lv_style_set_border_side(&bt_sel_style, LV_BORDER_SIDE_FULL);
+    lv_style_set_pad_top(&bt_sel_style, 3);
+    lv_style_set_pad_bottom(&bt_sel_style, 3);
+    lv_style_set_text_font(&bt_sel_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&bt_sel_style, primary);
+    lv_style_set_text_align(&bt_sel_style, LV_TEXT_ALIGN_CENTER);
+
+    /* ── Menu options ── */
+    static const char *bt_options[] = {
+        "Pair Device", "Auto Keyboard", "AI Keyboard"
+    };
+    int num_options = 3;
+    int selected = 1; /* Auto Keyboard — firmware default */
+
+    lv_obj_t *first_btn = NULL;
+    for (int i = 0; i < num_options; i++) {
+        lv_obj_t *btn = lv_list_add_btn(main_list, NULL, bt_options[i]);
+        lv_obj_set_size(btn, 200, 30);
+
+        if (i == selected) {
+            lv_obj_add_style(btn, &bt_sel_style, 0);
+        } else {
+            lv_obj_add_style(btn, &bt_btn_style, 0);
+        }
+
+        lv_obj_t *lbl = lv_obj_get_child(btn, 0);
+        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+
+        if (i == 0) first_btn = btn;
+    }
+
+    /* Format buttons as flex container with spacing */
+    lv_obj_t *cont = lv_obj_get_parent(first_btn);
+    lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    /* ── Persistent UI (arrows + battery) ──
+     * On the device, arrow_right is hidden on BLUETOOTH_PAGE — only up/down/left
+     * carry over from the selection page. */
+    lv_obj_t *arrow_top = lv_label_create(scr);
+    format_label(arrow_top, LV_SYMBOL_UP, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+
+    lv_obj_t *arrow_left = lv_label_create(scr);
+    format_label(arrow_left, LV_SYMBOL_LEFT, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 0);
+
+    lv_obj_t *arrow_bot = lv_label_create(scr);
+    format_label(arrow_bot, LV_SYMBOL_DOWN, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+    /* Battery */
+    lv_obj_t *lbl_bat_txt = lv_label_create(scr);
+    format_label(lbl_bat_txt, DEFAULT_BATTERY_LV, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_RIGHT, -28, 0);
+
+    lv_obj_t *lbl_bat_icon = lv_label_create(scr);
+    format_label(lbl_bat_icon, LV_SYMBOL_BATTERY_FULL, secondary,
+                 &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
+}
+
 /* ─── Settings page (placeholder) ─────────────────────────────── */
 
 void screen_settings(void)
