@@ -16,6 +16,56 @@
 
 #define DEFAULT_BATTERY_LV "92%"
 
+/* ─── Active menu state (for Up/Down navigation) ────────────── */
+
+typedef struct {
+    lv_obj_t   *btns[MENU_MAX_BTNS];
+    lv_style_t *btn_style;
+    lv_style_t *sel_style;
+    int         index;
+    int         size;
+} active_menu_t;
+
+static active_menu_t active_menu = {0};
+
+void screen_menu_reset(void)
+{
+    active_menu.size = 0;
+}
+
+/**
+ * Mirrors the firmware's lcd_*_update_menu() pattern:
+ *   1. Wrap index
+ *   2. Reset all buttons to unselected style
+ *   3. Highlight selected button
+ *   4. lv_obj_scroll_to_view with LV_ANIM_ON
+ */
+void screen_menu_navigate(int direction)
+{
+    if (active_menu.size <= 0) return;
+
+    active_menu.index += direction;
+
+    /* Wrap */
+    if (active_menu.index >= active_menu.size)
+        active_menu.index = 0;
+    else if (active_menu.index < 0)
+        active_menu.index = active_menu.size - 1;
+
+    /* Reset all to unselected */
+    for (int i = 0; i < active_menu.size; i++) {
+        lv_obj_remove_style(active_menu.btns[i], active_menu.sel_style, 0);
+        lv_obj_add_style(active_menu.btns[i], active_menu.btn_style, 0);
+    }
+
+    /* Highlight selected */
+    lv_obj_remove_style(active_menu.btns[active_menu.index], active_menu.btn_style, 0);
+    lv_obj_add_style(active_menu.btns[active_menu.index], active_menu.sel_style, 0);
+
+    /* Scroll to view with animation */
+    lv_obj_scroll_to_view(active_menu.btns[active_menu.index], LV_ANIM_ON);
+}
+
 /* ─── Helpers (from lcd_utils.c) ──────────────────────────────── */
 
 static void format_label(lv_obj_t *label, const char *text, lv_color_t color,
@@ -26,6 +76,40 @@ static void format_label(lv_obj_t *label, const char *text, lv_color_t color,
     lv_obj_set_style_text_color(label, color, 0);
     lv_obj_set_style_text_font(label, font, 0);
     lv_obj_align(label, alignment, x_offset, y_offset);
+}
+
+/**
+ * Mirror of lcd_apply_scrollbar_style() from lcd_utils.c — adds a narrow
+ * right-side scrollbar (AUTO mode), reserves padding for it, and nudges the
+ * list 6px right to re-center after the padding offset.
+ */
+static void apply_scrollbar_style(lv_obj_t *obj)
+{
+    lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_AUTO);
+
+    static lv_style_t main_style;
+    static bool main_inited = false;
+    if (!main_inited) {
+        lv_style_init(&main_style);
+        lv_style_set_pad_right(&main_style, 24); /* 4px bar + 8px gap + extra */
+        main_inited = true;
+    }
+    lv_obj_add_style(obj, &main_style, LV_PART_MAIN);
+    lv_obj_set_x(obj, lv_obj_get_x(obj) + 6);
+
+    static lv_style_t sb_style;
+    static bool sb_inited = false;
+    if (!sb_inited) {
+        lv_style_init(&sb_style);
+        lv_style_set_width(&sb_style, 4);
+        lv_style_set_bg_opa(&sb_style, LV_OPA_60);
+        lv_style_set_bg_color(&sb_style, USER_SECONDARY_COLOR);
+        lv_style_set_radius(&sb_style, 3);
+        lv_style_set_pad_left(&sb_style, 12);
+        lv_style_set_pad_right(&sb_style, 0);
+        sb_inited = true;
+    }
+    lv_obj_add_style(obj, &sb_style, LV_PART_SCROLLBAR);
 }
 
 static void format_center_button(lv_obj_t *btn_mid, lv_color_t primary, lv_color_t secondary)
@@ -167,7 +251,10 @@ void screen_selection(void)
     // */
 }
 
-/* ─── LoRa subpage (placeholder) ──────────────────────────────── */
+/* ─── LoRa page ────────────────────────────────────────────────
+ * Mirrors lcd_lora_setup_page() in components/lcd/src/lcd_lora.c.
+ * Options[0] is always "Add PolyPlug"; options[1..] are user outlets loaded
+ * from NVS. Default index is 1 when size > 1 (firmware lines 135-137). */
 
 void screen_lora(void)
 {
@@ -175,28 +262,107 @@ void screen_lora(void)
     lv_color_t secondary = USER_SECONDARY_COLOR;
 
     lv_obj_t *scr = lv_scr_act();
+    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_style_bg_color(scr, primary, 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
-    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
 
-    /* Title */
-    lv_obj_t *title = lv_label_create(scr);
-    format_label(title, "LoRa", secondary,
-            &lv_font_montserrat_24, LV_ALIGN_TOP_MID, 0, 8);
+    /* ── Menu list (from lcd_lora_setup_page) ── */
+    lv_obj_t *main_list = lv_list_create(scr);
+    lv_obj_set_size(main_list, 210, 106);
 
-    /* Placeholder list items — replace with your actual LoRa menu setup code */
-    lv_obj_t *item1 = lv_label_create(scr);
-    format_label(item1, "Living Room", secondary,
-            &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -10);
+    lv_obj_set_style_bg_color(main_list, primary, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_align(main_list, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_border_width(main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    apply_scrollbar_style(main_list);
+    lv_obj_set_scroll_dir(main_list, LV_DIR_VER);
 
-    lv_obj_t *item2 = lv_label_create(scr);
-    format_label(item2, "Bedroom", secondary,
-            &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 15);
+    /* ── Button style (unselected) ── */
+    static lv_style_t lora_btn_style;
+    lv_style_init(&lora_btn_style);
+    lv_style_set_radius(&lora_btn_style, 8);
+    lv_style_set_bg_color(&lora_btn_style, primary);
+    lv_style_set_border_width(&lora_btn_style, 2);
+    lv_style_set_border_color(&lora_btn_style, secondary);
+    lv_style_set_border_side(&lora_btn_style, LV_BORDER_SIDE_FULL);
+    lv_style_set_pad_top(&lora_btn_style, 3);
+    lv_style_set_pad_bottom(&lora_btn_style, 3);
+    lv_style_set_text_font(&lora_btn_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&lora_btn_style, secondary);
+    lv_style_set_text_align(&lora_btn_style, LV_TEXT_ALIGN_CENTER);
 
-    /* Back arrow */
-    lv_obj_t *back = lv_label_create(scr);
-    format_label(back, LV_SYMBOL_LEFT " Back", secondary,
-            &lv_font_montserrat_14, LV_ALIGN_BOTTOM_LEFT, 5, -5);
+    /* ── Selected style ── */
+    static lv_style_t lora_sel_style;
+    lv_style_init(&lora_sel_style);
+    lv_style_set_radius(&lora_sel_style, 8);
+    lv_style_set_bg_color(&lora_sel_style, secondary);
+    lv_style_set_border_width(&lora_sel_style, 2);
+    lv_style_set_border_color(&lora_sel_style, secondary);
+    lv_style_set_border_side(&lora_sel_style, LV_BORDER_SIDE_FULL);
+    lv_style_set_pad_top(&lora_sel_style, 3);
+    lv_style_set_pad_bottom(&lora_sel_style, 3);
+    lv_style_set_text_font(&lora_sel_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&lora_sel_style, primary);
+    lv_style_set_text_align(&lora_sel_style, LV_TEXT_ALIGN_CENTER);
+
+    /* ── Options ── */
+    static const char *lora_options[] = {
+        "Add PolyPlug", "Living Room", "Kitchen", "Bedroom Lamp", "Garage"
+    };
+    int num_options = sizeof(lora_options) / sizeof(lora_options[0]);
+    int selected = 1; /* firmware default when size > 1 */
+
+    for (int i = 0; i < num_options; i++) {
+        lv_obj_t *btn = lv_list_add_btn(main_list, NULL, lora_options[i]);
+        lv_obj_set_size(btn, 200, 30);
+
+        if (i == selected) {
+            lv_obj_add_style(btn, &lora_sel_style, 0);
+        } else {
+            lv_obj_add_style(btn, &lora_btn_style, 0);
+        }
+
+        lv_obj_t *lbl = lv_obj_get_child(btn, 0);
+        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+
+        active_menu.btns[i] = btn;
+    }
+
+    /* Format buttons as flex container with spacing */
+    lv_obj_t *cont = lv_obj_get_parent(active_menu.btns[0]);
+    lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    /* Register for Up/Down navigation */
+    active_menu.size      = num_options;
+    active_menu.index     = selected;
+    active_menu.btn_style = &lora_btn_style;
+    active_menu.sel_style = &lora_sel_style;
+
+    /* ── Persistent UI (arrows + battery) ──
+     * LoRa page inherits arrow state from selection: top/bot/left visible, right hidden. */
+    lv_obj_t *arrow_top = lv_label_create(scr);
+    format_label(arrow_top, LV_SYMBOL_UP, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+
+    lv_obj_t *arrow_left = lv_label_create(scr);
+    format_label(arrow_left, LV_SYMBOL_LEFT, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 0);
+
+    lv_obj_t *arrow_bot = lv_label_create(scr);
+    format_label(arrow_bot, LV_SYMBOL_DOWN, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+    /* Battery */
+    lv_obj_t *lbl_bat_txt = lv_label_create(scr);
+    format_label(lbl_bat_txt, DEFAULT_BATTERY_LV, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_RIGHT, -28, 0);
+
+    lv_obj_t *lbl_bat_icon = lv_label_create(scr);
+    format_label(lbl_bat_icon, LV_SYMBOL_BATTERY_FULL, secondary,
+                 &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
 }
 
 /* ─── Infrared page ───────────────────────────────────────────── */
@@ -460,7 +626,6 @@ void screen_bluetooth(void)
     int num_options = 3;
     int selected = 1; /* Auto Keyboard — firmware default */
 
-    lv_obj_t *first_btn = NULL;
     for (int i = 0; i < num_options; i++) {
         lv_obj_t *btn = lv_list_add_btn(main_list, NULL, bt_options[i]);
         lv_obj_set_size(btn, 200, 30);
@@ -476,14 +641,20 @@ void screen_bluetooth(void)
         lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
 
-        if (i == 0) first_btn = btn;
+        active_menu.btns[i] = btn;
     }
 
     /* Format buttons as flex container with spacing */
-    lv_obj_t *cont = lv_obj_get_parent(first_btn);
+    lv_obj_t *cont = lv_obj_get_parent(active_menu.btns[0]);
     lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    /* Register for Up/Down navigation */
+    active_menu.size      = num_options;
+    active_menu.index     = selected;
+    active_menu.btn_style = &bt_btn_style;
+    active_menu.sel_style = &bt_sel_style;
 
     /* ── Persistent UI (arrows + battery) ──
      * On the device, arrow_right is hidden on BLUETOOTH_PAGE — only up/down/left
@@ -510,7 +681,125 @@ void screen_bluetooth(void)
                  &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
 }
 
-/* ─── Settings page (placeholder) ─────────────────────────────── */
+/* ─── Tools page ─────────────────────────────────────────────────
+ * Mirrors lcd_tools_setup_page() in components/lcd/src/lcd_tools.c.
+ * Option list matches the static tools_menu initializer (8 entries).
+ * Default index is 0 ("Coin Flipper"). */
+
+void screen_tools(void)
+{
+    lv_color_t primary   = USER_PRIMARY_COLOR;
+    lv_color_t secondary = USER_SECONDARY_COLOR;
+
+    lv_obj_t *scr = lv_scr_act();
+    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_style_bg_color(scr, primary, 0);
+    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
+
+    /* ── Menu list (from lcd_tools_setup_page) ── */
+    lv_obj_t *main_list = lv_list_create(scr);
+    lv_obj_set_size(main_list, 210, 106);
+
+    lv_obj_set_style_bg_color(main_list, primary, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_align(main_list, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_border_width(main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    apply_scrollbar_style(main_list);
+    lv_obj_set_scroll_dir(main_list, LV_DIR_VER);
+
+    /* ── Button style (unselected) ── */
+    static lv_style_t tools_btn_style;
+    lv_style_init(&tools_btn_style);
+    lv_style_set_radius(&tools_btn_style, 8);
+    lv_style_set_bg_color(&tools_btn_style, primary);
+    lv_style_set_border_width(&tools_btn_style, 2);
+    lv_style_set_border_color(&tools_btn_style, secondary);
+    lv_style_set_border_side(&tools_btn_style, LV_BORDER_SIDE_FULL);
+    lv_style_set_pad_top(&tools_btn_style, 3);
+    lv_style_set_pad_bottom(&tools_btn_style, 3);
+    lv_style_set_text_font(&tools_btn_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&tools_btn_style, secondary);
+    lv_style_set_text_align(&tools_btn_style, LV_TEXT_ALIGN_CENTER);
+
+    /* ── Selected style ── */
+    static lv_style_t tools_sel_style;
+    lv_style_init(&tools_sel_style);
+    lv_style_set_radius(&tools_sel_style, 8);
+    lv_style_set_bg_color(&tools_sel_style, secondary);
+    lv_style_set_border_width(&tools_sel_style, 2);
+    lv_style_set_border_color(&tools_sel_style, secondary);
+    lv_style_set_border_side(&tools_sel_style, LV_BORDER_SIDE_FULL);
+    lv_style_set_pad_top(&tools_sel_style, 3);
+    lv_style_set_pad_bottom(&tools_sel_style, 3);
+    lv_style_set_text_font(&tools_sel_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&tools_sel_style, primary);
+    lv_style_set_text_align(&tools_sel_style, LV_TEXT_ALIGN_CENTER);
+
+    /* ── Options — matches the static tools_menu initializer in lcd_tools.c ── */
+    static const char *tools_options[] = {
+        "Coin Flipper", "Dice Roller", "Tetris", "Number Generator",
+        "Read the Docs", "Bitcoin QR", "Pomodoro Timer", "SRS Planner"
+    };
+    int num_options = sizeof(tools_options) / sizeof(tools_options[0]);
+    int selected = 0; /* firmware default */
+
+    for (int i = 0; i < num_options; i++) {
+        lv_obj_t *btn = lv_list_add_btn(main_list, NULL, tools_options[i]);
+        lv_obj_set_size(btn, 200, 30);
+
+        if (i == selected) {
+            lv_obj_add_style(btn, &tools_sel_style, 0);
+        } else {
+            lv_obj_add_style(btn, &tools_btn_style, 0);
+        }
+
+        lv_obj_t *lbl = lv_obj_get_child(btn, 0);
+        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+
+        active_menu.btns[i] = btn;
+    }
+
+    /* Format buttons as flex container with spacing */
+    lv_obj_t *cont = lv_obj_get_parent(active_menu.btns[0]);
+    lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    /* Register for Up/Down navigation */
+    active_menu.size      = num_options;
+    active_menu.index     = selected;
+    active_menu.btn_style = &tools_btn_style;
+    active_menu.sel_style = &tools_sel_style;
+
+    /* ── Persistent UI (arrows + battery) ──
+     * Tools page inherits arrow state from selection: top/bot/left visible, right hidden. */
+    lv_obj_t *arrow_top = lv_label_create(scr);
+    format_label(arrow_top, LV_SYMBOL_UP, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+
+    lv_obj_t *arrow_left = lv_label_create(scr);
+    format_label(arrow_left, LV_SYMBOL_LEFT, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 0);
+
+    lv_obj_t *arrow_bot = lv_label_create(scr);
+    format_label(arrow_bot, LV_SYMBOL_DOWN, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+    /* Battery */
+    lv_obj_t *lbl_bat_txt = lv_label_create(scr);
+    format_label(lbl_bat_txt, DEFAULT_BATTERY_LV, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_RIGHT, -28, 0);
+
+    lv_obj_t *lbl_bat_icon = lv_label_create(scr);
+    format_label(lbl_bat_icon, LV_SYMBOL_BATTERY_FULL, secondary,
+                 &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
+}
+
+/* ─── Settings page ──────────────────────────────────────────────
+ * Mirrors lcd_settings_setup_page() in components/lcd/src/lcd_settings.c.
+ * Option list matches the static settings_menu initializer (11 entries).
+ * Default index is 0 ("Check for Updates"). */
 
 void screen_settings(void)
 {
@@ -518,15 +807,107 @@ void screen_settings(void)
     lv_color_t secondary = USER_SECONDARY_COLOR;
 
     lv_obj_t *scr = lv_scr_act();
+    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_style_bg_color(scr, primary, 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
-    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
 
-    lv_obj_t *title = lv_label_create(scr);
-    format_label(title, "Settings", secondary,
-            &lv_font_montserrat_24, LV_ALIGN_TOP_MID, 0, 8);
+    /* ── Menu list (from lcd_settings_setup_page) ── */
+    lv_obj_t *main_list = lv_list_create(scr);
+    lv_obj_set_size(main_list, 210, 106);
 
-    lv_obj_t *item = lv_label_create(scr);
-    format_label(item, "Replace with actual settings menu", secondary,
-            &lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_bg_color(main_list, primary, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_align(main_list, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_border_width(main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    apply_scrollbar_style(main_list);
+    lv_obj_set_scroll_dir(main_list, LV_DIR_VER);
+
+    /* ── Button style (unselected) ── */
+    static lv_style_t sett_btn_style;
+    lv_style_init(&sett_btn_style);
+    lv_style_set_radius(&sett_btn_style, 8);
+    lv_style_set_bg_color(&sett_btn_style, primary);
+    lv_style_set_border_width(&sett_btn_style, 2);
+    lv_style_set_border_color(&sett_btn_style, secondary);
+    lv_style_set_border_side(&sett_btn_style, LV_BORDER_SIDE_FULL);
+    lv_style_set_pad_top(&sett_btn_style, 3);
+    lv_style_set_pad_bottom(&sett_btn_style, 3);
+    lv_style_set_text_font(&sett_btn_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&sett_btn_style, secondary);
+    lv_style_set_text_align(&sett_btn_style, LV_TEXT_ALIGN_CENTER);
+
+    /* ── Selected style ── */
+    static lv_style_t sett_sel_style;
+    lv_style_init(&sett_sel_style);
+    lv_style_set_radius(&sett_sel_style, 8);
+    lv_style_set_bg_color(&sett_sel_style, secondary);
+    lv_style_set_border_width(&sett_sel_style, 2);
+    lv_style_set_border_color(&sett_sel_style, secondary);
+    lv_style_set_border_side(&sett_sel_style, LV_BORDER_SIDE_FULL);
+    lv_style_set_pad_top(&sett_sel_style, 3);
+    lv_style_set_pad_bottom(&sett_sel_style, 3);
+    lv_style_set_text_font(&sett_sel_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&sett_sel_style, primary);
+    lv_style_set_text_align(&sett_sel_style, LV_TEXT_ALIGN_CENTER);
+
+    /* ── Options — matches the static settings_menu initializer in lcd_settings.c ── */
+    static const char *sett_options[] = {
+        "Check for Updates", "Set Unlock PIN", "Change Colors", "LCD Brightness",
+        "Adjust Haptics", "Adjust Sleep Timer", "Adjust RGB LED", "Tips and Tricks",
+        "System Info", "Reboot", "Factory Reset"
+    };
+    int num_options = sizeof(sett_options) / sizeof(sett_options[0]);
+    int selected = 0; /* firmware default */
+
+    for (int i = 0; i < num_options; i++) {
+        lv_obj_t *btn = lv_list_add_btn(main_list, NULL, sett_options[i]);
+        lv_obj_set_size(btn, 200, 30);
+
+        if (i == selected) {
+            lv_obj_add_style(btn, &sett_sel_style, 0);
+        } else {
+            lv_obj_add_style(btn, &sett_btn_style, 0);
+        }
+
+        lv_obj_t *lbl = lv_obj_get_child(btn, 0);
+        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+
+        active_menu.btns[i] = btn;
+    }
+
+    /* Format buttons as flex container with spacing */
+    lv_obj_t *cont = lv_obj_get_parent(active_menu.btns[0]);
+    lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    /* Register for Up/Down navigation */
+    active_menu.size      = num_options;
+    active_menu.index     = selected;
+    active_menu.btn_style = &sett_btn_style;
+    active_menu.sel_style = &sett_sel_style;
+
+    /* ── Persistent UI (arrows + battery) ──
+     * Settings page inherits arrow state from selection: top/bot/left visible, right hidden. */
+    lv_obj_t *arrow_top = lv_label_create(scr);
+    format_label(arrow_top, LV_SYMBOL_UP, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+
+    lv_obj_t *arrow_left = lv_label_create(scr);
+    format_label(arrow_left, LV_SYMBOL_LEFT, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 0);
+
+    lv_obj_t *arrow_bot = lv_label_create(scr);
+    format_label(arrow_bot, LV_SYMBOL_DOWN, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+    /* Battery */
+    lv_obj_t *lbl_bat_txt = lv_label_create(scr);
+    format_label(lbl_bat_txt, DEFAULT_BATTERY_LV, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_RIGHT, -28, 0);
+
+    lv_obj_t *lbl_bat_icon = lv_label_create(scr);
+    format_label(lbl_bat_icon, LV_SYMBOL_BATTERY_FULL, secondary,
+                 &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
 }

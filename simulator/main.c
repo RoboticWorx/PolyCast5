@@ -6,7 +6,9 @@
  *
  * Navigation:
  *   Left/Right arrows — cycle through screens
+ *   Up/Down arrows    — navigate menu items (with scroll animation)
  *   1-9 number keys   — jump to a specific screen
+ *   Click + drag      — scroll lists (Settings, LoRa, etc.)
  *   Escape            — exit
  *
  * The window opens at 4x zoom (960x540) for visibility.
@@ -18,6 +20,7 @@
 
 #include "lvgl.h"
 #include "src/drivers/sdl/lv_sdl_window.h"
+#include "src/drivers/sdl/lv_sdl_mouse.h"
 #include <SDL2/SDL.h>
 
 #include "screens.h"
@@ -38,6 +41,7 @@ static const screen_entry_t screens[] = {
     { "Infrared",          screen_infrared           },
     { "Infrared Add Sig",  screen_infrared_add_signal},
     { "LoRa",              screen_lora               },
+    { "Tools",             screen_tools              },
     { "Settings",          screen_settings           },
 };
 
@@ -45,11 +49,13 @@ static const screen_entry_t screens[] = {
 
 static int current_screen = 0;
 static volatile int pending_screen = -1; /* Set by event filter, applied in main loop */
-static volatile int quit_requested = 0;
+static volatile int pending_nav    =  0; /* -1 = up, +1 = down */
+static volatile int quit_requested =  0;
 
 static void load_screen(int index)
 {
     lv_obj_clean(lv_scr_act());
+    screen_menu_reset();
     screens[index].render();
     current_screen = index;
     printf("[%d/%d] %s\n", index + 1, (int)NUM_SCREENS, screens[index].name);
@@ -79,6 +85,12 @@ static int event_filter(void *userdata, SDL_Event *e)
             case SDLK_RIGHT:
                 pending_screen = (current_screen + 1) % NUM_SCREENS;
                 return 0;
+            case SDLK_UP:
+                pending_nav = -1;
+                return 0;
+            case SDLK_DOWN:
+                pending_nav = 1;
+                return 0;
             default:
                 if (e->key.keysym.sym >= SDLK_1 && e->key.keysym.sym <= SDLK_9) {
                     int idx = e->key.keysym.sym - SDLK_1;
@@ -105,6 +117,9 @@ int main(int argc, char **argv)
     lv_sdl_window_set_zoom(disp, ZOOM);
     lv_sdl_window_set_title(disp, "PolyCast5 Simulator");
 
+    /* Register mouse so click+drag can scroll lists (LoRa, Settings, etc.) */
+    lv_sdl_mouse_create();
+
     /* Install event filter to catch keys before LVGL eats them */
     SDL_SetEventFilter(event_filter, NULL);
 
@@ -120,6 +135,12 @@ int main(int argc, char **argv)
         if (pending_screen >= 0) {
             load_screen(pending_screen);
             pending_screen = -1;
+        }
+
+        /* Apply pending menu navigation */
+        if (pending_nav != 0) {
+            screen_menu_navigate(pending_nav);
+            pending_nav = 0;
         }
 
         SDL_Delay(5);

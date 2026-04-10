@@ -54,4 +54,22 @@ void screen_infrared_add_signal(void);
  */
 void screen_bluetooth(void);
 
+/**
+ * Render the Tools page.
+ * Shows the vertical menu with Coin Flipper, Dice Roller, Tetris, etc.
+ */
+void screen_tools(void);
+
+/* ─── Menu navigation (Up/Down arrows) ───────────────────────── */
+
+#define MENU_MAX_BTNS 16
+
+/** Reset active menu state — call before each screen render. */
+void screen_menu_reset(void);
+
+/** Navigate the active list up (dir=-1) or down (dir=+1).
+ *  Matches the firmware's lcd_*_update_menu: restyle all buttons,
+ *  highlight selected, lv_obj_scroll_to_view with LV_ANIM_ON. */
+void screen_menu_navigate(int direction);
+
 #endif /* SCREENS_H */
