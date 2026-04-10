@@ -371,9 +371,11 @@ static void lcd_task(void *pvParameters)
                     break;
                 case WIFI_BEACON_PAGE:
                     lcd_wifi_beacon_page(&ui_btns, &ui_menu, &wifi_menu);
+                    dont_sleep_on_this_page = true;
                     break;
                 case WIFI_DATA_PAGE:
                     lcd_wifi_data_page(&ui_btns, &ui_menu, &wifi_menu);
+                    dont_sleep_on_this_page = true;
                     break;
                 case WIFI_SYNC_PAGE:
                     lcd_wifi_sync_page(&ui_btns, &ui_menu, &wifi_menu);

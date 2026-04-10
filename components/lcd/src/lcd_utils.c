@@ -35,8 +35,8 @@
 #include "lcd_gpio.h"
 #include "lcd_utils.h"
 #include "lcd_anim.h"
-// #include "esp_phy_init.h"
-// #include "esp_private/periph_ctrl.h"
+#include "esp_phy_init.h"
+#include "esp_private/periph_ctrl.h"
 #include "wifi_utils.h"
 #include "wifi_ping.h"
 #include "wifi_task.h"
@@ -218,11 +218,11 @@ void lcd_device_sleep(void)
     // IDF-15338 workaround: phy_wakeup_init() on ESP32-C5 doesn't properly
     // restore RF state after the modem power domain is lost during light sleep.
     // Force full PHY recalibration so BLE (and WiFi) work after wake.
-    // esp_phy_common_clock_enable();
-    // phy_module_enable();
-    // esp_phy_load_cal_and_init();
-    // phy_module_disable();
-    // esp_phy_common_clock_disable();
+    esp_phy_common_clock_enable();
+    phy_module_enable();
+    esp_phy_load_cal_and_init();
+    phy_module_disable();
+    esp_phy_common_clock_disable();
 
     // Release holds so peripherals can reclaim their pins
     gpio_hold_dis(ST7789_DC_PIN);

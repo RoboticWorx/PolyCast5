@@ -1,6 +1,6 @@
 # PolyCast5 LVGL Simulator
 
-Renders PolyCast5 device screens in a desktop SDL window. Useful for taking screenshots for the website without needing the physical device.
+Renders PolyCast5 device screens in a desktop SDL window. Useful for viewing/testing screen layout without needing the physical device.
 
 Uses the same LVGL 9.2.2 source from `components/lvgl/` with the SDL2 backend instead of the ST7789 display driver. The display is 240x135 (matching the device) at 4x zoom for visibility.
 
