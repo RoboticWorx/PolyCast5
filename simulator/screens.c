@@ -588,7 +588,7 @@ void screen_bluetooth(void)
     lv_obj_set_style_bg_color(main_list, primary, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_align(main_list, LV_ALIGN_CENTER, 0, 0);
     lv_obj_set_style_border_width(main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_scrollbar_mode(main_list, LV_SCROLLBAR_MODE_OFF);
+    apply_scrollbar_style(main_list);
     lv_obj_set_scroll_dir(main_list, LV_DIR_VER);
 
     /* ── Button style (unselected) ── */
@@ -619,11 +619,13 @@ void screen_bluetooth(void)
     lv_style_set_text_color(&bt_sel_style, primary);
     lv_style_set_text_align(&bt_sel_style, LV_TEXT_ALIGN_CENTER);
 
-    /* ── Menu options ── */
+    /* ── Menu options — matches lcd_bluetooth_setup_page in lcd_bluetooth.c ── */
     static const char *bt_options[] = {
-        "Pair Device", "Auto Keyboard", "AI Keyboard"
+        "Pair Device", "Auto Keyboard", "AI Keyboard", "Media Controller",
+        "Page Scroller", "PowerPoint Clicker", "Camera Clicker",
+        "Socials Scroller", "Forget All Devices", "Known Devices"
     };
-    int num_options = 3;
+    int num_options = sizeof(bt_options) / sizeof(bt_options[0]);
     int selected = 1; /* Auto Keyboard — firmware default */
 
     for (int i = 0; i < num_options; i++) {
