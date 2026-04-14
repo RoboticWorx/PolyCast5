@@ -127,7 +127,7 @@
 #define LV_USE_BUTTONMATRIX 1
 #define LV_USE_CALENDAR 0
 #define LV_USE_CANVAS 1
-#define LV_USE_CHART 0
+#define LV_USE_CHART 1
 #define LV_USE_CHECKBOX 1
 #define LV_USE_DROPDOWN 1
 #define LV_USE_IMAGE 1

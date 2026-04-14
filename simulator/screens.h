@@ -60,6 +60,20 @@ void screen_bluetooth(void);
  */
 void screen_tools(void);
 
+/**
+ * Render the Wi-Fi beacon scan results page.
+ * Shows a bar chart of 20 RSSI samples with color-graded bars, plus SSID/
+ * channel/security info below.
+ */
+void screen_wifi_beacon(void);
+
+/**
+ * Render the Wi-Fi data frame scan page.
+ * Shows a bar chart of per-client packet counts (sorted desc, color-graded
+ * red→green by count) and a scrollable list of identified client MACs.
+ */
+void screen_wifi_data(void);
+
 /* ─── Menu navigation (Up/Down arrows) ───────────────────────── */
 
 #define MENU_MAX_BTNS 16
@@ -69,7 +83,14 @@ void screen_menu_reset(void);
 
 /** Navigate the active list up (dir=-1) or down (dir=+1).
  *  Matches the firmware's lcd_*_update_menu: restyle all buttons,
- *  highlight selected, lv_obj_scroll_to_view with LV_ANIM_ON. */
+ *  highlight selected, lv_obj_scroll_to_view with LV_ANIM_ON.
+ *  If no menu is active but a scroll container is registered (see
+ *  screen_set_scroll), scrolls that container instead. */
 void screen_menu_navigate(int direction);
+
+/** Register a scrollable container for chart pages that have no menu.
+ *  Up/Down keys will scroll it by step_px pixels (DOWN reveals content
+ *  below, matching firmware button semantics). Cleared on menu_reset. */
+void screen_set_scroll(lv_obj_t *cont, int step_px);
 
 #endif /* SCREENS_H */

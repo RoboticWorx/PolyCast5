@@ -11,6 +11,8 @@
  *   4. Add a function here and declare it in screens.h
  */
 
+#include <stdio.h>
+
 #include "screens.h"
 #include "lvgl.h"
 
@@ -28,9 +30,22 @@ typedef struct {
 
 static active_menu_t active_menu = {0};
 
+/* Fallback scroll target for pages without an active menu (Wi-Fi beacon /
+ * data pages). When set, Up/Down scroll this container instead. */
+static lv_obj_t *active_scroll      = NULL;
+static int       active_scroll_step = 55;
+
 void screen_menu_reset(void)
 {
-    active_menu.size = 0;
+    active_menu.size   = 0;
+    active_scroll      = NULL;
+    active_scroll_step = 55;
+}
+
+void screen_set_scroll(lv_obj_t *cont, int step_px)
+{
+    active_scroll      = cont;
+    active_scroll_step = (step_px > 0) ? step_px : 55;
 }
 
 /**
@@ -39,10 +54,22 @@ void screen_menu_reset(void)
  *   2. Reset all buttons to unselected style
  *   3. Highlight selected button
  *   4. lv_obj_scroll_to_view with LV_ANIM_ON
+ *
+ * If no menu is active but a scroll container is registered (chart pages),
+ * falls back to vertically scrolling that container.
  */
 void screen_menu_navigate(int direction)
 {
-    if (active_menu.size <= 0) return;
+    if (active_menu.size <= 0) {
+        /* Fallback: scroll the registered container (if any).
+         * Direction +1 (DOWN key) pushes content up to reveal content below
+         * (same sign convention as the firmware's button handlers). */
+        if (active_scroll) {
+            int dy = (direction > 0) ? -active_scroll_step : active_scroll_step;
+            lv_obj_scroll_by_bounded(active_scroll, 0, dy, true);
+        }
+        return;
+    }
 
     active_menu.index += direction;
 
@@ -892,6 +919,399 @@ void screen_settings(void)
 
     /* ── Persistent UI (arrows + battery) ──
      * Settings page inherits arrow state from selection: top/bot/left visible, right hidden. */
+    lv_obj_t *arrow_top = lv_label_create(scr);
+    format_label(arrow_top, LV_SYMBOL_UP, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+
+    lv_obj_t *arrow_left = lv_label_create(scr);
+    format_label(arrow_left, LV_SYMBOL_LEFT, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 0);
+
+    lv_obj_t *arrow_bot = lv_label_create(scr);
+    format_label(arrow_bot, LV_SYMBOL_DOWN, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+    /* Battery */
+    lv_obj_t *lbl_bat_txt = lv_label_create(scr);
+    format_label(lbl_bat_txt, DEFAULT_BATTERY_LV, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_RIGHT, -28, 0);
+
+    lv_obj_t *lbl_bat_icon = lv_label_create(scr);
+    format_label(lbl_bat_icon, LV_SYMBOL_BATTERY_FULL, secondary,
+                 &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
+}
+
+/* ─── Wi-Fi Beacon scan page ─────────────────────────────────────
+ * Mirrors lcd_wifi_beacon_page() in components/lcd/src/lcd_wifi.c.
+ * Bar chart of 20 signal samples (0-50 range, red→green gradient by value),
+ * RSSI/SNR labels above, SSID / channel / security info scrolls below. */
+
+/* Mirror of beacon_chart_draw_cb() in lcd_wifi.c — colors each bar by value
+ * (0 = red, 50 = green) via LV_EVENT_DRAW_TASK_ADDED. */
+static void beacon_chart_draw_cb(lv_event_t *e)
+{
+    lv_draw_task_t     *task = lv_event_get_draw_task(e);
+    lv_draw_dsc_base_t *base = (lv_draw_dsc_base_t *)lv_draw_task_get_draw_dsc(task);
+
+    if (base->part != LV_PART_ITEMS) {
+        return;
+    }
+
+    lv_draw_fill_dsc_t *fill = lv_draw_task_get_fill_dsc(task);
+    if (!fill) {
+        return;
+    }
+
+    lv_obj_t          *chart = lv_event_get_target_obj(e);
+    lv_chart_series_t *ser   = lv_event_get_user_data(e);
+    int32_t           *y_arr = lv_chart_get_y_array(chart, ser);
+
+    uint32_t pc = lv_chart_get_point_count(chart);
+    if (pc == 0) {
+        return;
+    }
+
+    uint32_t idx = base->id2;
+    if (idx >= pc) {
+        return;
+    }
+
+    uint32_t start   = lv_chart_get_x_start_point(chart, ser);
+    uint32_t logical = (start + idx) % pc;
+    int32_t  v       = y_arr[logical];
+    if (v > 50) {
+        v = 50;
+    }
+    if (v == LV_CHART_POINT_NONE) {
+        return;
+    }
+
+    uint8_t mix = (uint8_t)((uint32_t)v * 255 / 50);
+    fill->color = lv_color_mix(lv_palette_main(LV_PALETTE_GREEN),
+                               lv_palette_main(LV_PALETTE_RED), mix);
+}
+
+void screen_wifi_beacon(void)
+{
+    lv_color_t primary   = USER_PRIMARY_COLOR;
+    lv_color_t secondary = USER_SECONDARY_COLOR;
+
+    lv_obj_t *scr = lv_scr_act();
+    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_style_bg_color(scr, primary, 0);
+    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
+
+    /* ── Scrollable container (from lcd_wifi_beacon_page) ── */
+    lv_obj_t *cont = lv_obj_create(scr);
+    lv_obj_align(cont, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_bg_color(cont, primary, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(cont, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_size(cont, 210, 106);
+    lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_ON);
+
+    /* ── Chart ── */
+    lv_obj_t *chart = lv_chart_create(cont);
+    lv_obj_set_size(chart, 186, 60);
+    lv_obj_align(chart, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_bg_color(chart, lv_color_black(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_chart_set_type(chart, LV_CHART_TYPE_BAR);
+    lv_chart_set_point_count(chart, 20);
+    lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, 0, 50);
+    lv_chart_set_update_mode(chart, LV_CHART_UPDATE_MODE_SHIFT);
+
+    lv_chart_series_t *series = lv_chart_add_series(chart,
+                                                    lv_palette_main(LV_PALETTE_GREEN),
+                                                    LV_CHART_AXIS_PRIMARY_Y);
+
+    lv_obj_set_style_width(chart, 8, LV_PART_INDICATOR);
+    lv_obj_set_style_pad_column(chart, 2, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(chart, lv_palette_main(LV_PALETTE_GREEN), LV_PART_ITEMS);
+
+    /* Per-bar color gradient via draw-task callback */
+    lv_obj_add_flag(chart, LV_OBJ_FLAG_SEND_DRAW_TASK_EVENTS);
+    lv_obj_add_event_cb(chart, beacon_chart_draw_cb, LV_EVENT_DRAW_TASK_ADDED, series);
+
+    /* 20 varying signal samples (0-50 range) */
+    static const int32_t bar_values[20] = {
+        12, 28, 45, 33, 18, 40, 22,  8, 35, 48,
+        15, 30, 42, 25, 10, 38, 20, 44, 32, 16
+    };
+    for (uint32_t i = 0; i < 20; i++) {
+        lv_chart_set_value_by_id(chart, series, i, bar_values[i]);
+    }
+    lv_chart_refresh(chart);
+
+    /* ── RSSI / SNR / SCROLL labels ── */
+    lv_obj_t *lbl_rssi = lv_label_create(cont);
+    format_label(lbl_rssi, "RSSI: -52", secondary,
+                 &lv_font_montserrat_16, LV_ALIGN_TOP_LEFT, 0, -10);
+
+    lv_obj_t *lbl_snr = lv_label_create(cont);
+    format_label(lbl_snr, "SNR: 42", secondary,
+                 &lv_font_montserrat_16, LV_ALIGN_TOP_RIGHT, -5, -10);
+
+    lv_obj_t *lbl_scroll = lv_label_create(cont);
+    format_label(lbl_scroll, "SCROLL", secondary,
+                 &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, 15);
+
+    /* ── Info text below chart (scrolls into view) ── */
+    lv_obj_t *lbl_info = lv_label_create(cont);
+    lv_obj_set_style_text_color(lbl_info, secondary, 0);
+    lv_obj_set_style_text_font(lbl_info, &lv_font_montserrat_16, 0);
+    lv_obj_set_width(lbl_info, 190);
+    lv_obj_align_to(lbl_info, chart, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 25);
+    lv_label_set_long_mode(lbl_info, LV_LABEL_LONG_WRAP);
+    lv_label_set_text(lbl_info,
+        "SSID:\n - MyHomeWifi_5GHz\n"
+        "BSSID:\n - A4:C3:61:7B:9F:42\n"
+        "Vendor:\n - Apple Inc.\n"
+        "Channel:\n - 6 (2.4 GHz)\n"
+        "Type:\n - 802.11ax (Wi-Fi 6)\n - 2.437 GHz\n"
+        "Security:\n - WPA2/WPA3 Transition\n - AES (CCMP)\n - PMF: Optional\n"
+        " - WPS: No\n"
+        "Country Code:\n - US\n"
+        "Supported Rates:\n - 1, 2, 5.5, 6, 9, 11,\n   12, 18, 24, 36, 48, 54\n"
+        "HT Capabilities:\n - 20/40 MHz, SGI\n"
+        "Compatibility Code:\n - 0x0411\n"
+        "Beacon Interval:\n - 102 ms\n"
+        "DTIM Period:\n - 1\n"
+        "Time since reboot:\n - 14520m / 10 days");
+
+    /* Register container for Up/Down scroll (firmware uses 55 px/press). */
+    screen_set_scroll(cont, 55);
+
+    /* ── "DATA →" label (bottom-right, outside container) ── */
+    lv_obj_t *lbl_data = lv_label_create(scr);
+    format_label(lbl_data, "DATA " LV_SYMBOL_RIGHT, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_RIGHT, -3, 0);
+
+    /* ── Persistent UI (arrows + battery) ──
+     * Beacon page: all four arrows visible; "DATA →" label sits at the
+     * bottom-right corner, separate from the right-mid arrow. */
+    lv_obj_t *arrow_top = lv_label_create(scr);
+    format_label(arrow_top, LV_SYMBOL_UP, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+
+    lv_obj_t *arrow_left = lv_label_create(scr);
+    format_label(arrow_left, LV_SYMBOL_LEFT, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 0);
+
+    lv_obj_t *arrow_right = lv_label_create(scr);
+    format_label(arrow_right, LV_SYMBOL_RIGHT, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_RIGHT_MID, -4, 0);
+
+    lv_obj_t *arrow_bot = lv_label_create(scr);
+    format_label(arrow_bot, LV_SYMBOL_DOWN, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+    /* Battery */
+    lv_obj_t *lbl_bat_txt = lv_label_create(scr);
+    format_label(lbl_bat_txt, DEFAULT_BATTERY_LV, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_RIGHT, -28, 0);
+
+    lv_obj_t *lbl_bat_icon = lv_label_create(scr);
+    format_label(lbl_bat_icon, LV_SYMBOL_BATTERY_FULL, secondary,
+                 &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
+}
+
+/* ─── Wi-Fi Data Frame scan page ─────────────────────────────────
+ * Mirrors lcd_wifi_data_page() in components/lcd/src/lcd_wifi.c.
+ * Bar chart of per-client packet counts (sorted desc), color-graded
+ * red→green by count/max. MAC list below scrolls into view. */
+
+#define DATA_CHART_MIN_PKTS_SIM 10
+
+/* File-scope max so data_chart_draw_cb can scale bar colors (mirrors
+ * lcd_wifi.c's data_chart_max_count). Written once per render. */
+static int sim_data_chart_max_count = DATA_CHART_MIN_PKTS_SIM;
+
+/* Mirror of data_chart_draw_cb() in lcd_wifi.c — colors bars red→green
+ * based on value / max. */
+static void data_chart_draw_cb(lv_event_t *e)
+{
+    lv_draw_task_t     *task = lv_event_get_draw_task(e);
+    lv_draw_dsc_base_t *base = (lv_draw_dsc_base_t *)lv_draw_task_get_draw_dsc(task);
+
+    if (base->part != LV_PART_ITEMS) {
+        return;
+    }
+
+    lv_draw_fill_dsc_t *fill = lv_draw_task_get_fill_dsc(task);
+    if (!fill) {
+        return;
+    }
+
+    lv_obj_t          *chart = lv_event_get_target_obj(e);
+    lv_chart_series_t *ser   = lv_event_get_user_data(e);
+    int32_t           *y_arr = lv_chart_get_y_array(chart, ser);
+
+    uint32_t pc = lv_chart_get_point_count(chart);
+    if (pc == 0) {
+        return;
+    }
+
+    uint32_t idx = base->id2;
+    if (idx >= pc) {
+        return;
+    }
+
+    uint32_t start   = lv_chart_get_x_start_point(chart, ser);
+    uint32_t logical = (start + idx) % pc;
+    int32_t  v       = y_arr[logical];
+    if (v == LV_CHART_POINT_NONE) {
+        return;
+    }
+
+    int32_t maxv = (sim_data_chart_max_count > 0) ? sim_data_chart_max_count : 1;
+    if (v < 0) {
+        v = 0;
+    } else if (v > maxv) {
+        v = maxv;
+    }
+
+    uint8_t mix = (uint8_t)(((uint32_t)v * 255u) / (uint32_t)maxv);
+    fill->color = lv_color_mix(lv_palette_main(LV_PALETTE_GREEN),
+                               lv_palette_main(LV_PALETTE_RED), mix);
+}
+
+void screen_wifi_data(void)
+{
+    lv_color_t primary   = USER_PRIMARY_COLOR;
+    lv_color_t secondary = USER_SECONDARY_COLOR;
+
+    lv_obj_t *scr = lv_scr_act();
+    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_style_bg_color(scr, primary, 0);
+    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
+
+    /* ── Fake client data — varied OUIs + random tail bytes, sorted by
+     *    pkt_count desc (firmware sorts with qsort before rendering). ── */
+    typedef struct {
+        uint8_t  mac[6];
+        uint32_t pkt_count;
+    } sim_client_t;
+
+    static const sim_client_t clients[] = {
+        { { 0xA4, 0xC3, 0x61, 0x7B, 0x9F, 0x42 }, 320 },
+        { { 0x78, 0xBD, 0xBC, 0x14, 0xE0, 0x3C }, 215 },
+        { { 0xF0, 0x99, 0xBF, 0x52, 0x8A, 0xD1 }, 168 },
+        { { 0x00, 0x1B, 0x21, 0x3F, 0xC4, 0x08 }, 124 },
+        { { 0x3C, 0x15, 0xC2, 0xAA, 0x61, 0x9E },  92 },
+        { { 0xE0, 0xD4, 0xE8, 0x11, 0x73, 0x2C },  77 },
+        { { 0x54, 0xEE, 0x75, 0x29, 0xB0, 0x4F },  58 },
+        { { 0x9C, 0xB6, 0xD0, 0x66, 0x1A, 0xE5 },  41 },
+        { { 0x74, 0xE2, 0xF5, 0x08, 0x4D, 0x93 },  33 },
+        { { 0xB8, 0x27, 0xEB, 0xC1, 0x7E, 0x30 },  27 },
+        { { 0x68, 0x37, 0xE9, 0x50, 0x92, 0x2B },  22 },
+        { { 0xDC, 0xA6, 0x32, 0x2D, 0x5C, 0x71 },  19 },
+        { { 0x02, 0x4A, 0x7F, 0x8B, 0x46, 0xA9 },  14 },
+        { { 0x0A, 0x00, 0x27, 0xC9, 0x31, 0x04 },  11 },
+        { { 0x00, 0x0C, 0x29, 0x7E, 0xBF, 0x58 },   8 },
+        { { 0x2C, 0xF0, 0x5D, 0x41, 0x90, 0x6B },   5 },
+        { { 0xD4, 0x3B, 0x04, 0x67, 0xE2, 0x18 },   4 },
+        { { 0x8C, 0x85, 0x90, 0xBA, 0x3F, 0xD7 },   3 },
+        { { 0x40, 0xA3, 0x6B, 0x15, 0x7C, 0x82 },   2 },
+        { { 0x1C, 0x87, 0x2C, 0x09, 0xA5, 0x4E },   1 },
+    };
+    const uint32_t num_clients = sizeof(clients) / sizeof(clients[0]);
+
+    /* Compute max packet count (clamped to MIN_PKTS) — drives chart Y range
+     * and the draw-cb's color gradient denominator. */
+    uint32_t max_count = 1;
+    for (uint32_t i = 0; i < num_clients; i++) {
+        if (clients[i].pkt_count > max_count) {
+            max_count = clients[i].pkt_count;
+        }
+    }
+    if (max_count < DATA_CHART_MIN_PKTS_SIM) {
+        max_count = DATA_CHART_MIN_PKTS_SIM;
+    }
+    sim_data_chart_max_count = (int)max_count;
+
+    /* ── Scrollable container ── */
+    lv_obj_t *cont = lv_obj_create(scr);
+    lv_obj_align(cont, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_bg_color(cont, primary, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(cont, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_size(cont, 210, 106);
+    lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_ON);
+
+    /* ── Chart ── */
+    lv_obj_t *chart = lv_chart_create(cont);
+    lv_obj_set_size(chart, 186, 60);
+    lv_obj_align(chart, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_bg_color(chart, lv_color_black(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_chart_set_type(chart, LV_CHART_TYPE_BAR);
+    lv_chart_set_point_count(chart, num_clients);
+    lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, 0, sim_data_chart_max_count);
+    lv_chart_set_update_mode(chart, LV_CHART_UPDATE_MODE_SHIFT);
+
+    lv_chart_series_t *series = lv_chart_add_series(chart,
+                                                    lv_palette_main(LV_PALETTE_GREEN),
+                                                    LV_CHART_AXIS_PRIMARY_Y);
+
+    lv_obj_set_style_width(chart, 8, LV_PART_ITEMS);
+    lv_obj_set_style_pad_column(chart, 2, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(chart, lv_palette_main(LV_PALETTE_GREEN), LV_PART_ITEMS);
+
+    /* Per-bar color gradient */
+    lv_obj_add_flag(chart, LV_OBJ_FLAG_SEND_DRAW_TASK_EVENTS);
+    lv_obj_add_event_cb(chart, data_chart_draw_cb, LV_EVENT_DRAW_TASK_ADDED, series);
+
+    /* Fill bars with packet counts */
+    for (uint32_t i = 0; i < num_clients; i++) {
+        lv_chart_set_value_by_id(chart, series, i, (int32_t)clients[i].pkt_count);
+    }
+    lv_chart_refresh(chart);
+
+    /* ── "<N> users on Ch6@72Mbps" label at top of container ── */
+    lv_obj_t *lbl_clients = lv_label_create(cont);
+    char clients_buf[48];
+    snprintf(clients_buf, sizeof(clients_buf),
+             "%u users on Ch6@72Mbps", (unsigned)num_clients);
+    format_label(lbl_clients, clients_buf, secondary,
+                 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, -10);
+
+    /* ── SCROLL hint (initially below viewport) ── */
+    lv_obj_t *lbl_scroll = lv_label_create(cont);
+    format_label(lbl_scroll, "SCROLL", secondary,
+                 &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, 15);
+
+    /* ── MAC list (scrolls into view below chart) ── */
+    lv_obj_t *lbl_info = lv_label_create(cont);
+    lv_obj_set_style_text_color(lbl_info, secondary, 0);
+    lv_obj_set_style_text_font(lbl_info, &lv_font_montserrat_14, 0);
+    lv_label_set_long_mode(lbl_info, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(lbl_info, 190);
+    lv_obj_align_to(lbl_info, chart, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 25);
+
+    static char info_buf[1024];
+    size_t off = 0;
+    off += snprintf(info_buf + off, sizeof(info_buf) - off,
+                    "Unique users (MACs):\n");
+    for (uint32_t i = 0; i < num_clients && off < sizeof(info_buf); i++) {
+        const uint8_t *m    = clients[i].mac;
+        const char    *unit = (clients[i].pkt_count > 1) ? "pkts" : "pkt";
+        off += snprintf(info_buf + off, sizeof(info_buf) - off,
+                        "%02X:%02X:%02X:%02X:%02X:%02X: %u%s\n",
+                        m[0], m[1], m[2], m[3], m[4], m[5],
+                        (unsigned)clients[i].pkt_count, unit);
+    }
+    lv_label_set_text(lbl_info, info_buf);
+
+    /* Register container for Up/Down scroll (firmware uses 53 px/press). */
+    screen_set_scroll(cont, 53);
+
+    /* ── "◄ BEACON" label replaces the left arrow (back to beacon page) ── */
+    lv_obj_t *lbl_beacon = lv_label_create(scr);
+    format_label(lbl_beacon, LV_SYMBOL_LEFT " BEACON", secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_LEFT, 3, 0);
+
+    /* ── Persistent UI (up/down/left + battery).  Right arrow is hidden on
+     *    this page; "◄ BEACON" label sits at bottom-left, separate from the
+     *    left-mid arrow used for general back navigation. ── */
     lv_obj_t *arrow_top = lv_label_create(scr);
     format_label(arrow_top, LV_SYMBOL_UP, secondary,
                  &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);

@@ -14,8 +14,13 @@
       "Bash(ls:*)",
       "Bash(find:*)",
       "Bash(type:*)",
-      "Bash(git diff:*)"
+      "Bash(git diff:*)",
+
+      "Bash(*setup-ralph-loop.sh*)" 
     ]
   },
-  "autoMemoryEnabled": true
+  "autoMemoryEnabled": true,
+  "enabledPlugins": {
+    "ralph-loop@claude-plugins-official": true
+  }
 }
