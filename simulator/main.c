@@ -37,7 +37,10 @@ typedef struct {
 
 static const screen_entry_t screens[] = {
     { "Selection",         screen_selection          },
+    { "GPIO",              screen_gpio               },
+    { "GPIO Terminal",     screen_gpio_terminal      },
     { "Bluetooth",         screen_bluetooth          },
+    { "AI Keyboard",       screen_ai_keyboard        },
     { "Infrared",          screen_infrared           },
     { "Infrared Add Sig",  screen_infrared_add_signal},
     { "LoRa",              screen_lora               },

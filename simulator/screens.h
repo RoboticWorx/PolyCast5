@@ -74,6 +74,25 @@ void screen_wifi_beacon(void);
  */
 void screen_wifi_data(void);
 
+/**
+ * Render the Bluetooth AI Keyboard page (ready / "Hold & talk!" state).
+ * Shows the centered "Hold & talk!" prompt, "Use: non-reasoning" footer,
+ * settings-gear affordance, and persistent Wi-Fi + BT connected icons
+ * stacked in the top-left.
+ */
+void screen_ai_keyboard(void);
+
+/**
+ * Render the GPIO submenu (How It Works / Terminal / I2C Scanner).
+ */
+void screen_gpio(void);
+
+/**
+ * Render the I2C Terminal page with a single successful send/receive
+ * round-trip already shown in the scrollable log.
+ */
+void screen_gpio_terminal(void);
+
 /* ─── Menu navigation (Up/Down arrows) ───────────────────────── */
 
 #define MENU_MAX_BTNS 16
@@ -92,5 +111,15 @@ void screen_menu_navigate(int direction);
  *  Up/Down keys will scroll it by step_px pixels (DOWN reveals content
  *  below, matching firmware button semantics). Cleared on menu_reset. */
 void screen_set_scroll(lv_obj_t *cont, int step_px);
+
+/** Register per-page Up/Down action callbacks. When installed, these
+ *  override menu navigation and scrolling for that direction.
+ *  Cleared on menu_reset. Either pointer may be NULL. */
+void screen_set_nav_handlers(void (*on_up)(void), void (*on_down)(void));
+
+/** Register a cleanup hook run just before the next screen renders
+ *  (from screen_menu_reset). Used to delete timers / animations that
+ *  outlive their screen widgets. Cleared after invocation. */
+void screen_set_cleanup(void (*on_cleanup)(void));
 
 #endif /* SCREENS_H */

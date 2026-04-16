@@ -12,9 +12,13 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "screens.h"
 #include "lvgl.h"
+#include "img_ai_orb_1.h"
+#include "img_ai_orb_2.h"
+#include "img_ai_orb_3.h"
 
 #define DEFAULT_BATTERY_LV "92%"
 
@@ -35,17 +39,43 @@ static active_menu_t active_menu = {0};
 static lv_obj_t *active_scroll      = NULL;
 static int       active_scroll_step = 55;
 
+/* Per-page Up/Down action overrides + cleanup hook. */
+static void (*active_up_cb)(void)      = NULL;
+static void (*active_down_cb)(void)    = NULL;
+static void (*active_cleanup_cb)(void) = NULL;
+
 void screen_menu_reset(void)
 {
+    /* Run the previous screen's cleanup (e.g. delete timers whose targets
+     * are about to be destroyed by lv_obj_clean) before resetting state. */
+    if (active_cleanup_cb) {
+        void (*cb)(void) = active_cleanup_cb;
+        active_cleanup_cb = NULL;
+        cb();
+    }
+
     active_menu.size   = 0;
     active_scroll      = NULL;
     active_scroll_step = 55;
+    active_up_cb       = NULL;
+    active_down_cb     = NULL;
 }
 
 void screen_set_scroll(lv_obj_t *cont, int step_px)
 {
     active_scroll      = cont;
     active_scroll_step = (step_px > 0) ? step_px : 55;
+}
+
+void screen_set_nav_handlers(void (*on_up)(void), void (*on_down)(void))
+{
+    active_up_cb   = on_up;
+    active_down_cb = on_down;
+}
+
+void screen_set_cleanup(void (*on_cleanup)(void))
+{
+    active_cleanup_cb = on_cleanup;
 }
 
 /**
@@ -60,6 +90,11 @@ void screen_set_scroll(lv_obj_t *cont, int step_px)
  */
 void screen_menu_navigate(int direction)
 {
+    /* Custom per-page action first — this is how the AI keyboard toggles
+     * the "Hold & talk" recording animation on Down. */
+    if (direction > 0 && active_down_cb) { active_down_cb(); return; }
+    if (direction < 0 && active_up_cb)   { active_up_cb();   return; }
+
     if (active_menu.size <= 0) {
         /* Fallback: scroll the registered container (if any).
          * Direction +1 (DOWN key) pushes content up to reveal content below
@@ -333,7 +368,7 @@ void screen_lora(void)
 
     /* ── Options ── */
     static const char *lora_options[] = {
-        "Add PolyPlug", "Living Room", "Kitchen", "Bedroom Lamp", "Garage"
+        "Add PolyPlug", "Bedroom Fan", "Garage Lights", "Living Room", "Bedroom Lamp", "Garage"
     };
     int num_options = sizeof(lora_options) / sizeof(lora_options[0]);
     int selected = 1; /* firmware default when size > 1 */
@@ -1312,6 +1347,585 @@ void screen_wifi_data(void)
     /* ── Persistent UI (up/down/left + battery).  Right arrow is hidden on
      *    this page; "◄ BEACON" label sits at bottom-left, separate from the
      *    left-mid arrow used for general back navigation. ── */
+    lv_obj_t *arrow_top = lv_label_create(scr);
+    format_label(arrow_top, LV_SYMBOL_UP, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+
+    lv_obj_t *arrow_left = lv_label_create(scr);
+    format_label(arrow_left, LV_SYMBOL_LEFT, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 0);
+
+    lv_obj_t *arrow_bot = lv_label_create(scr);
+    format_label(arrow_bot, LV_SYMBOL_DOWN, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+    /* Battery */
+    lv_obj_t *lbl_bat_txt = lv_label_create(scr);
+    format_label(lbl_bat_txt, DEFAULT_BATTERY_LV, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_RIGHT, -28, 0);
+
+    lv_obj_t *lbl_bat_icon = lv_label_create(scr);
+    format_label(lbl_bat_icon, LV_SYMBOL_BATTERY_FULL, secondary,
+                 &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
+}
+
+/* ─── Bluetooth AI Keyboard page ─────────────────────────────────
+ * Mirrors lcd_bluetooth_ai_keyboard_page() in components/lcd/src/lcd_bluetooth.c
+ * in its AI_KEYB_IDLE ("Hold & talk!") ready state — both Wi-Fi and BLE
+ * connected, orb hidden, reasoning toggle footer shown.
+ *
+ * Simulator hook: pressing Down toggles the recording state, mirroring the
+ * firmware's select-button recording behavior — hides the text prompts,
+ * shows the orb, and spins/pulses it via an lv_anim rotation + periodic
+ * image-source swap to mimic voice pickup. */
+
+/* Handles of widgets the recording animation manipulates. */
+static lv_obj_t  *aikb_lbl_ins       = NULL;
+static lv_obj_t  *aikb_lbl_reasoning = NULL;
+static lv_obj_t  *aikb_lbl_config    = NULL;
+static lv_obj_t  *aikb_arrow_bot     = NULL;
+static lv_obj_t  *aikb_orb           = NULL;
+static lv_timer_t *aikb_pulse_timer  = NULL;
+static bool       aikb_recording     = false;
+
+/* Orb burst state machine — cycles frames 1→2→3→2→1 to mimic a voice
+ * burst, then sleeps a randomized gap before the next burst.  step 0 =
+ * idle gap, 1..5 = positions within the 5-frame sequence. */
+static int aikb_pulse_step = 0;
+static int aikb_pulse_gap  = 0;
+
+/* Loading dot (ported from lcd_anim_loading_start) — a pulsing circle
+ * that slides across a small invisible container, running continuously
+ * while the AI keyboard page is active. */
+static lv_obj_t *aikb_loading_cont = NULL;
+static lv_obj_t *aikb_loading_dot  = NULL;
+
+/* Re-center the orb's rotation pivot for its current image size. The three
+ * orb frames are different sizes (45/60/75 px) so the pivot must be
+ * recomputed each time the source image changes, otherwise rotation
+ * happens around a fixed pixel offset that's only the center of one
+ * frame. Re-align to CENTER so the newly-sized image doesn't shift off. */
+static void aikb_orb_recenter_pivot(void)
+{
+    if (!aikb_orb) return;
+    lv_obj_update_layout(aikb_orb);
+    int w = lv_obj_get_width(aikb_orb);
+    int h = lv_obj_get_height(aikb_orb);
+    lv_obj_set_style_transform_pivot_x(aikb_orb, w / 2, 0);
+    lv_obj_set_style_transform_pivot_y(aikb_orb, h / 2, 0);
+    lv_obj_align(aikb_orb, LV_ALIGN_CENTER, 0, 0);
+}
+
+/* Pulse timer: cycles the orb through the fixed 1→2→3→2→1 burst
+ * sequence to imitate a voice burst, then waits a random gap before the
+ * next burst. The deterministic sequence keeps the animation looking
+ * correct (grow then shrink) while the randomized gaps make bursts feel
+ * natural — short pauses between words / phonemes. */
+static void aikb_pulse_cb(lv_timer_t *t)
+{
+    (void)t;
+    if (!aikb_orb) return;
+
+    static const void *const frames[] = {
+        &img_ai_orb_1, &img_ai_orb_2, &img_ai_orb_3
+    };
+    /* Indices into frames[] for the burst sequence: 1, 2, 3, 2, 1. */
+    static const uint8_t BURST_SEQ[5] = { 0, 1, 2, 1, 0 };
+
+    if (aikb_pulse_step == 0) {
+        /* Between bursts — decrement gap; stay on the smallest frame. */
+        if (aikb_pulse_gap > 0) {
+            aikb_pulse_gap--;
+            return;
+        }
+        /* Gap elapsed; fall through to play step 0 of a new burst. */
+    }
+
+    lv_image_set_src(aikb_orb, frames[BURST_SEQ[aikb_pulse_step]]);
+    aikb_orb_recenter_pivot();
+
+    aikb_pulse_step++;
+    if (aikb_pulse_step >= 5) {
+        /* Burst complete — pick a weighted-random gap so bursts arrive at
+         * unpredictable intervals, mimicking words of varying length and
+         * natural pauses between phrases. The sequence itself is always
+         * 1→2→3→2→1 (rising-then-falling) so the shape stays correct. */
+        aikb_pulse_step = 0;
+        int r = rand() % 10;
+        if (r < 4) {
+            /* 40%: near-zero gap — rapid-fire run-on words. */
+            aikb_pulse_gap = rand() % 2;          /* 0–1 tick   */
+        } else if (r < 8) {
+            /* 40%: short gap — normal word spacing. */
+            aikb_pulse_gap = 2 + (rand() % 3);    /* 2–4 ticks  */
+        } else {
+            /* 20%: long gap — pause between phrases / thinking. */
+            aikb_pulse_gap = 8 + (rand() % 12);   /* 8–19 ticks */
+        }
+    }
+}
+
+/* lv_anim exec-cb: drives continuous rotation of the orb. */
+static void aikb_orb_rotate_cb(void *var, int32_t v)
+{
+    lv_obj_set_style_transform_rotation((lv_obj_t *)var, v, 0);
+}
+
+/* ── Loading dot animation (ported from lcd_anim_loading_*) ──
+ * A small circular dot that pulses in size and slides across a narrow
+ * invisible container parked in the bottom-right corner. */
+
+static void aikb_loading_size_cb(void *var, int32_t v)
+{
+    lv_obj_t *obj    = (lv_obj_t *)var;
+    lv_obj_t *parent = lv_obj_get_parent(obj);
+
+    lv_obj_set_size(obj, (lv_coord_t)v, (lv_coord_t)v);
+
+    /* Keep the dot vertically centered inside its container as it grows. */
+    if (parent) {
+        lv_coord_t h = lv_obj_get_height(parent);
+        lv_obj_set_y(obj, (h - (lv_coord_t)v) / 2);
+
+        lv_coord_t max_x = lv_obj_get_width(parent) - lv_obj_get_width(obj);
+        if (max_x < 0) max_x = 0;
+        lv_coord_t x = lv_obj_get_x(obj);
+        if (x > max_x)     lv_obj_set_x(obj, max_x);
+        else if (x < 0)    lv_obj_set_x(obj, 0);
+    }
+}
+
+static void aikb_loading_x_cb(void *var, int32_t v)
+{
+    lv_obj_t *obj    = (lv_obj_t *)var;
+    lv_obj_t *parent = lv_obj_get_parent(obj);
+
+    if (parent) {
+        lv_coord_t max_x = lv_obj_get_width(parent) - lv_obj_get_width(obj);
+        if (max_x < 0) max_x = 0;
+        if (v < 0)       v = 0;
+        else if (v > max_x) v = max_x;
+    }
+
+    lv_obj_set_x(obj, (lv_coord_t)v);
+}
+
+static void aikb_loading_start(lv_obj_t *scr, lv_color_t color)
+{
+    const lv_coord_t min_sz = 6;
+    const lv_coord_t max_sz = 24;
+
+    /* Invisible container in the bottom-right corner. */
+    aikb_loading_cont = lv_obj_create(scr);
+    lv_obj_set_size(aikb_loading_cont, max_sz + 1, max_sz + 1);
+    lv_obj_set_style_bg_opa(aikb_loading_cont, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(aikb_loading_cont, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_all(aikb_loading_cont, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_remove_flag(aikb_loading_cont, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_align(aikb_loading_cont, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
+
+    aikb_loading_dot = lv_obj_create(aikb_loading_cont);
+    lv_obj_set_style_radius(aikb_loading_dot, LV_RADIUS_CIRCLE, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(aikb_loading_dot, color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(aikb_loading_dot, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_all(aikb_loading_dot, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_size(aikb_loading_dot, min_sz, min_sz);
+    lv_obj_align(aikb_loading_dot, LV_ALIGN_LEFT_MID, 0, 0);
+
+    /* Pulse (size) */
+    lv_anim_t a_size;
+    lv_anim_init(&a_size);
+    lv_anim_set_var(&a_size, aikb_loading_dot);
+    lv_anim_set_exec_cb(&a_size, aikb_loading_size_cb);
+    lv_anim_set_values(&a_size, min_sz, max_sz);
+    lv_anim_set_duration(&a_size, 900);
+    lv_anim_set_playback_delay(&a_size, 80);
+    lv_anim_set_playback_duration(&a_size, 280);
+    lv_anim_set_repeat_delay(&a_size, 250);
+    lv_anim_set_repeat_count(&a_size, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_path_cb(&a_size, lv_anim_path_ease_in_out);
+    lv_anim_start(&a_size);
+
+    /* Travel (x) */
+    lv_anim_t a_x;
+    lv_anim_init(&a_x);
+    lv_anim_set_var(&a_x, aikb_loading_dot);
+    lv_anim_set_exec_cb(&a_x, aikb_loading_x_cb);
+    lv_anim_set_values(&a_x, 0, lv_obj_get_width(aikb_loading_cont));
+    lv_anim_set_duration(&a_x, 1100);
+    lv_anim_set_repeat_count(&a_x, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_path_cb(&a_x, lv_anim_path_ease_in_out);
+    lv_anim_start(&a_x);
+}
+
+static void aikb_loading_stop(void)
+{
+    if (aikb_loading_dot) {
+        lv_anim_delete(aikb_loading_dot, aikb_loading_size_cb);
+        lv_anim_delete(aikb_loading_dot, aikb_loading_x_cb);
+    }
+    aikb_loading_dot  = NULL;
+    aikb_loading_cont = NULL;
+}
+
+static void aikb_start_recording(void)
+{
+    if (!aikb_orb || aikb_recording) return;
+
+    /* Hide text + down arrow; show orb.  Settings gear stays visible
+     * throughout (gives a persistent right-side affordance while talking). */
+    lv_obj_add_flag(aikb_lbl_ins, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(aikb_lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(aikb_arrow_bot, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(aikb_orb, LV_OBJ_FLAG_HIDDEN);
+    lv_image_set_src(aikb_orb, &img_ai_orb_1);
+    aikb_orb_recenter_pivot();
+
+    /* Continuous rotation: 2 s per revolution, looping forever. */
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, aikb_orb);
+    lv_anim_set_values(&a, 0, 3600);
+    lv_anim_set_duration(&a, 2000);
+    lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_exec_cb(&a, aikb_orb_rotate_cb);
+    lv_anim_start(&a);
+
+    /* Start burst state machine at the beginning of sequence with no gap
+     * so the first burst fires on the next timer tick. */
+    aikb_pulse_step = 0;
+    aikb_pulse_gap  = 0;
+    if (!aikb_pulse_timer) {
+        /* 30 ms/tick → a 5-frame burst plays in ~150 ms, snappy enough to
+         * read as an individual word.  Weighted-random gaps then cluster
+         * bursts into run-ons, normal word-spaced groups, and occasional
+         * phrase pauses — so the orb looks like it's catching random
+         * words rather than a metronome pulse. */
+        aikb_pulse_timer = lv_timer_create(aikb_pulse_cb, 30, NULL);
+    }
+
+    aikb_recording = true;
+}
+
+static void aikb_stop_recording(void)
+{
+    if (!aikb_orb || !aikb_recording) return;
+
+    /* Stop spin + pulse. */
+    lv_anim_delete(aikb_orb, aikb_orb_rotate_cb);
+    if (aikb_pulse_timer) {
+        lv_timer_delete(aikb_pulse_timer);
+        aikb_pulse_timer = NULL;
+    }
+
+    /* Reset orb appearance then hide. */
+    lv_image_set_src(aikb_orb, &img_ai_orb_1);
+    lv_obj_set_style_transform_rotation(aikb_orb, 0, 0);
+    lv_obj_add_flag(aikb_orb, LV_OBJ_FLAG_HIDDEN);
+
+    /* Restore text + down arrow (settings gear was never hidden). */
+    lv_obj_remove_flag(aikb_lbl_ins, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(aikb_lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(aikb_arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+    aikb_recording = false;
+}
+
+/* Down-key handler — toggle recording (click once to start, click again
+ * to stop). */
+static void aikb_on_down(void)
+{
+    if (aikb_recording) {
+        aikb_stop_recording();
+    } else {
+        aikb_start_recording();
+    }
+}
+
+/* Runs from screen_menu_reset() before lv_obj_clean() destroys our widgets.
+ * Tears down the pulse timer and any running rotation animation whose var
+ * pointer is about to become stale. */
+static void aikb_cleanup(void)
+{
+    if (aikb_pulse_timer) {
+        lv_timer_delete(aikb_pulse_timer);
+        aikb_pulse_timer = NULL;
+    }
+    if (aikb_orb) {
+        lv_anim_delete(aikb_orb, NULL);
+    }
+    /* Loading dot lives for the page's lifetime — cancel its anims before
+     * lv_obj_clean() destroys the objects. */
+    aikb_loading_stop();
+    aikb_lbl_ins = aikb_lbl_reasoning = aikb_lbl_config = NULL;
+    aikb_arrow_bot = aikb_orb = NULL;
+    aikb_pulse_step = 0;
+    aikb_pulse_gap  = 0;
+    aikb_recording  = false;
+}
+
+void screen_ai_keyboard(void)
+{
+    lv_color_t primary   = USER_PRIMARY_COLOR;
+    lv_color_t secondary = USER_SECONDARY_COLOR;
+
+    lv_obj_t *scr = lv_scr_act();
+    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_style_bg_color(scr, primary, 0);
+    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
+
+    /* ── Main "Hold & talk!" prompt (idle/ready state) ── */
+    aikb_lbl_ins = lv_label_create(scr);
+    format_label(aikb_lbl_ins, "Hold & talk!", secondary,
+                 &lv_font_montserrat_22, LV_ALIGN_CENTER, 0, 0);
+
+    /* ── Reasoning-mode indicator (bottom-mid, toggled by Down button) ── */
+    aikb_lbl_reasoning = lv_label_create(scr);
+    format_label(aikb_lbl_reasoning, "Use: non-reasoning", secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, -14);
+
+    /* ── Settings gear (right-mid; replaces the right arrow on this page) ── */
+    aikb_lbl_config = lv_label_create(scr);
+    format_label(aikb_lbl_config, LV_SYMBOL_SETTINGS, secondary,
+                 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -16, 0);
+
+    /* ── AI orb image (hidden until recording starts) ── */
+    aikb_orb = lv_image_create(scr);
+    lv_image_set_src(aikb_orb, &img_ai_orb_1);
+    lv_obj_align(aikb_orb, LV_ALIGN_CENTER, 0, 0);
+    /* Give rotation some headroom so diagonals aren't clipped. */
+    lv_obj_set_style_transform_width(aikb_orb, 8, 0);
+    lv_obj_set_style_transform_height(aikb_orb, 8, 0);
+    /* Pivot is re-computed each pulse frame (images are 45/60/75 px, so a
+     * fixed pivot would only be centered for one of them). */
+    aikb_orb_recenter_pivot();
+    lv_obj_add_flag(aikb_orb, LV_OBJ_FLAG_HIDDEN);
+
+    /* ── Persistent Wi-Fi + BT connected icons (top-left, stacked) ──
+     * Offsets match lcd_update_icons() in lcd_utils.c for the wifi+bt-both
+     * state: Wi-Fi at (3, 0), Bluetooth at (5, 22). */
+    lv_obj_t *lbl_wifi_icon = lv_label_create(scr);
+    format_label(lbl_wifi_icon, LV_SYMBOL_WIFI, secondary,
+                 &lv_font_montserrat_18, LV_ALIGN_TOP_LEFT, 3, 0);
+
+    lv_obj_t *lbl_bt_icon = lv_label_create(scr);
+    format_label(lbl_bt_icon, LV_SYMBOL_BLUETOOTH, secondary,
+                 &lv_font_montserrat_20, LV_ALIGN_TOP_LEFT, 5, 22);
+
+    /* ── Persistent UI (arrows + battery).  The top arrow is intentionally
+     *    omitted on this page; left/right/down are all visible in ready
+     *    state.  Down toggles recording — while recording, down/settings
+     *    get hidden but left & right remain visible. ── */
+    lv_obj_t *arrow_left = lv_label_create(scr);
+    format_label(arrow_left, LV_SYMBOL_LEFT, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 0);
+
+    lv_obj_t *arrow_right = lv_label_create(scr);
+    format_label(arrow_right, LV_SYMBOL_RIGHT, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_RIGHT_MID, -4, 0);
+
+    aikb_arrow_bot = lv_label_create(scr);
+    format_label(aikb_arrow_bot, LV_SYMBOL_DOWN, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+    /* Battery */
+    lv_obj_t *lbl_bat_txt = lv_label_create(scr);
+    format_label(lbl_bat_txt, DEFAULT_BATTERY_LV, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_RIGHT, -28, 0);
+
+    lv_obj_t *lbl_bat_icon = lv_label_create(scr);
+    format_label(lbl_bat_icon, LV_SYMBOL_BATTERY_FULL, secondary,
+                 &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
+
+    /* Persistent loading-dot animation at bottom-right of the page. */
+    aikb_loading_start(scr, secondary);
+
+    /* Hook Down into the recording toggle; cleanup tears down timer/anim
+     * before the next screen is loaded. */
+    aikb_recording  = false;
+    aikb_pulse_step = 0;
+    aikb_pulse_gap  = 0;
+    screen_set_nav_handlers(NULL, aikb_on_down);
+    screen_set_cleanup(aikb_cleanup);
+}
+
+/* ─── GPIO submenu page ──────────────────────────────────────────
+ * Mirrors lcd_gpio_setup_page() in components/lcd/src/lcd_gpio.c.
+ * Three-option vertical list; default selection is index 0 ("How It Works")
+ * so the first thing a new user reads is the explainer page. */
+
+void screen_gpio(void)
+{
+    lv_color_t primary   = USER_PRIMARY_COLOR;
+    lv_color_t secondary = USER_SECONDARY_COLOR;
+
+    lv_obj_t *scr = lv_scr_act();
+    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_style_bg_color(scr, primary, 0);
+    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
+
+    /* ── Menu list ── */
+    lv_obj_t *main_list = lv_list_create(scr);
+    lv_obj_set_size(main_list, 210, 106);
+    lv_obj_set_style_bg_color(main_list, primary, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_align(main_list, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_border_width(main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    apply_scrollbar_style(main_list);
+    lv_obj_set_scroll_dir(main_list, LV_DIR_VER);
+
+    /* ── Button style (unselected) ── */
+    static lv_style_t gpio_btn_style;
+    lv_style_init(&gpio_btn_style);
+    lv_style_set_radius(&gpio_btn_style, 8);
+    lv_style_set_bg_color(&gpio_btn_style, primary);
+    lv_style_set_border_width(&gpio_btn_style, 2);
+    lv_style_set_border_color(&gpio_btn_style, secondary);
+    lv_style_set_border_side(&gpio_btn_style, LV_BORDER_SIDE_FULL);
+    lv_style_set_pad_top(&gpio_btn_style, 3);
+    lv_style_set_pad_bottom(&gpio_btn_style, 3);
+    lv_style_set_text_font(&gpio_btn_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&gpio_btn_style, secondary);
+    lv_style_set_text_align(&gpio_btn_style, LV_TEXT_ALIGN_CENTER);
+
+    /* ── Selected style ── */
+    static lv_style_t gpio_sel_style;
+    lv_style_init(&gpio_sel_style);
+    lv_style_set_radius(&gpio_sel_style, 8);
+    lv_style_set_bg_color(&gpio_sel_style, secondary);
+    lv_style_set_border_width(&gpio_sel_style, 2);
+    lv_style_set_border_color(&gpio_sel_style, secondary);
+    lv_style_set_border_side(&gpio_sel_style, LV_BORDER_SIDE_FULL);
+    lv_style_set_pad_top(&gpio_sel_style, 3);
+    lv_style_set_pad_bottom(&gpio_sel_style, 3);
+    lv_style_set_text_font(&gpio_sel_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&gpio_sel_style, primary);
+    lv_style_set_text_align(&gpio_sel_style, LV_TEXT_ALIGN_CENTER);
+
+    /* ── Options — matches the static initializer in lcd_gpio.c. ── */
+    static const char *gpio_options[] = {
+        "How It Works", "Terminal", "I2C Scanner"
+    };
+    int num_options = sizeof(gpio_options) / sizeof(gpio_options[0]);
+    int selected = 0;
+
+    for (int i = 0; i < num_options; i++) {
+        lv_obj_t *btn = lv_list_add_btn(main_list, NULL, gpio_options[i]);
+        lv_obj_set_size(btn, 200, 30);
+
+        if (i == selected) {
+            lv_obj_add_style(btn, &gpio_sel_style, 0);
+        } else {
+            lv_obj_add_style(btn, &gpio_btn_style, 0);
+        }
+
+        lv_obj_t *lbl = lv_obj_get_child(btn, 0);
+        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+
+        active_menu.btns[i] = btn;
+    }
+
+    /* Format buttons as flex container with spacing */
+    lv_obj_t *cont = lv_obj_get_parent(active_menu.btns[0]);
+    lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    /* Register for Up/Down navigation */
+    active_menu.size      = num_options;
+    active_menu.index     = selected;
+    active_menu.btn_style = &gpio_btn_style;
+    active_menu.sel_style = &gpio_sel_style;
+
+    /* ── Persistent UI (arrows + battery).  GPIO page inherits arrow state
+     *    from selection: up/down/left visible, right hidden. ── */
+    lv_obj_t *arrow_top = lv_label_create(scr);
+    format_label(arrow_top, LV_SYMBOL_UP, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+
+    lv_obj_t *arrow_left = lv_label_create(scr);
+    format_label(arrow_left, LV_SYMBOL_LEFT, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 0);
+
+    lv_obj_t *arrow_bot = lv_label_create(scr);
+    format_label(arrow_bot, LV_SYMBOL_DOWN, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+    /* Battery */
+    lv_obj_t *lbl_bat_txt = lv_label_create(scr);
+    format_label(lbl_bat_txt, DEFAULT_BATTERY_LV, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_RIGHT, -28, 0);
+
+    lv_obj_t *lbl_bat_icon = lv_label_create(scr);
+    format_label(lbl_bat_icon, LV_SYMBOL_BATTERY_FULL, secondary,
+                 &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
+}
+
+/* ─── GPIO I2C Terminal page ─────────────────────────────────────
+ * Mirrors lcd_gpio_terminal_page() in components/lcd/src/lcd_gpio.c.
+ * Shows the scrollable terminal container with title, instructions, and a
+ * single successful send→receive round-trip (Command 42 → "Hello ESP32!"). */
+
+void screen_gpio_terminal(void)
+{
+    lv_color_t primary   = USER_PRIMARY_COLOR;
+    lv_color_t secondary = USER_SECONDARY_COLOR;
+
+    lv_obj_t *scr = lv_scr_act();
+    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_style_bg_color(scr, primary, 0);
+    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
+
+    /* ── Scrollable terminal container (rounded, bordered, shadowed) ── */
+    lv_obj_t *cont = lv_obj_create(scr);
+    lv_obj_set_size(cont, 210, 106);
+    lv_obj_center(cont);
+    lv_obj_set_style_bg_color(cont, primary, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_color(cont, secondary, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+    lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+    lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    /* ── Title ── */
+    lv_obj_t *title_lbl = lv_label_create(cont);
+    lv_label_set_text(title_lbl, "I2C Terminal");
+    lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_color(title_lbl, secondary, 0);
+    lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+    /* ── Log label (scrolls into view as content grows) ── */
+    lv_obj_t *log_lbl = lv_label_create(cont);
+    lv_label_set_long_mode(log_lbl, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(log_lbl, lv_pct(100));
+    lv_obj_set_style_text_font(log_lbl, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(log_lbl, secondary, 0);
+    lv_obj_align_to(log_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+
+    /* One successful round-trip: up/down adjusted the command to 42, then
+     * select sent it to 0x2A and the slave replied with "Hello ESP32!".
+     * Format matches the firmware's term_log_append() output exactly. */
+    lv_label_set_text(log_lbl,
+        // "Use up/down to adjust.\n"
+        // "Press select to send.\n"
+        // "Command: 42\n"
+        // "\n"
+        "Sent: 42 (0x2A) to 0x2A\n"
+        "Response: Hello world!\n\n");
+        // "Sent: 41 (0x2A) to 0x2A\n"
+        // "Response: Hello ESP32!\n\n"
+
+    /* Register for Up/Down scroll (the firmware's up/down change the
+     * command; here the static page just scrolls so the whole log is
+     * reachable in the simulator). */
+    screen_set_scroll(cont, 40);
+
+    /* ── Persistent UI (arrows + battery).  Terminal inherits up/down/left
+     *    from the GPIO submenu; right is hidden. ── */
     lv_obj_t *arrow_top = lv_label_create(scr);
     format_label(arrow_top, LV_SYMBOL_UP, secondary,
                  &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);

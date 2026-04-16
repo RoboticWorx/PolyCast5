@@ -50,11 +50,15 @@ add_executable(polycast5_sim
     main.c
     screens.c
     ../components/lcd/media/src/img_save_new_remote.c
+    ../components/lcd/media/src/img_ai_orb_1.c
+    ../components/lcd/media/src/img_ai_orb_2.c
+    ../components/lcd/media/src/img_ai_orb_3.c
 )
 
 target_include_directories(polycast5_sim PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${LVGL_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../components/lcd/media/include"
 )
 
 target_link_libraries(polycast5_sim PRIVATE lvgl)
