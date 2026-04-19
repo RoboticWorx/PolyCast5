@@ -37,6 +37,7 @@ typedef struct {
 
 static const screen_entry_t screens[] = {
     { "Selection",         screen_selection          },
+    { "Selection (green)", screen_selection_green    },
     { "GPIO",              screen_gpio               },
     { "GPIO Terminal",     screen_gpio_terminal      },
     { "Bluetooth",         screen_bluetooth          },
@@ -45,9 +46,11 @@ static const screen_entry_t screens[] = {
     { "Infrared Add Sig",  screen_infrared_add_signal},
     { "LoRa",              screen_lora               },
     { "Tools",             screen_tools              },
+    { "Tetris",            screen_tetris             },
     { "Wi-Fi Beacon",      screen_wifi_beacon        },
     { "Wi-Fi Data",        screen_wifi_data          },
     { "Settings",          screen_settings           },
+    { "OTA Update",        screen_ota_update         },
 };
 
 #define NUM_SCREENS (sizeof(screens) / sizeof(screens[0]))

@@ -27,6 +27,12 @@
 void screen_selection(void);
 
 /**
+ * Alternate selection/home screen — same layout but with a black
+ * background and 0x008B00 green accent/text color (hacker palette).
+ */
+void screen_selection_green(void);
+
+/**
  * Render the LoRa subpage (example of a category page).
  */
 void screen_lora(void);
@@ -92,6 +98,20 @@ void screen_gpio(void);
  * round-trip already shown in the scrollable log.
  */
 void screen_gpio_terminal(void);
+
+/**
+ * Render the OTA update page.  Shows the "Updating..." title, progress bar,
+ * percent label, and recovery instructions.  On entry the bar animates
+ * from 0% to 100%, then switches to the success state.
+ */
+void screen_ota_update(void);
+
+/**
+ * Render the Tetris page with a self-playing example game.  A timer drives
+ * a simple best-landing-x AI so pieces move, rotate, fall, clear lines,
+ * score points, and eventually trigger game-over / restart.
+ */
+void screen_tetris(void);
 
 /* ─── Menu navigation (Up/Down arrows) ───────────────────────── */
 

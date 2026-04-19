@@ -13,6 +13,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "screens.h"
 #include "lvgl.h"
@@ -204,11 +205,8 @@ static void format_center_button(lv_obj_t *btn_mid, lv_color_t primary, lv_color
 #define SCROLLBAR_CONT_HEIGHT 106
 #define SCROLLBAR_THUMB_HEIGHT 20
 
-void screen_selection(void)
+static void render_selection(lv_color_t primary, lv_color_t secondary)
 {
-    lv_color_t primary   = USER_PRIMARY_COLOR;
-    lv_color_t secondary = USER_SECONDARY_COLOR;
-
     lv_obj_t *scr = lv_scr_act();
 
     /* Background */
@@ -311,6 +309,20 @@ void screen_selection(void)
     // format_label(lbl_wifi, LV_SYMBOL_WIFI, secondary,
     //              &lv_font_montserrat_18, LV_ALIGN_TOP_LEFT, 3, 0);
     // */
+}
+
+void screen_selection(void)
+{
+    render_selection(USER_PRIMARY_COLOR, USER_SECONDARY_COLOR);
+}
+
+/* Alternate home screen — black background with Green 500 (0x4CAF50) as
+ * the accent/text color.  Same 8-option layout, index 3 (LoRa) selected,
+ * just a different palette. */
+void screen_selection_green(void)
+{
+    render_selection(lv_color_black(),
+                     lv_color_make(0x4C, 0xAF, 0x50));
 }
 
 /* ─── LoRa page ────────────────────────────────────────────────
@@ -489,74 +501,70 @@ void screen_infrared(void)
     lv_style_set_text_color(&sel_style, primary);
     lv_style_set_text_align(&sel_style, LV_TEXT_ALIGN_CENTER);
 
-    /* ── Remote name style (with outline) ── */
-    static lv_style_t name_sel_style;
-    lv_style_init(&name_sel_style);
-    lv_style_set_radius(&name_sel_style, 8);
-    lv_style_set_bg_color(&name_sel_style, secondary);
-    lv_style_set_outline_width(&name_sel_style, 2);
-    lv_style_set_outline_color(&name_sel_style, secondary);
-    lv_style_set_outline_pad(&name_sel_style, 1);
-    lv_style_set_border_width(&name_sel_style, 2);
-    lv_style_set_border_color(&name_sel_style, secondary);
-    lv_style_set_border_side(&name_sel_style, LV_BORDER_SIDE_FULL);
-    lv_style_set_pad_top(&name_sel_style, 3);
-    lv_style_set_pad_bottom(&name_sel_style, 3);
-    lv_style_set_text_font(&name_sel_style, &lv_font_montserrat_16);
-    lv_style_set_text_color(&name_sel_style, primary);
-    lv_style_set_text_align(&name_sel_style, LV_TEXT_ALIGN_CENTER);
+    /* ── Remote-name outline (double-line) ──
+     * Applied permanently to button 0 so the remote title always reads as
+     * a special item.  btn_style / sel_style layer on top during nav; since
+     * neither touches outline properties, the double-line persists whether
+     * btn 0 is selected or not. */
+    static lv_style_t name_outline_style;
+    lv_style_init(&name_outline_style);
+    lv_style_set_outline_width(&name_outline_style, 2);
+    lv_style_set_outline_color(&name_outline_style, secondary);
+    lv_style_set_outline_pad(&name_outline_style, 1);
 
-    /* ── Build menu items (from lcd_ir_build_current_menu) ── */
+    /* ── Build menu items (from lcd_ir_build_current_menu) ──
+     * All items use btn_style / sel_style so Up/Down navigation (which
+     * swaps between those two) works cleanly.  The rotated list's
+     * scroll-to-view call inside screen_menu_navigate produces the
+     * expected horizontal scroll of the visual layout. */
 
     /* Fake remote data for preview */
-    static const char *signal_names[] = { "Power", "Vol Up", "Vol Down", "Mute" };
-    int num_signals = 4;
+    static const char *ir_options[] = {
+        "Room TV", "Edit", "Add New",
+        "Power", "Vol Up", "Vol Down", "Mute"
+    };
+    int num_options = sizeof(ir_options) / sizeof(ir_options[0]);
+    int selected = 0;
 
-    /* Remote name button (index 0) — selected by default */
-    lv_obj_t *btn0 = lv_list_add_btn(main_list, NULL, "Samsung TV");
-    lv_obj_set_size(btn0, 100, 28);
-    lv_obj_add_style(btn0, &name_sel_style, 0);
-    lv_obj_t *lbl = lv_obj_get_child(btn0, 0);
-    lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
-    lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
-
-    /* Edit button (index 1) */
-    lv_obj_t *btn1 = lv_list_add_btn(main_list, NULL, "Edit");
-    lv_obj_set_size(btn1, 100, 28);
-    lv_obj_add_style(btn1, &btn_style, 0);
-    lbl = lv_obj_get_child(btn1, 0);
-    lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
-    lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
-
-    /* Add New button (index 2) */
-    lv_obj_t *btn2 = lv_list_add_btn(main_list, NULL, "Add New");
-    lv_obj_set_size(btn2, 100, 28);
-    lv_obj_add_style(btn2, &btn_style, 0);
-    lbl = lv_obj_get_child(btn2, 0);
-    lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
-    lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
-
-    /* Signal buttons */
-    for (int i = 0; i < num_signals; i++) {
-        lv_obj_t *btn = lv_list_add_btn(main_list, NULL, signal_names[i]);
+    for (int i = 0; i < num_options; i++) {
+        lv_obj_t *btn = lv_list_add_btn(main_list, NULL, ir_options[i]);
         lv_obj_set_size(btn, 100, 28);
-        lv_obj_add_style(btn, &btn_style, 0);
-        lbl = lv_obj_get_child(btn, 0);
+
+        /* Add the outline base first on the remote-name button so later
+         * nav-driven style swaps leave it intact. */
+        if (i == 0) {
+            lv_obj_add_style(btn, &name_outline_style, 0);
+        }
+
+        if (i == selected) {
+            lv_obj_add_style(btn, &sel_style, 0);
+        } else {
+            lv_obj_add_style(btn, &btn_style, 0);
+        }
+
+        lv_obj_t *lbl = lv_obj_get_child(btn, 0);
         lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
         lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
+
+        active_menu.btns[i] = btn;
     }
 
     /* Format as flex container */
-    lv_obj_t *cont = lv_obj_get_parent(btn0);
+    lv_obj_t *cont = lv_obj_get_parent(active_menu.btns[0]);
     lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-    /* Scroll to top */
-    lv_obj_scroll_to_view(btn0, LV_ANIM_OFF);
+    /* Scroll selected into view */
+    lv_obj_scroll_to_view(active_menu.btns[selected], LV_ANIM_OFF);
+
+    /* Register for Up/Down navigation — Up/Down keys will re-style the
+     * buttons and scroll-to-view the selection, which in the rotated
+     * list visually scrolls the items horizontally. */
+    active_menu.size      = num_options;
+    active_menu.index     = selected;
+    active_menu.btn_style = &btn_style;
+    active_menu.sel_style = &sel_style;
 
     /* ── Persistent UI elements (from lcd_init_selection_labels, stay visible across pages) ── */
 
@@ -981,6 +989,57 @@ void screen_settings(void)
  * Bar chart of 20 signal samples (0-50 range, red→green gradient by value),
  * RSSI/SNR labels above, SSID / channel / security info scrolls below. */
 
+/* Live chart state — animate the RSSI bars so the graph looks alive,
+ * like a real-world signal meter.  Each tick, random subset of bars gets
+ * a small random-walk delta; most bars stay or shift by ±1, a few jitter
+ * by ±3.  Over time this yields natural-looking fluctuation with stable
+ * regions and noisier ones. */
+#define BEACON_BAR_COUNT 20
+#define BEACON_VAL_MIN   3
+#define BEACON_VAL_MAX   48
+
+static lv_obj_t          *beacon_chart  = NULL;
+static lv_chart_series_t *beacon_series = NULL;
+static int32_t            beacon_values[BEACON_BAR_COUNT];
+static lv_timer_t        *beacon_timer  = NULL;
+
+static void beacon_live_cb(lv_timer_t *t)
+{
+    (void)t;
+    if (!beacon_chart || !beacon_series) return;
+
+    bool changed = false;
+    for (uint32_t i = 0; i < BEACON_BAR_COUNT; i++) {
+        /* Most bars hold steady; some wobble lightly; a few leap a bit. */
+        int r = rand() % 100;
+        int delta = 0;
+        if (r < 20) {
+            delta = (rand() % 3) - 1;     /* -1, 0, +1 — gentle drift     */
+        } else if (r < 30) {
+            delta = (rand() % 7) - 3;     /* -3..+3  — occasional jump    */
+        }
+        if (delta == 0) continue;
+
+        int32_t v = beacon_values[i] + delta;
+        if (v < BEACON_VAL_MIN) v = BEACON_VAL_MIN;
+        if (v > BEACON_VAL_MAX) v = BEACON_VAL_MAX;
+        beacon_values[i] = v;
+        lv_chart_set_value_by_id(beacon_chart, beacon_series, i, v);
+        changed = true;
+    }
+    if (changed) lv_chart_refresh(beacon_chart);
+}
+
+static void beacon_cleanup(void)
+{
+    if (beacon_timer) {
+        lv_timer_delete(beacon_timer);
+        beacon_timer = NULL;
+    }
+    beacon_chart  = NULL;
+    beacon_series = NULL;
+}
+
 /* Mirror of beacon_chart_draw_cb() in lcd_wifi.c — colors each bar by value
  * (0 = red, 50 = green) via LV_EVENT_DRAW_TASK_ADDED. */
 static void beacon_chart_draw_cb(lv_event_t *e)
@@ -1067,15 +1126,29 @@ void screen_wifi_beacon(void)
     lv_obj_add_flag(chart, LV_OBJ_FLAG_SEND_DRAW_TASK_EVENTS);
     lv_obj_add_event_cb(chart, beacon_chart_draw_cb, LV_EVENT_DRAW_TASK_ADDED, series);
 
-    /* 20 varying signal samples (0-50 range) */
-    static const int32_t bar_values[20] = {
+    /* Seed the mutable values array with a varied initial distribution,
+     * then stamp them onto the chart.  The live-update timer below then
+     * random-walks these in place. */
+    static const int32_t bar_seed[BEACON_BAR_COUNT] = {
         12, 28, 45, 33, 18, 40, 22,  8, 35, 48,
         15, 30, 42, 25, 10, 38, 20, 44, 32, 16
     };
-    for (uint32_t i = 0; i < 20; i++) {
-        lv_chart_set_value_by_id(chart, series, i, bar_values[i]);
+    for (uint32_t i = 0; i < BEACON_BAR_COUNT; i++) {
+        beacon_values[i] = bar_seed[i];
+        lv_chart_set_value_by_id(chart, series, i, beacon_values[i]);
     }
     lv_chart_refresh(chart);
+
+    /* Remember chart + series so the live-update timer can keep modifying
+     * the bars after screen setup returns. */
+    beacon_chart  = chart;
+    beacon_series = series;
+    if (!beacon_timer) {
+        /* 150 ms/tick — slow enough to feel like real-world RSSI jitter,
+         * fast enough that the graph visibly breathes. */
+        beacon_timer = lv_timer_create(beacon_live_cb, 150, NULL);
+    }
+    screen_set_cleanup(beacon_cleanup);
 
     /* ── RSSI / SNR / SCROLL labels ── */
     lv_obj_t *lbl_rssi = lv_label_create(cont);
@@ -1156,10 +1229,99 @@ void screen_wifi_beacon(void)
  * red→green by count/max. MAC list below scrolls into view. */
 
 #define DATA_CHART_MIN_PKTS_SIM 10
+#define DATA_BAR_COUNT_MAX      20
+#define DATA_VALUE_CAP          9999
 
 /* File-scope max so data_chart_draw_cb can scale bar colors (mirrors
  * lcd_wifi.c's data_chart_max_count). Written once per render. */
 static int sim_data_chart_max_count = DATA_CHART_MIN_PKTS_SIM;
+
+/* Live packet-count state.  Packet counts only grow (real-world), but at
+ * varying rates — some clients are chatty, others quiet — so the bars
+ * evolve at different speeds and the chart max/range + color gradient
+ * adjust dynamically.  The MAC list label is rebuilt each tick so the
+ * "Npkts" counts next to each address stay in sync with the chart. */
+static lv_obj_t          *data_chart    = NULL;
+static lv_chart_series_t *data_series   = NULL;
+static lv_obj_t          *data_lbl_info = NULL;
+static int32_t            data_values[DATA_BAR_COUNT_MAX];
+static uint8_t            data_macs[DATA_BAR_COUNT_MAX][6];
+static uint32_t           data_n        = 0;
+static lv_timer_t        *data_timer    = NULL;
+
+static void data_rebuild_info_text(void)
+{
+    if (!data_lbl_info || data_n == 0) return;
+
+    static char info_buf[1024];
+    size_t off = 0;
+    off += snprintf(info_buf + off, sizeof(info_buf) - off,
+                    "Unique users (MACs):\n");
+    for (uint32_t i = 0; i < data_n && off < sizeof(info_buf); i++) {
+        const uint8_t *m    = data_macs[i];
+        const char    *unit = (data_values[i] > 1) ? "pkts" : "pkt";
+        off += snprintf(info_buf + off, sizeof(info_buf) - off,
+                        "%02X:%02X:%02X:%02X:%02X:%02X: %d%s\n",
+                        m[0], m[1], m[2], m[3], m[4], m[5],
+                        (int)data_values[i], unit);
+    }
+    lv_label_set_text(data_lbl_info, info_buf);
+}
+
+static void data_live_cb(lv_timer_t *t)
+{
+    (void)t;
+    if (!data_chart || !data_series || data_n == 0) return;
+
+    bool changed = false;
+    for (uint32_t i = 0; i < data_n; i++) {
+        /* Real traffic: most clients idle most ticks; some send a packet
+         * or two; occasionally a client bursts.  Only grows upward. */
+        int r = rand() % 100;
+        int inc = 0;
+        if (r < 25) {
+            inc = 1;                      /* 25% — trickle                */
+        } else if (r < 35) {
+            inc = 2 + (rand() % 3);       /* 10% — burst (+2..+4)         */
+        }
+        if (inc == 0) continue;
+
+        data_values[i] += inc;
+        if (data_values[i] > DATA_VALUE_CAP) data_values[i] = DATA_VALUE_CAP;
+        lv_chart_set_value_by_id(data_chart, data_series, i, data_values[i]);
+        changed = true;
+    }
+
+    if (!changed) return;
+
+    /* Recompute max so the y-axis range + bar colors track the tallest
+     * bar.  Floor at MIN_PKTS to avoid a flat chart early on. */
+    int32_t maxv = DATA_CHART_MIN_PKTS_SIM;
+    for (uint32_t i = 0; i < data_n; i++) {
+        if (data_values[i] > maxv) maxv = data_values[i];
+    }
+    if (maxv != sim_data_chart_max_count) {
+        sim_data_chart_max_count = maxv;
+        lv_chart_set_range(data_chart, LV_CHART_AXIS_PRIMARY_Y, 0, maxv);
+    }
+    lv_chart_refresh(data_chart);
+
+    /* Keep the per-MAC packet counts in the info panel synced with the
+     * chart so the scrolled-down list tracks live too. */
+    data_rebuild_info_text();
+}
+
+static void data_cleanup(void)
+{
+    if (data_timer) {
+        lv_timer_delete(data_timer);
+        data_timer = NULL;
+    }
+    data_chart    = NULL;
+    data_series   = NULL;
+    data_lbl_info = NULL;
+    data_n        = 0;
+}
 
 /* Mirror of data_chart_draw_cb() in lcd_wifi.c — colors bars red→green
  * based on value / max. */
@@ -1229,7 +1391,7 @@ void screen_wifi_data(void)
 
     static const sim_client_t clients[] = {
         { { 0xA4, 0xC3, 0x61, 0x7B, 0x9F, 0x42 }, 320 },
-        { { 0x78, 0xBD, 0xBC, 0x14, 0xE0, 0x3C }, 215 },
+        { { 0x78, 0x12, 0xBC, 0x14, 0xE0, 0x3C }, 215 },
         { { 0xF0, 0x99, 0xBF, 0x52, 0x8A, 0xD1 }, 168 },
         { { 0x00, 0x1B, 0x21, 0x3F, 0xC4, 0x08 }, 124 },
         { { 0x3C, 0x15, 0xC2, 0xAA, 0x61, 0x9E },  92 },
@@ -1295,11 +1457,28 @@ void screen_wifi_data(void)
     lv_obj_add_flag(chart, LV_OBJ_FLAG_SEND_DRAW_TASK_EVENTS);
     lv_obj_add_event_cb(chart, data_chart_draw_cb, LV_EVENT_DRAW_TASK_ADDED, series);
 
-    /* Fill bars with packet counts */
-    for (uint32_t i = 0; i < num_clients; i++) {
-        lv_chart_set_value_by_id(chart, series, i, (int32_t)clients[i].pkt_count);
+    /* Fill bars with packet counts, seeding the live-update arrays too
+     * (values for the chart, MACs for the rebuilt info text). */
+    uint32_t init_n = num_clients;
+    if (init_n > DATA_BAR_COUNT_MAX) init_n = DATA_BAR_COUNT_MAX;
+    for (uint32_t i = 0; i < init_n; i++) {
+        data_values[i] = (int32_t)clients[i].pkt_count;
+        memcpy(data_macs[i], clients[i].mac, 6);
+        lv_chart_set_value_by_id(chart, series, i, data_values[i]);
     }
     lv_chart_refresh(chart);
+
+    /* Remember chart/series + bar count so the live timer keeps growing
+     * the counts after this function returns. */
+    data_chart  = chart;
+    data_series = series;
+    data_n      = init_n;
+    if (!data_timer) {
+        /* 150 ms/tick — matches the beacon page cadence; packet counts
+         * tick up steadily with bursts, just like real network chatter. */
+        data_timer = lv_timer_create(data_live_cb, 150, NULL);
+    }
+    screen_set_cleanup(data_cleanup);
 
     /* ── "<N> users on Ch6@72Mbps" label at top of container ── */
     lv_obj_t *lbl_clients = lv_label_create(cont);
@@ -1322,19 +1501,10 @@ void screen_wifi_data(void)
     lv_obj_set_width(lbl_info, 190);
     lv_obj_align_to(lbl_info, chart, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 25);
 
-    static char info_buf[1024];
-    size_t off = 0;
-    off += snprintf(info_buf + off, sizeof(info_buf) - off,
-                    "Unique users (MACs):\n");
-    for (uint32_t i = 0; i < num_clients && off < sizeof(info_buf); i++) {
-        const uint8_t *m    = clients[i].mac;
-        const char    *unit = (clients[i].pkt_count > 1) ? "pkts" : "pkt";
-        off += snprintf(info_buf + off, sizeof(info_buf) - off,
-                        "%02X:%02X:%02X:%02X:%02X:%02X: %u%s\n",
-                        m[0], m[1], m[2], m[3], m[4], m[5],
-                        (unsigned)clients[i].pkt_count, unit);
-    }
-    lv_label_set_text(lbl_info, info_buf);
+    /* Remember the label so the live timer can rewrite it each tick; the
+     * initial text is the same rebuild against the seeded values. */
+    data_lbl_info = lbl_info;
+    data_rebuild_info_text();
 
     /* Register container for Up/Down scroll (firmware uses 53 px/press). */
     screen_set_scroll(cont, 53);
@@ -1933,6 +2103,585 @@ void screen_gpio_terminal(void)
     lv_obj_t *arrow_left = lv_label_create(scr);
     format_label(arrow_left, LV_SYMBOL_LEFT, secondary,
                  &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 0);
+
+    lv_obj_t *arrow_bot = lv_label_create(scr);
+    format_label(arrow_bot, LV_SYMBOL_DOWN, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+    /* Battery */
+    lv_obj_t *lbl_bat_txt = lv_label_create(scr);
+    format_label(lbl_bat_txt, DEFAULT_BATTERY_LV, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_RIGHT, -28, 0);
+
+    lv_obj_t *lbl_bat_icon = lv_label_create(scr);
+    format_label(lbl_bat_icon, LV_SYMBOL_BATTERY_FULL, secondary,
+                 &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
+}
+
+/* ─── OTA Update page ────────────────────────────────────────────
+ * Mirrors lcd_settings_update_page() in components/lcd/src/lcd_settings.c.
+ * Scrollable card with "Updating..." title, instructions, progress bar +
+ * percent readout, and recovery instructions.  A timer walks the bar from
+ * 0 → 100 then swaps to the success state, simulating a full OTA flow. */
+
+static lv_obj_t   *ota_cont      = NULL;
+static lv_obj_t   *ota_instr_lbl = NULL;
+static lv_obj_t   *ota_prog_bar  = NULL;
+static lv_obj_t   *ota_pct_lbl   = NULL;
+static lv_timer_t *ota_timer     = NULL;
+static int         ota_pct       = 0;
+static bool        ota_finished  = false;
+
+static void ota_tick_cb(lv_timer_t *t)
+{
+    (void)t;
+    if (!ota_prog_bar || !ota_pct_lbl) return;
+
+    if (!ota_finished) {
+        /* Advance 1–4% each tick so progress feels plausible and not
+         * perfectly uniform (real OTAs have variable chunk sizes). */
+        ota_pct += 1 + (rand() % 4);
+        if (ota_pct >= 100) {
+            ota_pct = 100;
+            ota_finished = true;
+            /* Success state matches firmware's ota_pct == -1 branch. */
+            lv_bar_set_value(ota_prog_bar, 100, LV_ANIM_ON);
+            lv_label_set_text(ota_pct_lbl, "Done!");
+            if (ota_instr_lbl) {
+                lv_label_set_text(ota_instr_lbl,
+                    "Update success! Device will restart...");
+            }
+            return;
+        }
+        lv_bar_set_value(ota_prog_bar, ota_pct, LV_ANIM_ON);
+        lv_label_set_text_fmt(ota_pct_lbl, "%d%%", ota_pct);
+    }
+}
+
+static void ota_cleanup(void)
+{
+    if (ota_timer) {
+        lv_timer_delete(ota_timer);
+        ota_timer = NULL;
+    }
+    ota_cont      = NULL;
+    ota_instr_lbl = NULL;
+    ota_prog_bar  = NULL;
+    ota_pct_lbl   = NULL;
+    ota_pct       = 0;
+    ota_finished  = false;
+}
+
+void screen_ota_update(void)
+{
+    lv_color_t primary   = USER_PRIMARY_COLOR;
+    lv_color_t secondary = USER_SECONDARY_COLOR;
+
+    lv_obj_t *scr = lv_scr_act();
+    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_style_bg_color(scr, primary, 0);
+    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
+
+    /* ── Scrollable card container (rounded, bordered, shadowed) ── */
+    ota_cont = lv_obj_create(scr);
+    lv_obj_set_size(ota_cont, 210, 106);
+    lv_obj_center(ota_cont);
+    lv_obj_set_style_bg_color(ota_cont, primary, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(ota_cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_color(ota_cont, secondary, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(ota_cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_width(ota_cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_color(ota_cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_scrollbar_mode(ota_cont, LV_SCROLLBAR_MODE_AUTO);
+    lv_obj_set_scroll_dir(ota_cont, LV_DIR_VER);
+    lv_obj_set_style_pad_all(ota_cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    /* ── Title ── */
+    lv_obj_t *title_lbl = lv_label_create(ota_cont);
+    lv_label_set_text(title_lbl, "Updating...");
+    lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_color(title_lbl, secondary, 0);
+    lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+    /* ── Instructions (below title) ── */
+    ota_instr_lbl = lv_label_create(ota_cont);
+    lv_label_set_long_mode(ota_instr_lbl, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(ota_instr_lbl, lv_pct(100));
+    lv_obj_set_style_text_font(ota_instr_lbl, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(ota_instr_lbl, secondary, 0);
+    lv_obj_align_to(ota_instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+    lv_label_set_text(ota_instr_lbl, "Please do not turn off your device.");
+
+    /* ── Progress row (bar + %) ── */
+    lv_obj_t *prog_row = lv_obj_create(ota_cont);
+    lv_obj_remove_style_all(prog_row);
+    lv_obj_set_width(prog_row, lv_pct(100));
+    lv_obj_set_style_pad_row(prog_row, 0, 0);
+    lv_obj_set_style_pad_column(prog_row, 4, 0);
+    lv_obj_set_style_pad_all(prog_row, 2, 0);
+    lv_obj_set_flex_flow(prog_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(prog_row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_align_to(prog_row, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, -10);
+
+    ota_prog_bar = lv_bar_create(prog_row);
+    lv_bar_set_range(ota_prog_bar, 0, 100);
+    lv_bar_set_value(ota_prog_bar, 0, LV_ANIM_OFF);
+    lv_obj_set_height(ota_prog_bar, 12);
+    lv_obj_set_width(ota_prog_bar, lv_pct(100));
+    lv_obj_set_flex_grow(ota_prog_bar, 1);
+    lv_obj_set_style_border_width(ota_prog_bar, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_color(ota_prog_bar, secondary, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(ota_prog_bar, LV_OPA_20, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(ota_prog_bar, lv_color_darken(primary, 100), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(ota_prog_bar, secondary, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa(ota_prog_bar, LV_OPA_COVER, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(ota_prog_bar, 6, LV_PART_MAIN | LV_PART_INDICATOR);
+
+    ota_pct_lbl = lv_label_create(prog_row);
+    lv_label_set_text(ota_pct_lbl, "0%");
+    lv_obj_set_style_text_color(ota_pct_lbl, secondary, 0);
+    lv_obj_set_style_text_font(ota_pct_lbl, &lv_font_montserrat_14, 0);
+
+    /* ── Recovery instructions ── */
+    lv_obj_t *ending_lbl = lv_label_create(ota_cont);
+    lv_label_set_long_mode(ending_lbl, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(ending_lbl, lv_pct(100));
+    lv_obj_set_style_text_font(ending_lbl, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(ending_lbl, secondary, 0);
+    lv_obj_align_to(ending_lbl, ota_prog_bar, LV_ALIGN_OUT_BOTTOM_MID, 14, 10);
+    lv_label_set_text(ending_lbl,
+        "If you get stuck at 0% for any reason, please reboot your device "
+        "by pressing the HOME and RIGHT buttons at the same time then try again.");
+
+    /* Reset state and start the progress ticker. */
+    ota_pct      = 0;
+    ota_finished = false;
+    if (!ota_timer) {
+        /* 150 ms/tick with 1–4% per tick → full update in ~5–10 s. */
+        ota_timer = lv_timer_create(ota_tick_cb, 150, NULL);
+    }
+
+    /* Register scroll so Up/Down walks the card, mirroring the firmware's
+     * OTA_UPDATING_Y_OFFSET scroll behavior. */
+    screen_set_scroll(ota_cont, 40);
+    screen_set_cleanup(ota_cleanup);
+
+    /* ── Persistent UI (arrows + battery) ── */
+    lv_obj_t *arrow_top = lv_label_create(scr);
+    format_label(arrow_top, LV_SYMBOL_UP, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+
+    lv_obj_t *arrow_left = lv_label_create(scr);
+    format_label(arrow_left, LV_SYMBOL_LEFT, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 0);
+
+    lv_obj_t *arrow_bot = lv_label_create(scr);
+    format_label(arrow_bot, LV_SYMBOL_DOWN, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+    /* Battery */
+    lv_obj_t *lbl_bat_txt = lv_label_create(scr);
+    format_label(lbl_bat_txt, DEFAULT_BATTERY_LV, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_RIGHT, -28, 0);
+
+    lv_obj_t *lbl_bat_icon = lv_label_create(scr);
+    format_label(lbl_bat_icon, LV_SYMBOL_BATTERY_FULL, secondary,
+                 &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
+}
+
+/* ─── Tetris page (self-playing example game) ────────────────────
+ * Ports the Tetris engine from components/lcd/src/lcd_tools.c, drives it
+ * with a simple best-landing-x AI instead of user input, and renders to
+ * an LVGL canvas exactly like the firmware.  Device is "held sideways"
+ * so pieces fall horizontally left→right. */
+
+#define TETRIS_ORTHO        10   /* rows (vertical when held sideways) */
+#define TETRIS_FALL         25   /* total fall columns                 */
+#define TETRIS_VISIBLE      21   /* visible fall columns               */
+#define TETRIS_HIDDEN       4    /* hidden spawn columns on the left   */
+#define TETRIS_CELL         10   /* pixels per cell                    */
+
+/* 7 tetromino shapes × 4 rotations × 4x4 cells — same table as firmware. */
+static const int tetris_tetrominoes[7][4][16] = {
+    /* I */
+    {{0,0,0,0, 1,1,1,1, 0,0,0,0, 0,0,0,0},
+     {0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0},
+     {0,0,0,0, 1,1,1,1, 0,0,0,0, 0,0,0,0},
+     {0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0}},
+    /* O */
+    {{0,0,0,0, 0,1,1,0, 0,1,1,0, 0,0,0,0},
+     {0,0,0,0, 0,1,1,0, 0,1,1,0, 0,0,0,0},
+     {0,0,0,0, 0,1,1,0, 0,1,1,0, 0,0,0,0},
+     {0,0,0,0, 0,1,1,0, 0,1,1,0, 0,0,0,0}},
+    /* T */
+    {{0,0,0,0, 0,1,0,0, 1,1,1,0, 0,0,0,0},
+     {0,0,1,0, 0,1,1,0, 0,0,1,0, 0,0,0,0},
+     {0,0,0,0, 1,1,1,0, 0,1,0,0, 0,0,0,0},
+     {0,1,0,0, 0,1,1,0, 0,1,0,0, 0,0,0,0}},
+    /* S */
+    {{0,0,0,0, 0,1,1,0, 1,1,0,0, 0,0,0,0},
+     {0,1,0,0, 0,1,1,0, 0,0,1,0, 0,0,0,0},
+     {0,0,0,0, 0,1,1,0, 1,1,0,0, 0,0,0,0},
+     {0,1,0,0, 0,1,1,0, 0,0,1,0, 0,0,0,0}},
+    /* Z */
+    {{0,0,0,0, 1,1,0,0, 0,1,1,0, 0,0,0,0},
+     {0,0,1,0, 0,1,1,0, 0,1,0,0, 0,0,0,0},
+     {0,0,0,0, 1,1,0,0, 0,1,1,0, 0,0,0,0},
+     {0,0,1,0, 0,1,1,0, 0,1,0,0, 0,0,0,0}},
+    /* J */
+    {{0,0,0,0, 1,0,0,0, 1,1,1,0, 0,0,0,0},
+     {0,1,1,0, 0,1,0,0, 0,1,0,0, 0,0,0,0},
+     {0,0,0,0, 1,1,1,0, 0,0,1,0, 0,0,0,0},
+     {0,0,1,0, 0,0,1,0, 0,1,1,0, 0,0,0,0}},
+    /* L */
+    {{0,0,0,0, 0,0,1,0, 1,1,1,0, 0,0,0,0},
+     {0,1,0,0, 0,1,0,0, 0,1,1,0, 0,0,0,0},
+     {0,0,0,0, 1,1,1,0, 1,0,0,0, 0,0,0,0},
+     {0,1,1,0, 0,0,1,0, 0,0,1,0, 0,0,0,0}}
+};
+
+typedef struct {
+    int x, y;        /* x = fall col (→ right on screen), y = ortho row */
+    int type;        /* 0..6 */
+    int rotation;    /* 0..3 */
+} tetris_piece_t;
+
+/* Game state */
+static int              tetris_board[TETRIS_ORTHO][TETRIS_FALL];
+static tetris_piece_t   tetris_current;
+static tetris_piece_t   tetris_next;
+static uint32_t         tetris_score        = 0;
+static bool             tetris_game_over    = false;
+static int              tetris_over_ticks   = 0;
+static int              tetris_target_rot   = 0;
+static int              tetris_target_y     = 0;
+
+/* LVGL state */
+static lv_obj_t        *tetris_canvas       = NULL;
+static lv_obj_t        *tetris_score_lbl    = NULL;
+static lv_obj_t        *tetris_over_lbl     = NULL;
+static uint8_t         *tetris_pixels       = NULL;
+static lv_draw_buf_t    tetris_draw_buf;
+static lv_timer_t      *tetris_timer        = NULL;
+
+static bool tetris_collision(int type, int x, int y, int rot)
+{
+    const int *shape = tetris_tetrominoes[type][rot];
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            if (!shape[i * 4 + j]) continue;
+            int col = x + j;
+            int row = y + i;
+            if (col < 0 || col >= TETRIS_FALL ||
+                row < 0 || row >= TETRIS_ORTHO ||
+                tetris_board[row][col]) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static void tetris_place(void)
+{
+    const int *shape = tetris_tetrominoes[tetris_current.type][tetris_current.rotation];
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            if (shape[i * 4 + j]) {
+                tetris_board[tetris_current.y + i][tetris_current.x + j] = 1;
+            }
+        }
+    }
+}
+
+static int tetris_clear_lines_sim(void)
+{
+    int cleared = 0;
+    for (int col = TETRIS_FALL - 1; col >= 0; col--) {
+        bool full = true;
+        for (int row = 0; row < TETRIS_ORTHO; row++) {
+            if (!tetris_board[row][col]) { full = false; break; }
+        }
+        if (full) {
+            cleared++;
+            for (int c = col; c > 0; c--) {
+                for (int r = 0; r < TETRIS_ORTHO; r++) {
+                    tetris_board[r][c] = tetris_board[r][c - 1];
+                }
+            }
+            for (int r = 0; r < TETRIS_ORTHO; r++) tetris_board[r][0] = 0;
+            col++;  /* re-check the column now shifted into this slot */
+        }
+    }
+    return cleared;
+}
+
+/* AI: pick (rotation, y) that lands the piece furthest to the right.
+ * Simple heuristic — produces flat, mostly-clearable stacks. */
+static void tetris_plan_target(void)
+{
+    int best_x   = -1;
+    int best_rot = 0;
+    int best_y   = tetris_current.y;
+
+    for (int rot = 0; rot < 4; rot++) {
+        for (int y = -1; y < TETRIS_ORTHO; y++) {
+            if (tetris_collision(tetris_current.type, 0, y, rot)) continue;
+            int x = 0;
+            while (!tetris_collision(tetris_current.type, x + 1, y, rot)) x++;
+            if (x > best_x) {
+                best_x   = x;
+                best_rot = rot;
+                best_y   = y;
+            }
+        }
+    }
+    tetris_target_rot = best_rot;
+    tetris_target_y   = best_y;
+}
+
+static void tetris_spawn(void)
+{
+    tetris_current = tetris_next;
+    tetris_current.x = 0;
+    tetris_current.y = TETRIS_ORTHO / 2 - 2;
+    tetris_next.type     = rand() % 7;
+    tetris_next.rotation = 0;
+    if (tetris_collision(tetris_current.type,
+                         tetris_current.x,
+                         tetris_current.y,
+                         tetris_current.rotation)) {
+        tetris_game_over = true;
+    } else {
+        tetris_plan_target();
+    }
+}
+
+static void tetris_reset(void)
+{
+    memset(tetris_board, 0, sizeof(tetris_board));
+    tetris_score      = 0;
+    tetris_game_over  = false;
+    tetris_over_ticks = 0;
+    tetris_next.type     = rand() % 7;
+    tetris_next.rotation = 0;
+    tetris_spawn();
+    if (tetris_over_lbl) lv_obj_add_flag(tetris_over_lbl, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void tetris_draw(void)
+{
+    if (!tetris_canvas) return;
+
+    lv_color_t falling = lv_color_make(0x00, 0x8B, 0x00);
+    lv_color_t resting = lv_color_make(0x00, 0x47, 0xAB);
+    lv_color_t outline = lv_color_white();
+
+    lv_canvas_fill_bg(tetris_canvas, lv_color_black(), LV_OPA_COVER);
+    lv_layer_t layer;
+    lv_canvas_init_layer(tetris_canvas, &layer);
+
+    /* Resting cells */
+    for (int col = TETRIS_HIDDEN; col < TETRIS_HIDDEN + TETRIS_VISIBLE; col++) {
+        for (int row = 0; row < TETRIS_ORTHO; row++) {
+            if (!tetris_board[row][col]) continue;
+            int px = (col - TETRIS_HIDDEN) * TETRIS_CELL;
+            int py = row * TETRIS_CELL;
+            lv_area_t a;
+            lv_area_set(&a, px, py, px + TETRIS_CELL - 1, py + TETRIS_CELL - 1);
+
+            lv_draw_rect_dsc_t fill;
+            lv_draw_rect_dsc_init(&fill);
+            fill.bg_color = resting; fill.bg_opa = LV_OPA_COVER; fill.radius = 0;
+            lv_draw_rect(&layer, &fill, &a);
+
+            lv_draw_rect_dsc_t brd;
+            lv_draw_rect_dsc_init(&brd);
+            brd.border_color = outline; brd.border_width = 1;
+            brd.border_opa = LV_OPA_COVER; brd.bg_opa = LV_OPA_TRANSP; brd.radius = 0;
+            lv_draw_rect(&layer, &brd, &a);
+        }
+    }
+
+    /* Current falling piece */
+    const int *shape = tetris_tetrominoes[tetris_current.type][tetris_current.rotation];
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            if (!shape[i * 4 + j]) continue;
+            int col = tetris_current.x + j;
+            int row = tetris_current.y + i;
+            if (col < TETRIS_HIDDEN || col >= TETRIS_HIDDEN + TETRIS_VISIBLE) continue;
+            int px = (col - TETRIS_HIDDEN) * TETRIS_CELL;
+            int py = row * TETRIS_CELL;
+            lv_area_t a;
+            lv_area_set(&a, px, py, px + TETRIS_CELL - 1, py + TETRIS_CELL - 1);
+
+            lv_draw_rect_dsc_t fill;
+            lv_draw_rect_dsc_init(&fill);
+            fill.bg_color = falling; fill.bg_opa = LV_OPA_COVER; fill.radius = 0;
+            lv_draw_rect(&layer, &fill, &a);
+
+            lv_draw_rect_dsc_t brd;
+            lv_draw_rect_dsc_init(&brd);
+            brd.border_color = outline; brd.border_width = 1;
+            brd.border_opa = LV_OPA_COVER; brd.bg_opa = LV_OPA_TRANSP; brd.radius = 0;
+            lv_draw_rect(&layer, &brd, &a);
+        }
+    }
+
+    /* Board outline */
+    lv_draw_rect_dsc_t brd;
+    lv_draw_rect_dsc_init(&brd);
+    brd.border_color = outline; brd.border_width = 1;
+    brd.border_opa = LV_OPA_COVER; brd.bg_opa = LV_OPA_TRANSP; brd.radius = 0;
+    lv_area_t board_area;
+    lv_area_set(&board_area, 0, 0,
+                TETRIS_VISIBLE * TETRIS_CELL - 1,
+                TETRIS_ORTHO   * TETRIS_CELL - 1);
+    lv_draw_rect(&layer, &brd, &board_area);
+
+    lv_canvas_finish_layer(tetris_canvas, &layer);
+    lv_obj_invalidate(tetris_canvas);
+}
+
+static void tetris_tick_cb(lv_timer_t *t)
+{
+    (void)t;
+    if (!tetris_canvas) return;
+
+    if (tetris_game_over) {
+        if (tetris_over_lbl && lv_obj_has_flag(tetris_over_lbl, LV_OBJ_FLAG_HIDDEN)) {
+            char buf[48];
+            snprintf(buf, sizeof(buf), "Game Over!\nScore: %u",
+                     (unsigned)tetris_score);
+            lv_label_set_text(tetris_over_lbl, buf);
+            lv_obj_remove_flag(tetris_over_lbl, LV_OBJ_FLAG_HIDDEN);
+        }
+        tetris_over_ticks++;
+        if (tetris_over_ticks >= 20) {   /* ~2 s pause then restart */
+            tetris_reset();
+            tetris_draw();
+        }
+        return;
+    }
+
+    /* Walk toward the planned target: first rotate, then align y, then
+     * gravity-step x.  When gravity is blocked, place + clear + spawn. */
+    if (tetris_current.rotation != tetris_target_rot) {
+        int nr = (tetris_current.rotation + 1) % 4;
+        if (!tetris_collision(tetris_current.type,
+                              tetris_current.x, tetris_current.y, nr)) {
+            tetris_current.rotation = nr;
+        } else {
+            tetris_target_rot = tetris_current.rotation;  /* give up */
+        }
+    } else if (tetris_current.y != tetris_target_y) {
+        int dy = (tetris_target_y > tetris_current.y) ? 1 : -1;
+        if (!tetris_collision(tetris_current.type,
+                              tetris_current.x,
+                              tetris_current.y + dy,
+                              tetris_current.rotation)) {
+            tetris_current.y += dy;
+        } else {
+            tetris_target_y = tetris_current.y;
+        }
+    } else {
+        /* Gravity */
+        if (!tetris_collision(tetris_current.type,
+                              tetris_current.x + 1,
+                              tetris_current.y,
+                              tetris_current.rotation)) {
+            tetris_current.x++;
+        } else {
+            tetris_place();
+            int lines = tetris_clear_lines_sim();
+            tetris_score += 100u * (uint32_t)lines * (uint32_t)lines;
+            tetris_spawn();
+        }
+    }
+    tetris_draw();
+}
+
+static void tetris_cleanup(void)
+{
+    if (tetris_timer) {
+        lv_timer_delete(tetris_timer);
+        tetris_timer = NULL;
+    }
+    if (tetris_pixels) {
+        free(tetris_pixels);
+        tetris_pixels = NULL;
+    }
+    tetris_canvas    = NULL;
+    tetris_score_lbl = NULL;
+    tetris_over_lbl  = NULL;
+    tetris_game_over = false;
+    tetris_over_ticks = 0;
+}
+
+void screen_tetris(void)
+{
+    lv_color_t primary   = USER_PRIMARY_COLOR;
+    lv_color_t secondary = USER_SECONDARY_COLOR;
+
+    lv_obj_t *scr = lv_scr_act();
+    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_style_bg_color(scr, primary, 0);
+    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
+
+    /* Allocate pixel buffer for the canvas (RGB565 = 2 B/px). */
+    const int W = TETRIS_VISIBLE * TETRIS_CELL;  /* 210 */
+    const int H = TETRIS_ORTHO   * TETRIS_CELL;  /* 100 */
+    const size_t buf_size = (size_t)W * H * 2;
+    tetris_pixels = (uint8_t *)malloc(buf_size);
+    if (!tetris_pixels) return;
+    lv_draw_buf_init(&tetris_draw_buf, W, H, LV_COLOR_FORMAT_RGB565,
+                     LV_STRIDE_AUTO, tetris_pixels, buf_size);
+
+    tetris_canvas = lv_canvas_create(scr);
+    lv_canvas_set_draw_buf(tetris_canvas, &tetris_draw_buf);
+    lv_obj_set_size(tetris_canvas, W, H);
+    lv_obj_align(tetris_canvas, LV_ALIGN_CENTER, 0, 0);
+
+    /* No score label during play — matches the device (firmware places it
+     * off-screen so only the board is visible while playing).  The score
+     * is still tracked and shown on the Game Over overlay. */
+    tetris_score_lbl = NULL;
+
+    /* Game-over label (hidden until needed), centered over the board. */
+    tetris_over_lbl = lv_label_create(scr);
+    lv_label_set_text(tetris_over_lbl, "");
+    lv_obj_set_style_text_font(tetris_over_lbl, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_color(tetris_over_lbl, secondary, 0);
+    lv_obj_set_style_text_align(tetris_over_lbl, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(tetris_over_lbl, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_add_flag(tetris_over_lbl, LV_OBJ_FLAG_HIDDEN);
+
+    /* Initialize game state and draw the first frame. */
+    tetris_reset();
+    tetris_draw();
+
+    /* 100 ms/tick — fast enough to feel like a playthrough. */
+    if (!tetris_timer) {
+        tetris_timer = lv_timer_create(tetris_tick_cb, 100, NULL);
+    }
+    screen_set_cleanup(tetris_cleanup);
+
+    /* ── Persistent UI (all four arrows + battery) ──
+     * Firmware reveals arrow_right on tetris entry (its "hard drop" hint)
+     * and keeps top/left/bottom visible, so the board sits centered with
+     * the full four-arrow ring around it. */
+    lv_obj_t *arrow_top = lv_label_create(scr);
+    format_label(arrow_top, LV_SYMBOL_UP, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+
+    lv_obj_t *arrow_left = lv_label_create(scr);
+    format_label(arrow_left, LV_SYMBOL_LEFT, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 0);
+
+    lv_obj_t *arrow_right = lv_label_create(scr);
+    format_label(arrow_right, LV_SYMBOL_RIGHT, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_RIGHT_MID, -4, 0);
 
     lv_obj_t *arrow_bot = lv_label_create(scr);
     format_label(arrow_bot, LV_SYMBOL_DOWN, secondary,
