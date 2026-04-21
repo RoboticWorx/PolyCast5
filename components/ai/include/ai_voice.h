@@ -6,7 +6,7 @@
 #include "esp_err.h"
 
 // Returned when the API rejects the request with HTTP 429 (out of credits / rate limited)
-#define ESP_ERR_AI_RATE_LIMITED 0x2001
+#define AI_VOICE_ERR_RATE_LIMITED 0x2001
 
 // Audio buffer returned by ai_voice_record_pcm16_16k()
 // Must call ai_voice_free_pcm() when done
@@ -54,15 +54,19 @@ void ai_voice_free_pcm(ai_voice_pcm_t *p);
 esp_err_t ai_voice_force_sleep_pins_low(void);
 
 /**
- * @brief Send PCM16 mono 16kHz to xAI realtime WebSocket STT and return the transcript
- * 
+ * @brief Send PCM16 mono 16kHz to xAI /v1/stt REST endpoint and return the transcript
+ *
+ * Wraps the PCM in a 44-byte WAV (RIFF) header and POSTs as multipart/form-data
+ * with model=grok-stt, format=json, language=en. Streams the body so memory use
+ * stays bounded even for ~30s recordings. Returns AI_VOICE_ERR_RATE_LIMITED on HTTP 429.
+ *
  * @param pcm16 Pointer to PCM16 samples
  * @param samples Number of samples in pcm16
  * @param out_text Output buffer for transcript text
  * @param out_text_sz Size of out_text buffer
- * 
+ *
  * @returns ESP error status
  */
-esp_err_t ai_voice_stt_ws_transcribe_pcm16_xai(const int16_t *pcm16, size_t samples, char *out_text, size_t out_text_sz);
+esp_err_t ai_voice_stt_transcribe_pcm16_xai(const int16_t *pcm16, size_t samples, char *out_text, size_t out_text_sz);
 
 #endif // AI_VOICE_H

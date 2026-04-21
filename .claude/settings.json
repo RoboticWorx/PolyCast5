@@ -10,6 +10,9 @@
 
       "WebFetch(domain:platform.claude.com)",
       "WebFetch(domain:code.claude.com)",
+
+      "WebFetch(domain:x.ai)",
+      "WebFetch(domain:docs.x.ai)",
       
       "Bash(ls:*)",
       "Bash(find:*)",

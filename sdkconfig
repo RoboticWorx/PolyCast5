@@ -4833,15 +4833,6 @@ CONFIG_CJSON_CIRCULAR_LIMIT=10000
 # end of cJSON
 
 #
-# ESP WebSocket client
-#
-# default:
-# CONFIG_ESP_WS_CLIENT_ENABLE_DYNAMIC_BUFFER is not set
-# default:
-# CONFIG_ESP_WS_CLIENT_SEPARATE_TX_LOCK is not set
-# end of ESP WebSocket client
-
-#
 # ESP-MQTT Configurations
 #
 # default:

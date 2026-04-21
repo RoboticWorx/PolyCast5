@@ -13,16 +13,13 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "esp_err.h"
-#include "esp_timer.h"
 #include "esp_heap_caps.h"
 #include "esp_crt_bundle.h"
-#include "esp_event.h"
-#include "esp_websocket_client.h"
+#include "esp_http_client.h"
 
 #include "driver/i2s_std.h"
 
 #include "cJSON.h"
-#include "mbedtls/base64.h"
 
 #include "ai_task.h"
 #include "ai_voice.h"
@@ -43,24 +40,15 @@
 
 #define SOUND_ANIM_THRESHOLD 100
 
-// xAI realtime WS
-#define XAI_REALTIME_URI         "wss://api.x.ai/v1/realtime"
-#define WS_CHUNK_SAMPLES         320 // 20ms @ 16kHz (320 samples)
-#define WS_CONNECT_TIMEOUT_MS    10000
-#define WS_TRANSCRIBE_TIMEOUT_MS 20000
+// xAI REST STT
+#define XAI_STT_URL            "https://api.x.ai/v1/stt"
+#define STT_HTTP_TIMEOUT_MS    30000
+#define STT_WRITE_CHUNK_BYTES  4096
+#define STT_RESPONSE_MAX_BYTES (32 * 1024)
+#define STT_MULTIPART_BOUNDARY "----PolyCast5SttBoundaryP8c0z"
 
 static i2s_chan_handle_t i2s_rx_channel = NULL;
 static bool voice_inited = false;
-
-typedef struct {
-    SemaphoreHandle_t done;
-    esp_err_t result;
-    int http_status;
-
-    char *out;
-    size_t out_sz;
-    size_t out_len;
-} stt_ws_ctx_t;
 
 // Converts a 32-bit I2S slot value (from the microphone) into a standard 16-bit signed PCM audio sample
 static inline int16_t slot32_to_pcm16(int32_t w)
@@ -445,235 +433,84 @@ void ai_voice_free_pcm(ai_voice_pcm_t *p)
     p->samples = 0;
 }
 
-// Realtime WS flow:
-//   1) Connect to wss: //api.x.ai/v1/realtime with Authorization: Bearer <key>
-//   2) session.update:
-//        - input format = audio/pcm, rate=16000
-//        - turn_detection.type = null (so we manually commit)
-//   3) Stream audio bytes via input_audio_buffer.append (base64)
-//   4) input_audio_buffer.commit
-//   5) response.create (triggers server processing)
-//   6) Accumulate transcript from response.output_audio_transcript.delta
-//   7) Finish on response.output_audio_transcript.done or response.done
-
-// Clears the STT WebSocket context output buffer
-static void stt_ws_clear(stt_ws_ctx_t *ctx)
+// Writes a 32-bit unsigned value to p[0..3] in little-endian order.
+// WAV is little-endian regardless of host endianness, so lay the bytes out explicitly.
+static inline void wav_put_u32_le(uint8_t *p, uint32_t v)
 {
-    // Validate arguments
-    if (!ctx || !ctx->out || ctx->out_sz == 0) {
-        return;
-    }
-
-    // Clear ctx
-    ctx->out[0] = '\0';
-    ctx->out_len = 0;
+    p[0] = (uint8_t)(v       & 0xFF);
+    p[1] = (uint8_t)(v >>  8 & 0xFF);
+    p[2] = (uint8_t)(v >> 16 & 0xFF);
+    p[3] = (uint8_t)(v >> 24 & 0xFF);
 }
 
-// Appends a string to the STT WebSocket context output buffer
-static void stt_ws_append(stt_ws_ctx_t *ctx, const char *s)
+// Writes a 16-bit unsigned value to p[0..1] in little-endian order
+static inline void wav_put_u16_le(uint8_t *p, uint16_t v)
 {
-    // Validate arguments
-    if (!ctx || !ctx->out || ctx->out_sz == 0 || !s) {
-        return;
-    }
-
-    // Always keep NULL-terminated, never overflow
-    size_t cap = ctx->out_sz - 1;
-    while (*s && ctx->out_len < cap) {
-        ctx->out[ctx->out_len++] = *s++;
-    }
-    ctx->out[ctx->out_len] = '\0';
+    p[0] = (uint8_t)(v      & 0xFF);
+    p[1] = (uint8_t)(v >> 8 & 0xFF);
 }
 
-// Sends a text message over the WebSocket
-static esp_err_t ws_send_json(esp_websocket_client_handle_t ws, const char *json)
+// Builds a canonical 44-byte WAV (RIFF/WAVE/fmt/data) header for PCM16 mono at STT_FS_HZ.
+// The xAI /v1/stt endpoint expects a container (wav/mp3/mp4/m4a), not raw PCM, so we
+// prepend this 44-byte header in front of our PCM buffer to form a valid WAV file.
+static void wav_build_header_pcm16_mono(uint8_t hdr[44], uint32_t pcm_bytes)
 {
-    // Validate arguments
-    if (!ws || !json) {
-        return ESP_ERR_INVALID_ARG;
-    }
+    // Audio format constants for PCM16 mono 16kHz
+    const uint32_t sample_rate   = STT_FS_HZ;
+    const uint16_t channels      = 1;
+    const uint16_t bits_per_samp = 16;
+    const uint16_t block_align   = channels * (bits_per_samp / 8); // 2 bytes per sample
+    const uint32_t byte_rate     = sample_rate * block_align; // bytes/sec
+    const uint32_t riff_size     = 36 + pcm_bytes; // full file size - 8
 
-    // Send text message
-    int sent = esp_websocket_client_send_text(ws, json, (int)strlen(json), portMAX_DELAY);
+    // RIFF chunk header: "RIFF" + size + "WAVE"
+    memcpy(&hdr[0], "RIFF", 4);
+    wav_put_u32_le(&hdr[4], riff_size);
+    memcpy(&hdr[8], "WAVE", 4);
 
-    return (sent > 0) ? ESP_OK : ESP_FAIL;
+    // "fmt " subchunk: describes the audio format
+    memcpy(&hdr[12], "fmt ", 4);
+    wav_put_u32_le(&hdr[16], 16); // fmt chunk size (16 for PCM)
+    wav_put_u16_le(&hdr[20], 1); // format code 1 = PCM
+    wav_put_u16_le(&hdr[22], channels);
+    wav_put_u32_le(&hdr[24], sample_rate);
+    wav_put_u32_le(&hdr[28], byte_rate);
+    wav_put_u16_le(&hdr[32], block_align);
+    wav_put_u16_le(&hdr[34], bits_per_samp);
+
+    // "data" subchunk header: the PCM samples follow this in the stream
+    memcpy(&hdr[36], "data", 4);
+    wav_put_u32_le(&hdr[40], pcm_bytes);
 }
 
-// WebSocket event handler for STT
-static void ws_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
+// Writes the full buffer to the HTTP client, looping on partial writes.
+// esp_http_client_write() may accept fewer bytes than requested under back-pressure,
+// so keep calling it until every byte is sent or we hit a hard error.
+static esp_err_t stt_http_write_all(esp_http_client_handle_t client, const uint8_t *buf, size_t len)
 {
-    (void)base;
-
-    stt_ws_ctx_t *ctx = (stt_ws_ctx_t *)handler_args;
-    esp_websocket_event_data_t *e = (esp_websocket_event_data_t *)event_data;
-
-    // Validate arguments
-    if (!ctx) {
-        return;
-    }
-    if (event_id == WEBSOCKET_EVENT_DISCONNECTED || event_id == WEBSOCKET_EVENT_ERROR) {
-        ESP_LOGW(TAG, "ws_event_handler: WebSocket disconnected or error");
-        ctx->result = ESP_FAIL;
-
-        // Capture HTTP status from failed WebSocket handshake (e.g. 429 = rate limited / out of credits)
-        if (event_id == WEBSOCKET_EVENT_ERROR && e && e->error_handle.esp_ws_handshake_status_code) {
-            ctx->http_status = e->error_handle.esp_ws_handshake_status_code;
-            ESP_LOGE(TAG, "ws_event_handler: WS handshake HTTP status %d", ctx->http_status);
+    size_t written = 0;
+    while (written < len) {
+        // Cap each write so large PCM buffers don't monopolize the TLS layer
+        size_t chunk = len - written;
+        if (chunk > STT_WRITE_CHUNK_BYTES) {
+            chunk = STT_WRITE_CHUNK_BYTES;
         }
 
-        xSemaphoreGive(ctx->done);
-        return;
-    }
-    if (event_id != WEBSOCKET_EVENT_DATA) {
-        return;
-    }
-    if (!e || !e->data_ptr || e->data_len <= 0) {
-        return;
-    }
-
-    // Parse JSON server message
-    cJSON *j = cJSON_ParseWithLength((const char *)e->data_ptr, e->data_len);
-    if (!j) {
-        return;
-    }
-
-    // Get "type" field
-    const cJSON *type = cJSON_GetObjectItem(j, "type");
-    const char *t = (cJSON_IsString(type) && type->valuestring) ? type->valuestring : NULL;
-    if (!t) {
-        cJSON_Delete(j);
-        return;
-    }
-
-#ifdef POLYCAST5_DEBUG
-    ESP_LOGI(TAG, "WS event type=%s", t);
-#endif
-
-    // If server sends an error object, fail immediately
-    const cJSON *err = cJSON_GetObjectItem(j, "error");
-    if (cJSON_IsObject(err)) {
-        // Log error message if present
-        const cJSON *msg = cJSON_GetObjectItem(err, "message");
-        if (cJSON_IsString(msg) && msg->valuestring) {
-            ESP_LOGE(TAG, "ws_event_handler: WS error: %s", msg->valuestring);
+        // Push one chunk into the HTTP client
+        int n = esp_http_client_write(client, (const char *)(buf + written), chunk);
+        if (n <= 0) {
+            ESP_LOGE(TAG, "stt_http_write_all: esp_http_client_write failed (n=%d)", n);
+            return ESP_FAIL;
         }
 
-        // Signal failure
-        ctx->result = ESP_FAIL;
-        xSemaphoreGive(ctx->done);
-        cJSON_Delete(j);
-        return;
+        // Advance by however many bytes actually landed
+        written += (size_t)n;
     }
 
-    // Input audio transcription completed (user speech recognized)
-    if (strcmp(t, "conversation.item.input_audio_transcription.completed") == 0) {
-        const cJSON *tr = cJSON_GetObjectItem(j, "transcript");
-        if (cJSON_IsString(tr) && tr->valuestring) {
-            ESP_LOGI(TAG, "User audio transcript (debug): %s", tr->valuestring);
-            // Append to ctx->out here (we only want transcript)
-            stt_ws_append(ctx, tr->valuestring);
-            // Signal done early (skip response generation)
-            ctx->result = (ctx->out && ctx->out[0] != '\0') ? ESP_OK : ESP_FAIL;
-            xSemaphoreGive(ctx->done);
-        }
-        cJSON_Delete(j);
-        return;
-    }
-
-    // Response text from audio transcript delta (xAI uses this for response text)
-    if (strcmp(t, "response.output_audio_transcript.delta") == 0) {
-        const cJSON *delta = cJSON_GetObjectItem(j, "delta");
-        if (cJSON_IsString(delta) && delta->valuestring) {
-            stt_ws_append(ctx, delta->valuestring);
-        }
-    }
-
-    // Response done events (use transcript.done as primary, fallback to response.done)
-    if (strcmp(t, "response.output_audio_transcript.done") == 0 ||
-        strcmp(t, "response.done") == 0) {
-        ctx->result = (ctx->out && ctx->out[0] != '\0') ? ESP_OK : ESP_FAIL;
-        xSemaphoreGive(ctx->done);
-        cJSON_Delete(j);
-        return;
-    }
-
-    cJSON_Delete(j);
+    return ESP_OK;
 }
 
-// Sends the session.update message to configure the STT session
-static esp_err_t ws_send_session_update(esp_websocket_client_handle_t ws, const char *system_prompt)
-{
-    if (!ws || !system_prompt) {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    // Root: { "type": "session.update", "session": { ... } }
-    cJSON *root = cJSON_CreateObject();
-    if (!root) return ESP_ERR_NO_MEM;
-
-    cJSON *session = NULL;
-    cJSON *turn_detection = NULL;
-    cJSON *audio = NULL;
-    cJSON *input = NULL;
-    cJSON *format = NULL;
-
-    // root.type
-    cJSON_AddStringToObject(root, "type", "session.update");
-
-    // root.session
-    session = cJSON_AddObjectToObject(root, "session");
-    if (!session) goto oom;
-
-    // session.instructions  <-- this is the important part (auto-escaped)
-    cJSON_AddStringToObject(session, "instructions", system_prompt);
-
-    // session.turn_detection = { "type": null }
-    turn_detection = cJSON_AddObjectToObject(session, "turn_detection");
-    if (!turn_detection) goto oom;
-    cJSON_AddNullToObject(turn_detection, "type");
-
-    // session.audio.input.format = { "type":"audio/pcm", "rate":16000 }
-    audio = cJSON_AddObjectToObject(session, "audio");
-    if (!audio) goto oom;
-
-    input = cJSON_AddObjectToObject(audio, "input");
-    if (!input) goto oom;
-
-    format = cJSON_AddObjectToObject(input, "format");
-    if (!format) goto oom;
-
-    cJSON_AddStringToObject(format, "type", "audio/pcm");
-    cJSON_AddNumberToObject(format, "rate", 16000);
-
-    // Enable input transcription (get transcript without full response)
-    cJSON *transcription = cJSON_AddObjectToObject(session, "input_audio_transcription");
-    if (!transcription) goto oom;
-    cJSON_AddStringToObject(transcription, "model", "whisper-1");  // xAI-compatible model for STT
-
-    // session.modalities = ["text"]
-    cJSON *modalities = cJSON_AddArrayToObject(session, "modalities");
-    if (!modalities) goto oom;
-    cJSON_AddItemToArray(modalities, cJSON_CreateString("text"));
-
-    // Serialize to compact JSON
-    char *json = cJSON_PrintUnformatted(root);
-    if (!json) goto oom;
-
-    // Send over websocket
-    esp_err_t err = ws_send_json(ws, json);
-
-    // Free print buffer + JSON tree
-    cJSON_free(json);
-    cJSON_Delete(root);
-    return err;
-
-oom:
-    cJSON_Delete(root);
-    return ESP_ERR_NO_MEM;
-}
-
-// Performs transcription via xAI realtime WebSocket API
-esp_err_t ai_voice_stt_ws_transcribe_pcm16_xai(const int16_t *pcm16, size_t samples, char *out_text, size_t out_text_sz)
+esp_err_t ai_voice_stt_transcribe_pcm16_xai(const int16_t *pcm16, size_t samples, char *out_text, size_t out_text_sz)
 {
     // Validate arguments
     if (!pcm16 || samples == 0 || !out_text || out_text_sz == 0) {
@@ -681,174 +518,239 @@ esp_err_t ai_voice_stt_ws_transcribe_pcm16_xai(const int16_t *pcm16, size_t samp
     }
     out_text[0] = '\0';
 
-    // Load xAI API key from NVS
+    // Shared state used by cleanup: NULL/0-initialized so cleanup is safe on early failures
+    esp_err_t err = ESP_OK;
+    esp_http_client_handle_t client = NULL;
+    char *resp_buf = NULL;
+    size_t resp_len = 0;
+
+    // Load xAI API key from NVS (memset first to clear any stale bytes from a prior call)
     POLYCAST5_USE_PSRAM_BSS static char api_key[AI_API_KEY_MAX_LEN] = {0};
     memset(api_key, 0, sizeof(api_key));
-    esp_err_t err = ai_utils_load_api_key_nvs(api_key, sizeof(api_key));
+    err = ai_utils_load_api_key_nvs(api_key, sizeof(api_key));
     if (err != ESP_OK || api_key[0] == '\0') {
-        ESP_LOGE(TAG, "ai_voice_stt_ws_send_pcm16_xai: ai_utils_load_api_key_nvs failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: ai_utils_load_api_key_nvs failed: %s", esp_err_to_name(err));
         return ESP_FAIL;
     }
 
-    // Context shared with the websocket event handler
-    stt_ws_ctx_t ctx = {
-        .done    = xSemaphoreCreateBinary(),
-        .result  = ESP_FAIL,
-        .out     = out_text,
-        .out_sz  = out_text_sz,
-        .out_len = 0,
-    };
-    if (!ctx.done) {
-        return ESP_ERR_NO_MEM;
-    }
-    stt_ws_clear(&ctx);
+    // Precompute sizes that drive Content-Length.
+    // The file part payload is: [44-byte WAV header][raw PCM16 bytes], with no trailing CRLF
+    // inside the part itself (the CRLF lives at the start of the closing boundary suffix).
+    const uint32_t pcm_bytes = (uint32_t)(samples * sizeof(int16_t));
+    const char *boundary = STT_MULTIPART_BOUNDARY;
 
-    // Authorization header required by xAI
-    POLYCAST5_USE_PSRAM_BSS static char headers[512];
-    memset(headers, 0, sizeof(headers));
-    snprintf(headers, sizeof(headers), "Authorization: Bearer %s\r\n", api_key);
+    // Static PSRAM-BSS scratch buffers: not re-entrant, but ai_task calls this serially
+    POLYCAST5_USE_PSRAM_BSS static char mp_prefix[1024];
+    POLYCAST5_USE_PSRAM_BSS static char mp_suffix[128];
 
-    // WebSocket client configuration
-    esp_websocket_client_config_t cfg = {
-        .uri = XAI_REALTIME_URI,
-        .headers = headers,
-        .crt_bundle_attach = esp_crt_bundle_attach, // Validates server cert
-        .buffer_size = 4096, // Increased to handle larger headers
-        .network_timeout_ms = 30000, // Network ops timeout
-        .disable_auto_reconnect = true, // No auto-reconnect
-    };
+    // Build the multipart prefix: four form-data parts (model, format, language, file headers).
+    // The file part's *body* (WAV + PCM) is appended separately so we don't embed binary in snprintf.
+    int prefix_len = snprintf(mp_prefix, sizeof(mp_prefix),
+        "--%s\r\n"
+        "Content-Disposition: form-data; name=\"model\"\r\n\r\n"
+        "grok-stt\r\n" // Want STT model
+        "--%s\r\n"
+        "Content-Disposition: form-data; name=\"format\"\r\n\r\n"
+        "json\r\n" // Response as JSON
+        "--%s\r\n"
+        "Content-Disposition: form-data; name=\"language\"\r\n\r\n"
+        "en\r\n" // English language
+        "--%s\r\n"
+        "Content-Disposition: form-data; name=\"file\"; filename=\"audio.wav\"\r\n"
+        "Content-Type: audio/wav\r\n\r\n",
+        boundary, boundary, boundary, boundary);
 
-    // Create websocket client
-    esp_websocket_client_handle_t ws = esp_websocket_client_init(&cfg);
-    if (!ws) {
-        ESP_LOGE(TAG, "ai_voice_stt_ws_send_pcm16_xai: esp_websocket_client_init failed");
-        vSemaphoreDelete(ctx.done);
+    // Closing delimiter: CRLF terminates the file part body, then "--boundary--" closes the envelope
+    int suffix_len = snprintf(mp_suffix, sizeof(mp_suffix), "\r\n--%s--\r\n", boundary);
+
+    // Guard against snprintf truncation (both lengths must be positive and fit within their buffers)
+    if (prefix_len <= 0 || prefix_len >= (int)sizeof(mp_prefix) ||
+            suffix_len <= 0 || suffix_len >= (int)sizeof(mp_suffix)) {
+        ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: multipart buffer overflow");
         return ESP_FAIL;
     }
 
-    // Attach handler
-    esp_websocket_register_events(ws, WEBSOCKET_EVENT_ANY, ws_event_handler, &ctx);
+    // Build the 44-byte WAV header so the server sees a proper RIFF container, not raw PCM
+    uint8_t wav_hdr[44];
+    wav_build_header_pcm16_mono(wav_hdr, pcm_bytes);
 
-    // Start the websocket client task
-    err = esp_websocket_client_start(ws);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "ai_voice_stt_ws_send_pcm16_xai: esp_websocket_client_start failed: %s", esp_err_to_name(err));
-        esp_websocket_client_destroy(ws);
-        vSemaphoreDelete(ctx.done);
-        return err;
+    // Total Content-Length must exactly equal the bytes streamed over write().
+    // Any mismatch leaves the server expecting more data or closing the connection early.
+    const size_t content_length = (size_t)prefix_len + sizeof(wav_hdr) + pcm_bytes + (size_t)suffix_len;
+
+    // Authorization: "Bearer <key>"; Content-Type carries the boundary so the server can parse the body
+    POLYCAST5_USE_PSRAM_BSS static char auth_header[512];
+    snprintf(auth_header, sizeof(auth_header), "Bearer %s", api_key);
+
+    POLYCAST5_USE_PSRAM_BSS static char ctype_header[128];
+    snprintf(ctype_header, sizeof(ctype_header), "multipart/form-data; boundary=%s", boundary);
+
+    // Configure HTTPS request for xAI /v1/stt (TLS via ESP-IDF CA bundle, 30s overall timeout)
+    esp_http_client_config_t cfg = {
+        .url = XAI_STT_URL,
+        .method = HTTP_METHOD_POST,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+        .timeout_ms = STT_HTTP_TIMEOUT_MS,
+        .disable_auto_redirect = true,
+    };
+
+    // Create the HTTP client (one-shot: we destroy it at cleanup)
+    client = esp_http_client_init(&cfg);
+    if (!client) {
+        ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: esp_http_client_init failed");
+        return ESP_FAIL;
     }
 
-    // Wait until connected or time out
-    int64_t t0 = esp_timer_get_time();
-    while (!esp_websocket_client_is_connected(ws)) {
-        vTaskDelay(pdMS_TO_TICKS(20));
+    // Attach the three custom headers (Authorization + the multipart Content-Type + Accept)
+    esp_http_client_set_header(client, "Authorization", auth_header);
+    esp_http_client_set_header(client, "Content-Type", ctype_header);
+    esp_http_client_set_header(client, "Accept", "application/json");
 
-        // Check for connect timeout
-        if ((esp_timer_get_time() - t0) > (int64_t)WS_CONNECT_TIMEOUT_MS * 1000LL) {
-            ESP_LOGE(TAG, "ai_voice_stt_ws_send_pcm16_xai: WS connect timeout");
-            esp_websocket_client_stop(ws);
-            esp_websocket_client_destroy(ws);
-            esp_err_t ret = (ctx.http_status == 429) ? ESP_ERR_AI_RATE_LIMITED : ESP_FAIL;
-            vSemaphoreDelete(ctx.done);
-            return ret;
-        }
-    }
+#ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "STT upload: pcm_bytes=%u content_length=%u",
+             (unsigned)pcm_bytes, (unsigned)content_length);
+#endif
 
-    // Use cJSON to build session_update to handle newline, etc.
-    err = ws_send_session_update(ws, "Transcribe the user's speech input to text.");
+    // Open the TLS connection and send the request line + headers (Content-Length = content_length)
+    err = esp_http_client_open(client, (int)content_length);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "ai_voice_stt_ws_send_pcm16_xai: ws_send_session_update failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: esp_http_client_open failed: %s", esp_err_to_name(err));
         goto cleanup;
     }
 
-    // Stream PCM in small chunks: Each chunk is base64 of raw PCM16 bytes (little-endian)
-    size_t idx = 0;
-    while (idx < samples) {
-        size_t n = samples - idx;
+    // Stream the body in four pieces. Order matters: prefix headers, WAV header, PCM payload, closing boundary.
+    err = stt_http_write_all(client, (const uint8_t *)mp_prefix, (size_t)prefix_len);
+    if (err != ESP_OK) goto cleanup;
 
-        // Limit to WS_CHUNK_SAMPLES
-        if (n > WS_CHUNK_SAMPLES) {
-            n = WS_CHUNK_SAMPLES;
-        }
+    err = stt_http_write_all(client, wav_hdr, sizeof(wav_hdr));
+    if (err != ESP_OK) goto cleanup;
 
-        const uint8_t *raw = (const uint8_t *)&pcm16[idx];
-        size_t raw_len = n * sizeof(int16_t);
+    // PCM samples are int16_t; ESP32-C5 is little-endian which matches the WAV spec, so write raw bytes
+    err = stt_http_write_all(client, (const uint8_t *)pcm16, pcm_bytes);
+    if (err != ESP_OK) goto cleanup;
 
-        // Base64 output capacity: 4 * ceil(n / 3) + 1
-        size_t b64_cap = 4 * ((raw_len + 2) / 3) + 1;
-        char *b64 = (char *)malloc(b64_cap);
-        if (!b64) {
-            ESP_LOGE(TAG, "ai_voice_stt_ws_send_pcm16_xai: No mem for base64 buffer (%u bytes)", (unsigned)b64_cap);
-            err = ESP_ERR_NO_MEM;
-            goto cleanup;
-        }
+    err = stt_http_write_all(client, (const uint8_t *)mp_suffix, (size_t)suffix_len);
+    if (err != ESP_OK) goto cleanup;
 
-        // Base64 encode
-        size_t olen = 0;
-        int mbed = mbedtls_base64_encode((unsigned char *)b64, b64_cap, &olen, (const unsigned char *)raw, raw_len);
-        if (mbed != 0) {
-            free(b64);
+    // Read response status line + headers. fetch_headers returns Content-Length (>0),
+    // 0 if the server uses chunked encoding, or negative on error.
+    int content_len = esp_http_client_fetch_headers(client);
+    int status = esp_http_client_get_status_code(client);
+
+#ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "STT response: status=%d content_len=%d", status, content_len);
+#endif
+
+    // Allocate response buffer (PSRAM preferred, internal heap as fallback).
+    // When Content-Length is unknown (chunked, content_len <= 0) size up to the safety cap
+    // so a long transcript isn't silently truncated.
+    size_t cap = (content_len > 0) ? (size_t)content_len + 1 : STT_RESPONSE_MAX_BYTES;
+    if (cap > STT_RESPONSE_MAX_BYTES) {
+        cap = STT_RESPONSE_MAX_BYTES;
+    }
+    resp_buf = (char *)heap_caps_malloc(cap, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
+    if (!resp_buf) {
+        resp_buf = (char *)malloc(cap);
+    }
+    if (!resp_buf) {
+        ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: No mem for response buffer (%u bytes)", (unsigned)cap);
+        err = ESP_ERR_NO_MEM;
+        goto cleanup;
+    }
+
+    // Drain the body until EOF (read() returns 0) or the buffer fills. We reserve one byte for the NUL.
+    while (resp_len + 1 < cap) {
+        int r = esp_http_client_read(client, resp_buf + resp_len, (int)(cap - 1 - resp_len));
+        if (r < 0) {
+            ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: esp_http_client_read failed (r=%d)", r);
             err = ESP_FAIL;
             goto cleanup;
         }
-        b64[olen] = '\0';
-
-        // Build JSON message: {"type":"input_audio_buffer.append","audio":"..."}
-        size_t msg_cap = olen + 64;
-        char *msg = (char *)malloc(msg_cap);
-        if (!msg) {
-            free(b64);
-            ESP_LOGE(TAG, "ai_voice_stt_ws_send_pcm16_xai: No mem for WS message (%u bytes)", (unsigned)msg_cap);
-            err = ESP_ERR_NO_MEM;
-            goto cleanup;
+        if (r == 0) {
+            break; // EOF - server finished sending the body
         }
-        snprintf(msg, msg_cap, "{\"type\":\"input_audio_buffer.append\",\"audio\":\"%s\"}", b64);
-
-        free(b64);
-
-        // Send audio chunk
-        err = ws_send_json(ws, msg);
-
-        // Free message buffer
-        free(msg);
-
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "ai_voice_stt_ws_send_pcm16_xai: ws_send_json(audio chunk) failed: %s", esp_err_to_name(err));
-            goto cleanup;
-        }
-
-        idx += n;
-
-        // Tiny yield to keep the system responsive
-        vTaskDelay(pdMS_TO_TICKS(1));
+        resp_len += (size_t)r;
     }
+    resp_buf[resp_len] = '\0';
 
-    // Commit the audio buffer (because turn_detection.type=null)
-    err = ws_send_json(ws, "{\"type\":\"input_audio_buffer.commit\"}");
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "ai_voice_stt_ws_send_pcm16_xai: ws_send_json(input_audio_buffer.commit) failed: %s", esp_err_to_name(err));
+    // Map documented xAI /v1/stt status codes to a descriptive log + return value.
+    // Only 429 gets its own return code so the UI can show the "Out of credits" screen;
+    // everything else bubbles up as ESP_FAIL so the generic "thinking failed" screen shows.
+    if (status != 200) {
+        switch (status) {
+            case 400:
+                // Malformed request (bad multipart framing, unsupported audio format, etc.)
+                ESP_LOGE(TAG, "STT 400 Bad Request: %s", resp_buf);
+                err = ESP_FAIL;
+                break;
+            case 401:
+                // API key is missing or invalid - user must fix it in the Wi-Fi portal
+                ESP_LOGE(TAG, "STT 401 Unauthorized - check your xAI API key: %s", resp_buf);
+                err = ESP_FAIL;
+                break;
+            case 413:
+                // File > 500 MB. PolyCast5 caps at ~4 min = ~8 MB, so this shouldn't fire.
+                ESP_LOGE(TAG, "STT 413 Payload Too Large (>500 MB): %s", resp_buf);
+                err = ESP_FAIL;
+                break;
+            case 429:
+                // Rate limited / out of credits - surface as a distinct UI state
+                ESP_LOGE(TAG, "STT 429 Rate Limited / out of credits: %s", resp_buf);
+                err = AI_VOICE_ERR_RATE_LIMITED;
+                break;
+            case 502:
+                // xAI-side upstream failure (not expected for direct file upload)
+                ESP_LOGE(TAG, "STT 502 Bad Gateway: %s", resp_buf);
+                err = ESP_FAIL;
+                break;
+            case 503:
+                // xAI backend temporarily unavailable - user can retry
+                ESP_LOGE(TAG, "STT 503 Service Unavailable - retry later: %s", resp_buf);
+                err = ESP_FAIL;
+                break;
+            default:
+                // Any status we don't recognize (still log body for diagnosis)
+                ESP_LOGE(TAG, "STT unexpected HTTP %d: %s", status, resp_buf);
+                err = ESP_FAIL;
+                break;
+        }
         goto cleanup;
     }
 
-    // Skip triggering processing / response generation (only get transcript)
-    // err = ws_send_json(ws, "{\"type\":\"response.create\",\"response\":{\"modalities\":[\"text\"]}}");
-    // if (err != ESP_OK) {
-    //     ESP_LOGE(TAG, "ai_voice_stt_ws_send_pcm16_xai: ws_send_json(response.create) failed: %s", esp_err_to_name(err));
-    //     goto cleanup;
-    // }
-
-    // Wait for "done" event from the handler
-    if (xSemaphoreTake(ctx.done, pdMS_TO_TICKS(WS_TRANSCRIBE_TIMEOUT_MS)) != pdTRUE) {
-        ESP_LOGE(TAG, "STT timeout waiting transcript");
+    // Parse JSON and pull out the top-level "text" field (xAI STT schema: {"text": "..."})
+    cJSON *j = cJSON_ParseWithLength(resp_buf, resp_len);
+    if (!j) {
+        ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: cJSON_Parse failed");
         err = ESP_FAIL;
         goto cleanup;
     }
 
-    err = ctx.result;
+    const cJSON *text = cJSON_GetObjectItem(j, "text");
+    if (!cJSON_IsString(text) || !text->valuestring) {
+        ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: response missing 'text'");
+        cJSON_Delete(j);
+        err = ESP_FAIL;
+        goto cleanup;
+    }
+
+    // Copy transcript into caller's buffer, truncating if needed and always NUL-terminating
+    strncpy(out_text, text->valuestring, out_text_sz - 1);
+    out_text[out_text_sz - 1] = '\0';
+
+    cJSON_Delete(j);
+
+    // Treat an empty transcript as failure so downstream parsing doesn't act on "nothing said"
+    err = (out_text[0] != '\0') ? ESP_OK : ESP_FAIL;
 
 cleanup:
-    esp_websocket_client_stop(ws);
-    esp_websocket_client_destroy(ws);
-    vSemaphoreDelete(ctx.done);
+    // heap_caps_free handles both heap_caps_malloc and malloc pointers on ESP-IDF
+    if (resp_buf) {
+        heap_caps_free(resp_buf);
+    }
+    // Safe to close/cleanup even if open() failed - esp_http_client tracks its own state
+    if (client) {
+        esp_http_client_close(client);
+        esp_http_client_cleanup(client);
+    }
     return err;
 }

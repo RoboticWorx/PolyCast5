@@ -1,25 +1,40 @@
 #include "ai_prompts.h"
 
+// Note: These are the compiled default: runtime override may be loaded from NVS via the web portal
+
 // AI dev prompt string for BLE HID keyboard script generation
-// Note: this is the compiled default: runtime override may be loaded from NVS via the web portal
 const char AI_PROMPT_AUTOKEY[] =
-  "BLE HID keystroke script generator for Windows 11 (US).\n"
-  "Output ONLY allowed tokens, ONE LINE, end with !END!\n"
+  "BLE HID keystroke generator. Default platform: Windows 11 (US). Output ONE LINE, end with !END!\n"
   "\n"
-  "Tokens: <delay=MS> <hold:KEY=MS> <enter> <tab> <esc> <space> <bs> <del> "
-  "<ctrl> <shift> <alt> <opt> <win> <cmd> <up> <down> <left> <right> <pgup> <pgdn> "
-  "<f1>-<f12> plus combos: <ctrl+c> <ctrl+shift+v> <alt+tab> <win+r> <win+s> <ctrl+t> <ctrl+l>\n"
+  "DEFAULT = TYPE mode. Output the answer as plain keystrokes only.\n"
+  "  Allowed tokens: letters/numbers/punctuation, <enter>, <space>, <bs>, <tab>,\n"
+  "  <up>/<down>/<left>/<right>, <esc>, <del>, <pgup>/<pgdn>, <f1>-<f12>,\n"
+  "  <delay=MS>, <hold:KEY=MS>.\n"
+  "  Never emit <win+*>, <ctrl+*>, <alt+*>, or <cmd+*> in TYPE mode.\n"
+  "  Assume the cursor is already in position. Keep answers concise; summarize long content.\n"
   "\n"
-  "Default: output the answer as raw keystrokes directly into wherever the cursor already is.\n"
-  "Only open apps or navigate if the user EXPLICITLY says to (open/launch/go to/navigate/search for).\n"
-  "tell/explain/list/write/type -> just output the text as keystrokes. Do not open anything.\n"
-  "Assume the user's cursor is already where they want text typed.\n"
+  "EXCEPTION = ACTION mode. Use ONLY when the user is directly telling the system to:\n"
+  "  - open/launch an app  (e.g., \"open notepad\", \"launch chrome\")\n"
+  "  - go to a URL or site (e.g., \"go to youtube.com\", \"navigate to gmail\")\n"
+  "  Requests for INFORMATION about those actions are TYPE, not ACTION.\n"
   "\n"
-  "Delays: <delay=500> between steps; <delay=1000> after launching apps.\n"
-  "App launch (only if asked): <win+s><delay=500>APP<delay=500><enter><delay=1000>\n"
-  "App launch macOS: <cmd+space><delay=500>APP<delay=500><enter><delay=1000>\n"
-  "If a different OS is specified, use commands for that OS.\n"
-  "No quotes/JSON/markdown. <enter> for newlines. Summarize long content.\n";
+  "  Launch templates (default to Windows unless the user names an OS):\n"
+  "    Windows:          <win+s><delay=500>APP<delay=500><enter><delay=1000>\n"
+  "    macOS/iOS/iPadOS: <cmd+space><delay=500>APP<delay=500><enter><delay=1000>\n"
+  "    Linux:            <win><delay=500>APP<delay=500><enter><delay=1000>\n"
+  "\n"
+  "  Shortcut convention: Windows/Linux use <ctrl+*>; macOS/iOS use <cmd+*>.\n"
+  "\n"
+  "Examples:\n"
+  "  \"what are three primary colors?\" -> red, green, blue!END!\n"
+  "  \"how do I open a pickle jar?\" -> Run hot water over the lid for 30 seconds, then twist firmly.!END!\n"
+  "  \"tell me a short joke\" -> Why did the chicken cross the road? To get to the other side.!END!\n"
+  "  \"write a haiku about rain\" -> Silver drops falling<enter>Whispers on the windowpane<enter>Earth drinks the sky's song!END!\n"
+  "  \"open notepad\" -> <win+s><delay=500>notepad<delay=500><enter><delay=1000>!END!\n"
+  "  \"open chrome and search youtube for cat videos\" -> <win+s><delay=500>chrome<delay=500><enter><delay=1000>youtube.com<enter><delay=1000>cat videos<enter>!END!\n"
+  "  \"open safari on ios\" -> <cmd+space><delay=500>safari<delay=500><enter><delay=1000>!END!\n"
+  "\n"
+  "No quotes, JSON, or markdown in the output.\n";
 
 // AI dev prompt string for password label location
 const char AI_PROMPT_CREDS[] =

@@ -220,15 +220,15 @@ static void ai_task(void *pvParameters)
             memset(user_transcript, 0, sizeof(user_transcript)); // Clear previous contents
 
 #ifdef POLYCAST5_DEBUG
-            ESP_LOGI(TAG, "WS STT uploading PCM: samples=%u", (unsigned)pcm.samples);
+            ESP_LOGI(TAG, "STT uploading PCM: samples=%u", (unsigned)pcm.samples);
 #endif
 
-            // Transcribe via xAI WebSocket STT
-            esp_err_t err = ai_voice_stt_ws_transcribe_pcm16_xai(pcm.pcm16, pcm.samples, user_transcript, sizeof(user_transcript));
+            // Transcribe via xAI /v1/stt REST endpoint
+            esp_err_t err = ai_voice_stt_transcribe_pcm16_xai(pcm.pcm16, pcm.samples, user_transcript, sizeof(user_transcript));
 
             if (err == ESP_OK) {
 #ifdef POLYCAST5_DEBUG
-                ESP_LOGI(TAG, "Realtime Transcript: %s", user_transcript);
+                ESP_LOGI(TAG, "STT transcript: %s", user_transcript);
 #endif
                 // Check if username or password query
                 cmd.type = parse_kind_and_query(user_transcript, &query);
@@ -266,10 +266,10 @@ static void ai_task(void *pvParameters)
                     }
                 }
             } else {
-                ESP_LOGE(TAG, "Realtime STT failed: %s", esp_err_to_name(err));
+                ESP_LOGE(TAG, "STT failed: %s", esp_err_to_name(err));
 
                 // Signal specific error type
-                if (err == ESP_ERR_AI_RATE_LIMITED) {
+                if (err == AI_VOICE_ERR_RATE_LIMITED) {
                     xEventGroupSetBits(xAiEventGroup, AI_RATE_LIMITED_BIT);
                 } else {
                     xEventGroupSetBits(xAiEventGroup, AI_THINKING_FAILED_BIT);
