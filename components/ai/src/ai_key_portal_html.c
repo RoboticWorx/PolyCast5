@@ -186,7 +186,7 @@ const char *AI_PORTAL_HTML =
 "    <p>\n"
 "      If you don't have an API key, visit\n"
 "      <a href=\"https://polycast5.com/blogs/docs/ai-keyboard\" target=\"_blank\" rel=\"noopener noreferrer\">polycast5.com/blogs/docs/ai-keyboard</a>\n"
-"      for a tutorial on how to get one for cheap ($5).\n"
+"      for a tutorial on how to get one for cheap ($5). <i>Note: You will need to reconnect to your actual Wi-Fi network first to access the website link.</i>\n"
 "    </p>\n"
 "    <p class=\"small-note\">For security, the key is not displayed after saving.</p>\n"
 

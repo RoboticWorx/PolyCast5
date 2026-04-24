@@ -410,7 +410,7 @@ void lcd_bluetooth_setup_page(bluetooth_menu_t *menu)
     memcpy(menu->options, bt_options, sizeof(bt_options));
 
     menu->size = NUM_BLUETOOTH_OPTIONS;
-    menu->index = 1;
+    menu->index = 0;
     menu->cont = NULL;
 
     // Setup bluetooth keyboard menu once

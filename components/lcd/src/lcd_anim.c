@@ -195,6 +195,8 @@ static void warm_anim(const char **paths, int cnt)
     for (int i = 0; i < cnt; ++i) {
         if (lv_image_decoder_open(&dsc, paths[i], NULL) == LV_RESULT_OK) {
             lv_image_decoder_close(&dsc);
+        } else {
+            ESP_LOGE(TAG, "Failed to warm anim frame: %s", paths[i]);
         }
     }
 }
