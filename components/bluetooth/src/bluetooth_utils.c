@@ -20,6 +20,7 @@
 #include "esp_err.h"
 
 #include "bluetooth_utils.h"
+#include "bluetooth_nvs.h"
 #include "gpio_utils.h"
 #include "gpio_task.h"
 #include "bluetooth_task.h"
@@ -1100,6 +1101,46 @@ static void ble_hid_device_host_task(void *param)
 // Declaration of extern esp function
 void ble_store_config_init(void);
 
+// Drop NimBLE bonds whose addresses are not in PolyCast5's NVS peer index
+static void bluetooth_utils_reconcile_bonds(void)
+{
+    // Snapshot PolyCast5's NVS peer index for comparison
+    // Skip reconciliation on read failure (-1) so we never mass-unpair on a phantom-empty index
+    bluetooth_peer_info_t known[BT_MAX_PEERS];
+    int known_count = bluetooth_nvs_get_peers_list(known, BT_MAX_PEERS);
+    if (known_count < 0) {
+        ESP_LOGE(TAG, "Reconcile: peer index read failed, skipping to avoid mass-unpair");
+        return;
+    }
+
+    // Snapshot NimBLE's bond store
+    // Bail on enumerator failure since there's nothing authoritative to compare against
+    ble_addr_t bonded[16]; // 16 is NimBLE's bond store cap
+    int bonded_count = 0;
+    if (ble_store_util_bonded_peers(bonded, &bonded_count, (int)(sizeof(bonded) / sizeof(bonded[0]))) != 0) {
+        return;
+    }
+
+    // For each bond NimBLE has, drop it if PolyCast5's index doesn't list it
+    for (int i = 0; i < bonded_count; ++i) {
+        bool keep = false;
+
+        // Compare against PolyCast5's NVS index of known peers
+        for (int j = 0; j < known_count; ++j) {
+            if (bonded[i].type == known[j].addr.type && memcmp(bonded[i].val, known[j].addr.val, 6) == 0) {
+                keep = true;
+                break;
+            }
+        }
+
+        // Orphan: bond exists in NimBLE but is not in the index (typically from a remove-while-BT-off)
+        if (!keep) {
+            ESP_LOGE(TAG, "Reconcile: unpairing orphan NimBLE bond (index has %d peer(s))", known_count);
+            ble_gap_unpair(&bonded[i]);
+        }
+    }
+}
+
 void bluetooth_utils_init(void)
 {
 #ifdef POLYCAST5_DEBUG
@@ -1171,6 +1212,9 @@ void bluetooth_utils_init(void)
 #endif
 
     bluetooth_state = BT_STATE_RUNNING;
+
+    // Re-sync NVS bonds to drop any NimBLE bonds that aren't in NVS
+    bluetooth_utils_reconcile_bonds();
 }
 
 void bluetooth_utils_deinit(void)
@@ -1212,6 +1256,9 @@ void bluetooth_utils_deinit(void)
 
     // Signal Bluetooth is disconnected
     xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT);
+
+    // Safety net: clear icon in case HID disconnect event didn't fire during stop
+    xEventGroupClearBits(xConnectionIconEventGroup, ICON_BIT_BT_CONNECTED);
 
     bluetooth_state = BT_STATE_OFF;
 }

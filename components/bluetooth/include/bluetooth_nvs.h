@@ -31,7 +31,7 @@ esp_err_t bluetooth_nvs_get_preferred_peer(ble_addr_t *out, bool *found);
  * @param [out] out Peers retrieved
  * @param [in] max Max peers to consider
  *
- * @returns Number of peers found
+ * @returns Returns count >= 0 on success (0 = legitimately empty), -1 on NVS open/read error
  */
 int bluetooth_nvs_get_peers_list(bluetooth_peer_info_t *out, int max);
 

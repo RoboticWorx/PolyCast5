@@ -5,6 +5,7 @@
 
 #include "nvs.h"
 #include "esp_err.h"
+#include "esp_log.h"
 
 #include "bluetooth_utils.h"
 #include "bluetooth_task.h"
@@ -22,19 +23,25 @@
 #define BT_PEERS_KEY "peers"
 #define BT_PEERS_PERF_KEY "pref_peer"
 
-// Load cached peers
+extern volatile bluetooth_state_t bluetooth_state;
+
 int bluetooth_nvs_get_peers_list(bluetooth_peer_info_t *out, int max)
 {
     // Guard
     if (!out || max <= 0) {
-        return 0;
+        ESP_LOGW(TAG, "bluetooth_nvs_get_peers_list: invalid args");
+        return -1;
     }
 
-    // Open NVS
+    // Open NVS - missing namespace is legit empty (first boot or after wipe)
     nvs_handle_t h;
     esp_err_t err = nvs_open(BT_IDX_NS, NVS_READONLY, &h);
-    if (err != ESP_OK) {
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
         return 0;
+    }
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "bluetooth_nvs_get_peers_list: nvs_open failed: %s", esp_err_to_name(err));
+        return -1;
     }
 
     // Read blob
@@ -43,9 +50,13 @@ int bluetooth_nvs_get_peers_list(bluetooth_peer_info_t *out, int max)
     err = nvs_get_blob(h, BT_IDX_KEY, tmp, &sz);
     nvs_close(h);
 
-    // No data
-    if (err != ESP_OK || sz == 0) {
+    // Missing key is legit empty (no peers ever written)
+    if (err == ESP_ERR_NVS_NOT_FOUND || sz == 0) {
         return 0;
+    }
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "bluetooth_nvs_get_peers_list: nvs_get_blob failed: %s", esp_err_to_name(err));
+        return -1;
     }
 
     // Parse
@@ -415,7 +426,10 @@ esp_err_t bluetooth_nvs_remove_peer(const ble_addr_t *addr)
     }
 
     // Unpair from NimBLE so it won't auto-reconnect
-    ble_gap_unpair((ble_addr_t *)addr);
+    // Only valid while the stack is running; otherwise NimBLE's bond storage would be untouched and the peer could auto-reconnect on next BT init.
+    if (bluetooth_state == BT_STATE_RUNNING) {
+        ble_gap_unpair((ble_addr_t *)addr);
+    }
 
     return ESP_OK;
 }

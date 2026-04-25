@@ -2241,12 +2241,15 @@ static void prompt_rename_or_del(ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth
             // Check size
             bluetooth_peer_info_t tmp[BT_MAX_PEERS];
             int n = bluetooth_nvs_get_peers_list(tmp, BT_MAX_PEERS);
-            // If empty now, forget all
-            if (n == 0) {
+            if (n < 0) {
+                // Index state is unknown - skip the destructive global unpair to avoid wiping bonds on a phantom-empty
+                ESP_LOGE(TAG, "prompt_rename_or_del: peer index read failed (%d), skipping global unpair", n);
+            } else if (n == 0) {
+                // Index confirmed empty - forget all bonds and reset BT identity
                 // Active bluetooth
                 uint16_t cmd = BLUETOOTH_CMD_INIT;
                 xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
-                
+
                 // Forget all bluetooth bonding keys
                 cmd = BLUETOOTH_CMD_UNPAIR_ALL_NO_REINIT;
                 xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
@@ -2275,6 +2278,10 @@ static void peer_menu_build(bluetooth_peer_menu_t *pm)
     // Read cached peers (BT stays OFF)
     bluetooth_peer_info_t tmp[BT_MAX_PEERS];
     int n = bluetooth_nvs_get_peers_list(tmp, BT_MAX_PEERS);
+    if (n < 0) { // Index unreadable - show empty list as graceful fallback
+        ESP_LOGE(TAG, "peer_menu_build: bluetooth_nvs_get_peers_list failed: %d", n);
+        n = 0; // Treat as empty
+    }
 
     // Size (+1 for the "Allow new devices" row)
     pm->size = (n > 0) ? (n + 1) : 1;
