@@ -777,7 +777,7 @@ void lcd_wifi_scan_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu
     }
 
     // When networks have been scanned
-    while (xQueueReceive(xWifiDeauthScanQueue, &deauth_scan_result[deauth_scan_count], 0) == pdPASS) {
+    while ((deauth_scan_count < WIFI_MAX_NETWORKS) && (xQueueReceive(xWifiDeauthScanQueue, &deauth_scan_result[deauth_scan_count], 0) == pdPASS)) {
         // If no networks found sentinel
         if (deauth_scan_result[deauth_scan_count].auth == 0xFF) {
             scanned = false;
@@ -792,13 +792,6 @@ void lcd_wifi_scan_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu
 
             lv_label_set_text(lbl_wait, "No eligible networks\nfound. (PMF enabled.)");
             lv_obj_align(lbl_wait, LV_ALIGN_CENTER, 0, 0);
-            continue;
-        }
-
-        // Cap entry count
-        if (deauth_scan_count >= WIFI_MAX_NETWORKS) {
-            ESP_LOGW(TAG, "lcd_wifi_scan_deauth_page: Too many deauth networks; dropping '%s'", 
-                    (char *)deauth_scan_result[deauth_scan_count].ssid);
             continue;
         }
 
@@ -1533,6 +1526,9 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 
     // When response received (non-blocking)
     if ((xQueueReceive(xWifiAiRawSniffQueue, &raw_frames_ai_response, 0) == pdTRUE) && (state == AI_PKT_ANALYSIS_WAITING)) {
+        // Snapshot into portal's s_result before AI task can memset ai_response on a subsequent command
+        ai_analysis_portal_set_result(raw_frames_ai_response);
+
         state = AI_PKT_ANALYSIS_COMPLETE;
 
 		// Stop loading animation
@@ -1707,12 +1703,7 @@ void lcd_wifi_ai_packet_results_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wif
 		lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 
-        // Set instruction text
-        const char *res = (raw_frames_ai_response) ? raw_frames_ai_response : "";
-
-        // Copy result into portal storage and start the portal
-        ai_analysis_portal_set_result(res);
-
+        // Result was already snapshotted into the portal's s_result on receive (see capture page)
         // Activate web portal
         xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_AI_PKT_ANALYSIS_START_BIT);
 

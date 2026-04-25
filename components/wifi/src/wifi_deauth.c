@@ -387,8 +387,8 @@ esp_err_t wifi_deauth_scan(wifi_scan_deauth_t *wifi_scan_deauth)
         if (count >= WIFI_MAX_NETWORKS) {
 #ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "wifi_deauth_scan: reached max deauth capacity (%" PRIu16 "/%d)", count, WIFI_MAX_NETWORKS);
-            continue;
 #endif
+            continue;
         }
 
         const char *ssid = (char *)ap_list[i].ssid;

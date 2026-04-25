@@ -365,8 +365,9 @@ static void bluetooth_task(void *arg)
         // If a AI is typing (this is a cool comment lol)
         // Password type cmd not streamed, send as a whole
         if (xQueueReceive(xBluetoothAiCmdQueue, &ai_script, 0) == pdTRUE) {
-            // Send the script
-            bluetooth_utils_send_script(ai_script, 2);
+            // Snapshot into send_buf - ai_script points to ai_task's shared ai_response
+            strlcpy(send_buf, ai_script, sizeof(send_buf));
+            bluetooth_utils_send_script(send_buf, 2);
 
             // Notify LCD we're done typing the credential
             xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT);
@@ -374,7 +375,8 @@ static void bluetooth_task(void *arg)
 
         // Dictate: literal text, no tag parsing (prevents <enter> etc. in transcripts)
         if (xQueueReceive(xBluetoothAiDictateQueue, &ai_script, 0) == pdTRUE) {
-            bluetooth_utils_send_literal(ai_script, 2);
+            strlcpy(send_buf, ai_script, sizeof(send_buf));
+            bluetooth_utils_send_literal(send_buf, 2);
             xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT);
         }
 
