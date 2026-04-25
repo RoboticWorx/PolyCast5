@@ -27,6 +27,7 @@
 
 #define NVS_OTA_VERSION_NS "ota"
 #define NVS_OTA_VERSION_KEY "version"
+#define NVS_OTA_PENDING_KEY "pending"
 
 //#define OTA_CHECK_PROJ_DESC 1 // Enables project_description.json version check (redundant)
 
@@ -177,14 +178,16 @@ static void ota_task(void *_)
         ESP_LOGI(TAG, "OTA OK, rebooting...");
 #endif
 
-        // Save the new version to NVS if exists
+        // Stage the new version as PENDING. wifi_task promotes it to the canonical
+        // version key only after the new image boots healthily (rollback would otherwise
+        // leave NVS pointing at a version we're no longer running -- BUG-018).
         if (pending_manifest_ver[0]) {
-            err = wifi_ota_update_set_nvs_version(pending_manifest_ver);
+            err = wifi_ota_update_set_nvs_pending_version(pending_manifest_ver);
             if (err != ESP_OK) {
-                ESP_LOGE(TAG, "wifi_ota_update_set_nvs_version failed: %s", esp_err_to_name(err));
+                ESP_LOGE(TAG, "wifi_ota_update_set_nvs_pending_version failed: %s", esp_err_to_name(err));
             } else {
 #ifdef POLYCAST5_DEBUG
-                ESP_LOGI(TAG, "Saved new FW version to NVS: %s", pending_manifest_ver);
+                ESP_LOGI(TAG, "Staged pending FW version in NVS: %s", pending_manifest_ver);
 #endif
             }
         }
@@ -472,19 +475,74 @@ esp_err_t wifi_ota_update_get_nvs_version(char *out, size_t out_sz)
 {
     nvs_handle_t h;
     esp_err_t err;
-    
+
     // Open NVS
     err = nvs_open(NVS_OTA_VERSION_NS, NVS_READONLY, &h);
     if (err != ESP_OK) {
         return err;
     }
-    
+
     size_t len = out_sz; // Must include room for '\0'
-    
+
     // Get the saved version string
     err = nvs_get_str(h, NVS_OTA_VERSION_KEY, out, &len);
-    
+
     // Close and return
+    nvs_close(h);
+    return err;
+}
+
+esp_err_t wifi_ota_update_set_nvs_pending_version(const char *val)
+{
+    nvs_handle_t h;
+    esp_err_t err;
+
+    err = nvs_open(NVS_OTA_VERSION_NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    err = nvs_set_str(h, NVS_OTA_PENDING_KEY, val);
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+
+    nvs_close(h);
+    return err;
+}
+
+esp_err_t wifi_ota_update_get_nvs_pending_version(char *out, size_t out_sz)
+{
+    nvs_handle_t h;
+    esp_err_t err;
+
+    err = nvs_open(NVS_OTA_VERSION_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    size_t len = out_sz;
+    err = nvs_get_str(h, NVS_OTA_PENDING_KEY, out, &len);
+
+    nvs_close(h);
+    return err;
+}
+
+esp_err_t wifi_ota_update_erase_nvs_pending_version(void)
+{
+    nvs_handle_t h;
+    esp_err_t err;
+
+    err = nvs_open(NVS_OTA_VERSION_NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    err = nvs_erase_key(h, NVS_OTA_PENDING_KEY);
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+
     nvs_close(h);
     return err;
 }

@@ -20,6 +20,8 @@
 #include "wifi_autoconnect.h"
 #include "wifi_ota_update.h"
 #include "esp_app_desc.h"
+#include "esp_ota_ops.h"
+#include "esp_partition.h"
 #include "wifi_btc_portal.h"
 #include "ai_key_portal.h"
 #include "bluetooth_portal.h"
@@ -167,11 +169,45 @@ static void wifi_task(void *param)
 #endif
     }
 
+    // Capture rollback state BEFORE marking valid
+    const esp_partition_t *running_part = esp_ota_get_running_partition();
+    esp_ota_img_states_t ota_state = ESP_OTA_IMG_VALID;
+    if (running_part) {
+        esp_err_t state_err = esp_ota_get_state_partition(running_part, &ota_state);
+        if (state_err != ESP_OK) {
+            ESP_LOGW(TAG, "esp_ota_get_state_partition failed (%s); defaulting to VALID", esp_err_to_name(state_err));
+        }
+    }
+    bool fresh_ota_boot = (ota_state == ESP_OTA_IMG_PENDING_VERIFY); // True = new ota app running
+
     // Let everything else initialize
     vTaskDelay(pdMS_TO_TICKS(2000));
 
     // Get here without crashing -> This is a valid OTA app
     wifi_ota_update_mark_app_valid();
+
+    // Promote (or discard) any pending OTA version staged before the last reboot.
+    // Fresh OTA boot -> promote pending into the canonical version key.
+    // Rolled-back boot -> discard pending so NVS keeps reflecting the running image.
+    char pending[64];
+    if (wifi_ota_update_get_nvs_pending_version(pending, sizeof(pending)) == ESP_OK) {
+        if (fresh_ota_boot) {
+            esp_err_t promote_err = wifi_ota_update_set_nvs_version(pending);
+            if (promote_err != ESP_OK) {
+                ESP_LOGE(TAG, "Promote of pending FW version '%s' failed: %s", pending, esp_err_to_name(promote_err));
+            }
+#ifdef POLYCAST5_DEBUG
+            else {
+                ESP_LOGI(TAG, "Promoted pending FW version to NVS: %s", pending);
+            }
+#endif
+        } else {
+#ifdef POLYCAST5_DEBUG
+            ESP_LOGW(TAG, "Discarding stale pending FW version (rollback or no fresh OTA): %s", pending);
+#endif
+        }
+        wifi_ota_update_erase_nvs_pending_version();
+    }
 
     /* Update NVS FW version */
     // If NVS version doesn't exist yet, set it
@@ -180,10 +216,10 @@ static void wifi_task(void *param)
         // Read the current app's version string from the embedded app descriptor
         const esp_app_desc_t *running = esp_app_get_description();
         const char *cur = running ? running->version : "";
-        
+
         // Save that version to NVS
         wifi_ota_update_set_nvs_version(cur);
-        
+
 #ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "Setting first time FW version: %s", cur);
 #endif
