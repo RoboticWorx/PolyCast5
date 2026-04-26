@@ -73,13 +73,17 @@ The repository can be cloned with the following git command:
 git clone https://github.com/RoboticWorx/PolyCast5.git
 ```
 
-## Build
+## Flashing
 
-Set the microcontroller target (if needed):
+Flash the full code (builds automatically):
 
 ```shell
-idf.py set-target esp32c5
+idf.py -p YOUR_PORT encrypted-flash
 ```
+
+_You must use `encrypted-flash` since development mode flash encryption is enabled by default for passive protection. For full protection, see [polycast5.com/blogs/docs/lock-it-down](https://polycast5.com/blogs/docs/lock-it-down)._
+
+## Build
 
 Change the device configuration (if needed):
 
@@ -91,14 +95,6 @@ Build the code:
 
 ```shell
 idf.py build
-```
-
-## Flashing
-
-Flash the full code:
-
-```shell
-idf.py -p YOUR_PORT flash
 ```
 
 # Patches

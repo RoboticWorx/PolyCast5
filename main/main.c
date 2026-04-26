@@ -12,6 +12,7 @@
 #include "driver/rtc_io.h"
 
 #include "esp_log.h"
+#include "esp_pm.h"
 #include "esp_sleep.h"
 #include "esp_spiffs.h" // POLYCAST5_DEBUG_SPIFFS
 #include "esp_psram.h" // POLYCAST5_DEBUG_RAM
@@ -76,7 +77,22 @@ void app_main(void)
     
     // Initialize NVS flash
     gpio_utils_init_nvs();
-    
+
+    // DFS scales CPU between min/max based on load
+    // Explicitly request 240 MHz max even though Kconfig caps boot at 160 MHz
+    // esp_flash_write_encrypted() automatically drops CPU to 160 MHz (v1.2+) during encrypted writes to avoid the silicon errata
+    esp_pm_config_t pm_cfg = {
+        .max_freq_mhz = 240,
+        .min_freq_mhz = 40,
+        .light_sleep_enable = false,
+    };
+    esp_err_t pm_err = esp_pm_configure(&pm_cfg);
+    if (pm_err != ESP_OK) {
+        ESP_LOGE(TAG, "240 MHz PM config rejected (%s), falling back to 160 MHz", esp_err_to_name(pm_err));
+        pm_cfg.max_freq_mhz = 160;
+        ESP_ERROR_CHECK(esp_pm_configure(&pm_cfg));
+    }
+
     // Allocate Wi-Fi buffers now without fragmentation
     ESP_ERROR_CHECK(espnow_utils_wifi_driver_init());
     // Turn off radio to save power

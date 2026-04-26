@@ -4,3 +4,5 @@ dependencies.lock
 sdkconfig
 BUGS.md
 .claude/ralph-loop.local.md
+*_signing_key*
+*.pem

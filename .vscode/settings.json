@@ -16,9 +16,15 @@
     "--query-driver=c:\\Espressif\\tools\\xtensa-esp-elf\\esp-15.2.0_20251204\\xtensa-esp-elf\\bin\\xtensa-esp32-elf-gcc.exe",
     "--compile-commands-dir=${workspaceFolder}\\build"
   ],
+  "idf.currentSetup": "C:\\Espressif\\.espressif\\v6.0\\esp-idf",
+
   "C_Cpp.errorSquiggles": "enabled",
   "diffEditor.renderSideBySide": false,
   "idf.flashType": "UART",
-  "idf.currentSetup": "C:\\Espressif\\.espressif\\v6.0\\esp-idf",
-  "claudeCode.selectedModel": "claude-opus-4-6[1m]"
+
+  "claudeCode.selectedModel": "claude-opus-4-7[1m]",
+  
+  "github.copilot.chat.commitMessageGeneration.instructions": [
+    { "text": "Never add Co-authored-by lines to the commit message." }
+  ]
 }

@@ -29,5 +29,6 @@ idf_component_register(
         console
         esp_driver_uart
         esp_psram
+        esp_pm
         spiffs
 )

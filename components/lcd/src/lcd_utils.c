@@ -215,15 +215,6 @@ void lcd_device_sleep(void)
 
     ESP_ERROR_CHECK(esp_light_sleep_start());
 
-    // IDF-15338 workaround: phy_wakeup_init() on ESP32-C5 doesn't properly
-    // restore RF state after the modem power domain is lost during light sleep.
-    // Force full PHY recalibration so BLE (and WiFi) work after wake.
-    esp_phy_common_clock_enable();
-    phy_module_enable();
-    esp_phy_load_cal_and_init();
-    phy_module_disable();
-    esp_phy_common_clock_disable();
-
     // Release holds so peripherals can reclaim their pins
     gpio_hold_dis(ST7789_DC_PIN);
     gpio_hold_dis(SPI_MOSI_PIN);

@@ -7,6 +7,7 @@
 #include "portmacro.h"
 
 #include "nvs_flash.h"
+#include "esp_partition.h"
 
 #include "driver/gpio.h"
 #include "driver/ledc.h"
@@ -55,9 +56,43 @@ static const soc_point_t soc_table[] = { // {V, %}
 static const int TABLE_LEN = sizeof(soc_table) / sizeof(soc_table[0]);
 
 void gpio_utils_init_nvs(void)
-{    
+{
+    // Notice that release mode encryption and secure boot are intentionally disabled by default
+#if !defined(CONFIG_SECURE_FLASH_ENCRYPTION_MODE_RELEASE) || !defined(CONFIG_SECURE_BOOT_V2_ENABLED)
+    ESP_LOGE("", "!!! READ THIS !!!");
+    ESP_LOGW("", "Release mode encryption and secure boot are DISABLED!");
+    ESP_LOGW("", "This is so that you are able to freely modify/re-flash the code that this device is running.");
+    ESP_LOGW("", "If you don't plan to modify the code, release mode encryption and secure boot should be enabled to prevent physical access attacks. A tutorial to enable this is available at www.polycast5.com/blogs/docs/lock-it-down.");
+    ESP_LOGW("", "It's important to note that if you do this, you will be UNABLE to re-flash the device again afterwards.");
+#endif
+
+    // This enables development mode encryption for passive protection while still allowing re-flashing
+#if CONFIG_NVS_ENCRYPTION
+    const esp_partition_t *key_part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA,
+            ESP_PARTITION_SUBTYPE_DATA_NVS_KEYS, NULL);
+    assert(key_part && "nvs_keys partition missing from partition table!");
+
+    nvs_sec_cfg_t cfg;
+    esp_err_t ret = nvs_flash_read_security_cfg(key_part, &cfg);
+    if (ret == ESP_ERR_NVS_KEYS_NOT_INITIALIZED || ret == ESP_ERR_NVS_CORRUPT_KEY_PART) {
+        ESP_ERROR_CHECK(nvs_flash_generate_keys(key_part, &cfg));
+    } else {
+        ESP_ERROR_CHECK(ret);
+    }
+
+    // First boot after enabling encryption will find unreadable plaintext NVS pages and erase the partition.
+    // Equivalent to factory reset!
+    ret = nvs_flash_secure_init(&cfg);
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_secure_init(&cfg);
+    }
+    ESP_ERROR_CHECK(ret); // Catch any unhandled init failure (XTS decrypt, key mismatch, etc.)
+#else
     ESP_ERROR_CHECK(nvs_flash_init());
-    
+    #error Development CONFIG_NVS_ENCRYPTION should be enabled! (Separate from release mode encryption noted above.)
+#endif
+
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "NVS initialized");
 #endif

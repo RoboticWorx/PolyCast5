@@ -1,8 +1,10 @@
-# Sizes: 256KB NVS, 3.8MB OTA slots, 8.85MB SPIFFS
-# Name,   Type, SubType, Offset,   Size,     Flags
-nvs,      data, nvs,     0x009000, 0x040000,
-otadata,  data, ota,     0x049000, 0x002000,
-phy_init, data, phy,     0x04B000, 0x001000,
-ota_0,    app,  ota_0,   0x050000, 0x3A0000,
-ota_1,    app,  ota_1,   0x3F0000, 0x3A0000,
-assets,   data, spiffs,  0x790000, 0x0870000,
+# Partition table at 0x10000: 56KB bootloader budget (FE ~34KB, FE+SBv2 ~46KB).
+# Sizes: 4KB NVS keys, 256KB NVS, 3.625MB OTA slots, 8.375MB SPIFFS.
+# Name,   Type, SubType,  Offset,   Size,     Flags
+nvs_keys, data, nvs_keys, 0x011000, 0x001000, encrypted
+nvs,      data, nvs,      0x012000, 0x040000,
+otadata,  data, ota,      0x052000, 0x002000,
+phy_init, data, phy,      0x054000, 0x001000,
+ota_0,    app,  ota_0,    0x060000, 0x3A0000,
+ota_1,    app,  ota_1,    0x400000, 0x3A0000,
+assets,   data, spiffs,   0x7A0000, 0x0860000,

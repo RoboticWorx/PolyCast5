@@ -19,6 +19,8 @@
 
 #define TAG "BLUETOOTH_TASK"
 
+#define BLUETOOTH_TAP_MS 2
+
 EventGroupHandle_t xBluetoothEventGroup;
 
 QueueHandle_t xBluetoothMediaCmdQueue;
@@ -67,7 +69,7 @@ static void stream_buf_append(const char *text, size_t len)
         // Send everything before !END!
         if (end_marker > stream_buf) {
             *end_marker = '\0';
-            bluetooth_utils_send_script(stream_buf, 2);
+            bluetooth_utils_send_script(stream_buf, BLUETOOTH_TAP_MS);
         }
         stream_buf_len = 0;
         stream_buf[0] = '\0';
@@ -102,7 +104,7 @@ static void stream_buf_append(const char *text, size_t len)
         // Temporarily NULL-terminate the safe portion and send it
         char saved = stream_buf[safe_len];
         stream_buf[safe_len] = '\0';
-        bluetooth_utils_send_script(stream_buf, 2);
+        bluetooth_utils_send_script(stream_buf, BLUETOOTH_TAP_MS);
         stream_buf[safe_len] = saved;
 
         // Shift remainder to front
@@ -120,7 +122,7 @@ static void stream_buf_flush(void)
 {
     if (stream_buf_len > 0) {
         stream_buf[stream_buf_len] = '\0';
-        bluetooth_utils_send_script(stream_buf, 2);
+        bluetooth_utils_send_script(stream_buf, BLUETOOTH_TAP_MS);
         stream_buf_len = 0;
         stream_buf[0] = '\0';
     }
@@ -254,13 +256,13 @@ static void bluetooth_task(void *arg)
                 vTaskDelay(pdMS_TO_TICKS(100));
                 bluetooth_utils_send_media(BLUETOOTH_CMD_NEXT_TRK, false);
                 vTaskDelay(pdMS_TO_TICKS(10));
-                bluetooth_utils_send_script("<right>", 1); // Also send right for if using next to fast forward
+                bluetooth_utils_send_script("<right>", BLUETOOTH_TAP_MS); // Also send right for if using next to fast forward
             } else if (bluetooth_cmd == BLUETOOTH_CMD_PREV_TRK && bluetooth_state == BT_STATE_RUNNING) { // Previous track command received
                 bluetooth_utils_send_media(BLUETOOTH_CMD_PREV_TRK, true);
                 vTaskDelay(pdMS_TO_TICKS(100));
                 bluetooth_utils_send_media(BLUETOOTH_CMD_PREV_TRK, false);
                 vTaskDelay(pdMS_TO_TICKS(10));
-                bluetooth_utils_send_script("<left>", 1); // Also send left for if using previous to rewind
+                bluetooth_utils_send_script("<left>", BLUETOOTH_TAP_MS); // Also send left for if using previous to rewind
             } else if (bluetooth_cmd == BLUETOOTH_CMD_PLAY_PAUSE && bluetooth_state == BT_STATE_RUNNING) { // Play pause command received
                 bluetooth_utils_send_media(BLUETOOTH_CMD_PLAY_PAUSE, true);
                 vTaskDelay(pdMS_TO_TICKS(100));
@@ -286,49 +288,49 @@ static void bluetooth_task(void *arg)
                             "If you see yourself more an ethical hacker, this is also basically a Bluetooth USB Rubber Ducky. "
                             "To start adding your own text scripts, just go to 'Add/Edit Script' and follow the few simple instructions.\n";
 
-                    bluetooth_utils_send_script(TEST_TXT, 1);
+                    bluetooth_utils_send_script(TEST_TXT, BLUETOOTH_TAP_MS);
                     continue;
                 }
                 /* If presentation mode command */
                   else if (bluetooth_cmd == BLUETOOTH_SCRIPT_PRESENTATION_START) {
-                    bluetooth_utils_send_script("<f5>", 1);
+                    bluetooth_utils_send_script("<f5>", BLUETOOTH_TAP_MS);
                     continue;
                 } else if (bluetooth_cmd == BLUETOOTH_SCRIPT_PRESENTATION_ESC) {
-                    bluetooth_utils_send_script("<esc>", 1);
+                    bluetooth_utils_send_script("<esc>", BLUETOOTH_TAP_MS);
                     continue;
                 } else if (bluetooth_cmd == BLUETOOTH_SCRIPT_PRESENTATION_BLANK) {
-                    bluetooth_utils_send_script("b", 1);
+                    bluetooth_utils_send_script("b", BLUETOOTH_TAP_MS);
                     continue;
                 } else if (bluetooth_cmd == BLUETOOTH_SCRIPT_PRESENTATION_LEFT) {
-                    bluetooth_utils_send_script("<left>", 1);
+                    bluetooth_utils_send_script("<left>", BLUETOOTH_TAP_MS);
                     continue;
                 } else if (bluetooth_cmd == BLUETOOTH_SCRIPT_PRESENTATION_RIGHT) {
-                    bluetooth_utils_send_script("<right>", 1);
+                    bluetooth_utils_send_script("<right>", BLUETOOTH_TAP_MS);
                     continue;
                 }
                 /* If social mode command */
                   else if (bluetooth_cmd == BLUETOOTH_SCRIPT_SCROLL_UP) {
-                    bluetooth_utils_send_script("<up><up><up><up>", 1);
+                    bluetooth_utils_send_script("<up><up><up><up>", BLUETOOTH_TAP_MS);
                     continue;
                 } else if (bluetooth_cmd == BLUETOOTH_SCRIPT_SCROLL_DOWN) {
-                    bluetooth_utils_send_script("<down><down><down><down>", 1);
+                    bluetooth_utils_send_script("<down><down><down><down>", BLUETOOTH_TAP_MS);
                     continue;
                 } else if (bluetooth_cmd == BLUETOOTH_SCRIPT_SCROLL_PG_UP) {
-                    bluetooth_utils_send_script("<pgup>", 1);
+                    bluetooth_utils_send_script("<pgup>", BLUETOOTH_TAP_MS);
                     continue;
                 } else if (bluetooth_cmd == BLUETOOTH_SCRIPT_SCROLL_PG_DOWN) {
-                    bluetooth_utils_send_script("<pgdn>", 1);
+                    bluetooth_utils_send_script("<pgdn>", BLUETOOTH_TAP_MS);
                     continue;
                 }
                 /* If social media scroller command */
                   else if (bluetooth_cmd == BLUETOOTH_SCRIPT_SOCIALS_UP) {
-                    bluetooth_utils_send_script("<up><delay=150>k", 1); // Try both
+                    bluetooth_utils_send_script("<up><delay=150>k", BLUETOOTH_TAP_MS); // Try both
                     continue;
                 } else if (bluetooth_cmd == BLUETOOTH_SCRIPT_SOCIALS_DOWN) {
-                    bluetooth_utils_send_script("<down><delay=150>j", 1); // Try both
+                    bluetooth_utils_send_script("<down><delay=150>j", BLUETOOTH_TAP_MS); // Try both
                     continue;
                 } else if (bluetooth_cmd == BLUETOOTH_SCRIPT_SOCIALS_LIKE) {
-                    bluetooth_utils_send_script("l", 1);
+                    bluetooth_utils_send_script("l", BLUETOOTH_TAP_MS);
                     continue;
                 }
 
@@ -347,7 +349,7 @@ static void bluetooth_task(void *arg)
                         ESP_LOGI(TAG, "Sending script: %s", send_buf);
 #endif
                         // Send the script
-                        bluetooth_utils_send_script(send_buf, 1);
+                        bluetooth_utils_send_script(send_buf, BLUETOOTH_TAP_MS);
                     } else {
 #ifdef POLYCAST5_DEBUG
                         ESP_LOGW(TAG, "Failed/no script body at idx=%u (err=%s, blen=%u)",
@@ -367,7 +369,7 @@ static void bluetooth_task(void *arg)
         if (xQueueReceive(xBluetoothAiCmdQueue, &ai_script, 0) == pdTRUE) {
             // Snapshot into send_buf - ai_script points to ai_task's shared ai_response
             strlcpy(send_buf, ai_script, sizeof(send_buf));
-            bluetooth_utils_send_script(send_buf, 2);
+            bluetooth_utils_send_script(send_buf, BLUETOOTH_TAP_MS);
 
             // Notify LCD we're done typing the credential
             xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT);
@@ -376,7 +378,7 @@ static void bluetooth_task(void *arg)
         // Dictate: literal text, no tag parsing (prevents <enter> etc. in transcripts)
         if (xQueueReceive(xBluetoothAiDictateQueue, &ai_script, 0) == pdTRUE) {
             strlcpy(send_buf, ai_script, sizeof(send_buf));
-            bluetooth_utils_send_literal(send_buf, 2);
+            bluetooth_utils_send_literal(send_buf, BLUETOOTH_TAP_MS);
             xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT);
         }
 

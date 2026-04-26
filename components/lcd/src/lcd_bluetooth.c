@@ -2262,7 +2262,7 @@ static void prompt_rename_or_del(ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth
             // Force next rebuild of the known-devices list
             lv_obj_clean(bluetooth_menu->bluetooth_peer_menu.main_list);
             
-             // Switch pages
+            // Switch pages
             ui_menu->page = BLUETOOTH_KNOWN_DEVICES_PAGE;
             
             // Go back
