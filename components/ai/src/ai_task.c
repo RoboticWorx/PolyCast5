@@ -208,23 +208,45 @@ static void ai_task(void *pvParameters)
             }
 
             // Enable mic
-            ESP_ERROR_CHECK(ai_voice_init());
+            // On failure, surface as a retryable thinking error so the device doesn't reboot when internal RAM is tight
+            err = ai_voice_init();
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "ai_voice_init failed: %s", esp_err_to_name(err));
+                xEventGroupSetBits(xAiEventGroup, AI_THINKING_FAILED_BIT);
+                continue;
+            }
 
 #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Starting ai_voice_record_pcm16_16k");
 #endif
 
-            ESP_ERROR_CHECK(ai_voice_record_pcm16_16k(&mic_recording, &pcm));
+            err = ai_voice_record_pcm16_16k(&mic_recording, &pcm);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "ai_voice_record_pcm16_16k failed: %s", esp_err_to_name(err));
+                xEventGroupSetBits(xAiEventGroup, AI_THINKING_FAILED_BIT);
+                ai_voice_free_pcm(&pcm);
+                esp_err_t deinit_err = ai_voice_deinit();
+                if (deinit_err != ESP_OK) {
+                    ESP_LOGE(TAG, "ai_voice_deinit failed: %s", esp_err_to_name(deinit_err));
+                }
+            }
             continue;
         } else if (cmd.type == AI_CMD_KEYBOARD_DONE_REC) { // Process transcription
             memset(user_transcript, 0, sizeof(user_transcript)); // Clear previous contents
+
+            // Tear down the mic before STT so the I2S DMA buffers are released back to the heap
+            // The PCM payload lives in PSRAM, so it survives this
+            esp_err_t deinit_err = ai_voice_deinit();
+            if (deinit_err != ESP_OK) {
+                ESP_LOGE(TAG, "ai_voice_deinit failed: %s", esp_err_to_name(deinit_err));
+            }
 
 #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "STT uploading PCM: samples=%u", (unsigned)pcm.samples);
 #endif
 
             // Transcribe via xAI /v1/stt REST endpoint
-            esp_err_t err = ai_voice_stt_transcribe_pcm16_xai(pcm.pcm16, pcm.samples, user_transcript, sizeof(user_transcript));
+            err = ai_voice_stt_transcribe_pcm16_xai(pcm.pcm16, pcm.samples, user_transcript, sizeof(user_transcript));
 
             if (err == ESP_OK) {
 #ifdef POLYCAST5_DEBUG
@@ -275,9 +297,9 @@ static void ai_task(void *pvParameters)
                     xEventGroupSetBits(xAiEventGroup, AI_THINKING_FAILED_BIT);
                 }
             }
-            // Disable mic
-            ai_voice_free_pcm(&pcm); // Free PCM buffer
-            ESP_ERROR_CHECK(ai_voice_deinit());
+            // Free the PCM buffer in PSRAM
+            // The mic was already torn down so STT had the DMA-capable internal SRAM it needed for the AES-encrypted upload
+            ai_voice_free_pcm(&pcm);
         } else if (cmd.type == AI_CMD_RAW_FRAMES) { // Organizing raw Wi-Fi frames
 #ifdef POLYCAST5_DEBUG
             size_t msg_len = (cmd.msg_len != 0) ? cmd.msg_len : strlen(cmd.msg);

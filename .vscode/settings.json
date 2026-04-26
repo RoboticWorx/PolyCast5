@@ -26,5 +26,6 @@
   
   "github.copilot.chat.commitMessageGeneration.instructions": [
     { "text": "Never add Co-authored-by lines to the commit message." }
-  ]
+  ],
+  "git.addAICoAuthor": "off"
 }
