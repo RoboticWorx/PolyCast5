@@ -35,8 +35,6 @@
 #include "lcd_gpio.h"
 #include "lcd_utils.h"
 #include "lcd_anim.h"
-#include "esp_phy_init.h"
-#include "esp_private/periph_ctrl.h"
 #include "wifi_utils.h"
 #include "wifi_ping.h"
 #include "wifi_task.h"
