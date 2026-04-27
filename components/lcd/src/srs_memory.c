@@ -18,6 +18,7 @@ Please see https://polycast5.com/blogs/docs/srs-memory-planner
 #include "lcd_utils.h"
 #include "misc/lv_types.h"
 #include "polycast5_macros.h"
+#include "polycast5_fonts.h"
 
 #include <stdbool.h>
 #include <stdint.h>

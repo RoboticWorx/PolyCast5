@@ -1,5 +1,6 @@
 #include "polycast5_macros.h"
 #include "polycast5_gpios.h"
+#include "polycast5_fonts.h"
 
 #include <stdlib.h>
 #include <string.h>

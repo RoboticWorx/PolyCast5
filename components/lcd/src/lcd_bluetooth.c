@@ -3,6 +3,7 @@
 #include "gpio_task.h"
 #include "misc/lv_timer.h"
 #include "polycast5_macros.h"
+#include "polycast5_fonts.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"

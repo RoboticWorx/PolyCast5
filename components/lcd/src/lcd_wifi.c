@@ -1,4 +1,5 @@
 #include "polycast5_macros.h"
+#include "polycast5_fonts.h"
 
 #include "freertos/idf_additions.h"
 #include "portmacro.h"

@@ -16,6 +16,7 @@
 #include "lcd_utils.h"
 #include "lcd_lora.h"
 #include "lcd_espnow.h"
+#include "polycast5_fonts.h"
 #include "espnow_task.h"
 
 #include "gpio_task.h"

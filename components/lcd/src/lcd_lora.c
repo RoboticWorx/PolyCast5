@@ -1,6 +1,7 @@
 #include "core/lv_obj.h"
 #include "misc/lv_area.h"
 #include "polycast5_macros.h"
+#include "polycast5_fonts.h"
 
 #include "core/lv_obj_pos.h"
 #include "core/lv_obj_tree.h"

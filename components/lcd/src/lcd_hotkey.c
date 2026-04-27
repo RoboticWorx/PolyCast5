@@ -5,6 +5,7 @@
 #include "core/lv_obj_pos.h"
 #include "misc/lv_area.h"
 #include "polycast5_macros.h"
+#include "polycast5_fonts.h"
 #include "widgets/label/lv_label.h"
 #include "font/lv_symbol_def.h"
 

@@ -23,7 +23,7 @@ Usage examples:
   python verify_encryption.py
   python verify_encryption.py --port COM7
   python verify_encryption.py --secret "TestPassword_PolyCast5_12345"
-  python verify_encryption.py --port COM13 --secret "exists"
+  python verify_encryption.py --port COM13 --secret "xai-"
   python verify_encryption.py --skip-dump
   python verify_encryption.py --skip-dump --secret "AnotherSecret"
 

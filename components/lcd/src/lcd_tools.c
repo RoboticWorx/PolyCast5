@@ -23,6 +23,7 @@
 
 #include "wifi_btc_portal.h"
 #include "lcd_asset_macros.h"
+#include "polycast5_fonts.h"
 #include "lcd_utils.h"
 
 #include "srs_memory.h"
