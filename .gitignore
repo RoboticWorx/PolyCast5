@@ -2,7 +2,15 @@ build/
 managed_components/
 dependencies.lock
 sdkconfig
+
 BUGS.md
 .claude/ralph-loop.local.md
+
 *_signing_key*
 *.pem
+
+dump_app.bin
+dump_bootloader.bin
+dump_nvs_keys.bin
+dump_nvs.bin
+dump_spiffs_sample.bin
