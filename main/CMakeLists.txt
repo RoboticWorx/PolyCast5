@@ -30,5 +30,5 @@ idf_component_register(
         esp_driver_uart
         esp_psram
         esp_pm
-        spiffs
+        joltwallet__littlefs
 )

@@ -14,7 +14,7 @@
 #include "esp_log.h"
 #include "esp_pm.h"
 #include "esp_sleep.h"
-#include "esp_spiffs.h" // POLYCAST5_DEBUG_SPIFFS
+#include "esp_littlefs.h" // POLYCAST5_DEBUG_FS
 #include "esp_psram.h" // POLYCAST5_DEBUG_RAM
 #include "esp_random.h"
 
@@ -182,19 +182,19 @@ void app_main(void)
     ESP_LOGI("AFTER PSRAM", "Free internal heap = %u KB", free_int / 1024);
 #endif
     
-#ifdef POLYCAST5_DEBUG_SPIFFS
+#ifdef POLYCAST5_DEBUG_FS
     // Wait for tasks to allocate
     vTaskDelay(pdMS_TO_TICKS(2000));
-    
+
     size_t total_bytes, used_bytes;
-    esp_err_t ret = esp_spiffs_info("assets", &total_bytes, &used_bytes);
+    esp_err_t ret = esp_littlefs_info("assets", &total_bytes, &used_bytes);
 
     if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "SPIFFS Partition Info:");
+        ESP_LOGI(TAG, "LittleFS Partition Info:");
         ESP_LOGI(TAG, "Total: %d bytes", total_bytes);
         ESP_LOGI(TAG, "Used: %d bytes", used_bytes);
     } else {
-        ESP_LOGE(TAG, "Failed to get SPIFFS info (%s)", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to get LittleFS info (%s)", esp_err_to_name(ret));
     }
 #endif
 

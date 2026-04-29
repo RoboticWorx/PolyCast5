@@ -36,9 +36,9 @@ Parameters (all optional):
                     (~30s saved).
 
 Typical workflow:
-  1. Flash firmware, save a known Wi-Fi password to the device.
+  1. Flash firmware, save a known Wi-Fi/other password to the device.
   2. Reboot the device, wait for it to reconnect.
-  3. python verify_encryption.py --port COM13 --secret "Yellow-Guyana-34?"
+  3. python verify_encryption.py --port COM13 --secret "first_chars_of_said_password"
   4. Iterate on more secrets with --skip-dump (no re-dump needed).
 
 Exit code: 0 if all checks pass, 1 if any check fails. Useful for scripting.
@@ -70,8 +70,8 @@ DUMPS: list[tuple[str, str, int, int]] = [
     ("bootloader",  "dump_bootloader.bin",     0x002000, 0x00E000),  # FE-encrypted
     ("nvs_keys",    "dump_nvs_keys.bin",       0x011000, 0x001000),  # FE-encrypted
     ("nvs",         "dump_nvs.bin",            0x012000, 0x03B000),  # values NVS-encrypted
-    ("app",         "dump_app.bin",            0x050000, 0x3B0000),  # FE-encrypted
-    ("spiffs",      "dump_spiffs_sample.bin",  0x7B0000, 0x010000),  # plaintext (assets)
+    ("app",         "dump_app.bin",            0x050000, 0x400000),  # FE-encrypted
+    ("assets",      "dump_littlefs_sample.bin", 0x850000, 0x010000), # plaintext (assets)
 ]
 
 BUILD_BOOTLOADER = Path("build") / "bootloader" / "bootloader.bin"
@@ -239,8 +239,8 @@ def main() -> int:
     #   nvs             @ 0x12000  size 0x3B000  (NOT FE-encrypted - but
     #                                              values inside are NVS-
     #                                              encrypted)
-    #   ota_0 (app)     @ 0x50000  size 0x3B0000 (FE-encrypted)
-    #   assets (SPIFFS) @ 0x7B0000 size 0x10000  (PLAINTEXT - first 64 KB
+    #   ota_0 (app)     @ 0x50000  size 0x400000 (FE-encrypted)
+    #   assets          @ 0x850000 size 0x10000  (PLAINTEXT - first 64 KB
     #                                              sample, enough to verify
     #                                              it's not over-encrypted)
     # -----------------------------------------------------------------------
@@ -271,7 +271,7 @@ def main() -> int:
     dump_strings: dict[str, list[bytes]] = {}
     for label, fname, _, _ in DUMPS:
         # Only the heavy ones get progress lines; small dumps are instantaneous.
-        if fname in ("dump_app.bin", "dump_nvs.bin", "dump_spiffs_sample.bin"):
+        if fname in ("dump_app.bin", "dump_nvs.bin", "dump_littlefs_sample.bin"):
             sz_kb = Path(fname).stat().st_size // 1024
             note = " (slowest)" if fname == "dump_app.bin" else ""
             print(f"  Scanning {fname} ({sz_kb} KB){note}...")
@@ -398,17 +398,17 @@ def main() -> int:
         print(gray("\n(Skip secret-leak test: pass --secret 'YourPassword' to enable)"))
 
     # -----------------------------------------------------------------------
-    # STEP 7 - SPIFFS plaintext sanity check.
+    # STEP 7 - Assets (LittleFS) plaintext sanity check.
     #
-    # SPIFFS holds fonts, icons, animations - intentionally NOT encrypted.
+    # LittleFS holds fonts, icons, animations - intentionally NOT encrypted.
     # This step confirms we haven't accidentally over-encrypted: it should
     # produce LOTS of readable strings.
     # -----------------------------------------------------------------------
-    print(cyan("\n=== SPIFFS plaintext sanity ==="))
+    print(cyan("\n=== Assets plaintext sanity ==="))
 
-    spiffs_count = len(dump_strings["dump_spiffs_sample.bin"])
-    add_check_result("spiffs-plain", spiffs_count >= 100,
-                     f"string count: {spiffs_count} (expect >= 100; many strings = NOT over-encrypted)")
+    assets_count = len(dump_strings["dump_littlefs_sample.bin"])
+    add_check_result("assets-plain", assets_count >= 100,
+                     f"string count: {assets_count} (expect >= 100; many strings = NOT over-encrypted)")
 
     # -----------------------------------------------------------------------
     # Final summary + exit code.

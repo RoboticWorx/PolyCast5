@@ -16,7 +16,7 @@
 #include "driver/gpio.h"
 #include "esp_timer.h"
 #include "esp_log.h"
-#include "esp_spiffs.h"
+#include "esp_littlefs.h"
 #include "esp_err.h"
 
 #include "qrcodegen.h"
@@ -281,25 +281,25 @@ static void warm_img(const char *path) {
 
 void lcd_lvgl_init(void)
 {
-    // Mount SPIFFS so that "/assets/…" works
-    esp_vfs_spiffs_conf_t cfg = {
+    // Mount LittleFS so that "/assets/…" works
+    esp_vfs_littlefs_conf_t cfg = {
         .base_path = "/assets",
         .partition_label = "assets",
-        .max_files = (CITY_FRAME_CNT + BLACK_HOLE_FRAME_CNT + MATRIX_RAIN_FRAME_CNT + PYRAMID_FRAME_CNT) * 6, // Plenty of PSRAM available for now
-        .format_if_mount_failed = false
+        .format_if_mount_failed = false,
+        .dont_mount = false,
     };
-    esp_err_t ret = esp_vfs_spiffs_register(&cfg);
+    esp_err_t ret = esp_vfs_littlefs_register(&cfg);
     if (ret != ESP_OK) {
-        ESP_LOGE("LCD", "SPIFFS mount failed: %d", ret);
+        ESP_LOGE("LCD", "LittleFS mount failed: %d", ret);
         return;
     } else {
-        ESP_LOGI("LCD", "SPIFFS mounted successfully");
+        ESP_LOGI("LCD", "LittleFS mounted successfully");
     }
-    
+
     // LVGL library init
     lv_init();
-    
-    // Initialize LVGL's POSIX file system driver (binds to VFS/SPIFFS)
+
+    // Initialize LVGL's POSIX file system driver (binds to VFS/LittleFS)
     lv_fs_posix_init();
     
      // Reserve slots in the decoded-image cache

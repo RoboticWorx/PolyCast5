@@ -19,7 +19,7 @@
       "Bash(type:*)",
       "Bash(git diff:*)",
 
-      "Bash(*setup-ralph-loop.sh*)" 
+      "Bash(*setup-ralph-loop.sh*)"
     ]
   },
   "autoMemoryEnabled": true,

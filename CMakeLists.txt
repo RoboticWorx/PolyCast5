@@ -7,5 +7,5 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 set(PROJECT_VER "0.1.0")
 project(PolyCast5)
 
-# Build a SPIFFS image
-spiffs_create_partition_image(assets "${CMAKE_SOURCE_DIR}/assets" FLASH_IN_PROJECT)
+# Build a LittleFS image
+littlefs_create_partition_image(assets "${CMAKE_SOURCE_DIR}/assets" FLASH_IN_PROJECT)

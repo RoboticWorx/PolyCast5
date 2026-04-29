@@ -15,7 +15,7 @@ idf_component_register(
         "fonts"
 
     REQUIRES
-        common lvgl sx126x infrared espnow lora wifi bluetooth ai gpio bootloader_support spiffs esp_driver_spi esp_driver_i2c esp_driver_gpio
+        common lvgl sx126x infrared espnow lora wifi bluetooth ai gpio bootloader_support joltwallet__littlefs esp_driver_spi esp_driver_i2c esp_driver_gpio
     
     PRIV_REQUIRES
 )

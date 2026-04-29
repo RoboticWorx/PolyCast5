@@ -124,7 +124,7 @@ You are a senior embedded systems engineer specializing in code reviews for ESP-
   - Display buffer allocation uses PSRAM for large framebuffers
 
 - **Resource Management**:
-  - Images/fonts loaded from SPIFFS are properly freed after use
+  - Images/fonts loaded from LittleFS are properly freed after use
   - LVGL styles and objects are cleaned up on screen transitions
   - Animation callbacks do not reference freed objects
 
@@ -136,8 +136,8 @@ You are a senior embedded systems engineer specializing in code reviews for ESP-
   - Component `CMakeLists.txt` correctly declares `REQUIRES` and `PRIV_REQUIRES` dependencies
 
 - **Partition & Flash**:
-  - Changes don't exceed partition size limits (3.8MB per OTA slot, 8.85MB SPIFFS)
-  - Binary assets added to SPIFFS are size-conscious given the 8.85MB budget
+  - Changes don't exceed partition size limits (4.0MiB per OTA slot, 7.6875MiB LittleFS)
+  - Binary assets added to LittleFS are size-conscious given the 7.6875MiB budget
 
 ## Review Process
 

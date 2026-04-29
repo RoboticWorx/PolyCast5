@@ -37,7 +37,7 @@ _PolyCast5 also comes with cool, customizable homescreen animations and hotkeys!
 # Project Structure
 
 * `main` - Initialization code. The program runs from here.
-* `assets` - Media image files stored as `.bin` for SPIFFS access.
+* `assets` - Media image files stored as `.bin` for LittleFS access.
 * `bin` - Precompiled binaries of the latest release for OTA/updater.
 * `scripts` - Bluetooth keystroke injection (autotype) examples as well as a few miscellaneous developement scripts.
 * `components` - The various pieces of the application code broken into folders.

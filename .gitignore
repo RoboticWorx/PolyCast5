@@ -13,4 +13,4 @@ dump_app.bin
 dump_bootloader.bin
 dump_nvs_keys.bin
 dump_nvs.bin
-dump_spiffs_sample.bin
+dump_littlefs_sample.bin

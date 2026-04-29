@@ -15,3 +15,4 @@ dependencies:
   #   # All dependencies of `main` are public by default.
   #   public: true
   lvgl/lvgl: ^9.2.2
+  joltwallet/littlefs: ^1.14.0
