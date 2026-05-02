@@ -821,8 +821,13 @@ esp_err_t wifi_utils_radio_start(const char *ssid, const uint8_t* bssid, const c
 
     cfg.sta.channel = 0; // Don't lock to a specific channel
     cfg.sta.scan_method = WIFI_FAST_SCAN; // First matching SSID (vs WIFI_ALL_CHANNEL_SCAN)
-    
-    cfg.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK; // Weakest auth mode to accept in the fast scan mode 
+
+    cfg.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK; // Weakest auth mode to accept in the fast scan mode
+
+    // Required for WPA2/WPA3 transition APs (e.g. iPhone Personal Hotspot, AUTH:7)
+    cfg.sta.pmf_cfg.capable = true;
+    cfg.sta.pmf_cfg.required = false;
+    cfg.sta.sae_pwe_h2e = WPA3_SAE_PWE_BOTH;
 
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Setting Wi-Fi config SSID='%s'", ssid);
