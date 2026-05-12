@@ -26,6 +26,10 @@
 
 #define TAG "AI_UTILS"
 
+#define XAI_MODEL "grok-4.3"
+#define XAI_REASONING_LEVEL "medium"
+#define XAI_NONREASONING_LEVEL "none"
+
 // Hard ceiling so a bad response doesn't eat all RAM
 #define AI_HTTP_BODY_MAX_CAP (128 * 1024)
 
@@ -486,7 +490,8 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
     // Build JSON payload for /v1/chat/completions
     // Minimal shape:
     //   {
-    //     "model": "grok-4-1-fast-non-reasoning",
+    //     "model": "grok-4.3",
+    //     "reasoning_effort": "none",
     //     "messages": [
     //       {"role":"system","content": "... instructions ..."},
     //       {"role":"user","content": "... command ..."},
@@ -500,12 +505,11 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
         return ESP_ERR_NO_MEM;
     }
 
-    // Fastest grok model
-    if (reasoning) {
-        cJSON_AddStringToObject(root, "model", "grok-4-1-fast-reasoning");
-    } else {
-        cJSON_AddStringToObject(root, "model", "grok-4-1-fast-non-reasoning");
-    }
+    // grok-4.3 replaces the retired grok-4-1-fast-* pair (xAI May-15 retirement).
+    // reasoning_effort picks the behavior: "low" mimics the fast-reasoning variant,
+    // "none" mimics the non-reasoning variant.
+    cJSON_AddStringToObject(root, "model", XAI_MODEL);
+    cJSON_AddStringToObject(root, "reasoning_effort", reasoning ? XAI_REASONING_LEVEL : XAI_NONREASONING_LEVEL);
 
     // Messages array
     cJSON *messages = cJSON_AddArrayToObject(root, "messages");
@@ -884,12 +888,9 @@ esp_err_t ai_utils_send_command_xai_stream(const char *system_prompt, const char
         return ESP_ERR_NO_MEM;
     }
 
-    // Pick Grok model
-    if (reasoning) {
-        cJSON_AddStringToObject(root, "model", "grok-4-1-fast-reasoning");
-    } else {
-        cJSON_AddStringToObject(root, "model", "grok-4-1-fast-non-reasoning");
-    }
+    // grok-4.3 replaces the retired grok-4-1-fast-* pair
+    cJSON_AddStringToObject(root, "model", XAI_MODEL);
+    cJSON_AddStringToObject(root, "reasoning_effort", reasoning ? XAI_REASONING_LEVEL : XAI_NONREASONING_LEVEL);
 
     // Messages array
     cJSON *messages = cJSON_AddArrayToObject(root, "messages");
