@@ -127,5 +127,23 @@ void lcd_tools_how_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
  */
 void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu);
 
+/**
+ * @brief Shows live Claude AI subscription usage fetched from a LAN companion host
+ *
+ * @param [in] ui_btns User input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] tools_menu Tools menu structure
+ */
+void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu);
+
+/**
+ * @brief Web-portal setup page for the Claude companion host (IP + port entry)
+ *
+ * @param [in] ui_btns User input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] tools_menu Tools menu structure
+ */
+void lcd_tools_claude_setup_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu);
+
 
 #endif // LCD_TOOLS_H

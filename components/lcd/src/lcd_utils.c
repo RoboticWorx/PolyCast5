@@ -2868,15 +2868,28 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
     } else if (ui_btns->select_btn == 1 && tools_menu->index == 7) { // SRS memory assist selected
         // Hide tools menu
         lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-        
+
         // Reset static
         do_once = false;
-        
+
         // Show right arrow
         lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-        
+
         // Switch pages
         ui_menu->page = TOOLS_HOW_SRS_PAGE;
+    } else if (ui_btns->select_btn == 1 && tools_menu->index == 8) { // Claude Usage selected
+        // Hide tools menu
+        lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Hide up/down arrow
+        lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+        // Reset static
+        do_once = false;
+
+        // Switch pages
+        ui_menu->page = TOOLS_CLAUDE_USAGE_PAGE;
     } else if (ui_btns->left_btn == 1) { // Back selected
         // Hide tools menu
         lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);

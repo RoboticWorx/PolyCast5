@@ -893,15 +893,15 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *ir_menu)
         if (xSemaphoreTake(xInfraredSignalSavedSemaphore, 0) == pdTRUE) {
             lv_obj_delete(img_save_remote); // Delete img
             
-            // "Saving.." text
+            // Saving... text
             lv_obj_center(lbl_ins);
-            lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_24, 0);
-            lv_label_set_text(lbl_ins, "Saving...");
+            lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_20, 0);
+            xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
+            lv_label_set_text_fmt(lbl_ins, "Saving %zu pulses...", ir_signal_length);
+            xSemaphoreGive(xInfraredDataMutex); // Release IR
             lv_timer_handler(); // Show
 
-            xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
-            lv_label_set_text_fmt(lbl_sig_len, "(%zu pulses)", ir_signal_length);
-            xSemaphoreGive(xInfraredDataMutex); // Release IR
+            lv_label_set_text(lbl_sig_len, "");
             lv_timer_handler(); // Show
             
             // Wait then clear

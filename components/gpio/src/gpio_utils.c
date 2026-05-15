@@ -62,7 +62,7 @@ void gpio_utils_init_nvs(void)
     ESP_LOGE("", "!!! READ THIS !!!");
     ESP_LOGW("", "Release mode encryption and secure boot are DISABLED!");
     ESP_LOGW("", "This is so that you are able to freely modify/re-flash the code that this device is running.");
-    ESP_LOGW("", "If you don't plan to modify the code, release mode encryption and secure boot should be enabled to prevent physical access attacks. A tutorial to enable this is available at www.polycast5.com/blogs/docs/lock-it-down.");
+    ESP_LOGW("", "If you don't plan to modify the code, release mode encryption and secure boot should be enabled to prevent physical access attacks. A tutorial to enable this is available at polycast5.com/blogs/docs/lock-it-down.");
     ESP_LOGW("", "It's important to note that if you do this, you will be UNABLE to re-flash the device again afterwards.");
 #endif
 

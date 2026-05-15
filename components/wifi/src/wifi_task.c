@@ -19,6 +19,8 @@
 #include "wifi_deauth.h"
 #include "wifi_autoconnect.h"
 #include "wifi_ota_update.h"
+#include "wifi_claude.h"
+#include "wifi_claude_portal.h"
 #include "esp_app_desc.h"
 #include "esp_ota_ops.h"
 #include "esp_partition.h"
@@ -138,6 +140,8 @@ static void wifi_task(void *param)
     wifi_utils_wifi_event_init();
     wifi_mqtt_client_init();
     wifi_autoconnect_init();
+
+    wifi_claude_init(); // Init Claude usage queue + semaphore
 
     // If Wi-Fi BTC portal password NVS doesn't exist yet, set it
     if (wifi_btc_pass_load_nvs(btc_wifi_portal_pass, sizeof(btc_wifi_portal_pass)) != ESP_OK) {
@@ -510,9 +514,29 @@ static void wifi_task(void *param)
                 }
             }
 
+            // If Claude setup web portal bit transitioned 0 -> 1
+            if ((current_portal_bits & WIFI_PORTAL_CLAUDE_START_BIT) &&
+                    !(last_portal_bits & WIFI_PORTAL_CLAUDE_START_BIT)) {
+                err = wifi_claude_portal_start();
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "wifi_claude_portal_start failed: %s", esp_err_to_name(err));
+                }
+            }
+            // If Claude setup web portal bit transitioned 1 -> 0
+            if ((last_portal_bits & WIFI_PORTAL_CLAUDE_START_BIT) &&
+                    !(current_portal_bits & WIFI_PORTAL_CLAUDE_START_BIT)) {
+                err = wifi_claude_portal_stop();
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "wifi_claude_portal_stop failed: %s", esp_err_to_name(err));
+                }
+            }
+
             last_portal_bits = current_portal_bits;
         }
-    
+
+        // Claude usage poll (throttled internally)
+        wifi_claude_tick();
+
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }

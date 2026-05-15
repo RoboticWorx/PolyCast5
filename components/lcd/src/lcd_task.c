@@ -426,6 +426,14 @@ static void lcd_task(void *pvParameters)
                     lcd_tools_srs_page(&ui_btns, &ui_menu, &tools_menu);
                     dont_sleep_on_this_page = true;
                     break;
+                case TOOLS_CLAUDE_USAGE_PAGE:
+                    lcd_tools_claude_usage_page(&ui_btns, &ui_menu, &tools_menu);
+                    dont_sleep_on_this_page = true;
+                    break;
+                case TOOLS_CLAUDE_SETUP_PAGE:
+                    lcd_tools_claude_setup_page(&ui_btns, &ui_menu, &tools_menu);
+                    dont_sleep_on_this_page = true;
+                    break;
                 // Settings pages
                 case SETTINGS_OTA_CONFIRM_PAGE:
                     lcd_settings_ota_confirm_page(&ui_btns, &ui_menu, &settings_menu);
