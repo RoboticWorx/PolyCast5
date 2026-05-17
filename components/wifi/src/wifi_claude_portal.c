@@ -385,6 +385,7 @@ esp_err_t wifi_claude_portal_start(void)
     // Start the HTTP server
     claude_server = claude_httpd_start();
     if (!claude_server) {
+        (void)wifi_claude_portal_stop();
         return ESP_FAIL;
     }
 

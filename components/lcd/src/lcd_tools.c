@@ -1199,6 +1199,7 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
 
     // Clawd "walking" - driven once per frame from the per-frame block
     #define CLAWD_STEP_MS        80 // ms per 1-pixel step (lower = faster walk)
+    #define CLAWD_STEP_PX         3 // Clawd step size in pixels
     #define CLAWD_PAUSE_MIN_MS 1000 // Shortest idle pause at a destination
     #define CLAWD_PAUSE_MAX_MS 6000 // Longest idle pause at a destination
     #define CLAWD_X_MARGIN        4 // px to keep clear of left/right screen edges
@@ -1393,7 +1394,11 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
 
         // Walking: step one pixel toward the target
         } else if ((now - clawd_last_step) >= pdMS_TO_TICKS(CLAWD_STEP_MS)) {
-            clawd_x = (clawd_x < clawd_target_x) ? (int16_t)(clawd_x + 1) : (int16_t)(clawd_x - 1);
+            int16_t delta = (int16_t)(clawd_target_x - clawd_x);
+            int16_t step  = (delta > 0)
+                    ? (int16_t)((delta <  CLAWD_STEP_PX) ?  delta :  CLAWD_STEP_PX)
+                    : (int16_t)((delta > -CLAWD_STEP_PX) ?  delta : -CLAWD_STEP_PX);
+            clawd_x = (int16_t)(clawd_x + step);
             lv_obj_align(clawd, LV_ALIGN_BOTTOM_MID, clawd_x, 0);
             clawd_last_step = now;
 

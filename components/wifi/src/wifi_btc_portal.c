@@ -264,6 +264,7 @@ esp_err_t wifi_btc_portal_start(void)
     // Start HTTP server
     btc_server = btc_httpd_start(); // start_httpd helper
     if (!btc_server) {
+        (void)wifi_btc_portal_stop();
         return ESP_FAIL;
     }
 
