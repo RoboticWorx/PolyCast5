@@ -46,6 +46,15 @@ void wifi_claude_init(void);
 void wifi_claude_tick(void);
 
 /**
+ * @brief Gate background polling on the Claude Usage page being visible.
+ *
+ * When false (the default), wifi_claude_tick() is a no-op so the poller
+ * doesn't burn CPU/RAM while the user is on other pages. The LCD page
+ * sets this true on entry and false on every exit path.
+ */
+void wifi_claude_set_page_active(bool active);
+
+/**
  * @brief Check if Claude info is configured by verifying if a non-empty host URL is set.
  * 
  * @returns True if the user has completed setup (we have a URL to fetch from).

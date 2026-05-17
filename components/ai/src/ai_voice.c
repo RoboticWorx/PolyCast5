@@ -172,6 +172,8 @@ esp_err_t ai_voice_init(void)
 
     // Create an RX channel
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
+    chan_cfg.dma_desc_num = 4;
+    chan_cfg.dma_frame_num = 200;
     err = i2s_new_channel(&chan_cfg, NULL, &i2s_rx_channel);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "ai_voice_init: i2s_new_channel failed: %s", esp_err_to_name(err));

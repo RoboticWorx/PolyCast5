@@ -46,6 +46,7 @@ SemaphoreHandle_t xWifiClaudeRefreshSemaphore = NULL;
 
 static int64_t s_last_fetch_us = 0;             // Timestamp of last attempt (success or fail)
 static TaskHandle_t s_fetch_task_handle = NULL; // Non-NULL while a fetch is in flight
+static volatile bool s_page_active = false;     // Set by lcd_tools_claude_usage_page on enter/exit
 
 /* =============== HTTP body accumulator =============== */
 
@@ -423,6 +424,11 @@ void wifi_claude_tick(void)
         return;
     }
 
+    // Only poll while the user is viewing the Claude Usage page
+    if (!s_page_active) {
+        return;
+    }
+
     // Don't stack fetches
     if (s_fetch_task_handle != NULL) {
         return;
@@ -449,10 +455,15 @@ void wifi_claude_tick(void)
     }
 
     // Spawn the fetch
-    if (xTaskCreate(claude_fetch_task, "claude_fetch", CLAUDE_FETCH_TASK_STACK, 
+    if (xTaskCreate(claude_fetch_task, "claude_fetch", CLAUDE_FETCH_TASK_STACK,
             NULL, POLYCAST5_PRIORITY_MEDIUM, &s_fetch_task_handle) != pdPASS) {
         ESP_LOGE(TAG, "Failed to spawn claude_fetch_task");
         s_fetch_task_handle = NULL;
         s_last_fetch_us = now_us;
     }
+}
+
+void wifi_claude_set_page_active(bool active)
+{
+    s_page_active = active;
 }

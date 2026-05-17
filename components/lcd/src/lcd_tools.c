@@ -1366,6 +1366,9 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
         refresh_pending = false;
         init = true;
 
+        // Unblock wifi_claude_tick now that the page is visible
+        wifi_claude_set_page_active(true);
+
         // Kick off an immediate refresh now that Wi-Fi is up
         if (xWifiClaudeRefreshSemaphore) {
             xSemaphoreGive(xWifiClaudeRefreshSemaphore);
@@ -1477,6 +1480,9 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
             }
         }
     } else if (ui_btns->up_btn == 1) { // Go to setup page
+        // Stop the background poller now that we're leaving the page
+        wifi_claude_set_page_active(false);
+
         // Drop Wi-Fi on exit
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
@@ -1508,6 +1514,9 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
 
         ui_menu->page = TOOLS_CLAUDE_SETUP_PAGE;
     } else if (ui_btns->left_btn == 1) { // Back
+        // Stop the background poller now that we're leaving the page
+        wifi_claude_set_page_active(false);
+
         // Drop Wi-Fi on exit
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
@@ -1541,6 +1550,9 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
         lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         ui_menu->page = TOOLS_PAGE;
     } else if (ui_btns->home_btn || ui_btns->pwr_btn) {
+        // Stop the background poller now that we're leaving the page
+        wifi_claude_set_page_active(false);
+
         // Drop Wi-Fi on exit
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
