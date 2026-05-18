@@ -59,7 +59,6 @@ import threading
 import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib import error as urlerror
 from urllib import request as urlrequest
 
 
@@ -235,10 +234,8 @@ def _refresh_once(session_key, org_id, debug_raw):
             _cache["last_error"] = None
         # stdout for happy path so it's easy to confirm the loop is alive
         print(f"[{time.strftime('%H:%M:%S')}] refresh ok", flush=True)
-    except (urlerror.URLError, json.JSONDecodeError,
-            KeyError, ValueError, RuntimeError) as exc:
-        # Note: we deliberately keep the OLD payload on failure so the device
-        # keeps showing the last-known good numbers rather than draining to "--"
+    except Exception as exc:  # noqa: BLE001 - daemon thread must never die
+        # Catch-all: TimeoutError, ConnectionResetError, SSL errors, JSON parse errors, anything claude.ai might throw
         with _cache_lock:
             _cache["last_error"] = repr(exc)
         # stderr for failures so they stand out in the user's terminal
@@ -247,11 +244,18 @@ def _refresh_once(session_key, org_id, debug_raw):
 
 
 def _refresher_thread(session_key, org_id, debug_raw, interval_secs, stop_event):
-    """Background loop that keeps the cache fresh."""
+    """Background loop that keeps the cache fresh.
+
+    Defense-in-depth: the inner _refresh_once() already swallows fetch
+    errors, but we also wrap the loop body so a bug in our own code can't
+    kill the refresher and silently freeze the cache."""
     while not stop_event.is_set():
-        # One fetch attempt per iteration; the wait() below also functions as
-        # the inter-refresh delay and as the cancellation signal on Ctrl-C.
-        _refresh_once(session_key, org_id, debug_raw)
+        try:
+            # One fetch attempt per iteration
+            _refresh_once(session_key, org_id, debug_raw)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[{time.strftime('%H:%M:%S')}] refresher loop error: {exc!r}",
+                  file=sys.stderr, flush=True)
         # wait() returns early when stop_event is set, so shutdown is prompt
         stop_event.wait(interval_secs)
 
@@ -340,8 +344,9 @@ def _build_argparser():
     )
     p.add_argument(
         "--refresh", "-r", type=int,
-        default=int(os.environ.get("REFRESH_SECONDS", "45")),
-        help="Seconds between background refreshes of claude.ai (default: 45).",
+        default=int(os.environ.get("REFRESH_SECONDS", "15")),
+        help="Seconds between background refreshes of claude.ai (default: 15, "
+             "to match the device's 15s poll cadence).",
     )
     p.add_argument(
         "--debug-raw",

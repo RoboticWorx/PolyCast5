@@ -32,7 +32,8 @@
 #define CLAUDE_POLL_INTERVAL_US (15ULL * 1000000ULL)
 
 // HTTP-level safety net
-#define CLAUDE_HTTP_TIMEOUT_MS 10000       // Companion is on LAN; 10s is generous
+// 3s is plenty for a LAN GET (healthy fetch is <100ms; connection-refused returns instantly)
+#define CLAUDE_HTTP_TIMEOUT_MS 3000
 #define CLAUDE_HTTP_BODY_MAX   (16 * 1024) // Hard ceiling so a bad response can't eat RAM
 
 // Dedicated fetch task - TLS handshake + JSON parse can push past 4KB

@@ -1212,7 +1212,22 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
     static int64_t last_rendered_us = -1;
     static bool refresh_pending = false;
 
+    // Overlay shown when the most recent fetch failed (script down, session
+    // expired, etc). Lives on ACTIVE_SCR so it survives the row container
+    // being hidden, and is torn down on every exit path below.
+    static lv_obj_t *error_lbl = NULL;
+
+    #define CLAUDE_FETCH_FAILED_TXT \
+            "Couldn't fetch usage!\n\n" \
+            "See:\n" \
+            "polycast5.com/blogs/\n" \
+            "docs/claude-usage"
+
     if (!init) {
+        // Hide top/bottom arrows
+        lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
         // If Claude not configured, go straight to setup page
         if (!wifi_claude_is_configured()) {
             // Show top/bottom arrows
@@ -1223,6 +1238,13 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
 
             return;
         }
+
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+
+        LCD_LOADING_ANIM_START_DEFAULT();
 
         // Claude is configured
         // Make sure Wi-Fi is up before we start polling the companion
@@ -1248,6 +1270,8 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
                 lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
                 lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 
+                lcd_anim_loading_stop();
+
                 return;
             } else if (status == LCD_WAIT_FOR_BIT_BETTER_EXIT) {
                 // User aborted with LEFT - disconnect Wi-Fi and go back to tools menu
@@ -1261,6 +1285,8 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
                 lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
                 lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 
+                lcd_anim_loading_stop();
+
                 // Show tools menu
                 lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
                 ui_menu->page = TOOLS_PAGE; // Go back
@@ -1271,6 +1297,8 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
             lv_obj_delete(status_lbl);
             status_lbl = NULL;
         }
+
+        lcd_anim_loading_stop();
 
         // Show up arrow
         lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
@@ -1418,42 +1446,59 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
         claude_usage_t usage;
 
         if (xQueuePeek(xWifiClaudeUsageQueue, &usage, 0) == pdTRUE && usage.fetched_at_us != last_rendered_us) {
-            // Flatten the four-of-each fields into arrays for a tight loop
-            uint8_t pcts[CLAUDE_NUM_ROWS] = {
-                usage.session_pct,
-                usage.weekly_all_pct,
-                usage.weekly_sonnet_pct,
-                usage.claude_design_pct,
-            };
-            uint32_t resets[CLAUDE_NUM_ROWS] = {
-                usage.session_reset_secs,
-                usage.weekly_all_reset_secs,
-                usage.weekly_sonnet_reset_secs,
-                usage.claude_design_reset_secs,
-            };
+            if (!usage.ok) {
+                // Fetch failed: hide the rows and surface the docs URL so the user knows where
+                // to look (script not running, sessionKey expired, wrong companion IP, etc.)
+                lv_obj_add_flag(root, LV_OBJ_FLAG_HIDDEN);
 
-            // Per-row update loop that runs once per refresh
-            for (int i = 0; i < CLAUDE_NUM_ROWS; ++i) {
-                // Unused sentinel: bar stays at 0, reset still shows the upcoming window-end
-                bool is_unused = (pcts[i] == WIFI_CLAUDE_PCT_UNUSED);
-                uint8_t display_pct = is_unused ? 0 : pcts[i];
+                if (!error_lbl) {
+                    // Build error label
+                    error_lbl = lv_label_create(ACTIVE_SCR);
+                    lv_label_set_long_mode(error_lbl, LV_LABEL_LONG_WRAP);
+                    lv_obj_set_width(error_lbl, 220);
+                    lv_obj_set_style_text_font(error_lbl, &lv_font_montserrat_14, 0);
+                    lv_obj_set_style_text_color(error_lbl, user_secondary_color, 0);
+                    lv_obj_set_style_text_align(error_lbl, LV_TEXT_ALIGN_CENTER, 0);
+                    lv_obj_align(error_lbl, LV_ALIGN_CENTER, 0, -8);
+                    lv_label_set_text(error_lbl, CLAUDE_FETCH_FAILED_TXT);
+                }
+            } else {
+                // Recovered: drop the failure overlay and re-show the rows
+                if (error_lbl) {
+                    lv_obj_delete(error_lbl);
+                    error_lbl = NULL;
+                }
+                lv_obj_remove_flag(root, LV_OBJ_FLAG_HIDDEN);
 
-                if (row_pct[i]) {
-                    if (!usage.ok) { // Not valid: show dashes
-                        lv_label_set_text(row_pct[i], "--%");
-                    } else { // Valid: update percentage
+                // Flatten the four-of-each fields into arrays for a tight loop
+                uint8_t pcts[CLAUDE_NUM_ROWS] = {
+                    usage.session_pct,
+                    usage.weekly_all_pct,
+                    usage.weekly_sonnet_pct,
+                    usage.claude_design_pct,
+                };
+                uint32_t resets[CLAUDE_NUM_ROWS] = {
+                    usage.session_reset_secs,
+                    usage.weekly_all_reset_secs,
+                    usage.weekly_sonnet_reset_secs,
+                    usage.claude_design_reset_secs,
+                };
+
+                // Per-row update loop that runs once per refresh
+                for (int i = 0; i < CLAUDE_NUM_ROWS; ++i) {
+                    // Unused sentinel: bar stays at 0, reset still shows the upcoming window-end
+                    bool is_unused = (pcts[i] == WIFI_CLAUDE_PCT_UNUSED);
+                    uint8_t display_pct = is_unused ? 0 : pcts[i];
+
+                    if (row_pct[i]) {
                         lv_label_set_text_fmt(row_pct[i], "%u%%", (unsigned)display_pct);
                     }
-                }
 
-                if (row_bar[i] && usage.ok) { // Valid: update bar
-                    lv_bar_set_value(row_bar[i], display_pct, LV_ANIM_ON);
-                }
+                    if (row_bar[i]) {
+                        lv_bar_set_value(row_bar[i], display_pct, LV_ANIM_ON);
+                    }
 
-                if (row_reset[i]) {
-                    if (!usage.ok) { // Not valid: show dashes
-                        lv_label_set_text(row_reset[i], "--");
-                    } else { // Valid: update reset time
+                    if (row_reset[i]) {
                         char buf[32];
                         claude_format_reset(resets[i], buf, sizeof(buf));
                         lv_label_set_text(row_reset[i], buf);
@@ -1499,6 +1544,10 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
             lv_obj_delete(status_lbl);
             status_lbl = NULL;
         }
+        if (error_lbl) {
+            lv_obj_delete(error_lbl);
+            error_lbl = NULL;
+        }
         for (int i = 0; i < CLAUDE_NUM_ROWS; ++i) {
             row_pct[i] = row_bar[i] = row_reset[i] = NULL;
         }
@@ -1507,6 +1556,8 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
         init = false;
         refresh_pending = false;
         last_rendered_us = -1;
+
+        lcd_anim_loading_stop();
 
         // Show top/bottom arrows
         lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
@@ -1533,6 +1584,10 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
             lv_obj_delete(status_lbl);
             status_lbl = NULL;
         }
+        if (error_lbl) {
+            lv_obj_delete(error_lbl);
+            error_lbl = NULL;
+        }
         for (int i = 0; i < CLAUDE_NUM_ROWS; ++i) {
             row_pct[i] = row_bar[i] = row_reset[i] = NULL;
         }
@@ -1541,6 +1596,8 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
         init = false;
         refresh_pending = false;
         last_rendered_us = -1;
+
+        lcd_anim_loading_stop();
 
         // Show top/bottom arrows
         lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
@@ -1569,6 +1626,10 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
             lv_obj_delete(status_lbl);
             status_lbl = NULL;
         }
+        if (error_lbl) {
+            lv_obj_delete(error_lbl);
+            error_lbl = NULL;
+        }
         for (int i = 0; i < CLAUDE_NUM_ROWS; ++i) {
             row_pct[i] = row_bar[i] = row_reset[i] = NULL;
         }
@@ -1577,6 +1638,8 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
         init = false;
         refresh_pending = false;
         last_rendered_us = -1;
+
+        lcd_anim_loading_stop();
 
         // Show top/bottom arrows
         lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
@@ -1629,7 +1692,7 @@ void lcd_tools_claude_setup_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
         lv_obj_set_style_text_color(intro_lbl, user_secondary_color, 0);
         lv_obj_align_to(intro_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
         lv_label_set_text(intro_lbl,
-                "See your live Claude AI usage stats on PolyCast5 as you work!\n\n"
+                "See your Claude AI usage stats live on PolyCast5 as you work!\n\n"
                 "To get this working, please see the following page:\n\n"
                 "polycast5.com/blogs/ docs/claude-usage\n\n"
                 "Then join the following Wi-Fi network using your phone/PC:\n\n");
