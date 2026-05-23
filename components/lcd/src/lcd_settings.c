@@ -670,8 +670,9 @@ void lcd_settings_ota_updating_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, sett
 
         const char *ending_text =
                 "If you get stuck at 0% for any reason, please reboot your device "
-                "by pressing the HOME and RIGHT buttons at the same time then try again.";
-                
+                "by pressing the HOME and RIGHT buttons at the same time then try again.\n\n"
+                "If all else fails, you can also update manually at polycast5.com/pages /firmware-updater";
+        
         lv_label_set_text(ending_lbl, ending_text);
 
         // Start the OTA update

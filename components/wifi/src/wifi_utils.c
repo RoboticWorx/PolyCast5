@@ -739,7 +739,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
         // If WIFI_CHECK_OTA_ON_CONN_BIT is set, check for OTA firmware update on this connection
         if (xEventGroupGetBits(xWifiEventGroup) & WIFI_CHECK_OTA_ON_CONN_BIT) {
             // Check for new firmware version and update if so
-            wifi_ota_update_check_start("https://raw.githubusercontent.com/RoboticWorx/pc5-test/main/manifest.json");
+            wifi_ota_update_check_start("https://raw.githubusercontent.com/RoboticWorx/PolyCast5-OTA/main/manifest.json");
 
             // Clear the bit now that we've acted on it
             xEventGroupClearBits(xWifiEventGroup, WIFI_CHECK_OTA_ON_CONN_BIT);
