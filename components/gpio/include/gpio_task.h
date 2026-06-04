@@ -35,14 +35,16 @@ extern SemaphoreHandle_t xIsChargingSemaphore;
 extern SemaphoreHandle_t xNotChargingSemaphore;
 
 extern SemaphoreHandle_t xLEDCSemaphore;
+extern SemaphoreHandle_t xReadAccelSemaphore;
 
 // Queues
 extern QueueHandle_t xAdcBatReadingQueue;
 extern QueueHandle_t xAdcBatBluetoothQueue;
 extern QueueHandle_t xLEDQueue;
+extern QueueHandle_t xAccelReadingsQueue;
 
 /**
- * @brief  Create the GPIO expander task.
+ * @brief  Create the GPIO task.
  *         Internally it calls gpio_utils_init(), then
  *         polls P0.0–P0.7 and mirrors each bit to P1.0–P1.7.
  */

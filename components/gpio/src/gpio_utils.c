@@ -18,6 +18,7 @@
 #include "esp_adc/adc_cali_scheme.h"
 
 #include "tca9535.h"
+#include "lis2dh12.h"
 
 #include "gpio_utils.h"
 #include "gpio_task.h"
@@ -266,7 +267,13 @@ esp_err_t gpio_utils_init(void)
     // Create the one-shot blink stop timer
     rgb_blink_stop_timer = xTimerCreate("rgb_blink_stop", pdMS_TO_TICKS(rgb_blink_total_ms), pdFALSE, NULL, rgb_blink_stop_cb);
     configASSERT(rgb_blink_stop_timer);
-    
+
+    // Bring up the LIS2DH12 accelerometer on the same I2C bus (non-fatal if absent)
+    esp_err_t accel_ret = lis2dh12_init();
+    if (accel_ret != ESP_OK) {
+        ESP_LOGE(TAG, "lis2dh12_init failed: %s", esp_err_to_name(accel_ret));
+    }
+
     return ret;
 }
 

@@ -1,8 +1,12 @@
 #include "polycast5_macros.h"
 #include "polycast5_fonts.h"
 
+#include <math.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
+#include "freertos/semphr.h"
+#include "freertos/queue.h"
 
 #include "nvs.h"
 #include "esp_log.h"
@@ -15,18 +19,20 @@
 #include "core/lv_obj.h"
 #include "misc/lv_style.h"
 #include "misc/lv_area.h"
+#include "misc/lv_anim.h"
 #include "widgets/label/lv_label.h"
 
 #include "tca9535.h"
 #include "gpio_task.h"
+#include "lis2dh12.h"
 #include "lcd_utils.h"
 #include "lcd_gpio.h"
 
 #define TAG "LCD_GPIO"
 
 gpio_menu_t gpio_menu = {
-    .options = {"How It Works", "Terminal", "I2C Scanner"},
-    .size = 3,
+    .options = {"How It Works", "Accelerometer", "Terminal", "I2C Scanner"},
+    .size = 4,
     .index = 1,
     .cont = NULL,
 };
@@ -227,7 +233,334 @@ void lcd_gpio_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio
         title_lbl = instr_lbl = NULL;
         init = false;
         
-         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
+}
+
+static void prompt_accel_espnow_qr(ui_menu_t *ui_menu, gpio_menu_t *gpio_menu)
+{
+    static lv_obj_t *qr_canvas = NULL;
+    static uint8_t *qr_buf = NULL; // Canvas backing buffer
+    
+    // Hide arrows
+    lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+    
+    // Create and format ins labels
+    lv_obj_t *lbl_ask_enc = lv_label_create(ACTIVE_SCR);
+    lcd_format_label(lbl_ask_enc, "Use wirelessly:", user_secondary_color,
+            &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 11, 6);
+    
+    lv_obj_t *lbl_qr_ok = lv_label_create(ACTIVE_SCR);
+    lcd_format_label(lbl_qr_ok, "OK", user_secondary_color,
+            &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
+
+    lv_obj_t *lbl_qr_back = lv_label_create(ACTIVE_SCR);
+    lcd_format_label(lbl_qr_back, "BACK", user_secondary_color,
+            &lv_font_montserrat_18, LV_ALIGN_LEFT_MID, 16, -1);
+    
+    // Create QR canvas
+    qr_canvas = lv_canvas_create(ACTIVE_SCR);
+    lv_obj_set_size(qr_canvas, 100, 100);
+    lv_obj_align(qr_canvas, LV_ALIGN_CENTER, 11, 12);
+    
+    // Draw the URL as a QR
+    const char *url = "https://polycast5.com/blogs/tutorials/control-custom-builds-with-accelerometer";
+    int n = lcd_draw_qr(qr_canvas, url, 100, &qr_buf);
+    if (n != 0) {
+        ESP_LOGE(TAG, "prompt_accel_espnow_qr lcd_draw_qr failed: %d", n);
+    }
+    
+    while (1) {
+        lv_timer_handler();
+        
+        // OK
+        if (xSemaphoreTake(xRightButtonSemaphore, 0) == pdTRUE) {
+            // Show arrows
+            lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+            
+            // Delete used
+            lv_obj_delete(lbl_ask_enc);
+            lv_obj_delete(lbl_qr_ok);
+            lv_obj_delete(lbl_qr_back);
+            lv_obj_delete(qr_canvas);
+        
+            // Free QR buffer
+            if (qr_buf) {
+                free(qr_buf);
+                qr_buf = NULL;
+            }
+            
+            qr_canvas = NULL;
+            
+            lcd_clear_pending_inputs = true; // Clear any false inputs
+            
+            // Go back
+            return;
+        }
+
+        // BACK
+        if (xSemaphoreTake(xLeftButtonSemaphore, 0) == pdTRUE) {
+            // Show arrows
+            lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+            
+            // Delete used
+            lv_obj_delete(lbl_ask_enc);
+            lv_obj_delete(lbl_qr_ok);
+            lv_obj_delete(lbl_qr_back);
+            lv_obj_delete(qr_canvas);
+        
+            // Free QR buffer
+            if (qr_buf) {
+                free(qr_buf);
+                qr_buf = NULL;
+            }
+            
+            qr_canvas = NULL;
+            
+            lcd_clear_pending_inputs = true; // Clear any false inputs
+            
+            // Go back
+            return;
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+// Ease one axis of the bubble-level ball from its current offset to a target.
+// Re-starting on the same (var, exec_cb) replaces the running anim, so frequent
+// retargeting glides instead of jumping.
+static void accel_ball_ease(lv_obj_t *ball, lv_anim_exec_xcb_t cb, int32_t from, int32_t to)
+{
+    #define ACCEL_EASE_MS 180
+
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, ball);
+    lv_anim_set_exec_cb(&a, cb);
+    lv_anim_set_values(&a, from, to);
+    lv_anim_set_time(&a, ACCEL_EASE_MS);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+    lv_anim_start(&a);
+}
+
+// Display name for each accelerometer orientation mode (index = mode value).
+static const char *accel_mode_name(uint8_t m)
+{
+    static const char *names[] = { "Flat", "Holding", "Remote" };
+    return (m < 3) ? names[m] : "";
+}
+
+void lcd_gpio_accel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu)
+{
+    #define ACCEL_REFRESH_MS 25    // Ask gpio_task for a fresh sample at ~40 Hz
+    #define LEVEL_D          88    // Bubble-level circle diameter (px)
+    #define BALL_D           18    // Moving ball diameter (px)
+    #define MAX_TILT_DEG     45.0f // Tilt that pushes the ball to the circle edge
+
+    #define MODE_FLAT 0
+    #define MODE_HOLDING 1
+    #define MODE_REMOTE 2  // Upright, then rotated 90 deg to the right
+    #define MODE_COUNT 3
+
+    #define DEG2RAD 0.017453292f
+
+    // Statics
+    static bool init = false;
+    static lv_obj_t *cont = NULL;
+    static lv_obj_t *level_bg = NULL;
+    static lv_obj_t *ball = NULL;
+    static lv_obj_t *mode_lbl = NULL;
+    static lv_obj_t *val_lbl = NULL;
+    static TickType_t last_refresh = 0;
+    static uint8_t mode = MODE_FLAT;
+
+    // Max distance (px) the ball centre may travel from the circle centre
+    const float max_travel = (LEVEL_D / 2.0f) - (BALL_D / 2.0f) - 2.0f;
+
+    if (!init) {
+        lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Show right arrow
+
+        // Outer container
+        cont = lv_obj_create(ACTIVE_SCR);
+        lv_obj_set_size(cont, 210, 106);
+        lv_obj_center(cont);
+        lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(cont, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_shadow_width(cont, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_style_pad_all(cont, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+        // Bubble-level circle (left side)
+        level_bg = lv_obj_create(cont);
+        lv_obj_set_size(level_bg, LEVEL_D, LEVEL_D);
+        lv_obj_align(level_bg, LV_ALIGN_LEFT_MID, 0, 0);
+        lv_obj_set_style_radius(level_bg, LV_RADIUS_CIRCLE, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_color(level_bg, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(level_bg, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_color(level_bg, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_clear_flag(level_bg, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_style_pad_all(level_bg, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+        // Faint crosshair through the centre
+        lv_obj_t *h_line = lv_obj_create(level_bg);
+        lv_obj_set_size(h_line, LEVEL_D - 8, 1);
+        lv_obj_align(h_line, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_set_style_bg_color(h_line, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_opa(h_line, LV_OPA_40, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(h_line, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_clear_flag(h_line, LV_OBJ_FLAG_SCROLLABLE);
+
+        lv_obj_t *v_line = lv_obj_create(level_bg);
+        lv_obj_set_size(v_line, 1, LEVEL_D - 8);
+        lv_obj_align(v_line, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_set_style_bg_color(v_line, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_opa(v_line, LV_OPA_40, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(v_line, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_clear_flag(v_line, LV_OBJ_FLAG_SCROLLABLE);
+
+        // Moving ball (created last so it draws on top of the crosshair)
+        ball = lv_obj_create(level_bg);
+        lv_obj_set_size(ball, BALL_D, BALL_D);
+        lv_obj_align(ball, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_set_style_radius(ball, LV_RADIUS_CIRCLE, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_color(ball, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(ball, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_clear_flag(ball, LV_OBJ_FLAG_SCROLLABLE);
+
+        // Right-side panel filling the space beside the circle: mode name on
+        // top, X/Y readout centred below. Transparent so it shows the bg.
+        lv_obj_t *right_panel = lv_obj_create(cont);
+        lv_obj_set_size(right_panel, 110, lv_pct(100));
+        lv_obj_align(right_panel, LV_ALIGN_RIGHT_MID, 0, 0);
+        lv_obj_set_style_bg_opa(right_panel, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(right_panel, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_pad_all(right_panel, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_pad_row(right_panel, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_clear_flag(right_panel, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_flex_flow(right_panel, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_flex_align(right_panel, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+        // Current mode name (above the readout)
+        mode_lbl = lv_label_create(right_panel);
+        lv_obj_set_style_text_font(mode_lbl, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_color(mode_lbl, user_secondary_color, 0);
+        lv_obj_set_style_text_align(mode_lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_text(mode_lbl, accel_mode_name(mode));
+
+        // X / Y degree readout
+        val_lbl = lv_label_create(right_panel);
+        lv_obj_set_style_text_font(val_lbl, &lv_font_montserrat_16, 0);
+        lv_obj_set_style_text_color(val_lbl, user_secondary_color, 0);
+        lv_obj_set_style_text_align(val_lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_text(val_lbl, "X: 0\xC2\xB0\nY: 0\xC2\xB0");
+
+        // Drop any stale reading left in the queue from a previous visit
+        xQueueReset(xAccelReadingsQueue);
+
+        last_refresh = 0; // Force an immediate trigger on the first frame
+        init = true;
+    }
+
+    // Periodically ask gpio_task for a fresh sample
+    if (xTaskGetTickCount() - last_refresh >= pdMS_TO_TICKS(ACCEL_REFRESH_MS)) {
+        last_refresh = xTaskGetTickCount();
+        xSemaphoreGive(xReadAccelSemaphore);
+    }
+
+    // Move the ball + update text whenever gpio_task posts a reading (non-blocking)
+    accel_deg_t accel;
+    if (xQueueReceive(xAccelReadingsQueue, &accel, 0) == pdTRUE) {
+        // Neutral (centred) orientation is roll (X) ~ 90, pitch (Y) ~ 0.
+        // Pitch -> horizontal (sensor left moves ball left);
+        // roll's offset from 90 -> vertical (kept direction).
+
+        float dx, dy;
+
+        if (mode == MODE_FLAT) {
+            dx = (accel.pitch / MAX_TILT_DEG) * max_travel;
+            dy = (accel.roll / MAX_TILT_DEG) * max_travel;
+        } else if (mode == MODE_HOLDING) {
+            dx = (accel.pitch / MAX_TILT_DEG) * max_travel;
+            dy = (accel.roll - 90.0f) / MAX_TILT_DEG * max_travel;
+        } else { // MODE_REMOTE
+            float p = accel.pitch * DEG2RAD;
+            float r = accel.roll  * DEG2RAD;
+            float gy = cosf(p) * sinf(r);
+            float gz = cosf(p) * cosf(r);
+
+            // ~45 deg of tilt reaches the edge. Flip a sign if a direction
+            // feels reversed on the hardware.
+            const float scale = max_travel / sinf(MAX_TILT_DEG * DEG2RAD);
+            // Axes swapped vs the raw components: the 90 deg-right rotation maps
+            // the Z tilt to horizontal and the Y tilt to vertical.
+            dx = -gz * scale;
+            dy =  gy * scale;
+        }
+
+        // Keep the ball inside the circle (clamp the offset vector length)
+        float mag = sqrtf(dx * dx + dy * dy);
+        if (mag > max_travel) {
+            dx *= max_travel / mag;
+            dy *= max_travel / mag;
+        }
+
+        // Smoothly ease the ball from its current offset to the new target.
+        // (Ball is aligned LV_ALIGN_CENTER, so set_x/set_y are offsets from centre.)
+        accel_ball_ease(ball, (lv_anim_exec_xcb_t)lv_obj_set_x,
+                lv_obj_get_style_x(ball, LV_PART_MAIN), (int32_t)dx);
+        accel_ball_ease(ball, (lv_anim_exec_xcb_t)lv_obj_set_y,
+                lv_obj_get_style_y(ball, LV_PART_MAIN), (int32_t)dy);
+
+        char buf[48];
+        snprintf(buf, sizeof(buf), "X: %+.0f\xC2\xB0\n" "Y: %+.0f\xC2\xB0", (double)accel.roll, (double)accel.pitch);
+        lv_label_set_text(val_lbl, buf);
+    }
+
+    /* User input */
+    if (ui_btns->up_btn == 1) { // Next mode (wraps)
+        mode = (mode + 1) % MODE_COUNT;
+        lv_label_set_text(mode_lbl, accel_mode_name(mode));
+    } else if (ui_btns->down_btn == 1) {   // Previous mode (wraps)
+        mode = (mode + MODE_COUNT - 1) % MODE_COUNT;
+        lv_label_set_text(mode_lbl, accel_mode_name(mode));
+    } else if (ui_btns->left_btn) { // Go back
+        lv_anim_delete(ball, NULL); // Stop ball anims before freeing the object
+        lv_obj_delete(cont); // Deletes children
+
+        cont = NULL;
+        level_bg = ball = mode_lbl = val_lbl = NULL;
+        init = false;
+
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Hide right
+
+        // Back to GPIO menu
+        lv_obj_remove_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        ui_menu->page = GPIO_PAGE;
+    } else if (ui_btns->right_btn) { // Use accel with ESP-NOW
+        lv_anim_delete(ball, NULL); // Stop ball anims before freeing the object
+        lv_obj_delete(cont); // Deletes children
+
+        cont = NULL;
+        level_bg = ball = mode_lbl = val_lbl = NULL;
+        init = false;
+
+        // Show tutorial QR to proceed
+        prompt_accel_espnow_qr(ui_menu, gpio_menu);
+    } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
+        lv_anim_delete(ball, NULL); // Stop ball anims before freeing the object
+        lv_obj_delete(cont); // Deletes children
+
+        cont = NULL;
+        level_bg = ball = mode_lbl = val_lbl = NULL;
+        init = false;
+
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 

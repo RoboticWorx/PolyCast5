@@ -10,6 +10,7 @@
 #include "hal/adc_hal.h"
 #include "esp_log.h"
 
+#include "lis2dh12.h"
 #include "gpio_task.h"
 #include "gpio_utils.h"
 
@@ -50,10 +51,12 @@ SemaphoreHandle_t xIsChargingSemaphore;
 SemaphoreHandle_t xNotChargingSemaphore;
 
 SemaphoreHandle_t xLEDCSemaphore;
+SemaphoreHandle_t xReadAccelSemaphore;
 
 QueueHandle_t xAdcBatReadingQueue;
 QueueHandle_t xAdcBatBluetoothQueue;
 QueueHandle_t xLEDQueue;
+QueueHandle_t xAccelReadingsQueue;
 
 typedef struct {
     uint8_t pin; // Expander pin number
@@ -220,6 +223,8 @@ static void gpio_task(void *arg)
 
     xLEDCSemaphore = xSemaphoreCreateBinary();
     configASSERT(xLEDCSemaphore);
+    xReadAccelSemaphore = xSemaphoreCreateBinary();
+    configASSERT(xReadAccelSemaphore);
 
     xGpioLeftBtnMutex = xSemaphoreCreateMutex();
     configASSERT(xGpioLeftBtnMutex);
@@ -230,6 +235,8 @@ static void gpio_task(void *arg)
     configASSERT(xAdcBatBluetoothQueue);
     xLEDQueue = xQueueCreate(1, sizeof(uint8_t));
     configASSERT(xLEDQueue);
+    xAccelReadingsQueue = xQueueCreate(1, sizeof(accel_deg_t));
+    configASSERT(xAccelReadingsQueue);
 
     // Default states set in gpio_utils_init()
     
@@ -318,6 +325,22 @@ static void gpio_task(void *arg)
             
             // Set previous
             b->prev = level;
+        }
+
+        if (xSemaphoreTake(xReadAccelSemaphore, 0) == pdTRUE) {
+            float pitch, roll;
+            if (lis2dh12_read_deg(&pitch, &roll) == ESP_OK) {
+#ifdef POLYCAST5_DEBUG
+                ESP_LOGI(TAG, "Accel deg: pitch=%.3f roll=%.3f", pitch, roll);
+#endif
+                accel_deg_t accel_deg = {
+                    .pitch = pitch,
+                    .roll = roll,
+                };
+
+                // Send to LCD
+                xQueueOverwrite(xAccelReadingsQueue, &accel_deg);
+            }
         }
         
         // Go to sleep requested

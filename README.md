@@ -97,6 +97,18 @@ Build the code:
 idf.py build
 ```
 
+## Recovery
+
+Device uses development mode flash encryption for passive protection.
+
+To recover from `esp_littlefs: mount failed`, flash as encrypted then re-flash the assets partition as plaintext:
+
+```shell
+idf.py -p YOUR_PORT encrypted-flash
+esptool --chip esp32c5 -p YOUR_PORT erase-region 0x850000 0x7B0000
+esptool --chip esp32c5 -p YOUR_PORT write-flash 0x850000 build/assets.bin
+```
+
 # Patches
 
 Changes to the ESP-IDF framework are required to build the correct code for this device.

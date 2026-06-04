@@ -3396,22 +3396,31 @@ void lcd_gpio_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_men
         
         // Switch pages
         ui_menu->page = GPIO_HOW_PAGE;
-    } else if (ui_btns->select_btn == 1 && gpio_menu->index == 1) { // Terminal selected
+    } else if (ui_btns->select_btn == 1 && gpio_menu->index == 1) { // Accelerometer selected
         // Hide GPIO menu
         lv_obj_add_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-        
+
         // Reset static
         do_once = false;
-        
+
+        // Switch pages
+        ui_menu->page = GPIO_ACCEL_PAGE;
+    } else if (ui_btns->select_btn == 1 && gpio_menu->index == 2) { // Terminal selected
+        // Hide GPIO menu
+        lv_obj_add_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Reset static
+        do_once = false;
+
         // Switch pages
         ui_menu->page = GPIO_TERMINAL_PAGE;
-    } else if (ui_btns->select_btn == 1 && gpio_menu->index == 2) { // I2C scanner selected
+    } else if (ui_btns->select_btn == 1 && gpio_menu->index == 3) { // I2C scanner selected
         // Hide GPIO menu
         lv_obj_add_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-        
+
         // Reset static
         do_once = false;
-        
+
         // Switch pages
         ui_menu->page = GPIO_SCANNER_PAGE;
     } else if (ui_btns->left_btn == 1) { // Back selected
