@@ -26,6 +26,10 @@ static const uint8_t UNIVERSAL_MAC[ESP_NOW_ETH_ALEN] = {0xFF,0xFF,0xFF,0xFF,0xFF
 
 static uint8_t received_enc_key[LORA_PCP_ENC_KEY_LEN];
 
+// Accelerometer streaming session state
+static bool accel_streaming = false;
+static uint8_t accel_stream_mac[ESPNOW_MAC_SIZE];
+
 SemaphoreHandle_t xEspCmdRxStatusSemaphore;
 SemaphoreHandle_t xEspCmdTxSuccessSemaphore;
 SemaphoreHandle_t xEspCmdTxFailedSemaphore;
@@ -34,6 +38,8 @@ QueueHandle_t xEspSendEncKeyQueueNVS;
 QueueHandle_t xEspSendEncKeyQueue;
 QueueHandle_t xEspSendCmdQueue;
 QueueHandle_t xEspSendMqttQueue;
+QueueHandle_t xEspAccelStreamCtrlQueue;
+QueueHandle_t xEspAccelStreamQueue;
 
 static void espnow_task(void *param)
 {
@@ -67,7 +73,13 @@ static void espnow_task(void *param)
         ESP_LOGE(TAG, "Failed to create xEspSendMqttQueue");
     }
     configASSERT(xEspSendMqttQueue);
-    
+
+    // Accelerometer streaming: control (start/stop) + latest-sample queues
+    xEspAccelStreamCtrlQueue = xQueueCreate(2, sizeof(espnow_accel_ctrl_t));
+    configASSERT(xEspAccelStreamCtrlQueue);
+    xEspAccelStreamQueue = xQueueCreate(1, sizeof(espnow_accel_t));
+    configASSERT(xEspAccelStreamQueue);
+
     while (1) {
         // Key generated and requesting send for LoRa handshake
         if (xQueueReceive(xEspSendEncKeyQueue, received_enc_key, 0) == pdPASS) {
@@ -202,7 +214,63 @@ static void espnow_task(void *param)
             espnow_utils_espnow_deinit();
             espnow_utils_wifi_radio_stop();
         }
-    
+
+        // Accelerometer streaming: start/stop a long-lived session
+        espnow_accel_ctrl_t accel_ctrl;
+        if (xQueueReceive(xEspAccelStreamCtrlQueue, &accel_ctrl, 0) == pdPASS) {
+            if (accel_ctrl.start && !accel_streaming) {
+                // Make sure the radio is stopped first
+                wifi_utils_radio_stop();
+
+                // Bring the radio + peer up once for the whole session
+                if (espnow_utils_wifi_radio_start(WIFI_CHANNEL) == ESP_OK &&
+                        espnow_utils_espnow_init(accel_ctrl.mac_selected, WIFI_CHANNEL,
+                        accel_ctrl.enc == true, accel_ctrl.enc ? accel_ctrl.lmk : NULL) == ESP_OK) {
+                    memcpy(accel_stream_mac, accel_ctrl.mac_selected, ESPNOW_MAC_SIZE);
+                    accel_streaming = true;
+
+                    // Drop any sample left over from a previous session
+                    xQueueReset(xEspAccelStreamQueue);
+                } else {
+                    ESP_LOGE(TAG, "accel: stream start failed");
+                    espnow_utils_espnow_deinit();
+                    espnow_utils_wifi_radio_stop();
+                }
+            } else if (!accel_ctrl.start && accel_streaming) {
+                // Tear the session down
+                espnow_utils_espnow_deinit();
+                espnow_utils_wifi_radio_stop();
+                accel_streaming = false;
+
+                // Streaming's per-frame send_cb repeatedly gives the delivery semaphore
+                // Drain it so the command page doesn't later see a stale received without a command being sent
+                xSemaphoreTake(xEspCmdRxStatusSemaphore, 0);
+            }
+        }
+
+        // While streaming, transmit each fresh accel sample as it arrives
+        if (accel_streaming) {
+            espnow_accel_t accel_sample;
+            if (xQueueReceive(xEspAccelStreamQueue, &accel_sample, 0) == pdPASS) {
+                char tx_payload[ESP_NOW_MAX_DATA_LEN];
+
+                // Format payload to send: ESPNOW_MAGICx,y -> "PC5: x,y"
+                int tx_len = snprintf(tx_payload, sizeof(tx_payload), ESPNOW_MAGIC "%.1f,%.1f",
+                        (double)accel_sample.x, (double)accel_sample.y);
+                
+                // Send it if formatting succeeded
+                if (tx_len > 0 && tx_len < (int)sizeof(tx_payload)) {
+                    if (espnow_utils_send_data(accel_stream_mac, (uint8_t *)tx_payload, tx_len) != ESP_OK) {
+#ifdef POLYCAST5_DEBUG
+                        ESP_LOGW(TAG, "xEspAccelStreamQueue: Accel payload send failed.");
+#endif
+                    }
+                } else {
+                    ESP_LOGE(TAG, "xEspAccelStreamQueue: Accel payload snprintf failed or too long.");
+                }
+            }
+        }
+
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }

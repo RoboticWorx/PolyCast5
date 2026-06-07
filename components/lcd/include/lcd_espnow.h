@@ -41,7 +41,15 @@ typedef struct {
     espnow_submenu_t espnow_submenu;
 } espnow_menu_t;
 
-extern espnow_menu_t espnow_menu; 
+extern espnow_menu_t espnow_menu;
+
+// Where the ESP-NOW device picker was entered from
+typedef enum {
+    ESPNOW_ENTRY_NORMAL = 0, // Normal ESP-NOW menu (one-shot command sender)
+    ESPNOW_ENTRY_ACCEL,      // Picking a peer to stream accelerometer data to
+} espnow_entry_t;
+
+extern espnow_entry_t espnow_entry_mode;
 
 /**
  * @brief Pre-load ESP-NOW send page labels and data

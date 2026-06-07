@@ -2334,7 +2334,13 @@ void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espn
     if (!do_once) {
         // Show ESP-NOW list
         lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-        
+
+        // Top entry is "Add ESP32" normally, but "Select a device:" when streaming
+        lv_label_set_text(lv_obj_get_child(espnow_menu->btns[0], 0),
+                espnow_entry_mode == ESPNOW_ENTRY_ACCEL ? "Select a device:" : espnow_menu->options[0]);
+
+        lv_timer_handler(); // Update lbl
+
         do_once = true;
     }
     
@@ -2348,6 +2354,11 @@ void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espn
         espnow_menu->index++;
         lcd_espnow_update_menu(espnow_menu);
     } else if (ui_btns->select_btn == 1 && espnow_menu->index == 0) { // Add ESP32 selected
+        // Not clickable in accel mode
+        if (espnow_entry_mode == ESPNOW_ENTRY_ACCEL) {
+            return;
+        }
+
         // Abort if we've reached the maximum number of peers
         if (espnow_menu->size >= MAX_ESPNOW_OPTIONS) {
 #ifdef POLYCAST5_DEBUG
@@ -2383,12 +2394,21 @@ void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espn
             ui_menu->page = ESPNOW_RX_MAC_PAGE;
         }
     } else if (ui_btns->select_btn == 1) { // Specific selected
-        // Disconnect from Wi-Fi if connected
-        xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
-        
         // Hide ESP-NOW menu
         lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-        
+
+        // Accel mode: stream live readings to this peer instead of the one-shot command sender
+        if (espnow_entry_mode == ESPNOW_ENTRY_ACCEL) {
+            do_once = false;
+
+            // Go to stream page
+            ui_menu->page = GPIO_ACCEL_STREAM_PAGE;
+            return;
+        }
+
+        // Normal one-shot path: drop Wi-Fi before bringing the ESP-NOW radio up
+        xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+
         // Show ESP-NOW submenu
         lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send_tx, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(espnow_menu->espnow_submenu.lbl_send_rx, LV_OBJ_FLAG_HIDDEN);
@@ -2413,30 +2433,39 @@ void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espn
     } else if (ui_btns->left_btn == 1) { // Back selected
         // Hide ESP-NOW menu
         lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-        
-        // Show selection labels
-        lcd_unhide_selection_widgets(ui_menu);
-        
+
         // Reset static
         do_once = false;
-        
+
+        // Accel mode: go back to the GPIO menu
+        if (espnow_entry_mode == ESPNOW_ENTRY_ACCEL) {
+            espnow_entry_mode = ESPNOW_ENTRY_NORMAL;
+            ui_menu->page = GPIO_PAGE;
+            return;
+        }
+
+        // Show selection labels
+        lcd_unhide_selection_widgets(ui_menu);
+
         // Switch pages
         ui_menu->page = SELECTION_PAGE;
     } else if (ui_btns->home_btn == 1) { // Home selected
         // Hide ESP-NOW menu
         lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-        
+
         // Reset static
         do_once = false;
-        
+        espnow_entry_mode = ESPNOW_ENTRY_NORMAL; // Clear accel flow if active
+
         lcd_transition_back(true, ui_menu); // True = home, false = sleep
     } else if (ui_btns->pwr_btn == 1) { // Power off selected
         // Hide ESP-NOW menu
         lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-        
+
         // Reset static
         do_once = false;
-        
+        espnow_entry_mode = ESPNOW_ENTRY_NORMAL; // Clear accel flow if active
+
         lcd_transition_back(false, ui_menu); // True = home, false = sleep
     }
 }

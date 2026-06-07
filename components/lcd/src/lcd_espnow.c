@@ -61,6 +61,9 @@ espnow_menu_t espnow_menu = {
     .cont = NULL,
 };
 
+// Default: normal command-sender entry (see espnow_entry_t in lcd_espnow.h)
+espnow_entry_t espnow_entry_mode = ESPNOW_ENTRY_NORMAL;
+
 void lcd_espnow_setup_page(espnow_menu_t *menu)
 {
     // Create list
@@ -982,24 +985,24 @@ void lcd_espnow_setup_send_page(espnow_menu_t *espnow_menu)
 static void prompt_name_or_del(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 {
     lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-    
+
     // Create and format ins labels
     lv_obj_t *lbl_ins = lv_label_create(ACTIVE_SCR);
     lcd_format_label(lbl_ins, LV_SYMBOL_SETTINGS, user_secondary_color,
-                 &lv_font_montserrat_30, LV_ALIGN_CENTER, 0, 0);
+            &lv_font_montserrat_30, LV_ALIGN_CENTER, 0, 0);
                  
     lv_obj_t *lbl_exit = lv_label_create(ACTIVE_SCR);
     lcd_format_label(lbl_exit, "BACK", user_secondary_color,
-                 &lv_font_montserrat_18, LV_ALIGN_LEFT_MID, 16, -1);
+            &lv_font_montserrat_18, LV_ALIGN_LEFT_MID, 16, -1);
                  
     lv_obj_t *lbl_name = lv_label_create(ACTIVE_SCR);
     lcd_format_label(lbl_name, "RENAME", user_secondary_color,
-                 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 13);
+            &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 13);
                  
     lv_obj_t *lbl_del = lv_label_create(ACTIVE_SCR);
     lcd_format_label(lbl_del, "DELETE", user_secondary_color,
-                 &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
-                    
+            &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
+
     while (1) {
         lv_timer_handler();
         

@@ -41,21 +41,33 @@ esp_err_t espnow_utils_wifi_driver_init(void)
 
 esp_err_t espnow_utils_wifi_radio_start(uint8_t channel)
 {
-    // Start Wi-Fi
-    ESP_ERROR_CHECK(esp_wifi_start());
-    
+    // Start Wi-Fi - don't abort on error
+    esp_err_t err = esp_wifi_start();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "esp_wifi_start failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
     // Set the channel
-    ESP_ERROR_CHECK(esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE));
-    
+    err = esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "esp_wifi_set_channel failed: %s", esp_err_to_name(err));
+        espnow_utils_wifi_radio_stop();
+        return err;
+    }
+
     return ESP_OK;
 }
 
 esp_err_t espnow_utils_wifi_radio_stop(void)
 {
-    // Stop Wi-Fi
-    ESP_ERROR_CHECK(esp_wifi_stop());
-    
-    return ESP_OK;
+    // Stop Wi-Fi - don't abort on error
+    esp_err_t err = esp_wifi_stop();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "esp_wifi_stop failed: %s", esp_err_to_name(err));
+    }
+
+    return err;
 }
 
 static void send_cb(const wifi_tx_info_t *info, esp_now_send_status_t status)

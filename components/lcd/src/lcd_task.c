@@ -550,6 +550,10 @@ static void lcd_task(void *pvParameters)
                     lcd_gpio_accel_page(&ui_btns, &ui_menu, &gpio_menu);
                     dont_sleep_on_this_page = true;
                     break;
+                case GPIO_ACCEL_STREAM_PAGE:
+                    lcd_gpio_accel_stream_page(&ui_btns, &ui_menu, &gpio_menu);
+                    dont_sleep_on_this_page = true;
+                    break;
                 case GPIO_TERMINAL_PAGE:
                     lcd_gpio_terminal_page(&ui_btns, &ui_menu, &gpio_menu);
                     dont_sleep_on_this_page = true;

@@ -115,6 +115,20 @@ out:
     return ret;
 }
 
+// The sensor is mounted rotated 180 deg on the PCB:
+static inline void remap_axes_i16(int16_t *x, int16_t *y, int16_t *z)
+{
+    if (x) *x = -*x; // X => -X
+    if (y) *y = -*y; // Y => -Y
+    (void)z; // Z unchanged
+}
+static inline void remap_axes_f(float *x, float *y, float *z)
+{
+    if (x) *x = -*x; // X => -X
+    if (y) *y = -*y; // Y => -Y
+    (void)z; // Z unchanged
+}
+
 esp_err_t lis2dh12_read_raw(int16_t *x, int16_t *y, int16_t *z)
 {
     if (s_dev == NULL) { // Not initialized (or init failed)
@@ -129,11 +143,13 @@ esp_err_t lis2dh12_read_raw(int16_t *x, int16_t *y, int16_t *z)
     if (r != 0) { // I2C read failed
         return ESP_FAIL;
     }
-
+    
     // ST driver returns left-justified 16-bit; >>6 yields signed 10-bit normal-mode counts
     if (x) *x = raw[0] >> 6;
     if (y) *y = raw[1] >> 6;
     if (z) *z = raw[2] >> 6;
+
+    remap_axes_i16(x, y, z);
 
     return ESP_OK;
 }
@@ -157,6 +173,8 @@ esp_err_t lis2dh12_read_g(float *x, float *y, float *z)
     if (x) *x = lis2dh12_from_fs2_nm_to_mg(raw[0]) / 1000.0f; // mg -> g
     if (y) *y = lis2dh12_from_fs2_nm_to_mg(raw[1]) / 1000.0f;
     if (z) *z = lis2dh12_from_fs2_nm_to_mg(raw[2]) / 1000.0f;
+
+    remap_axes_f(x, y, z);
 
     return ESP_OK;
 }
@@ -187,6 +205,8 @@ esp_err_t lis2dh12_read_deg(float *pitch, float *roll)
     if (roll) {
         *roll = atan2f(ay, az) * RAD_TO_DEG;
     }
+
+    remap_axes_f(pitch, roll, NULL);
 
     return ESP_OK;
 }

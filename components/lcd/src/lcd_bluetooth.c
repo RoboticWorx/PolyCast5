@@ -2814,7 +2814,7 @@ void lcd_bluetooth_forget_all_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
                 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 10);
                      
         lbl_note = lv_label_create(ACTIVE_SCR);
-        lcd_format_label(lbl_note, "Note: You will need\nto do this on your\nhost device as well.", user_secondary_color,
+        lcd_format_label(lbl_note, "Note: You will need\nto do this on your\nhost devices as well.", user_secondary_color,
                 &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -10);
         do_once = true;
     }

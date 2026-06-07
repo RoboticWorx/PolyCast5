@@ -17,6 +17,20 @@ typedef struct {
     uint8_t lmk[LMK_LEN]; // Local master key (if enc)
 } espnow_cmd_t;
 
+// Live accelerometer sample streamed to a peer (the mode-aware X/Y shown on the LCD)
+typedef struct {
+    float x;
+    float y;
+} espnow_accel_t;
+
+// Start/stop control for an accelerometer streaming session
+typedef struct {
+    bool start; // true = begin streaming to mac_selected, false = stop
+    uint8_t mac_selected[ESPNOW_MAC_SIZE];
+    bool enc; // If encryption is enabled for this peer
+    uint8_t lmk[LMK_LEN]; // Local master key (if enc)
+} espnow_accel_ctrl_t;
+
 typedef struct {
     uint8_t key[16];
     char ssid[33];
