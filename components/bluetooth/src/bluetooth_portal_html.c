@@ -380,6 +380,7 @@ const char *BLUETOOTH_WEB_PORTAL_HTML =
 "      &lt;pgup&gt; - Page up<br />\n"
 "      &lt;pgdn&gt; - Page down<br />\n"
 "      &lt;fx&gt; - Function x (e.g. f1, f2, etc.)<br />\n"
+"      &lt;select_prior&gt; - Selects all text typed before it<br />\n"
 "      &lt;down:c&gt; - Hold c down until &lt;up:c&gt; is called<br />\n"
 "      &lt;up:c&gt; - Release c if &lt;down:c&gt; was called<br />\n"
 "      <br />\n"

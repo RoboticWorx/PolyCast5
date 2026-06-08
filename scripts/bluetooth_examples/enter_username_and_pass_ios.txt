@@ -1,24 +1,23 @@
 Script:
 
-your@email.comPASSWORD<shift+left><shift+left><shift+left><shift+left><shift+left><shift+left><shift+left><shift+left><cmd+x>
+your@email.com<select_prior><cmd+x>PASSWORD
 
 Explanation:
 
-This script will type your username 'your@email.com' into the username section and then write and cut your
-password 'PASSWORD' for you to paste (ctrl+v) manually after into the password section.
+This script types your username 'your@email.com', then the <select_prior> command back-selects it. The
+<cmd+x> then cuts the selected username to the clipboard. Finally it types your password 'PASSWORD'.
 
-It is important that you <shift+left> the same number of times as characters in your password. For example,
-'PASSWORD' is eight characters long so I write <shift+left> eight times.
+Run this with the password field selected so others cannot see it. The username is typed, selected and cut to the clipboard,
+and then the password is typed directly into the focused field. You then paste (Cmd+V) your username into the username
+field manually.
 
-Also to note is that people can see you password when running this as it is typed on your screen before the
-script cuts it with ctrl+x. This said, I would only use this when you're in a private location.
-
-To reiterate, this script writes out your username and password, then copies and deletes (cuts) the
-password part for you to then paste into the password section of the login. The end result is
-your username typed out and your password ready to be pasted for fast login.
+The <select_prior> command saves you from manually counting characters and writing out a <shift+left> for
+every character. It selects everything typed before it automatically; you then choose what to do with the
+selection, such as cutting it with <cmd+x>, copying it with <cmd+c>, etc.
 
 Steps:
-- Types username and password text
-- Back-selects the password part
-- Cuts out the password (copy + delete)
-- Password is now ready to paste
+- Types your username
+- Back-selects the username with <select_prior>
+- Cuts the selected username (copy + delete) to the clipboard with <cmd+x>
+- Types your password into the focused field
+- Username is now ready to paste into the username field

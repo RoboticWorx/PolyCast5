@@ -713,10 +713,31 @@ static void send_chord(uint8_t modifiers, const uint8_t *keycodes, size_t nkeys,
     vTaskDelay(pdMS_TO_TICKS(tap_ms));
 }
 
+// Used to break out of long send loops so they stay responsive to cancel
+static bool bt_typing_should_abort(void)
+{
+    uint16_t cmd_buf; // Dummy value
+    return (xQueuePeek(xBluetoothMediaCmdQueue, &cmd_buf, 0) == pdTRUE)
+            || (xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_CANCEL_TYPING_BIT);
+}
+
+// True if a keycode types one printable character that advances the cursor by one
+// Used by <select_prior> to count single-character tokens
+static bool kc_is_text_key(uint8_t kc)
+{
+    if (kc >= HID_KC_A && kc <= HID_KC_0) { // 0x04..0x27 letters and digits
+        return true;
+    }
+    if (kc >= HID_KC_SPACE && kc <= HID_KC_SLASH) { // 0x2C..0x38 space + punctuation
+        return true;
+    }
+    return false;
+}
+
 // Parse a <...+...> or <...> style token
 // Returns true if it consumed a token and sent it
 // *consumed_end points to the closing '>' or NULL if none
-static bool parse_and_send_tag(const char *start, const char **consumed_end, uint32_t tap_ms) {
+static bool parse_and_send_tag(const char *start, const char **consumed_end, uint32_t tap_ms, size_t *typed_count) {
     // Start points at the '<'
     const char *gt = strchr(start, '>'); // Points to first occurrence of '>'
     if (!gt) {
@@ -752,6 +773,30 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
 
         // Delay that amount (blocks bluetooth_task)
         vTaskDelay(pdMS_TO_TICKS((uint32_t)ms));
+
+        *consumed_end = gt;
+        return true;
+    }
+
+    // If is <select_prior>: back-select every character typed before this token
+    if (!icmp(tmp, "select_prior")) {
+        size_t count = typed_count ? *typed_count : 0;
+
+        // Select each preceding character with shift+left
+        // Check for cancel each iteration so a very long selection stays interruptible
+        uint8_t left_kc = HID_KC_LEFT;
+        for (size_t i = 0; i < count; ++i) {
+            if (bt_typing_should_abort()) {
+                *consumed_end = gt;
+                return true;
+            }
+            send_chord(MOD_LSHIFT, &left_kc, 1, tap_ms, tap_ms);
+        }
+
+        // Reset so a following <select_prior> only counts newly typed text
+        if (typed_count) {
+            *typed_count = 0;
+        }
 
         *consumed_end = gt;
         return true;
@@ -883,12 +928,23 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
         // If permanent down/up events
         if (is_down) {
             kbd_state_add(mods, keys, nkeys);
+
+            // A held key (e.g. an arrow) may move the cursor, so invalidate <select_prior> count to stay safe
+            if (typed_count) {
+                *typed_count = 0;
+            }
+
             *consumed_end = gt;
             return true;
         }
 
         if (is_up) {
             kbd_state_remove(mods, keys, nkeys);
+
+            if (typed_count) {
+                *typed_count = 0; // Same: a held key may have moved the cursor
+            }
+            
             *consumed_end = gt;
             return true;
         }
@@ -898,6 +954,18 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
         uint32_t use_hold = is_hold ? hold_ms : tap_ms;
 
         send_chord(mods, keys, nkeys, use_hold, tap_ms);
+
+        // Keep <select_prior>'s count in sync with the cursor: a plain single-char insert advances it by one
+        if (typed_count) {
+            if (!is_hold && nkeys == 1
+                    && !(mods & (MOD_LCTRL | MOD_RCTRL | MOD_LALT | MOD_RALT | MOD_LGUI | MOD_RGUI))
+                    && kc_is_text_key(keys[0])) {
+                (*typed_count)++;
+            } else {
+                // Any other chord (shortcuts, navigation, enter/tab/backspace, multi-key, holds) resets
+                *typed_count = 0;
+            }
+        }
 
         *consumed_end = gt;
         return true;
@@ -921,26 +989,43 @@ void bluetooth_utils_send_script(const char *script, uint32_t tap_ms)
 
     const char *s = script;
 
-    uint16_t cmd_buf; // Does nothing, just for xQueuePeek
+    // How many characters have been typed; consumed by <select_prior> to know how many <shift+left> presses to back-select
+    size_t typed_count = 0;
 
     // Check the script for tokens
     while (*s) {
         // If found command start
         if (*s == '<') {
             const char *gt = NULL;
-            
-            if (parse_and_send_tag(s, &gt, tap_ms) && gt) {
+
+            if (parse_and_send_tag(s, &gt, tap_ms, &typed_count) && gt) {
                 s = gt + 1; // Consumed a tag
+
+                // Honor cancel / pending media cmd between tags too
+                if (bt_typing_should_abort()) {
+                    break;
+                }
+
                 continue;
             }
             // Malformed tag: no '>' -> type the '<' literally
         }
 
         // Ordinary text path, keep typing
-        kbd_type_char(*s++, tap_ms);
+        char c = *s;
+        if (kbd_type_char(c, tap_ms)) {
+            // Keep <select_prior>'s count in sync: plain printable inserts advance the cursor by one
+            // Newline/tab/backspace break the linear-insert assumption, so reset to 0 to avoid ever over-selecting
+            if (c == '\n' || c == '\r' || c == '\t' || c == '\b') {
+                typed_count = 0;
+            } else {
+                typed_count++;
+            }
+        }
+        s++;
 
         // Media command pending (init/deinit) or cancel cmd: abort typing
-        if ((xQueuePeek(xBluetoothMediaCmdQueue, &cmd_buf, 0) == pdTRUE) || (xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_CANCEL_TYPING_BIT)) {
+        if (bt_typing_should_abort()) {
             break;
         }
     }
@@ -959,14 +1044,12 @@ void bluetooth_utils_send_literal(const char *text, uint32_t tap_ms)
         return;
     }
 
-    uint16_t cmd_buf; // Does nothing, just for xQueuePeek
-
     // Type each character literally, no tag parsing
     while (*text) {
         kbd_type_char(*text++, tap_ms);
 
         // Media command pending (init/deinit) or cancel cmd: abort typing
-        if ((xQueuePeek(xBluetoothMediaCmdQueue, &cmd_buf, 0) == pdTRUE) || (xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_CANCEL_TYPING_BIT)) {
+        if (bt_typing_should_abort()) {
             break;
         }
     }
