@@ -10,8 +10,8 @@ idf_component_register(
         "include"
     
     REQUIRES
-        common esp_wifi
-    
+        common esp_wifi lora
+
     PRIV_REQUIRES
-        esp_netif lora wifi gpio
+        esp_netif wifi gpio
 )

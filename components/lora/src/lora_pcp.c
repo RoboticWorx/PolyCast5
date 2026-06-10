@@ -126,6 +126,10 @@ void lora_pcp_generate_random_key(void)
 
     if (xQueueSend(xEspSendEncKeyQueue, encryption_key, pdMS_TO_TICKS(100)) != pdPASS) {
         ESP_LOGE("LORA", "Failed to queue encryption key");
+
+        // Post a failure result so the LCD task waiting on the pairing outcome is released right away
+        espnow_enc_key_result_t key_result = { .success = false };
+        xQueueOverwrite(xEspSendEncKeyQueueNVS, &key_result);
     }
 }
 

@@ -468,7 +468,7 @@ void infrared_utils_save_all_remotes_nvs(void)
     for (size_t r = 0; r < num_remotes; r++) {
         // Format remote name key
         snprintf(key, sizeof(key), IR_REMOTE_NAME_FMT, (int)r);
-        nvs_set_str(h, key, remotes[r].name); // Save
+        nvs_set_str(h, key, remotes[r].name ? remotes[r].name : "REMOTE"); // Save (guard OOM NULL name)
 
         // Format num_signals key
         snprintf(key, sizeof(key), IR_REMOTE_NSIG_FMT, (int)r);
@@ -603,11 +603,20 @@ void infrared_utils_delete_remote_nvs(size_t remote_idx)
     free(remotes[remote_idx].signal_names);
     free(remotes[remote_idx].name);
 
-    // Shift remotes over one
-    for (size_t k = remote_idx; k < num_remotes - 1; k++) {
-        remotes[k] = remotes[k + 1];
+    // Never drop below one remote (num_remotes >= 1 is assumed everywhere):
+    // deleting the only remote resets it to a default empty one instead
+    if (num_remotes == 1) {
+        remotes[0].name = strdup("REMOTE");
+        remotes[0].num_signals = 0;
+        remotes[0].signals = NULL;
+        remotes[0].signal_names = NULL;
+    } else {
+        // Shift remotes over one
+        for (size_t k = remote_idx; k < num_remotes - 1; k++) {
+            remotes[k] = remotes[k + 1];
+        }
+        num_remotes--;
     }
-    num_remotes--;
 
     // Resave to NVS
     infrared_utils_save_all_remotes_nvs();

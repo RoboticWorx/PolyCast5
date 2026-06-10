@@ -50,7 +50,7 @@ static void espnow_task(void *param)
     xEspCmdTxFailedSemaphore = xSemaphoreCreateBinary();
     configASSERT(xEspCmdTxFailedSemaphore);
     
-    xEspSendEncKeyQueueNVS = xQueueCreate(1, LORA_PCP_ENC_KEY_LEN);
+    xEspSendEncKeyQueueNVS = xQueueCreate(1, sizeof(espnow_enc_key_result_t));
     if (xEspSendEncKeyQueueNVS == NULL) {
         ESP_LOGE(TAG, "Failed to create xEspSendEncKeyQueueNVS");
     }
@@ -85,21 +85,33 @@ static void espnow_task(void *param)
         if (xQueueReceive(xEspSendEncKeyQueue, received_enc_key, 0) == pdPASS) {
             esp_err_t err;
 
+            // Always post a result so the LCD task is never left waiting
+            espnow_enc_key_result_t key_result = { .success = false };
+            memcpy(key_result.key, received_enc_key, LORA_PCP_ENC_KEY_LEN);
+
             // Start radio and initialize ESP-NOW
             err = espnow_utils_wifi_radio_start(WIFI_CHANNEL);
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "enc_key: radio_start failed: %s", esp_err_to_name(err));
+                xQueueOverwrite(xEspSendEncKeyQueueNVS, &key_result); // Send failure
                 continue;
             }
             err = espnow_utils_espnow_init(UNIVERSAL_MAC, WIFI_CHANNEL, false, NULL);
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "enc_key: espnow_init failed: %s", esp_err_to_name(err));
                 espnow_utils_wifi_radio_stop();
+                xQueueOverwrite(xEspSendEncKeyQueueNVS, &key_result); // Send failure
                 continue;
             }
 
             // Send the data
-            espnow_utils_send_data(UNIVERSAL_MAC, received_enc_key, LORA_PCP_ENC_KEY_LEN);
+            err = espnow_utils_send_data(UNIVERSAL_MAC, received_enc_key, LORA_PCP_ENC_KEY_LEN);
+            if (err != ESP_OK) {
+                key_result.success = false;
+                ESP_LOGE(TAG, "espnow_utils_send_data: Failed to send encryption key: %s", esp_err_to_name(err));
+            } else {
+                key_result.success = true;
+            }
 
             vTaskDelay(pdMS_TO_TICKS(100));
 
@@ -107,8 +119,9 @@ static void espnow_task(void *param)
             espnow_utils_espnow_deinit();
             espnow_utils_wifi_radio_stop();
 
-            // Send the data to LCD task to save to NVS under given option
-            xQueueSend(xEspSendEncKeyQueueNVS, received_enc_key, portMAX_DELAY);
+            // Send the result to LCD task to save to NVS under given option
+            // (overwrite: depth-1 queue, latest result wins, never blocks)
+            xQueueOverwrite(xEspSendEncKeyQueueNVS, &key_result);
         }
 
         // Sharing MAC address as unique token for MQTT commands

@@ -4,6 +4,7 @@ dependencies.lock
 sdkconfig
 
 BUGS.md
+BUGS-fable.md
 .claude/ralph-loop.local.md
 
 *_signing_key*

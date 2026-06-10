@@ -43,6 +43,9 @@
 
 #define LORA_NUM_CHAR_ROWS 4
 
+#define LORA_PAIR_KEY_TIMEOUT_MS 10000 // Max wait for the pairing key result
+#define LORA_PAIR_FAIL_SHOW_MS 2500 // How long the 'Pairing failed' notice shows
+
 lora_menu_t lora_menu = {
     .options = {"Add PolyPlug"},
     .keys = {},
@@ -386,9 +389,11 @@ void lcd_lora_add_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora
         title_lbl = instr_lbl = NULL;
         init = false;
         
-        // Generate encryption key
-        xSemaphoreGive(xLoraGenerateEncKeySemaphore);
-                    
+        // Drop any stale request/result from a previous pairing attempt
+        xQueueReset(xEspSendEncKeyQueue);
+        xQueueReset(xEspSendEncKeyQueueNVS);
+        xSemaphoreGive(xLoraGenerateEncKeySemaphore); // Request a fresh encryption key
+
         // Prompt to enter name
         ui_menu->page = LORA_NAME_PAGE;
     } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
@@ -431,8 +436,8 @@ static void update_name_label_lcd(lv_obj_t *lbl_display, char cur_char, int cur_
 
 void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu)
 {
-    static uint8_t received_enc_key_nvs[LORA_PCP_ENC_KEY_LEN];
-    
+    static espnow_enc_key_result_t enc_key_result;
+
     // Declare statics
     static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
     static int cur_pos = 0; // User position
@@ -648,48 +653,98 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
             lcd_lora_update_submenu(lora_menu);
             lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN); // Hide
         } else { // Else adding a whole new remote
-            lora_menu->size++;
+            // Show status while waiting on key distribution
+            lv_obj_t *lbl_pairing = lv_label_create(ACTIVE_SCR);
+            lcd_format_label(lbl_pairing, "Pairing...", user_secondary_color,
+                    &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 0);
 
-            // Save to options, then to NVS
-            char *name_copy = strdup(saved_name);
-            if (!name_copy) {
-                ESP_LOGE(TAG, "strdup failed for new remote");
-                name_copy = strdup("???");
-            }
-            lora_menu->options[lora_menu->size - 1] = name_copy;
-            lcd_lora_menu_nvs_save(lora_menu);
-            
-            // Get shared encryption key and do the same under the same index
-            if (xQueueReceive(xEspSendEncKeyQueueNVS, received_enc_key_nvs, portMAX_DELAY) == pdPASS) {
-                // Allocate a fresh buffer for this entry
-                uint8_t *slot = malloc(LORA_PCP_ENC_KEY_LEN);
-                if (!slot) {
-                    ESP_LOGE(TAG, "Out of memory allocating LORA_PCP_ENC_KEY_LEN key");
-                    return;
+            // Wait (bounded) for the shared encryption key from espnow_task
+            // espnow_task always posts a result; UI can never deadlock here
+            bool got_result = false;
+            for (int elapsed = 0; elapsed < LORA_PAIR_KEY_TIMEOUT_MS; elapsed += 10) {
+                if (xQueueReceive(xEspSendEncKeyQueueNVS, &enc_key_result, 0) == pdPASS) {
+                    got_result = true;
+                    break;
                 }
-                memcpy(slot, received_enc_key_nvs, LORA_PCP_ENC_KEY_LEN);
-                
-                // Save to keys at next available position
-                lora_menu->keys[lora_menu->size - 1] = slot;
-                
-#ifdef POLYCAST5_DEBUG
-                ESP_LOGI(TAG, "Key saved at slot %d:", lora_menu->size - 1);
-                ESP_LOG_BUFFER_HEX("SAVED IN QUEUE", lora_menu->keys[lora_menu->size - 1], LORA_PCP_ENC_KEY_LEN);
-#endif
-                
-                lcd_lora_key_nvs_save(lora_menu);
+                lv_timer_handler();
+                vTaskDelay(pdMS_TO_TICKS(10));
             }
 
-            // Create new button for new option
-            lora_menu->btns[lora_menu->size - 1] = lv_list_add_btn(lora_menu->main_list, NULL, lora_menu->options[lora_menu->size - 1]);
-            lv_obj_set_size(lora_menu->btns[lora_menu->size - 1], 200, 30);
-            lv_obj_add_style(lora_menu->btns[lora_menu->size - 1], &lora_menu->btn_style, 0);
+            // Only commit the new entry once the key actually arrived,
+            // so NVS can never hold a plug name without its key
+            bool paired = false;
+            if (got_result && enc_key_result.success) {
+                // Allocate fresh buffers for this entry
+                uint8_t *slot = malloc(LORA_PCP_ENC_KEY_LEN);
+                char *name_copy = strdup(saved_name);
+                if (!name_copy) {
+                    name_copy = strdup("Unknown"); // Fallback name
+                    ESP_LOGW(TAG, "Out of memory saving new PolyPlug name, using fallback");
+                }
 
-            // Create and format text label
-            lv_obj_t *lbl = lv_obj_get_child(lora_menu->btns[lora_menu->size - 1], 0);
-            lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
-            lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-            lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
+                if (!slot || !name_copy) {
+                    ESP_LOGE(TAG, "Out of memory saving new PolyPlug");
+                    free(slot);
+                    free(name_copy);
+                } else {
+                    memcpy(slot, enc_key_result.key, LORA_PCP_ENC_KEY_LEN);
+
+                    // Save name and key under the same new index, then to NVS
+                    lora_menu->size++;
+                    lora_menu->options[lora_menu->size - 1] = name_copy;
+                    lora_menu->keys[lora_menu->size - 1] = slot;
+
+                    // Both saves must land or the entry won't survive a reboot;
+                    // roll back on failure so memory and NVS stay consistent
+                    if (lcd_lora_menu_nvs_save(lora_menu) == ESP_OK &&
+                            lcd_lora_key_nvs_save(lora_menu) == ESP_OK) {
+                        paired = true;
+
+#ifdef POLYCAST5_DEBUG
+                        ESP_LOGI(TAG, "Key saved at slot %d:", lora_menu->size - 1);
+                        ESP_LOG_BUFFER_HEX("SAVED IN QUEUE", lora_menu->keys[lora_menu->size - 1], LORA_PCP_ENC_KEY_LEN);
+#endif
+                    } else {
+                        ESP_LOGE(TAG, "Failed to save new PolyPlug to NVS");
+                        lora_menu->options[lora_menu->size - 1] = NULL;
+                        lora_menu->keys[lora_menu->size - 1] = NULL;
+                        lora_menu->size--;
+                        lcd_lora_menu_nvs_save(lora_menu); // Best-effort count restore
+                        free(name_copy);
+                        free(slot);
+                    }
+                }
+            }
+
+            lv_obj_delete(lbl_pairing);
+
+            if (paired) {
+                // Create new button for new option
+                lora_menu->btns[lora_menu->size - 1] = lv_list_add_btn(lora_menu->main_list, NULL, lora_menu->options[lora_menu->size - 1]);
+                lv_obj_set_size(lora_menu->btns[lora_menu->size - 1], 200, 30);
+                lv_obj_add_style(lora_menu->btns[lora_menu->size - 1], &lora_menu->btn_style, 0);
+
+                // Create and format text label
+                lv_obj_t *lbl = lv_obj_get_child(lora_menu->btns[lora_menu->size - 1], 0);
+                lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+                lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+                lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
+            } else { // Nothing was saved; tell the user and fall back to the LoRa menu
+                ESP_LOGE(TAG, "PolyPlug pairing failed: no encryption key distributed");
+
+                lv_obj_t *lbl_fail = lv_label_create(ACTIVE_SCR);
+                lcd_format_label(lbl_fail, "Pairing failed!\nPlease try again.", user_secondary_color,
+                        &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+
+                // Show the notice, then clean it up
+                for (int shown = 0; shown < LORA_PAIR_FAIL_SHOW_MS; shown += 10) {
+                    lv_timer_handler();
+                    vTaskDelay(pdMS_TO_TICKS(10));
+                }
+                lv_obj_delete(lbl_fail);
+            }
+
+            lcd_clear_pending_inputs = true; // Clear user inputs from wait
         }
         
         // Hide right arrow

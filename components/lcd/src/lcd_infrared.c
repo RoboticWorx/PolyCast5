@@ -137,10 +137,17 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
             lv_obj_delete(lbl_select);
             lbl_title = lbl_name = lbl_back = lbl_edit = lbl_select = NULL;
             
-            // Go to previous remote
+            // Go to previous remote, clamped so index 0 can't underflow and the index stays valid after the delete
             xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
-            ir_current_remote--;
-            
+            if (ir_current_remote > 0) {
+                ir_current_remote--;
+            } else {
+                ESP_LOGW(TAG, "Cannot decrement ir_current_remote below 0.");
+            }
+            if (ir_current_remote >= num_remotes) {
+                ir_current_remote = num_remotes - 1;
+            }
+
             // Rebuild menu with new remote
             lcd_ir_build_current_menu(ir_menu, ir_current_remote);
             xSemaphoreGive(xInfraredDataMutex); // Release IR
@@ -235,10 +242,10 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
             lv_label_set_text(lbl_title, SIG_TXT);
             lv_label_set_text(lbl_select, SELECT_TXT);
         }
-    } else if (ui_btns->down_btn) { // Iterate down    
-        // Wrap    
+    } else if (ui_btns->down_btn) { // Iterate down
+        // Wrap
         if (edit_idx == 0) {
-            edit_idx = (ir_menu->size > 3) ? (ir_menu->size - 1) : 0;
+            edit_idx = ir_menu->size - 1;
         } else { // Else decrement
             edit_idx--;
         }
