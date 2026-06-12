@@ -11,6 +11,7 @@
 #include "lcd_espnow.h"
 #include "lcd_wifi.h"
 #include "lcd_tools.h"
+#include "lcd_games.h"
 #include "lcd_settings.h"
 #include "lcd_hotkey.h"
 #include "lcd_bluetooth.h"

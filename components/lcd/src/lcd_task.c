@@ -406,7 +406,7 @@ static void lcd_task(void *pvParameters)
                     lcd_tools_num_gen_page(&ui_btns, &ui_menu, &tools_menu);
                     break;
                 case TOOLS_TETRIS_PAGE:
-                    lcd_tools_tetris_page(&ui_btns, &ui_menu, &tools_menu);
+                    lcd_games_tetris_page(&ui_btns, &ui_menu, &tools_menu);
                     break;
                 case TOOLS_HOW_SRS_PAGE:
                     lcd_tools_how_srs_page(&ui_btns, &ui_menu, &tools_menu);

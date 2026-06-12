@@ -8,13 +8,7 @@ PolyCast5 is an open-source multi-tool wireless remote firmware for ESP32-C5, bu
 
 ## Build Commands
 
-```bash
-idf.py build                # Build
-idf.py -p PORT flash        # Flash to device
-idf.py -p PORT monitor      # Serial monitor
-idf.py fullclean            # Full clean (required after ESP-IDF patches or sdkconfig changes)
-idf.py menuconfig           # Interactive config editor
-```
+Do not run build commands, user will confirm build success manually.
 
 There is no test framework; validation is done by flashing to hardware.
 

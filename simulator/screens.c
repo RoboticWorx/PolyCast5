@@ -2290,7 +2290,7 @@ void screen_ota_update(void)
 }
 
 /* ─── Tetris page (self-playing example game) ────────────────────
- * Ports the Tetris engine from components/lcd/src/lcd_tools.c, drives it
+ * Ports the Tetris engine from components/lcd/src/lcd_games.c, drives it
  * with a simple best-landing-x AI instead of user input, and renders to
  * an LVGL canvas exactly like the firmware.  Device is "held sideways"
  * so pieces fall horizontally left→right. */
