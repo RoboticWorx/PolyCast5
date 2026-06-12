@@ -383,14 +383,19 @@ void infrared_utils_save_signal_to_remote_nvs(size_t remote_idx, size_t sig_idx,
         ESP_LOGE(TAG, "Failed to save signal name %zu for remote %zu: %s", sig_idx, remote_idx, esp_err_to_name(ret));
     }
 
-    // Format signal key
-    snprintf(key, sizeof(key), IR_SIGNAL_BLOB_FMT, (int)remote_idx, (int)sig_idx);
-    size_t blob_size = sizeof(ir_signal_t) + (sig->length * sizeof(rmt_symbol_word_t));
-    
-    // Save signal blob
-    ret = nvs_set_blob(h, key, sig, blob_size);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to save signal blob %zu for remote %zu: %s", sig_idx, remote_idx, esp_err_to_name(ret));
+    // Save signal blob (skip NULL signals, e.g. blob failed to load)
+    if (sig) {
+        // Format signal key
+        snprintf(key, sizeof(key), IR_SIGNAL_BLOB_FMT, (int)remote_idx, (int)sig_idx);
+        size_t blob_size = sizeof(ir_signal_t) + (sig->length * sizeof(rmt_symbol_word_t));
+        
+        // Save signal blob
+        ret = nvs_set_blob(h, key, sig, blob_size);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to save signal blob %zu for remote %zu: %s", sig_idx, remote_idx, esp_err_to_name(ret));
+        }
+    } else {
+        ESP_LOGE(TAG, "NULL signal %zu for remote %zu: name saved, blob skipped", sig_idx, remote_idx);
     }
 
     // Commit changes

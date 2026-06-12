@@ -749,6 +749,9 @@ esp_err_t esp_hid_ble_gap_adv_start(void)
 //extern void ble_hid_task_start_up(void);
 static struct ble_hs_adv_fields fields;
 
+// Bluetooth stack state (owned by bluetooth_utils.c)
+extern volatile bluetooth_state_t bluetooth_state;
+
 esp_err_t esp_hid_ble_gap_adv_init(uint16_t appearance, const char *device_name)
 {
     ble_uuid16_t *uuid16, *uuid16_1;
@@ -760,6 +763,7 @@ esp_err_t esp_hid_ble_gap_adv_init(uint16_t appearance, const char *device_name)
      *     o 16-bit service UUIDs (HID).
      */
 
+    free((void *)fields.uuids16); // Free previous allocation on reinit (before memset clears the pointer)
     memset(&fields, 0, sizeof fields);
 
     /* Advertise two flags:
@@ -783,7 +787,6 @@ esp_err_t esp_hid_ble_gap_adv_init(uint16_t appearance, const char *device_name)
     fields.name_len = strlen(device_name);
     fields.name_is_complete = 1;
 
-    free((void *)fields.uuids16); // Free previous allocation on reinit
     uuid16 = (ble_uuid16_t *)malloc(sizeof(ble_uuid16_t));
     if (!uuid16) {
         ESP_LOGE(TAG, "esp_hid_ble_gap_adv_init: Failed to allocate uuid16");
@@ -835,6 +838,15 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
     case BLE_GAP_EVENT_ADV_COMPLETE:
         ESP_LOGI(TAG, "advertise complete; reason=%d",
                 event->adv_complete.reason);
+
+        // Safety net: advertising runs with BLE_HS_FOREVER, so this only fires on abnormal completion
+        // Re-arm while the stack is still up
+        if (bluetooth_state == BT_STATE_RUNNING) {
+            rc = esp_hid_ble_gap_adv_start();
+            if (rc != 0) {
+                ESP_LOGE(TAG, "failed to restart advertising; rc=%d", rc);
+            }
+        }
         return 0;
 
     case BLE_GAP_EVENT_SUBSCRIBE:
@@ -860,6 +872,13 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
         /* Encryption has been enabled or disabled for this connection. */
         MODLOG_DFLT(INFO, "encryption change event; status=%d ",
                 event->enc_change.status);
+
+        // Non-zero status means pairing/encryption FAILED (wrong passkey,
+        // cancelled dialog, SM timeout) - never persist that peer
+        if (event->enc_change.status != 0) {
+            return 0;
+        }
+
         rc = ble_gap_conn_find(event->enc_change.conn_handle, &desc);
         if (rc != 0) {
             ESP_LOGE(TAG, "ble_gap_conn_find failed on enc_change: %d", rc);
@@ -988,7 +1007,7 @@ esp_err_t esp_hid_ble_gap_adv_start(void)
     int rc;
     uint8_t own_addr_type;
     struct ble_gap_adv_params adv;
-    const int32_t adv_duration_ms = 180000; // General adv window
+    const int32_t adv_duration_ms = BLE_HS_FOREVER; // Advertise until connected or stopped
 
     // Program advertisement data
     rc = ble_gap_adv_set_fields(&fields);
@@ -1042,7 +1061,7 @@ esp_err_t esp_hid_ble_gap_adv_start(void)
         }
 
         // Keep this undirected -> pass direct_addr = NULL
-        rc = ble_gap_adv_start(own_addr_type, NULL, 30000, &adv,
+        rc = ble_gap_adv_start(own_addr_type, NULL, adv_duration_ms, &adv,
                 nimble_hid_gap_event, NULL);
 
 #ifdef POLYCAST5_DEBUG

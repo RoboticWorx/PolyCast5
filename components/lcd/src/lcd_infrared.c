@@ -614,6 +614,7 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
                 size_t ns = remotes[ir_current_remote].num_signals - 1; // num_signals
                 
                 // Save to remote
+                free(remotes[ir_current_remote].signal_names[ns]); // Free the temporary empty name
                 remotes[ir_current_remote].signal_names[ns] = strdup(saved_name);
                 infrared_utils_save_signal_to_remote_nvs(ir_current_remote, ns, remotes[ir_current_remote].signals[ns], saved_name);
                 xSemaphoreGive(xInfraredDataMutex); // Release IR

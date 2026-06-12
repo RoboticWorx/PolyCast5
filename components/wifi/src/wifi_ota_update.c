@@ -158,7 +158,7 @@ static void ota_task(void *_)
         }
         
         // Yield CPU time for UI
-        vTaskDelay(pdMS_TO_TICKS(1));
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
     
     // If error

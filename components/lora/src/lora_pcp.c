@@ -185,8 +185,7 @@ void lora_pcp_process_received_message(uint8_t *message, size_t message_len)
 #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "ACK matches id=%" PRIu32, ack.msg_id);
 #endif
-            xQueueReset(xLoraSendEncQueue); // Clear pending commands
-            waiting_for_ack = false;
+            waiting_for_ack = false; // Done; a queued next command dispatches normally
 
             xSemaphoreGive(xLoraReceiptValidSemaphore);
         } else {

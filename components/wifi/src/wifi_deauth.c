@@ -356,7 +356,7 @@ esp_err_t wifi_deauth_scan(wifi_scan_deauth_t *wifi_scan_deauth)
         wifi_scan_deauth->auth = 0xFF;
 
         // Signal LCD no APs found
-        if (xQueueSend(xWifiDeauthScanQueue, &wifi_scan_deauth, portMAX_DELAY) != pdPASS) {
+        if (xQueueSend(xWifiDeauthScanQueue, wifi_scan_deauth, portMAX_DELAY) != pdPASS) {
             ESP_LOGE(TAG, "xWifiDeauthScanQueue: ap_num == 0: Failed to enqueue");
         }
 

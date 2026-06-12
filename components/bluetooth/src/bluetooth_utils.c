@@ -689,6 +689,9 @@ static char *trim_tok(char *s)
     return s;
 }
 
+// Used to break out of long send loops so they stay responsive to cancel
+static bool bt_typing_should_abort(void);
+
 // Press up to 6 keys with optional modifiers, hold for hold_ms, then release
 // After release, wait tap_ms to preserve existing pacing
 static void send_chord(uint8_t modifiers, const uint8_t *keycodes, size_t nkeys, uint32_t hold_ms, uint32_t tap_ms)
@@ -708,7 +711,12 @@ static void send_chord(uint8_t modifiers, const uint8_t *keycodes, size_t nkeys,
 
     // Send
     kbd_send_raw(modifiers, keys);
-    vTaskDelay(pdMS_TO_TICKS(hold_ms));
+    // Hold in short slices so cancel/deinit stays responsive during long holds
+    while (hold_ms > 0 && !bt_typing_should_abort()) {
+        uint32_t step = hold_ms > 50 ? 50 : hold_ms;
+        vTaskDelay(pdMS_TO_TICKS(step));
+        hold_ms -= step;
+    }
     kbd_release_all();
     vTaskDelay(pdMS_TO_TICKS(tap_ms));
 }
@@ -771,8 +779,18 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
             ms = 0;
         }
 
-        // Delay that amount (blocks bluetooth_task)
-        vTaskDelay(pdMS_TO_TICKS((uint32_t)ms));
+        // Max is 300000 (5 min)
+        if (ms > 300000) {
+            ms = 300000;
+        }
+
+        // Delay that amount in short slices so cancel/deinit stays responsive
+        uint32_t remaining = (uint32_t)ms;
+        while (remaining > 0 && !bt_typing_should_abort()) {
+            uint32_t step = remaining > 50 ? 50 : remaining;
+            vTaskDelay(pdMS_TO_TICKS(step));
+            remaining -= step;
+        }
 
         *consumed_end = gt;
         return true;
@@ -835,7 +853,7 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
                 if (ms < 0) {
                     ms = 0;
                 }
-                if (ms > 10000000) { // ~6.9 days
+                if (ms > 10000000) { // ~2.78 h
                     ms = 10000000;
                 }
 
@@ -1078,6 +1096,14 @@ void bluetooth_utils_set_battery_level(uint8_t percent)
 void bluetooth_utils_forget_all_peers(void)
 {
     int rc;
+
+    // NimBLE host APIs below are only valid while the stack is running
+    if (bluetooth_state != BT_STATE_RUNNING) {
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "Cannot forget peers; Bluetooth not running");
+#endif
+        return;
+    }
 
     // Stop advertising to prevent incoming connections during the reset
     rc = ble_gap_adv_stop();

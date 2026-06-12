@@ -212,12 +212,19 @@ static void lora_task(void *pvParameters)
             // Encrypt and send the same command again
             if (lora_pcp_encrypt_and_transmit((uint8_t *)&cmd_msg, sizeof(cmd_msg))) {
                 need_to_retry = false;
-            } else {
+            } else if (retry_count < MAX_RETRIES) {
+                retry_count++;
                 ESP_LOGE(TAG, "Retry TX failed, will retry next loop");
+            } else { // Radio TX keeps failing: give up on this command
+                need_to_retry = false;
+                waiting_for_ack = false;
+                ESP_LOGE(TAG, "Giving up TX after max retries");
             }
         }
-        // Else if new command
-        else if (!waiting_for_ack && xQueuePeek(xLoraSendEncQueue, &lora_cmd, 0) == pdTRUE) {
+        // Else if new command: take ownership now so the queue slot frees -
+        // a command sent while this one is in flight waits its turn instead of overwriting it in the queue (where it would be wiped on ACK/give-up)
+        else if (!waiting_for_ack && xQueueReceive(xLoraSendEncQueue, &lora_cmd, 0) == pdTRUE) {
+            xSemaphoreTake(xLoraReceiptValidSemaphore, 0); // Drain stale receipt: only this command's ACK may show 'delivered'
             lora_pcp_set_key(lora_cmd.key);
 
             // Create unique message ID
@@ -244,10 +251,13 @@ static void lora_task(void *pvParameters)
             ESP_LOGI(TAG, "SENDING idx=%d instr=%s msg_id=%" PRIu32, cmd_msg.index, cmd_msg.instr, cmd_msg.msg_id);
             ESP_LOG_BUFFER_HEX("LORA_TASK: Using encryption_key", lora_cmd.key, LORA_PCP_ENC_KEY_LEN);
 #endif
-            // Encrypt and send: only block queue on success
+            // Encrypt and send
             if (lora_pcp_encrypt_and_transmit((uint8_t *)&cmd_msg, sizeof(cmd_msg))) {
                 waiting_for_ack = true;
             } else {
+                // Command is already off the queue: retry it via the retry path (bounded)
+                waiting_for_ack = true;
+                need_to_retry = true;
                 ESP_LOGE(TAG, "TX failed, will retry next loop");
             }
         }
@@ -291,15 +301,14 @@ static void lora_event_handler_task(void *pvParameters)
 #ifdef POLYCAST5_DEBUG
                     ESP_LOGW(TAG, "Invalid RX size %d, discarding", rx_size);
 #endif
-                    sx126x_clear_irq_status(NULL, SX126X_IRQ_RX_DONE);
+                    sx126x_clear_irq_status(NULL, SX126X_IRQ_ALL); // Also clear co-latched CRC/HEADER flags
                     sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
 
                     if (retry_count < MAX_RETRIES) {
                         need_to_retry = true;
                         retry_count++;
                     } else {
-                        xQueueReset(xLoraSendEncQueue);
-                        waiting_for_ack = false;
+                        waiting_for_ack = false; // Give up; a queued next command dispatches normally
                     }
                     continue;
                 }
@@ -323,8 +332,7 @@ static void lora_event_handler_task(void *pvParameters)
                         need_to_retry = true;
                         retry_count++;
                     } else {
-                        xQueueReset(xLoraSendEncQueue);
-                        waiting_for_ack = false;
+                        waiting_for_ack = false; // Give up; a queued next command dispatches normally
                     }
                 }
             }
@@ -341,8 +349,7 @@ static void lora_event_handler_task(void *pvParameters)
                     need_to_retry = true;
                     retry_count++;
                 } else {
-                    xQueueReset(xLoraSendEncQueue); // Clear pending commands
-                    waiting_for_ack = false;
+                    waiting_for_ack = false; // Give up; a queued next command dispatches normally
                     
 #ifdef POLYCAST5_DEBUG
                     ESP_LOGW(TAG, "Hit max LoRa retries");
@@ -362,8 +369,7 @@ static void lora_event_handler_task(void *pvParameters)
                     need_to_retry = true;
                     retry_count++;
                 } else {
-                    xQueueReset(xLoraSendEncQueue); // Clear pending commands
-                    waiting_for_ack = false;
+                    waiting_for_ack = false; // Give up; a queued next command dispatches normally
                     
 #ifdef POLYCAST5_DEBUG
                     ESP_LOGW(TAG, "Hit max LoRa retries");
@@ -383,8 +389,7 @@ static void lora_event_handler_task(void *pvParameters)
                     need_to_retry = true;
                     retry_count++;
                 } else {
-                    xQueueReset(xLoraSendEncQueue); // Clear pending commands
-                    waiting_for_ack = false;
+                    waiting_for_ack = false; // Give up; a queued next command dispatches normally
                     
 #ifdef POLYCAST5_DEBUG
                     ESP_LOGW(TAG, "Hit max LoRa retries");

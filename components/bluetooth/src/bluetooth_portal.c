@@ -198,6 +198,7 @@ esp_err_t bluetooth_portal_script_label_get_nvs(uint8_t idx, char *buf, size_t b
 #ifdef POLYCAST5_DEBUG
        ESP_LOGE(TAG, "bluetooth_script_label_get nvs_open failed: %s", esp_err_to_name(err));
 #endif
+        return err;
     }
     
     // Format key

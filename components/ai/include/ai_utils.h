@@ -28,6 +28,7 @@ typedef enum {
     AI_CMD_CUSTOM,
     AI_CMD_DICTATE,
     AI_CMD_RAW_FRAMES,
+    AI_CMD_KEYBOARD_ABORT_REC, // Page exited mid-recording: deinit mic + free capture, no STT
 } ai_cmd_type_t;
 
 typedef struct {

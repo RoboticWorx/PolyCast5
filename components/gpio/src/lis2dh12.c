@@ -112,6 +112,10 @@ esp_err_t lis2dh12_init(void)
 
 out:
     xSemaphoreGive(xI2CBusMutex); // Release the I2C bus
+    if (ret != ESP_OK) { // Failed: remove the device so the read guards see s_dev == NULL
+        i2c_master_bus_rm_device(s_dev);
+        s_dev = NULL;
+    }
     return ret;
 }
 

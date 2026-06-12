@@ -633,9 +633,18 @@ void wifi_utils_get_current_date_time(void)
     time_t now = 0;
     struct tm timeinfo = {0};
 
-    // Wait until the SNTP task clock has gone past 2025
+    // Wait until the SNTP task clock has gone past 2025 (bounded ~30 s)
+    xEventGroupClearBits(xWifiEventGroup, WIFI_DATE_TIME_FAILED_BIT); // Fresh attempt
+    int sntp_retry = 0;
+    const int sntp_retry_max = 300; // 300 * 100 ms = 30 s
     while (timeinfo.tm_year < (2025 - 1900)) {
-        vTaskDelay(pdMS_TO_TICKS(1));
+        if (sntp_retry++ >= sntp_retry_max) {
+            // Timed out without a real sync; do not pretend we got the time
+            ESP_LOGE(TAG, "wifi_utils_get_current_date_time: SNTP sync timed out after 30 s");
+            xEventGroupSetBits(xWifiEventGroup, WIFI_DATE_TIME_FAILED_BIT); // Tell waiters it's over
+            return;
+        }
+        vTaskDelay(pdMS_TO_TICKS(100));
         time(&now);
         localtime_r(&now, &timeinfo);
     }
@@ -822,7 +831,7 @@ esp_err_t wifi_utils_radio_start(const char *ssid, const uint8_t* bssid, const c
     cfg.sta.channel = 0; // Don't lock to a specific channel
     cfg.sta.scan_method = WIFI_FAST_SCAN; // First matching SSID (vs WIFI_ALL_CHANNEL_SCAN)
 
-    cfg.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK; // Weakest auth mode to accept in the fast scan mode
+    cfg.sta.threshold.authmode = WIFI_AUTH_OPEN; // Weakest auth mode to accept in the fast scan mode
 
     // Required for WPA2/WPA3 transition APs (e.g. iPhone Personal Hotspot, AUTH:7)
     cfg.sta.pmf_cfg.capable = true;
@@ -1114,7 +1123,12 @@ static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
     
     // Points to the raw 802.11 frame bytes
     uint8_t *frame = pkt->payload;
-    
+
+    // Need fixed params for Beacon/ProbeResp: 24-byte header + 12 bytes fixed
+    if (pkt->rx_ctrl.sig_len < (24 + 12)) {
+        return;
+    }
+
     // frame_ctrl == first two bytes
     uint16_t frame_ctrl = (frame[1] << 8) | frame[0];
     
@@ -1390,6 +1404,12 @@ static void wifi_sniffer_data_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 
     wifi_promiscuous_pkt_t *pkt = (wifi_promiscuous_pkt_t*)buf;
     uint8_t *frame = pkt->payload;
+
+    // Need at least a full data header before touching fixed offsets
+    if (pkt->rx_ctrl.sig_len < 24) {
+        return;
+    }
+
     // Get frame type
     uint16_t fc = (frame[1] << 8) | frame[0];
 
@@ -1422,6 +1442,9 @@ static void wifi_sniffer_data_cb(void* buf, wifi_promiscuous_pkt_type_t type)
         sa = &frame[10]; // Addr2 is station's MAC
     } else {
         // WDS: mesh or 4-addr; Addr4 is original source
+        if (pkt->rx_ctrl.sig_len < 30) {
+            return; // Addr4 (bytes 24–29) not present in this frame
+        }
         sa = &frame[24];
     }
 
@@ -1544,12 +1567,25 @@ static void wifi_sniffer_raw_cb(void *buf, wifi_promiscuous_pkt_type_t type)
 void wifi_utils_init_promiscuous(wifi_sniff_t *network)
 {
     // Start up the radio
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    esp_err_t err = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "wifi_utils_init_promiscuous: esp_wifi_set_mode failed: %s", esp_err_to_name(err));
+        return;
+    }
 
-    ESP_ERROR_CHECK(esp_wifi_start());
+    err = esp_wifi_start();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "wifi_utils_init_promiscuous: esp_wifi_start failed: %s", esp_err_to_name(err));
+        return;
+    }
 
     // Fix the channel to the target AP: set channel (0 = auto/current)
-    ESP_ERROR_CHECK(esp_wifi_set_channel(network->channel, WIFI_SECOND_CHAN_NONE));
+    err = esp_wifi_set_channel(network->channel, WIFI_SECOND_CHAN_NONE);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "wifi_utils_init_promiscuous: esp_wifi_set_channel(%d) failed: %s",
+                network->channel, esp_err_to_name(err));
+        return; // Continuing without a valid channel is pointless
+    }
 
     // Only selected frame(s)
     wifi_promiscuous_filter_t filter = {
@@ -1560,20 +1596,34 @@ void wifi_utils_init_promiscuous(wifi_sniff_t *network)
     memcpy(target_bssid, network->target_bssid, 6);
     
     // Filter for matching packets
-    ESP_ERROR_CHECK(esp_wifi_set_promiscuous_filter(&filter));
+    err = esp_wifi_set_promiscuous_filter(&filter);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "wifi_utils_init_promiscuous: esp_wifi_set_promiscuous_filter failed: %s", esp_err_to_name(err));
+        return;
+    }
 
     // Register callback and enable promiscuous mode
     if (network->mask == WIFI_PROMIS_FILTER_MASK_MGMT) {
-        ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_beacon_cb)); // Sniff beacon frames
+        err = esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_beacon_cb); // Sniff beacon frames
     } else if (network->mask == WIFI_PROMIS_FILTER_MASK_DATA) {
-        ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_data_cb)); // Sniff data frames
+        err = esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_data_cb); // Sniff data frames
         memset(&wifi_data, 0, sizeof(wifi_data)); // Reset counts so chart reflects this session
     } else if (network->mask == WIFI_PROMIS_FILTER_MASK_RAW_USEFUL) {
-        ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_raw_cb)); // Sniff everything
+        err = esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_raw_cb); // Sniff everything
     } else {
         ESP_LOGE(TAG, "wifi_utils_init_promiscuous: unknown filter mask: %d", network->mask);
+        return;
     }
-    ESP_ERROR_CHECK(esp_wifi_set_promiscuous(true));
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "wifi_utils_init_promiscuous: esp_wifi_set_promiscuous_rx_cb failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    err = esp_wifi_set_promiscuous(true);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "wifi_utils_init_promiscuous: esp_wifi_set_promiscuous failed: %s", esp_err_to_name(err));
+        return;
+    }
 
     // If sniffing a target network
     if (network->mask != WIFI_PROMIS_FILTER_MASK_RAW_USEFUL) {

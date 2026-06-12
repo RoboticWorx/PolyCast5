@@ -106,6 +106,7 @@ void spi_master_init(TFT_t * dev, int16_t GPIO_MOSI, int16_t GPIO_SCLK, int16_t 
     assert(ret==ESP_OK);
     dev->_dc = GPIO_DC;
     //dev->_bl = GPIO_BL;
+    dev->_bl = -1; // Backlight is LEDC-controlled elsewhere
     dev->_SPIHandle = handle;
 }
 
@@ -181,7 +182,8 @@ bool spi_master_write_color(TFT_t * dev, uint16_t color, uint16_t size)
 // Add 202001
 bool spi_master_write_colors(TFT_t * dev, uint16_t * colors, uint16_t size)
 {
-    static uint8_t Byte[1024];
+    static uint8_t Byte[1024]; // 512 pixels - largest live caller is the LVGL flush (FLUSH_CHUNK*HOR_RES = 480)
+    if (size > sizeof(Byte)/2) size = sizeof(Byte)/2;
     int index = 0;
     for(int i=0;i<size;i++) {
         Byte[index++] = (colors[i] >> 8) & 0xFF;

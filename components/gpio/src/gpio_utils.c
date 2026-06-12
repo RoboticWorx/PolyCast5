@@ -497,11 +497,11 @@ void gpio_utils_spin_haptic(uint32_t ms)
         ticks = 1; // Can't be 0
     }
     
-    gpio_utils_write_output(TCA9535_HAPTIC_PIN, 1); // Haptic ON
-    
-    // Re-arm the timer with the new period
+    // Re-arm the timer with the new period (clears any pending expiry from a previous buzz)
     xTimerChangePeriod(haptic_timer, ticks, portMAX_DELAY);
     xTimerStart(haptic_timer, portMAX_DELAY);
+    
+    gpio_utils_write_output(TCA9535_HAPTIC_PIN, 1); // Haptic ON
     
     // Haptic OFF when timer expires
 }
@@ -509,8 +509,9 @@ void gpio_utils_spin_haptic(uint32_t ms)
 void gpio_utils_rgb_indicate(uint8_t rgb_data)
 {
     xSemaphoreTake(xRgbLedMutex, portMAX_DELAY); // Lock RGB LED
-    // Skip if invalid (pdMS_TO_TICKS rounds down to 0)
-    if (rbg_blink_period_ms < 10) {
+    bool is_blink = (rgb_data == RGB_BLINK_RED || rgb_data == RGB_BLINK_GREEN || rgb_data == RGB_BLINK_BLUE || rgb_data == RGB_BLINK_PURPLE || rgb_data == RGB_BLINK_TEAL);
+    // Skip blink cmds if invalid (pdMS_TO_TICKS rounds down to 0); always process solid cmds
+    if (is_blink && rbg_blink_period_ms < 10) {
         xSemaphoreGive(xRgbLedMutex); // Release RGB LED
         return;
     }
@@ -531,7 +532,7 @@ void gpio_utils_rgb_indicate(uint8_t rgb_data)
     xTimerStop(rgb_blink_stop_timer, portMAX_DELAY);
     
     // Update periods if blink cmd
-    if (rgb_data == RGB_BLINK_RED || rgb_data == RGB_BLINK_GREEN || rgb_data == RGB_BLINK_BLUE || rgb_data == RGB_BLINK_PURPLE || rgb_data == RGB_BLINK_TEAL) {
+    if (is_blink) {
         xTimerChangePeriod(rgb_blink_timer, pdMS_TO_TICKS(rbg_blink_period_ms), portMAX_DELAY);
         xTimerChangePeriod(rgb_blink_stop_timer, pdMS_TO_TICKS(rgb_blink_total_ms), portMAX_DELAY);
     }

@@ -172,11 +172,11 @@ static void adc_task(void *arg)
 #endif
             
             // Send value to LCD
-            if (xQueueSend(xAdcBatReadingQueue, &percentage, portMAX_DELAY) != pdPASS) {
+            if (xQueueOverwrite(xAdcBatReadingQueue, &percentage) != pdPASS) {
                 ESP_LOGE(TAG, "Failed to send xAdcBatReadingQueue: %u%%", percentage);
             }
             // And to bluetooth
-            if (xQueueSend(xAdcBatBluetoothQueue, &percentage, portMAX_DELAY) != pdPASS) {
+            if (xQueueOverwrite(xAdcBatBluetoothQueue, &percentage) != pdPASS) {
                 ESP_LOGE(TAG, "Failed to send xAdcBatBluetoothQueue: %u%%", percentage);
             }
         }

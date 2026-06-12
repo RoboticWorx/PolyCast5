@@ -579,6 +579,11 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
                 break;
             }
         }
+        // Char not found in any row; fall back to first row/char
+        if (row_idx >= LORA_NUM_CHAR_ROWS) {
+            row_idx = 0;
+            char_idx = 0;
+        }
         cur_char = lora_char_rows[row_idx][char_idx];
         
         update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
@@ -826,8 +831,10 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
             
                 return;
             }
-        
-            // Trigger overwrite 
+
+            lcd_clear_pending_inputs = true; // Clear any false inputs
+
+            // Trigger overwrite
             lora_menu_overwrite = true;
         
             // Prompt rename
@@ -983,7 +990,13 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
             lora_menu->submenu.index += 3;
         }
         lcd_lora_update_submenu(lora_menu);
-    } else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 0) { // Send selected        
+    } else if (ui_btns->select_btn == 1 && lora_menu->submenu.index == 0) { // Send selected
+        // No key saved for this PolyPlug (interrupted pairing); don't send
+        if (lora_menu->keys[lora_menu->index] == NULL) {
+            ESP_LOGE(TAG, "Missing LoRa key for index %d; skipping send", lora_menu->index);
+            return;
+        }
+
         // Build the packet
         lora_pcp_cmd_t lora_cmd = {0}; // Zero out
         lora_cmd.index = lora_menu->submenu.index;
@@ -1013,8 +1026,9 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
         }
         
         // Send the command
-        xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY);
-        
+        xQueueOverwrite(xLoraSendEncQueue, &lora_cmd);
+        xSemaphoreTake(xLoraReceiptValidSemaphore, 0); // Drain stale receipt so only this command's ACK shows
+
         // RGB indicator
         uint8_t rgb_state = RGB_BLINK_TEAL;
         xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
@@ -1212,19 +1226,24 @@ void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
         lbl_bot_time = NULL;
         
         // Send the data to lora_task
-        lora_pcp_cmd_t lora_cmd = {0}; // Zero out
-        lora_cmd.index = lora_menu->submenu.index;
-        memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
-        snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "on %s off %s", time_opts[on_idx], time_opts[off_idx]);
+        if (lora_menu->keys[lora_menu->index] == NULL) { // No key saved (interrupted pairing); don't send
+            ESP_LOGE(TAG, "Missing LoRa key for index %d; skipping send", lora_menu->index);
+        } else {
+            lora_pcp_cmd_t lora_cmd = {0}; // Zero out
+            lora_cmd.index = lora_menu->submenu.index;
+            memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
+            snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "on %s off %s", time_opts[on_idx], time_opts[off_idx]);
 
-        // Confirmation text
-        lcd_format_label(lbl_subpage_ins, "Sending to PolyPlug...", user_secondary_color,
-                 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
-        lv_timer_handler();
-        
-        xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY); // Send the command
-        vTaskDelay(pdMS_TO_TICKS(500));
-        
+            // Confirmation text
+            lcd_format_label(lbl_subpage_ins, "Sending to PolyPlug...", user_secondary_color,
+                    &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+            lv_timer_handler();
+
+            xQueueOverwrite(xLoraSendEncQueue, &lora_cmd); // Send the command
+            xSemaphoreTake(xLoraReceiptValidSemaphore, 0); // Drain stale receipt so only this command's ACK shows
+            vTaskDelay(pdMS_TO_TICKS(500));
+        }
+
         // Reset confirmation lbl
         lv_obj_delete(lbl_subpage_ins);
         lbl_subpage_ins = NULL;
@@ -1445,15 +1464,20 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
         lv_label_set_text(lbl_send_rx, GPIO_RX_TXT);
         
         // Send the data to lora_task
-        lora_pcp_cmd_t lora_cmd = {0}; // Zero out
-        lora_cmd.index = lora_menu->submenu.index;
-        memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
-        snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "gpio %d", cmd_to_send);
-        
-        xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY); // Send the command
-        
-        // TX confirmation
-        tx_success = true;
+        if (lora_menu->keys[lora_menu->index] == NULL) { // No key saved (interrupted pairing); don't send
+            ESP_LOGE(TAG, "Missing LoRa key for index %d; skipping send", lora_menu->index);
+        } else {
+            lora_pcp_cmd_t lora_cmd = {0}; // Zero out
+            lora_cmd.index = lora_menu->submenu.index;
+            memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
+            snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "gpio %d", cmd_to_send);
+
+            xQueueOverwrite(xLoraSendEncQueue, &lora_cmd); // Send the command
+            xSemaphoreTake(xLoraReceiptValidSemaphore, 0); // Drain stale receipt so only this command's ACK shows
+
+            // TX confirmation
+            tx_success = true;
+        }
     } else if (ui_btns->left_btn == 1) { // Back
         // Reset objects
         lv_obj_delete(lbl_send_tx);
@@ -2032,25 +2056,30 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
         }
         
         // Send the data to lora_task
-        lora_pcp_cmd_t lora_cmd = {0}; // Zero out
-        lora_cmd.index = lora_menu->submenu.index;
-        memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
-        // Remove colons
-        int h1, m1, s1, h2, m2, s2;
-        sscanf(start_time, "%2d:%2d:%2d", &h1,&m1,&s1);
-        sscanf(end_time, "%2d:%2d:%2d", &h2,&m2,&s2);
-        snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "d %s o %02d%02d%02d f %02d%02d%02d",
-                plan_selected_days, h1, m1, s1, h2, m2, s2);
-                
-        // Confirmation text
-        lv_obj_t *lbl_send_conf = lv_label_create(ACTIVE_SCR); // Create and format label
-        lcd_format_label(lbl_send_conf, "Sending to PolyPlug...", user_secondary_color,
-                &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
-        lv_timer_handler();
-        xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY); // Send the command
-        
-        vTaskDelay(pdMS_TO_TICKS(1000)); // Wait 1000ms
-        lv_obj_delete(lbl_send_conf); // Delete label
+        if (lora_menu->keys[lora_menu->index] == NULL) { // No key saved (interrupted pairing); don't send
+            ESP_LOGE(TAG, "Missing LoRa key for index %d; skipping send", lora_menu->index);
+        } else {
+            lora_pcp_cmd_t lora_cmd = {0}; // Zero out
+            lora_cmd.index = lora_menu->submenu.index;
+            memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
+            // Remove colons
+            int h1, m1, s1, h2, m2, s2;
+            sscanf(start_time, "%2d:%2d:%2d", &h1,&m1,&s1);
+            sscanf(end_time, "%2d:%2d:%2d", &h2,&m2,&s2);
+            snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "d %s o %02d%02d%02d f %02d%02d%02d",
+                    plan_selected_days, h1, m1, s1, h2, m2, s2);
+
+            // Confirmation text
+            lv_obj_t *lbl_send_conf = lv_label_create(ACTIVE_SCR); // Create and format label
+            lcd_format_label(lbl_send_conf, "Sending to PolyPlug...", user_secondary_color,
+                    &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+            lv_timer_handler();
+            xQueueOverwrite(xLoraSendEncQueue, &lora_cmd); // Send the command
+            xSemaphoreTake(xLoraReceiptValidSemaphore, 0); // Drain stale receipt so only this command's ACK shows
+
+            vTaskDelay(pdMS_TO_TICKS(1000)); // Wait 1000ms
+            lv_obj_delete(lbl_send_conf); // Delete label
+        }
         lcd_clear_pending_inputs = true;
         
         // Reset statics
@@ -2129,6 +2158,10 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
         
         // Update
         set_digit(current_time_str, adj_pos, digit_val);
+        // Keep hours <= 23: clamp ones-of-hours when tens-of-hours becomes 2
+        if (adj_pos == 0 && digit_val == 2 && get_digit(current_time_str, 1) > 3) {
+            set_digit(current_time_str, 1, 3);
+        }
         update_time_label(time_labels, start_time, end_time);
     } else if (ui_btns->down_btn == 1) { // Digit down
         // Select time string and adjusted pos (0-5)
@@ -2152,6 +2185,10 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
         
         // Update
         set_digit(current_time_str, adj_pos, digit_val);
+        // Keep hours <= 23: clamp ones-of-hours when tens-of-hours becomes 2
+        if (adj_pos == 0 && digit_val == 2 && get_digit(current_time_str, 1) > 3) {
+            set_digit(current_time_str, 1, 3);
+        }
         update_time_label(time_labels, start_time, end_time);
     } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off selected
         // Reset objects
@@ -2302,25 +2339,30 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
         lv_obj_add_flag(away_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         
         // Send the data to lora_task
-        lora_pcp_cmd_t lora_cmd = {0}; // Zero out
-        lora_cmd.index = lora_menu->submenu.index;
-        memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
-        snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "away %s", away_menu->options[away_menu->index]);
-        
+        if (lora_menu->keys[lora_menu->index] == NULL) { // No key saved (interrupted pairing); don't send
+            ESP_LOGE(TAG, "Missing LoRa key for index %d; skipping send", lora_menu->index);
+        } else {
+            lora_pcp_cmd_t lora_cmd = {0}; // Zero out
+            lora_cmd.index = lora_menu->submenu.index;
+            memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
+            snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "away %s", away_menu->options[away_menu->index]);
+
 #ifdef POLYCAST5_DEBUG
-        ESP_LOGI(TAG, "Sending LoRa AWAY cmd instr '%s'", lora_cmd.instr);
+            ESP_LOGI(TAG, "Sending LoRa AWAY cmd instr '%s'", lora_cmd.instr);
 #endif
 
-        // Confirmation text
-        lv_obj_t *lbl_send_conf = lv_label_create(ACTIVE_SCR); // Create and format label
-        lcd_format_label(lbl_send_conf, "Sending to PolyPlug...", user_secondary_color,
-                &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
-        lv_timer_handler();
-        
-        xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY); // Send
-        vTaskDelay(pdMS_TO_TICKS(500)); // Wait additional 500ms
-        
-        lv_obj_delete(lbl_send_conf); // Delete label
+            // Confirmation text
+            lv_obj_t *lbl_send_conf = lv_label_create(ACTIVE_SCR); // Create and format label
+            lcd_format_label(lbl_send_conf, "Sending to PolyPlug...", user_secondary_color,
+                    &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+            lv_timer_handler();
+
+            xQueueOverwrite(xLoraSendEncQueue, &lora_cmd); // Send
+            xSemaphoreTake(xLoraReceiptValidSemaphore, 0); // Drain stale receipt so only this command's ACK shows
+            vTaskDelay(pdMS_TO_TICKS(500)); // Wait additional 500ms
+
+            lv_obj_delete(lbl_send_conf); // Delete label
+        }
         lcd_clear_pending_inputs = true;
         
         // Delete away_menu lv_obj
@@ -2468,26 +2510,31 @@ void lcd_lora_away_custom_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_m
         lbl_unit = lbl_ins = lbl_min = lbl_max = lbl_val_min = lbl_val_max = lbl_pointer = NULL;
         
         // Send the data to lora_task
-        lora_pcp_cmd_t lora_cmd = {0}; // Zero out
-        lora_cmd.index = lora_menu->submenu.index;
-        memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
-        snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "away %d-%dm ON/OFF", min_val, max_val); // Keep formatting
-        
+        if (lora_menu->keys[lora_menu->index] == NULL) { // No key saved (interrupted pairing); don't send
+            ESP_LOGE(TAG, "Missing LoRa key for index %d; skipping send", lora_menu->index);
+        } else {
+            lora_pcp_cmd_t lora_cmd = {0}; // Zero out
+            lora_cmd.index = lora_menu->submenu.index;
+            memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
+            snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "away %d-%dm ON/OFF", min_val, max_val); // Keep formatting
+
 #ifdef POLYCAST5_DEBUG
-        ESP_LOGI(TAG, "Sending LoRa AWAY cmd instr '%s'", lora_cmd.instr);
+            ESP_LOGI(TAG, "Sending LoRa AWAY cmd instr '%s'", lora_cmd.instr);
 #endif
 
-        // Confirmation text
-        lv_obj_t *lbl_send_conf = lv_label_create(ACTIVE_SCR); // Create and format label
-        lcd_format_label(lbl_send_conf, "Sending to PolyPlug...", user_secondary_color,
-                &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
-        lv_timer_handler();
-        
-        xQueueSend(xLoraSendEncQueue, &lora_cmd, portMAX_DELAY); // Send
-        vTaskDelay(pdMS_TO_TICKS(500)); // Wait additional 500ms
-        lcd_clear_pending_inputs = true;
-        
-        lv_obj_delete(lbl_send_conf); // Delete label
+            // Confirmation text
+            lv_obj_t *lbl_send_conf = lv_label_create(ACTIVE_SCR); // Create and format label
+            lcd_format_label(lbl_send_conf, "Sending to PolyPlug...", user_secondary_color,
+                    &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+            lv_timer_handler();
+
+            xQueueOverwrite(xLoraSendEncQueue, &lora_cmd); // Send
+            xSemaphoreTake(xLoraReceiptValidSemaphore, 0); // Drain stale receipt so only this command's ACK shows
+            vTaskDelay(pdMS_TO_TICKS(500)); // Wait additional 500ms
+            lcd_clear_pending_inputs = true;
+
+            lv_obj_delete(lbl_send_conf); // Delete label
+        }
         
         // Show LoRa submenu cont
         lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);

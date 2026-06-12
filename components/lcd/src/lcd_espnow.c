@@ -1527,6 +1527,12 @@ esp_err_t lcd_espnow_rx_mac_nvs_load(espnow_menu_t *espnow_menu)
         return err;
     }
 
+    // Clamp count to array capacity (slot 0 is "Add ESP32")
+    if (cnt > MAX_ESPNOW_OPTIONS - 1) {
+        cnt = MAX_ESPNOW_OPTIONS - 1;
+        ESP_LOGW(TAG, "lcd_espnow_rx_mac_nvs_load: Too many MACs in NVS, clamping to %d", cnt);
+    }
+
     // Zero out macs
     memset(espnow_menu->rx_mac, 0, sizeof(espnow_menu->rx_mac));
 
@@ -1579,6 +1585,12 @@ esp_err_t lcd_espnow_lmk_nvs_load(espnow_menu_t *espnow_menu)
     else if (err != ESP_OK) {
         nvs_close(nvs);
         return err;
+    }
+
+    // Clamp count to array capacity (slot 0 is "Add ESP32")
+    if (cnt > MAX_ESPNOW_OPTIONS - 1) {
+        cnt = MAX_ESPNOW_OPTIONS - 1;
+        ESP_LOGW(TAG, "lcd_espnow_lmk_nvs_load: Too many LMKs in NVS, clamping to %d", cnt);
     }
 
     // Zero out LMKs

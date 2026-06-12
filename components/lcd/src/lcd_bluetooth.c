@@ -186,7 +186,7 @@ static void keyboard_submenu_refresh_from_nvs(bluetooth_keyboard_menu_t *km, uin
 
     // Pull labels for each user script i that matches category
     int s = 0;
-    memset(km->script_indices, 0, sizeof(km->script_indices));
+    memset(km->script_indices, 255, sizeof(km->script_indices)); // 255 = invalid; only filled slots hold real script indices
 
     for (uint32_t i = 0; i < count; ++i) {
         uint8_t cat = 0;
@@ -1712,6 +1712,18 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
             );
         }
     } else if (ui_btns->right_btn == 1) { // Config page selected
+        // Stop mic_recording; if a capture is in progress, have ai_task tear down the mic and free the abandoned recording (no STT)
+        mic_recording = false;
+        if (state == AI_KEYB_RECORDING) {
+            ai_cmd_t abort_cmd = {
+                .type = AI_CMD_KEYBOARD_ABORT_REC,
+            };
+            if (xQueueSend(xAiCmdQueue, &abort_cmd, pdMS_TO_TICKS(100)) != pdPASS) {
+                ESP_LOGE(TAG, "Failed: xAiCmdQueue AI_CMD_KEYBOARD_ABORT_REC");
+            }
+            state = AI_KEYB_IDLE;
+        }
+
         // Disconnect from Wi-Fi
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
@@ -1746,6 +1758,18 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         // Switch to config page
         ui_menu->page = BLUETOOTH_AI_CONFIG_PAGE;
     } else if (ui_btns->left_btn == 1) { // Back selected
+        // Stop mic_recording; if a capture is in progress, have ai_task tear down the mic and free the abandoned recording (no STT)
+        mic_recording = false;
+        if (state == AI_KEYB_RECORDING) {
+            ai_cmd_t abort_cmd = {
+                .type = AI_CMD_KEYBOARD_ABORT_REC,
+            };
+            if (xQueueSend(xAiCmdQueue, &abort_cmd, pdMS_TO_TICKS(100)) != pdPASS) {
+                ESP_LOGE(TAG, "Failed: xAiCmdQueue AI_CMD_KEYBOARD_ABORT_REC");
+            }
+            state = AI_KEYB_IDLE;
+        }
+
         // Disconnect from Wi-Fi
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
@@ -1785,6 +1809,18 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         // Switch pages
         ui_menu->page = BLUETOOTH_PAGE;
     } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off selected
+        // Stop mic_recording; if a capture is in progress, have ai_task tear down the mic and free the abandoned recording (no STT)
+        mic_recording = false;
+        if (state == AI_KEYB_RECORDING) {
+            ai_cmd_t abort_cmd = {
+                .type = AI_CMD_KEYBOARD_ABORT_REC,
+            };
+            if (xQueueSend(xAiCmdQueue, &abort_cmd, pdMS_TO_TICKS(100)) != pdPASS) {
+                ESP_LOGE(TAG, "Failed: xAiCmdQueue AI_CMD_KEYBOARD_ABORT_REC");
+            }
+            state = AI_KEYB_IDLE;
+        }
+
         // Disconnect from Wi-Fi
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
@@ -1960,8 +1996,8 @@ void lcd_bluetooth_keyboard_sub_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blu
         submenu->index++;
         update_keyboard_submenu(submenu);
     } else if (ui_btns->select_btn == 1) { // Select script
-        // If no scripts in this category, ignore select
-        if (bluetooth_keyboard_submenu.size <= 0) {
+        // If no scripts in this category (255 = placeholder row), ignore select
+        if (submenu->script_indices[submenu->index] == 255) {
 #ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "No scripts in selected category");
 #endif
@@ -2278,7 +2314,7 @@ static void peer_menu_build(bluetooth_peer_menu_t *pm)
 {
     // Read cached peers (BT stays OFF)
     bluetooth_peer_info_t tmp[BT_MAX_PEERS];
-    int n = bluetooth_nvs_get_peers_list(tmp, BT_MAX_PEERS);
+    int n = bluetooth_nvs_get_peers_list(tmp, BT_MAX_PEERS - 1); // Row 0 is "Pair Another", so peers occupy rows 1..BT_MAX_PEERS-1
     if (n < 0) { // Index unreadable - show empty list as graceful fallback
         ESP_LOGE(TAG, "peer_menu_build: bluetooth_nvs_get_peers_list failed: %d", n);
         n = 0; // Treat as empty
@@ -2625,6 +2661,7 @@ void lcd_bluetooth_rename_peer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 
         // Copy the old name into buffer
         strncpy(bt_name_buf, prefill, MAX_CUSTOM_NAME_LEN);
+        bt_name_buf[MAX_CUSTOM_NAME_LEN] = '\0'; // strncpy may not terminate
 
         // Place cursor at the end
         cur_pos = strlen(bt_name_buf);

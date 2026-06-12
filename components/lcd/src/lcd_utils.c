@@ -251,8 +251,8 @@ void lcd_device_sleep(void)
 void lcd_init_driver(void)
 {
     // SPI bus + device init
+    //spi_clock_speed(40 * 1000 * 1000); // 40 MHz (20 by default)
     spi_master_init(&tft, SPI_MOSI_PIN, SPI_SCLK_PIN, ST7789_CS_PIN, ST7789_DC_PIN, ST7789_LEDA_PIN);
-    spi_clock_speed(40 * 1000 * 1000);  // 40 MHz
 
     // ST7789 panel init
     lcdInit(&tft, HOR_RES, VER_RES, 0, 0);

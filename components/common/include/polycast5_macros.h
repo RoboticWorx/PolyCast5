@@ -10,7 +10,7 @@
 
 // Memory control - SRAM currently: 197861/61.65 - Flash currently: 2825007 (app)
 #define POLYCAST5_USE_PSRAM_BSS EXT_RAM_BSS_ATTR // For zero-initialized memory
-#define POLYCAST5_USE_PSRAM_DATA EXT_RAM_ATTR // For non zero-initialized memory (initialized at runtime)
+#define POLYCAST5_USE_PSRAM_DATA EXT_RAM_NOINIT_ATTR // For non zero-initialized memory (initialized at runtime)
 
 // Debugging
 #define POLYCAST5_DEBUG 1 // If debugging: enables all ESP_LOGI/W

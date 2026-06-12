@@ -99,8 +99,8 @@ extern volatile bool haptic_btns[6];
 
 extern uint16_t home_sleep_after_s;
 
-extern int16_t rbg_blink_period_ms;
-extern int16_t rgb_blink_total_ms;
+extern volatile int16_t rbg_blink_period_ms;
+extern volatile int16_t rgb_blink_total_ms;
 
 extern int8_t lcd_ledc_brightness;
 
@@ -783,7 +783,7 @@ void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu
         // Save and rebuild
         settings_menu->pin_menu.unlock_pin[num_filled++] = code;
         lcd_settings_rebuild_pin_boxes(pin_container, pin_labels, settings_menu->pin_menu.unlock_pin, &num_boxes, num_filled);
-    } else if (ui_btns->select_btn == 1) { // Save
+    } else if (ui_btns->select_btn == 1 && num_filled > 0) { // Save
         settings_menu->pin_menu.unlock_pin[num_filled] = '\0'; // Ensure termination
             
 #ifdef POLYCAST5_DEBUG
@@ -1238,6 +1238,11 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
         lv_slider_set_value(slider, haptic_len_ms, LV_ANIM_OFF);
         xSemaphoreGive(xHapticsMutex); // Release haptics
         
+        // Row margin style
+        lv_style_init(&row_style);
+        lv_style_set_margin_top(&row_style, 2);
+        lv_style_set_margin_bottom(&row_style, 2);
+
         // Six switch rows
         for (int i = 0; i < 6; ++i) {
             // Create a row container for each row
@@ -1247,9 +1252,6 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
             lv_obj_set_style_bg_opa(sw_row[i], LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_scrollbar_mode(sw_row[i], LV_SCROLLBAR_MODE_OFF);
             lv_obj_set_style_border_width(sw_row[i], 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_style_init(&row_style);
-            lv_style_set_margin_top(&row_style, 2);
-            lv_style_set_margin_bottom(&row_style, 2);
             lv_obj_add_style(sw_row[i], &row_style, 0);
             
             // Flex formatting
@@ -1624,6 +1626,7 @@ void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
         // Reset statics
         lbl_every = lbl_for = pointer = NULL;
         slider_every = slider_for = NULL;
+        every_selected = true;
         init = false;
         
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
@@ -1706,7 +1709,7 @@ static void system_build_info(char *buf, size_t n)
     const char *idf = esp_get_idf_version();
     
     // Get this firmware version
-    char pc5_fw_version[64];
+    char pc5_fw_version[64] = "unknown";
     esp_err_t err = wifi_ota_update_get_nvs_version(pc5_fw_version, sizeof(pc5_fw_version));
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "wifi_ota_update_get_nvs_version failed: %s", esp_err_to_name(err));
@@ -2263,7 +2266,10 @@ void lcd_settings_pin_lockout_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
                 (pin_lockout_seconds % 3600U) / 60U,
                 pin_lockout_seconds % 60U);
 
-        lcd_settings_pin_lockout_s_nvs_save();
+        // Persist only at a coarse interval to limit flash wear
+        if (pin_lockout_seconds % 30 == 0) {
+            lcd_settings_pin_lockout_s_nvs_save();
+        }
         shown_seconds = pin_lockout_seconds;
     }
 
@@ -2384,18 +2390,25 @@ void lcd_settings_color_nvs_save(int new_color_idx, bool is_primary)
 
     // Open NVS
     err = nvs_open(SETTINGS_COLOR_NS, NVS_READWRITE, &handle);
-    ESP_ERROR_CHECK(err);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "lcd_settings_color_nvs_save: open failed (%s)", esp_err_to_name(err));
+        return;
+    }
 
     // Pick a key for primary vs secondary
     const char *key = is_primary ? SETTINGS_COLOR_PRIM_KEY : SETTINGS_COLOR_SEC_KEY;
 
     // Store the index
     err = nvs_set_i32(handle, key, new_color_idx);
-    ESP_ERROR_CHECK(err);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "lcd_settings_color_nvs_save: index set failed");
+    }
 
     //Commit & close
     err = nvs_commit(handle);
-    ESP_ERROR_CHECK(err);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "lcd_settings_color_nvs_save: commit failed");
+    }
     nvs_close(handle);
 }
 
@@ -2409,12 +2422,12 @@ void lcd_settings_color_nvs_load(void)
     if (err == ESP_OK) {
         int32_t idx;
         // Get primary color
-        if (nvs_get_i32(handle, SETTINGS_COLOR_PRIM_KEY, &idx) == ESP_OK) {
+        if (nvs_get_i32(handle, SETTINGS_COLOR_PRIM_KEY, &idx) == ESP_OK && idx >= 0 && idx < COLOR_OPTION_COUNT) {
             user_primary_color = primary_color_options[idx];
         }
         
         // Get secondary color
-        if (nvs_get_i32(handle, SETTINGS_COLOR_SEC_KEY, &idx) == ESP_OK) {
+        if (nvs_get_i32(handle, SETTINGS_COLOR_SEC_KEY, &idx) == ESP_OK && idx >= 0 && idx < COLOR_OPTION_COUNT) {
             user_secondary_color = secondary_color_options[idx];
         }
         nvs_close(handle);
@@ -2431,6 +2444,7 @@ void lcd_settings_pin_nvs_save(const settings_menu_t *menu)
     // Check
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "lcd_settings_pin_nvs_save NVS open error");
+        return;
     }
 
     // Save pin_set as a u8
@@ -2476,6 +2490,7 @@ void lcd_settings_pin_nvs_load(settings_menu_t *menu)
     
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "lcd_settings_pin_nvs_load nvs_open 2 failed: %s", esp_err_to_name(err));
+        return;
     }
 
     // Read pin_set
@@ -2531,7 +2546,7 @@ void lcd_settings_pin_attempts_nvs_save(void)
     esp_err_t err = nvs_open(SETTINGS_ATTEMPTS_NS, NVS_READWRITE, &h);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Pin attempts NVS open error: %s", esp_err_to_name(err));
-        goto out;
+        return;
     }
 
     // Store pin_attempts as a uint32
@@ -2548,7 +2563,6 @@ void lcd_settings_pin_attempts_nvs_save(void)
     }
     
     // Close NVS
-    out:
     nvs_close(h);
 }
 
@@ -2563,7 +2577,7 @@ void lcd_settings_pin_attempts_nvs_load(void)
         ESP_LOGW(TAG, "Pin attempts nvs_open failed: %s", esp_err_to_name(err));
 #endif
         
-        goto out;
+        return;
     }
     
     // Get the uint32
@@ -2586,7 +2600,6 @@ void lcd_settings_pin_attempts_nvs_load(void)
 #endif
     
     // Close NVS
-    out:
     nvs_close(h);
 }
 

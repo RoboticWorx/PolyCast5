@@ -44,6 +44,7 @@ extern EventGroupHandle_t xWiFiPortalEventGroup;
 #define WIFI_GET_DATE_TIME_BIT     (1U << 11)
 #define WIFI_GOT_DATE_TIME_BIT     (1U << 12)
 #define WIFI_STOP_DEAUTH_BIT       (1U << 13)
+#define WIFI_DATE_TIME_FAILED_BIT  (1U << 14) // SNTP sync gave up (pairs with WIFI_GOT_DATE_TIME_BIT)
 extern EventGroupHandle_t xWifiEventGroup;
 
 extern QueueHandle_t xWifiScanQueue;

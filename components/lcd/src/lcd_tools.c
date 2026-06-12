@@ -655,14 +655,10 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
         lv_obj_delete(lbl_roll_log);
         lv_obj_delete(cont_roll_log);
         
-        // Remove styles
-        lv_obj_remove_style_all(lbl_sides);
-        lv_obj_remove_style_all(lbl_dice);
-        
         // Reset statics
         lbl_ins = lbl_dice = lbl_sides = lbl_num_dice = lbl_num_sides = lbl_pointer = img_dice = lbl_result = lbl_roll_log = cont_roll_log = NULL;
         do_once = false;
-        
+
         // Hide right arrow
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
         
@@ -684,14 +680,10 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
         lv_obj_delete(lbl_roll_log);
         lv_obj_delete(cont_roll_log);
         
-        // Remove styles
-        lv_obj_remove_style_all(lbl_sides);
-        lv_obj_remove_style_all(lbl_dice);
-        
         // Reset statics
         lbl_ins = lbl_dice = lbl_sides = lbl_num_dice = lbl_num_sides = lbl_pointer = img_dice = lbl_result = lbl_roll_log = cont_roll_log = NULL;
         do_once = false;
-        
+
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
@@ -2543,7 +2535,7 @@ static void tetris_high_score_nvs_save(uint32_t score)
     esp_err_t err = nvs_open(HIGH_SCORE_NS, NVS_READWRITE, &h);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "tetris_high_score_nvs_save nvs_open failed");
-        goto out;
+        return; // Handle not open - nothing to close
     }
 
     // Store high score as a uint32
@@ -2560,7 +2552,6 @@ static void tetris_high_score_nvs_save(uint32_t score)
     }
     
     // Close NVS
-    out:
     nvs_close(h);
 }
 
@@ -2575,6 +2566,7 @@ static uint32_t tetris_high_score_nvs_load(void)
 #ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "tetris_high_score_nvs_load NS DNE");
 #endif
+        return 0; // Handle not open - no high score saved yet
     }
     
     // Get the uint32
@@ -2948,10 +2940,13 @@ void lcd_tools_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t 
 
     // Time-based fall (increase x)
     TickType_t now = xTaskGetTickCount();
-    uint32_t fall_delay = FALL_DELAY_MS - (tetris_score / 1000) * LEVEL_SPEED_INCREASE; // Speed up with level
-    
-    if (fall_delay < 100) {
+    uint32_t fall_reduction = (tetris_score / 1000) * LEVEL_SPEED_INCREASE; // Speed up with level
+    uint32_t fall_delay;
+
+    if (fall_reduction + 100 >= FALL_DELAY_MS) { // Clamp before subtracting to avoid underflow
         fall_delay = 100; // Min speed
+    } else {
+        fall_delay = FALL_DELAY_MS - fall_reduction;
     }
     
     // Soft drop with right button

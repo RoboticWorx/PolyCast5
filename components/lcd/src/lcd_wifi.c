@@ -2679,14 +2679,15 @@ static void update_name_label_lcd(lv_obj_t *lbl_display, char cur_char, int cur_
         len = MAX_CUSTOM_NAME_LEN + 1;
     }
     
-    // Copy name into display buffer
-    if (cur_pos > 0) {
-        memcpy(display, mqtt_name_buf, cur_pos);
+    // Copy name into display buffer (clamped so a long buffer can't overflow display)
+    int n = len - 1; // Clamped cur_pos
+    if (n > 0) {
+        memcpy(display, mqtt_name_buf, n);
     }
-    
+
     // Get current
-    display[cur_pos] = cur_char;
-    display[len] = '\0';
+    display[n] = cur_char;
+    display[n + 1] = '\0';
     
     // Set text and re-center
     lv_label_set_text(lbl_display, display);
@@ -2711,6 +2712,7 @@ void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_m
         if (wifi_menu_overwrite) {
             // Copy the old name into buffer
             strncpy(mqtt_name_buf, wifi_menu->options[wifi_menu->index], MAX_CUSTOM_NAME_LEN);
+            mqtt_name_buf[MAX_CUSTOM_NAME_LEN] = '\0'; // strncpy doesn't terminate when truncating
 
             // Place cursor at the end
             cur_pos = strlen(mqtt_name_buf);
@@ -3524,6 +3526,11 @@ esp_err_t lcd_wifi_topic_keys_nvs_load(wifi_menu_t *menu)
     if (err != ESP_OK) {
         nvs_close(h);
         return err;
+    }
+
+    // Clamp count so user entries can't overrun the fixed arrays
+    if (count > MAX_WIFI_OPTIONS - WIFI_MENU_START_SIZE) {
+        count = MAX_WIFI_OPTIONS - WIFI_MENU_START_SIZE;
     }
 
     // Zero out everything first

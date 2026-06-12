@@ -37,6 +37,8 @@ Please see https://polycast5.com/blogs/docs/srs-memory-planner
 
 #define TAG "SRS_MEMORY"
 
+#define SRS_TIME_SYNC_TIMEOUT_MS 35000 // Backstop slightly beyond the 30 s SNTP bound in wifi_utils
+
 // Namespace and keys
 #define SRS_FORMAT "e%04u"
 #define SRS_CNT_KEY "cnt" // Number of entries key
@@ -133,19 +135,35 @@ bool srs_sync_time_over_wifi(void)
         // Request to get date and time
         xEventGroupSetBits(xWifiEventGroup, WIFI_GET_DATE_TIME_BIT);
 
-        // Wait for it to complete
-        while (!(xEventGroupGetBits(xWifiEventGroup) & WIFI_GOT_DATE_TIME_BIT)) {
+        // Wait (bounded) for it to complete or fail
+        bool got_time = false;
+        TickType_t sync_start = xTaskGetTickCount();
+        while ((xTaskGetTickCount() - sync_start) < pdMS_TO_TICKS(SRS_TIME_SYNC_TIMEOUT_MS)) {
+            EventBits_t bits = xEventGroupGetBits(xWifiEventGroup);
+            if (bits & WIFI_GOT_DATE_TIME_BIT) {
+                got_time = true;
+                break;
+            }
+            if (bits & WIFI_DATE_TIME_FAILED_BIT) {
+                break;
+            }
             lv_timer_handler();
             vTaskDelay(pdMS_TO_TICKS(10));
         }
         // Reset for next time
-        xEventGroupClearBits(xWifiEventGroup, WIFI_GOT_DATE_TIME_BIT);
+        xEventGroupClearBits(xWifiEventGroup, WIFI_GOT_DATE_TIME_BIT | WIFI_DATE_TIME_FAILED_BIT);
 
         // Delete helper text
         lv_obj_delete(lbl_info);
         lbl_info = NULL;
 
         lcd_anim_loading_stop();
+
+        // Sync failed or timed out
+        if (!got_time) {
+            lcd_clear_pending_inputs = true; // Clear user inputs from wait
+            return false;
+        }
     
         return true;
     }
@@ -190,18 +208,36 @@ bool srs_sync_time_over_wifi(void)
         // Request to get date and time
         xEventGroupSetBits(xWifiEventGroup, WIFI_GET_DATE_TIME_BIT);
         
-        // Wait for it to complete
-        while (!(xEventGroupGetBits(xWifiEventGroup) & WIFI_GOT_DATE_TIME_BIT)) {
+        // Wait (bounded) for it to complete or fail
+        bool got_time = false;
+        TickType_t sync_start = xTaskGetTickCount();
+        while ((xTaskGetTickCount() - sync_start) < pdMS_TO_TICKS(SRS_TIME_SYNC_TIMEOUT_MS)) {
+            EventBits_t bits = xEventGroupGetBits(xWifiEventGroup);
+            if (bits & WIFI_GOT_DATE_TIME_BIT) {
+                got_time = true;
+                break;
+            }
+            if (bits & WIFI_DATE_TIME_FAILED_BIT) {
+                break;
+            }
             lv_timer_handler();
             vTaskDelay(pdMS_TO_TICKS(10));
         }
         // Reset for next time
-        xEventGroupClearBits(xWifiEventGroup, WIFI_GOT_DATE_TIME_BIT);
+        xEventGroupClearBits(xWifiEventGroup, WIFI_GOT_DATE_TIME_BIT | WIFI_DATE_TIME_FAILED_BIT);
 
         // Done with Wi-Fi -> disconnect to save power
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
         lcd_clear_pending_inputs = true; // Clear user inputs from wait
+
+        // Sync failed or timed out
+        if (!got_time) {
+            lcd_anim_loading_stop();
+            lv_obj_delete(lbl_info);
+            lbl_info = NULL;
+            return false;
+        }
     } else {
         // Stop loading animation
         lcd_anim_loading_stop();

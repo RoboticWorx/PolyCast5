@@ -231,6 +231,14 @@ static void ai_task(void *pvParameters)
                 }
             }
             continue;
+        } else if (cmd.type == AI_CMD_KEYBOARD_ABORT_REC) { // Page exited mid-recording
+            // No STT: just release the mic and the abandoned capture
+            esp_err_t deinit_err = ai_voice_deinit();
+            if (deinit_err != ESP_OK) {
+                ESP_LOGE(TAG, "ai_voice_deinit failed: %s", esp_err_to_name(deinit_err));
+            }
+            ai_voice_free_pcm(&pcm);
+            continue;
         } else if (cmd.type == AI_CMD_KEYBOARD_DONE_REC) { // Process transcription
             memset(user_transcript, 0, sizeof(user_transcript)); // Clear previous contents
 

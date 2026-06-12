@@ -732,7 +732,7 @@ void lcd_gpio_accel_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_men
 }
 
 // Helper function to perform the I2C scan and return found addresses
-static void i2c_scan(uint8_t found_addrs[], int *found_count)
+static void i2c_scan(uint8_t found_addrs[], int max, int *found_count)
 {
     *found_count = 0;
 
@@ -749,6 +749,11 @@ static void i2c_scan(uint8_t found_addrs[], int *found_count)
 
         // If slave at addr ACKed the address byte
         if (ret == ESP_OK) {
+            // Stop once the caller's buffer is full
+            if (*found_count >= max) {
+                ESP_LOGW(TAG, "I2C scan found more than %d devices, some addresses not reported", max);
+                break;
+            }
             found_addrs[*found_count] = addr;
             (*found_count)++;
 
@@ -830,7 +835,7 @@ void lcd_gpio_scanner_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *
         // Perform scan
         uint8_t found_addrs[I2C_MAX_DEVICES];
         int found_count = 0;
-        i2c_scan(found_addrs, &found_count);
+        i2c_scan(found_addrs, I2C_MAX_DEVICES, &found_count);
 
         // Build concatenated string of devices found
         if (found_count > 0) { // If any

@@ -152,9 +152,18 @@ esp_err_t bluetooth_nvs_clear_peers_list(bool preferred_only)
         return err;
     }
 
-    // Erase key
+    // Erase keys; a missing key just means there is nothing to erase
     err = nvs_erase_key(h, BT_PEERS_KEY);
-    err = nvs_erase_key(h, BT_PEERS_PERF_KEY);
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        err = ESP_OK;
+    }
+    esp_err_t err2 = nvs_erase_key(h, BT_PEERS_PERF_KEY);
+    if (err2 == ESP_ERR_NVS_NOT_FOUND) {
+        err2 = ESP_OK;
+    }
+    if (err == ESP_OK) {
+        err = err2;
+    }
 
     // Commit and close
     if (err == ESP_OK) {
