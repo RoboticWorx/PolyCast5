@@ -12,4 +12,13 @@
  */
 void lcd_games_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu);
 
+/**
+ * @brief T-Rex Runner game implemetation
+ *
+ * @param [in] ui_btns User input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] tools_menu Tools menu structure
+ */
+void lcd_games_trex_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu);
+
 #endif // LCD_GAMES_H

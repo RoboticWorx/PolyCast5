@@ -39,9 +39,9 @@
 #define TAG "LCD_TOOLS"
 
 tools_menu_t tools_menu = {
-    .options = {"Coin Flipper", "Dice Roller", "Tetris", "Number Generator", "Read the Docs", "Bitcoin QR",
+    .options = {"Coin Flipper", "Dice Roller", "Tetris", "T-Rex Runner", "Number Generator", "Read the Docs", "Bitcoin QR",
             "Pomodoro Timer", "SRS Planner", "Claude Usage"},
-    .size = 9,
+    .size = 10,
     .index = 0,
     .cont = NULL,
 };
@@ -183,11 +183,11 @@ void lcd_tools_coin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
         
         // Create coin image
         coin_heads = lv_img_create(ACTIVE_SCR);
-        lv_img_set_src(coin_heads, &img_coin_heads);
+        lv_image_set_src(coin_heads, &img_coin_heads);
         lv_obj_align(coin_heads, LV_ALIGN_CENTER, -40, 16);
         
         coin_tails = lv_img_create(ACTIVE_SCR);
-        lv_img_set_src(coin_tails, &img_coin_tails);
+        lv_image_set_src(coin_tails, &img_coin_tails);
         lv_obj_align(coin_tails, LV_ALIGN_CENTER, -40, 16);
         lv_obj_add_flag(coin_tails, LV_OBJ_FLAG_HIDDEN); // Hide for now
         
@@ -209,7 +209,7 @@ void lcd_tools_coin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
                 lv_obj_remove_flag(coin_heads, LV_OBJ_FLAG_HIDDEN);
                 lv_obj_add_flag(coin_tails, LV_OBJ_FLAG_HIDDEN);
             }
-            lv_timer_handler();
+            lv_refr_now(NULL); // Render this frame now (lv_timer_handler skips frames when the refresh period exceeds the step delay)
             vTaskDelay(pdMS_TO_TICKS(FLIP_DELAY));
         }
         
@@ -427,7 +427,7 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
         
         // Create dice img
         img_dice = lv_img_create(ACTIVE_SCR);
-        lv_img_set_src(img_dice, IMG_DICE_2);
+        lv_image_set_src(img_dice, IMG_DICE_2);
         lv_obj_align(img_dice, LV_ALIGN_CENTER, -65, 0);
         
         lbl_ins = lv_label_create(ACTIVE_SCR);
@@ -511,22 +511,22 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
         uint32_t zero_to_five = esp_random() % NUM_IMGS; // Random end frame
         
         // Animate
-        for (int i = 0; i < (15 + zero_to_five); ++i) {
+        for (int i = 0; i < (7 + zero_to_five); ++i) {
             if (i % NUM_IMGS == 0) {
-                lv_img_set_src(img_dice, IMG_DICE_1);
+                lv_image_set_src(img_dice, IMG_DICE_1);
             } else if (i % NUM_IMGS == 1) {
-                lv_img_set_src(img_dice, IMG_DICE_2);
+                lv_image_set_src(img_dice, IMG_DICE_2);
             } else if (i % NUM_IMGS == 2) {
-                lv_img_set_src(img_dice, IMG_DICE_3);
+                lv_image_set_src(img_dice, IMG_DICE_3);
             } else if (i % NUM_IMGS == 3) {
-                lv_img_set_src(img_dice, IMG_DICE_4);
+                lv_image_set_src(img_dice, IMG_DICE_4);
             } else if (i % NUM_IMGS == 4) {
-                lv_img_set_src(img_dice, IMG_DICE_5);
+                lv_image_set_src(img_dice, IMG_DICE_5);
             } else if (i % NUM_IMGS == 5) {
-                lv_img_set_src(img_dice, IMG_DICE_6);
+                lv_image_set_src(img_dice, IMG_DICE_6);
             }
-            
-            lv_timer_handler();
+
+            lv_refr_now(NULL); // Render this frame now (lv_timer_handler skips frames: 33ms refresh period vs 30ms steps)
             vTaskDelay(pdMS_TO_TICKS(ANIM_DELAY));
         }
         

@@ -302,8 +302,11 @@ void lcd_lvgl_init(void)
     // Initialize LVGL's POSIX file system driver (binds to VFS/LittleFS)
     lv_fs_posix_init();
     
-     // Reserve slots in the decoded-image cache
-    lv_image_cache_init((CITY_FRAME_CNT + BLACK_HOLE_FRAME_CNT + MATRIX_RAIN_FRAME_CNT + PYRAMID_FRAME_CNT) * 3);
+    // Size the decoded-image caches
+    // Sized in bytes to fit every fullscreen frame of the LARGEST enabled animation
+    lv_image_cache_resize(LV_MAX3(CITY_FRAME_CNT, BLACK_HOLE_FRAME_CNT, MATRIX_RAIN_FRAME_CNT)
+            * (HOR_RES * VER_RES * 2 + 12) + 256 * 1024, false);
+    lv_image_header_cache_resize(160, false); // Count-based, tiny entries
 
     // Draw‐buffer: HOR_RES x DRAW_LINES lines
     // Allocate space for 20 lines of 240 px each (~9.6 kB), DMA-capable in DRAM
@@ -2842,7 +2845,22 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
         
         // Switch pages
         ui_menu->page = TOOLS_TETRIS_PAGE;
-    } else if (ui_btns->select_btn == 1 && tools_menu->index == 3) { // Random number generator selected
+    } else if (ui_btns->select_btn == 1 && tools_menu->index == 3) { // T-Rex Runner selected
+        // Hide tools menu
+        lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Reset static
+        do_once = false;
+
+        // Hide all arrows
+        lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+        // Switch pages
+        ui_menu->page = TOOLS_TREX_PAGE;
+    } else if (ui_btns->select_btn == 1 && tools_menu->index == 4) { // Random number generator selected
         // Hide tools menu
         lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         
@@ -2854,7 +2872,7 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
         
         // Switch pages
         ui_menu->page = TOOLS_NUM_GEN_PAGE;
-    } else if (ui_btns->select_btn == 1 && tools_menu->index == 4) { // Read the docs selected
+    } else if (ui_btns->select_btn == 1 && tools_menu->index == 5) { // Read the docs selected
         // Hide tools menu
         lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         
@@ -2870,7 +2888,7 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
         
         // Switch pages
         ui_menu->page = TOOLS_DOCS_PAGE;
-    } else if (ui_btns->select_btn == 1 && tools_menu->index == 5) { // BTC address selected
+    } else if (ui_btns->select_btn == 1 && tools_menu->index == 6) { // BTC address selected
         // Hide tools menu
         lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         
@@ -2882,7 +2900,7 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
         
         // Switch pages
         ui_menu->page = TOOLS_BTC_ADDR_PAGE;
-    } else if (ui_btns->select_btn == 1 && tools_menu->index == 6) { // Pomodoro timer selected
+    } else if (ui_btns->select_btn == 1 && tools_menu->index == 7) { // Pomodoro timer selected
         // Hide tools menu
         lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         
@@ -2894,7 +2912,7 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
         
         // Switch pages
         ui_menu->page = TOOLS_POMODORO_PAGE;
-    } else if (ui_btns->select_btn == 1 && tools_menu->index == 7) { // SRS memory assist selected
+    } else if (ui_btns->select_btn == 1 && tools_menu->index == 8) { // SRS memory assist selected
         // Hide tools menu
         lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
@@ -2906,7 +2924,7 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
 
         // Switch pages
         ui_menu->page = TOOLS_HOW_SRS_PAGE;
-    } else if (ui_btns->select_btn == 1 && tools_menu->index == 8) { // Claude Usage selected
+    } else if (ui_btns->select_btn == 1 && tools_menu->index == 9) { // Claude Usage selected
         // Hide tools menu
         lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 

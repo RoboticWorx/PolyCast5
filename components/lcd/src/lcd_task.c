@@ -408,6 +408,10 @@ static void lcd_task(void *pvParameters)
                 case TOOLS_TETRIS_PAGE:
                     lcd_games_tetris_page(&ui_btns, &ui_menu, &tools_menu);
                     break;
+                case TOOLS_TREX_PAGE:
+                    lcd_games_trex_page(&ui_btns, &ui_menu, &tools_menu);
+                    dont_sleep_on_this_page = true; // Game timer consumes button semaphores, so the inactivity timer never resets
+                    break;
                 case TOOLS_HOW_SRS_PAGE:
                     lcd_tools_how_srs_page(&ui_btns, &ui_menu, &tools_menu);
                     break;
