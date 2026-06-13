@@ -1210,6 +1210,10 @@ static void ble_hid_device_host_task(void *param)
 // Declaration of extern esp function
 void ble_store_config_init(void);
 
+// NimBLE GATT server init (private IDF symbol, ble_gatt_priv.h)
+// Re-arms the GATT context (ble_gatts_static_vars) without touching the ATT attribute list
+extern int ble_gatts_init(void);
+
 // Drop NimBLE bonds whose addresses are not in PolyCast5's NVS peer index
 static void bluetooth_utils_reconcile_bonds(void)
 {
@@ -1309,6 +1313,10 @@ void bluetooth_utils_init(void)
         if (ble_hid_param.hid_dev) {
             esp_hidd_dev_deinit(ble_hid_param.hid_dev);
             ble_hid_param.hid_dev = NULL;
+
+            // Re-arm the GATT context so esp_hid_gap_deinit()'s ble_hs_deinit()
+            // doesn't ble_gatts_stop() a freed context
+            ble_gatts_init();
         }
 
         esp_hid_gap_deinit();
@@ -1353,6 +1361,23 @@ void bluetooth_utils_deinit(void)
     if (ble_hid_param.hid_dev) {
         esp_hidd_dev_deinit(ble_hid_param.hid_dev);
         ble_hid_param.hid_dev = NULL;
+
+        // esp_hidd_dev_deinit() -> nimble_hid_stop_gatts() calls ble_gatts_stop(),
+        // and esp_hid_gap_deinit() below tears down the host via ble_hs_deinit(),
+        // which calls ble_gatts_stop() a SECOND time. Under
+        // CONFIG_BT_NIMBLE_STATIC_TO_DYNAMIC the first stop frees the GATT context
+        // (ble_gatts_static_vars) and NULLs it. This double-stop was harmless on
+        // ESP-IDF v6.0 (every static_vars access in ble_gatts_free_mem was guarded
+        // by a max-count or a NULL check), but v6.0.1's NimBLE leak fix for the
+        // dynamic-services-disabled path added an UNGUARDED deref of static_vars
+        // - "if (ble_gatts_clt_cfgs != NULL)" at ble_gatts.c:1739 - so the second
+        // stop now panics (load fault) on the freed/NULL context.
+        // ble_gatts_init() reallocates the context (via ble_gatts_ensure_ctx()) so
+        // the host's own teardown stop frees an empty struct instead of crashing.
+        // We use ble_gatts_init() and NOT ble_gatts_reset(): reset walks
+        // ble_att_svr_list, whose entries are dangling after the HID services were
+        // torn down, and faults in ble_att_svr_reset().
+        ble_gatts_init();
     }
 
     // Tears down NimBLE (esp_nimble_deinit), BT controller, and semaphores
