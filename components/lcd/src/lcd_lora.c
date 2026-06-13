@@ -278,11 +278,12 @@ void lcd_lora_update_menu(lora_menu_t *menu)
 }
 
 void lcd_lora_update_submenu(lora_menu_t *menu)
-{    
+{
     // Hide and reset receipt label
     lv_obj_add_flag(menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
     lv_label_set_text(menu->submenu.lbl_receipt, "");
-        
+    xSemaphoreTake(xLoraReceiptValidSemaphore, 0); // Drop any receipt latched while away (e.g. a hotkey command's ACK)
+
     // Reveal
     lv_obj_remove_flag(menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 

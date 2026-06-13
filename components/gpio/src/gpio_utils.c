@@ -497,12 +497,15 @@ void gpio_utils_spin_haptic(uint32_t ms)
         ticks = 1; // Can't be 0
     }
     
-    // Re-arm the timer with the new period (clears any pending expiry from a previous buzz)
-    xTimerChangePeriod(haptic_timer, ticks, portMAX_DELAY);
-    xTimerStart(haptic_timer, portMAX_DELAY);
-    
+    // Stop first so a pending expiry from a previous buzz can't fire OFF around the ON write
+    xTimerStop(haptic_timer, portMAX_DELAY);
+
     gpio_utils_write_output(TCA9535_HAPTIC_PIN, 1); // Haptic ON
-    
+
+    // Arm the off-timer only after the ON write is committed, so OFF always follows ON
+    // (xTimerChangePeriod also starts timer)
+    xTimerChangePeriod(haptic_timer, ticks, portMAX_DELAY);
+
     // Haptic OFF when timer expires
 }
 

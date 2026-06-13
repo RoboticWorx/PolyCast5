@@ -831,7 +831,9 @@ esp_err_t wifi_utils_radio_start(const char *ssid, const uint8_t* bssid, const c
     cfg.sta.channel = 0; // Don't lock to a specific channel
     cfg.sta.scan_method = WIFI_FAST_SCAN; // First matching SSID (vs WIFI_ALL_CHANNEL_SCAN)
 
-    cfg.sta.threshold.authmode = WIFI_AUTH_OPEN; // Weakest auth mode to accept in the fast scan mode
+    // Open networks (empty stored password) are joinable; protected networks require at least
+    // WPA so a rogue open AP broadcasting a saved SSID can't downgrade the connection
+    cfg.sta.threshold.authmode = (password[0] != '\0') ? WIFI_AUTH_WPA_PSK : WIFI_AUTH_OPEN;
 
     // Required for WPA2/WPA3 transition APs (e.g. iPhone Personal Hotspot, AUTH:7)
     cfg.sta.pmf_cfg.capable = true;

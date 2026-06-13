@@ -117,7 +117,8 @@ static void ota_task(void *_)
     /* Download and write loop */
     size_t last = 0;
     int last_pct = -1;
-    
+    uint32_t chunks = 0;
+
     // While updating:
     // Stream chunks from the server and write them directly into flash at the inactive OTA slot
     while ((err = esp_https_ota_perform(h)) == ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
@@ -157,8 +158,11 @@ static void ota_task(void *_)
             }
         }
         
-        // Yield CPU time for UI
-        vTaskDelay(pdMS_TO_TICKS(10));
+        // Yield a real tick every 8th chunk so lower-priority tasks (buttons, BT, LoRa)
+        // still run, without adding ~10 ms per chunk (~14 s) to the whole download
+        if ((++chunks % 8) == 0) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
     }
     
     // If error

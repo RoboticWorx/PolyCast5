@@ -187,7 +187,11 @@ void lora_pcp_process_received_message(uint8_t *message, size_t message_len)
 #endif
             waiting_for_ack = false; // Done; a queued next command dispatches normally
 
-            xSemaphoreGive(xLoraReceiptValidSemaphore);
+            // Only signal delivered if no newer command is already queued -
+            // the UI checkmark must never show for a command that hasn't been sent yet
+            if (uxQueueMessagesWaiting(xLoraSendEncQueue) == 0) {
+                xSemaphoreGive(xLoraReceiptValidSemaphore);
+            }
         } else {
 #ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "ACK ID wrong (got=%" PRIu32 ", want=%" PRIu32 ")", ack.msg_id, expected_rx_id);

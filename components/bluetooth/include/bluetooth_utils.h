@@ -135,7 +135,7 @@ typedef struct {
 #define BLUETOOTH_CMD_INIT 0
 #define BLUETOOTH_CMD_DEINIT 1
 #define BLUETOOTH_CMD_UNPAIR_ALL 2
-#define BLUETOOTH_CMD_UNPAIR_ALL_NO_REINIT 3
+#define BLUETOOTH_CMD_UNPAIR_ALL_NO_REINIT 3 // Must be at end (largest number)
 
 #define BLUETOOTH_SCRIPT_OFFSET 1000
 

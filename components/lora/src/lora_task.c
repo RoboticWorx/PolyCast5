@@ -343,17 +343,20 @@ static void lora_event_handler_task(void *pvParameters)
 #endif
                 sx126x_clear_irq_status(NULL, SX126X_IRQ_TIMEOUT);
                 sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
-                
+
                 // Never got receipt, need to try again with same everything
-                if (retry_count < MAX_RETRIES) { // Cap at MAX_RETRIES
-                    need_to_retry = true;
-                    retry_count++;
-                } else {
-                    waiting_for_ack = false; // Give up; a queued next command dispatches normally
-                    
+                // (unless RX_DONE co-latched - then the RX_DONE handler already spent this event's retry)
+                if (!(irq_flags & SX126X_IRQ_RX_DONE)) {
+                    if (retry_count < MAX_RETRIES) { // Cap at MAX_RETRIES
+                        need_to_retry = true;
+                        retry_count++;
+                    } else {
+                        waiting_for_ack = false; // Give up; a queued next command dispatches normally
+
 #ifdef POLYCAST5_DEBUG
-                    ESP_LOGW(TAG, "Hit max LoRa retries");
+                        ESP_LOGW(TAG, "Hit max LoRa retries");
 #endif
+                    }
                 }
             }
 
@@ -363,17 +366,20 @@ static void lora_event_handler_task(void *pvParameters)
 #endif
                 sx126x_clear_irq_status(NULL, SX126X_IRQ_HEADER_ERROR);
                 sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
-                
+
                 // Never got receipt, need to try again with same everything
-                if (retry_count < MAX_RETRIES) { // Cap at MAX_RETRIES
-                    need_to_retry = true;
-                    retry_count++;
-                } else {
-                    waiting_for_ack = false; // Give up; a queued next command dispatches normally
-                    
+                // (unless RX_DONE co-latched - then the RX_DONE handler already spent this event's retry)
+                if (!(irq_flags & SX126X_IRQ_RX_DONE)) {
+                    if (retry_count < MAX_RETRIES) { // Cap at MAX_RETRIES
+                        need_to_retry = true;
+                        retry_count++;
+                    } else {
+                        waiting_for_ack = false; // Give up; a queued next command dispatches normally
+
 #ifdef POLYCAST5_DEBUG
-                    ESP_LOGW(TAG, "Hit max LoRa retries");
+                        ESP_LOGW(TAG, "Hit max LoRa retries");
 #endif
+                    }
                 }
             }
 
@@ -383,17 +389,20 @@ static void lora_event_handler_task(void *pvParameters)
 #endif
                 sx126x_clear_irq_status(NULL, SX126X_IRQ_CRC_ERROR);
                 sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
-                
+
                 // Never got receipt, need to try again with same everything
-                if (retry_count < MAX_RETRIES) { // Cap at MAX_RETRIES
-                    need_to_retry = true;
-                    retry_count++;
-                } else {
-                    waiting_for_ack = false; // Give up; a queued next command dispatches normally
-                    
+                // (unless RX_DONE co-latched - then the RX_DONE handler already spent this event's retry)
+                if (!(irq_flags & SX126X_IRQ_RX_DONE)) {
+                    if (retry_count < MAX_RETRIES) { // Cap at MAX_RETRIES
+                        need_to_retry = true;
+                        retry_count++;
+                    } else {
+                        waiting_for_ack = false; // Give up; a queued next command dispatches normally
+
 #ifdef POLYCAST5_DEBUG
-                    ESP_LOGW(TAG, "Hit max LoRa retries");
+                        ESP_LOGW(TAG, "Hit max LoRa retries");
 #endif
+                    }
                 }
             }
         }

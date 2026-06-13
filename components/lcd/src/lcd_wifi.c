@@ -662,7 +662,8 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
                 ui_menu->page = WIFI_PASSWORD_PAGE;
             } else { // Else open network: go ahead and send
                 selected_network.locked = false; // Doesn't require password
-                
+                selected_network.password[0] = '\0'; // Clear any stale password from a previous protected join (open = empty password)
+
                 if (xQueueSend(xWifiSelectedNetworkQueue, &selected_network, portMAX_DELAY) != pdPASS) {
                     ESP_LOGE(TAG, "Failed: xWifiSelectedNetworkQueue SSID");
                 }
