@@ -22,6 +22,196 @@
 #define HIGH_SCORE_NS "tetris"
 #define HIGH_SCORE_KEY "score"
 
+games_menu_t games_menu = {
+    .options = {"Tetris", "T-Rex Runner"},
+    .size = 2,
+    .index = 0,
+    .cont = NULL,
+};
+
+void lcd_games_setup_page(games_menu_t *menu)
+{
+    // Create list
+    menu->main_list = lv_list_create(ACTIVE_SCR);
+    lv_obj_set_size(menu->main_list, 210, 106);
+
+    // Format
+    lv_obj_set_style_bg_color(menu->main_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_align(menu->main_list, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_border_width(menu->main_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lcd_apply_scrollbar_style(menu->main_list);
+    lv_obj_set_scroll_dir(menu->main_list, LV_DIR_VER);
+
+    // Create button style
+    lv_style_init(&menu->btn_style);
+
+    lv_style_set_radius(&menu->btn_style, 8);
+    lv_style_set_bg_color(&menu->btn_style, user_primary_color);
+
+    lv_style_set_border_width(&menu->btn_style, 2);
+    lv_style_set_border_color(&menu->btn_style, user_secondary_color);
+    lv_style_set_border_side(&menu->btn_style, LV_BORDER_SIDE_FULL);
+
+    lv_style_set_pad_top(&menu->btn_style, 3);
+    lv_style_set_pad_bottom(&menu->btn_style, 3);
+
+    lv_style_set_text_font(&menu->btn_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&menu->btn_style, user_secondary_color);
+    lv_style_set_text_align(&menu->btn_style, LV_TEXT_ALIGN_CENTER);
+
+    // Create selected button style
+    lv_style_init(&menu->sel_style);
+
+    lv_style_set_radius(&menu->sel_style, 8);
+    lv_style_set_bg_color(&menu->sel_style, user_secondary_color);
+
+    lv_style_set_border_width(&menu->sel_style, 2);
+    lv_style_set_border_color(&menu->sel_style, user_secondary_color);
+    lv_style_set_border_side(&menu->sel_style, LV_BORDER_SIDE_FULL);
+
+    lv_style_set_pad_top(&menu->sel_style, 3);
+    lv_style_set_pad_bottom(&menu->sel_style, 3);
+
+    lv_style_set_text_font(&menu->sel_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&menu->sel_style, user_primary_color);
+    lv_style_set_text_align(&menu->sel_style, LV_TEXT_ALIGN_CENTER);
+
+    // Create buttons
+    // Wrap index
+    if (menu->index >= menu->size) {
+        menu->index = 0;
+    } else if (menu->index < 0) {
+        menu->index = menu->size - 1;
+    }
+
+    // Create button for each option
+    for (int i = 0; i < menu->size; ++i) {
+
+        menu->btns[i] = lv_list_add_btn(menu->main_list, NULL, menu->options[i]);
+        lv_obj_set_size(menu->btns[i], 200, 30);
+
+        // Style selected
+        if (i == menu->index) {
+            lv_obj_add_style(menu->btns[i], &menu->sel_style, 0);
+        } else {
+            lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
+        }
+
+        // Create and format text label
+        lv_obj_t *lbl = lv_obj_get_child(menu->btns[i], 0);
+        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+    }
+
+    // Format buttons as container
+    menu->cont = lv_obj_get_parent(menu->btns[0]);
+    lv_obj_set_flex_flow (menu->cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(menu->cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(menu->cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT); // Set button spacing
+
+    // Hide for now
+    lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
+}
+
+void lcd_games_update_menu(games_menu_t *menu)
+{
+    // Reveal
+    lv_obj_remove_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+    // Wrap index
+    if (menu->index >= menu->size) {
+        menu->index = 0;
+    } else if (menu->index < 0) {
+        menu->index = menu->size - 1;
+    }
+
+    // Reset every button to unselected
+    for (int i = 0; i < menu->size; ++i) {
+        lv_obj_remove_style(menu->btns[i], &menu->sel_style, 0);
+        lv_obj_add_style(menu->btns[i], &menu->btn_style, 0);
+    }
+
+    // Highlight only the current index
+    lv_obj_remove_style(menu->btns[menu->index], &menu->btn_style, 0);
+    lv_obj_add_style(menu->btns[menu->index], &menu->sel_style, 0);
+
+    // Enable scrolling if list gets too long
+    lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
+}
+
+void lcd_games_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *games_menu)
+{
+    // Statics
+    static bool do_once = false;
+
+    // Only execute once
+    if (!do_once) {
+        // Show games list
+        lv_obj_remove_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        do_once = true;
+    }
+
+    // Up button pressed
+    if (ui_btns->up_btn == 1) {
+        // Update selection
+        games_menu->index--;
+        lcd_games_update_menu(games_menu);
+    } else if (ui_btns->down_btn == 1) { // Down button pressed
+        // Update selection
+        games_menu->index++;
+        lcd_games_update_menu(games_menu);
+    } else if (ui_btns->select_btn == 1 && games_menu->index == 0) { // Tetris selected
+        // Hide games menu
+        lv_obj_add_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Reset static
+        do_once = false;
+
+        // Show right arrow
+        lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        // Switch pages
+        ui_menu->page = GAMES_TETRIS_PAGE;
+    } else if (ui_btns->select_btn == 1 && games_menu->index == 1) { // T-Rex Runner selected
+        // Hide games menu
+        lv_obj_add_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Reset static
+        do_once = false;
+
+        // Hide all arrows
+        lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+        // Switch pages
+        ui_menu->page = GAMES_TREX_PAGE;
+    } else if (ui_btns->left_btn == 1) { // Back selected
+        // Hide games menu
+        lv_obj_add_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Show selection labels
+        lcd_unhide_selection_widgets(ui_menu);
+
+        // Reset static
+        do_once = false;
+
+        // Switch pages
+        ui_menu->page = SELECTION_PAGE;
+    } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off selected
+        // Hide games menu
+        lv_obj_add_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Reset static
+        do_once = false;
+
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
+}
+
 /* =============== TETRIS IMPLEMENTATION =============== */
 
 // Macros for game config
@@ -356,7 +546,7 @@ static void draw_board()
     lv_obj_invalidate(tetris_canvas); // Refresh
 }
 
-void lcd_games_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
+void lcd_games_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *games_menu)
 {
     static bool init = false;
     static lv_draw_buf_t canvas_buf; // Metadata struct (small, internal SRAM)
@@ -377,7 +567,7 @@ void lcd_games_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t 
             ESP_LOGE("TETRIS", "Failed to alloc PSRAM for canvas");
 
             // Fallback or exit to menu
-            ui_menu->page = TOOLS_PAGE;
+            ui_menu->page = GAMES_PAGE;
             return;
         }
 
@@ -440,12 +630,12 @@ void lcd_games_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t 
             tetris_canvas_pixels = NULL;
             init = false;
 
-            // Back to tools menu
-            lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+            // Back to games menu
+            lv_obj_remove_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
             lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
             lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-            ui_menu->page = TOOLS_PAGE;
+            ui_menu->page = GAMES_PAGE;
         }
         return;
     }
@@ -490,13 +680,13 @@ void lcd_games_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t 
         tetris_canvas = tetris_score_label = tetris_game_over_label = tetris_canvas_pixels = NULL;
         init = false;
 
-        // Show tools menu
-        lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        // Show games menu
+        lv_obj_remove_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
         // Hide right arrow
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
-        ui_menu->page = TOOLS_PAGE;
+        ui_menu->page = GAMES_PAGE;
         return;
     } else if (ui_btns->pwr_btn) { // Sleep
         // Delete objects
@@ -1061,7 +1251,7 @@ static void trex_game_timer_cb(lv_timer_t *t)
 
     // Sample gameplay buttons directly at the 50ms tick: waiting for the
     // 200ms page-handler poll adds up to 200ms of input lag (lcd_task only
-    // misses these takes, so it must not auto-sleep on TOOLS_TREX_PAGE)
+    // misses these takes, so it must not auto-sleep on GAMES_TREX_PAGE)
     if (xUpButtonSemaphore && xSemaphoreTake(xUpButtonSemaphore, 0) == pdTRUE) {
         trex_jump_pending = true;
     }
@@ -1146,7 +1336,7 @@ static void trex_game_timer_cb(lv_timer_t *t)
     }
 }
 
-void lcd_games_trex_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
+void lcd_games_trex_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *games_menu)
 {
     static lv_draw_buf_t canvas_buf; // Metadata struct (small, internal SRAM)
 
@@ -1163,7 +1353,7 @@ void lcd_games_trex_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
 
             // Fallback or exit to menu
             lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-            ui_menu->page = TOOLS_PAGE;
+            ui_menu->page = GAMES_PAGE;
             return;
         }
 
@@ -1231,15 +1421,15 @@ void lcd_games_trex_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
         } else if (ui_btns->down_btn || ui_btns->left_btn || ui_btns->right_btn || ui_btns->home_btn) { // Exit to menu
             trex_cleanup();
 
-            // Back to tools menu
-            lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+            // Back to games menu
+            lv_obj_remove_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
             // Show arrows
             lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
             lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
             lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 
-            ui_menu->page = TOOLS_PAGE;
+            ui_menu->page = GAMES_PAGE;
         } else if (ui_btns->pwr_btn) { // Sleep
             trex_cleanup();
 
@@ -1262,15 +1452,15 @@ void lcd_games_trex_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
     } else if (ui_btns->home_btn) { // Exit to menu
         trex_cleanup();
 
-        // Show tools menu
-        lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        // Show games menu
+        lv_obj_remove_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
         // Show arrows
         lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 
-        ui_menu->page = TOOLS_PAGE;
+        ui_menu->page = GAMES_PAGE;
     } else if (ui_btns->pwr_btn) { // Sleep
         trex_cleanup();
 

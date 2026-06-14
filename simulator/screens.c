@@ -808,8 +808,8 @@ void screen_tools(void)
 
     /* ── Options — matches the static tools_menu initializer in lcd_tools.c ── */
     static const char *tools_options[] = {
-        "Coin Flipper", "Dice Roller", "Tetris", "T-Rex Runner", "Number Generator",
-        "Read the Docs", "Bitcoin QR", "Pomodoro Timer", "SRS Planner"
+        "Coin Flipper", "Dice Roller", "Number Generator",
+        "Read the Docs", "Bitcoin QR", "Pomodoro Timer", "SRS Planner", "Claude Usage"
     };
     int num_options = sizeof(tools_options) / sizeof(tools_options[0]);
     int selected = 0; /* firmware default */

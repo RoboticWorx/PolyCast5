@@ -766,7 +766,7 @@ void lcd_update_battery(ui_menu_t *ui_menu, uint8_t battery_percentage, bool cha
 }
 
 static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t *ir_menu, lora_menu_t *lora_menu, espnow_menu_t *espnow_menu,
-        wifi_menu_t *wifi_menu, tools_menu_t *tools_menu, settings_menu_t *settings_menu, bluetooth_menu_t *bluetooth_menu, gpio_menu_t *gpio_menu)
+        wifi_menu_t *wifi_menu, tools_menu_t *tools_menu, games_menu_t *games_menu, settings_menu_t *settings_menu, bluetooth_menu_t *bluetooth_menu, gpio_menu_t *gpio_menu)
 {
     // Hide selection menu scrollbar
     lv_obj_add_flag(ui_menu->scroll_bar, LV_OBJ_FLAG_HIDDEN);
@@ -808,6 +808,10 @@ static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t *ir_menu, lo
         // Show tools list
         lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         ui_menu->page = TOOLS_PAGE;
+    } else if (strcmp(option, OPTION_GAMES) == 0) {
+        // Show games list
+        lv_obj_remove_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        ui_menu->page = GAMES_PAGE;
     } else if (strcmp(option, OPTION_SETTINGS) == 0) {
         // Show settings list
         lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -1964,8 +1968,8 @@ void lcd_hotkey_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotk
 }
 
 void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_menu, lora_menu_t *lora_menu,
-        espnow_menu_t *espnow_menu, wifi_menu_t *wifi_menu, tools_menu_t *tools_menu, settings_menu_t *settings_menu,
-        bluetooth_menu_t *bluetooth_menu, gpio_menu_t *gpio_menu) 
+        espnow_menu_t *espnow_menu, wifi_menu_t *wifi_menu, tools_menu_t *tools_menu, games_menu_t *games_menu,
+        settings_menu_t *settings_menu, bluetooth_menu_t *bluetooth_menu, gpio_menu_t *gpio_menu)
 {
     if (ui_btns->up_btn == 1) {
         scrolling_menu = true;
@@ -1975,7 +1979,7 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
         scrolling_up = true;
     } else if (ui_btns->select_btn == 1) {
         // Switch to the selected page
-        lcd_selection_btn_pressed(ui_menu, ir_menu, lora_menu, espnow_menu, wifi_menu, tools_menu, settings_menu, bluetooth_menu, gpio_menu);
+        lcd_selection_btn_pressed(ui_menu, ir_menu, lora_menu, espnow_menu, wifi_menu, tools_menu, games_menu, settings_menu, bluetooth_menu, gpio_menu);
     } else if (ui_btns->left_btn == 1) { // Go back
         // Reset long semaphores to avoid false triggers
         xQueueReset(xSelectButtonLongSemaphore);
@@ -2833,46 +2837,19 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
         
         // Switch pages
         ui_menu->page = TOOLS_DICE_PAGE;
-    } else if (ui_btns->select_btn == 1 && tools_menu->index == 2) { // Tetris selected
+    } else if (ui_btns->select_btn == 1 && tools_menu->index == 2) { // Random number generator selected
         // Hide tools menu
         lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-        
+
         // Reset static
         do_once = false;
-        
+
         // Show right arrow
         lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-        
-        // Switch pages
-        ui_menu->page = TOOLS_TETRIS_PAGE;
-    } else if (ui_btns->select_btn == 1 && tools_menu->index == 3) { // T-Rex Runner selected
-        // Hide tools menu
-        lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
-        // Reset static
-        do_once = false;
-
-        // Hide all arrows
-        lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-
-        // Switch pages
-        ui_menu->page = TOOLS_TREX_PAGE;
-    } else if (ui_btns->select_btn == 1 && tools_menu->index == 4) { // Random number generator selected
-        // Hide tools menu
-        lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-        
-        // Reset static
-        do_once = false;
-        
-        // Show right arrow
-        lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-        
         // Switch pages
         ui_menu->page = TOOLS_NUM_GEN_PAGE;
-    } else if (ui_btns->select_btn == 1 && tools_menu->index == 5) { // Read the docs selected
+    } else if (ui_btns->select_btn == 1 && tools_menu->index == 3) { // Read the docs selected
         // Hide tools menu
         lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         
@@ -2888,7 +2865,7 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
         
         // Switch pages
         ui_menu->page = TOOLS_DOCS_PAGE;
-    } else if (ui_btns->select_btn == 1 && tools_menu->index == 6) { // BTC address selected
+    } else if (ui_btns->select_btn == 1 && tools_menu->index == 4) { // BTC address selected
         // Hide tools menu
         lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         
@@ -2900,7 +2877,7 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
         
         // Switch pages
         ui_menu->page = TOOLS_BTC_ADDR_PAGE;
-    } else if (ui_btns->select_btn == 1 && tools_menu->index == 7) { // Pomodoro timer selected
+    } else if (ui_btns->select_btn == 1 && tools_menu->index == 5) { // Pomodoro timer selected
         // Hide tools menu
         lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         
@@ -2912,7 +2889,7 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
         
         // Switch pages
         ui_menu->page = TOOLS_POMODORO_PAGE;
-    } else if (ui_btns->select_btn == 1 && tools_menu->index == 8) { // SRS memory assist selected
+    } else if (ui_btns->select_btn == 1 && tools_menu->index == 6) { // SRS memory assist selected
         // Hide tools menu
         lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
@@ -2924,7 +2901,7 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
 
         // Switch pages
         ui_menu->page = TOOLS_HOW_SRS_PAGE;
-    } else if (ui_btns->select_btn == 1 && tools_menu->index == 9) { // Claude Usage selected
+    } else if (ui_btns->select_btn == 1 && tools_menu->index == 7) { // Claude Usage selected
         // Hide tools menu
         lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 

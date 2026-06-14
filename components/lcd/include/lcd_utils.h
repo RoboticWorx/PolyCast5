@@ -35,6 +35,7 @@
 #define OPTION_ESPNOW "ESP-NOW" // "ESP32"
 #define OPTION_INFRARED "Infrared"
 #define OPTION_TOOLS "Tools"
+#define OPTION_GAMES "Games"
 #define OPTION_SETTINGS "Settings"
 
 #define LCD_WAIT_FOR_BIT_BETTER_SUCCESS 0
@@ -55,6 +56,7 @@ enum {
     INFRARED_PAGE,
     SETTINGS_PAGE,
     TOOLS_PAGE,
+    GAMES_PAGE,
     WIFI_PAGE,
     BLUETOOTH_PAGE,
     
@@ -94,8 +96,6 @@ enum {
     TOOLS_DOCS_PAGE,
     TOOLS_DICE_PAGE,
     TOOLS_NUM_GEN_PAGE,
-    TOOLS_TETRIS_PAGE,
-    TOOLS_TREX_PAGE,
     TOOLS_BTC_ADDR_PAGE,
     TOOLS_BTC_ADDR_SETUP_PAGE,
     TOOLS_POMODORO_PAGE,
@@ -103,7 +103,7 @@ enum {
     TOOLS_SRS_PAGE,
     TOOLS_CLAUDE_USAGE_PAGE,
     TOOLS_CLAUDE_SETUP_PAGE,
-    
+
     SETTINGS_OTA_CONFIRM_PAGE,
     SETTINGS_OTA_UPDATING_PAGE,
     SETTINGS_COLORS_PAGE,
@@ -140,6 +140,9 @@ enum {
     GPIO_TERMINAL_PAGE,
     GPIO_ACCEL_PAGE,
     GPIO_ACCEL_STREAM_PAGE,
+
+    GAMES_TETRIS_PAGE,
+    GAMES_TREX_PAGE,
 };
 
 extern uint32_t pin_attempts;
@@ -424,12 +427,13 @@ void lcd_hotkey_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_t *hotk
  * @param [in] espnow_menu ESP-NOW menu structure
  * @param [in] wifi_menu Wi-Fi menu structure
  * @param [in] tools_menu Tools menu structure
+ * @param [in] games_menu Games menu structure
  * @param [in] settings_menu Settings menu structure
  * @param [in] bluetooth_menu Bluetooth menu structure
  * @param [in] gpio_menu GPIO menu structure
  */
 void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t* ir_menu, lora_menu_t* lora_menu, espnow_menu_t* espnow_menu,
-        wifi_menu_t* wifi_menu, tools_menu_t* tools_menu, settings_menu_t* settings_menu, bluetooth_menu_t *bluetooth_menu, gpio_menu_t *gpio_menu);
+        wifi_menu_t* wifi_menu, tools_menu_t* tools_menu, games_menu_t* games_menu, settings_menu_t* settings_menu, bluetooth_menu_t *bluetooth_menu, gpio_menu_t *gpio_menu);
 
 /**
  * @brief Executes on infrared page

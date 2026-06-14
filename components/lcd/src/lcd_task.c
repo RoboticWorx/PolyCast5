@@ -30,8 +30,8 @@ uint16_t home_sleep_after_s = 30; // Home: default 30s
 
 ui_menu_t ui_menu = {
     .options = (const char *[]) {OPTION_GPIO, OPTION_WIFI, OPTION_BLUETOOTH, OPTION_LORA, OPTION_ESPNOW,
-            OPTION_INFRARED, OPTION_TOOLS, OPTION_SETTINGS},
-    .size = 8,
+            OPTION_INFRARED, OPTION_TOOLS, OPTION_GAMES, OPTION_SETTINGS},
+    .size = 9,
     .index = 3, // Starts on OPTION_LORA
     .page = HOME_PAGE,
     .lbl_top = NULL,
@@ -149,7 +149,8 @@ static void lcd_task(void *pvParameters)
     lcd_wifi_create_scan_list(&wifi_menu.scan_menu);
     
     lcd_tools_setup_page(&tools_menu);
-    
+    lcd_games_setup_page(&games_menu);
+
     lcd_settings_setup_page(&settings_menu);
     lcd_settings_setup_pin_page(&settings_menu);
     
@@ -286,7 +287,7 @@ static void lcd_task(void *pvParameters)
                     break;
                 case SELECTION_PAGE:
                     lcd_selection_page(&ui_btns, &ui_menu, &ir_menu, &lora_menu, &espnow_menu, &wifi_menu,
-                            &tools_menu, &settings_menu, &bluetooth_menu, &gpio_menu);
+                            &tools_menu, &games_menu, &settings_menu, &bluetooth_menu, &gpio_menu);
                     break;
                 // Infrared pages
                 case INFRARED_PAGE:
@@ -405,13 +406,6 @@ static void lcd_task(void *pvParameters)
                 case TOOLS_NUM_GEN_PAGE:
                     lcd_tools_num_gen_page(&ui_btns, &ui_menu, &tools_menu);
                     break;
-                case TOOLS_TETRIS_PAGE:
-                    lcd_games_tetris_page(&ui_btns, &ui_menu, &tools_menu);
-                    break;
-                case TOOLS_TREX_PAGE:
-                    lcd_games_trex_page(&ui_btns, &ui_menu, &tools_menu);
-                    dont_sleep_on_this_page = true; // Game timer consumes button semaphores, so the inactivity timer never resets
-                    break;
                 case TOOLS_HOW_SRS_PAGE:
                     lcd_tools_how_srs_page(&ui_btns, &ui_menu, &tools_menu);
                     break;
@@ -437,6 +431,17 @@ static void lcd_task(void *pvParameters)
                 case TOOLS_CLAUDE_SETUP_PAGE:
                     lcd_tools_claude_setup_page(&ui_btns, &ui_menu, &tools_menu);
                     dont_sleep_on_this_page = true;
+                    break;
+                // Games pages
+                case GAMES_PAGE:
+                    lcd_games_page(&ui_btns, &ui_menu, &games_menu);
+                    break;
+                case GAMES_TETRIS_PAGE:
+                    lcd_games_tetris_page(&ui_btns, &ui_menu, &games_menu);
+                    break;
+                case GAMES_TREX_PAGE:
+                    lcd_games_trex_page(&ui_btns, &ui_menu, &games_menu);
+                    dont_sleep_on_this_page = true; // Game timer consumes button semaphores, so the inactivity timer never resets
                     break;
                 // Settings pages
                 case SETTINGS_OTA_CONFIRM_PAGE:
