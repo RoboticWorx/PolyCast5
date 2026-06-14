@@ -64,4 +64,13 @@ void lcd_games_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t 
  */
 void lcd_games_trex_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *games_menu);
 
+/**
+ * @brief Flappy Bird game implemetation
+ *
+ * @param [in] ui_btns User input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] games_menu Games menu structure
+ */
+void lcd_games_flappy_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *games_menu);
+
 #endif // LCD_GAMES_H

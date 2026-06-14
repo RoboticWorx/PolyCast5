@@ -23,8 +23,8 @@
 #define HIGH_SCORE_KEY "score"
 
 games_menu_t games_menu = {
-    .options = {"Tetris", "T-Rex Runner"},
-    .size = 2,
+    .options = {"Tetris", "T-Rex Runner", "Flappy Bird"},
+    .size = 3,
     .index = 0,
     .cont = NULL,
 };
@@ -189,6 +189,21 @@ void lcd_games_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *games_
 
         // Switch pages
         ui_menu->page = GAMES_TREX_PAGE;
+    } else if (ui_btns->select_btn == 1 && games_menu->index == 2) { // Flappy Bird selected
+        // Hide games menu
+        lv_obj_add_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Reset static
+        do_once = false;
+
+        // Hide all arrows
+        lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+        // Switch pages
+        ui_menu->page = GAMES_FLAPPY_PAGE;
     } else if (ui_btns->left_btn == 1) { // Back selected
         // Hide games menu
         lv_obj_add_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -1463,6 +1478,599 @@ void lcd_games_trex_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *g
         ui_menu->page = GAMES_PAGE;
     } else if (ui_btns->pwr_btn) { // Sleep
         trex_cleanup();
+
+        lcd_transition_back(false, ui_menu); // False = sleep
+    }
+}
+
+/* ========== Flappy Bird Implementation ========== */
+
+#define FLAPPY_HIGH_SCORE_NS "flappy"
+
+// Macros for game config
+#define FLAPPY_CANVAS_W 220 // Canvas width in px
+#define FLAPPY_CANVAS_H 90 // Canvas height in px
+#define FLAPPY_FRAME_MS 50 // Physics/render tick (20 FPS via lv_timer)
+#define FLAPPY_GROUND_Y 86 // Ground line y inside canvas
+#define FLAPPY_BIRD_X 40 // Fixed bird left edge
+#define FLAPPY_BIRD_W 16 // Bird sprite width
+#define FLAPPY_BIRD_H 12 // Bird sprite height
+#define FLAPPY_HITBOX_INSET 2 // Bird collision box inset for fairness
+#define FLAPPY_GRAVITY_Q4 12 // Gravity per frame (Q4 px/frame^2, positive = down)
+#define FLAPPY_FLAP_V0_Q4 (-88) // Flap impulse velocity (Q4 px/frame, negative = up)
+#define FLAPPY_MAX_FALL_Q4 120 // Terminal fall speed (Q4 px/frame)
+#define FLAPPY_MAX_PIPES 4 // Max simultaneous pipes
+#define FLAPPY_PIPE_W 14 // Pipe column width (collision width)
+#define FLAPPY_LIP_H 5 // Pipe rim height at the gap opening
+#define FLAPPY_GAP_BASE 40 // Starting vertical gap height (px)
+#define FLAPPY_GAP_MIN 26 // Min gap height when hardest (px)
+#define FLAPPY_GAP_MARGIN 8 // Min gap distance from ceiling/ground (px)
+#define FLAPPY_SPEED_BASE_Q4 40 // Starting scroll speed (Q4 = 2.5 px/frame)
+#define FLAPPY_SPEED_MAX_Q4 110 // Max scroll speed (Q4 ≈ 6.9 px/frame)
+#define FLAPPY_SPACING_BASE 120 // Starting horizontal spacing between pipes (px)
+#define FLAPPY_SPACING_MIN 80 // Min spacing when hardest (px)
+#define FLAPPY_FIRST_SPAWN_PX 90 // Grace distance before the first pipe
+
+typedef struct {
+    int32_t x_q4; // Left edge (Q4 subpixels)
+    int gap_y; // Top of the gap in canvas px (top pipe spans 0..gap_y)
+    int gap_h; // Gap height in px
+    bool scored; // Whether the bird has already passed this pipe
+} flappy_pipe_t;
+
+/* Sprite bitmaps: one uint32_t per row, bit (w-1-x) = pixel at column x */
+
+// Bird, frame A (16x12): wing raised
+static const uint32_t flappy_bird_a[FLAPPY_BIRD_H] = {
+    0b0000011111100000,
+    0b0001111111111000,
+    0b0011111111111100,
+    0b0111111111001110, // Eye (gap near the front)
+    0b0111111111001111, // Beak tip
+    0b1111111111111110, // Wing up reaches the back edge
+    0b1111111111111100, // Wing up
+    0b0011111111111000,
+    0b0001111111110000,
+    0b0000111111100000,
+    0b0000011111000000,
+    0b0000001110000000,
+};
+
+// Bird, frame B (16x12): wing lowered
+static const uint32_t flappy_bird_b[FLAPPY_BIRD_H] = {
+    0b0000011111100000,
+    0b0001111111111000,
+    0b0011111111111100,
+    0b0011111111001110, // Eye (gap near the front)
+    0b0011111111001111, // Beak tip
+    0b0011111111111110,
+    0b0111111111111100,
+    0b1111111111111000, // Wing down reaches the back edge
+    0b1111111111110000, // Wing down
+    0b0011111111100000,
+    0b0000011111000000,
+    0b0000001110000000,
+};
+
+// Game state (PSRAM: only touched at the 20 FPS tick, never from ISRs)
+POLYCAST5_USE_PSRAM_BSS static uint32_t flappy_score;
+POLYCAST5_USE_PSRAM_BSS static uint32_t flappy_high_score;
+POLYCAST5_USE_PSRAM_BSS static uint32_t flappy_dist_q4; // Distance scrolled (Q4 px), drives ground + first spawn
+POLYCAST5_USE_PSRAM_BSS static int32_t flappy_bird_y_q4; // Bird top edge y (Q4 px, grows downward)
+POLYCAST5_USE_PSRAM_BSS static int32_t flappy_bird_vel_q4; // Vertical velocity (Q4 px/frame, positive = falling)
+POLYCAST5_USE_PSRAM_BSS static uint32_t flappy_frame_count;
+POLYCAST5_USE_PSRAM_BSS static bool flappy_started; // Bird hovers until the first flap
+POLYCAST5_USE_PSRAM_BSS static bool flappy_game_over;
+POLYCAST5_USE_PSRAM_BSS static bool flappy_game_over_handled; // High score + overlay done once
+POLYCAST5_USE_PSRAM_BSS static TickType_t flappy_game_over_tick; // When the game over overlay appeared
+POLYCAST5_USE_PSRAM_BSS static bool flappy_init;
+POLYCAST5_USE_PSRAM_BSS static flappy_pipe_t flappy_pipes[FLAPPY_MAX_PIPES];
+POLYCAST5_USE_PSRAM_BSS static int flappy_pipe_count;
+POLYCAST5_USE_PSRAM_BSS static uint32_t flappy_label_score; // Last score rendered on the label
+
+// LVGL elements
+POLYCAST5_USE_PSRAM_BSS static lv_obj_t *flappy_canvas;
+POLYCAST5_USE_PSRAM_BSS static lv_obj_t *flappy_score_label;
+POLYCAST5_USE_PSRAM_BSS static lv_obj_t *flappy_game_over_label;
+POLYCAST5_USE_PSRAM_BSS static lv_timer_t *flappy_timer;
+
+POLYCAST5_USE_PSRAM_BSS static void *flappy_canvas_pixels; // Raw pixel buffer in PSRAM
+
+// Save score as high score
+static void flappy_high_score_nvs_save(uint32_t score)
+{
+    nvs_handle_t h;
+
+    // Open NVS
+    esp_err_t err = nvs_open(FLAPPY_HIGH_SCORE_NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "flappy_high_score_nvs_save nvs_open failed");
+        return; // Handle not open - nothing to close
+    }
+
+    // Store high score as a uint32
+    err = nvs_set_u32(h, HIGH_SCORE_KEY, score);
+    if (err == ESP_OK) {
+        // Commit to flash
+        err = nvs_commit(h);
+
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGI(TAG, "Saved Flappy high score: %" PRIu32, score);
+#endif
+    } else {
+        ESP_LOGE(TAG, "Failed to flappy_high_score_nvs_save nvs_set_u32: %" PRIu32, score);
+    }
+
+    // Close NVS
+    nvs_close(h);
+}
+
+// Load Flappy high score
+static uint32_t flappy_high_score_nvs_load(void)
+{
+    nvs_handle_t h;
+
+    // Open NVS
+    esp_err_t err = nvs_open(FLAPPY_HIGH_SCORE_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "flappy_high_score_nvs_load NS DNE");
+#endif
+        return 0; // Handle not open - no high score saved yet
+    }
+
+    // Get the uint32
+    uint32_t score = 0;
+    err = nvs_get_u32(h, HIGH_SCORE_KEY, &score);
+    if (err != ESP_OK) {
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGE(TAG, "Failed flappy_high_score_nvs_load nvs_get_u32");
+#endif
+    } else {
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGI(TAG, "Loaded Flappy high score: %" PRIu32, score);
+#endif
+    }
+
+    // Close NVS
+    nvs_close(h);
+
+    return score;
+}
+
+// Helper: Draw a packed 1bpp sprite in secondary color, clipped to the canvas
+static void flappy_draw_sprite(int x, int y, const uint32_t *rows, int w, int h)
+{
+    for (int row = 0; row < h; row++) {
+        int py = y + row;
+        if (py < 0 || py >= FLAPPY_CANVAS_H) {
+            continue;
+        }
+
+        uint32_t bits = rows[row];
+        if (!bits) {
+            continue; // Empty row
+        }
+
+        for (int col = 0; col < w; col++) {
+            if (bits & (1UL << (w - 1 - col))) { // Bit (w-1-col) = pixel at column col
+                int px = x + col;
+                if (px >= 0 && px < FLAPPY_CANVAS_W) {
+                    lv_canvas_set_px(flappy_canvas, px, py, user_secondary_color, LV_OPA_COVER);
+                }
+            }
+        }
+    }
+}
+
+// Helper: Fill a solid rectangle in secondary color, clipped to the canvas
+static void flappy_fill_rect(int x, int y, int w, int h)
+{
+    for (int row = 0; row < h; row++) {
+        int py = y + row;
+        if (py < 0 || py >= FLAPPY_CANVAS_H) {
+            continue;
+        }
+        for (int col = 0; col < w; col++) {
+            int px = x + col;
+            if (px >= 0 && px < FLAPPY_CANVAS_W) {
+                lv_canvas_set_px(flappy_canvas, px, py, user_secondary_color, LV_OPA_COVER);
+            }
+        }
+    }
+}
+
+// Helper: Draw one pipe (narrow shaft + a wider rim at the gap opening)
+static void flappy_draw_pipe(const flappy_pipe_t *p)
+{
+    int px = p->x_q4 >> 4;
+    int shaft_x = px + 2;
+    int shaft_w = FLAPPY_PIPE_W - 4;
+
+    int top_h = p->gap_y; // Top pipe spans 0 .. gap_y
+    int bot_y = p->gap_y + p->gap_h; // Bottom pipe spans bot_y .. ground
+    int bot_h = FLAPPY_GROUND_Y - bot_y;
+
+    // Top pipe: shaft then a rim at the bottom (gap-facing) edge
+    if (top_h > 0) {
+        int shaft_h = top_h - FLAPPY_LIP_H;
+        if (shaft_h > 0) {
+            flappy_fill_rect(shaft_x, 0, shaft_w, shaft_h);
+            flappy_fill_rect(px, shaft_h, FLAPPY_PIPE_W, FLAPPY_LIP_H);
+        } else {
+            flappy_fill_rect(px, 0, FLAPPY_PIPE_W, top_h); // Too short for a separate rim
+        }
+    }
+
+    // Bottom pipe: a rim at the top (gap-facing) edge then the shaft
+    if (bot_h > 0) {
+        int rim_h = (bot_h < FLAPPY_LIP_H) ? bot_h : FLAPPY_LIP_H;
+        flappy_fill_rect(px, bot_y, FLAPPY_PIPE_W, rim_h);
+        int shaft_h = bot_h - rim_h;
+        if (shaft_h > 0) {
+            flappy_fill_rect(shaft_x, bot_y + rim_h, shaft_w, shaft_h);
+        }
+    }
+}
+
+// Helper: Draw the whole frame (background, pipes, ground, bird)
+static void flappy_draw_frame(void)
+{
+    // Pipes are solid fills, so flappy_fill_rect issues many lv_canvas_set_px
+    // calls and each one calls lv_obj_invalidate(). Suppress invalidation for
+    // the whole frame and trigger a single refresh at the end (same end result,
+    // far fewer invalidate calls than the per-pixel default)
+    lv_display_t *disp = lv_obj_get_display(flappy_canvas);
+    lv_display_enable_invalidation(disp, false);
+
+    lv_canvas_fill_bg(flappy_canvas, user_primary_color, LV_OPA_COVER); // Clear background
+
+    // Pipes
+    for (int i = 0; i < flappy_pipe_count; i++) {
+        flappy_draw_pipe(&flappy_pipes[i]);
+    }
+
+    // Scrolling dotted ground line
+    uint32_t off = flappy_dist_q4 >> 4;
+    for (int x = 0; x < FLAPPY_CANVAS_W; x++) {
+        if (((x + off) & 7) < 6) { // 6 px dash, 2 px gap
+            lv_canvas_set_px(flappy_canvas, x, FLAPPY_GROUND_Y, user_secondary_color, LV_OPA_COVER);
+        }
+    }
+
+    // Bird (wings flap continuously)
+    const uint32_t *frame = ((flappy_frame_count / 2) & 1) ? flappy_bird_b : flappy_bird_a;
+    flappy_draw_sprite(FLAPPY_BIRD_X, flappy_bird_y_q4 >> 4, frame, FLAPPY_BIRD_W, FLAPPY_BIRD_H);
+
+    // Re-enable invalidation and issue one refresh for the whole canvas
+    lv_display_enable_invalidation(disp, true);
+    lv_obj_invalidate(flappy_canvas); // Refresh
+}
+
+// Helper: Reset all run state for a fresh game (init and restart)
+static void flappy_reset_run(void)
+{
+    flappy_score = 0;
+    flappy_dist_q4 = 0;
+    flappy_bird_y_q4 = ((FLAPPY_GROUND_Y - FLAPPY_BIRD_H) / 2) << 4; // Centered vertically
+    flappy_bird_vel_q4 = 0;
+    flappy_frame_count = 0;
+    flappy_pipe_count = 0;
+    flappy_started = false;
+    flappy_game_over = false;
+    flappy_game_over_handled = false;
+    flappy_label_score = UINT32_MAX; // Force label refresh on first frame
+}
+
+// Helper: Spawn a new pipe at the right edge with a score-scaled gap
+static void flappy_spawn_pipe(void)
+{
+    if (flappy_pipe_count >= FLAPPY_MAX_PIPES) {
+        return;
+    }
+
+    flappy_pipe_t *p = &flappy_pipes[flappy_pipe_count];
+
+    // Gap shrinks with score (harder), clamped to a passable minimum
+    int gap_h = FLAPPY_GAP_BASE - (int)(flappy_score / 4);
+    if (gap_h < FLAPPY_GAP_MIN) {
+        gap_h = FLAPPY_GAP_MIN;
+    }
+
+    // Random gap position, kept clear of the ceiling and ground
+    int range = FLAPPY_GROUND_Y - gap_h - 2 * FLAPPY_GAP_MARGIN;
+    if (range < 1) {
+        range = 1;
+    }
+    p->gap_y = FLAPPY_GAP_MARGIN + (int)(esp_random() % (uint32_t)range);
+    p->gap_h = gap_h;
+    p->x_q4 = FLAPPY_CANVAS_W << 4;
+    p->scored = false;
+    flappy_pipe_count++;
+}
+
+// Helper: Check the bird AABB (inset for fairness) against pipes and the ground
+static bool flappy_check_collision(void)
+{
+    int by = flappy_bird_y_q4 >> 4;
+
+    // Hit the ground
+    if (by + FLAPPY_BIRD_H >= FLAPPY_GROUND_Y) {
+        return true;
+    }
+
+    int bx0 = FLAPPY_BIRD_X + FLAPPY_HITBOX_INSET;
+    int bx1 = FLAPPY_BIRD_X + FLAPPY_BIRD_W - FLAPPY_HITBOX_INSET;
+    int by0 = by + FLAPPY_HITBOX_INSET;
+    int by1 = by + FLAPPY_BIRD_H - FLAPPY_HITBOX_INSET;
+
+    for (int i = 0; i < flappy_pipe_count; i++) {
+        flappy_pipe_t *p = &flappy_pipes[i];
+        int px0 = p->x_q4 >> 4;
+        int px1 = px0 + FLAPPY_PIPE_W;
+
+        if (bx1 > px0 && bx0 < px1) { // Horizontal overlap with this pipe column
+            if (by0 < p->gap_y || by1 > p->gap_y + p->gap_h) { // Above or below the gap
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+// Helper: Delete the timer, LVGL objects and PSRAM buffer (all exit paths)
+static void flappy_cleanup(void)
+{
+    // Stop the frame timer before deleting the objects it draws to
+    if (flappy_timer) {
+        lv_timer_del(flappy_timer);
+        flappy_timer = NULL;
+    }
+
+    lv_obj_delete(flappy_canvas);
+    lv_obj_delete(flappy_score_label);
+    lv_obj_delete(flappy_game_over_label);
+    heap_caps_free(flappy_canvas_pixels); // Free PSRAM
+
+    flappy_canvas = flappy_score_label = flappy_game_over_label = NULL;
+    flappy_canvas_pixels = NULL;
+    flappy_init = false;
+}
+
+// 20 FPS game tick: input, physics, spawning, collision, rendering
+static void flappy_game_timer_cb(lv_timer_t *t)
+{
+    // Idle while not running or frozen on the game over frame
+    if (!flappy_init || flappy_game_over) {
+        return;
+    }
+
+    flappy_frame_count++;
+
+    // Sample the flap buttons directly at the 50ms tick: waiting for the
+    // 200ms page-handler poll adds up to 200ms of input lag (lcd_task only
+    // misses these takes, so it must not auto-sleep on GAMES_FLAPPY_PAGE)
+    bool flap = false;
+    if (xUpButtonSemaphore && xSemaphoreTake(xUpButtonSemaphore, 0) == pdTRUE) {
+        flap = true;
+    }
+    if (xSelectButtonSemaphore && xSemaphoreTake(xSelectButtonSemaphore, 0) == pdTRUE) {
+        flap = true;
+    }
+    if (flap) {
+        flappy_started = true; // First flap launches the run
+        flappy_bird_vel_q4 = FLAPPY_FLAP_V0_Q4;
+    }
+
+    // Bird hovers (wings flapping) until the first flap
+    if (!flappy_started) {
+        flappy_draw_frame();
+        return;
+    }
+
+    // Difficulty: scroll speed ramps with score, clamped to max
+    uint32_t speed_q4 = FLAPPY_SPEED_BASE_Q4 + flappy_score * 2;
+    if (speed_q4 > FLAPPY_SPEED_MAX_Q4) {
+        speed_q4 = FLAPPY_SPEED_MAX_Q4;
+    }
+
+    // Gravity integration, clamped to terminal velocity
+    flappy_bird_vel_q4 += FLAPPY_GRAVITY_Q4;
+    if (flappy_bird_vel_q4 > FLAPPY_MAX_FALL_Q4) {
+        flappy_bird_vel_q4 = FLAPPY_MAX_FALL_Q4;
+    }
+    flappy_bird_y_q4 += flappy_bird_vel_q4;
+
+    // Clamp at the ceiling (not fatal, just blocks)
+    if (flappy_bird_y_q4 < 0) {
+        flappy_bird_y_q4 = 0;
+        flappy_bird_vel_q4 = 0;
+    }
+
+    // Distance drives the scrolling ground and the first-spawn grace
+    flappy_dist_q4 += speed_q4;
+
+    // Advance pipes, score those passed, drop those off the left edge
+    int alive = 0;
+    for (int i = 0; i < flappy_pipe_count; i++) {
+        flappy_pipes[i].x_q4 -= (int32_t)speed_q4;
+
+        // Score once the pipe is fully behind the bird
+        if (!flappy_pipes[i].scored && (flappy_pipes[i].x_q4 >> 4) + FLAPPY_PIPE_W < FLAPPY_BIRD_X) {
+            flappy_pipes[i].scored = true;
+            flappy_score++;
+        }
+
+        if ((flappy_pipes[i].x_q4 >> 4) + FLAPPY_PIPE_W > 0) {
+            flappy_pipes[alive++] = flappy_pipes[i];
+        }
+    }
+    flappy_pipe_count = alive;
+
+    // Spawn when the gap to the right edge is large enough (tighter when faster)
+    if (flappy_pipe_count == 0) {
+        if (flappy_dist_q4 > (FLAPPY_FIRST_SPAWN_PX << 4)) { // Grace period at run start
+            flappy_spawn_pipe();
+        }
+    } else {
+        flappy_pipe_t *last = &flappy_pipes[flappy_pipe_count - 1];
+        int spacing = FLAPPY_SPACING_BASE - (int)(flappy_score / 2);
+        if (spacing < FLAPPY_SPACING_MIN) {
+            spacing = FLAPPY_SPACING_MIN;
+        }
+        if (FLAPPY_CANVAS_W - ((last->x_q4 >> 4) + FLAPPY_PIPE_W) >= spacing) {
+            flappy_spawn_pipe();
+        }
+    }
+
+    // Collision ends the run (frame below still drawn to show the crash)
+    if (flappy_check_collision()) {
+        flappy_game_over = true;
+    }
+
+    flappy_draw_frame();
+
+    // Refresh score label only when the value changes
+    if (flappy_score != flappy_label_score) {
+        flappy_label_score = flappy_score;
+        char buf[32];
+        snprintf(buf, sizeof(buf), "HI %05" PRIu32 " %05" PRIu32, flappy_high_score, flappy_score);
+        lv_label_set_text(flappy_score_label, buf);
+    }
+}
+
+void lcd_games_flappy_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *games_menu)
+{
+    POLYCAST5_USE_PSRAM_BSS static lv_draw_buf_t canvas_buf; // Metadata struct (PSRAM)
+
+    if (!flappy_init) {
+        // Load persisted high score once per session, reset run state
+        flappy_high_score = flappy_high_score_nvs_load();
+        flappy_reset_run();
+
+        // Allocate pixel buffer in PSRAM
+        size_t buf_size = FLAPPY_CANVAS_W * FLAPPY_CANVAS_H * 2; // RGB565: 2 bytes/pixel
+        flappy_canvas_pixels = heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!flappy_canvas_pixels) {
+            ESP_LOGE(TAG, "Failed to alloc PSRAM for Flappy canvas");
+
+            // Fallback: return to the games menu
+            lv_obj_remove_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+            ui_menu->page = GAMES_PAGE;
+            return;
+        }
+
+        // Init draw buf metadata (small struct in internal SRAM)
+        lv_draw_buf_init(&canvas_buf, FLAPPY_CANVAS_W, FLAPPY_CANVAS_H, LV_COLOR_FORMAT_RGB565, LV_STRIDE_AUTO, flappy_canvas_pixels, buf_size);
+
+        // Create canvas
+        flappy_canvas = lv_canvas_create(ACTIVE_SCR);
+        lv_canvas_set_draw_buf(flappy_canvas, &canvas_buf);
+        lv_obj_set_size(flappy_canvas, FLAPPY_CANVAS_W, FLAPPY_CANVAS_H);
+        lv_obj_align(flappy_canvas, LV_ALIGN_CENTER, 0, 4);
+
+        // Score label: "HI <best> <current>"
+        flappy_score_label = lv_label_create(ACTIVE_SCR);
+        char buf[32];
+        snprintf(buf, sizeof(buf), "HI %05" PRIu32 " %05" PRIu32, flappy_high_score, flappy_score);
+        lv_label_set_text(flappy_score_label, buf);
+        lv_obj_set_style_text_color(flappy_score_label, user_secondary_color, 0);
+        lv_obj_align(flappy_score_label, LV_ALIGN_TOP_MID, 0, 2);
+
+        // Game over label (hidden initially)
+        flappy_game_over_label = lv_label_create(ACTIVE_SCR);
+        lv_label_set_text(flappy_game_over_label, "");
+        lv_obj_set_style_text_font(flappy_game_over_label, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_color(flappy_game_over_label, user_secondary_color, 0);
+        lv_obj_set_style_text_align(flappy_game_over_label, LV_TEXT_ALIGN_CENTER, 0); // Center each line, not just the label
+        lv_obj_align(flappy_game_over_label, LV_ALIGN_CENTER, 0, -17);
+        lv_obj_add_flag(flappy_game_over_label, LV_OBJ_FLAG_HIDDEN);
+
+        flappy_draw_frame();
+
+        // Physics + render at 20 FPS (page handler only runs at the 200ms button poll)
+        flappy_timer = lv_timer_create(flappy_game_timer_cb, FLAPPY_FRAME_MS, NULL);
+
+        flappy_init = true;
+    }
+
+    // Handle game over
+    if (flappy_game_over) {
+        // One-time: high score check + overlay text
+        if (!flappy_game_over_handled) {
+            // If new high score, save
+            if (flappy_score > flappy_high_score) {
+                flappy_high_score = flappy_score;
+                flappy_high_score_nvs_save(flappy_high_score);
+            }
+
+            char buf[64];
+            snprintf(buf, sizeof(buf), "Game Over!\nScore: %" PRIu32 "\nHigh Score: %" PRIu32, flappy_score, flappy_high_score);
+            lv_label_set_text(flappy_game_over_label, buf);
+            lv_obj_remove_flag(flappy_game_over_label, LV_OBJ_FLAG_HIDDEN);
+
+            flappy_game_over_handled = true;
+            flappy_game_over_tick = xTaskGetTickCount();
+        }
+
+        // Brief grace so a button still held from the crash is not consumed
+        if (xTaskGetTickCount() - flappy_game_over_tick < pdMS_TO_TICKS(600)) {
+            return;
+        }
+
+        if (ui_btns->up_btn || ui_btns->select_btn) { // Restart
+            lv_obj_add_flag(flappy_game_over_label, LV_OBJ_FLAG_HIDDEN);
+            flappy_reset_run();
+
+            // Refresh the readout to 0 for the hover before the first flap
+            // (the hover tick returns before the timer's own label update)
+            char buf[32];
+            snprintf(buf, sizeof(buf), "HI %05" PRIu32 " %05" PRIu32, flappy_high_score, flappy_score);
+            lv_label_set_text(flappy_score_label, buf);
+        } else if (ui_btns->down_btn || ui_btns->left_btn || ui_btns->right_btn || ui_btns->home_btn) { // Exit to menu
+            flappy_cleanup();
+
+            // Back to games menu
+            lv_obj_remove_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+            // Show arrows
+            lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+
+            ui_menu->page = GAMES_PAGE;
+        } else if (ui_btns->pwr_btn) { // Sleep
+            flappy_cleanup();
+
+            lcd_transition_back(false, ui_menu); // False = sleep
+        }
+        return;
+    }
+
+    /* Input fallback: the 20 FPS timer samples the semaphores first, but the
+       main loop's 200ms poll can win the race, in which case presses arrive
+       here instead. Exit buttons (home/pwr) are only ever seen here. */
+    if (ui_btns->up_btn || ui_btns->select_btn) { // Flap
+        flappy_started = true;
+        flappy_bird_vel_q4 = FLAPPY_FLAP_V0_Q4;
+    } else if (ui_btns->home_btn) { // Exit to menu
+        flappy_cleanup();
+
+        // Show games menu
+        lv_obj_remove_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Show arrows
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+
+        ui_menu->page = GAMES_PAGE;
+    } else if (ui_btns->pwr_btn) { // Sleep
+        flappy_cleanup();
 
         lcd_transition_back(false, ui_menu); // False = sleep
     }
