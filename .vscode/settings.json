@@ -22,7 +22,7 @@
   "diffEditor.renderSideBySide": false,
   "idf.flashType": "UART",
 
-  "claudeCode.selectedModel": "claude-opus-4-7[1m]",
+  "claudeCode.selectedModel": "claude-opus-4-8[1m]",
   
   "github.copilot.chat.commitMessageGeneration.instructions": [
     { "text": "Never add Co-authored-by lines to the commit message." }

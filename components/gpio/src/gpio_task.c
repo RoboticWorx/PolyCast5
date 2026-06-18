@@ -69,8 +69,14 @@ typedef struct {
 volatile uint8_t haptic_len_ms = 20; // Default buzz 20ms
 volatile bool haptic_btns[6] = {true, false, false, false, false, false}; // Default buzz on select
 
-// True while the physical SELECT button is held (0 = pressed, 1 = released)
+// True while the physical button is held (0 = pressed, 1 = released).
+// Raw held-state for games that need smooth hold-to-act input (e.g. Doom
+// movement); the short-press semaphores only auto-repeat and are unsuitable.
 volatile bool gpio_select_btn_held = false;
+volatile bool gpio_up_btn_held = false;
+volatile bool gpio_down_btn_held = false;
+volatile bool gpio_left_btn_held = false;
+volatile bool gpio_right_btn_held = false;
 volatile bool gpio_left_to_exit = false;
 volatile bool gpio_waiting_for_left = false;
 
@@ -258,9 +264,13 @@ static void gpio_task(void *arg)
             btn_state_t *b = &buttons[i]; // Get the button
             bool level = gpio_utils_read_input(b->pin); // Read its state: 0 = pressed, 1 = released
 
-            // Track held state for SELECT (buttons[0])
-            if (i == 0) {
-                gpio_select_btn_held = (level == 0);
+            // Track raw held state for select + directional buttons (for games)
+            switch (i) {
+                case 0: gpio_select_btn_held = (level == 0); break; // SELECT
+                case 2: gpio_up_btn_held     = (level == 0); break; // UP
+                case 3: gpio_down_btn_held   = (level == 0); break; // DOWN
+                case 4: gpio_left_btn_held   = (level == 0); break; // LEFT
+                case 5: gpio_right_btn_held  = (level == 0); break; // RIGHT
             }
 
             // Button pressed

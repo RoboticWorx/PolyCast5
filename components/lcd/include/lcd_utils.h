@@ -144,6 +144,7 @@ enum {
     GAMES_TETRIS_PAGE,
     GAMES_TREX_PAGE,
     GAMES_FLAPPY_PAGE,
+    GAMES_DOOM_PAGE,
 };
 
 extern uint32_t pin_attempts;

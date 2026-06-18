@@ -23,8 +23,8 @@
 #define HIGH_SCORE_KEY "score"
 
 games_menu_t games_menu = {
-    .options = {"Tetris", "T-Rex Runner", "Flappy Bird"},
-    .size = 3,
+    .options = {"DOOM", "Tetris", "T-Rex Runner", "Flappy Bird"},
+    .size = 4,
     .index = 0,
     .cont = NULL,
 };
@@ -162,7 +162,22 @@ void lcd_games_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *games_
         // Update selection
         games_menu->index++;
         lcd_games_update_menu(games_menu);
-    } else if (ui_btns->select_btn == 1 && games_menu->index == 0) { // Tetris selected
+    } else if (ui_btns->select_btn == 1 && games_menu->index == 0) { // DOOM selected
+        // Hide games menu
+        lv_obj_add_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Reset static
+        do_once = false;
+
+        // Hide all arrows
+        lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+        // Switch pages
+        ui_menu->page = GAMES_DOOM_PAGE;
+    } else if (ui_btns->select_btn == 1 && games_menu->index == 1) { // Tetris selected
         // Hide games menu
         lv_obj_add_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
@@ -174,7 +189,7 @@ void lcd_games_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *games_
 
         // Switch pages
         ui_menu->page = GAMES_TETRIS_PAGE;
-    } else if (ui_btns->select_btn == 1 && games_menu->index == 1) { // T-Rex Runner selected
+    } else if (ui_btns->select_btn == 1 && games_menu->index == 2) { // T-Rex Runner selected
         // Hide games menu
         lv_obj_add_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
@@ -189,7 +204,7 @@ void lcd_games_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *games_
 
         // Switch pages
         ui_menu->page = GAMES_TREX_PAGE;
-    } else if (ui_btns->select_btn == 1 && games_menu->index == 2) { // Flappy Bird selected
+    } else if (ui_btns->select_btn == 1 && games_menu->index == 3) { // Flappy bird selected
         // Hide games menu
         lv_obj_add_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 

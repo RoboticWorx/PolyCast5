@@ -447,6 +447,10 @@ static void lcd_task(void *pvParameters)
                     lcd_games_flappy_page(&ui_btns, &ui_menu, &games_menu);
                     dont_sleep_on_this_page = true; // Game timer consumes button semaphores, so the inactivity timer never resets
                     break;
+                case GAMES_DOOM_PAGE:
+                    lcd_games_doom_page(&ui_btns, &ui_menu, &games_menu);
+                    dont_sleep_on_this_page = true; // Game timer consumes button semaphores, so the inactivity timer never resets
+                    break;
                 // Settings pages
                 case SETTINGS_OTA_CONFIRM_PAGE:
                     lcd_settings_ota_confirm_page(&ui_btns, &ui_menu, &settings_menu);
