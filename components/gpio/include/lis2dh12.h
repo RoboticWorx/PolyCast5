@@ -56,4 +56,15 @@ esp_err_t lis2dh12_read_g(float *x, float *y, float *z);
  */
 esp_err_t lis2dh12_read_deg(float *pitch, float *roll);
 
+/**
+ * @brief Read the on-die temperature in degrees Celsius. This is a relative
+ *        sensor: absolute accuracy is only +-several C and it reads warm due to
+ *        board self-heating. Useful for tracking changes, not precise ambient.
+ *
+ * @param [out] temp_c  Temperature in C (may be NULL)
+ *
+ * @return ESP_OK on success, ESP_ERR_INVALID_STATE if not initialized
+ */
+esp_err_t lis2dh12_read_temp_c(float *temp_c);
+
 #endif // LIS2DH12_H

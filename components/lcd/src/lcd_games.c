@@ -773,6 +773,69 @@ void lcd_games_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t 
     }
 }
 
+/* ========== Shared game-over overlay (white text, black stroke) ========== */
+
+// 8 directions for the text stroke: the overlay text is drawn once per offset
+// in black behind a white copy so the readout pops against the game background
+static const int8_t kGameOverStroke[8][2] = {
+    {-1, -1}, {0, -1}, {1, -1},
+    {-1,  0},          {1,  0},
+    {-1,  1}, {0,  1}, {1,  1},
+};
+
+// Create the centered overlay: 8 black stroke copies (behind) + 1 white main
+// label on top, all hidden until game over. main is created last to sit on top
+static void game_over_overlay_create(lv_obj_t **main, lv_obj_t *stroke[8])
+{
+    for (int i = 0; i < 8; i++) {
+        stroke[i] = lv_label_create(ACTIVE_SCR);
+        lv_label_set_text(stroke[i], "");
+        lv_obj_set_style_text_font(stroke[i], &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_color(stroke[i], lv_color_black(), 0);
+        lv_obj_set_style_text_align(stroke[i], LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(stroke[i], LV_ALIGN_CENTER, kGameOverStroke[i][0], kGameOverStroke[i][1]);
+        lv_obj_add_flag(stroke[i], LV_OBJ_FLAG_HIDDEN);
+    }
+
+    *main = lv_label_create(ACTIVE_SCR);
+    lv_label_set_text(*main, "");
+    lv_obj_set_style_text_font(*main, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_color(*main, lv_color_white(), 0);
+    lv_obj_set_style_text_align(*main, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(*main, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_add_flag(*main, LV_OBJ_FLAG_HIDDEN);
+}
+
+// Set the same text on every copy and reveal the overlay
+static void game_over_overlay_show(lv_obj_t *main, lv_obj_t *stroke[8], const char *txt)
+{
+    for (int i = 0; i < 8; i++) {
+        lv_label_set_text(stroke[i], txt);
+        lv_obj_remove_flag(stroke[i], LV_OBJ_FLAG_HIDDEN);
+    }
+    lv_label_set_text(main, txt);
+    lv_obj_remove_flag(main, LV_OBJ_FLAG_HIDDEN);
+}
+
+// Hide every copy (used on restart)
+static void game_over_overlay_hide(lv_obj_t *main, lv_obj_t *stroke[8])
+{
+    for (int i = 0; i < 8; i++) {
+        lv_obj_add_flag(stroke[i], LV_OBJ_FLAG_HIDDEN);
+    }
+    lv_obj_add_flag(main, LV_OBJ_FLAG_HIDDEN);
+}
+
+// Delete every copy (used on exit/cleanup)
+static void game_over_overlay_delete(lv_obj_t *main, lv_obj_t *stroke[8])
+{
+    lv_obj_delete(main);
+    for (int i = 0; i < 8; i++) {
+        lv_obj_delete(stroke[i]);
+        stroke[i] = NULL;
+    }
+}
+
 /* ========== T-Rex Runner Implementation ========== */
 
 #define TREX_HIGH_SCORE_NS "trex"
@@ -799,6 +862,17 @@ void lcd_games_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t 
 #define TREX_GAP_BASE 60 // Min empty px between obstacles
 #define TREX_GAP_RAND 60 // Random extra gap px
 #define TREX_FIRST_SPAWN_PX 150 // Grace distance before the first obstacle
+
+// Game colors (vibrant desert theme)
+#define TREX_COL_SKY_TOP (lv_color_make(0x4F, 0x9E, 0xD6)) // Sky gradient (zenith)
+#define TREX_COL_SKY_BOTTOM (lv_color_make(0xCD, 0xEA, 0xF5)) // Sky gradient (horizon)
+#define TREX_COL_GROUND (lv_color_make(0xE4, 0xC8, 0x90)) // Sandy desert floor
+#define TREX_COL_GROUND_DARK (lv_color_make(0xBE, 0x9A, 0x5A)) // Ground edge, dashes, pebbles
+#define TREX_COL_GROUND_LIGHT (lv_color_make(0xF3, 0xDE, 0xB0)) // Sand speckle highlights
+#define TREX_COL_DINO (lv_color_make(0x2E, 0x7D, 0x1B)) // Dark green T-Rex (cactus shade)
+#define TREX_COL_CACTUS (lv_color_make(0x2E, 0x7D, 0x1B)) // Cactus green
+#define TREX_COL_BIRD (lv_color_make(0x55, 0x55, 0x55)) // Pterodactyl slate gray
+#define TREX_COL_HUD (lv_color_white()) // High-score readout text
 
 // Obstacle types
 typedef enum {
@@ -984,6 +1058,16 @@ static const uint32_t trex_bird_b[12] = {
     0b000000000011000000,
 };
 
+// Cloud sprite (18x4): soft puff drawn in white, drifts as slow parallax
+#define TREX_CLOUD_W 18
+#define TREX_CLOUD_H 4
+static const uint32_t trex_cloud[TREX_CLOUD_H] = {
+    0b000000111111000000,
+    0b000111111111111000,
+    0b011111111111111110,
+    0b111111111111111111,
+};
+
 // Game state (PSRAM: only touched at the 20 FPS tick, never from ISRs)
 POLYCAST5_USE_PSRAM_BSS static uint32_t trex_score;
 POLYCAST5_USE_PSRAM_BSS static uint32_t trex_high_score;
@@ -1007,6 +1091,7 @@ POLYCAST5_USE_PSRAM_BSS static uint32_t trex_label_score; // Last score rendered
 POLYCAST5_USE_PSRAM_BSS static lv_obj_t *trex_canvas;
 POLYCAST5_USE_PSRAM_BSS static lv_obj_t *trex_score_label;
 POLYCAST5_USE_PSRAM_BSS static lv_obj_t *trex_game_over_label;
+POLYCAST5_USE_PSRAM_BSS static lv_obj_t *trex_game_over_stroke[8]; // 8-way black text stroke behind the overlay
 POLYCAST5_USE_PSRAM_BSS static lv_timer_t *trex_timer;
 
 POLYCAST5_USE_PSRAM_BSS static void *trex_canvas_pixels; // Raw pixel buffer in PSRAM
@@ -1073,9 +1158,13 @@ static uint32_t trex_high_score_nvs_load(void)
     return score;
 }
 
-// Helper: Draw a packed 1bpp sprite in secondary color, clipped to the canvas
-static void trex_draw_sprite(int x, int y, const uint32_t *rows, int w, int h)
+// Helper: Draw a packed 1bpp sprite in the given color, clipped to the canvas.
+// Writes straight into the RGB565 buffer (stride == TREX_CANVAS_W, since the
+// buffer is allocated W*H*2) to avoid lv_canvas_set_px's per-pixel overhead
+static void trex_draw_sprite(int x, int y, const uint32_t *rows, int w, int h, lv_color_t color)
 {
+    uint16_t *base = (uint16_t *)trex_canvas_pixels;
+    uint16_t c = lv_color_to_u16(color);
     for (int row = 0; row < h; row++) {
         int py = y + row;
         if (py < 0 || py >= TREX_CANVAS_H) {
@@ -1087,13 +1176,32 @@ static void trex_draw_sprite(int x, int y, const uint32_t *rows, int w, int h)
             continue; // Empty row
         }
 
+        uint16_t *prow = base + py * TREX_CANVAS_W;
         for (int col = 0; col < w; col++) {
             if (bits & (1UL << (w - 1 - col))) { // Bit (w-1-col) = pixel at column col
                 int px = x + col;
                 if (px >= 0 && px < TREX_CANVAS_W) {
-                    lv_canvas_set_px(trex_canvas, px, py, user_secondary_color, LV_OPA_COVER);
+                    prow[px] = c;
                 }
             }
+        }
+    }
+}
+
+// Helper: Fill a solid rectangle in the given color, clipped to the canvas
+// (direct RGB565 writes, same fast path as trex_draw_sprite)
+static void trex_fill_rect(int x, int y, int w, int h, lv_color_t color)
+{
+    uint16_t *base = (uint16_t *)trex_canvas_pixels;
+    uint16_t c = lv_color_to_u16(color);
+    int x0 = x < 0 ? 0 : x;
+    int y0 = y < 0 ? 0 : y;
+    int x1 = (x + w > TREX_CANVAS_W) ? TREX_CANVAS_W : (x + w);
+    int y1 = (y + h > TREX_CANVAS_H) ? TREX_CANVAS_H : (y + h);
+    for (int yy = y0; yy < y1; yy++) {
+        uint16_t *row = base + yy * TREX_CANVAS_W;
+        for (int xx = x0; xx < x1; xx++) {
+            row[xx] = c;
         }
     }
 }
@@ -1198,15 +1306,59 @@ static bool trex_check_collision(void)
 }
 
 // Helper: Draw the whole frame (background, ground, dino, obstacles)
+// Helper: Draw a sprite tiled for horizontal wrap-around (parallax scenery)
+static void trex_draw_parallax(const uint32_t *spr, int w, int h, int base_x, int y, int period, uint32_t scroll, lv_color_t color)
+{
+    int cx = (int)(((uint32_t)base_x + (uint32_t)period - (scroll % (uint32_t)period)) % (uint32_t)period);
+    trex_draw_sprite(cx - period, y, spr, w, h, color);
+    trex_draw_sprite(cx, y, spr, w, h, color);
+    trex_draw_sprite(cx + period, y, spr, w, h, color);
+}
+
 static void trex_draw_frame(void)
 {
-    lv_canvas_fill_bg(trex_canvas, user_primary_color, LV_OPA_COVER); // Clear background
+    // The full-canvas fills below issue many lv_canvas_set_px calls, each of
+    // which would invalidate the canvas. Suppress invalidation for the whole
+    // frame and trigger a single refresh at the end (same as the Flappy frame)
+    lv_display_t *disp = lv_obj_get_display(trex_canvas);
+    lv_display_enable_invalidation(disp, false);
 
-    // Scrolling dotted ground line
     uint32_t off = trex_dist_q4 >> 4;
+
+    // Sky: vertical gradient from a deeper blue at the top to a pale horizon
+    for (int y = 0; y < TREX_GROUND_Y; y++) {
+        uint8_t mix = (uint8_t)(255 - y * 255 / TREX_GROUND_Y);
+        trex_fill_rect(0, y, TREX_CANVAS_W, 1, lv_color_mix(TREX_COL_SKY_TOP, TREX_COL_SKY_BOTTOM, mix));
+    }
+
+    // Slow-drifting clouds (parallax behind the action)
+    uint32_t cloud_off = off / 3;
+    trex_draw_parallax(trex_cloud, TREX_CLOUD_W, TREX_CLOUD_H, 20, 10, TREX_CANVAS_W + 80, cloud_off, lv_color_white());
+    trex_draw_parallax(trex_cloud, TREX_CLOUD_W, TREX_CLOUD_H, 120, 26, TREX_CANVAS_W + 80, cloud_off, lv_color_white());
+    trex_draw_parallax(trex_cloud, TREX_CLOUD_W, TREX_CLOUD_H, 210, 16, TREX_CANVAS_W + 80, cloud_off, lv_color_white());
+
+    // Ground: sandy band, a packed dark surface, a scrolling motion dash, and
+    // scattered pebbles/specks for texture (all scroll with the world)
+    trex_fill_rect(0, TREX_GROUND_Y, TREX_CANVAS_W, TREX_CANVAS_H - TREX_GROUND_Y, TREX_COL_GROUND);
+    trex_fill_rect(0, TREX_GROUND_Y, TREX_CANVAS_W, 1, TREX_COL_GROUND_DARK);
     for (int x = 0; x < TREX_CANVAS_W; x++) {
         if (((x + off) & 7) < 6) { // 6 px dash, 2 px gap
-            lv_canvas_set_px(trex_canvas, x, TREX_GROUND_Y, user_secondary_color, LV_OPA_COVER);
+            lv_canvas_set_px(trex_canvas, x, TREX_GROUND_Y + 2, TREX_COL_GROUND_DARK, LV_OPA_COVER);
+        }
+    }
+    int sand_top = TREX_GROUND_Y + 4;
+    int sand_h = TREX_CANVAS_H - sand_top;
+    for (int x = 0; x < TREX_CANVAS_W; x++) {
+        uint32_t hsh = ((uint32_t)x + off) * 2654435761u; // Stable per world-column
+        if ((hsh >> 28) == 0) { // ~1/16 columns: a 2 px dark pebble
+            int py = sand_top + (int)((hsh >> 8) % (uint32_t)sand_h);
+            lv_canvas_set_px(trex_canvas, x, py, TREX_COL_GROUND_DARK, LV_OPA_COVER);
+            if (x + 1 < TREX_CANVAS_W) {
+                lv_canvas_set_px(trex_canvas, x + 1, py, TREX_COL_GROUND_DARK, LV_OPA_COVER);
+            }
+        } else if ((hsh >> 28) == 1) { // ~1/16 columns: a light speck
+            int py = sand_top + (int)((hsh >> 12) % (uint32_t)sand_h);
+            lv_canvas_set_px(trex_canvas, x, py, TREX_COL_GROUND_LIGHT, LV_OPA_COVER);
         }
     }
 
@@ -1214,11 +1366,11 @@ static void trex_draw_frame(void)
     int h_px = trex_dino_h_q4 >> 4;
     if (trex_ducking) {
         const uint32_t *frame = ((trex_frame_count / 3) & 1) ? trex_dino_duck_b : trex_dino_duck_a;
-        trex_draw_sprite(TREX_DINO_X, TREX_GROUND_Y - TREX_DUCK_H - h_px, frame, TREX_DUCK_W, TREX_DUCK_H);
+        trex_draw_sprite(TREX_DINO_X, TREX_GROUND_Y - TREX_DUCK_H - h_px, frame, TREX_DUCK_W, TREX_DUCK_H, TREX_COL_DINO);
     } else {
         const uint32_t *frame = (h_px > 0) ? trex_dino_run_a
                 : (((trex_frame_count / 3) & 1) ? trex_dino_run_b : trex_dino_run_a);
-        trex_draw_sprite(TREX_DINO_X, TREX_GROUND_Y - TREX_DINO_H - h_px, frame, TREX_DINO_W, TREX_DINO_H);
+        trex_draw_sprite(TREX_DINO_X, TREX_GROUND_Y - TREX_DINO_H - h_px, frame, TREX_DINO_W, TREX_DINO_H, TREX_COL_DINO);
     }
 
     // Obstacles
@@ -1228,23 +1380,30 @@ static void trex_draw_frame(void)
 
         switch (o->type) {
             case TREX_OBST_CACTUS_SMALL:
-                trex_draw_sprite(ox, o->y, trex_cactus_small, 8, 16);
+                trex_draw_sprite(ox, o->y, trex_cactus_small, 8, 16, TREX_COL_CACTUS);
                 break;
             case TREX_OBST_CACTUS_LARGE:
-                trex_draw_sprite(ox, o->y, trex_cactus_large, 11, 22);
+                trex_draw_sprite(ox, o->y, trex_cactus_large, 11, 22, TREX_COL_CACTUS);
                 break;
             case TREX_OBST_CACTUS_PAIR:
-                trex_draw_sprite(ox, o->y, trex_cactus_small, 8, 16);
-                trex_draw_sprite(ox + 9, o->y, trex_cactus_small, 8, 16);
+                trex_draw_sprite(ox, o->y, trex_cactus_small, 8, 16, TREX_COL_CACTUS);
+                trex_draw_sprite(ox + 9, o->y, trex_cactus_small, 8, 16, TREX_COL_CACTUS);
                 break;
             default: { // Birds
                 const uint32_t *frame = ((trex_frame_count / 4) & 1) ? trex_bird_b : trex_bird_a;
-                trex_draw_sprite(ox, o->y, frame, 18, 12);
+                trex_draw_sprite(ox, o->y, frame, 18, 12, TREX_COL_BIRD);
                 break;
             }
         }
     }
 
+    // White frame around the play area
+    trex_fill_rect(0, 0, TREX_CANVAS_W, 1, lv_color_white());
+    trex_fill_rect(0, TREX_CANVAS_H - 1, TREX_CANVAS_W, 1, lv_color_white());
+    trex_fill_rect(0, 0, 1, TREX_CANVAS_H, lv_color_white());
+    trex_fill_rect(TREX_CANVAS_W - 1, 0, 1, TREX_CANVAS_H, lv_color_white());
+
+    lv_display_enable_invalidation(disp, true);
     lv_obj_invalidate(trex_canvas); // Refresh
 }
 
@@ -1259,7 +1418,7 @@ static void trex_cleanup(void)
 
     lv_obj_delete(trex_canvas);
     lv_obj_delete(trex_score_label);
-    lv_obj_delete(trex_game_over_label);
+    game_over_overlay_delete(trex_game_over_label, trex_game_over_stroke);
     heap_caps_free(trex_canvas_pixels); // Free PSRAM
 
     trex_canvas = trex_score_label = trex_game_over_label = NULL;
@@ -1401,17 +1560,11 @@ void lcd_games_trex_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *g
         char buf[32];
         snprintf(buf, sizeof(buf), "HI %05" PRIu32 " %05" PRIu32, trex_high_score, trex_score);
         lv_label_set_text(trex_score_label, buf);
-        lv_obj_set_style_text_color(trex_score_label, user_secondary_color, 0);
+        lv_obj_set_style_text_color(trex_score_label, TREX_COL_HUD, 0);
         lv_obj_align(trex_score_label, LV_ALIGN_TOP_MID, 0, 2);
 
-        // Game over label (hidden initially)
-        trex_game_over_label = lv_label_create(ACTIVE_SCR);
-        lv_label_set_text(trex_game_over_label, "");
-        lv_obj_set_style_text_font(trex_game_over_label, &lv_font_montserrat_18, 0);
-        lv_obj_set_style_text_color(trex_game_over_label, user_secondary_color, 0);
-        lv_obj_set_style_text_align(trex_game_over_label, LV_TEXT_ALIGN_CENTER, 0); // Center each line, not just the label
-        lv_obj_align(trex_game_over_label, LV_ALIGN_CENTER, 0, -17);
-        lv_obj_add_flag(trex_game_over_label, LV_OBJ_FLAG_HIDDEN);
+        // Game over overlay: centered white text with an 8-way black stroke
+        game_over_overlay_create(&trex_game_over_label, trex_game_over_stroke);
 
         trex_draw_frame();
 
@@ -1433,8 +1586,7 @@ void lcd_games_trex_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *g
 
             char buf[64];
             snprintf(buf, sizeof(buf), "Game Over!\nScore: %" PRIu32 "\nHigh Score: %" PRIu32, trex_score, trex_high_score);
-            lv_label_set_text(trex_game_over_label, buf);
-            lv_obj_remove_flag(trex_game_over_label, LV_OBJ_FLAG_HIDDEN);
+            game_over_overlay_show(trex_game_over_label, trex_game_over_stroke, buf);
 
             trex_game_over_handled = true;
             trex_game_over_tick = xTaskGetTickCount();
@@ -1446,7 +1598,7 @@ void lcd_games_trex_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *g
         }
 
         if (ui_btns->up_btn || ui_btns->select_btn) { // Restart (Chrome style)
-            lv_obj_add_flag(trex_game_over_label, LV_OBJ_FLAG_HIDDEN);
+            game_over_overlay_hide(trex_game_over_label, trex_game_over_stroke);
             trex_reset_run();
         } else if (ui_btns->down_btn || ui_btns->left_btn || ui_btns->right_btn || ui_btns->home_btn) { // Exit to menu
             trex_cleanup();
@@ -1526,6 +1678,25 @@ void lcd_games_trex_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *g
 #define FLAPPY_SPACING_MIN 80 // Min spacing when hardest (px)
 #define FLAPPY_FIRST_SPAWN_PX 90 // Grace distance before the first pipe
 
+// Game colors (classic Flappy Bird palette)
+#define FLAPPY_COL_SKY_TOP (lv_color_make(0x66, 0xB5, 0xE8)) // Sky gradient (zenith)
+#define FLAPPY_COL_SKY_BOTTOM (lv_color_make(0xC6, 0xEA, 0xF8)) // Sky gradient (horizon)
+#define FLAPPY_COL_HILL (lv_color_make(0x8F, 0xC9, 0x6B)) // Distant hills (mid green)
+#define FLAPPY_COL_HILL_LIGHT (lv_color_make(0xB5, 0xDE, 0x8E)) // Sunlit hill crown
+#define FLAPPY_COL_HILL_DARK (lv_color_make(0x5E, 0x9E, 0x3C)) // Shaded hill base
+#define FLAPPY_COL_GROUND (lv_color_make(0xDE, 0xD8, 0x95)) // Tan ground band
+#define FLAPPY_COL_GRASS (lv_color_make(0x5E, 0xC4, 0x28)) // Grass strip on top of the ground
+#define FLAPPY_COL_GRASS_DARK (lv_color_make(0x46, 0x9E, 0x22)) // Grass shadow line
+#define FLAPPY_COL_GROUND_DARK (lv_color_make(0xB8, 0x9A, 0x4E)) // Ground diagonal stripes
+#define FLAPPY_COL_PIPE (lv_color_make(0x5E, 0xC4, 0x28)) // Pipe body green
+#define FLAPPY_COL_PIPE_LIGHT (lv_color_make(0x9B, 0xE0, 0x55)) // Pipe highlight
+#define FLAPPY_COL_PIPE_DARK (lv_color_make(0x3A, 0x86, 0x1E)) // Pipe outline/shadow
+#define FLAPPY_COL_BIRD (lv_color_make(0xFF, 0xC4, 0x00)) // Bird body (gold)
+#define FLAPPY_COL_BEAK (lv_color_make(0xF0, 0x60, 0x0E)) // Bird beak (orange-red)
+#define FLAPPY_COL_WING (lv_color_make(0xE0, 0x93, 0x0F)) // Bird wing (darker gold)
+#define FLAPPY_COL_OUTLINE (lv_color_make(0x2E, 0x22, 0x12)) // Bird dark outline
+#define FLAPPY_COL_TEXT (lv_color_white()) // HUD/score text
+
 typedef struct {
     int32_t x_q4; // Left edge (Q4 subpixels)
     int gap_y; // Top of the gap in canvas px (top pipe spans 0..gap_y)
@@ -1535,36 +1706,162 @@ typedef struct {
 
 /* Sprite bitmaps: one uint32_t per row, bit (w-1-x) = pixel at column x */
 
-// Bird, frame A (16x12): wing raised
-static const uint32_t flappy_bird_a[FLAPPY_BIRD_H] = {
-    0b0000011111100000,
-    0b0001111111111000,
-    0b0011111111111100,
-    0b0111111111001110, // Eye (gap near the front)
-    0b0111111111001111, // Beak tip
-    0b1111111111111110, // Wing up reaches the back edge
-    0b1111111111111100, // Wing up
-    0b0011111111111000,
-    0b0001111111110000,
-    0b0000111111100000,
-    0b0000011111000000,
-    0b0000001110000000,
+/* Bird (16x12): hand-drawn layers composited in order — dark outline, gold
+   body, white (big eye + belly), black pupil, orange beak, then the wing.
+   The layers are mutually exclusive (except pupil over the eye and the wing
+   over the body), so the baked outline stays crisp instead of a dilated halo. */
+
+// Dark outline (silhouette border + eye underline)
+static const uint32_t flappy_bird_outline[FLAPPY_BIRD_H] = {
+    0b0001111110000000,
+    0b0010000001100000,
+    0b0100000000010000,
+    0b1000000000001000,
+    0b1000000000001000,
+    0b1000000000010000,
+    0b1000000111100000,
+    0b1000000000110000,
+    0b0100000000110000,
+    0b0011000011000000,
+    0b0000111100000000,
+    0b0000000000000000,
 };
 
-// Bird, frame B (16x12): wing lowered
-static const uint32_t flappy_bird_b[FLAPPY_BIRD_H] = {
-    0b0000011111100000,
-    0b0001111111111000,
-    0b0011111111111100,
-    0b0011111111001110, // Eye (gap near the front)
-    0b0011111111001111, // Beak tip
-    0b0011111111111110,
-    0b0111111111111100,
-    0b1111111111111000, // Wing down reaches the back edge
-    0b1111111111110000, // Wing down
-    0b0011111111100000,
-    0b0000011111000000,
-    0b0000001110000000,
+// Gold body fill
+static const uint32_t flappy_bird_body[FLAPPY_BIRD_H] = {
+    0b0000000000000000,
+    0b0001111110000000,
+    0b0011111000000000,
+    0b0111110000000000,
+    0b0111110000000000,
+    0b0111110000000000,
+    0b0111111000000000,
+    0b0100011111000000,
+    0b0000000011000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+};
+
+// White: big eye sclera (upper front) + belly (lower)
+static const uint32_t flappy_bird_white[FLAPPY_BIRD_H] = {
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000111100000,
+    0b0000001111010000,
+    0b0000001110010000,
+    0b0000001111100000,
+    0b0000000000000000,
+    0b0011100000000000,
+    0b0011111100000000,
+    0b0000111100000000,
+    0b0000000000000000,
+    0b0000000000000000,
+};
+
+// Black pupil (centre of the eye)
+static const uint32_t flappy_bird_pupil[FLAPPY_BIRD_H] = {
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000100000,
+    0b0000000001100000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+};
+
+// Orange-red beak (front)
+static const uint32_t flappy_bird_beak[FLAPPY_BIRD_H] = {
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000001100,
+    0b0000000000011110,
+    0b0000000000001100,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+};
+
+// Wing, frame A (raised) and frame B (lowered) — a darker-gold patch on the body
+static const uint32_t flappy_bird_wing_a[FLAPPY_BIRD_H] = {
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0011100000000000,
+    0b0011110000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+};
+static const uint32_t flappy_bird_wing_b[FLAPPY_BIRD_H] = {
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0011110000000000,
+    0b0011100000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+    0b0000000000000000,
+};
+
+// Cloud sprite (20x5): soft puff drawn in white, drifts as slow parallax
+#define FLAPPY_CLOUD_W 20
+#define FLAPPY_CLOUD_H 5
+static const uint32_t flappy_cloud[FLAPPY_CLOUD_H] = {
+    0b00000001111110000000,
+    0b00000111111111100000,
+    0b00011111111111111000,
+    0b01111111111111111110,
+    0b11111111111111111111,
+};
+
+// Bush tile (32x10): rounded hump on a solid base, tiles seamlessly on the horizon
+#define FLAPPY_HILL_W 32
+#define FLAPPY_HILL_H 10
+static const uint32_t flappy_hill[FLAPPY_HILL_H] = {
+    0b00000000000001111110000000000000,
+    0b00000000000111111111100000000000,
+    0b00000000011111111111111000000000,
+    0b00000001111111111111111110000000,
+    0b00000111111111111111111111100000,
+    0b00011111111111111111111111111000,
+    0b01111111111111111111111111111110,
+    0b11111111111111111111111111111111,
+    0b11111111111111111111111111111111,
+    0b11111111111111111111111111111111,
+};
+
+// Hill shading layers (same silhouette): a lighter sunlit crown on the upper
+// rows and a darker shaded base, drawn over the mid-green hill so it isn't flat
+static const uint32_t flappy_hill_light[FLAPPY_HILL_H] = {
+    0b00000000000001111110000000000000,
+    0b00000000000111111111100000000000,
+    0b00000000011111111111111000000000,
+    0b00000001111111111111111110000000,
+    0, 0, 0, 0, 0, 0,
+};
+static const uint32_t flappy_hill_dark[FLAPPY_HILL_H] = {
+    0, 0, 0, 0, 0, 0, 0,
+    0b11111111111111111111111111111111,
+    0b11111111111111111111111111111111,
+    0b11111111111111111111111111111111,
 };
 
 // Game state (PSRAM: only touched at the 20 FPS tick, never from ISRs)
@@ -1587,6 +1884,7 @@ POLYCAST5_USE_PSRAM_BSS static uint32_t flappy_label_score; // Last score render
 POLYCAST5_USE_PSRAM_BSS static lv_obj_t *flappy_canvas;
 POLYCAST5_USE_PSRAM_BSS static lv_obj_t *flappy_score_label;
 POLYCAST5_USE_PSRAM_BSS static lv_obj_t *flappy_game_over_label;
+POLYCAST5_USE_PSRAM_BSS static lv_obj_t *flappy_game_over_stroke[8]; // 8-way black text stroke behind the overlay
 POLYCAST5_USE_PSRAM_BSS static lv_timer_t *flappy_timer;
 
 POLYCAST5_USE_PSRAM_BSS static void *flappy_canvas_pixels; // Raw pixel buffer in PSRAM
@@ -1653,9 +1951,13 @@ static uint32_t flappy_high_score_nvs_load(void)
     return score;
 }
 
-// Helper: Draw a packed 1bpp sprite in secondary color, clipped to the canvas
-static void flappy_draw_sprite(int x, int y, const uint32_t *rows, int w, int h)
+// Helper: Draw a packed 1bpp sprite in the given color, clipped to the canvas.
+// Writes straight into the RGB565 buffer (stride == FLAPPY_CANVAS_W, since the
+// buffer is allocated W*H*2) to avoid lv_canvas_set_px's per-pixel overhead
+static void flappy_draw_sprite(int x, int y, const uint32_t *rows, int w, int h, lv_color_t color)
 {
+    uint16_t *base = (uint16_t *)flappy_canvas_pixels;
+    uint16_t c = lv_color_to_u16(color);
     for (int row = 0; row < h; row++) {
         int py = y + row;
         if (py < 0 || py >= FLAPPY_CANVAS_H) {
@@ -1667,32 +1969,57 @@ static void flappy_draw_sprite(int x, int y, const uint32_t *rows, int w, int h)
             continue; // Empty row
         }
 
+        uint16_t *prow = base + py * FLAPPY_CANVAS_W;
         for (int col = 0; col < w; col++) {
             if (bits & (1UL << (w - 1 - col))) { // Bit (w-1-col) = pixel at column col
                 int px = x + col;
                 if (px >= 0 && px < FLAPPY_CANVAS_W) {
-                    lv_canvas_set_px(flappy_canvas, px, py, user_secondary_color, LV_OPA_COVER);
+                    prow[px] = c;
                 }
             }
         }
     }
 }
 
-// Helper: Fill a solid rectangle in secondary color, clipped to the canvas
-static void flappy_fill_rect(int x, int y, int w, int h)
+// Helper: Fill a solid rectangle in the given color, clipped to the canvas
+// (direct RGB565 writes, same fast path as flappy_draw_sprite)
+static void flappy_fill_rect(int x, int y, int w, int h, lv_color_t color)
 {
-    for (int row = 0; row < h; row++) {
-        int py = y + row;
-        if (py < 0 || py >= FLAPPY_CANVAS_H) {
-            continue;
-        }
-        for (int col = 0; col < w; col++) {
-            int px = x + col;
-            if (px >= 0 && px < FLAPPY_CANVAS_W) {
-                lv_canvas_set_px(flappy_canvas, px, py, user_secondary_color, LV_OPA_COVER);
-            }
+    uint16_t *base = (uint16_t *)flappy_canvas_pixels;
+    uint16_t c = lv_color_to_u16(color);
+    int x0 = x < 0 ? 0 : x;
+    int y0 = y < 0 ? 0 : y;
+    int x1 = (x + w > FLAPPY_CANVAS_W) ? FLAPPY_CANVAS_W : (x + w);
+    int y1 = (y + h > FLAPPY_CANVAS_H) ? FLAPPY_CANVAS_H : (y + h);
+    for (int yy = y0; yy < y1; yy++) {
+        uint16_t *row = base + yy * FLAPPY_CANVAS_W;
+        for (int xx = x0; xx < x1; xx++) {
+            row[xx] = c;
         }
     }
+}
+
+// Helper: Draw a vertical pipe segment with a left highlight and dark edges
+static void flappy_fill_shaded_col(int x, int y, int w, int h)
+{
+    if (h <= 0) {
+        return;
+    }
+    flappy_fill_rect(x, y, w, h, FLAPPY_COL_PIPE); // Body
+    flappy_fill_rect(x + 1, y, 2, h, FLAPPY_COL_PIPE_LIGHT); // Highlight near the left
+    flappy_fill_rect(x, y, 1, h, FLAPPY_COL_PIPE_DARK); // Left outline
+    flappy_fill_rect(x + w - 1, y, 1, h, FLAPPY_COL_PIPE_DARK); // Right shadow
+}
+
+// Helper: Draw a pipe cap (wider rim) shaded like the shaft with dark edges
+static void flappy_fill_cap(int x, int y, int w, int h)
+{
+    if (h <= 0) {
+        return;
+    }
+    flappy_fill_shaded_col(x, y, w, h);
+    flappy_fill_rect(x, y, w, 1, FLAPPY_COL_PIPE_DARK); // Top edge
+    flappy_fill_rect(x, y + h - 1, w, 1, FLAPPY_COL_PIPE_DARK); // Bottom edge
 }
 
 // Helper: Draw one pipe (narrow shaft + a wider rim at the gap opening)
@@ -1710,52 +2037,100 @@ static void flappy_draw_pipe(const flappy_pipe_t *p)
     if (top_h > 0) {
         int shaft_h = top_h - FLAPPY_LIP_H;
         if (shaft_h > 0) {
-            flappy_fill_rect(shaft_x, 0, shaft_w, shaft_h);
-            flappy_fill_rect(px, shaft_h, FLAPPY_PIPE_W, FLAPPY_LIP_H);
+            flappy_fill_shaded_col(shaft_x, 0, shaft_w, shaft_h);
+            flappy_fill_cap(px, shaft_h, FLAPPY_PIPE_W, FLAPPY_LIP_H);
         } else {
-            flappy_fill_rect(px, 0, FLAPPY_PIPE_W, top_h); // Too short for a separate rim
+            flappy_fill_cap(px, 0, FLAPPY_PIPE_W, top_h); // Too short for a separate rim
         }
     }
 
     // Bottom pipe: a rim at the top (gap-facing) edge then the shaft
     if (bot_h > 0) {
         int rim_h = (bot_h < FLAPPY_LIP_H) ? bot_h : FLAPPY_LIP_H;
-        flappy_fill_rect(px, bot_y, FLAPPY_PIPE_W, rim_h);
+        flappy_fill_cap(px, bot_y, FLAPPY_PIPE_W, rim_h);
         int shaft_h = bot_h - rim_h;
         if (shaft_h > 0) {
-            flappy_fill_rect(shaft_x, bot_y + rim_h, shaft_w, shaft_h);
+            flappy_fill_shaded_col(shaft_x, bot_y + rim_h, shaft_w, shaft_h);
         }
+    }
+}
+
+// Helper: Draw a sprite tiled for horizontal wrap-around (parallax scenery)
+static void flappy_draw_parallax(const uint32_t *spr, int w, int h, int base_x, int y, int period, uint32_t scroll, lv_color_t color)
+{
+    int cx = (int)(((uint32_t)base_x + (uint32_t)period - (scroll % (uint32_t)period)) % (uint32_t)period);
+    flappy_draw_sprite(cx - period, y, spr, w, h, color);
+    flappy_draw_sprite(cx, y, spr, w, h, color);
+    flappy_draw_sprite(cx + period, y, spr, w, h, color);
+}
+
+// Helper: Tile the bush sprite across the horizon, scrolling with the world
+static void flappy_draw_hills(uint32_t scroll)
+{
+    int y = FLAPPY_GROUND_Y - FLAPPY_HILL_H;
+    int start = -(int)(scroll % (uint32_t)FLAPPY_HILL_W);
+    for (int x = start; x < FLAPPY_CANVAS_W; x += FLAPPY_HILL_W) {
+        flappy_draw_sprite(x, y, flappy_hill, FLAPPY_HILL_W, FLAPPY_HILL_H, FLAPPY_COL_HILL);
+        flappy_draw_sprite(x, y, flappy_hill_light, FLAPPY_HILL_W, FLAPPY_HILL_H, FLAPPY_COL_HILL_LIGHT);
+        flappy_draw_sprite(x, y, flappy_hill_dark, FLAPPY_HILL_W, FLAPPY_HILL_H, FLAPPY_COL_HILL_DARK);
     }
 }
 
 // Helper: Draw the whole frame (background, pipes, ground, bird)
 static void flappy_draw_frame(void)
 {
-    // Pipes are solid fills, so flappy_fill_rect issues many lv_canvas_set_px
-    // calls and each one calls lv_obj_invalidate(). Suppress invalidation for
-    // the whole frame and trigger a single refresh at the end (same end result,
-    // far fewer invalidate calls than the per-pixel default)
+    // The full-canvas fills below issue many lv_canvas_set_px calls, each of
+    // which would invalidate the canvas. Suppress invalidation for the whole
+    // frame and trigger a single refresh at the end
     lv_display_t *disp = lv_obj_get_display(flappy_canvas);
     lv_display_enable_invalidation(disp, false);
 
-    lv_canvas_fill_bg(flappy_canvas, user_primary_color, LV_OPA_COVER); // Clear background
+    uint32_t off = flappy_dist_q4 >> 4;
+
+    // Sky: vertical gradient from a deeper teal at the top to a lighter horizon
+    for (int y = 0; y < FLAPPY_GROUND_Y; y++) {
+        uint8_t mix = (uint8_t)(255 - y * 255 / FLAPPY_GROUND_Y);
+        flappy_fill_rect(0, y, FLAPPY_CANVAS_W, 1, lv_color_mix(FLAPPY_COL_SKY_TOP, FLAPPY_COL_SKY_BOTTOM, mix));
+    }
+
+    // Slow clouds and a row of bushes on the horizon (parallax depth, behind pipes)
+    uint32_t cloud_off = off / 3;
+    flappy_draw_parallax(flappy_cloud, FLAPPY_CLOUD_W, FLAPPY_CLOUD_H, 30, 12, FLAPPY_CANVAS_W + 80, cloud_off, lv_color_white());
+    flappy_draw_parallax(flappy_cloud, FLAPPY_CLOUD_W, FLAPPY_CLOUD_H, 150, 24, FLAPPY_CANVAS_W + 80, cloud_off, lv_color_white());
+    flappy_draw_hills(off / 2);
 
     // Pipes
     for (int i = 0; i < flappy_pipe_count; i++) {
         flappy_draw_pipe(&flappy_pipes[i]);
     }
 
-    // Scrolling dotted ground line
-    uint32_t off = flappy_dist_q4 >> 4;
-    for (int x = 0; x < FLAPPY_CANVAS_W; x++) {
-        if (((x + off) & 7) < 6) { // 6 px dash, 2 px gap
-            lv_canvas_set_px(flappy_canvas, x, FLAPPY_GROUND_Y, user_secondary_color, LV_OPA_COVER);
+    // Ground: grass strip with a shadow line, tan base, scrolling diagonal stripes
+    flappy_fill_rect(0, FLAPPY_GROUND_Y, FLAPPY_CANVAS_W, 1, FLAPPY_COL_GRASS);
+    flappy_fill_rect(0, FLAPPY_GROUND_Y + 1, FLAPPY_CANVAS_W, 1, FLAPPY_COL_GRASS_DARK);
+    flappy_fill_rect(0, FLAPPY_GROUND_Y + 2, FLAPPY_CANVAS_W, FLAPPY_CANVAS_H - FLAPPY_GROUND_Y - 2, FLAPPY_COL_GROUND);
+    for (int y = FLAPPY_GROUND_Y + 2; y < FLAPPY_CANVAS_H; y++) {
+        for (int x = 0; x < FLAPPY_CANVAS_W; x++) {
+            if (((uint32_t)x + off + (uint32_t)(y - FLAPPY_GROUND_Y)) % 6 < 2) { // Diagonal stripe
+                lv_canvas_set_px(flappy_canvas, x, y, FLAPPY_COL_GROUND_DARK, LV_OPA_COVER);
+            }
         }
     }
 
-    // Bird (wings flap continuously)
-    const uint32_t *frame = ((flappy_frame_count / 2) & 1) ? flappy_bird_b : flappy_bird_a;
-    flappy_draw_sprite(FLAPPY_BIRD_X, flappy_bird_y_q4 >> 4, frame, FLAPPY_BIRD_W, FLAPPY_BIRD_H);
+    // Bird: outline, gold body, white (eye + belly), pupil, beak, flapping wing
+    int by = flappy_bird_y_q4 >> 4;
+    const uint32_t *wing = ((flappy_frame_count / 3) & 1) ? flappy_bird_wing_b : flappy_bird_wing_a;
+    flappy_draw_sprite(FLAPPY_BIRD_X, by, flappy_bird_outline, FLAPPY_BIRD_W, FLAPPY_BIRD_H, FLAPPY_COL_OUTLINE);
+    flappy_draw_sprite(FLAPPY_BIRD_X, by, flappy_bird_body, FLAPPY_BIRD_W, FLAPPY_BIRD_H, FLAPPY_COL_BIRD);
+    flappy_draw_sprite(FLAPPY_BIRD_X, by, flappy_bird_white, FLAPPY_BIRD_W, FLAPPY_BIRD_H, lv_color_white());
+    flappy_draw_sprite(FLAPPY_BIRD_X, by, flappy_bird_pupil, FLAPPY_BIRD_W, FLAPPY_BIRD_H, lv_color_black());
+    flappy_draw_sprite(FLAPPY_BIRD_X, by, flappy_bird_beak, FLAPPY_BIRD_W, FLAPPY_BIRD_H, FLAPPY_COL_BEAK);
+    flappy_draw_sprite(FLAPPY_BIRD_X, by, wing, FLAPPY_BIRD_W, FLAPPY_BIRD_H, FLAPPY_COL_WING);
+
+    // White frame around the play area
+    flappy_fill_rect(0, 0, FLAPPY_CANVAS_W, 1, lv_color_white());
+    flappy_fill_rect(0, FLAPPY_CANVAS_H - 1, FLAPPY_CANVAS_W, 1, lv_color_white());
+    flappy_fill_rect(0, 0, 1, FLAPPY_CANVAS_H, lv_color_white());
+    flappy_fill_rect(FLAPPY_CANVAS_W - 1, 0, 1, FLAPPY_CANVAS_H, lv_color_white());
 
     // Re-enable invalidation and issue one refresh for the whole canvas
     lv_display_enable_invalidation(disp, true);
@@ -1845,7 +2220,7 @@ static void flappy_cleanup(void)
 
     lv_obj_delete(flappy_canvas);
     lv_obj_delete(flappy_score_label);
-    lv_obj_delete(flappy_game_over_label);
+    game_over_overlay_delete(flappy_game_over_label, flappy_game_over_stroke);
     heap_caps_free(flappy_canvas_pixels); // Free PSRAM
 
     flappy_canvas = flappy_score_label = flappy_game_over_label = NULL;
@@ -1993,17 +2368,11 @@ void lcd_games_flappy_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t 
         char buf[32];
         snprintf(buf, sizeof(buf), "HI %05" PRIu32 " %05" PRIu32, flappy_high_score, flappy_score);
         lv_label_set_text(flappy_score_label, buf);
-        lv_obj_set_style_text_color(flappy_score_label, user_secondary_color, 0);
+        lv_obj_set_style_text_color(flappy_score_label, FLAPPY_COL_TEXT, 0);
         lv_obj_align(flappy_score_label, LV_ALIGN_TOP_MID, 0, 2);
 
-        // Game over label (hidden initially)
-        flappy_game_over_label = lv_label_create(ACTIVE_SCR);
-        lv_label_set_text(flappy_game_over_label, "");
-        lv_obj_set_style_text_font(flappy_game_over_label, &lv_font_montserrat_18, 0);
-        lv_obj_set_style_text_color(flappy_game_over_label, user_secondary_color, 0);
-        lv_obj_set_style_text_align(flappy_game_over_label, LV_TEXT_ALIGN_CENTER, 0); // Center each line, not just the label
-        lv_obj_align(flappy_game_over_label, LV_ALIGN_CENTER, 0, -17);
-        lv_obj_add_flag(flappy_game_over_label, LV_OBJ_FLAG_HIDDEN);
+        // Game over overlay: centered white text with an 8-way black stroke
+        game_over_overlay_create(&flappy_game_over_label, flappy_game_over_stroke);
 
         flappy_draw_frame();
 
@@ -2025,8 +2394,7 @@ void lcd_games_flappy_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t 
 
             char buf[64];
             snprintf(buf, sizeof(buf), "Game Over!\nScore: %" PRIu32 "\nHigh Score: %" PRIu32, flappy_score, flappy_high_score);
-            lv_label_set_text(flappy_game_over_label, buf);
-            lv_obj_remove_flag(flappy_game_over_label, LV_OBJ_FLAG_HIDDEN);
+            game_over_overlay_show(flappy_game_over_label, flappy_game_over_stroke, buf);
 
             flappy_game_over_handled = true;
             flappy_game_over_tick = xTaskGetTickCount();
@@ -2038,7 +2406,7 @@ void lcd_games_flappy_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t 
         }
 
         if (ui_btns->up_btn || ui_btns->select_btn) { // Restart
-            lv_obj_add_flag(flappy_game_over_label, LV_OBJ_FLAG_HIDDEN);
+            game_over_overlay_hide(flappy_game_over_label, flappy_game_over_stroke);
             flappy_reset_run();
 
             // Refresh the readout to 0 for the hover before the first flap

@@ -28,6 +28,7 @@
 #include "widgets/label/lv_label.h"
 
 #include "gpio_task.h"
+#include "lis2dh12.h" // lis2dh12_read_temp_c
 #include "lcd_utils.h"
 #include "lcd_settings.h"
 #include "wifi_ota_update.h"
@@ -1745,8 +1746,21 @@ static void system_build_info(char *buf, size_t n)
         ESP_LOGE(TAG, "esp_partition_find_first failed");
     }
 
+    // On-die temperature (relative sensor, +-several C). Show "--" if the read fails.
+    float temp_c = 0.0f;
+    char temp_str[16];
+    if (lis2dh12_read_temp_c(&temp_c) == ESP_OK) {
+        // \xC2\xB0 is the UTF-8 encoding of the degree symbol; split from "C" so the
+        // hex escape doesn't swallow the 'C' as another hex digit.
+        snprintf(temp_str, sizeof(temp_str), "%.0f \xC2\xB0" "C", temp_c);
+    } else {
+        snprintf(temp_str, sizeof(temp_str), "--");
+    }
+
     // Compose buffer text
     snprintf(buf, n,
+        "Battery Temp: %s\n\n"
+
         "Total uptime:\n"
         "%" PRIu64 " days\n"
         "%" PRIu64 " hours\n"
@@ -1777,7 +1791,9 @@ static void system_build_info(char *buf, size_t n)
         "AP: %s\n\n"
         "BT:\n"
         "MAC: %s",
-        
+
+        temp_str,
+
         uptime_d, uptime_h, uptime_m, uptime_s,
 
         pc5_fw_version,

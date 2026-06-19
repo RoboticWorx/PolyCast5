@@ -96,11 +96,13 @@ esp_err_t lis2dh12_init(void)
         goto out;
     }
 
-    // Configure: block-data-update on, +-2 g full scale, normal (10-bit) mode, 100 Hz ODR
+    // Configure: block-data-update on, +-2 g full scale, normal (10-bit) mode, 100 Hz ODR.
+    // Also enable the on-die temperature sensor (ADC_EN + TEMP_EN); BDU above is required for it.
     if (lis2dh12_block_data_update_set(&s_ctx, PROPERTY_ENABLE) != 0 ||
             lis2dh12_full_scale_set(&s_ctx, LIS2DH12_2g) != 0 ||
             lis2dh12_operating_mode_set(&s_ctx, LIS2DH12_NM_10bit) != 0 ||
-            lis2dh12_data_rate_set(&s_ctx, LIS2DH12_ODR_100Hz) != 0) {
+            lis2dh12_data_rate_set(&s_ctx, LIS2DH12_ODR_100Hz) != 0 ||
+            lis2dh12_temperature_meas_set(&s_ctx, LIS2DH12_TEMP_ENABLE) != 0) {
         ESP_LOGE(TAG, "configuration write failed");
         ret = ESP_FAIL;
         goto out;
@@ -211,6 +213,27 @@ esp_err_t lis2dh12_read_deg(float *pitch, float *roll)
     }
 
     remap_axes_f(pitch, roll, NULL);
+
+    return ESP_OK;
+}
+
+esp_err_t lis2dh12_read_temp_c(float *temp_c)
+{
+    if (s_dev == NULL) { // Not initialized (or init failed)
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    // Read the raw temperature under the bus lock
+    int16_t raw;
+    xSemaphoreTake(xI2CBusMutex, portMAX_DELAY);
+    int32_t r = lis2dh12_temperature_raw_get(&s_ctx, &raw); // OUT_TEMP_L/H (0x0C/0x0D)
+    xSemaphoreGive(xI2CBusMutex);
+    if (r != 0) { // I2C read failed
+        return ESP_FAIL;
+    }
+
+    // Chip is configured in normal (10-bit) mode -> normal-mode converter (1 C/LSB)
+    if (temp_c) *temp_c = lis2dh12_from_lsb_nm_to_celsius(raw);
 
     return ESP_OK;
 }
