@@ -225,7 +225,9 @@ esp_err_t lis2dh12_read_temp_c(float *temp_c)
 
     // Read the raw temperature under the bus lock
     int16_t raw;
-    xSemaphoreTake(xI2CBusMutex, portMAX_DELAY);
+    if (xSemaphoreTake(xI2CBusMutex, pdMS_TO_TICKS(50)) != pdTRUE) {
+        return ESP_ERR_TIMEOUT;
+    }
     int32_t r = lis2dh12_temperature_raw_get(&s_ctx, &raw); // OUT_TEMP_L/H (0x0C/0x0D)
     xSemaphoreGive(xI2CBusMutex);
     if (r != 0) { // I2C read failed

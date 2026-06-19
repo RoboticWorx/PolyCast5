@@ -1341,24 +1341,30 @@ static void trex_draw_frame(void)
     // scattered pebbles/specks for texture (all scroll with the world)
     trex_fill_rect(0, TREX_GROUND_Y, TREX_CANVAS_W, TREX_CANVAS_H - TREX_GROUND_Y, TREX_COL_GROUND);
     trex_fill_rect(0, TREX_GROUND_Y, TREX_CANVAS_W, 1, TREX_COL_GROUND_DARK);
+    uint16_t *gnd_base = (uint16_t *)trex_canvas_pixels; // Direct RGB565 writes (same fast path as the fills above)
+    uint16_t dark_c = lv_color_to_u16(TREX_COL_GROUND_DARK);
+    uint16_t *dash_row = gnd_base + (TREX_GROUND_Y + 2) * TREX_CANVAS_W;
     for (int x = 0; x < TREX_CANVAS_W; x++) {
         if (((x + off) & 7) < 6) { // 6 px dash, 2 px gap
-            lv_canvas_set_px(trex_canvas, x, TREX_GROUND_Y + 2, TREX_COL_GROUND_DARK, LV_OPA_COVER);
+            dash_row[x] = dark_c;
         }
     }
     int sand_top = TREX_GROUND_Y + 4;
     int sand_h = TREX_CANVAS_H - sand_top;
+    uint16_t light_c = lv_color_to_u16(TREX_COL_GROUND_LIGHT);
     for (int x = 0; x < TREX_CANVAS_W; x++) {
         uint32_t hsh = ((uint32_t)x + off) * 2654435761u; // Stable per world-column
         if ((hsh >> 28) == 0) { // ~1/16 columns: a 2 px dark pebble
             int py = sand_top + (int)((hsh >> 8) % (uint32_t)sand_h);
-            lv_canvas_set_px(trex_canvas, x, py, TREX_COL_GROUND_DARK, LV_OPA_COVER);
+            uint16_t *prow = gnd_base + py * TREX_CANVAS_W;
+            prow[x] = dark_c;
             if (x + 1 < TREX_CANVAS_W) {
-                lv_canvas_set_px(trex_canvas, x + 1, py, TREX_COL_GROUND_DARK, LV_OPA_COVER);
+                prow[x + 1] = dark_c;
             }
         } else if ((hsh >> 28) == 1) { // ~1/16 columns: a light speck
             int py = sand_top + (int)((hsh >> 12) % (uint32_t)sand_h);
-            lv_canvas_set_px(trex_canvas, x, py, TREX_COL_GROUND_LIGHT, LV_OPA_COVER);
+            uint16_t *prow = gnd_base + py * TREX_CANVAS_W;
+            prow[x] = light_c;
         }
     }
 
@@ -2108,10 +2114,13 @@ static void flappy_draw_frame(void)
     flappy_fill_rect(0, FLAPPY_GROUND_Y, FLAPPY_CANVAS_W, 1, FLAPPY_COL_GRASS);
     flappy_fill_rect(0, FLAPPY_GROUND_Y + 1, FLAPPY_CANVAS_W, 1, FLAPPY_COL_GRASS_DARK);
     flappy_fill_rect(0, FLAPPY_GROUND_Y + 2, FLAPPY_CANVAS_W, FLAPPY_CANVAS_H - FLAPPY_GROUND_Y - 2, FLAPPY_COL_GROUND);
+    uint16_t *gnd_base = (uint16_t *)flappy_canvas_pixels; // Direct RGB565 writes (same fast path as the fills above)
+    uint16_t stripe_c = lv_color_to_u16(FLAPPY_COL_GROUND_DARK);
     for (int y = FLAPPY_GROUND_Y + 2; y < FLAPPY_CANVAS_H; y++) {
+        uint16_t *prow = gnd_base + y * FLAPPY_CANVAS_W;
         for (int x = 0; x < FLAPPY_CANVAS_W; x++) {
             if (((uint32_t)x + off + (uint32_t)(y - FLAPPY_GROUND_Y)) % 6 < 2) { // Diagonal stripe
-                lv_canvas_set_px(flappy_canvas, x, y, FLAPPY_COL_GROUND_DARK, LV_OPA_COVER);
+                prow[x] = stripe_c;
             }
         }
     }
