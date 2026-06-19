@@ -872,7 +872,6 @@ static void game_over_overlay_delete(lv_obj_t *main, lv_obj_t *stroke[8])
 #define TREX_COL_DINO (lv_color_make(0x2E, 0x7D, 0x1B)) // Dark green T-Rex (cactus shade)
 #define TREX_COL_CACTUS (lv_color_make(0x2E, 0x7D, 0x1B)) // Cactus green
 #define TREX_COL_BIRD (lv_color_make(0x55, 0x55, 0x55)) // Pterodactyl slate gray
-#define TREX_COL_HUD (lv_color_white()) // High-score readout text
 
 // Obstacle types
 typedef enum {
@@ -1403,11 +1402,11 @@ static void trex_draw_frame(void)
         }
     }
 
-    // White frame around the play area
-    trex_fill_rect(0, 0, TREX_CANVAS_W, 1, lv_color_white());
-    trex_fill_rect(0, TREX_CANVAS_H - 1, TREX_CANVAS_W, 1, lv_color_white());
-    trex_fill_rect(0, 0, 1, TREX_CANVAS_H, lv_color_white());
-    trex_fill_rect(TREX_CANVAS_W - 1, 0, 1, TREX_CANVAS_H, lv_color_white());
+    // Frame around the play area (user accent color)
+    trex_fill_rect(0, 0, TREX_CANVAS_W, 1, user_secondary_color);
+    trex_fill_rect(0, TREX_CANVAS_H - 1, TREX_CANVAS_W, 1, user_secondary_color);
+    trex_fill_rect(0, 0, 1, TREX_CANVAS_H, user_secondary_color);
+    trex_fill_rect(TREX_CANVAS_W - 1, 0, 1, TREX_CANVAS_H, user_secondary_color);
 
     lv_display_enable_invalidation(disp, true);
     lv_obj_invalidate(trex_canvas); // Refresh
@@ -1566,7 +1565,7 @@ void lcd_games_trex_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *g
         char buf[32];
         snprintf(buf, sizeof(buf), "HI %05" PRIu32 " %05" PRIu32, trex_high_score, trex_score);
         lv_label_set_text(trex_score_label, buf);
-        lv_obj_set_style_text_color(trex_score_label, TREX_COL_HUD, 0);
+        lv_obj_set_style_text_color(trex_score_label, user_secondary_color, 0);
         lv_obj_align(trex_score_label, LV_ALIGN_TOP_MID, 0, 2);
 
         // Game over overlay: centered white text with an 8-way black stroke
@@ -1701,7 +1700,6 @@ void lcd_games_trex_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *g
 #define FLAPPY_COL_BEAK (lv_color_make(0xF0, 0x60, 0x0E)) // Bird beak (orange-red)
 #define FLAPPY_COL_WING (lv_color_make(0xE0, 0x93, 0x0F)) // Bird wing (darker gold)
 #define FLAPPY_COL_OUTLINE (lv_color_make(0x2E, 0x22, 0x12)) // Bird dark outline
-#define FLAPPY_COL_TEXT (lv_color_white()) // HUD/score text
 
 typedef struct {
     int32_t x_q4; // Left edge (Q4 subpixels)
@@ -2135,11 +2133,11 @@ static void flappy_draw_frame(void)
     flappy_draw_sprite(FLAPPY_BIRD_X, by, flappy_bird_beak, FLAPPY_BIRD_W, FLAPPY_BIRD_H, FLAPPY_COL_BEAK);
     flappy_draw_sprite(FLAPPY_BIRD_X, by, wing, FLAPPY_BIRD_W, FLAPPY_BIRD_H, FLAPPY_COL_WING);
 
-    // White frame around the play area
-    flappy_fill_rect(0, 0, FLAPPY_CANVAS_W, 1, lv_color_white());
-    flappy_fill_rect(0, FLAPPY_CANVAS_H - 1, FLAPPY_CANVAS_W, 1, lv_color_white());
-    flappy_fill_rect(0, 0, 1, FLAPPY_CANVAS_H, lv_color_white());
-    flappy_fill_rect(FLAPPY_CANVAS_W - 1, 0, 1, FLAPPY_CANVAS_H, lv_color_white());
+    // Frame around the play area (user accent color)
+    flappy_fill_rect(0, 0, FLAPPY_CANVAS_W, 1, user_secondary_color);
+    flappy_fill_rect(0, FLAPPY_CANVAS_H - 1, FLAPPY_CANVAS_W, 1, user_secondary_color);
+    flappy_fill_rect(0, 0, 1, FLAPPY_CANVAS_H, user_secondary_color);
+    flappy_fill_rect(FLAPPY_CANVAS_W - 1, 0, 1, FLAPPY_CANVAS_H, user_secondary_color);
 
     // Re-enable invalidation and issue one refresh for the whole canvas
     lv_display_enable_invalidation(disp, true);
@@ -2377,7 +2375,7 @@ void lcd_games_flappy_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t 
         char buf[32];
         snprintf(buf, sizeof(buf), "HI %05" PRIu32 " %05" PRIu32, flappy_high_score, flappy_score);
         lv_label_set_text(flappy_score_label, buf);
-        lv_obj_set_style_text_color(flappy_score_label, FLAPPY_COL_TEXT, 0);
+        lv_obj_set_style_text_color(flappy_score_label, user_secondary_color, 0);
         lv_obj_align(flappy_score_label, LV_ALIGN_TOP_MID, 0, 2);
 
         // Game over overlay: centered white text with an 8-way black stroke
