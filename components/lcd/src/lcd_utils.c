@@ -309,8 +309,10 @@ void lcd_lvgl_init(void)
     lv_image_header_cache_resize(160, false); // Count-based, tiny entries
 
     // Draw‐buffer: HOR_RES x DRAW_LINES lines
-    // Allocate space for 20 lines of 240 px each (~9.6 kB), DMA-capable in DRAM
-    static DRAM_ATTR lv_color_t buf[HOR_RES * DRAW_LINES * 2]
+    // static DRAM_ATTR lv_color_t buf[HOR_RES * DRAW_LINES * 2]
+    // Lives in PSRAM, not internal DRAM: the flush copies it into st7789's internal
+    // Byte[] staging buffer (CPU, sequential) before SPI/DMA, so it is never a DMA source
+    POLYCAST5_USE_PSRAM_BSS static lv_color_t buf[HOR_RES * DRAW_LINES]
             __attribute__((aligned(4)));
         
     static lv_draw_buf_t draw_buf;
