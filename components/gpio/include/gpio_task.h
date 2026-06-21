@@ -36,12 +36,14 @@ extern SemaphoreHandle_t xNotChargingSemaphore;
 
 extern SemaphoreHandle_t xLEDCSemaphore;
 extern SemaphoreHandle_t xReadAccelSemaphore;
+extern SemaphoreHandle_t xReadMagSemaphore;
 
 // Queues
 extern QueueHandle_t xAdcBatReadingQueue;
 extern QueueHandle_t xAdcBatBluetoothQueue;
 extern QueueHandle_t xLEDQueue;
 extern QueueHandle_t xAccelReadingsQueue;
+extern QueueHandle_t xMagReadingsQueue;
 
 /**
  * @brief  Create the GPIO task.

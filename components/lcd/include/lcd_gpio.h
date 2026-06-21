@@ -47,22 +47,32 @@ void lcd_gpio_update_menu(gpio_menu_t *gpio_menu);
 void lcd_gpio_how_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu);
 
 /**
- * @brief Live accelerometer (LIS2DH12) tilt readout page
+ * @brief Live magcelerometer (LIS2DH12 + MMC5603) tilt readout page
  *
  * @param [in] ui_btns UI input structure
  * @param [in] ui_menu UI menu structure
  * @param [in] gpio_menu GPIO menu structure
  */
-void lcd_gpio_accel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu);
+void lcd_gpio_magcel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu);
 
 /**
- * @brief Streams live accelerometer tilt to the selected ESP-NOW peer
+ * @brief Streams live magcelerometer readings to the selected ESP-NOW peer
  *
  * @param [in] ui_btns UI input structure
  * @param [in] ui_menu UI menu structure
  * @param [in] gpio_menu GPIO menu structure
  */
-void lcd_gpio_accel_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu);
+void lcd_gpio_magcel_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu);
+
+/**
+ * @brief Compass calibration page (entered with DOWN from the magcel page). SELECT starts/stops a
+ *        manual hard-/soft-iron calibration turn; the result is saved to NVS.
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] gpio_menu GPIO menu structure
+ */
+void lcd_gpio_magcal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu);
 
 /**
  * @brief I2C terminal page to communicate with external hardware

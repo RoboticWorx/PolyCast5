@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PolyCast5 is an open-source multi-tool wireless remote firmware for ESP32-C5, built on ESP-IDF v6.0. It controls outlets (via LoRa), Bluetooth devices (HID), infrared remotes, custom ESP32 builds (ESP-NOW), and Wi-Fi/MQTT targets. Written in C.
+PolyCast5 is an open-source multi-tool wireless remote firmware for ESP32-C5, built on ESP-IDF v6.0.1 (C:\Espressif\.espressif\v6.0.1\esp-idf). It controls outlets (via LoRa), Bluetooth devices (HID), infrared remotes, custom ESP32 builds (ESP-NOW), and Wi-Fi/MQTT targets. Written in C.
 
 ## Build Commands
 

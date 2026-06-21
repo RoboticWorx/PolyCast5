@@ -11,6 +11,7 @@
 #include "esp_log.h"
 
 #include "lis2dh12.h"
+#include "mmc5603.h"
 #include "gpio_task.h"
 #include "gpio_utils.h"
 
@@ -52,11 +53,13 @@ SemaphoreHandle_t xNotChargingSemaphore;
 
 SemaphoreHandle_t xLEDCSemaphore;
 SemaphoreHandle_t xReadAccelSemaphore;
+SemaphoreHandle_t xReadMagSemaphore;
 
 QueueHandle_t xAdcBatReadingQueue;
 QueueHandle_t xAdcBatBluetoothQueue;
 QueueHandle_t xLEDQueue;
 QueueHandle_t xAccelReadingsQueue;
+QueueHandle_t xMagReadingsQueue;
 
 typedef struct {
     uint8_t pin; // Expander pin number
@@ -231,6 +234,8 @@ static void gpio_task(void *arg)
     configASSERT(xLEDCSemaphore);
     xReadAccelSemaphore = xSemaphoreCreateBinary();
     configASSERT(xReadAccelSemaphore);
+    xReadMagSemaphore = xSemaphoreCreateBinary();
+    configASSERT(xReadMagSemaphore);
 
     xGpioLeftBtnMutex = xSemaphoreCreateMutex();
     configASSERT(xGpioLeftBtnMutex);
@@ -243,6 +248,8 @@ static void gpio_task(void *arg)
     configASSERT(xLEDQueue);
     xAccelReadingsQueue = xQueueCreate(1, sizeof(accel_deg_t));
     configASSERT(xAccelReadingsQueue);
+    xMagReadingsQueue = xQueueCreate(1, sizeof(mmc5603_reading_t));
+    configASSERT(xMagReadingsQueue);
 
     // Default states set in gpio_utils_init()
     
@@ -256,8 +263,8 @@ static void gpio_task(void *arg)
     
     // Get opposite initial charging state to update once
     bool was_charging = !(gpio_utils_read_input(TCA9535_CHG_IND_PIN) == 0);
-    
-    while (1) 
+
+    while (1)
     {
         // Press + auto-repeat state machine
         for (size_t i = 0; i < 6; ++i) {
@@ -352,7 +359,16 @@ static void gpio_task(void *arg)
                 xQueueOverwrite(xAccelReadingsQueue, &accel_deg);
             }
         }
-        
+
+        // Magnetometer read, triggered independently so pages without a compass don't pay for it
+        if (xSemaphoreTake(xReadMagSemaphore, 0) == pdTRUE) {
+            float mx, my, mz;
+            if (mmc5603_read_ut(&mx, &my, &mz) == ESP_OK) {
+                mmc5603_reading_t mag = { .x = mx, .y = my, .z = mz };
+                xQueueOverwrite(xMagReadingsQueue, &mag);
+            }
+        }
+
         // Go to sleep requested
         if (gpio_utils_read_input(TCA9535_USER_BUTTON_POWER_PIN) == 0) {
             xSemaphoreGive(xPowerButtonSemaphore);

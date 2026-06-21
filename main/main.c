@@ -167,7 +167,7 @@ void app_main(void)
     wifi_task_create();
     bluetooth_task_create();
     ai_task_create();
-    
+
 #ifdef POLYCAST5_DEBUG_RAM
     // Wait for tasks to allocate
     vTaskDelay(pdMS_TO_TICKS(8000));

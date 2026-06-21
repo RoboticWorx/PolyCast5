@@ -21,10 +21,14 @@
 #include "misc/lv_area.h"
 #include "misc/lv_anim.h"
 #include "widgets/label/lv_label.h"
+#include "widgets/image/lv_image.h"
+#include "widgets/bar/lv_bar.h"
+#include "draw/lv_image_dsc.h"
 
 #include "tca9535.h"
 #include "gpio_task.h"
 #include "lis2dh12.h"
+#include "mmc5603.h"
 #include "lcd_utils.h"
 #include "lcd_espnow.h"   // espnow_menu, espnow_entry_mode
 #include "espnow_task.h"  // xEspAccelStreamCtrlQueue, xEspAccelStreamQueue
@@ -33,7 +37,7 @@
 #define TAG "LCD_GPIO"
 
 gpio_menu_t gpio_menu = {
-    .options = {"How It Works", "Accelerometer", "Terminal", "I2C Scanner"},
+    .options = {"How It Works", "Magcelerometer", "Terminal", "I2C Scanner"},
     .size = 4,
     .index = 1,
     .cont = NULL,
@@ -352,6 +356,41 @@ static void prompt_accel_espnow_qr(ui_menu_t *ui_menu, gpio_menu_t *gpio_menu)
 #define MODE_REMOTE  2 // Upright, then rotated 90 deg to the right
 #define MODE_COUNT   3
 
+#define ARROW_SIZE 34      // Square ARGB image holding the arrow (px)
+#define ARROW_FILL_SCALE 0.74f // Inner fill inset, leaving a white border rim
+#define ARROW_SMOOTH 0.5f // Heading low-pass factor (0..1, higher = snappier / less lag)
+
+// Magnetometer hard-/soft-iron calibration persistence (NVS)
+// Stores the four X/Y min/max bounds so the compass works on every boot without a fresh calibration turn
+#define MAGCAL_NVS_NS  "magcal"
+#define MAGCAL_NVS_KEY "minmax"
+
+typedef struct {
+    float x_min, x_max, y_min, y_max;
+} magcal_blob_t;
+
+// Static ARGB8888 arrow image, re-rasterised on each page entry to track the accent colour
+POLYCAST5_USE_PSRAM_BSS static uint8_t arrow_px[ARROW_SIZE * ARROW_SIZE * 4] __attribute__((aligned(4)));
+static lv_image_dsc_t arrow_dsc;
+
+// Hard-/soft-iron compass calibration state: Min/max of the X/Y field: centre = midpoint, radius = half-span
+static float mag_cal_x_min = 1e9f, mag_cal_x_max = -1e9f;
+static float mag_cal_y_min = 1e9f, mag_cal_y_max = -1e9f;
+static bool magcal_loaded = false; // NVS calibration loaded this boot?
+static bool cal_complete = false;  // Do we have a usable calibration (from NVS or the cal page)?
+
+// Centre of the calibration ellipse (hard-iron offset), used by both the compass and cal pages
+static inline float magcal_center_x(void) { return (mag_cal_x_min + mag_cal_x_max) * 0.5f; }
+static inline float magcal_center_y(void) { return (mag_cal_y_min + mag_cal_y_max) * 0.5f; }
+
+// Arrow outline as offsets from the image centre, tip pointing up
+static const float arrow_pts[4][2] = {
+    {  0.0f, -13.0f }, // Tip
+    { 10.0f,  11.0f }, // Right wing
+    {  0.0f,   5.0f }, // Centre notch
+    {-10.0f,  11.0f }, // Left wing
+};
+
 // Current orientation mode
 static uint8_t accel_mode = MODE_FLAT;
 
@@ -377,8 +416,70 @@ static const char *accel_mode_name(uint8_t m)
     return (m < 3) ? names[m] : "";
 }
 
-// Build the bubble-level view: circle + crosshair + ball, plus the mode name and X/Y readout on the right
-static void accel_build_bubble(ui_menu_t *ui_menu, lv_obj_t *cont, lv_obj_t **out_ball, lv_obj_t **out_mode_lbl, lv_obj_t **out_val_lbl)
+// Signed edge function (>0, <0 or 0 tells which side of segment AB the point P is on)
+static inline float arrow_edge(float ax, float ay, float bx, float by, float px, float py)
+{
+    return (bx - ax) * (py - ay) - (by - ay) * (px - ax);
+}
+
+// True if (px,py) is inside the concave arrow scaled by k about the image centre
+static bool arrow_hit(float px, float py, float k)
+{
+    const float ctr = ARROW_SIZE / 2.0f;
+    const float tx = ctr + arrow_pts[0][0] * k, ty = ctr + arrow_pts[0][1] * k; // tip
+    const float rx = ctr + arrow_pts[1][0] * k, ry = ctr + arrow_pts[1][1] * k; // right
+    const float nx = ctr + arrow_pts[2][0] * k, ny = ctr + arrow_pts[2][1] * k; // notch
+    const float lx = ctr + arrow_pts[3][0] * k, ly = ctr + arrow_pts[3][1] * k; // left
+
+    // Inside if within triangle(tip,right,notch) OR triangle(tip,notch,left).
+    // A point is in a triangle when its three edge functions all share one sign.
+    float a = arrow_edge(tx, ty, rx, ry, px, py);
+    float b = arrow_edge(rx, ry, nx, ny, px, py);
+    float c = arrow_edge(nx, ny, tx, ty, px, py);
+    bool in1 = (a <= 0 && b <= 0 && c <= 0) || (a >= 0 && b >= 0 && c >= 0);
+
+    a = arrow_edge(tx, ty, nx, ny, px, py);
+    b = arrow_edge(nx, ny, lx, ly, px, py);
+    c = arrow_edge(lx, ly, tx, ty, px, py);
+    bool in2 = (a <= 0 && b <= 0 && c <= 0) || (a >= 0 && b >= 0 && c >= 0);
+
+    return in1 || in2;
+}
+
+// Rasterise the arrow into arrow_px (accent fill + white border, transparent elsewhere)
+// and point the static descriptor at it
+static void arrow_rasterize(lv_color_t fill)
+{
+    const uint32_t white  = 0xFFFFFFFFu;
+    const uint32_t accent = ((uint32_t)0xFF << 24) | ((uint32_t)fill.red << 16) |
+                            ((uint32_t)fill.green << 8) | (uint32_t)fill.blue;
+    uint32_t *px = (uint32_t *)arrow_px;
+
+    for (int y = 0; y < ARROW_SIZE; y++) {
+        for (int x = 0; x < ARROW_SIZE; x++) {
+            const float fx = x + 0.5f, fy = y + 0.5f; // sample pixel centres
+            uint32_t v = 0; // transparent
+            if (arrow_hit(fx, fy, ARROW_FILL_SCALE)) {
+                v = accent;
+            } else if (arrow_hit(fx, fy, 1.0f)) {
+                v = white; // border rim
+            }
+            px[y * ARROW_SIZE + x] = v;
+        }
+    }
+
+    arrow_dsc.header.magic  = LV_IMAGE_HEADER_MAGIC;
+    arrow_dsc.header.cf     = LV_COLOR_FORMAT_ARGB8888;
+    arrow_dsc.header.w      = ARROW_SIZE;
+    arrow_dsc.header.h      = ARROW_SIZE;
+    arrow_dsc.header.stride = ARROW_SIZE * 4;
+    arrow_dsc.data_size     = sizeof(arrow_px);
+    arrow_dsc.data          = arrow_px;
+}
+
+// Build the bubble-level view: circle + crosshair + moving indicator, plus the mode name and X/Y readout on the right
+// When use_arrow is set, the moving indicator is a rotating direction arrow (accel page); otherwise the classic ball
+static void accel_build_bubble(ui_menu_t *ui_menu, lv_obj_t *cont, bool use_arrow, lv_obj_t **out_ball, lv_obj_t **out_mode_lbl, lv_obj_t **out_val_lbl)
 {
     #define X_OFFSET 15 // Move all to the right a bit
 
@@ -410,14 +511,27 @@ static void accel_build_bubble(ui_menu_t *ui_menu, lv_obj_t *cont, lv_obj_t **ou
     lv_obj_set_style_border_width(v_line, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_remove_flag(v_line, LV_OBJ_FLAG_SCROLLABLE);
 
-    // Moving ball (created last so it draws on top of the crosshair)
-    lv_obj_t *ball = lv_obj_create(level_bg);
-    lv_obj_set_size(ball, BALL_D, BALL_D);
-    lv_obj_align(ball, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_radius(ball, LV_RADIUS_CIRCLE, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(ball, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(ball, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_remove_flag(ball, LV_OBJ_FLAG_SCROLLABLE);
+    // Moving indicator (created last so it draws on top of the crosshair):
+    // a rotating direction arrow, or the classic bubble ball
+    lv_obj_t *ball;
+    if (use_arrow) {
+        arrow_rasterize(user_secondary_color); // Build the arrow in the current accent colour
+        ball = lv_image_create(level_bg);
+        lv_image_set_src(ball, &arrow_dsc);
+        lv_obj_set_size(ball, ARROW_SIZE, ARROW_SIZE);
+        lv_image_set_pivot(ball, ARROW_SIZE / 2, ARROW_SIZE / 2); // Rotate about its centre
+        lv_image_set_antialias(ball, true);
+        lv_obj_align(ball, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_remove_flag(ball, LV_OBJ_FLAG_SCROLLABLE);
+    } else { // Classic ball (stream page)
+        ball = lv_obj_create(level_bg);
+        lv_obj_set_size(ball, BALL_D, BALL_D);
+        lv_obj_align(ball, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_set_style_radius(ball, LV_RADIUS_CIRCLE, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_color(ball, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(ball, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_remove_flag(ball, LV_OBJ_FLAG_SCROLLABLE);
+    }
 
     // Right-side panel: mode name on top, X/Y readout centred below
     lv_obj_t *right_panel = lv_obj_create(cont);
@@ -459,10 +573,11 @@ static void accel_build_bubble(ui_menu_t *ui_menu, lv_obj_t *cont, lv_obj_t **ou
     *out_val_lbl = val_lbl;
 }
 
-// Move the ball to reflect a reading and update the X/Y label
-static void accel_apply_reading(const accel_deg_t *a, lv_obj_t *ball, lv_obj_t *val_lbl, float *out_x, float *out_y)
+// Update the X/Y readout from a reading and ease the indicator toward the tilt
+// indicator_d is the indicator's diameter in px; travel is clamped to it so a larger indicator still stays inside the circle.
+static void accel_apply_reading(const accel_deg_t *a, lv_obj_t *ball, float indicator_d, lv_obj_t *val_lbl, float *out_x, float *out_y)
 {
-    const float max_travel = (LEVEL_D / 2.0f) - (BALL_D / 2.0f) - 2.0f;
+    const float max_travel = (LEVEL_D / 2.0f) - (indicator_d / 2.0f) - 2.0f;
 
     float dx, dy; // Ball offset from centre (px)
     float read_x, read_y; // X/Y readout in deg, 0 at the current mode's centred pose
@@ -500,14 +615,14 @@ static void accel_apply_reading(const accel_deg_t *a, lv_obj_t *ball, lv_obj_t *
         }
     }
 
-    // Keep the ball inside the circle
+    // Keep the indicator inside the circle
     float mag = sqrtf(dx * dx + dy * dy);
     if (mag > max_travel) {
         dx *= max_travel / mag;
         dy *= max_travel / mag;
     }
 
-    // Smoothly ease the ball from its current offset to the new target
+    // Smoothly ease the indicator from its current offset to the new target
     accel_ball_ease(ball, (lv_anim_exec_xcb_t)lv_obj_set_x, lv_obj_get_style_x(ball, LV_PART_MAIN), (int32_t)dx);
     accel_ball_ease(ball, (lv_anim_exec_xcb_t)lv_obj_set_y, lv_obj_get_style_y(ball, LV_PART_MAIN), (int32_t)dy);
 
@@ -521,9 +636,72 @@ static void accel_apply_reading(const accel_deg_t *a, lv_obj_t *ball, lv_obj_t *
     if (out_y) *out_y = read_y;
 }
 
-void lcd_gpio_accel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu)
+static void magcal_nvs_save(float x_min, float x_max, float y_min, float y_max)
 {
-    #define ACCEL_REFRESH_MS 25 // Ask gpio_task for a fresh sample at ~40 Hz
+    nvs_handle_t h;
+
+    // Open NVS
+    esp_err_t err = nvs_open(MAGCAL_NVS_NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "magcal_nvs_save nvs_open failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    // Write the four bounds as a blob and commit
+    magcal_blob_t blob = { x_min, x_max, y_min, y_max };
+    err = nvs_set_blob(h, MAGCAL_NVS_KEY, &blob, sizeof(blob));
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    } else {
+        ESP_LOGE(TAG, "magcal_nvs_save set_blob failed: %s", esp_err_to_name(err));
+    }
+
+    // Close NVS
+    nvs_close(h);
+}
+
+// Fill the four bounds from NVS and report whether a valid calibration was loaded
+static bool magcal_nvs_load(float *x_min, float *x_max, float *y_min, float *y_max)
+{
+    nvs_handle_t h;
+
+    // Open NVS
+    esp_err_t err = nvs_open(MAGCAL_NVS_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "magcal_nvs_load nvs_open failed: %s", esp_err_to_name(err));
+#endif
+        return false;
+    }
+
+    // Read the four bounds as a blob
+    magcal_blob_t blob;
+    size_t sz = sizeof(blob);
+    err = nvs_get_blob(h, MAGCAL_NVS_KEY, &blob, &sz);
+    nvs_close(h); // Close NVS
+    if (err != ESP_OK || sz != sizeof(blob)) {
+        return false; // Not stored yet
+    }
+
+    // Reject corrupt/implausible data so a bad blob can't break the compass
+    float xr = (blob.x_max - blob.x_min) * 0.5f;
+    float yr = (blob.y_max - blob.y_min) * 0.5f;
+    if (xr <= 0.0f || yr <= 0.0f || xr > 500.0f || yr > 500.0f) {
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "magcal_nvs_load rejected implausible blob: x_min=%.1f x_max=%.1f y_min=%.1f y_max=%.1f",
+                (double)blob.x_min, (double)blob.x_max, (double)blob.y_min, (double)blob.y_max);
+#endif
+        return false;
+    }
+
+    *x_min = blob.x_min; *x_max = blob.x_max;
+    *y_min = blob.y_min; *y_max = blob.y_max;
+    return true;
+}
+
+void lcd_gpio_magcel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu)
+{
+    #define ACCEL_REFRESH_MS 25 // Ask gpio_task for fresh accel + mag samples at ~40 Hz
 
     // Statics
     static bool init = false;
@@ -532,8 +710,28 @@ void lcd_gpio_accel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gp
     static lv_obj_t *mode_lbl = NULL;
     static lv_obj_t *val_lbl = NULL;
     static TickType_t last_refresh = 0;
+    static float arrow_heading = 0.0f; // Smoothed absolute heading
+    static float heading_ref = 0.0f;   // Heading captured at entry ("straight ahead" = up)
+    static bool heading_init = false;  // Has heading_ref been captured this visit?
+    static float arrow_drawn = -1.0f;  // Last relative angle actually rendered (-1 = none yet)
+    static float disp_x = 0.0f, disp_y = 0.0f; // Latest tilt readout, shown alongside Z = heading
 
     if (!init) {
+        // Seed the calibration from NVS once per boot and trust a valid stored calibration
+        if (!magcal_loaded) {
+            magcal_loaded = true;
+            if (magcal_nvs_load(&mag_cal_x_min, &mag_cal_x_max, &mag_cal_y_min, &mag_cal_y_max)) {
+                cal_complete = true;
+            }
+        }
+
+        // The compass can only read a heading once calibrated; on first boot there is none
+        // Send the user straight to the calibration page rather than show a dead arrow
+        if (!cal_complete) {
+            ui_menu->page = GPIO_MAGCAL_PAGE;
+            return;
+        }
+
         lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Show right arrow
 
         // Outer container
@@ -546,37 +744,126 @@ void lcd_gpio_accel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gp
         lv_obj_remove_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_set_style_pad_all(cont, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-        // Bubble view (shared with the ESP-NOW stream page)
-        accel_build_bubble(ui_menu, cont, &ball, &mode_lbl, &val_lbl);
+        // Bubble view with the rotating direction arrow
+        accel_build_bubble(ui_menu, cont, true, &ball, &mode_lbl, &val_lbl);
 
-        // Drop any stale reading left in the queue from a previous visit
+        // Drop any stale readings left in the queues from a previous visit
         xQueueReset(xAccelReadingsQueue);
+        xQueueReset(xMagReadingsQueue);
 
         last_refresh = 0; // Force an immediate trigger on the first frame
+        arrow_heading = 0.0f;
+        heading_ref = 0.0f;
+        heading_init = false; // Re-capture the "straight ahead" reference on entry
+        arrow_drawn = -1.0f;
+        disp_x = disp_y = 0.0f;
         init = true;
     }
 
-    // Periodically ask gpio_task for a fresh sample
+    // Periodically ask gpio_task for a fresh accel (tilt) + mag (heading) sample
     if (xTaskGetTickCount() - last_refresh >= pdMS_TO_TICKS(ACCEL_REFRESH_MS)) {
         last_refresh = xTaskGetTickCount();
-        xSemaphoreGive(xReadAccelSemaphore);
+        xSemaphoreGive(xReadAccelSemaphore); // Req accel
+        xSemaphoreGive(xReadMagSemaphore); // Req mag
     }
 
-    // Move the ball + update text whenever gpio_task posts a reading (non-blocking)
+    // Update arrow + text whenever reading received
     accel_deg_t accel;
     if (xQueueReceive(xAccelReadingsQueue, &accel, 0) == pdTRUE) {
-        accel_apply_reading(&accel, ball, val_lbl, NULL, NULL);
+        // Writes the X/Y label and hands back the displayed tilt values for the Z line below
+        accel_apply_reading(&accel, ball, ARROW_SIZE, val_lbl, &disp_x, &disp_y);
+    }
+
+    // Compass heading from the magnetometer using the stored hard-/soft-iron calibration
+    mmc5603_reading_t mag;
+    if (ball && xQueueReceive(xMagReadingsQueue, &mag, 0) == pdTRUE) {
+        // Recover the calibration shape
+        float x_half = (mag_cal_x_max - mag_cal_x_min) * 0.5f; // X radius from the stored calibration
+        float y_half = (mag_cal_y_max - mag_cal_y_min) * 0.5f; // Y radius
+
+        if (x_half > 0.0f && y_half > 0.0f) { // Always true once calibrated; guards a bad blob
+#ifdef POLYCAST5_DEBUG_MAGNETO
+            static TickType_t last_cal_log = 0;
+            if (xTaskGetTickCount() - last_cal_log >= pdMS_TO_TICKS(500)) {
+                last_cal_log = xTaskGetTickCount();
+                ESP_LOGI(TAG, "MAGCAL centre=(%.1f, %.1f) radius=(%.1f, %.1f)",
+                         (double)magcal_center_x(), (double)magcal_center_y(),
+                         (double)x_half, (double)y_half);
+            }
+#endif
+            // Hard-iron: subtract the centre. Soft-iron: normalise each axis to its half-span.
+            float cx = (mag.x - magcal_center_x()) / x_half;
+            float cy = (mag.y - magcal_center_y()) / y_half;
+
+            // atan2 of the centred unit circle -> heading in degrees, +y convention
+            float raw_heading = atan2f(cy, cx) / DEG2RAD; // rad -> deg
+            if (raw_heading < 0.0f) raw_heading += 360.0f;
+
+            if (!heading_init) {
+                // First sample this visit: take it as "straight ahead" so the arrow starts up
+                arrow_heading = raw_heading;
+                heading_ref = raw_heading;
+                heading_init = true;
+            } else {
+                // Low-pass over the shortest angular path (handles the 360->0 wrap)
+                float d = raw_heading - arrow_heading;
+                while (d > 180.0f) d -= 360.0f;
+                while (d < -180.0f) d += 360.0f;
+
+                // Eases a fraction toward it each frame
+                arrow_heading += d * ARROW_SMOOTH;
+                if (arrow_heading < 0.0f) arrow_heading += 360.0f;
+                else if (arrow_heading >= 360.0f) arrow_heading -= 360.0f;
+            }
+        }
+
+        // Show the turn relative to the entry orientation: 0 = straight ahead = arrow up
+        float rel = arrow_heading - heading_ref;
+        while (rel < 0.0f) rel += 360.0f;
+        while (rel >= 360.0f) rel -= 360.0f;
+
+        // Readout: X/Y are the tilt (from the accel), Z is the compass heading (arrow angle)
+        // Overwrites the X/Y-only text accel_apply_reading wrote above
+        char buf[64];
+        snprintf(buf, sizeof(buf), "X: %+.0f\xC2\xB0\n" "Y: %+.0f\xC2\xB0\n" "Z: %.0f\xC2\xB0",
+                (double)disp_x, (double)disp_y, (double)rel);
+        lv_label_set_text(val_lbl, buf);
+
+        // Actually spin the arrow on screen
+        float dd = rel - arrow_drawn;
+        while (dd > 180.0f) dd -= 360.0f;
+        while (dd < -180.0f) dd += 360.0f;
+        if (arrow_drawn < 0.0f || fabsf(dd) >= 1.0f) {
+            lv_image_set_rotation(ball, (int32_t)lroundf(rel * 10.0f) % 3600);
+            arrow_drawn = rel;
+        }
     }
 
     /* User input */
     if (ui_btns->up_btn == 1) { // Next mode (wraps)
         accel_mode = (accel_mode + 1) % MODE_COUNT;
         lv_label_set_text(mode_lbl, accel_mode_name(accel_mode));
-    } else if (ui_btns->down_btn == 1) { // Previous mode (wraps)
-        accel_mode = (accel_mode + MODE_COUNT - 1) % MODE_COUNT;
-        lv_label_set_text(mode_lbl, accel_mode_name(accel_mode));
+    } else if (ui_btns->down_btn == 1) { // Open the compass calibration page
+        lv_anim_delete(ball, NULL); // Stop arrow anims before freeing the object
+        lv_obj_delete(cont); // Deletes children
+
+        cont = NULL;
+        ball = mode_lbl = val_lbl = NULL;
+        init = false;
+
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Hide right
+        ui_menu->page = GPIO_MAGCAL_PAGE;
+    } else if (ui_btns->select_btn) { // Refresh
+        lv_anim_delete(ball, NULL); // Stop arrow anims before freeing the object
+        lv_obj_delete(cont); // Deletes children
+
+        cont = NULL;
+        ball = mode_lbl = val_lbl = NULL;
+        init = false;
+
+        lv_timer_handler(); // Refresh screen
     } else if (ui_btns->left_btn) { // Go back
-        lv_anim_delete(ball, NULL); // Stop ball anims before freeing the object
+        lv_anim_delete(ball, NULL); // Stop arrow anims before freeing the object
         lv_obj_delete(cont); // Deletes children
 
         cont = NULL;
@@ -589,7 +876,7 @@ void lcd_gpio_accel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gp
         lv_obj_remove_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         ui_menu->page = GPIO_PAGE;
     } else if (ui_btns->right_btn) { // Use accel with ESP-NOW
-        lv_anim_delete(ball, NULL); // Stop ball anims before freeing the object
+        lv_anim_delete(ball, NULL); // Stop arrow anims before freeing the object
         lv_obj_delete(cont); // Deletes children
 
         cont = NULL;
@@ -599,7 +886,7 @@ void lcd_gpio_accel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gp
         // Show tutorial QR to proceed
         prompt_accel_espnow_qr(ui_menu, gpio_menu);
     } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
-        lv_anim_delete(ball, NULL); // Stop ball anims before freeing the object
+        lv_anim_delete(ball, NULL); // Stop arrow anims before freeing the object
         lv_obj_delete(cont); // Deletes children
 
         cont = NULL;
@@ -610,7 +897,222 @@ void lcd_gpio_accel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gp
     }
 }
 
-void lcd_gpio_accel_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu)
+void lcd_gpio_magcal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu)
+{
+    #define MAGCAL_REFRESH_MS 25 // Pull fresh mag samples at ~40 Hz while calibrating
+    #define MAGCAL_SECTORS_REQ 12 // Wedges (of 12) that count as a full turn
+
+    // Statics
+    static bool init = false;
+    static lv_obj_t *cont = NULL;
+    static lv_obj_t *title_lbl = NULL;
+    static lv_obj_t *instr_lbl = NULL;
+    static lv_obj_t *status_lbl = NULL;
+    static lv_obj_t *arrow_img = NULL;   // Live direction arrow (shown while calibrating)
+    static lv_obj_t *prog_bar = NULL;    // Coverage progress bar (shown while calibrating)
+    static bool calibrating = false;
+    static uint16_t visited_sectors = 0; // Bitmask of the 12x30deg heading wedges seen this run
+    static TickType_t last_refresh = 0;
+
+    // Snapshot of the calibration taken when a run starts, restored if the user backs out
+    static float bk_x_min, bk_x_max, bk_y_min, bk_y_max;
+    static bool bk_cal_complete;
+
+    if (!init) {
+        cont = lv_obj_create(ACTIVE_SCR);
+        lv_obj_set_size(cont, 210, 106);
+        lv_obj_center(cont);
+        lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_remove_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_style_pad_all(cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+        // Title
+        title_lbl = lv_label_create(cont);
+        lv_label_set_text(title_lbl, "Compass Calibration");
+        lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_16, 0);
+        lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+        lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+        // Instruction (centre); text changes once a run starts
+        instr_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(instr_lbl, lv_pct(100));
+        lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
+        lv_obj_set_style_text_align(instr_lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_text(instr_lbl, "Lay flat away from metal, then turn a full circle.");
+        lv_obj_align(instr_lbl, LV_ALIGN_CENTER, 0, 0);
+
+        // Status / progress line at the bottom
+        status_lbl = lv_label_create(cont);
+        lv_obj_set_style_text_font(status_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(status_lbl, user_secondary_color, 0);
+        lv_obj_set_style_text_align(status_lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_text(status_lbl, "SELECT: start   LEFT: back");
+        lv_obj_align(status_lbl, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+        // Live direction arrow (hidden until a run starts), built in the current accent colour
+        arrow_rasterize(user_secondary_color);
+        arrow_img = lv_image_create(cont);
+        lv_image_set_src(arrow_img, &arrow_dsc);
+        lv_obj_set_size(arrow_img, ARROW_SIZE, ARROW_SIZE);
+        lv_image_set_pivot(arrow_img, ARROW_SIZE / 2, ARROW_SIZE / 2);
+        lv_image_set_antialias(arrow_img, true);
+        lv_obj_align(arrow_img, LV_ALIGN_CENTER, 0, -8);
+        lv_obj_add_flag(arrow_img, LV_OBJ_FLAG_HIDDEN);
+
+        // OTA-style coverage progress bar (hidden until a run starts)
+        prog_bar = lv_bar_create(cont);
+        lv_bar_set_range(prog_bar, 0, 100);
+        lv_bar_set_value(prog_bar, 0, LV_ANIM_OFF);
+        lv_obj_set_size(prog_bar, 150, 12);
+        lv_obj_align(prog_bar, LV_ALIGN_BOTTOM_MID, 0, -20);
+        lv_obj_set_style_border_width(prog_bar, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_color(prog_bar, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_opa(prog_bar, LV_OPA_20, LV_PART_MAIN);
+        lv_obj_set_style_bg_color(prog_bar, lv_color_darken(user_primary_color, 100), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(prog_bar, user_secondary_color, LV_PART_INDICATOR);
+        lv_obj_set_style_bg_opa(prog_bar, LV_OPA_COVER, LV_PART_INDICATOR);
+        lv_obj_set_style_radius(prog_bar, 6, LV_PART_MAIN | LV_PART_INDICATOR);
+        lv_obj_add_flag(prog_bar, LV_OBJ_FLAG_HIDDEN);
+
+        calibrating = false;
+        last_refresh = 0;
+        init = true;
+    }
+
+    // While a run is active, keep pulling samples, grow the bounds, and show coverage
+    if (calibrating) {
+        if (xTaskGetTickCount() - last_refresh >= pdMS_TO_TICKS(MAGCAL_REFRESH_MS)) {
+            last_refresh = xTaskGetTickCount();
+            xSemaphoreGive(xReadMagSemaphore);
+        }
+
+        // When a reading is received
+        mmc5603_reading_t mag;
+        if (xQueueReceive(xMagReadingsQueue, &mag, 0) == pdTRUE) {
+            // Update calibration bounds
+            if (mag.x < mag_cal_x_min) mag_cal_x_min = mag.x;
+            if (mag.x > mag_cal_x_max) mag_cal_x_max = mag.x;
+            if (mag.y < mag_cal_y_min) mag_cal_y_min = mag.y;
+            if (mag.y > mag_cal_y_max) mag_cal_y_max = mag.y;
+
+            // Live direction from the hard-iron-centred field
+            // Only act when the vector is clearly off-centre
+
+            // Field vector relative to the circle's center
+            float dx = mag.x - magcal_center_x();
+            float dy = mag.y - magcal_center_y();
+
+            // Avoid dead zone near the center
+            if (dx * dx + dy * dy > 9.0f) { // > ~3 uT from centre -> valid
+                // Angle of that vector in degrees [0,360)
+                float heading = atan2f(dy, dx) / DEG2RAD;
+                if (heading < 0.0f) heading += 360.0f;
+                lv_image_set_rotation(arrow_img, (int32_t)lroundf(heading * 10.0f) % 3600); // Rotate arrow img
+
+                // Split the circle into 12 wedges of 30 degrees and tally which ones the user has covered
+                int sector = (int)(heading / 30.0f);
+                if (sector >= 0 && sector < 12) {
+                    visited_sectors |= (uint16_t)(1u << sector);
+                }
+            }
+
+            // Counts the set bits = how many distinct wedges have been hit (0–12)
+            int covered = __builtin_popcount(visited_sectors);
+
+            // Map and show percentage of wedges covered
+            int pct = covered * 100 / MAGCAL_SECTORS_REQ;
+            if (pct > 100) pct = 100;
+            lv_bar_set_value(prog_bar, pct, LV_ANIM_ON);
+            if (covered >= MAGCAL_SECTORS_REQ) {
+                lv_label_set_text(status_lbl, "Ready - SELECT to finish");
+            } else {
+                char buf[40];
+                snprintf(buf, sizeof(buf), "Keep turning... %d%%", pct);
+                lv_label_set_text(status_lbl, buf);
+            }
+        }
+    }
+
+    /* User input */
+    if (ui_btns->select_btn) {
+        if (!calibrating) {
+            // Start: snapshot the current calibration, then clear it and begin collecting
+            bk_x_min = mag_cal_x_min; bk_x_max = mag_cal_x_max;
+            bk_y_min = mag_cal_y_min; bk_y_max = mag_cal_y_max;
+            bk_cal_complete = cal_complete;
+
+            // Min max start values
+            mag_cal_x_min = mag_cal_y_min = 1e9f; // Biggest possible float
+            mag_cal_x_max = mag_cal_y_max = -1e9f; // Smallest possible float
+            cal_complete = false;
+            visited_sectors = 0;
+            xQueueReset(xMagReadingsQueue);
+
+            calibrating = true;
+            last_refresh = 0;
+            
+            lv_obj_add_flag(title_lbl, LV_OBJ_FLAG_HIDDEN); // Free the top for the arrow
+            lv_obj_add_flag(instr_lbl, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(arrow_img, LV_OBJ_FLAG_HIDDEN); // Reveal the live arrow + bar
+            lv_obj_remove_flag(prog_bar, LV_OBJ_FLAG_HIDDEN);
+            lv_bar_set_value(prog_bar, 0, LV_ANIM_OFF);
+            lv_label_set_text(status_lbl, "Keep turning... 0%");
+        } else {
+            // Finish: only accept once enough wedges are covered (a real full turn)
+            if (__builtin_popcount(visited_sectors) >= MAGCAL_SECTORS_REQ) {
+                cal_complete = true;
+                magcal_nvs_save(mag_cal_x_min, mag_cal_x_max, mag_cal_y_min, mag_cal_y_max); // Save
+
+                // Clean up
+                lv_obj_delete(cont);
+                cont = NULL; title_lbl = instr_lbl = status_lbl = arrow_img = prog_bar = NULL;
+                calibrating = false; init = false;
+                ui_menu->page = GPIO_ACCEL_PAGE; // Back to the compass
+            } else {
+                lv_label_set_text(status_lbl, "Not enough - keep turning");
+            }
+        }
+    } else if (ui_btns->left_btn) { // Cancel / back out
+        if (calibrating) { // Restore the calibration the run replaced
+            mag_cal_x_min = bk_x_min; mag_cal_x_max = bk_x_max;
+            mag_cal_y_min = bk_y_min; mag_cal_y_max = bk_y_max;
+            cal_complete = bk_cal_complete;
+        }
+
+        // Clean up
+        lv_obj_delete(cont);
+        cont = NULL; title_lbl = instr_lbl = status_lbl = arrow_img = prog_bar = NULL;
+        calibrating = false; init = false;
+
+        if (cal_complete) { // Have a calibration -> back to the compass
+            ui_menu->page = GPIO_ACCEL_PAGE;
+
+        // No calibration yet (e.g. first-boot forced cal) -> GPIO menu, not a dead compass
+        } else {
+            lv_obj_remove_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+            ui_menu->page = GPIO_PAGE;
+        }
+    } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
+        if (calibrating) {
+            mag_cal_x_min = bk_x_min; mag_cal_x_max = bk_x_max;
+            mag_cal_y_min = bk_y_min; mag_cal_y_max = bk_y_max;
+            cal_complete = bk_cal_complete;
+        }
+
+        // Clean up
+        lv_obj_delete(cont);
+        cont = NULL; title_lbl = instr_lbl = status_lbl = arrow_img = prog_bar = NULL;
+        calibrating = false; init = false;
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
+}
+
+void lcd_gpio_magcel_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu)
 {
     #define STREAM_REFRESH_MS 25 // Trigger + transmit a sample at ~40 Hz
 
@@ -660,8 +1162,8 @@ void lcd_gpio_accel_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_men
         lv_obj_remove_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_set_style_pad_all(cont, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-        // Same bubble view as the accel page
-        accel_build_bubble(ui_menu, cont, &ball, &mode_lbl, &val_lbl);
+        // Same bubble view as the accel page, but with the classic ball
+        accel_build_bubble(ui_menu, cont, false, &ball, &mode_lbl, &val_lbl);
 
         // Drop any stale reading from a previous visit
         xQueueReset(xAccelReadingsQueue);
@@ -680,7 +1182,7 @@ void lcd_gpio_accel_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_men
     accel_deg_t accel;
     if (xQueueReceive(xAccelReadingsQueue, &accel, 0) == pdTRUE) {
         float disp_x, disp_y;
-        accel_apply_reading(&accel, ball, val_lbl, &disp_x, &disp_y);
+        accel_apply_reading(&accel, ball, BALL_D, val_lbl, &disp_x, &disp_y);
 
         // Stream exactly what the LCD shows (mode-aware, recentred X/Y)
         espnow_accel_t sample = {

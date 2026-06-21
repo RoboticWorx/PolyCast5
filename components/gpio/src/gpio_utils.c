@@ -19,6 +19,7 @@
 
 #include "tca9535.h"
 #include "lis2dh12.h"
+#include "mmc5603.h"
 
 #include "gpio_utils.h"
 #include "gpio_task.h"
@@ -272,6 +273,12 @@ esp_err_t gpio_utils_init(void)
     esp_err_t accel_ret = lis2dh12_init();
     if (accel_ret != ESP_OK) {
         ESP_LOGE(TAG, "lis2dh12_init failed: %s", esp_err_to_name(accel_ret));
+    }
+
+    // Bring up the MMC5603 magnetometer on the same I2C bus (non-fatal if absent)
+    esp_err_t mag_ret = mmc5603_init();
+    if (mag_ret != ESP_OK) {
+        ESP_LOGE(TAG, "mmc5603_init failed: %s", esp_err_to_name(mag_ret));
     }
 
     return ret;
