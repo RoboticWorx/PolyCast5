@@ -9,7 +9,8 @@
 
 #include "espnow_utils.h"
 
-#define MAX_ESPNOW_OPTIONS 51 // - 1 for "Add ESP32"
+#define ESPNOW_BASE_OPTS 2    // Fixed menu entries before saved devices: "Add ESP32", "eCompass"
+#define MAX_ESPNOW_OPTIONS 51 // Total menu slots (ESPNOW_BASE_OPTS base entries + saved devices)
 
 // Forward-declare structs (from lcd_utils.h)
 typedef struct ui_btns_t ui_btns_t;

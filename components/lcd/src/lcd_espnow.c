@@ -55,8 +55,8 @@ static const char *espnow_char_rows[ESPNOW_NUM_CHAR_ROWS] = {
 };
 
 espnow_menu_t espnow_menu = {
-    .options = {"Add ESP32"},
-    .size = 1,
+    .options = {"Add ESP32", "eCompass"},
+    .size = 2,
     .index = 0,
     .cont = NULL,
 };
@@ -120,8 +120,8 @@ void lcd_espnow_setup_page(espnow_menu_t *menu)
         menu->index = menu->size - 1;
     }
     
-    if (menu->size > 1) {
-        menu->index = 1;
+    if (menu->size > ESPNOW_BASE_OPTS) {
+        menu->index = ESPNOW_BASE_OPTS; // Land on the first saved device when one exists
     }
     
     // Create button for each option
@@ -1072,7 +1072,7 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
             int del_idx = espnow_menu->index;     
             
             // Just in case
-            if (del_idx == 0) {
+            if (del_idx < ESPNOW_BASE_OPTS) { // Base entries ("Add ESP32", "eCompass") aren't deletable
                 lcd_clear_pending_inputs = true;
                 lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
                 ui_menu->page = ESPNOW_PAGE;
@@ -1095,7 +1095,7 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
             }
             
             // Delete RX MAC (espnow_menu->size--)
-            lcd_espnow_rx_mac_lmk_nvs_delete(espnow_menu, (uint8_t)(del_idx - 1));
+            lcd_espnow_rx_mac_lmk_nvs_delete(espnow_menu, (uint8_t)(del_idx - ESPNOW_BASE_OPTS));
             
             // Null out dangling index
             espnow_menu->options[espnow_menu->size] = NULL;
@@ -1321,9 +1321,9 @@ esp_err_t lcd_espnow_menu_nvs_save(const espnow_menu_t *menu)
     if (err != ESP_OK)
         return err;
 
-    // menu->options[0] is default "Add New"
-    // If menu->size == 1 there are no user names, otherwise there are menu->size - 1 names
-    uint8_t user_cnt = (menu->size > 1) ? menu->size - 1 : 0;
+    // menu->options[0..ESPNOW_BASE_OPTS-1] are base entries ("Add ESP32", "eCompass")
+    // User device names start at index ESPNOW_BASE_OPTS
+    uint8_t user_cnt = (menu->size > ESPNOW_BASE_OPTS) ? menu->size - ESPNOW_BASE_OPTS : 0;
     err = nvs_set_u8(h, ESPNOW_MENU_KEY_COUNT, user_cnt);
     
     // If error, exit
@@ -1335,8 +1335,8 @@ esp_err_t lcd_espnow_menu_nvs_save(const espnow_menu_t *menu)
         char key[16];
         snprintf(key, sizeof(key), ESPNOW_MENU_KEY_FMT, i);
         
-        // Store the menu option string at each key starting at index 1
-        err = nvs_set_str(h, key, menu->options[i + 1]);
+        // Store the menu option string at each key, skipping the base entries
+        err = nvs_set_str(h, key, menu->options[i + ESPNOW_BASE_OPTS]);
         
         // Exit if error
         if (err != ESP_OK)
@@ -1369,7 +1369,7 @@ esp_err_t lcd_espnow_menu_nvs_load(espnow_menu_t *menu)
         return err;
     }
 
-    menu->size = 1; // Don't change first option
+    menu->size = ESPNOW_BASE_OPTS; // Keep the base entries
     menu->index = 0;
 
     // Loop through all keys
@@ -1419,8 +1419,8 @@ esp_err_t lcd_espnow_rx_mac_nvs_save(const espnow_menu_t *espnow_menu)
         return err;
 
     // Save how many MACs we have 
-    // size - 1 since first is "Add ESP32"
-    uint8_t user_cnt = (espnow_menu->size > 1) ? espnow_menu->size - 1 : 0;
+    // Subtract the base entries; saved devices start at index ESPNOW_BASE_OPTS
+    uint8_t user_cnt = (espnow_menu->size > ESPNOW_BASE_OPTS) ? espnow_menu->size - ESPNOW_BASE_OPTS : 0;
     err = nvs_set_u8(nvs_handle, ESPNOW_RX_MAC_KEY_COUNT, user_cnt);
     if (err != ESP_OK) {
         nvs_close(nvs_handle);
@@ -1436,7 +1436,7 @@ esp_err_t lcd_espnow_rx_mac_nvs_save(const espnow_menu_t *espnow_menu)
         // Up to num of MACs saved
         if (i < user_cnt) {
             // Save MAC in 6-byte blob
-            err = nvs_set_blob(nvs_handle, key, espnow_menu->rx_mac[i + 1], ESPNOW_MAC_SIZE); // Skip 0 to allign with index
+            err = nvs_set_blob(nvs_handle, key, espnow_menu->rx_mac[i + ESPNOW_BASE_OPTS], ESPNOW_MAC_SIZE); // Skip base entries to align with menu index
         } else {
             // Erase leftover key if it exists
             err = nvs_erase_key(nvs_handle, key);
@@ -1468,8 +1468,8 @@ esp_err_t lcd_espnow_lmk_nvs_save(const espnow_menu_t *espnow_menu)
         return err;
 
     // Save how many LMKs we have 
-    // size - 1 since first is "Add ESP32"
-    uint8_t user_cnt = (espnow_menu->size > 1) ? espnow_menu->size - 1 : 0;
+    // Subtract the base entries; saved devices start at index ESPNOW_BASE_OPTS
+    uint8_t user_cnt = (espnow_menu->size > ESPNOW_BASE_OPTS) ? espnow_menu->size - ESPNOW_BASE_OPTS : 0;
     err = nvs_set_u8(nvs_handle, ESPNOW_LMK_KEY_COUNT, user_cnt);
     if (err != ESP_OK) {
         nvs_close(nvs_handle);
@@ -1485,7 +1485,7 @@ esp_err_t lcd_espnow_lmk_nvs_save(const espnow_menu_t *espnow_menu)
         // Up to num of LMKs saved
         if (i < user_cnt) {
             // Save LMK in 16-byte blob
-            err = nvs_set_blob(nvs_handle, key, espnow_menu->lmk[i + 1], LMK_LEN); // Skip 0 to allign with index
+            err = nvs_set_blob(nvs_handle, key, espnow_menu->lmk[i + ESPNOW_BASE_OPTS], LMK_LEN); // Skip base entries to align with menu index
         } else {
             // Erase leftover key if it exists
             err = nvs_erase_key(nvs_handle, key);
@@ -1527,9 +1527,9 @@ esp_err_t lcd_espnow_rx_mac_nvs_load(espnow_menu_t *espnow_menu)
         return err;
     }
 
-    // Clamp count to array capacity (slot 0 is "Add ESP32")
-    if (cnt > MAX_ESPNOW_OPTIONS - 1) {
-        cnt = MAX_ESPNOW_OPTIONS - 1;
+    // Clamp count to array capacity (the first ESPNOW_BASE_OPTS slots are base entries)
+    if (cnt > MAX_ESPNOW_OPTIONS - ESPNOW_BASE_OPTS) {
+        cnt = MAX_ESPNOW_OPTIONS - ESPNOW_BASE_OPTS;
         ESP_LOGW(TAG, "lcd_espnow_rx_mac_nvs_load: Too many MACs in NVS, clamping to %d", cnt);
     }
 
@@ -1545,10 +1545,10 @@ esp_err_t lcd_espnow_rx_mac_nvs_load(espnow_menu_t *espnow_menu)
         size_t len = ESPNOW_MAC_SIZE;
         
         // Get the MAC blob
-        err = nvs_get_blob(nvs, key, espnow_menu->rx_mac[i + 1], &len);
+        err = nvs_get_blob(nvs, key, espnow_menu->rx_mac[i + ESPNOW_BASE_OPTS], &len);
         
         if (err == ESP_ERR_NVS_NOT_FOUND) { // If there's a hole, zero it out
-            memset(espnow_menu->rx_mac[i + 1], 0, ESPNOW_MAC_SIZE);
+            memset(espnow_menu->rx_mac[i + ESPNOW_BASE_OPTS], 0, ESPNOW_MAC_SIZE);
             continue;
         }
         if (err != ESP_OK || len != ESPNOW_MAC_SIZE) {
@@ -1561,7 +1561,7 @@ esp_err_t lcd_espnow_rx_mac_nvs_load(espnow_menu_t *espnow_menu)
     nvs_close(nvs);
 
     // Bookkeeping
-    espnow_menu->size = cnt + 1; // Menu size is number of MACs + 1
+    espnow_menu->size = cnt + ESPNOW_BASE_OPTS; // Base entries + saved devices
     espnow_menu->index = 0;
 
     return (cnt > 0) ? ESP_OK : ESP_ERR_NVS_NOT_FOUND;
@@ -1587,9 +1587,9 @@ esp_err_t lcd_espnow_lmk_nvs_load(espnow_menu_t *espnow_menu)
         return err;
     }
 
-    // Clamp count to array capacity (slot 0 is "Add ESP32")
-    if (cnt > MAX_ESPNOW_OPTIONS - 1) {
-        cnt = MAX_ESPNOW_OPTIONS - 1;
+    // Clamp count to array capacity (the first ESPNOW_BASE_OPTS slots are base entries)
+    if (cnt > MAX_ESPNOW_OPTIONS - ESPNOW_BASE_OPTS) {
+        cnt = MAX_ESPNOW_OPTIONS - ESPNOW_BASE_OPTS;
         ESP_LOGW(TAG, "lcd_espnow_lmk_nvs_load: Too many LMKs in NVS, clamping to %d", cnt);
     }
 
@@ -1605,10 +1605,10 @@ esp_err_t lcd_espnow_lmk_nvs_load(espnow_menu_t *espnow_menu)
         size_t len = LMK_LEN;
         
         // Get the MAC blob
-        err = nvs_get_blob(nvs, key, espnow_menu->lmk[i + 1], &len);
+        err = nvs_get_blob(nvs, key, espnow_menu->lmk[i + ESPNOW_BASE_OPTS], &len);
         
         if (err == ESP_ERR_NVS_NOT_FOUND) { // If there's a hole, zero it out
-            memset(espnow_menu->lmk[i + 1], 0, LMK_LEN);
+            memset(espnow_menu->lmk[i + ESPNOW_BASE_OPTS], 0, LMK_LEN);
             continue;
         }
         if (err != ESP_OK || len != LMK_LEN) {
@@ -1621,7 +1621,7 @@ esp_err_t lcd_espnow_lmk_nvs_load(espnow_menu_t *espnow_menu)
     nvs_close(nvs);
 
     // Bookkeeping
-    espnow_menu->size = cnt + 1; // Menu size is number of LMKs + 1
+    espnow_menu->size = cnt + ESPNOW_BASE_OPTS; // Base entries + saved devices
     espnow_menu->index = 0;
 
     return (cnt > 0) ? ESP_OK : ESP_ERR_NVS_NOT_FOUND;
@@ -1629,12 +1629,12 @@ esp_err_t lcd_espnow_lmk_nvs_load(espnow_menu_t *espnow_menu)
 
 esp_err_t lcd_espnow_rx_mac_lmk_nvs_delete(espnow_menu_t *espnow_menu, uint8_t slot)
 {
-    // If nothing to delete
-    if (espnow_menu->size <= 1) 
+    // If nothing to delete (only the base entries remain)
+    if (espnow_menu->size <= ESPNOW_BASE_OPTS)
         return ESP_ERR_INVALID_ARG;
         
     // Num macs
-    uint8_t user_cnt = espnow_menu->size - 1;
+    uint8_t user_cnt = espnow_menu->size - ESPNOW_BASE_OPTS;
     
     // If out of range
     if (slot >= user_cnt)
@@ -1642,13 +1642,13 @@ esp_err_t lcd_espnow_rx_mac_lmk_nvs_delete(espnow_menu_t *espnow_menu, uint8_t s
 
     // Shift everything after slot up one remove slot
     for (uint8_t i = slot; i < user_cnt - 1; ++i) {
-        memcpy(espnow_menu->rx_mac[i + 1], espnow_menu->rx_mac[i + 2], ESPNOW_MAC_SIZE);
-        memcpy(espnow_menu->lmk[i + 1], espnow_menu->lmk[i + 2], LMK_LEN);
+        memcpy(espnow_menu->rx_mac[i + ESPNOW_BASE_OPTS], espnow_menu->rx_mac[i + ESPNOW_BASE_OPTS + 1], ESPNOW_MAC_SIZE);
+        memcpy(espnow_menu->lmk[i + ESPNOW_BASE_OPTS], espnow_menu->lmk[i + ESPNOW_BASE_OPTS + 1], LMK_LEN);
     }
     
     // Zero out the dangling
-    memset(espnow_menu->rx_mac[user_cnt], 0, ESPNOW_MAC_SIZE);
-    memset(espnow_menu->lmk[user_cnt], 0, LMK_LEN);
+    memset(espnow_menu->rx_mac[user_cnt - 1 + ESPNOW_BASE_OPTS], 0, ESPNOW_MAC_SIZE);
+    memset(espnow_menu->lmk[user_cnt - 1 + ESPNOW_BASE_OPTS], 0, LMK_LEN);
 
     // Size one less
     espnow_menu->size--;

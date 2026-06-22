@@ -205,7 +205,7 @@ esp_err_t mmc5603_read_ut(float *x, float *y, float *z)
     // Counts are unsigned with zero field at mid-scale (2^19)
     // Subtract that bias to get a signed deviation, then scale counts -> microtesla
     // (negative result = field along -axis)
-    
+
     // The chip sits rotated 180 deg in the PCB plane:
     // a turn about the board normal negates the in-plane X and Y axes (Z is unchanged)
     // Correct it here so every downstream consumer reads the field in the true board frame.
@@ -230,7 +230,7 @@ esp_err_t mmc5603_read_heading(float *heading_deg)
 
     // Simple heading: angle of the X/Y field vector
     // Assumes the board is held flat and ignores hard-iron offset and declination
-    // magcel_page compass does its own calibrated heading instead
+    // ecompass_page compass does its own calibrated heading instead
     float h = atan2f(y, x) * RAD_TO_DEG; // atan2 returns (-180,180];
 
     // Fold the negative half up so the result is [0,360).

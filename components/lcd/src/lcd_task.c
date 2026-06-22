@@ -8,6 +8,7 @@
 #include "lcd_bluetooth.h"
 #include "lcd_hotkey.h"
 #include "lcd_gpio.h"
+#include "lcd_ecompass.h"
 
 #include "lcd_task.h"
 #include "gpio_task.h"
@@ -337,6 +338,18 @@ static void lcd_task(void *pvParameters)
                 case ESPNOW_PAGE:
                     lcd_espnow_page(&ui_btns, &ui_menu, &espnow_menu);
                     break;
+                case ESPNOW_ECOMPASS_PAGE:
+                    lcd_ecompass_page(&ui_btns, &ui_menu, &espnow_menu);
+                    dont_sleep_on_this_page = true;
+                    break;
+                case ESPNOW_ECOMPASS_STREAM_PAGE:
+                    lcd_ecompass_stream_page(&ui_btns, &ui_menu, &espnow_menu);
+                    dont_sleep_on_this_page = true;
+                    break;
+                case ESPNOW_ECOMPASS_CAL_PAGE:
+                    lcd_ecompass_calibration_page(&ui_btns, &ui_menu, &espnow_menu);
+                    dont_sleep_on_this_page = true;
+                    break;
                 case ESPNOW_RX_MAC_PAGE:
                     lcd_espnow_get_rx_mac(&ui_btns, &ui_menu, &espnow_menu);
                     break;
@@ -562,18 +575,6 @@ static void lcd_task(void *pvParameters)
                     break;
                 case GPIO_HOW_PAGE:
                     lcd_gpio_how_page(&ui_btns, &ui_menu, &gpio_menu);
-                    break;
-                case GPIO_ACCEL_PAGE:
-                    lcd_gpio_magcel_page(&ui_btns, &ui_menu, &gpio_menu);
-                    dont_sleep_on_this_page = true;
-                    break;
-                case GPIO_ACCEL_STREAM_PAGE:
-                    lcd_gpio_magcel_stream_page(&ui_btns, &ui_menu, &gpio_menu);
-                    dont_sleep_on_this_page = true;
-                    break;
-                case GPIO_MAGCAL_PAGE:
-                    lcd_gpio_magcal_page(&ui_btns, &ui_menu, &gpio_menu);
-                    dont_sleep_on_this_page = true;
                     break;
                 case GPIO_TERMINAL_PAGE:
                     lcd_gpio_terminal_page(&ui_btns, &ui_menu, &gpio_menu);

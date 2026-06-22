@@ -2,7 +2,7 @@
 name: code-reviewer-git
 description: Performs thorough patch reviews for PolyCast5 ESP-IDF firmware, focusing on embedded C best practices, FreeRTOS safety, memory constraints, and logical correctness. Use this agent proactively after writing any significant code changes.
 argument-hint: Reviews current git diff for correctness, safety, and embedded best practices.
-tools: [execute/getTerminalOutput, execute/runInTerminal, read, search, web, espressif.esp-idf-extension/espIdfCommands]
+tools: [execute, read, agent, search, web, 'pylance-mcp-server/*', espressif.esp-idf-extension/espIdfCommands, ms-python.python/getPythonEnvironmentInfo, ms-python.python/getPythonExecutableCommand, ms-python.python/installPythonPackage, ms-python.python/configurePythonEnvironment, todo]
 color: blue
 ---
 

@@ -2402,7 +2402,21 @@ void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espn
             
             ui_menu->page = ESPNOW_RX_MAC_PAGE;
         }
-    } else if (ui_btns->select_btn == 1) { // Specific selected
+    } else if (ui_btns->select_btn == 1 && espnow_menu->index == 1) { // eCompass selected
+        // Not a valid target when picking a device to stream readings to
+        if (espnow_entry_mode == ESPNOW_ENTRY_ACCEL) {
+            return;
+        }
+
+        // Hide ESP-NOW menu
+        lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Reset static
+        do_once = false;
+
+        // Open the eCompass page
+        ui_menu->page = ESPNOW_ECOMPASS_PAGE;
+    } else if (ui_btns->select_btn == 1) { // Specific device selected
         // Hide ESP-NOW menu
         lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
@@ -2411,7 +2425,7 @@ void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espn
             do_once = false;
 
             // Go to stream page
-            ui_menu->page = GPIO_ACCEL_STREAM_PAGE;
+            ui_menu->page = ESPNOW_ECOMPASS_STREAM_PAGE;
             return;
         }
 
@@ -2446,10 +2460,10 @@ void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espn
         // Reset static
         do_once = false;
 
-        // Accel mode: go back to the GPIO menu
+        // Accel mode: go back to the eCompass
         if (espnow_entry_mode == ESPNOW_ENTRY_ACCEL) {
             espnow_entry_mode = ESPNOW_ENTRY_NORMAL;
-            ui_menu->page = GPIO_PAGE;
+            ui_menu->page = ESPNOW_ECOMPASS_PAGE;
             return;
         }
 
@@ -3422,16 +3436,7 @@ void lcd_gpio_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_men
         
         // Switch pages
         ui_menu->page = GPIO_HOW_PAGE;
-    } else if (ui_btns->select_btn == 1 && gpio_menu->index == 1) { // Accelerometer selected
-        // Hide GPIO menu
-        lv_obj_add_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-
-        // Reset static
-        do_once = false;
-
-        // Switch pages
-        ui_menu->page = GPIO_ACCEL_PAGE;
-    } else if (ui_btns->select_btn == 1 && gpio_menu->index == 2) { // Terminal selected
+    } else if (ui_btns->select_btn == 1 && gpio_menu->index == 1) { // Terminal selected
         // Hide GPIO menu
         lv_obj_add_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
@@ -3440,7 +3445,7 @@ void lcd_gpio_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_men
 
         // Switch pages
         ui_menu->page = GPIO_TERMINAL_PAGE;
-    } else if (ui_btns->select_btn == 1 && gpio_menu->index == 3) { // I2C scanner selected
+    } else if (ui_btns->select_btn == 1 && gpio_menu->index == 2) { // I2C scanner selected
         // Hide GPIO menu
         lv_obj_add_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
