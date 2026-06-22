@@ -23,6 +23,8 @@
 #include "widgets/label/lv_label.h"
 #include "widgets/image/lv_image.h"
 #include "widgets/bar/lv_bar.h"
+#include "widgets/arc/lv_arc.h"
+#include "widgets/scale/lv_scale.h"
 #include "draw/lv_image_dsc.h"
 
 #include "tca9535.h"
@@ -360,6 +362,18 @@ static void prompt_accel_espnow_qr(ui_menu_t *ui_menu, gpio_menu_t *gpio_menu)
 #define ARROW_FILL_SCALE 0.74f // Inner fill inset, leaving a white border rim
 #define ARROW_SMOOTH 0.5f // Heading low-pass factor (0..1, higher = snappier / less lag)
 
+#define HEADING_ARC_W   3  // Heading-trace ring thickness over the bubble rim (px)
+#define HEADING_ARC_EXT 2  // How far the ring's outer edge sits beyond the circle rim (px)
+#define ARC_TOP_DEG     270 // 12 o'clock in LVGL arc/scale angles (0 = right, increasing clockwise)
+
+#define DIAL_TICK_CNT    12 // Rim tick marks, one every 30deg (matches the 12 calibration sectors)
+#define DIAL_MAJOR_EVERY 3  // Every 3rd tick is a long "cardinal" mark -> 4 of them, at 12/3/6/9 o'clock
+#define DIAL_TICK_MINOR  6  // Minor tick length, measured inward from the rim (px)
+#define DIAL_TICK_MAJOR  8  // Cardinal tick length (px)
+#define NORTH_PIP_R      30 // Radius of the drifting "N" marker from the circle centre (px)
+
+#define BULLSEYE_RINGS   3  // Faint concentric tilt-scale rings inside the bubble (indicator dist = tilt)
+
 // Magnetometer hard-/soft-iron calibration persistence (NVS)
 // Stores the four X/Y min/max bounds so the compass works on every boot without a fresh calibration turn
 #define MAGCAL_NVS_NS  "magcal"
@@ -479,7 +493,7 @@ static void arrow_rasterize(lv_color_t fill)
 
 // Build the bubble-level view: circle + crosshair + moving indicator, plus the mode name and X/Y readout on the right
 // When use_arrow is set, the moving indicator is a rotating direction arrow (accel page); otherwise the classic ball
-static void accel_build_bubble(ui_menu_t *ui_menu, lv_obj_t *cont, bool use_arrow, lv_obj_t **out_ball, lv_obj_t **out_mode_lbl, lv_obj_t **out_val_lbl)
+static void accel_build_bubble(ui_menu_t *ui_menu, lv_obj_t *cont, bool use_arrow, lv_obj_t **out_ball, lv_obj_t **out_mode_lbl, lv_obj_t **out_val_lbl, lv_obj_t **out_arc, lv_obj_t **out_npip)
 {
     #define X_OFFSET 15 // Move all to the right a bit
 
@@ -511,7 +525,25 @@ static void accel_build_bubble(ui_menu_t *ui_menu, lv_obj_t *cont, bool use_arro
     lv_obj_set_style_border_width(v_line, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_remove_flag(v_line, LV_OBJ_FLAG_SCROLLABLE);
 
-    // Moving indicator (created last so it draws on top of the crosshair):
+    // Bullseye tilt scale: faint concentric rings the moving indicator crosses as it leaves
+    // center, so its distance from the middle reads as a tilt gauge
+    float ring_max = (LEVEL_D / 2.0f) - ((use_arrow ? ARROW_SIZE : BALL_D) / 2.0f) - 2.0f;
+    for (int i = 1; i <= BULLSEYE_RINGS; i++) { // Create each ring
+        int32_t d = (int32_t)lroundf(2.0f * ring_max * (float)i / BULLSEYE_RINGS); // Ring diameter (px)
+        lv_obj_t *ring = lv_obj_create(level_bg);
+        lv_obj_set_size(ring, d, d);
+        lv_obj_align(ring, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_set_style_radius(ring, LV_RADIUS_CIRCLE, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_opa(ring, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_shadow_width(ring, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(ring, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_color(ring, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_opa(ring, LV_OPA_30, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_remove_flag(ring, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_remove_flag(ring, LV_OBJ_FLAG_CLICKABLE);
+    }
+
+    // Moving indicator (created last so it draws on top of the crosshair + rings):
     // a rotating direction arrow, or the classic bubble ball
     lv_obj_t *ball;
     if (use_arrow) {
@@ -567,6 +599,77 @@ static void accel_build_bubble(ui_menu_t *ui_menu, lv_obj_t *cont, bool use_arro
     lv_obj_set_style_text_color(val_lbl, user_secondary_color, 0);
     lv_obj_set_style_text_align(val_lbl, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(val_lbl, "X: 0\xC2\xB0\nY: 0\xC2\xB0");
+
+    // Compass overlays, a tick dial, a thick arc that traces the turn from the entry pose, and a North pip that drifts as you rotate
+    if (use_arrow) {
+        // Heading-trace ring: a thick accent arc that grows from the 12-o'clock "zero" point
+        if (out_arc) {
+            lv_obj_t *arc = lv_arc_create(cont); // Sibling of level_bg, drawn on top of its rim
+            lv_obj_set_size(arc, LEVEL_D + 2 * HEADING_ARC_EXT, LEVEL_D + 2 * HEADING_ARC_EXT);
+            lv_obj_align(arc, LV_ALIGN_LEFT_MID, X_OFFSET - HEADING_ARC_EXT, 0); // Centre on the level circle
+            lv_obj_remove_flag(arc, LV_OBJ_FLAG_CLICKABLE); // Display only; buttons drive the UI
+            lv_obj_remove_flag(arc, LV_OBJ_FLAG_SCROLLABLE);
+
+            // Hide the widget's own chrome: no rectangle bg, no background track arc, no knob
+            lv_obj_set_style_bg_opa(arc, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_arc_opa(arc, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_bg_opa(arc, LV_OPA_TRANSP, LV_PART_KNOB | LV_STATE_DEFAULT);
+
+            // The visible part: a thick accent-coloured arc that thickens the rim as it traces
+            lv_obj_set_style_arc_color(arc, user_secondary_color, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+            lv_obj_set_style_arc_width(arc, HEADING_ARC_W, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+            lv_obj_set_style_arc_rounded(arc, false, LV_PART_INDICATOR | LV_STATE_DEFAULT); // Crisp edge at the 0 mark
+
+            lv_arc_set_rotation(arc, 0);
+            lv_arc_set_bg_angles(arc, 0, 360); // Full (invisible) track so the indicator may sweep anywhere
+            lv_arc_set_angles(arc, ARC_TOP_DEG, ARC_TOP_DEG); // Zero-length = nothing drawn until the heading moves
+
+            *out_arc = arc;
+        }
+
+        // Tick dial: 12 marks at 30deg (the same wedges the calibration walks through), every 3rd one a longer cardinal
+        lv_obj_t *dial = lv_scale_create(cont); // Sibling of level_bg, shares its box -> shares its center
+        lv_obj_set_size(dial, LEVEL_D, LEVEL_D);
+        lv_obj_align(dial, LV_ALIGN_LEFT_MID, X_OFFSET, 0);
+        lv_obj_remove_flag(dial, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_remove_flag(dial, LV_OBJ_FLAG_SCROLLABLE);
+        lv_scale_set_mode(dial, LV_SCALE_MODE_ROUND_INNER);
+        lv_scale_set_label_show(dial, false); // Ticks only, no numbers
+        lv_scale_set_total_tick_count(dial, DIAL_TICK_CNT);
+        lv_scale_set_major_tick_every(dial, DIAL_MAJOR_EVERY);
+        lv_scale_set_angle_range(dial, 30 * (DIAL_TICK_CNT - 1)); // 330deg: 12 ticks at 30deg, last clears 0
+        lv_scale_set_rotation(dial, ARC_TOP_DEG); // Tick 0 sits at the top (the 0 mark)
+
+        // Drop the scale's own baseline ring + box
+        lv_obj_set_style_bg_opa(dial, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_arc_opa(dial, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_line_width(dial, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_pad_all(dial, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(dial, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+        // Minor ticks (the 8 in-between marks): short and dim
+        lv_obj_set_style_length(dial, DIAL_TICK_MINOR, LV_PART_ITEMS | LV_STATE_DEFAULT);
+        lv_obj_set_style_line_width(dial, 2, LV_PART_ITEMS | LV_STATE_DEFAULT);
+        lv_obj_set_style_line_color(dial, user_secondary_color, LV_PART_ITEMS | LV_STATE_DEFAULT);
+        lv_obj_set_style_line_opa(dial, LV_OPA_40, LV_PART_ITEMS | LV_STATE_DEFAULT);
+
+        // Cardinal ticks (the 4 quarter marks): longer and bold
+        lv_obj_set_style_length(dial, DIAL_TICK_MAJOR, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+        lv_obj_set_style_line_width(dial, 2, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+        lv_obj_set_style_line_color(dial, user_secondary_color, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+        lv_obj_set_style_line_opa(dial, LV_OPA_COVER, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+
+        // North pip: a small "N" just inside the rim that points at magnetic north
+        if (out_npip) {
+            lv_obj_t *npip = lv_label_create(level_bg);
+            lv_label_set_text(npip, "N");
+            lv_obj_set_style_text_font(npip, &lv_font_montserrat_14, 0);
+            lv_obj_set_style_text_color(npip, user_secondary_color, 0);
+            lv_obj_remove_flag(npip, LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_add_flag(npip, LV_OBJ_FLAG_HIDDEN);
+            *out_npip = npip;
+        }
+    }
 
     *out_ball = ball;
     *out_mode_lbl = mode_lbl;
@@ -709,6 +812,8 @@ void lcd_gpio_magcel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
     static lv_obj_t *ball = NULL;
     static lv_obj_t *mode_lbl = NULL;
     static lv_obj_t *val_lbl = NULL;
+    static lv_obj_t *heading_arc = NULL;  // Rim arc tracing how far the heading has turned from 0
+    static lv_obj_t *heading_npip = NULL; // "N" pip that drifts around the rim toward magnetic north
     static TickType_t last_refresh = 0;
     static float arrow_heading = 0.0f; // Smoothed absolute heading
     static float heading_ref = 0.0f;   // Heading captured at entry ("straight ahead" = up)
@@ -744,8 +849,8 @@ void lcd_gpio_magcel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
         lv_obj_remove_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_set_style_pad_all(cont, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-        // Bubble view with the rotating direction arrow
-        accel_build_bubble(ui_menu, cont, true, &ball, &mode_lbl, &val_lbl);
+        // Bubble view with the rotating arrow + heading-trace rim arc, tick dial and North pip
+        accel_build_bubble(ui_menu, cont, true, &ball, &mode_lbl, &val_lbl, &heading_arc, &heading_npip);
 
         // Drop any stale readings left in the queues from a previous visit
         xQueueReset(xAccelReadingsQueue);
@@ -796,7 +901,8 @@ void lcd_gpio_magcel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
             float cy = (mag.y - magcal_center_y()) / y_half;
 
             // atan2 of the centred unit circle -> heading in degrees, +y convention
-            float raw_heading = atan2f(cy, cx) / DEG2RAD; // rad -> deg
+            // rad -> deg; the driver already corrects the 180deg mount, so this is a true bearing
+            float raw_heading = atan2f(cy, cx) / DEG2RAD;
             if (raw_heading < 0.0f) raw_heading += 360.0f;
 
             if (!heading_init) {
@@ -836,6 +942,24 @@ void lcd_gpio_magcel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
         if (arrow_drawn < 0.0f || fabsf(dd) >= 1.0f) {
             lv_image_set_rotation(ball, (int32_t)lroundf(rel * 10.0f) % 3600);
             arrow_drawn = rel;
+
+            // Grow the rim arc to match: from straight-up (0) clockwise through the turn
+            if (heading_arc) {
+                int32_t rdeg = (int32_t)lroundf(rel);
+                if (rdeg > 359) rdeg = 359;
+                lv_arc_set_angles(heading_arc, ARC_TOP_DEG, ARC_TOP_DEG + rdeg);
+            }
+
+            // Drift the North pip
+            if (heading_npip) {
+                // arrow_heading is kept in [0,360), so 360 - it is the north bearing CW from "up"
+                float north_deg = fmodf(360.0f - arrow_heading, 360.0f);
+                float a = (ARC_TOP_DEG + north_deg) * DEG2RAD; // -> LVGL screen angle (0 = right, +y down)
+                lv_obj_align(heading_npip, LV_ALIGN_CENTER,
+                             (int32_t)lroundf(NORTH_PIP_R * cosf(a)),
+                             (int32_t)lroundf(NORTH_PIP_R * sinf(a)));
+                lv_obj_remove_flag(heading_npip, LV_OBJ_FLAG_HIDDEN); // Reveal once a heading exists
+            }
         }
     }
 
@@ -848,7 +972,7 @@ void lcd_gpio_magcel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
         lv_obj_delete(cont); // Deletes children
 
         cont = NULL;
-        ball = mode_lbl = val_lbl = NULL;
+        ball = mode_lbl = val_lbl = heading_arc = heading_npip = NULL;
         init = false;
 
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Hide right
@@ -858,7 +982,7 @@ void lcd_gpio_magcel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
         lv_obj_delete(cont); // Deletes children
 
         cont = NULL;
-        ball = mode_lbl = val_lbl = NULL;
+        ball = mode_lbl = val_lbl = heading_arc = heading_npip = NULL;
         init = false;
 
         lv_timer_handler(); // Refresh screen
@@ -867,7 +991,7 @@ void lcd_gpio_magcel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
         lv_obj_delete(cont); // Deletes children
 
         cont = NULL;
-        ball = mode_lbl = val_lbl = NULL;
+        ball = mode_lbl = val_lbl = heading_arc = heading_npip = NULL;
         init = false;
 
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Hide right
@@ -880,7 +1004,7 @@ void lcd_gpio_magcel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
         lv_obj_delete(cont); // Deletes children
 
         cont = NULL;
-        ball = mode_lbl = val_lbl = NULL;
+        ball = mode_lbl = val_lbl = heading_arc = heading_npip = NULL;
         init = false;
 
         // Show tutorial QR to proceed
@@ -890,7 +1014,7 @@ void lcd_gpio_magcel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
         lv_obj_delete(cont); // Deletes children
 
         cont = NULL;
-        ball = mode_lbl = val_lbl = NULL;
+        ball = mode_lbl = val_lbl = heading_arc = heading_npip = NULL;
         init = false;
 
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
@@ -1009,7 +1133,7 @@ void lcd_gpio_magcal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
 
             // Avoid dead zone near the center
             if (dx * dx + dy * dy > 9.0f) { // > ~3 uT from centre -> valid
-                // Angle of that vector in degrees [0,360)
+                // Angle of that vector in degrees [0,360); the driver corrects the 180deg mount
                 float heading = atan2f(dy, dx) / DEG2RAD;
                 if (heading < 0.0f) heading += 360.0f;
                 lv_image_set_rotation(arrow_img, (int32_t)lroundf(heading * 10.0f) % 3600); // Rotate arrow img
@@ -1162,8 +1286,8 @@ void lcd_gpio_magcel_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_me
         lv_obj_remove_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_set_style_pad_all(cont, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-        // Same bubble view as the accel page, but with the classic ball
-        accel_build_bubble(ui_menu, cont, false, &ball, &mode_lbl, &val_lbl);
+        // Same bubble view as the accel page, but with the classic ball (no compass overlays)
+        accel_build_bubble(ui_menu, cont, false, &ball, &mode_lbl, &val_lbl, NULL, NULL);
 
         // Drop any stale reading from a previous visit
         xQueueReset(xAccelReadingsQueue);

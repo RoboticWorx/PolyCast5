@@ -6,6 +6,9 @@
  *   mmc5603_read_raw                  - output registers -> three unsigned 20-bit counts
  *   mmc5603_read_ut                   - counts -> microtesla (zero-field removed, signed)
  *   mmc5603_read_heading              - flat, uncalibrated magnetic heading (atan2 of X/Y)
+ *
+ * NOTE: The chip is mounted rotated 180 degrees on the physical PCB. mmc5603_read_ut negates the
+ *       in-plane X/Y axes so every caller (heading, calibration) works in the true board frame.
  */
 
 #include "mmc5603.h"
@@ -202,9 +205,13 @@ esp_err_t mmc5603_read_ut(float *x, float *y, float *z)
     // Counts are unsigned with zero field at mid-scale (2^19)
     // Subtract that bias to get a signed deviation, then scale counts -> microtesla
     // (negative result = field along -axis)
-    if (x) *x = ((float)rx - MMC5603_NULL_FIELD_OFFSET) * MMC5603_UT_PER_LSB;
-    if (y) *y = ((float)ry - MMC5603_NULL_FIELD_OFFSET) * MMC5603_UT_PER_LSB;
-    if (z) *z = ((float)rz - MMC5603_NULL_FIELD_OFFSET) * MMC5603_UT_PER_LSB;
+    
+    // The chip sits rotated 180 deg in the PCB plane:
+    // a turn about the board normal negates the in-plane X and Y axes (Z is unchanged)
+    // Correct it here so every downstream consumer reads the field in the true board frame.
+    if (x) *x = -(((float)rx - MMC5603_NULL_FIELD_OFFSET) * MMC5603_UT_PER_LSB);
+    if (y) *y = -(((float)ry - MMC5603_NULL_FIELD_OFFSET) * MMC5603_UT_PER_LSB);
+    if (z) *z =  ((float)rz - MMC5603_NULL_FIELD_OFFSET) * MMC5603_UT_PER_LSB;
 
     return ESP_OK;
 }

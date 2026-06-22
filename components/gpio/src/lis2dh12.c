@@ -1,3 +1,9 @@
+/*
+ * LIS2DH12 3-axis accelerometer driver (I2C).
+ * 
+ * NOTE: Chip is mounted with a 180-degree rotation on the physical PCB!
+ */
+
 #include "lis2dh12.h"
 #include "lis2dh12_reg.h"
 
