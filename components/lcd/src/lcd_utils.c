@@ -803,6 +803,7 @@ static void lcd_selection_btn_pressed(ui_menu_t *ui_menu, ir_menu_t *ir_menu, lo
         lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);    
         ui_menu->page = LORA_PAGE;
     } else if (strcmp(option, OPTION_ESPNOW) == 0) {
+        lcd_espnow_refresh_list_for_mode(espnow_menu); // Refresh
         // Show ESP-NOW list
         lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         ui_menu->page = ESPNOW_PAGE;
@@ -2344,24 +2345,39 @@ void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espn
         // Show ESP-NOW list
         lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
-        // Top entry is "Add ESP32" normally, but "Select a device:" when streaming
-        lv_label_set_text(lv_obj_get_child(espnow_menu->btns[0], 0),
-                espnow_entry_mode == ESPNOW_ENTRY_ACCEL ? "Select a device:" : espnow_menu->options[0]);
-
-        lv_timer_handler(); // Update lbl
+        lv_timer_handler(); // Update labels
 
         do_once = true;
     }
     
     // Up button pressed
     if (ui_btns->up_btn == 1) {
-        // Update selection
-        espnow_menu->index--;
-        lcd_espnow_update_menu(espnow_menu);
+        if (espnow_entry_mode == ESPNOW_ENTRY_ACCEL) {
+            // Streaming picker: move only among saved devices, skipping the "eCompass" entry
+            if (espnow_menu->size > ESPNOW_BASE_OPTS) {
+                if (--espnow_menu->index < ESPNOW_BASE_OPTS) {
+                    espnow_menu->index = espnow_menu->size - 1; // Wrap to the last device
+                }
+                lcd_espnow_update_menu(espnow_menu);
+            }
+        } else {
+            // Update selection
+            espnow_menu->index--;
+            lcd_espnow_update_menu(espnow_menu);
+        }
     } else if (ui_btns->down_btn == 1) { // Down button pressed
-        // Update selection
-        espnow_menu->index++;
-        lcd_espnow_update_menu(espnow_menu);
+        if (espnow_entry_mode == ESPNOW_ENTRY_ACCEL) {
+            if (espnow_menu->size > ESPNOW_BASE_OPTS) {
+                if (++espnow_menu->index >= espnow_menu->size) {
+                    espnow_menu->index = ESPNOW_BASE_OPTS; // Wrap to the first device
+                }
+                lcd_espnow_update_menu(espnow_menu);
+            }
+        } else {
+            // Update selection
+            espnow_menu->index++;
+            lcd_espnow_update_menu(espnow_menu);
+        }
     } else if (ui_btns->select_btn == 1 && espnow_menu->index == 0) { // Add ESP32 selected
         // Not clickable in accel mode
         if (espnow_entry_mode == ESPNOW_ENTRY_ACCEL) {

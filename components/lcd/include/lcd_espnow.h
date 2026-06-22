@@ -74,6 +74,15 @@ void lcd_espnow_setup_page(espnow_menu_t *espnow_menu);
 void lcd_espnow_update_menu(espnow_menu_t *espnow_menu);
 
 /**
+ * @brief Configure the ESP-NOW list for the current entry mode (espnow_entry_mode) and reveal it.
+ *        Call this BEFORE switching to ESPNOW_PAGE so the first refresh already shows the correct
+ *        rows, instead of flashing the previous mode's labels for one frame.
+ *
+ * @param [in] menu ESP-NOW menu structure
+ */
+void lcd_espnow_refresh_list_for_mode(espnow_menu_t *menu);
+
+/**
  * @brief Executes when specific ESP-NOW option is selected
  *
  * @param [in] ui_btns UI input structure

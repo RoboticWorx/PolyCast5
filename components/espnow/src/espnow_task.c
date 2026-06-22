@@ -38,8 +38,8 @@ QueueHandle_t xEspSendEncKeyQueueNVS;
 QueueHandle_t xEspSendEncKeyQueue;
 QueueHandle_t xEspSendCmdQueue;
 QueueHandle_t xEspSendMqttQueue;
-QueueHandle_t xEspAccelStreamCtrlQueue;
-QueueHandle_t xEspAccelStreamQueue;
+QueueHandle_t xEspEcompassStreamCtrlQueue;
+QueueHandle_t xEspEcompassStreamQueue;
 
 static void espnow_task(void *param)
 {
@@ -75,10 +75,10 @@ static void espnow_task(void *param)
     configASSERT(xEspSendMqttQueue);
 
     // Accelerometer streaming: control (start/stop) + latest-sample queues
-    xEspAccelStreamCtrlQueue = xQueueCreate(2, sizeof(espnow_accel_ctrl_t));
-    configASSERT(xEspAccelStreamCtrlQueue);
-    xEspAccelStreamQueue = xQueueCreate(1, sizeof(espnow_accel_t));
-    configASSERT(xEspAccelStreamQueue);
+    xEspEcompassStreamCtrlQueue = xQueueCreate(2, sizeof(espnow_ecompass_ctrl_t));
+    configASSERT(xEspEcompassStreamCtrlQueue);
+    xEspEcompassStreamQueue = xQueueCreate(1, sizeof(espnow_ecompass_t));
+    configASSERT(xEspEcompassStreamQueue);
 
     while (1) {
         // Key generated and requesting send for LoRa handshake
@@ -229,27 +229,27 @@ static void espnow_task(void *param)
         }
 
         // Accelerometer streaming: start/stop a long-lived session
-        espnow_accel_ctrl_t accel_ctrl;
-        if (xQueueReceive(xEspAccelStreamCtrlQueue, &accel_ctrl, 0) == pdPASS) {
-            if (accel_ctrl.start && !accel_streaming) {
+        espnow_ecompass_ctrl_t ecompass_ctrl;
+        if (xQueueReceive(xEspEcompassStreamCtrlQueue, &ecompass_ctrl, 0) == pdPASS) {
+            if (ecompass_ctrl.start && !accel_streaming) {
                 // Make sure the radio is stopped first
                 wifi_utils_radio_stop();
 
                 // Bring the radio + peer up once for the whole session
                 if (espnow_utils_wifi_radio_start(WIFI_CHANNEL) == ESP_OK &&
-                        espnow_utils_espnow_init(accel_ctrl.mac_selected, WIFI_CHANNEL,
-                        accel_ctrl.enc == true, accel_ctrl.enc ? accel_ctrl.lmk : NULL) == ESP_OK) {
-                    memcpy(accel_stream_mac, accel_ctrl.mac_selected, ESPNOW_MAC_SIZE);
+                        espnow_utils_espnow_init(ecompass_ctrl.mac_selected, WIFI_CHANNEL,
+                        ecompass_ctrl.enc == true, ecompass_ctrl.enc ? ecompass_ctrl.lmk : NULL) == ESP_OK) {
+                    memcpy(accel_stream_mac, ecompass_ctrl.mac_selected, ESPNOW_MAC_SIZE);
                     accel_streaming = true;
 
                     // Drop any sample left over from a previous session
-                    xQueueReset(xEspAccelStreamQueue);
+                    xQueueReset(xEspEcompassStreamQueue);
                 } else {
                     ESP_LOGE(TAG, "accel: stream start failed");
                     espnow_utils_espnow_deinit();
                     espnow_utils_wifi_radio_stop();
                 }
-            } else if (!accel_ctrl.start && accel_streaming) {
+            } else if (!ecompass_ctrl.start && accel_streaming) {
                 // Tear the session down
                 espnow_utils_espnow_deinit();
                 espnow_utils_wifi_radio_stop();
@@ -263,23 +263,24 @@ static void espnow_task(void *param)
 
         // While streaming, transmit each fresh accel sample as it arrives
         if (accel_streaming) {
-            espnow_accel_t accel_sample;
-            if (xQueueReceive(xEspAccelStreamQueue, &accel_sample, 0) == pdPASS) {
+            espnow_ecompass_t ecompass_sample;
+            if (xQueueReceive(xEspEcompassStreamQueue, &ecompass_sample, 0) == pdPASS) {
                 char tx_payload[ESP_NOW_MAX_DATA_LEN];
 
-                // Format payload to send: ESPNOW_MAGICx,y -> "PC5: x,y"
-                int tx_len = snprintf(tx_payload, sizeof(tx_payload), ESPNOW_MAGIC "%.1f,%.1f",
-                        (double)accel_sample.x, (double)accel_sample.y);
+                // Format payload to send: ESPNOW_MAGICx,y,z -> "PC5: x,y,z"
+                // x/y = tilt (deg), z = compass heading (deg)
+                int tx_len = snprintf(tx_payload, sizeof(tx_payload), ESPNOW_MAGIC "%.1f,%.1f,%.1f",
+                        (double)ecompass_sample.x, (double)ecompass_sample.y, (double)ecompass_sample.z);
                 
                 // Send it if formatting succeeded
                 if (tx_len > 0 && tx_len < (int)sizeof(tx_payload)) {
                     if (espnow_utils_send_data(accel_stream_mac, (uint8_t *)tx_payload, tx_len) != ESP_OK) {
 #ifdef POLYCAST5_DEBUG
-                        ESP_LOGW(TAG, "xEspAccelStreamQueue: Accel payload send failed.");
+                        ESP_LOGW(TAG, "xEspEcompassStreamQueue: eCompass payload send failed.");
 #endif
                     }
                 } else {
-                    ESP_LOGE(TAG, "xEspAccelStreamQueue: Accel payload snprintf failed or too long.");
+                    ESP_LOGE(TAG, "xEspEcompassStreamQueue: eCompass payload snprintf failed or too long.");
                 }
             }
         }

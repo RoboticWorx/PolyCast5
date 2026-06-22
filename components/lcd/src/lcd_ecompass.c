@@ -6,7 +6,7 @@
 #include "gpio_task.h"   // accel/mag queues + button semaphores
 #include "lis2dh12.h"    // accel_deg_t
 #include "mmc5603.h"     // mmc5603_reading_t
-#include "espnow_task.h" // xEspAccelStreamCtrlQueue, xEspAccelStreamQueue
+#include "espnow_task.h" // xEspEcompassStreamCtrlQueue, xEspEcompassStreamQueue
 
 #include "lcd_utils.h"
 #include "lcd_ecompass.h"
@@ -14,7 +14,6 @@
 #define TAG "LCD_ECOMPASS"
 
 #define LEVEL_D      88    // Bubble-level circle diameter (px)
-#define BALL_D       18    // Moving ball diameter (px)
 #define MAX_TILT_DEG 45.0f // Tilt that pushes the ball to the circle edge
 #define DEG2RAD      0.017453292f
 
@@ -156,9 +155,8 @@ static void arrow_rasterize(lv_color_t fill)
     arrow_dsc.data          = arrow_px;
 }
 
-// Build the bubble-level view: circle + crosshair + moving indicator, plus the mode name and X/Y readout on the right
-// When use_arrow is set, the moving indicator is a rotating direction arrow (accel page); otherwise the classic ball
-static void accel_build_bubble(ui_menu_t *ui_menu, lv_obj_t *cont, bool use_arrow, lv_obj_t **out_ball, lv_obj_t **out_mode_lbl, lv_obj_t **out_val_lbl, lv_obj_t **out_arc, lv_obj_t **out_npip)
+// Build the bubble-level view: circle + crosshair + a rotating direction-arrow indicator
+static void accel_build_bubble(ui_menu_t *ui_menu, lv_obj_t *cont, lv_obj_t **out_ball, lv_obj_t **out_mode_lbl, lv_obj_t **out_val_lbl, lv_obj_t **out_arc, lv_obj_t **out_npip)
 {
     #define X_OFFSET 15 // Move all to the right a bit
 
@@ -192,7 +190,7 @@ static void accel_build_bubble(ui_menu_t *ui_menu, lv_obj_t *cont, bool use_arro
 
     // Bullseye tilt scale: faint concentric rings the moving indicator crosses as it leaves
     // center, so its distance from the middle reads as a tilt gauge
-    float ring_max = (LEVEL_D / 2.0f) - ((use_arrow ? ARROW_SIZE : BALL_D) / 2.0f) - 2.0f;
+    float ring_max = (LEVEL_D / 2.0f) - (ARROW_SIZE / 2.0f) - 2.0f;
     for (int i = 1; i <= BULLSEYE_RINGS; i++) { // Create each ring
         int32_t d = (int32_t)lroundf(2.0f * ring_max * (float)i / BULLSEYE_RINGS); // Ring diameter (px)
         lv_obj_t *ring = lv_obj_create(level_bg);
@@ -209,26 +207,15 @@ static void accel_build_bubble(ui_menu_t *ui_menu, lv_obj_t *cont, bool use_arro
     }
 
     // Moving indicator (created last so it draws on top of the crosshair + rings):
-    // a rotating direction arrow, or the classic bubble ball
-    lv_obj_t *ball;
-    if (use_arrow) {
-        arrow_rasterize(user_secondary_color); // Build the arrow in the current accent colour
-        ball = lv_image_create(level_bg);
-        lv_image_set_src(ball, &arrow_dsc);
-        lv_obj_set_size(ball, ARROW_SIZE, ARROW_SIZE);
-        lv_image_set_pivot(ball, ARROW_SIZE / 2, ARROW_SIZE / 2); // Rotate about its centre
-        lv_image_set_antialias(ball, true);
-        lv_obj_align(ball, LV_ALIGN_CENTER, 0, 0);
-        lv_obj_remove_flag(ball, LV_OBJ_FLAG_SCROLLABLE);
-    } else { // Classic ball (stream page)
-        ball = lv_obj_create(level_bg);
-        lv_obj_set_size(ball, BALL_D, BALL_D);
-        lv_obj_align(ball, LV_ALIGN_CENTER, 0, 0);
-        lv_obj_set_style_radius(ball, LV_RADIUS_CIRCLE, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_bg_color(ball, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_border_width(ball, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_remove_flag(ball, LV_OBJ_FLAG_SCROLLABLE);
-    }
+    // a rotating direction arrow, translated by tilt and rotated by heading
+    arrow_rasterize(user_secondary_color); // Build the arrow in the current accent colour
+    lv_obj_t *ball = lv_image_create(level_bg);
+    lv_image_set_src(ball, &arrow_dsc);
+    lv_obj_set_size(ball, ARROW_SIZE, ARROW_SIZE);
+    lv_image_set_pivot(ball, ARROW_SIZE / 2, ARROW_SIZE / 2); // Rotate about its centre
+    lv_image_set_antialias(ball, true);
+    lv_obj_align(ball, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_remove_flag(ball, LV_OBJ_FLAG_SCROLLABLE);
 
     // Right-side panel: mode name on top, X/Y readout centred below
     lv_obj_t *right_panel = lv_obj_create(cont);
@@ -237,7 +224,8 @@ static void accel_build_bubble(ui_menu_t *ui_menu, lv_obj_t *cont, bool use_arro
     lv_obj_set_style_bg_opa(right_panel, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(right_panel, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_all(right_panel, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_row(right_panel, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
+    // Tighter row gap on the stream page, where the extra "Sending:" line crowds the X/Y/Z readout
+    lv_obj_set_style_pad_row(right_panel, ui_menu->page == ESPNOW_ECOMPASS_STREAM_PAGE ? 4 : 6, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_remove_flag(right_panel, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_flex_flow(right_panel, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(right_panel, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -263,77 +251,75 @@ static void accel_build_bubble(ui_menu_t *ui_menu, lv_obj_t *cont, bool use_arro
     lv_obj_set_style_text_font(val_lbl, &lv_font_montserrat_16, 0);
     lv_obj_set_style_text_color(val_lbl, user_secondary_color, 0);
     lv_obj_set_style_text_align(val_lbl, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_text(val_lbl, "X: 0\xC2\xB0\nY: 0\xC2\xB0");
+    lv_label_set_text(val_lbl, "X: 0\xC2\xB0\nY: 0\xC2\xB0\nZ: 0\xC2\xB0");
 
-    // Compass overlays, a tick dial, a thick arc that traces the turn from the entry pose, and a North pip that drifts as you rotate
-    if (use_arrow) {
-        // Heading-trace ring: a thick accent arc that grows from the 12-o'clock "zero" point
-        if (out_arc) {
-            lv_obj_t *arc = lv_arc_create(cont); // Sibling of level_bg, drawn on top of its rim
-            lv_obj_set_size(arc, LEVEL_D + 2 * HEADING_ARC_EXT, LEVEL_D + 2 * HEADING_ARC_EXT);
-            lv_obj_align(arc, LV_ALIGN_LEFT_MID, X_OFFSET - HEADING_ARC_EXT, 0); // Centre on the level circle
-            lv_obj_remove_flag(arc, LV_OBJ_FLAG_CLICKABLE); // Display only; buttons drive the UI
-            lv_obj_remove_flag(arc, LV_OBJ_FLAG_SCROLLABLE);
+    // Compass overlays: a tick dial, a thick arc that traces the turn from the entry pose, and a North pip that drifts as you rotate
+    // Heading-trace ring: a thick accent arc that grows from the 12-o'clock "zero" point
+    if (out_arc) {
+        lv_obj_t *arc = lv_arc_create(cont); // Sibling of level_bg, drawn on top of its rim
+        lv_obj_set_size(arc, LEVEL_D + 2 * HEADING_ARC_EXT, LEVEL_D + 2 * HEADING_ARC_EXT);
+        lv_obj_align(arc, LV_ALIGN_LEFT_MID, X_OFFSET - HEADING_ARC_EXT, 0); // Centre on the level circle
+        lv_obj_remove_flag(arc, LV_OBJ_FLAG_CLICKABLE); // Display only; buttons drive the UI
+        lv_obj_remove_flag(arc, LV_OBJ_FLAG_SCROLLABLE);
 
-            // Hide the widget's own chrome: no rectangle bg, no background track arc, no knob
-            lv_obj_set_style_bg_opa(arc, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_arc_opa(arc, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_bg_opa(arc, LV_OPA_TRANSP, LV_PART_KNOB | LV_STATE_DEFAULT);
+        // Hide the widget's own chrome: no rectangle bg, no background track arc, no knob
+        lv_obj_set_style_bg_opa(arc, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_arc_opa(arc, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_opa(arc, LV_OPA_TRANSP, LV_PART_KNOB | LV_STATE_DEFAULT);
 
-            // The visible part: a thick accent-coloured arc that thickens the rim as it traces
-            lv_obj_set_style_arc_color(arc, user_secondary_color, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-            lv_obj_set_style_arc_width(arc, HEADING_ARC_W, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-            lv_obj_set_style_arc_rounded(arc, false, LV_PART_INDICATOR | LV_STATE_DEFAULT); // Crisp edge at the 0 mark
+        // The visible part: a thick accent-coloured arc that thickens the rim as it traces
+        lv_obj_set_style_arc_color(arc, user_secondary_color, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+        lv_obj_set_style_arc_width(arc, HEADING_ARC_W, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+        lv_obj_set_style_arc_rounded(arc, false, LV_PART_INDICATOR | LV_STATE_DEFAULT); // Crisp edge at the 0 mark
 
-            lv_arc_set_rotation(arc, 0);
-            lv_arc_set_bg_angles(arc, 0, 360); // Full (invisible) track so the indicator may sweep anywhere
-            lv_arc_set_angles(arc, ARC_TOP_DEG, ARC_TOP_DEG); // Zero-length = nothing drawn until the heading moves
+        lv_arc_set_rotation(arc, 0);
+        lv_arc_set_bg_angles(arc, 0, 360); // Full (invisible) track so the indicator may sweep anywhere
+        lv_arc_set_angles(arc, ARC_TOP_DEG, ARC_TOP_DEG); // Zero-length = nothing drawn until the heading moves
 
-            *out_arc = arc;
-        }
+        *out_arc = arc;
+    }
 
-        // Tick dial: 12 marks at 30deg (the same wedges the calibration walks through), every 3rd one a longer cardinal
-        lv_obj_t *dial = lv_scale_create(cont); // Sibling of level_bg, shares its box -> shares its center
-        lv_obj_set_size(dial, LEVEL_D, LEVEL_D);
-        lv_obj_align(dial, LV_ALIGN_LEFT_MID, X_OFFSET, 0);
-        lv_obj_remove_flag(dial, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_remove_flag(dial, LV_OBJ_FLAG_SCROLLABLE);
-        lv_scale_set_mode(dial, LV_SCALE_MODE_ROUND_INNER);
-        lv_scale_set_label_show(dial, false); // Ticks only, no numbers
-        lv_scale_set_total_tick_count(dial, DIAL_TICK_CNT);
-        lv_scale_set_major_tick_every(dial, DIAL_MAJOR_EVERY);
-        lv_scale_set_angle_range(dial, 30 * (DIAL_TICK_CNT - 1)); // 330deg: 12 ticks at 30deg, last clears 0
-        lv_scale_set_rotation(dial, ARC_TOP_DEG); // Tick 0 sits at the top (the 0 mark)
+    // Tick dial: 12 marks at 30deg (the same wedges the calibration walks through), every 3rd one a longer cardinal
+    lv_obj_t *dial = lv_scale_create(cont); // Sibling of level_bg, shares its box -> shares its center
+    lv_obj_set_size(dial, LEVEL_D, LEVEL_D);
+    lv_obj_align(dial, LV_ALIGN_LEFT_MID, X_OFFSET, 0);
+    lv_obj_remove_flag(dial, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(dial, LV_OBJ_FLAG_SCROLLABLE);
+    lv_scale_set_mode(dial, LV_SCALE_MODE_ROUND_INNER);
+    lv_scale_set_label_show(dial, false); // Ticks only, no numbers
+    lv_scale_set_total_tick_count(dial, DIAL_TICK_CNT);
+    lv_scale_set_major_tick_every(dial, DIAL_MAJOR_EVERY);
+    lv_scale_set_angle_range(dial, 30 * (DIAL_TICK_CNT - 1)); // 330deg: 12 ticks at 30deg, last clears 0
+    lv_scale_set_rotation(dial, ARC_TOP_DEG); // Tick 0 sits at the top (the 0 mark)
 
-        // Drop the scale's own baseline ring + box
-        lv_obj_set_style_bg_opa(dial, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_arc_opa(dial, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_line_width(dial, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_pad_all(dial, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_border_width(dial, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    // Drop the scale's own baseline ring + box
+    lv_obj_set_style_bg_opa(dial, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_arc_opa(dial, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_line_width(dial, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_all(dial, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(dial, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-        // Minor ticks (the 8 in-between marks): short and dim
-        lv_obj_set_style_length(dial, DIAL_TICK_MINOR, LV_PART_ITEMS | LV_STATE_DEFAULT);
-        lv_obj_set_style_line_width(dial, 2, LV_PART_ITEMS | LV_STATE_DEFAULT);
-        lv_obj_set_style_line_color(dial, user_secondary_color, LV_PART_ITEMS | LV_STATE_DEFAULT);
-        lv_obj_set_style_line_opa(dial, LV_OPA_40, LV_PART_ITEMS | LV_STATE_DEFAULT);
+    // Minor ticks (the 8 in-between marks): short and dim
+    lv_obj_set_style_length(dial, DIAL_TICK_MINOR, LV_PART_ITEMS | LV_STATE_DEFAULT);
+    lv_obj_set_style_line_width(dial, 2, LV_PART_ITEMS | LV_STATE_DEFAULT);
+    lv_obj_set_style_line_color(dial, user_secondary_color, LV_PART_ITEMS | LV_STATE_DEFAULT);
+    lv_obj_set_style_line_opa(dial, LV_OPA_40, LV_PART_ITEMS | LV_STATE_DEFAULT);
 
-        // Cardinal ticks (the 4 quarter marks): longer and bold
-        lv_obj_set_style_length(dial, DIAL_TICK_MAJOR, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-        lv_obj_set_style_line_width(dial, 2, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-        lv_obj_set_style_line_color(dial, user_secondary_color, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-        lv_obj_set_style_line_opa(dial, LV_OPA_COVER, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+    // Cardinal ticks (the 4 quarter marks): longer and bold
+    lv_obj_set_style_length(dial, DIAL_TICK_MAJOR, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+    lv_obj_set_style_line_width(dial, 2, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+    lv_obj_set_style_line_color(dial, user_secondary_color, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+    lv_obj_set_style_line_opa(dial, LV_OPA_COVER, LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
-        // North pip: a small "N" just inside the rim that points at magnetic north
-        if (out_npip) {
-            lv_obj_t *npip = lv_label_create(level_bg);
-            lv_label_set_text(npip, "N");
-            lv_obj_set_style_text_font(npip, &lv_font_montserrat_14, 0);
-            lv_obj_set_style_text_color(npip, user_secondary_color, 0);
-            lv_obj_remove_flag(npip, LV_OBJ_FLAG_SCROLLABLE);
-            lv_obj_add_flag(npip, LV_OBJ_FLAG_HIDDEN);
-            *out_npip = npip;
-        }
+    // North pip: a small "N" just inside the rim that points at magnetic north
+    if (out_npip) {
+        lv_obj_t *npip = lv_label_create(level_bg);
+        lv_label_set_text(npip, "N");
+        lv_obj_set_style_text_font(npip, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(npip, user_secondary_color, 0);
+        lv_obj_remove_flag(npip, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_add_flag(npip, LV_OBJ_FLAG_HIDDEN);
+        *out_npip = npip;
     }
 
     *out_ball = ball;
@@ -341,9 +327,10 @@ static void accel_build_bubble(ui_menu_t *ui_menu, lv_obj_t *cont, bool use_arro
     *out_val_lbl = val_lbl;
 }
 
-// Update the X/Y readout from a reading and ease the indicator toward the tilt
+// Update the X/Y/Z readout from a reading and ease the indicator toward the tilt
 // indicator_d is the indicator's diameter in px; travel is clamped to it so a larger indicator still stays inside the circle.
-static void accel_apply_reading(const accel_deg_t *a, lv_obj_t *ball, float indicator_d, lv_obj_t *val_lbl, float *out_x, float *out_y)
+// heading is the last compass Z, drawn so an accel-only frame never drops the readout to two lines (mag block rewrites Z when fresh)
+static void accel_apply_reading(const accel_deg_t *a, lv_obj_t *ball, float indicator_d, lv_obj_t *val_lbl, float heading, float *out_x, float *out_y)
 {
     const float max_travel = (LEVEL_D / 2.0f) - (indicator_d / 2.0f) - 2.0f;
 
@@ -394,9 +381,11 @@ static void accel_apply_reading(const accel_deg_t *a, lv_obj_t *ball, float indi
     accel_ball_ease(ball, (lv_anim_exec_xcb_t)lv_obj_set_x, lv_obj_get_style_x(ball, LV_PART_MAIN), (int32_t)dx);
     accel_ball_ease(ball, (lv_anim_exec_xcb_t)lv_obj_set_y, lv_obj_get_style_y(ball, LV_PART_MAIN), (int32_t)dy);
 
-    // X and Y readout: \xC2\xB0 is the degree symbol in UTF-8
-    char buf[48];
-    snprintf(buf, sizeof(buf), "X: %+.0f\xC2\xB0\n" "Y: %+.0f\xC2\xB0", (double)read_x, (double)read_y);
+    // X/Y/Z readout: \xC2\xB0 is the degree symbol in UTF-8. Always three lines so the Z line never
+    // blinks off on a frame that delivered accel but not mag; the mag block overwrites Z when fresh.
+    char buf[64];
+    snprintf(buf, sizeof(buf), "X: %+.0f\xC2\xB0\n" "Y: %+.0f\xC2\xB0\n" "Z: %.0f\xC2\xB0",
+            (double)read_x, (double)read_y, (double)heading);
     lv_label_set_text(val_lbl, buf);
 
     // Hand the displayed values back so the stream can send exactly what's shown
@@ -531,8 +520,8 @@ static void prompt_accel_espnow_qr(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
             // Enter the ESP-NOW device picker in "accel streaming" mode
             espnow_entry_mode = ESPNOW_ENTRY_ACCEL; // Set picker flag
 
-            // Go to page
-            lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+            // Configure the list for eCompass mode now so it shows correctly on the picker's first refresh
+            lcd_espnow_refresh_list_for_mode(espnow_menu);
             ui_menu->page = ESPNOW_PAGE;
             return;
         }
@@ -585,7 +574,7 @@ void lcd_ecompass_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
     static float heading_ref = 0.0f;   // Heading captured at entry ("straight ahead" = up)
     static bool heading_init = false;  // Has heading_ref been captured this visit?
     static float arrow_drawn = -1.0f;  // Last relative angle actually rendered (-1 = none yet)
-    static float disp_x = 0.0f, disp_y = 0.0f; // Latest tilt readout, shown alongside Z = heading
+    static float disp_x = 0.0f, disp_y = 0.0f, disp_z = 0.0f; // Latest tilt + heading, Z carried into accel frames too
 
     if (!init) {
         // Seed the calibration from NVS once per boot and trust a valid stored calibration
@@ -616,7 +605,7 @@ void lcd_ecompass_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
         lv_obj_set_style_pad_all(cont, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
 
         // Bubble view with the rotating arrow + heading-trace rim arc, tick dial and North pip
-        accel_build_bubble(ui_menu, cont, true, &ball, &mode_lbl, &val_lbl, &heading_arc, &heading_npip);
+        accel_build_bubble(ui_menu, cont, &ball, &mode_lbl, &val_lbl, &heading_arc, &heading_npip);
 
         // Drop any stale readings left in the queues from a previous visit
         xQueueReset(xAccelReadingsQueue);
@@ -627,7 +616,7 @@ void lcd_ecompass_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
         heading_ref = 0.0f;
         heading_init = false; // Re-capture the "straight ahead" reference on entry
         arrow_drawn = -1.0f;
-        disp_x = disp_y = 0.0f;
+        disp_x = disp_y = disp_z = 0.0f;
         init = true;
     }
 
@@ -641,8 +630,8 @@ void lcd_ecompass_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
     // Update arrow + text whenever reading received
     accel_deg_t accel;
     if (xQueueReceive(xAccelReadingsQueue, &accel, 0) == pdTRUE) {
-        // Writes the X/Y label and hands back the displayed tilt values for the Z line below
-        accel_apply_reading(&accel, ball, ARROW_SIZE, val_lbl, &disp_x, &disp_y);
+        // Draws the X/Y/Z readout (Z = last heading) and hands back the tilt for the mag block below
+        accel_apply_reading(&accel, ball, ARROW_SIZE, val_lbl, disp_z, &disp_x, &disp_y);
     }
 
     // Compass heading from the magnetometer using the stored hard-/soft-iron calibration
@@ -694,8 +683,11 @@ void lcd_ecompass_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
         while (rel < 0.0f) rel += 360.0f;
         while (rel >= 360.0f) rel -= 360.0f;
 
+        // Remember the heading so the next accel frame can redraw Z without a fresh mag sample
+        disp_z = rel;
+
         // Readout: X/Y are the tilt (from the accel), Z is the compass heading (arrow angle)
-        // Overwrites the X/Y-only text accel_apply_reading wrote above
+        // Refreshes Z with the fresh heading (accel_apply_reading already drew X/Y + last Z)
         char buf[64];
         snprintf(buf, sizeof(buf), "X: %+.0f\xC2\xB0\n" "Y: %+.0f\xC2\xB0\n" "Z: %.0f\xC2\xB0",
                 (double)disp_x, (double)disp_y, (double)rel);
@@ -762,8 +754,8 @@ void lcd_ecompass_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
 
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Hide right
 
-        // Back to ESP-NOW menu
-        lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        // Back to ESP-NOW menu - restore the correct list rows before the first refresh
+        lcd_espnow_refresh_list_for_mode(espnow_menu);
         ui_menu->page = ESPNOW_PAGE;
     } else if (ui_btns->right_btn) { // Use accel with ESP-NOW
         lv_anim_delete(ball, NULL); // Stop arrow anims before freeing the object
@@ -984,7 +976,7 @@ void lcd_ecompass_calibration_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
 
         // No calibration yet (e.g. first-boot forced cal) -> ESP-NOW menu, not a dead compass
         } else {
-            lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+            lcd_espnow_refresh_list_for_mode(espnow_menu); // Restore list rows before first refresh
             ui_menu->page = ESPNOW_PAGE;
         }
     } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
@@ -1012,9 +1004,24 @@ void lcd_ecompass_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_men
     static lv_obj_t *ball = NULL;
     static lv_obj_t *mode_lbl = NULL;
     static lv_obj_t *val_lbl = NULL;
+    static lv_obj_t *heading_arc = NULL;  // Rim arc tracing how far the heading has turned from 0
+    static lv_obj_t *heading_npip = NULL; // "N" pip that drifts around the rim toward magnetic north
     static TickType_t last_refresh = 0;
+    static float arrow_heading = 0.0f; // Smoothed absolute heading
+    static float heading_ref = 0.0f;   // Heading captured at entry ("straight ahead" = up)
+    static bool heading_init = false;  // Has heading_ref been captured this visit?
+    static float arrow_drawn = -1.0f;  // Last relative angle actually rendered (-1 = none yet)
+    static float disp_x = 0.0f, disp_y = 0.0f, disp_z = 0.0f; // Latest tilt + heading, streamed each frame
 
     if (!init) {
+        // Seed the calibration from NVS once per boot (redundant)
+        if (!ecompass_loaded) {
+            ecompass_loaded = true;
+            if (ecompass_nvs_load(&mag_cal_x_min, &mag_cal_x_max, &mag_cal_y_min, &mag_cal_y_max)) {
+                cal_complete = true;
+            }
+        }
+
         int idx = espnow_menu->index;
 
         // Encryption is on for this peer if it has a non-zero LMK stored
@@ -1022,7 +1029,7 @@ void lcd_ecompass_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_men
         bool enc = memcmp(espnow_menu->lmk[idx], zero_lmk, LMK_LEN) != 0;
 
         // Ask the ESP-NOW task to open a streaming session to this peer
-        espnow_accel_ctrl_t ctrl = {
+        espnow_ecompass_ctrl_t ctrl = {
             .start = true,
             .enc = enc
         };
@@ -1030,11 +1037,6 @@ void lcd_ecompass_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_men
         if (enc) {
             memcpy(ctrl.lmk, espnow_menu->lmk[idx], LMK_LEN);
         }
-
-        lv_timer_handler(); // Let the UI update before starting the session
-
-        // Bring the radio + peer up
-        xQueueSend(xEspAccelStreamCtrlQueue, &ctrl, portMAX_DELAY);
 
         // Up/down change the view mode, left goes back; no right action here
         lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
@@ -1052,34 +1054,130 @@ void lcd_ecompass_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_men
         lv_obj_remove_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_set_style_pad_all(cont, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-        // Same bubble view as the accel page, but with the classic ball (no compass overlays)
-        accel_build_bubble(ui_menu, cont, false, &ball, &mode_lbl, &val_lbl, NULL, NULL);
+        // Same compass view as the ecompass page: rotating arrow + heading-trace rim arc, tick dial and North pip
+        accel_build_bubble(ui_menu, cont, &ball, &mode_lbl, &val_lbl, &heading_arc, &heading_npip);
 
-        // Drop any stale reading from a previous visit
+        // Drop any stale readings left in the queues from a previous visit
         xQueueReset(xAccelReadingsQueue);
+        xQueueReset(xMagReadingsQueue);
 
         last_refresh = 0; // Force an immediate trigger on the first frame
+        arrow_heading = 0.0f;
+        heading_ref = 0.0f;
+        heading_init = false; // Re-capture the "straight ahead" reference on entry
+        arrow_drawn = -1.0f;
+        disp_x = disp_y = disp_z = 0.0f;
+
+        // Paint the freshly-built stream UI before the radio bring-up
+        lv_timer_handler();
+        xQueueSend(xEspEcompassStreamCtrlQueue, &ctrl, portMAX_DELAY); // Bring the radio + peer up
+
         init = true;
     }
 
-    // Periodically request a fresh accel sample from gpio_task
+    // Periodically ask gpio_task for a fresh accel (tilt) + mag (heading) sample
     if (xTaskGetTickCount() - last_refresh >= pdMS_TO_TICKS(STREAM_REFRESH_MS)) {
         last_refresh = xTaskGetTickCount();
-        xSemaphoreGive(xReadAccelSemaphore);
+        xSemaphoreGive(xReadAccelSemaphore); // Req accel
+        xSemaphoreGive(xReadMagSemaphore); // Req mag
     }
 
-    // Move the ball + update text, and forward each new sample to the ESP-NOW task
+    // Move the arrow tilt + update the X/Y text
+    bool fresh_sample = false;
     accel_deg_t accel;
     if (xQueueReceive(xAccelReadingsQueue, &accel, 0) == pdTRUE) {
-        float disp_x, disp_y;
-        accel_apply_reading(&accel, ball, BALL_D, val_lbl, &disp_x, &disp_y);
+        // Draws the X/Y/Z readout (Z = last heading) and hands back the tilt for the mag block below
+        accel_apply_reading(&accel, ball, ARROW_SIZE, val_lbl, disp_z, &disp_x, &disp_y);
+        fresh_sample = true;
+    }
 
-        // Stream exactly what the LCD shows (mode-aware, recentred X/Y)
-        espnow_accel_t sample = {
+    // Compass heading from the magnetometer using the stored hard-/soft-iron calibration
+    mmc5603_reading_t mag;
+    if (ball && xQueueReceive(xMagReadingsQueue, &mag, 0) == pdTRUE) {
+        // Recover the calibration shape
+        float x_half = (mag_cal_x_max - mag_cal_x_min) * 0.5f; // X radius from the stored calibration
+        float y_half = (mag_cal_y_max - mag_cal_y_min) * 0.5f; // Y radius
+
+        if (x_half > 0.0f && y_half > 0.0f) { // Always true once calibrated; guards a bad blob
+            // Hard-iron: subtract the centre. Soft-iron: normalise each axis to its half-span.
+            float cx = (mag.x - ecompass_center_x()) / x_half;
+            float cy = (mag.y - ecompass_center_y()) / y_half;
+
+            // atan2 of the centred unit circle -> heading in degrees, +y convention
+            // rad -> deg; the driver already corrects the 180deg mount, so this is a true bearing
+            float raw_heading = atan2f(cy, cx) / DEG2RAD;
+            if (raw_heading < 0.0f) raw_heading += 360.0f;
+
+            if (!heading_init) {
+                // First sample this visit: take it as "straight ahead" so the arrow starts up
+                arrow_heading = raw_heading;
+                heading_ref = raw_heading;
+                heading_init = true;
+            } else {
+                // Low-pass over the shortest angular path (handles the 360->0 wrap)
+                float d = raw_heading - arrow_heading;
+                while (d > 180.0f) d -= 360.0f;
+                while (d < -180.0f) d += 360.0f;
+
+                // Eases a fraction toward it each frame
+                arrow_heading += d * ARROW_SMOOTH;
+                if (arrow_heading < 0.0f) arrow_heading += 360.0f;
+                else if (arrow_heading >= 360.0f) arrow_heading -= 360.0f;
+            }
+        }
+
+        // Show the turn relative to the entry orientation: 0 = straight ahead = arrow up
+        float rel = arrow_heading - heading_ref;
+        while (rel < 0.0f) rel += 360.0f;
+        while (rel >= 360.0f) rel -= 360.0f;
+
+        // Latest heading the stream should carry (Z); the next accel frame sends it
+        disp_z = rel;
+
+        // Readout: X/Y are the tilt (from the accel), Z is the compass heading (arrow angle)
+        // Refreshes Z with the fresh heading (accel_apply_reading already drew X/Y + last Z)
+        char buf[64];
+        snprintf(buf, sizeof(buf), "X: %+.0f\xC2\xB0\n" "Y: %+.0f\xC2\xB0\n" "Z: %.0f\xC2\xB0",
+                (double)disp_x, (double)disp_y, (double)rel);
+        lv_label_set_text(val_lbl, buf);
+
+        // Actually spin the arrow on screen
+        float dd = rel - arrow_drawn;
+        while (dd > 180.0f) dd -= 360.0f;
+        while (dd < -180.0f) dd += 360.0f;
+        if (arrow_drawn < 0.0f || fabsf(dd) >= 1.0f) {
+            lv_image_set_rotation(ball, (int32_t)lroundf(rel * 10.0f) % 3600);
+            arrow_drawn = rel;
+
+            // Grow the rim arc to match: from straight-up (0) clockwise through the turn
+            if (heading_arc) {
+                int32_t rdeg = (int32_t)lroundf(rel);
+                if (rdeg > 359) rdeg = 359;
+                lv_arc_set_angles(heading_arc, ARC_TOP_DEG, ARC_TOP_DEG + rdeg);
+            }
+
+            // Drift the North pip
+            if (heading_npip) {
+                // arrow_heading is kept in [0,360), so 360 - it is the north bearing CW from "up"
+                float north_deg = fmodf(360.0f - arrow_heading, 360.0f);
+                float a = (ARC_TOP_DEG + north_deg) * DEG2RAD; // -> LVGL screen angle (0 = right, +y down)
+                lv_obj_align(heading_npip, LV_ALIGN_CENTER,
+                             (int32_t)lroundf(NORTH_PIP_R * cosf(a)),
+                             (int32_t)lroundf(NORTH_PIP_R * sinf(a)));
+                lv_obj_remove_flag(heading_npip, LV_OBJ_FLAG_HIDDEN); // Reveal once a heading exists
+            }
+        }
+    }
+
+    // Stream exactly what the LCD shows: mode-aware X/Y tilt + the compass heading Z, now that
+    // both disp_x/disp_y and disp_z are settled this frame (sent at the accel cadence)
+    if (fresh_sample) {
+        espnow_ecompass_t sample = {
             .x = disp_x,
-            .y = disp_y
+            .y = disp_y,
+            .z = disp_z
         };
-        xQueueOverwrite(xEspAccelStreamQueue, &sample); // Latest value wins
+        xQueueOverwrite(xEspEcompassStreamQueue, &sample); // Latest value wins
     }
 
     /* User input */
@@ -1089,33 +1187,34 @@ void lcd_ecompass_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_men
     } else if (ui_btns->down_btn == 1) { // Previous view mode (wraps)
         accel_mode = (accel_mode + MODE_COUNT - 1) % MODE_COUNT;
         lv_label_set_text(mode_lbl, accel_mode_name(accel_mode));
-    } else if (ui_btns->left_btn) { // Stop streaming, back to ESP-NOW menu
-        espnow_accel_ctrl_t stop = {
+    } else if (ui_btns->left_btn) { // Stop streaming, back to the main selection menu
+        espnow_ecompass_ctrl_t stop = {
             .start = false
         };
-        xQueueSend(xEspAccelStreamCtrlQueue, &stop, portMAX_DELAY);
+        xQueueSend(xEspEcompassStreamCtrlQueue, &stop, portMAX_DELAY);
 
-        lv_anim_delete(ball, NULL); // Stop ball anims before freeing the object
+        lv_anim_delete(ball, NULL); // Stop arrow anims before freeing the object
         lv_obj_delete(cont);
         cont = NULL;
-        ball = mode_lbl = val_lbl = NULL;
+        ball = mode_lbl = val_lbl = heading_arc = heading_npip = NULL;
         init = false;
 
         espnow_entry_mode = ESPNOW_ENTRY_NORMAL;
 
-        // Go to ESP-NOW menu
-        lv_obj_remove_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-        ui_menu->page = ESPNOW_PAGE;
+        // Keep the ESP-NOW list hidden and jump straight to the main selection menu
+        lv_obj_add_flag(espnow_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        lcd_unhide_selection_widgets(ui_menu);
+        ui_menu->page = SELECTION_PAGE;
     } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
-        espnow_accel_ctrl_t stop = {
+        espnow_ecompass_ctrl_t stop = {
             .start = false
         };
-        xQueueSend(xEspAccelStreamCtrlQueue, &stop, portMAX_DELAY);
+        xQueueSend(xEspEcompassStreamCtrlQueue, &stop, portMAX_DELAY);
 
-        lv_anim_delete(ball, NULL); // Stop ball anims before freeing the object
+        lv_anim_delete(ball, NULL); // Stop arrow anims before freeing the object
         lv_obj_delete(cont);
         cont = NULL;
-        ball = mode_lbl = val_lbl = NULL;
+        ball = mode_lbl = val_lbl = heading_arc = heading_npip = NULL;
         init = false;
 
         espnow_entry_mode = ESPNOW_ENTRY_NORMAL;

@@ -180,6 +180,30 @@ void lcd_espnow_update_menu(espnow_menu_t *menu)
     lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
 }
 
+void lcd_espnow_refresh_list_for_mode(espnow_menu_t *menu)
+{
+    // Entering to select ESP32 to stream accel data to
+    if (espnow_entry_mode == ESPNOW_ENTRY_ACCEL) {
+        // Stream-target picker: title row + saved devices only
+        lv_label_set_text(lv_obj_get_child(menu->btns[0], 0), "Select a device:");
+        lv_obj_add_flag(menu->btns[1], LV_OBJ_FLAG_HIDDEN); // "eCompass" is not a stream target
+
+        // Land the highlight on the first real device (or the title if none added yet)
+        menu->index = (menu->size > ESPNOW_BASE_OPTS) ? ESPNOW_BASE_OPTS : 0;
+        lcd_espnow_update_menu(menu); // Reveals the list + highlights the chosen row
+        
+    // Normal ESP32 selection menu (one-shot command sender)
+    } else {
+        // Normal command-sender menu: restore the base rows
+        lv_label_set_text(lv_obj_get_child(menu->btns[0], 0), menu->options[0]);
+        lv_obj_remove_flag(menu->btns[1], LV_OBJ_FLAG_HIDDEN); // Show "eCompass" again
+
+        // Always land the highlight on the "eCompass" row (index 1) for quick access to the stream flow
+        menu->index = 1;
+        lcd_espnow_update_menu(menu); // Reveals the list + highlights eCompass
+    }
+}
+
 static void display_mac_and_lmk(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 {
     if (espnow_menu->size >= MAX_ESPNOW_OPTIONS) {
@@ -195,7 +219,7 @@ static void display_mac_and_lmk(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
     // Get device MAC address
     uint8_t my_mac[6];
     esp_read_mac(my_mac, ESP_MAC_WIFI_STA);
-    char mac_str[30]; // “XX:XX:XX:XX:XX:XX\0” = 18 + "Device MAC:\n" = 30
+    char mac_str[30]; // "XX:XX:XX:XX:XX:XX\0" = 18 + "Device MAC:\n" = 30
     snprintf(mac_str, sizeof(mac_str), "Device MAC:\n%02X:%02X:%02X:%02X:%02X:%02X", my_mac[0], my_mac[1], my_mac[2], my_mac[3], my_mac[4], my_mac[5]);
     
     // Generate ESP-NOW LMK

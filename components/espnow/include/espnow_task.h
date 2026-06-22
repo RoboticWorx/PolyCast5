@@ -21,8 +21,8 @@ extern QueueHandle_t xEspSendCmdQueue;
 extern QueueHandle_t xEspSendMqttQueue;
 
 // Accelerometer streaming
-extern QueueHandle_t xEspAccelStreamCtrlQueue;
-extern QueueHandle_t xEspAccelStreamQueue;
+extern QueueHandle_t xEspEcompassStreamCtrlQueue;
+extern QueueHandle_t xEspEcompassStreamQueue;
 
 /**
  * @brief Create the ESP-NOW task

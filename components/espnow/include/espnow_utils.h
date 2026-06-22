@@ -17,11 +17,13 @@ typedef struct {
     uint8_t lmk[LMK_LEN]; // Local master key (if enc)
 } espnow_cmd_t;
 
-// Live accelerometer sample streamed to a peer (the mode-aware X/Y shown on the LCD)
+// Live ecompass sample streamed to a peer:
+// mode-aware X/Y tilt plus Z = compass heading in degrees (0 = entry orientation)
 typedef struct {
-    float x;
-    float y;
-} espnow_accel_t;
+    float x; // Roll
+    float y; // Pitch
+    float z; // Yaw (heading)
+} espnow_ecompass_t;
 
 // Start/stop control for an accelerometer streaming session
 typedef struct {
@@ -29,7 +31,7 @@ typedef struct {
     uint8_t mac_selected[ESPNOW_MAC_SIZE];
     bool enc; // If encryption is enabled for this peer
     uint8_t lmk[LMK_LEN]; // Local master key (if enc)
-} espnow_accel_ctrl_t;
+} espnow_ecompass_ctrl_t;
 
 typedef struct {
     uint8_t key[16];

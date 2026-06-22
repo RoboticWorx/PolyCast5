@@ -100,6 +100,7 @@ esp_err_t espnow_utils_espnow_init(const uint8_t *mac, uint8_t channel, bool enc
     err = esp_now_register_send_cb(send_cb);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "register_send_cb failed: %s", esp_err_to_name(err));
+        esp_now_deinit();
         return err;
     }
 
@@ -120,6 +121,7 @@ esp_err_t espnow_utils_espnow_init(const uint8_t *mac, uint8_t channel, bool enc
     err = esp_now_add_peer(&peer);
     if (err != ESP_OK && err != ESP_ERR_ESPNOW_EXIST) {
         ESP_LOGE(TAG, "add_peer failed: %s", esp_err_to_name(err));
+        esp_now_deinit();
         return err;
     }
 
