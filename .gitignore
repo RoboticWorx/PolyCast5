@@ -1,5 +1,6 @@
 build/
 managed_components/
+__pycache__/
 dependencies.lock
 sdkconfig
 

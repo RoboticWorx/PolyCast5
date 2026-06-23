@@ -1,6 +1,6 @@
 <p align="center">
   <img
-    src="https://github.com/user-attachments/assets/745ff4fc-c3f0-4f40-b177-9631ba14db68"
+    src="https://raw.githubusercontent.com/RoboticWorx/PolyCast5/main/scripts/dev/pc5_wordmark.png"
     alt="PolyCast5"
     width="66%"
   />
@@ -78,10 +78,12 @@ git clone https://github.com/RoboticWorx/PolyCast5.git
 Flash the full code (builds automatically):
 
 ```shell
-idf.py -p YOUR_PORT encrypted-flash
+python flash.py
 ```
 
-_You must use `encrypted-flash` since development mode flash encryption is enabled by default for passive protection. For full protection, see [polycast5.com/blogs/docs/lock-it-down](https://polycast5.com/blogs/docs/lock-it-down)._
+Runs the PolyCast5 Python flashing script. Must be ran in an ESP-IDF terminal.
+
+_Note: Development mode flash encryption is enabled by default for passive protection. For full protection, see [polycast5.com/blogs/docs/lock-it-down](https://polycast5.com/blogs/docs/lock-it-down)._
 
 ## Build
 
