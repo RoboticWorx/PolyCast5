@@ -14,6 +14,7 @@
 #include "lora_task.h"
 #include "lora_pcp.h"
 #include "lora_radio.h"
+#include "lora_meshtastic.h"
 
 #define MAX_RETRIES 2
 
@@ -92,6 +93,13 @@ static void lora_task(void *pvParameters)
         .invert_iq_is_on = false,
     };
 
+    // Mode-dependent PHY: PCP defaults above, or Meshtastic LongFast below
+    uint32_t rf_freq = 915000000;  // PCP frequency
+    uint8_t lora_sync_word = 0x62; // PCP sync word
+    if (g_meshtastic_mode) {
+        lora_meshtastic_get_radio_params(&lora_mod_params, &lora_pkt_params, &rf_freq, &lora_sync_word);
+    }
+
     // Define the PA configuration parameters
     sx126x_pa_cfg_params_t pa_config = {
         .pa_duty_cycle = 0x04, // Duty cycle setting
@@ -119,14 +127,27 @@ static void lora_task(void *pvParameters)
         ESP_LOGE(TAG, "Failed to set dio2 as rf switch");
     }
 
-    status = sx126x_cal(NULL, SX126X_CAL_ALL);
+#ifdef POLYCAST5_LORA_TCXO_VOLTAGE
+    // Board feeds the radio's TCXO from DIO3: power it BEFORE calibration (the cal
+    // needs a stable reference). Required for SF11/Meshtastic LongFast frequency
+    // accuracy. timeout is in 15.625us RTC steps: 5ms / 15.625us = 320.
+    // WARNING: do NOT define POLYCAST5_LORA_TCXO_VOLTAGE on a bare-crystal board
+    // (current PolyCast5 hardware) — it can hang the radio in XOSC_START_ERR.
+    status = sx126x_set_dio3_as_tcxo_ctrl(NULL, POLYCAST5_LORA_TCXO_VOLTAGE, 320);
     if (status != SX126X_STATUS_OK) {
-        ESP_LOGE(TAG, "Failed to calibrate");
+        ESP_LOGE(TAG, "Failed to set DIO3 as TCXO ctrl");
     }
+#endif
 
+    // Calibration must run in STDBY_RC (and, on a TCXO board, after the TCXO is up).
     status = sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
     if (status != SX126X_STATUS_OK) {
         ESP_LOGE(TAG, "Failed to set standby");
+    }
+
+    status = sx126x_cal(NULL, SX126X_CAL_ALL);
+    if (status != SX126X_STATUS_OK) {
+        ESP_LOGE(TAG, "Failed to calibrate");
     }
 
     status = sx126x_set_pkt_type(NULL, SX126X_PKT_TYPE_LORA);
@@ -134,9 +155,16 @@ static void lora_task(void *pvParameters)
         ESP_LOGE(TAG, "Failed to set packet type");
     }
 
-    status = sx126x_set_rf_freq(NULL, 915000000);
+    status = sx126x_set_rf_freq(NULL, rf_freq);
     if (status != SX126X_STATUS_OK) {
         ESP_LOGE(TAG, "Failed to set frequency");
+    }
+
+    // Image-calibrate for the operating band AFTER the frequency is set. 902-928
+    // covers both Meshtastic (906.875 MHz) and PCP (915 MHz), so one cal serves both.
+    status = sx126x_cal_img_in_mhz(NULL, 902, 928);
+    if (status != SX126X_STATUS_OK) {
+        ESP_LOGE(TAG, "Failed to calibrate image");
     }
 
     status = sx126x_set_pa_cfg(NULL, &pa_config);
@@ -168,7 +196,7 @@ static void lora_task(void *pvParameters)
         ESP_LOGE(TAG, "Failed to set LoRa packet parameters");
     }
 
-    status = sx126x_set_lora_sync_word(NULL, 0x62);
+    status = sx126x_set_lora_sync_word(NULL, lora_sync_word);
     if (status != SX126X_STATUS_OK) {
         ESP_LOGE(TAG, "Failed to set LoRa sync word");
     }
@@ -195,6 +223,11 @@ static void lora_task(void *pvParameters)
     };
     gpio_config(&io_conf);
     gpio_isr_handler_add(SX126X_DIO1_PIN, dio1_isr_handler, NULL);
+
+    // Meshtastic mode runs its own loop (continuous RX + text/NodeInfo TX) and never returns if true
+    if (g_meshtastic_mode) {
+        lora_meshtastic_run();
+    }
 
     lora_pcp_load_msg_id_nvs(); // Load persisted msg_id counter
     lora_pcp_cmd_msg_t cmd_msg = {0}; // Hold binary command to send
@@ -274,6 +307,12 @@ static void lora_event_handler_task(void *pvParameters)
             // Check IRQ flags
             uint16_t irq_flags = 0;
             sx126x_get_irq_status(NULL, &irq_flags);
+
+            // Meshtastic mode handles its own RX/TX IRQs (continuous listen)
+            if (g_meshtastic_mode) {
+                lora_meshtastic_handle_irq(irq_flags);
+                continue;
+            }
 
             // If transmission complete
             if (irq_flags & SX126X_IRQ_TX_DONE) {

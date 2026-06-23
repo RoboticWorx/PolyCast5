@@ -41,6 +41,12 @@
 // #define POLYCAST5_EN_PYRAMID_ANIM 1 // Enables pyramid-alien homescreen animation (56 frames)
 
 // Settings/testing
+#define POLYCAST5_MESHTASTIC_MODE 1 // 1 = LoRa joins the Meshtastic mesh on LongFast (phase 1: terminal only); 0 = normal PolyCast PCP LoRa
+// SX1262 reference clock. Leave UNDEFINED for a bare-crystal board (current hardware).
+// Define to a TCXO control-voltage enum (e.g. SX126X_TCXO_CTRL_1_8V) ONLY on a board that
+// feeds the radio's TCXO from DIO3 — required for SF11/Meshtastic LongFast frequency accuracy.
+// Enabling this on a crystal board can hang the radio in XOSC_START_ERR.
+//#define POLYCAST5_LORA_TCXO_VOLTAGE SX126X_TCXO_CTRL_1_8V
 //#define POLYCAST5_PERSIST_SELECTION_INDEX 1 // Persist selected menu option across NVS and home
 //#define POLYCAST5_PASS_DEBUG 1 // Show password logs for debugging
 //#define POLYCAST5_CYCLE_RGB_ON_BOOT 1 // Cycle through the RGB LED to make sure it is working
