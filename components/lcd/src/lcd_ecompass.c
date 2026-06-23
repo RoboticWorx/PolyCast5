@@ -24,7 +24,7 @@
 
 #define ARROW_SIZE 34      // Square ARGB image holding the arrow (px)
 #define ARROW_FILL_SCALE 0.74f // Inner fill inset, leaving a white border rim
-#define ARROW_SMOOTH 0.5f // Heading low-pass factor (0..1, higher = snappier / less lag)
+#define ARROW_SMOOTH 0.95f // Heading low-pass factor (0..1, higher = snappier / less lag)
 
 #define HEADING_ARC_W   3  // Heading-trace ring thickness over the bubble rim (px)
 #define HEADING_ARC_EXT 2  // How far the ring's outer edge sits beyond the circle rim (px)
