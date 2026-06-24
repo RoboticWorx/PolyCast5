@@ -119,14 +119,14 @@ static void lora_task(void *pvParameters)
         ESP_LOGE(TAG, "Failed to set dio2 as rf switch");
     }
 
-    status = sx126x_cal(NULL, SX126X_CAL_ALL);
-    if (status != SX126X_STATUS_OK) {
-        ESP_LOGE(TAG, "Failed to calibrate");
-    }
-
     status = sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
     if (status != SX126X_STATUS_OK) {
         ESP_LOGE(TAG, "Failed to set standby");
+    }
+
+    status = sx126x_cal(NULL, SX126X_CAL_ALL);
+    if (status != SX126X_STATUS_OK) {
+        ESP_LOGE(TAG, "Failed to calibrate");
     }
 
     status = sx126x_set_pkt_type(NULL, SX126X_PKT_TYPE_LORA);
@@ -137,6 +137,11 @@ static void lora_task(void *pvParameters)
     status = sx126x_set_rf_freq(NULL, 915000000);
     if (status != SX126X_STATUS_OK) {
         ESP_LOGE(TAG, "Failed to set frequency");
+    }
+
+    status = sx126x_cal_img_in_mhz(NULL, 902, 928);
+    if (status != SX126X_STATUS_OK) {
+        ESP_LOGE(TAG, "Failed to calibrate image");
     }
 
     status = sx126x_set_pa_cfg(NULL, &pa_config);
