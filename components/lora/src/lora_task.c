@@ -155,6 +155,11 @@ static void lora_task(void *pvParameters)
         ESP_LOGE(TAG, "Failed to set TX params");
     }
 
+    status = sx126x_cfg_tx_clamp(NULL); // SX1262 §15.2 PA-clamp init workaround
+    if (status != SX126X_STATUS_OK) {
+        ESP_LOGE(TAG, "Failed to configure TX clamp");
+    }
+
     // sx126x_set_rx_tx_fallback_mode // Default is RC standby
 
     /*status = sx126x_cfg_rx_boosted(
