@@ -645,6 +645,7 @@ lv_obj_t *lcd_anim_animate_label_x(lv_obj_t *old_lbl, const char *new_text, cons
     lv_label_set_text(new_lbl, new_text);
     lv_obj_set_style_text_font(new_lbl, cur_font, 0);
     lv_obj_set_style_text_color(new_lbl, user_secondary_color, 0);
+    lv_obj_set_style_text_align(new_lbl, lv_obj_get_style_text_align(old_lbl, LV_PART_MAIN), 0);
     lv_obj_update_layout(new_lbl);
 
     lv_coord_t new_w = lv_obj_get_width(new_lbl);
@@ -727,6 +728,7 @@ lv_obj_t *lcd_anim_animate_label_y(lv_obj_t *old_lbl, const char *new_text, cons
     lv_label_set_text(new_lbl, new_text);
     lv_obj_set_style_text_font(new_lbl, cur_font, 0);
     lv_obj_set_style_text_color(new_lbl, user_secondary_color, 0);
+    lv_obj_set_style_text_align(new_lbl, lv_obj_get_style_text_align(old_lbl, LV_PART_MAIN), 0);
     lv_obj_update_layout(new_lbl);
 
     lv_coord_t new_w = lv_obj_get_width(new_lbl);

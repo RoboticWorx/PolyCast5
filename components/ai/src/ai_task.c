@@ -367,6 +367,19 @@ static void ai_task(void *pvParameters)
             }
         } else {
             ESP_LOGE(TAG, "AI request failed: %s", esp_err_to_name(err));
+
+            // Explicitly release the AI keyboard from its "thinking" state, or the UI hangs forever
+            // STT failures above already raised a bit, so check none raised before
+            if (!(xEventGroupGetBits(xAiEventGroup) &
+                    (AI_RATE_LIMITED_BIT | AI_THINKING_FAILED_BIT | AI_DONE_THINKING_BIT))) {
+                if (err == ESP_ERR_NOT_FOUND &&
+                        (cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD || cmd.type == AI_CMD_CUSTOM)) {
+                    // No saved entry matched the query (Grok replies "-1")
+                    xEventGroupSetBits(xAiEventGroup, AI_NO_MATCH_BIT); // Show no match
+                } else {
+                    xEventGroupSetBits(xAiEventGroup, AI_THINKING_FAILED_BIT); // Generic failure
+                }
+            }
         }
 
         if (cmd.free_on_done && cmd.free_ptr) {

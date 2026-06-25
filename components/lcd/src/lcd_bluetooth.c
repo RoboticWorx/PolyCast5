@@ -1402,9 +1402,12 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
             lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
         }
 
+        lv_timer_handler(); // Update
+
         // Clear any previous states
         xEventGroupClearBits(xAiEventGroup, AI_DONE_THINKING_BIT);
         xEventGroupClearBits(xAiEventGroup, AI_THINKING_FAILED_BIT);
+        xEventGroupClearBits(xAiEventGroup, AI_NO_MATCH_BIT);
         xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT);
         xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_CANCEL_TYPING_BIT);
         xQueueReset(xAiSoundHeardSemaphore);
@@ -1417,6 +1420,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         LCD_LOADING_ANIM_START_DEFAULT();
         
         lbl_ins = lv_label_create(ACTIVE_SCR);
+        lv_obj_set_style_text_align(lbl_ins, LV_TEXT_ALIGN_CENTER, 0); // Centered text style
         lcd_format_label(lbl_ins, AI_KEYB_WIFI_CONNECTING_TXT, user_secondary_color,
                 &lv_font_montserrat_16, LV_ALIGN_CENTER, -10, 0);
 
@@ -1566,7 +1570,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         lv_obj_remove_flag(lbl_ins, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
         lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
-        lv_label_set_text(lbl_ins, "Out of API credits!\nCheck your usage:\n       console.x.ai");
+        lv_label_set_text(lbl_ins, "Out of API credits!\nCheck your usage:\nconsole.x.ai");
         lv_obj_remove_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
         xEventGroupClearBits(xAiEventGroup, AI_RATE_LIMITED_BIT);
@@ -1581,7 +1585,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
 
         // Show error
-        lv_label_set_text(lbl_ins, " Thinking failed!\nPlease try again.");
+        lv_label_set_text(lbl_ins, "Thinking failed!\nPlease try again.");
 
         // Show reasoning
         lv_obj_remove_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
@@ -1589,6 +1593,27 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 
         // Clear bit
         xEventGroupClearBits(xAiEventGroup, AI_THINKING_FAILED_BIT);
+
+        // Reset state
+        state = AI_KEYB_IDLE;
+    // If no saved entry matched the request
+    } else if (xEventGroupGetBits(xAiEventGroup) & AI_NO_MATCH_BIT) {
+        // Show instructions label
+        lv_obj_remove_flag(lbl_ins, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
+
+        // Hide orb
+        lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
+
+        // Show no-match message
+        lv_label_set_text(lbl_ins, "No matches found!\nTry different wording.");
+
+        // Show reasoning
+        lv_obj_remove_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+        // Clear bit
+        xEventGroupClearBits(xAiEventGroup, AI_NO_MATCH_BIT);
 
         // Reset state
         state = AI_KEYB_IDLE;
