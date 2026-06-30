@@ -285,12 +285,22 @@ static void lora_event_handler_task(void *pvParameters)
             uint16_t irq_flags = 0;
             sx126x_get_irq_status(NULL, &irq_flags);
 
+            // Meshtastic / continuous-RX guard: uncomment to re-enable. MUST stay above the
+            // clear-all below, or that blanket clear will (1) wipe flags this mode's handler
+            // still needs and (2) drop a fresh packet's flag that latches in the get->clear window.
+            // if (g_meshtastic_mode) {
+            //     lora_meshtastic_handle_irq(irq_flags);
+            //     continue;
+            // }
+
+            // Clear all latched flags up front; keeps a co-latched flag from being left set
+            sx126x_clear_irq_status(NULL, SX126X_IRQ_ALL);
+
             // If transmission complete
             if (irq_flags & SX126X_IRQ_TX_DONE) {
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Transmission completed");
 #endif
-                sx126x_clear_irq_status(NULL, SX126X_IRQ_TX_DONE);
                 lora_radio_set_rx_mode(); // Listen for receipt from receiver
             } else if (irq_flags & SX126X_IRQ_RX_DONE) { // Else if receive complete
                 // Read the received packet
@@ -311,7 +321,6 @@ static void lora_event_handler_task(void *pvParameters)
 #ifdef POLYCAST5_DEBUG
                     ESP_LOGW(TAG, "Invalid RX size %d, discarding", rx_size);
 #endif
-                    sx126x_clear_irq_status(NULL, SX126X_IRQ_ALL); // Also clear co-latched CRC/HEADER flags
                     sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
 
                     if (retry_count < MAX_RETRIES) {
@@ -332,8 +341,6 @@ static void lora_event_handler_task(void *pvParameters)
                 // Process received
                 lora_pcp_process_received_message(rx_buffer, rx_size);
 
-                // Clear IRQ
-                sx126x_clear_irq_status(NULL, SX126X_IRQ_RX_DONE);
                 sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
 
                 // If ACK wasn't accepted, treat like a failed receive
@@ -345,74 +352,56 @@ static void lora_event_handler_task(void *pvParameters)
                         waiting_for_ack = false; // Give up; a queued next command dispatches normally
                     }
                 }
-            }
-
-            if (irq_flags & SX126X_IRQ_TIMEOUT) {
+            } else if (irq_flags & SX126X_IRQ_TIMEOUT) {
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGW(TAG, "RX timeout occurred");
 #endif
-                sx126x_clear_irq_status(NULL, SX126X_IRQ_TIMEOUT);
                 sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
 
                 // Never got receipt, need to try again with same everything
-                // (unless RX_DONE co-latched - then the RX_DONE handler already spent this event's retry)
-                if (!(irq_flags & SX126X_IRQ_RX_DONE)) {
-                    if (retry_count < MAX_RETRIES) { // Cap at MAX_RETRIES
-                        need_to_retry = true;
-                        retry_count++;
-                    } else {
-                        waiting_for_ack = false; // Give up; a queued next command dispatches normally
+                if (retry_count < MAX_RETRIES) { // Cap at MAX_RETRIES
+                    need_to_retry = true;
+                    retry_count++;
+                } else {
+                    waiting_for_ack = false; // Give up; a queued next command dispatches normally
 
 #ifdef POLYCAST5_DEBUG
-                        ESP_LOGW(TAG, "Hit max LoRa retries");
+                    ESP_LOGW(TAG, "Hit max LoRa retries");
 #endif
-                    }
                 }
-            }
-
-            if (irq_flags & SX126X_IRQ_HEADER_ERROR) {
+            } else if (irq_flags & SX126X_IRQ_HEADER_ERROR) {
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGE(TAG, "Header error in received packet");
 #endif
-                sx126x_clear_irq_status(NULL, SX126X_IRQ_HEADER_ERROR);
                 sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
 
                 // Never got receipt, need to try again with same everything
-                // (unless RX_DONE co-latched - then the RX_DONE handler already spent this event's retry)
-                if (!(irq_flags & SX126X_IRQ_RX_DONE)) {
-                    if (retry_count < MAX_RETRIES) { // Cap at MAX_RETRIES
-                        need_to_retry = true;
-                        retry_count++;
-                    } else {
-                        waiting_for_ack = false; // Give up; a queued next command dispatches normally
+                if (retry_count < MAX_RETRIES) { // Cap at MAX_RETRIES
+                    need_to_retry = true;
+                    retry_count++;
+                } else {
+                    waiting_for_ack = false; // Give up; a queued next command dispatches normally
 
 #ifdef POLYCAST5_DEBUG
-                        ESP_LOGW(TAG, "Hit max LoRa retries");
+                    ESP_LOGW(TAG, "Hit max LoRa retries");
 #endif
-                    }
                 }
-            }
-
-            if (irq_flags & SX126X_IRQ_CRC_ERROR) {
+            } else if (irq_flags & SX126X_IRQ_CRC_ERROR) {
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGE(TAG, "CRC error in received packet");
 #endif
-                sx126x_clear_irq_status(NULL, SX126X_IRQ_CRC_ERROR);
                 sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
 
                 // Never got receipt, need to try again with same everything
-                // (unless RX_DONE co-latched - then the RX_DONE handler already spent this event's retry)
-                if (!(irq_flags & SX126X_IRQ_RX_DONE)) {
-                    if (retry_count < MAX_RETRIES) { // Cap at MAX_RETRIES
-                        need_to_retry = true;
-                        retry_count++;
-                    } else {
-                        waiting_for_ack = false; // Give up; a queued next command dispatches normally
+                if (retry_count < MAX_RETRIES) { // Cap at MAX_RETRIES
+                    need_to_retry = true;
+                    retry_count++;
+                } else {
+                    waiting_for_ack = false; // Give up; a queued next command dispatches normally
 
 #ifdef POLYCAST5_DEBUG
-                        ESP_LOGW(TAG, "Hit max LoRa retries");
+                    ESP_LOGW(TAG, "Hit max LoRa retries");
 #endif
-                    }
                 }
             }
         }
