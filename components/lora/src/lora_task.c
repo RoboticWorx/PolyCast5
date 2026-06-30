@@ -14,6 +14,7 @@
 #include "lora_task.h"
 #include "lora_pcp.h"
 #include "lora_radio.h"
+#include "lora_meshtastic.h"
 
 #define MAX_RETRIES 2
 
@@ -92,6 +93,13 @@ static void lora_task(void *pvParameters)
         .invert_iq_is_on = false,
     };
 
+    // Mode-dependent PHY: PCP defaults above, or Meshtastic LongFast below
+    uint32_t rf_freq = 915000000;  // PCP frequency
+    uint8_t lora_sync_word = 0x62; // PCP sync word
+    if (g_meshtastic_mode) {
+        lora_meshtastic_get_radio_params(&lora_mod_params, &lora_pkt_params, &rf_freq, &lora_sync_word);
+    }
+
     // Define the PA configuration parameters
     sx126x_pa_cfg_params_t pa_config = {
         .pa_duty_cycle = 0x04, // Duty cycle setting
@@ -134,7 +142,7 @@ static void lora_task(void *pvParameters)
         ESP_LOGE(TAG, "Failed to set packet type");
     }
 
-    status = sx126x_set_rf_freq(NULL, 915000000);
+    status = sx126x_set_rf_freq(NULL, rf_freq);
     if (status != SX126X_STATUS_OK) {
         ESP_LOGE(TAG, "Failed to set frequency");
     }
@@ -178,7 +186,7 @@ static void lora_task(void *pvParameters)
         ESP_LOGE(TAG, "Failed to set LoRa packet parameters");
     }
 
-    status = sx126x_set_lora_sync_word(NULL, 0x62);
+    status = sx126x_set_lora_sync_word(NULL, lora_sync_word);
     if (status != SX126X_STATUS_OK) {
         ESP_LOGE(TAG, "Failed to set LoRa sync word");
     }
@@ -205,6 +213,11 @@ static void lora_task(void *pvParameters)
     };
     gpio_config(&io_conf);
     gpio_isr_handler_add(SX126X_DIO1_PIN, dio1_isr_handler, NULL);
+
+    // Meshtastic mode runs its own loop (continuous RX + text/NodeInfo TX) and never returns if true
+    if (g_meshtastic_mode) {
+        lora_meshtastic_run();
+    }
 
     lora_pcp_load_msg_id_nvs(); // Load persisted msg_id counter
     lora_pcp_cmd_msg_t cmd_msg = {0}; // Hold binary command to send
@@ -285,13 +298,10 @@ static void lora_event_handler_task(void *pvParameters)
             uint16_t irq_flags = 0;
             sx126x_get_irq_status(NULL, &irq_flags);
 
-            // Meshtastic / continuous-RX guard: uncomment to re-enable. MUST stay above the
-            // clear-all below, or that blanket clear will (1) wipe flags this mode's handler
-            // still needs and (2) drop a fresh packet's flag that latches in the get->clear window.
-            // if (g_meshtastic_mode) {
-            //     lora_meshtastic_handle_irq(irq_flags);
-            //     continue;
-            // }
+            if (g_meshtastic_mode) {
+                lora_meshtastic_handle_irq(irq_flags);
+                continue;
+            }
 
             // Clear all latched flags up front; keeps a co-latched flag from being left set
             sx126x_clear_irq_status(NULL, SX126X_IRQ_ALL);
@@ -421,6 +431,19 @@ void lora_task_abort_pending(void)
     if (xLoraSendEncQueue) {
         xQueueReset(xLoraSendEncQueue);
     }
+}
+
+void lora_task_resume_after_sleep(void)
+{
+#if POLYCAST5_MESHTASTIC_MODE
+    // Meshtastic mode must be put back into the continuous RX that
+    // lora_task_abort_pending() tore down before sleep.
+    lora_meshtastic_resume_rx();
+#else
+    // PCP idles the radio in the standby left by lora_task_abort_pending() and
+    // re-enters RX/TX on the next command, so that standby is the correct woken
+    // resting state - nothing to re-arm here.
+#endif
 }
 
 // Function to create the LoRa task

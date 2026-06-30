@@ -227,6 +227,8 @@ void lcd_device_sleep(void)
     xSemaphoreGive(xSPIBusMutex); // Release SPI bus
     xSemaphoreGive(xI2CBusMutex); // Release I2C bus
 
+    lora_task_resume_after_sleep(); // Re-arm LoRa RX (Meshtastic continuous RX) after sleep
+
     lcd_panel_wake(); // Wake up ST7789
     gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_ON); // BL high
     
