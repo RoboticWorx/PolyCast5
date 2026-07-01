@@ -15,6 +15,7 @@
 #include "lora_pcp.h"
 #include "lora_radio.h"
 #include "lora_meshtastic.h"
+#include "lora_meshtastic_portal.h"
 
 #define MAX_RETRIES 2
 
@@ -72,7 +73,10 @@ static void lora_task(void *pvParameters)
         ESP_LOGE(TAG, "Failed to create xLoraSendEncQueue queue");
     }
     configASSERT(xLoraSendEncQueue);
-    
+
+    // Load (or generate) the Meshtastic web portal password
+    lora_meshtastic_portal_pass_init();
+
     // Create the LoRa event handler task
     if (xTaskCreate(lora_event_handler_task, "lora_event_handler", 1024 * 3, NULL, POLYCAST5_PRIORITY_INTERRUPT, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start lora_event_handler_task");

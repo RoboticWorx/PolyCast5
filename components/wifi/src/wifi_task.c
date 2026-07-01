@@ -28,6 +28,7 @@
 #include "ai_key_portal.h"
 #include "bluetooth_portal.h"
 #include "ai_analysis_portal.h"
+#include "lora_meshtastic_portal.h"
 
 #include "wifi_task.h"
 
@@ -511,6 +512,23 @@ static void wifi_task(void *param)
                 err = bluetooth_portal_stop();
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "bluetooth_portal_stop failed: %s", esp_err_to_name(err));
+                }
+            }
+
+            // If Meshtastic web portal bit transitioned 0 -> 1
+            if ((current_portal_bits & WIFI_PORTAL_MESHTASTIC_START_BIT) &&
+                    !(last_portal_bits & WIFI_PORTAL_MESHTASTIC_START_BIT)) {
+                err = lora_meshtastic_portal_start();
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "lora_meshtastic_portal_start failed: %s", esp_err_to_name(err));
+                }
+            }
+            // If Meshtastic web portal bit transitioned 1 -> 0
+            if ((last_portal_bits & WIFI_PORTAL_MESHTASTIC_START_BIT) &&
+                    !(current_portal_bits & WIFI_PORTAL_MESHTASTIC_START_BIT)) {
+                err = lora_meshtastic_portal_stop();
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "lora_meshtastic_portal_stop failed: %s", esp_err_to_name(err));
                 }
             }
 

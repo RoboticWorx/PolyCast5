@@ -115,6 +115,7 @@ static void lcd_task(void *pvParameters)
     
     lcd_lora_menu_nvs_load(&lora_menu);
     lcd_lora_key_nvs_load(&lora_menu);
+    lcd_lora_menu_load_reconcile(&lora_menu); // Drop any user slot left half-loaded (name w/o key or vice versa)
     
     lcd_espnow_menu_nvs_load(&espnow_menu);
     lcd_espnow_lmk_nvs_load(&espnow_menu);
@@ -306,6 +307,10 @@ static void lcd_task(void *pvParameters)
                     break;
                 case LORA_ADD_PAGE:
                     lcd_lora_add_page(&ui_btns, &ui_menu, &lora_menu);
+                    break;
+                case LORA_MESHTASTIC_PAGE:
+                    lcd_lora_meshtastic_page(&ui_btns, &ui_menu, &lora_menu);
+                    dont_sleep_on_this_page = true;
                     break;
                 case LORA_NAME_PAGE:
                     lcd_lora_create_custom_name(&ui_btns, &ui_menu, &lora_menu);

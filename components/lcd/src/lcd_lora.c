@@ -13,6 +13,7 @@
 #include "misc/lv_timer.h"
 #include "portmacro.h"
 #include "widgets/label/lv_label.h"
+#include "widgets/switch/lv_switch.h"
 
 #include "nvs.h"
 #include "esp_log.h"
@@ -20,8 +21,10 @@
 #include "lcd_lora.h"
 #include "lora_task.h"
 #include "lora_pcp.h"
+#include "lora_meshtastic_portal.h"
 #include "gpio_task.h"
 #include "lcd_utils.h"
+#include "wifi_task.h"
 
 #include "espnow_task.h"
 
@@ -47,9 +50,9 @@
 #define LORA_PAIR_FAIL_SHOW_MS 2500 // How long the 'Pairing failed' notice shows
 
 lora_menu_t lora_menu = {
-    .options = {"Add PolyPlug"},
+    .options = {"Add PolyPlug", "Meshtastic: OFF"},
     .keys = {},
-    .size = 1,
+    .size = LORA_NUM_STATIC_OPTS,
     .index = 0,
     .cont = NULL,
 };
@@ -82,6 +85,13 @@ static const char *lora_char_rows[LORA_NUM_CHAR_ROWS] = {
 
 void lcd_lora_setup_page(lora_menu_t *menu)
 {
+    bool meshtastic_enabled = lora_meshtastic_portal_enabled_load_nvs();
+    if (meshtastic_enabled) {
+        menu->options[1] = "Meshtastic: ON";
+    } else {
+        menu->options[1] = "Meshtastic: OFF";
+    }
+
     // Create list
     menu->main_list = lv_list_create(ACTIVE_SCR);
     lv_obj_set_size(menu->main_list, 210, 106);
@@ -136,8 +146,8 @@ void lcd_lora_setup_page(lora_menu_t *menu)
         menu->index = menu->size - 1;
     }
     
-    if (menu->size > 1) {
-        menu->index = 1;
+    if (menu->size > LORA_NUM_STATIC_OPTS) {
+        menu->index = LORA_NUM_STATIC_OPTS; // Land on the first user plug if any exist
     }
     
     // Create button for each option
@@ -406,7 +416,270 @@ void lcd_lora_add_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora
         title_lbl = instr_lbl = NULL;
         init = false;
         
-         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
+}
+
+void lcd_lora_meshtastic_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu)
+{
+    #define MESHTASTIC_ADD_Y_OFFSET 40
+
+    // Statics
+    static bool init = false;
+    static bool meshtastic_enabled = false; // Toggle state (visual only for now); persists across page visits
+    static bool meshtastic_was_loaded = false; // Flag for if meshtastic was loaded
+    static lv_obj_t *cont = NULL;
+    static lv_obj_t *toggle_hint_lbl = NULL;
+    static lv_obj_t *toggle_row = NULL;
+    static lv_obj_t *toggle_sw = NULL;
+    static lv_obj_t *toggle_state_lbl = NULL;
+    static lv_obj_t *intro_lbl = NULL;
+    static lv_obj_t *join_lbl = NULL;
+    static lv_obj_t *wifi_creds_lbl = NULL;
+    static lv_obj_t *middle_lbl = NULL;
+    static lv_obj_t *wifi_ip_lbl = NULL;
+    static lv_obj_t *ending_lbl = NULL;
+
+    if (!init) {
+        // Create a scrollable container for the instructions
+        cont = lv_obj_create(ACTIVE_SCR);
+        lv_obj_set_size(cont, 210, 106);
+        lv_obj_center(cont);
+        lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners for appeal
+        lv_obj_set_style_shadow_width(cont, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_shadow_color(cont, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+        lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+        lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
+
+        // "Press select to toggle" hint (replaces the old title)
+        toggle_hint_lbl = lv_label_create(cont);
+        lv_label_set_text(toggle_hint_lbl, "Press select to toggle.");
+        lv_obj_set_style_text_font(toggle_hint_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(toggle_hint_lbl, user_secondary_color, 0);
+        lv_obj_align(toggle_hint_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+        // Centered row holding the toggle switch and its ON/OFF label
+        toggle_row = lv_obj_create(cont);
+        lv_obj_set_size(toggle_row, 150, 28);
+        lv_obj_set_style_bg_color(toggle_row, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(toggle_row, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_pad_all(toggle_row, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_pad_column(toggle_row, 0, LV_PART_MAIN | LV_STATE_DEFAULT); // No default flex gap; spacing set via switch margin
+        lv_obj_set_scrollbar_mode(toggle_row, LV_SCROLLBAR_MODE_OFF);
+        lv_obj_set_flex_flow(toggle_row, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(toggle_row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_align_to(toggle_row, toggle_hint_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 2);
+
+        // Toggle switch (styled by the default LVGL theme, like the settings toggles)
+        toggle_sw = lv_switch_create(toggle_row);
+        lv_obj_set_size(toggle_sw, 44, 24);
+        lv_obj_set_style_margin_right(toggle_sw, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+        // ON/OFF state label next to the switch
+        toggle_state_lbl = lv_label_create(toggle_row);
+        lv_obj_set_style_text_font(toggle_state_lbl, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_color(toggle_state_lbl, user_secondary_color, 0);
+
+        // Sync the switch and label to the persisted state
+        meshtastic_enabled = lora_meshtastic_portal_enabled_load_nvs();
+        if (meshtastic_enabled) {
+            lv_obj_add_state(toggle_sw, LV_STATE_CHECKED);
+            lv_label_set_text(toggle_state_lbl, "ON");
+            meshtastic_was_loaded = true; // Loaded meshtastic
+        } else {
+            lv_obj_remove_state(toggle_sw, LV_STATE_CHECKED);
+            lv_label_set_text(toggle_state_lbl, "OFF");
+            meshtastic_was_loaded = false;
+        }
+
+        // Intro / explanation label (scrollable if text is long)
+        intro_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(intro_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(intro_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(intro_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(intro_lbl, user_secondary_color, 0);
+        lv_obj_align_to(intro_lbl, toggle_row, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+        if (meshtastic_enabled) {
+            const char *intro_text =
+                "Press the down arrow to scroll.\n\nMeshtastic is an open-source, long-range mesh network that lets devices "
+                "text and share data over LoRa radio, no internet needed.";
+            lv_label_set_text(intro_lbl, intro_text);
+        } else {
+            const char *intro_text =
+                "Enable Meshtastic, press RIGHT, then come back.";
+            lv_label_set_text(intro_lbl, intro_text);
+        }
+
+        // Join instructions label
+        join_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(join_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(join_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(join_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(join_lbl, user_secondary_color, 0);
+        lv_obj_align_to(join_lbl, intro_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+        lv_label_set_text(join_lbl, "To create messages, join the following Wi-Fi network using your phone/PC:");
+
+        // Wi-Fi credentials label
+        wifi_creds_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(wifi_creds_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(wifi_creds_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(wifi_creds_lbl, &lv_font_montserrat_16, 0);
+        lv_obj_set_style_text_color(wifi_creds_lbl, user_secondary_color, 0);
+        lv_obj_align_to(wifi_creds_lbl, join_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+        lv_label_set_text_fmt(wifi_creds_lbl, "%s\nPass: %s",
+                lora_meshtastic_portal_get_ssid(), lora_meshtastic_portal_get_pass());
+
+        // Middle label
+        middle_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(middle_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(middle_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(middle_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(middle_lbl, user_secondary_color, 0);
+        lv_obj_align_to(middle_lbl, wifi_creds_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+        lv_label_set_text(middle_lbl,
+                "Once connected, open your internet browser of choice and search:");
+
+        // IP address label
+        wifi_ip_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(wifi_ip_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(wifi_ip_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(wifi_ip_lbl, &lv_font_montserrat_24, 0);
+        lv_obj_set_style_text_color(wifi_ip_lbl, user_secondary_color, 0);
+        lv_obj_align_to(wifi_ip_lbl, middle_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+        lv_label_set_text_fmt(wifi_ip_lbl, "%s", lora_meshtastic_portal_get_ip());
+
+        // Ending label
+        ending_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(ending_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(ending_lbl, lv_pct(100)); // Full width for wrapping
+        lv_obj_set_style_text_font(ending_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(ending_lbl, user_secondary_color, 0);
+        lv_obj_align_to(ending_lbl, wifi_ip_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+        lv_label_set_text(ending_lbl,
+                "Then follow the on-screen instructions. "
+                "DO NOT exit this page until you're done!");
+
+        // Hide join instructions until Meshtastic is enabled
+        if (!meshtastic_enabled) {
+            lv_obj_add_flag(join_lbl, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(wifi_creds_lbl, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(middle_lbl, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(wifi_ip_lbl, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(ending_lbl, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_timer_handler();
+            // Start SoftAP and web portal
+            xEventGroupSetBits(xWiFiPortalEventGroup, WIFI_PORTAL_MESHTASTIC_START_BIT);
+        }
+
+        lv_timer_handler();
+
+        init = true;
+    }
+
+    if (ui_btns->up_btn == 1) {
+        lv_obj_scroll_by_bounded(cont, 0, MESHTASTIC_ADD_Y_OFFSET, LV_ANIM_ON);
+    } else if (ui_btns->down_btn == 1) {
+        lv_obj_scroll_by_bounded(cont, 0, -MESHTASTIC_ADD_Y_OFFSET, LV_ANIM_ON);
+    } else if (ui_btns->select_btn == 1) { // Toggle Meshtastic on/off (visual only for now)
+        meshtastic_enabled = !meshtastic_enabled;
+        if (meshtastic_enabled) {
+            lv_obj_add_state(toggle_sw, LV_STATE_CHECKED);
+
+            lv_label_set_text(toggle_state_lbl, "ON");
+            if (meshtastic_was_loaded) {
+                lv_label_set_text(toggle_hint_lbl, "Press select to toggle.");
+                lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Hide right arrow
+            } else {
+                lv_label_set_text(toggle_hint_lbl, "PRESS RIGHT to confirm.");
+                lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Show right arrow
+            }
+        } else {
+            lv_obj_remove_state(toggle_sw, LV_STATE_CHECKED);
+
+            lv_label_set_text(toggle_state_lbl, "OFF");
+            if (meshtastic_was_loaded) {
+                lv_label_set_text(toggle_hint_lbl, "PRESS RIGHT to confirm.");
+                lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Show right arrow
+            } else {
+                lv_label_set_text(toggle_hint_lbl, "Press select to toggle.");
+                lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Hide right arrow
+            }
+        }
+    } else if (ui_btns->right_btn && ((meshtastic_enabled && !meshtastic_was_loaded) || 
+            (!meshtastic_enabled && meshtastic_was_loaded))) { // When right arrow showing
+        // Turn off web portal
+        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_MESHTASTIC_START_BIT);
+
+        // Hide arrows
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+        // Delete objects
+        lv_obj_delete(cont); // Deletes children
+
+        // Reset statics
+        cont = NULL;
+        toggle_hint_lbl = toggle_row = toggle_sw = toggle_state_lbl = NULL;
+        intro_lbl = join_lbl = wifi_creds_lbl = middle_lbl = wifi_ip_lbl = ending_lbl = NULL;
+        init = false;
+
+        // Persist the toggle state so it survives a reboot
+        lora_meshtastic_portal_enabled_save_nvs(meshtastic_enabled);
+
+        // Confirmation text
+        lv_obj_t *lbl_rst = lv_label_create(ACTIVE_SCR);
+        lv_obj_set_style_text_align(lbl_rst, LV_TEXT_ALIGN_CENTER, 0);
+        lcd_format_label(lbl_rst, "Saving config...\nDevice will restart.", user_secondary_color,
+                &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
+        lv_timer_handler();
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        
+        esp_restart();
+    } else if (ui_btns->left_btn) { // Go back
+        // Turn off web portal
+        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_MESHTASTIC_START_BIT);
+
+        // Hide right arrow
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        // Delete objects
+        lv_obj_delete(cont); // Deletes children
+
+        // Reset statics
+        cont = NULL;
+        toggle_hint_lbl = toggle_row = toggle_sw = toggle_state_lbl = NULL;
+        intro_lbl = join_lbl = wifi_creds_lbl = middle_lbl = wifi_ip_lbl = ending_lbl = NULL;
+        init = false;
+
+        // Show LoRa menu
+        lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Switch back
+        ui_menu->page = LORA_PAGE;
+    } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
+        // Turn off web portal
+        xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_MESHTASTIC_START_BIT);
+
+        // Hide right arrow
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        // Delete objects
+        lv_obj_delete(cont); // Deletes children
+
+        // Reset statics
+        cont = NULL;
+        toggle_hint_lbl = toggle_row = toggle_sw = toggle_state_lbl = NULL;
+        intro_lbl = join_lbl = wifi_creds_lbl = middle_lbl = wifi_ip_lbl = ending_lbl = NULL;
+        init = false;
+
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }
 
@@ -817,8 +1090,8 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
             lv_obj_delete(lbl_del);
             lv_obj_delete(lbl_ins);
                         
-            // Don't allow renaming the first index
-            if (lora_menu->index == 0) {
+            // Don't allow renaming the static entries ("Add PolyPlug", "Meshtastic")
+            if (lora_menu->index < LORA_NUM_STATIC_OPTS) {
                 // Show right arrow
                 lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
                 
@@ -857,8 +1130,8 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
             // Get user entry to remove
             int del_idx = lora_menu->index;     
             
-            // Can't be "Add PolyPlug"     
-            if (del_idx == 0) {
+            // Can't be a static entry ("Add PolyPlug", "Meshtastic")
+            if (del_idx < LORA_NUM_STATIC_OPTS) {
                 // Show right arrow
                 lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
                 
@@ -2638,11 +2911,10 @@ esp_err_t lcd_lora_menu_nvs_save(const lora_menu_t *menu)
     if (err != ESP_OK)
         return err;
 
-    // menu->options[0] is default "Add New"
-    // If menu->size == 1 there are no user names, otherwise there are menu->size - 1 names
-    uint8_t user_cnt = (menu->size > 1) ? menu->size - 1 : 0;
+    // menu->options[0..LORA_NUM_STATIC_OPTS-1] are static entries; only user plugs are persisted
+    uint8_t user_cnt = (menu->size > LORA_NUM_STATIC_OPTS) ? menu->size - LORA_NUM_STATIC_OPTS : 0;
     err = nvs_set_u8(h, LORA_OPTIONS_KEY_COUNT, user_cnt);
-    
+
     // If error, exit
     if (err != ESP_OK)
         goto out;
@@ -2651,9 +2923,9 @@ esp_err_t lcd_lora_menu_nvs_save(const lora_menu_t *menu)
     for (uint8_t i = 0; i < user_cnt; ++i) {
         char key[16];
         snprintf(key, sizeof(key), LORA_OPTIONS_KEY_FMT, i);
-        
-        // Store the menu option string at each key starting at index 1
-        err = nvs_set_str(h, key, menu->options[i + 1]);
+
+        // Store the menu option string; user plugs start after the static entries
+        err = nvs_set_str(h, key, menu->options[i + LORA_NUM_STATIC_OPTS]);
         
         // Exit if error
         if (err != ESP_OK)
@@ -2678,11 +2950,10 @@ esp_err_t lcd_lora_key_nvs_save(const lora_menu_t *menu)
     if (err != ESP_OK)
         return err;
 
-    // menu->options[0] is default "Add New"
-    // If menu->size == 1 there are no user names, otherwise there are menu->size - 1 names
-    uint8_t user_cnt = (menu->size > 1) ? menu->size - 1 : 0;
+    // menu->keys[0..LORA_NUM_STATIC_OPTS-1] belong to static entries; only user plugs are persisted
+    uint8_t user_cnt = (menu->size > LORA_NUM_STATIC_OPTS) ? menu->size - LORA_NUM_STATIC_OPTS : 0;
     err = nvs_set_u8(h, LORA_ENC_KEY_COUNT, user_cnt);
-    
+
     // If error, exit
     if (err != ESP_OK)
         goto out;
@@ -2691,9 +2962,9 @@ esp_err_t lcd_lora_key_nvs_save(const lora_menu_t *menu)
     for (uint8_t i = 0; i < user_cnt; ++i) {
         char key[16];
         snprintf(key, sizeof(key), LORA_ENC_KEY_FMT, i);
-        
-        // Store the key string at each key starting at index 1 to match user options
-        err = nvs_set_blob(h, key, menu->keys[i + 1], LORA_PCP_ENC_KEY_LEN);
+
+        // Store the key blob; user plugs start after the static entries to match user options
+        err = nvs_set_blob(h, key, menu->keys[i + LORA_NUM_STATIC_OPTS], LORA_PCP_ENC_KEY_LEN);
         
         // Exit if error
         if (err != ESP_OK)
@@ -2726,12 +2997,12 @@ esp_err_t lcd_lora_menu_nvs_load(lora_menu_t *menu)
         return err;
     }
 
-    menu->size = 1; // Don't change first option
+    menu->size = LORA_NUM_STATIC_OPTS; // Keep the static entries; append user plugs after them
     menu->index = 0;
 
     // Loop through all keys
     for (uint8_t i = 0; i < user_cnt; ++i) {
-        
+
         char key[16];
         snprintf(key, sizeof(key), LORA_OPTIONS_KEY_FMT, i);
         size_t len = 0;
@@ -2783,12 +3054,12 @@ esp_err_t lcd_lora_key_nvs_load(lora_menu_t *menu)
         return err;
     }
 
-    menu->size = 1; // Don't change first option
+    menu->size = LORA_NUM_STATIC_OPTS; // Keep the static entries; append user plug keys after them
     menu->index = 0;
 
     // Loop through all keys
     for (uint8_t i = 0; i < user_cnt; ++i) {
-        
+
         char key[16];
         snprintf(key, sizeof(key), LORA_ENC_KEY_FMT, i);
         
@@ -2826,8 +3097,37 @@ esp_err_t lcd_lora_key_nvs_load(lora_menu_t *menu)
     
     // Close NVS
     nvs_close(h);
-    
+
     return err;
+}
+
+void lcd_lora_menu_load_reconcile(lora_menu_t *menu)
+{
+    // lcd_lora_menu_nvs_load and lcd_lora_key_nvs_load run as a pair and each set menu->size independently
+    // A partial failure in either can leave menu->size counting a slot whose options[] or keys[] is NULL
+    // Trim to the first slot missing either half and free anything dangling beyond it
+
+    // Find the first user slot (after the static entries) missing a name or a key
+    int good = menu->size;
+    for (int i = LORA_NUM_STATIC_OPTS; i < menu->size; ++i) {
+        if (menu->options[i] == NULL || menu->keys[i] == NULL) {
+            good = i;
+            break;
+        }
+    }
+
+    // Free and NULL every entry from the first incomplete slot to the end of the arrays
+    for (int i = good; i < MAX_LORA_OPTIONS; ++i) {
+        free(menu->options[i]);
+        menu->options[i] = NULL;
+        free(menu->keys[i]);
+        menu->keys[i] = NULL;
+    }
+
+    menu->size = good;
+    if (menu->index >= menu->size) {
+        menu->index = 0;
+    }
 }
 
 esp_err_t lcd_lora_menu_nvs_delete(uint8_t del_idx)
@@ -2843,17 +3143,20 @@ esp_err_t lcd_lora_menu_nvs_delete(uint8_t del_idx)
     // Get current number of items in menu
     uint8_t user_cnt = 0;
     err = nvs_get_u8(h, LORA_OPTIONS_KEY_COUNT, &user_cnt);
-    
-    // Error check/if out of range
-    if (err != ESP_OK || del_idx >= user_cnt + 1) {
+
+    // del_idx is the menu index; static entries are never stored in NVS
+    // Convert to the 0-based user/NVS index and range-check
+    if (err != ESP_OK || del_idx < LORA_NUM_STATIC_OPTS ||
+            (del_idx - LORA_NUM_STATIC_OPTS) >= user_cnt) {
         nvs_close(h);
         return ESP_ERR_INVALID_ARG;
     }
+    uint8_t nvs_idx = del_idx - LORA_NUM_STATIC_OPTS;
 
-    // Shift every key above del_idx down one slot
-    for (uint8_t i = del_idx; i < user_cnt; ++i) {
+    // Shift every key above nvs_idx down one slot
+    for (uint8_t i = nvs_idx + 1; i < user_cnt; ++i) {
         char key_src[16], key_dst[16];
-        
+
         // Format key
         snprintf(key_src, sizeof key_src, LORA_OPTIONS_KEY_FMT, i);
         snprintf(key_dst, sizeof key_dst, LORA_OPTIONS_KEY_FMT, i - 1);
@@ -2917,20 +3220,23 @@ esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx)
     // Get number of keys
     uint8_t user_cnt = 0;
     err = nvs_get_u8(h, LORA_ENC_KEY_COUNT, &user_cnt);
-    
-    // Error check
-    if (err != ESP_OK || del_idx >= user_cnt + 1) {
+
+    // del_idx is the menu index; static entries are never stored in NVS
+    // Convert to the 0-based user/NVS index and range-check
+    if (err != ESP_OK || del_idx < LORA_NUM_STATIC_OPTS ||
+            (del_idx - LORA_NUM_STATIC_OPTS) >= user_cnt) {
         nvs_close(h);
         return ESP_ERR_INVALID_ARG;
     }
+    uint8_t nvs_idx = del_idx - LORA_NUM_STATIC_OPTS;
 
     // Buffer
     uint8_t tmp[LORA_PCP_ENC_KEY_LEN];
 
-    // Shift all keys down one
-    for (uint8_t i = del_idx; i < user_cnt; ++i) {
+    // Shift all keys above nvs_idx down one
+    for (uint8_t i = nvs_idx + 1; i < user_cnt; ++i) {
         char src[16], dst[16];
-        
+
         // Format key
         snprintf(src, sizeof src, LORA_ENC_KEY_FMT, i);
         snprintf(dst, sizeof dst, LORA_ENC_KEY_FMT, i - 1);
@@ -2963,7 +3269,7 @@ esp_err_t lcd_lora_key_nvs_delete(uint8_t del_idx)
             err = nvs_commit(h);
         }
     }
-    
+
     // Close NVS
     nvs_close(h);
     return err;

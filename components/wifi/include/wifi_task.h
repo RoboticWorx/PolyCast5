@@ -28,6 +28,7 @@ extern EventGroupHandle_t xConnectionIconEventGroup;
 #define WIFI_PORTAL_BTC_START_BIT               (1U << 2)
 #define WIFI_PORTAL_BT_START_BIT                (1U << 3)
 #define WIFI_PORTAL_CLAUDE_START_BIT            (1U << 4)
+#define WIFI_PORTAL_MESHTASTIC_START_BIT        (1U << 5)
 extern EventGroupHandle_t xWiFiPortalEventGroup;
 
 #define WIFI_SCAN_NETWORKS_BIT     (1U << 0)

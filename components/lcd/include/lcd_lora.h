@@ -5,7 +5,9 @@
 
 #include "esp_err.h"
 
-#define MAX_LORA_OPTIONS 51 // - 1 for "Add PolyPlug"
+// Static (non-user) menu entries occupying the first slots: "Add PolyPlug", "Meshtastic"
+#define LORA_NUM_STATIC_OPTS 2
+#define MAX_LORA_OPTIONS 52 // - LORA_NUM_STATIC_OPTS for the static entries (50 user plugs)
 #define MAX_LORA_SUBMENU_OPTIONS 6 // SEND, LOOP, PLAN, AWAY, EDIT, DEL
 #define LORA_PLAN_SUBMENU_COUNT 8
 
@@ -178,6 +180,15 @@ void lcd_lora_update_plan_menu(lora_plan_menu_t *lora_plan_menu);
 void lcd_lora_add_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu);
 
 /**
+ * @brief Opens the 'PolyCast5-Meshtastic' Wi-Fi portal page
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] lora_menu LoRa menu structure
+ */
+void lcd_lora_meshtastic_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu);
+
+/**
  * @brief Takes user input to create a name for/rename a designated PolyPlug
  *
  * @param [in] ui_btns UI input structure
@@ -223,6 +234,17 @@ esp_err_t lcd_lora_menu_nvs_load(lora_menu_t *lora_menu);
  * @returns ESP error status
  */
 esp_err_t lcd_lora_key_nvs_load(lora_menu_t *lora_menu);
+
+/**
+ * @brief Reconciles the separately-loaded name and key arrays after NVS load
+ *
+ * Call once after both lcd_lora_menu_nvs_load() and lcd_lora_key_nvs_load(). Trims
+ * menu->size to the first user slot missing either a name or a key, so a partial load
+ * failure can't leave a counted slot half-populated, and frees any dangling buffers.
+ *
+ * @param [in] lora_menu LoRa menu structure
+ */
+void lcd_lora_menu_load_reconcile(lora_menu_t *lora_menu);
 
 /**
  * @brief Deletes a given enc key from NVS

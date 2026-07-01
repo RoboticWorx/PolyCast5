@@ -46,6 +46,7 @@
 #include "lora_task.h"
 #include "espnow_task.h"
 #include "ai_utils.h"
+#include "lora_meshtastic_portal.h" // lora_meshtastic_portal_enabled_load_nvs
 
 #define DRAW_LINES 20
 #define FLUSH_CHUNK 2
@@ -2255,8 +2256,7 @@ void lcd_lora_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_men
         lora_menu->index++;
         lcd_lora_update_menu(lora_menu);
     } else if (ui_btns->select_btn == 1 && lora_menu->index == 0) { // Add PolyPlug selected
-        // Abort if we've reached the maximum number of peers
-        // Compare with total user plugs: Total size - "Add PolyPlug" + 1 (since not yet size++) -> just lora_menu->size
+        // Abort if the options/keys/btns arrays are full (static entries + user plugs)
         if (lora_menu->size >= MAX_LORA_OPTIONS) {
 #ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "Max LoRa PolyPlug entries reached");
@@ -2291,21 +2291,58 @@ void lcd_lora_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_men
             // Switch to add page
             ui_menu->page = LORA_ADD_PAGE;
         }
-    } else if (ui_btns->select_btn == 1) { // PolyPlug selected
+    } else if (ui_btns->select_btn == 1 && lora_menu->index == 1) { // Meshtastic selected
+        // Disconnect from Wi-Fi if connected (the portal takes over the radio as a SoftAP)
+        xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+
         // Hide LoRa menu
         lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-        
-        // Reset static
-        do_once = false;
-        
-        // Show right arrow
-        lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-        
-        // Show submenu
-        lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
 
-        ui_menu->page = LORA_SUBPAGE;
-    
+        // Switch to Meshtastic info/portal page
+        ui_menu->page = LORA_MESHTASTIC_PAGE;
+    } else if (ui_btns->select_btn == 1) { // PolyPlug selected
+        bool meshtastic_enabled = lora_meshtastic_portal_enabled_load_nvs();
+        if (meshtastic_enabled) {
+            // Hide LoRa menu
+            lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+            // Remove arrows
+            lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+
+            // User notice
+            lv_obj_t *lbl_rst = lv_label_create(ACTIVE_SCR);
+            lv_obj_set_style_text_align(lbl_rst, LV_TEXT_ALIGN_CENTER, 0);
+            lcd_format_label(lbl_rst, "Meshtastic must be\ndisabled first!", user_secondary_color,
+                     &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
+            lv_timer_handler();
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            lv_obj_delete(lbl_rst);
+            lcd_clear_pending_inputs = true;
+
+            // Show arrows
+            lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+
+            // Show LoRa menu
+            lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        } else { // Meshtastic disabled, can use PCP
+            // Hide LoRa menu
+            lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+            
+            // Reset static
+            do_once = false;
+            
+            // Show right arrow
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            
+            // Show submenu
+            lv_obj_remove_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+
+            ui_menu->page = LORA_SUBPAGE;
+        }    
     } else if (ui_btns->left_btn == 1) { // Back selected
         // Hide LoRa menu
         lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
