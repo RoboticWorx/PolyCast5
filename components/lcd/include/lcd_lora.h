@@ -55,9 +55,10 @@ extern lora_plan_menu_t lora_plan_menu;
 /**
  * @brief Creates the central LoRa page then hides it for quick access
  *
+ * @param [in] ui_menu UI menu structure
  * @param [in] lora_menu LoRa menu structure
  */
-void lcd_lora_setup_page(lora_menu_t *lora_menu);
+void lcd_lora_setup_page(ui_menu_t *ui_menu, lora_menu_t *lora_menu);
 
 /**
  * @brief Creates the LoRa subpage then hides it for quick access

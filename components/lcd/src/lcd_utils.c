@@ -47,6 +47,7 @@
 #include "espnow_task.h"
 #include "ai_utils.h"
 #include "lora_meshtastic_portal.h" // lora_meshtastic_portal_enabled_load_nvs
+#include "lora_meshtastic.h"        // g_meshtastic_mode, lora_meshtastic_listen_stop
 
 #define DRAW_LINES 20
 #define FLUSH_CHUNK 2
@@ -193,7 +194,10 @@ void lcd_device_sleep(void)
     // Wait for Wi-Fi to shut off if on
     xSemaphoreTake(xWifiCanSleepSemaphore, pdMS_TO_TICKS(1000));
 
-    lora_task_abort_pending(); // Cancel any in-flight LoRa retries and idle the radio
+    lora_task_abort_pending(); // Cancel any in-flight LoRa retries and idle the radio (no-op in Meshtastic mode)
+
+    // In Meshtastic mode abort_pending() above is a no-op, so this is the ONLY path that idles the radio before sleep
+    lora_meshtastic_listen_stop();
 
     xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
     xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
@@ -1359,6 +1363,25 @@ static void go_to_page_from_hotkey(ui_menu_t *ui_menu)
     }
 }
 
+// LoRa hotkeys only work in PCP LoRa mode, if Meshtastic: deny
+static bool lora_hotkey_blocked_by_meshtastic(void)
+{
+    if (!g_meshtastic_mode) {
+        return false; // Meshtastic NOT enabled, allow
+    }
+
+    lv_obj_t *lbl = lv_label_create(ACTIVE_SCR);
+    lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+    lcd_format_label(lbl, "Meshtastic must be\ndisabled first!", user_secondary_color,
+                     &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
+    lv_timer_handler();
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    lv_obj_delete(lbl);
+    lcd_clear_pending_inputs = true;
+
+    return true; // Meshtastic enabled, deny
+}
+
 void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
     if (ui_btns->up_btn == 1) {
@@ -1468,7 +1491,7 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
     // Long press home
     else if (xHomeButtonLongSemaphore && xSemaphoreTake(xHomeButtonLongSemaphore, 0) == pdTRUE) {
         /* Check for commands */
-        if (hotkey_cmd.has_lora[HOTKEY_LONG_HOME_IDX]) { // If LoRa command exists
+        if (hotkey_cmd.has_lora[HOTKEY_LONG_HOME_IDX] && !lora_hotkey_blocked_by_meshtastic()) { // LoRa cmd; shows a notice and skips if Meshtastic owns the radio
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_TEAL;
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
@@ -1510,7 +1533,7 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
     // Long press left
     else if (xLeftButtonLongSemaphore && xSemaphoreTake(xLeftButtonLongSemaphore, 0) == pdTRUE) {
         /* Check for commands */
-        if (hotkey_cmd.has_lora[HOTKEY_LONG_LEFT_IDX]) { // If LoRa command exists
+        if (hotkey_cmd.has_lora[HOTKEY_LONG_LEFT_IDX] && !lora_hotkey_blocked_by_meshtastic()) { // LoRa cmd; shows a notice and skips if Meshtastic owns the radio
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_TEAL;
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
@@ -1552,7 +1575,7 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
     // Long press right
     else if (xRightButtonLongSemaphore && xSemaphoreTake(xRightButtonLongSemaphore, 0) == pdTRUE) {
         /* Check for commands */
-        if (hotkey_cmd.has_lora[HOTKEY_LONG_RIGHT_IDX]) { // If LoRa command exists
+        if (hotkey_cmd.has_lora[HOTKEY_LONG_RIGHT_IDX] && !lora_hotkey_blocked_by_meshtastic()) { // LoRa cmd; shows a notice and skips if Meshtastic owns the radio
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_TEAL;
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
@@ -1594,7 +1617,7 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
     // Long press select
     else if (xSelectButtonLongSemaphore && xSemaphoreTake(xSelectButtonLongSemaphore, 0) == pdTRUE) {
         /* Check for commands */
-        if (hotkey_cmd.has_lora[HOTKEY_LONG_SELECT_IDX]) { // If LoRa command exists
+        if (hotkey_cmd.has_lora[HOTKEY_LONG_SELECT_IDX] && !lora_hotkey_blocked_by_meshtastic()) { // LoRa cmd; shows a notice and skips if Meshtastic owns the radio
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_TEAL;
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
@@ -1634,7 +1657,7 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
         }
     } else if (ui_btns->home_btn == 1) { // Short press home
         /* Check for commands */
-        if (hotkey_cmd.has_lora[HOTKEY_SHORT_HOME_IDX]) { // If LoRa command exists
+        if (hotkey_cmd.has_lora[HOTKEY_SHORT_HOME_IDX] && !lora_hotkey_blocked_by_meshtastic()) { // LoRa cmd; shows a notice and skips if Meshtastic owns the radio
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_TEAL;
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
@@ -1674,7 +1697,7 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
         }
     } else if (ui_btns->right_btn == 1) { // Short press right
         /* Check for commands */
-        if (hotkey_cmd.has_lora[HOTKEY_SHORT_RIGHT_IDX]) { // If LoRa command exists
+        if (hotkey_cmd.has_lora[HOTKEY_SHORT_RIGHT_IDX] && !lora_hotkey_blocked_by_meshtastic()) { // LoRa cmd; shows a notice and skips if Meshtastic owns the radio
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_TEAL;
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
@@ -2279,17 +2302,48 @@ void lcd_lora_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_men
             
             return;
         } else { // Else we're good to add another
-            // Disconnect from Wi-Fi if connected
-            xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
-            
-            // Show right arrow
-            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
-            
-            // Hide LoRa menu
-            lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-            
-            // Switch to add page
-            ui_menu->page = LORA_ADD_PAGE;
+            // Check if Meshtastic is enabled
+            bool meshtastic_enabled = lora_meshtastic_portal_enabled_load_nvs();
+            if (meshtastic_enabled) {
+                // Hide LoRa menu
+                lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+                // Hide arrows
+                lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+                lv_obj_t *lbl = lv_label_create(ACTIVE_SCR);
+                lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+                lcd_format_label(lbl, "Meshtastic must be\ndisabled first!", user_secondary_color,
+                                &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
+                lv_timer_handler();
+                vTaskDelay(pdMS_TO_TICKS(1000));
+                lv_obj_delete(lbl);
+                lcd_clear_pending_inputs = true;
+
+                // Show LoRa menu
+                lv_obj_remove_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+                // Show arrows
+                lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+                lv_timer_handler();
+            } else { // Meshtastic disabled, can add a PolyPlug
+                // Disconnect from Wi-Fi if connected
+                xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+                
+                // Show right arrow
+                lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+                
+                // Hide LoRa menu
+                lv_obj_add_flag(lora_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+                
+                // Switch to add page
+                ui_menu->page = LORA_ADD_PAGE;
+            }
         }
     } else if (ui_btns->select_btn == 1 && lora_menu->index == 1) { // Meshtastic selected
         // Disconnect from Wi-Fi if connected (the portal takes over the radio as a SoftAP)

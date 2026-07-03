@@ -13,8 +13,23 @@
 
 #include "lora_meshtastic_portal.h"
 #include "lora_meshtastic_portal_html.h"
+#include "lora_meshtastic.h" // node id, message log, TX enqueue
 
 #define TAG "MESHTASTIC_WEB_PORTAL"
+
+// Largest POST body accepted by /api/send
+// (a single text message, plus slack for UTF-8 / trailing whitespace; lora_meshtastic_enqueue_text truncates to spec)
+#define MESHTASTIC_SEND_MAX_BODY 512
+
+// Scratch sizes for the /api/messages JSON builder
+// A JSON-escaped char can grow to 6 bytes (\u00XX), so bound the worst case on the stored text length
+#define MESHTASTIC_MSG_ESC_BUF (MESHTASTIC_RX_TEXT_MAX * 6 + 8)
+#define MESHTASTIC_MSG_OBJ_BUF (MESHTASTIC_RX_TEXT_MAX * 6 + 256)
+
+// Scratch sizes for the /api/nodes JSON builder (JSON-escaped names + fixed fields)
+#define MESHTASTIC_NODE_LONG_ESC  (MESHTASTIC_NODE_LONG_MAX * 6 + 8)
+#define MESHTASTIC_NODE_SHORT_ESC (MESHTASTIC_NODE_SHORT_MAX * 6 + 8)
+#define MESHTASTIC_NODE_OBJ_BUF   (MESHTASTIC_NODE_LONG_ESC + MESHTASTIC_NODE_SHORT_ESC + 128)
 
 // NVS storage for the randomly generated portal password
 #define MESHTASTIC_PORTAL_NS  "mesh_portal"
@@ -160,6 +175,216 @@ static esp_err_t root_get(httpd_req_t *req)
     return httpd_resp_send(req, LORA_MESHTASTIC_PORTAL_HTML, HTTPD_RESP_USE_STRLEN);
 }
 
+// Escape a UTF-8 string into a JSON string body (without the surrounding quotes),
+// writing at most out_sz-1 bytes plus a NUL. Returns bytes written (excl. NUL).
+static size_t json_escape(const char *in, char *out, size_t out_sz)
+{
+    static const char hex[] = "0123456789abcdef";
+    size_t o = 0;
+
+    for (const unsigned char *p = (const unsigned char *)in; *p != '\0'; p++) {
+        unsigned char c = *p;
+
+        // Worst case is a 6-byte \u00XX escape; keep room for that plus the NUL
+        if (o + 6 >= out_sz) {
+            break;
+        }
+
+        switch (c) {
+        case '\"': out[o++] = '\\'; out[o++] = '\"'; break;
+        case '\\': out[o++] = '\\'; out[o++] = '\\'; break;
+        case '\n': out[o++] = '\\'; out[o++] = 'n';  break;
+        case '\r': out[o++] = '\\'; out[o++] = 'r';  break;
+        case '\t': out[o++] = '\\'; out[o++] = 't';  break;
+        default:
+            if (c < 0x20) {
+                out[o++] = '\\'; out[o++] = 'u'; out[o++] = '0'; out[o++] = '0';
+                out[o++] = hex[(c >> 4) & 0x0F];
+                out[o++] = hex[c & 0x0F];
+            } else {
+                out[o++] = (char)c; // Printable ASCII and UTF-8 bytes pass through
+            }
+            break;
+        }
+    }
+
+    out[o] = '\0';
+    return o;
+}
+
+// POST /api/send - raw request body is the message text to broadcast.
+// The portal is purely an input surface: it hands the text to the LoRa radio,
+// which frames and transmits it per Meshtastic spec.
+static esp_err_t send_post(httpd_req_t *req)
+{
+    // Reject empty or oversized bodies (copy to int first, as the other portals
+    // do, to keep the length comparisons signed)
+    int total = (int)req->content_len;
+    if (total <= 0 || total > MESHTASTIC_SEND_MAX_BODY) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad length");
+    }
+
+    // Allocate a buffer for the body (+1 for NUL)
+    char *buf = (char *)malloc((size_t)total + 1);
+    if (buf == NULL) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+    }
+
+    // Read the full body
+    int off = 0;
+    while (off < total) {
+        int r = httpd_req_recv(req, buf + off, total - off);
+        if (r <= 0) {
+            free(buf);
+            return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "recv");
+        }
+        off += r;
+    }
+    buf[off] = '\0';
+
+    // Trim leading/trailing ASCII blanks/controls (UTF-8 bytes are >= 0x80, kept)
+    char *start = buf;
+    while (*start != '\0' && (unsigned char)*start <= ' ') {
+        start++;
+    }
+    size_t len = strlen(start);
+    while (len > 0 && (unsigned char)start[len - 1] <= ' ') {
+        start[--len] = '\0';
+    }
+
+    // Queue for the mesh TX task (single-producer TX). Empty after trim -> reject
+    bool ok = (len > 0) && lora_meshtastic_enqueue_text(start);
+    free(buf);
+
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, ok ? "{\"ok\":true}" : "{\"ok\":false}");
+}
+
+// GET /api/messages?since=N  — text messages with seq > N, as JSON.
+// Response: {"node":"!id","newest":N,"msgs":[{"seq","from","out","rssi","snr","text"},...]}
+static esp_err_t messages_get(httpd_req_t *req)
+{
+    // Parse optional ?since=N (default 0 = all currently stored)
+    uint32_t since = 0;
+    char qstr[48];
+    if (httpd_req_get_url_query_str(req, qstr, sizeof(qstr)) == ESP_OK) {
+        char val[16];
+        if (httpd_query_key_value(qstr, "since", val, sizeof(val)) == ESP_OK) {
+            since = (uint32_t)strtoul(val, NULL, 10);
+        }
+    }
+
+    // Scratch: message snapshot + per-message escape/object buffers
+    lora_meshtastic_msg_t *msgs = (lora_meshtastic_msg_t *)malloc(sizeof(*msgs) * MESHTASTIC_MSG_LOG_CAP);
+    char *esc = (char *)malloc(MESHTASTIC_MSG_ESC_BUF);
+    char *obj = (char *)malloc(MESHTASTIC_MSG_OBJ_BUF);
+    if (msgs == NULL || esc == NULL || obj == NULL) {
+        free(msgs);
+        free(esc);
+        free(obj);
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+    }
+
+    uint32_t newest = 0;
+    size_t n = lora_meshtastic_get_msgs_since(since, msgs, MESHTASTIC_MSG_LOG_CAP, &newest);
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Header chunk (also carries the live node count for the roster badge)
+    int hlen = snprintf(obj, MESHTASTIC_MSG_OBJ_BUF,
+                        "{\"node\":\"%s\",\"newest\":%u,\"nodes\":%u,\"msgs\":[",
+                        lora_meshtastic_node_id(), (unsigned)newest,
+                        (unsigned)lora_meshtastic_node_count());
+    if (hlen < 0) {
+        hlen = 0;
+    } else if (hlen >= MESHTASTIC_MSG_OBJ_BUF) {
+        hlen = MESHTASTIC_MSG_OBJ_BUF - 1;
+    }
+    esp_err_t err = httpd_resp_send_chunk(req, obj, hlen);
+
+    // One chunk per message object
+    for (size_t i = 0; i < n && err == ESP_OK; i++) {
+        json_escape(msgs[i].text, esc, MESHTASTIC_MSG_ESC_BUF);
+
+        int olen = snprintf(obj, MESHTASTIC_MSG_OBJ_BUF,
+                            "%s{\"seq\":%u,\"id\":%u,\"from\":\"!%08x\",\"out\":%s,\"acked\":%s,\"failed\":%s,\"rssi\":%d,\"snr\":%d,\"hops\":%u,\"text\":\"%s\"}",
+                            (i == 0) ? "" : ",",
+                            (unsigned)msgs[i].seq, (unsigned)msgs[i].id, (unsigned)msgs[i].from_node,
+                            msgs[i].outbound ? "true" : "false",
+                            msgs[i].acked ? "true" : "false",
+                            msgs[i].failed ? "true" : "false",
+                            (int)msgs[i].rssi, (int)msgs[i].snr, (unsigned)msgs[i].hops, esc);
+        if (olen < 0) {
+            olen = 0;
+        } else if (olen >= MESHTASTIC_MSG_OBJ_BUF) {
+            olen = MESHTASTIC_MSG_OBJ_BUF - 1;
+        }
+        err = httpd_resp_send_chunk(req, obj, olen);
+    }
+
+    // Footer + terminate the chunked response (best-effort on prior error)
+    if (err == ESP_OK) {
+        err = httpd_resp_send_chunk(req, "]}", 2);
+    }
+    httpd_resp_send_chunk(req, NULL, 0);
+
+    free(msgs);
+    free(esc);
+    free(obj);
+    return err;
+}
+
+// GET /api/nodes  — roster of heard nodes (client sorts by most-recently-heard).
+// Response: {"nodes":[{"id":"!id","long":"..","short":"..","rssi":r,"snr":s,"hops":h,"age":sec},...]}
+static esp_err_t nodes_get(httpd_req_t *req)
+{
+    lora_meshtastic_node_t *nodes = (lora_meshtastic_node_t *)malloc(sizeof(*nodes) * MESHTASTIC_NODE_MAX);
+    char *el  = (char *)malloc(MESHTASTIC_NODE_LONG_ESC);
+    char *es  = (char *)malloc(MESHTASTIC_NODE_SHORT_ESC);
+    char *obj = (char *)malloc(MESHTASTIC_NODE_OBJ_BUF);
+    if (nodes == NULL || el == NULL || es == NULL || obj == NULL) {
+        free(nodes);
+        free(el);
+        free(es);
+        free(obj);
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+    }
+
+    size_t n = lora_meshtastic_get_nodes(nodes, MESHTASTIC_NODE_MAX);
+
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t err = httpd_resp_send_chunk(req, "{\"nodes\":[", 10);
+
+    for (size_t i = 0; i < n && err == ESP_OK; i++) {
+        json_escape(nodes[i].long_name, el, MESHTASTIC_NODE_LONG_ESC);
+        json_escape(nodes[i].short_name, es, MESHTASTIC_NODE_SHORT_ESC);
+
+        int olen = snprintf(obj, MESHTASTIC_NODE_OBJ_BUF,
+                            "%s{\"id\":\"!%08x\",\"long\":\"%s\",\"short\":\"%s\",\"rssi\":%d,\"snr\":%d,\"hops\":%u,\"age\":%u}",
+                            (i == 0) ? "" : ",",
+                            (unsigned)nodes[i].node_num, el, es,
+                            (int)nodes[i].rssi, (int)nodes[i].snr,
+                            (unsigned)nodes[i].hops, (unsigned)nodes[i].age_s);
+        if (olen < 0) {
+            olen = 0;
+        } else if (olen >= MESHTASTIC_NODE_OBJ_BUF) {
+            olen = MESHTASTIC_NODE_OBJ_BUF - 1;
+        }
+        err = httpd_resp_send_chunk(req, obj, olen);
+    }
+
+    if (err == ESP_OK) {
+        err = httpd_resp_send_chunk(req, "]}", 2);
+    }
+    httpd_resp_send_chunk(req, NULL, 0);
+
+    free(nodes);
+    free(el);
+    free(es);
+    free(obj);
+    return err;
+}
+
 /* ========== HTTP server bootstrap ========== */
 
 // Start the embedded HTTP server and register endpoints
@@ -179,6 +404,16 @@ static httpd_handle_t start_http(void)
     // UI
     httpd_uri_t root = {.uri = "/", .method = HTTP_GET, .handler = root_get};
     httpd_register_uri_handler(srv, &root);
+
+    // Messaging API
+    httpd_uri_t send = {.uri = "/api/send", .method = HTTP_POST, .handler = send_post};
+    httpd_register_uri_handler(srv, &send);
+
+    httpd_uri_t msgs = {.uri = "/api/messages", .method = HTTP_GET, .handler = messages_get};
+    httpd_register_uri_handler(srv, &msgs);
+
+    httpd_uri_t nodes = {.uri = "/api/nodes", .method = HTTP_GET, .handler = nodes_get};
+    httpd_register_uri_handler(srv, &nodes);
 
     return srv;
 }

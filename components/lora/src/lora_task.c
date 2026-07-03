@@ -77,6 +77,9 @@ static void lora_task(void *pvParameters)
     // Load (or generate) the Meshtastic web portal password
     lora_meshtastic_portal_pass_init();
 
+    // Set global meshtastic enabled flag
+    g_meshtastic_mode = lora_meshtastic_portal_enabled_load_nvs();
+
     // Create the LoRa event handler task
     if (xTaskCreate(lora_event_handler_task, "lora_event_handler", 1024 * 3, NULL, POLYCAST5_PRIORITY_INTERRUPT, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start lora_event_handler_task");
@@ -424,6 +427,10 @@ static void lora_event_handler_task(void *pvParameters)
 
 void lora_task_abort_pending(void)
 {
+    if (g_meshtastic_mode) {
+        return;
+    }
+
     // Idle the radio first so no further DIO1 IRQs can re-set the flags
     sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
     sx126x_clear_irq_status(NULL, SX126X_IRQ_ALL);
@@ -439,15 +446,13 @@ void lora_task_abort_pending(void)
 
 void lora_task_resume_after_sleep(void)
 {
-#if POLYCAST5_MESHTASTIC_MODE
-    // Meshtastic mode must be put back into the continuous RX that
-    // lora_task_abort_pending() tore down before sleep.
-    lora_meshtastic_resume_rx();
-#else
+    if (g_meshtastic_mode) {
+        // Meshtastic mode must be put back into the continuous RX before sleep
+        lora_meshtastic_resume_rx();
+    }
     // PCP idles the radio in the standby left by lora_task_abort_pending() and
     // re-enters RX/TX on the next command, so that standby is the correct woken
     // resting state - nothing to re-arm here.
-#endif
 }
 
 // Function to create the LoRa task

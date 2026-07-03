@@ -83,13 +83,16 @@ static const char *lora_char_rows[LORA_NUM_CHAR_ROWS] = {
 };
 
 
-void lcd_lora_setup_page(lora_menu_t *menu)
+void lcd_lora_setup_page(ui_menu_t *ui_menu, lora_menu_t *menu)
 {
-    bool meshtastic_enabled = lora_meshtastic_portal_enabled_load_nvs();
-    if (meshtastic_enabled) {
-        menu->options[1] = "Meshtastic: ON";
-    } else {
-        menu->options[1] = "Meshtastic: OFF";
+    // Update Meshtastic option text if not rebuilding for away subpage
+    if (ui_menu->page != LORA_AWAY_SUBPAGE) {
+        bool meshtastic_enabled = lora_meshtastic_portal_enabled_load_nvs();
+        if (meshtastic_enabled) {
+            menu->options[1] = "Meshtastic: ON";
+        } else {
+            menu->options[1] = "Meshtastic: OFF";
+        }
     }
 
     // Create list
@@ -2533,7 +2536,7 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
         away_menu->options[5] = "0-1m ON/OFF";
         
         // Create everything
-        lcd_lora_setup_page(away_menu);
+        lcd_lora_setup_page(ui_menu, away_menu);
         
         // Show and assign to first element
         away_menu->index = 0;

@@ -29,6 +29,7 @@
 #include "bluetooth_portal.h"
 #include "ai_analysis_portal.h"
 #include "lora_meshtastic_portal.h"
+#include "lora_meshtastic.h" // lora_meshtastic_listen_start/stop
 
 #include "wifi_task.h"
 
@@ -521,15 +522,21 @@ static void wifi_task(void *param)
                 err = lora_meshtastic_portal_start();
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "lora_meshtastic_portal_start failed: %s", esp_err_to_name(err));
+                } else {
+                    // Start LoRa RX only once the portal actually came up, so the radio isn't draining the battery
+                    lora_meshtastic_listen_start();
                 }
             }
             // If Meshtastic web portal bit transitioned 1 -> 0
             if ((last_portal_bits & WIFI_PORTAL_MESHTASTIC_START_BIT) &&
                     !(current_portal_bits & WIFI_PORTAL_MESHTASTIC_START_BIT)) {
+                // Stop the HTTP server FIRST so no /api/send can still be enqueuing,
+                // then idle the radio and drop the queue
                 err = lora_meshtastic_portal_stop();
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "lora_meshtastic_portal_stop failed: %s", esp_err_to_name(err));
                 }
+                lora_meshtastic_listen_stop();
             }
 
             // If Claude setup web portal bit transitioned 0 -> 1

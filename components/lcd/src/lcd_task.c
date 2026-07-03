@@ -139,7 +139,7 @@ static void lcd_task(void *pvParameters)
     
     lcd_ir_setup_page(&ir_menu);
     
-    lcd_lora_setup_page(&lora_menu);
+    lcd_lora_setup_page(&ui_menu, &lora_menu);
     lcd_lora_setup_subpage(&lora_menu);
     lcd_lora_setup_plan_page(&ui_menu, &lora_plan_menu);
     

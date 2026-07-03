@@ -4,8 +4,7 @@ __pycache__/
 dependencies.lock
 sdkconfig
 
-BUGS.md
-BUGS-fable.md
+BUGS*.md
 .claude/ralph-loop.local.md
 
 *_signing_key*

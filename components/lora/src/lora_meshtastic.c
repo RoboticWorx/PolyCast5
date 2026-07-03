@@ -1,9 +1,12 @@
-// Meshtastic interop layer for PolyCast5 (phase 1: terminal only).
+// Meshtastic interop layer for PolyCast5.
 //
 // Speaks the Meshtastic LongFast public-channel wire protocol directly on the
-// SX1262: continuous RX with on-terminal decode, plus broadcast of text and
-// NodeInfo. Hand-rolled minimal protobuf (no nanopb dependency). All wire
-// constants are documented and sourced in lora_meshtastic.h.
+// SX1262: continuous RX with decode, plus broadcast of text and NodeInfo. RX
+// text and our own sent text are kept in a small ring buffer that the Wi-Fi
+// config portal polls, and portal text is queued back here for transmit - so
+// the portal is a text I/O surface while all radio framing happens here.
+// Hand-rolled minimal protobuf (no nanopb dependency). All wire constants are
+// documented and sourced in lora_meshtastic.h.
 //
 // On-air packet:  [ 16-byte PacketHeader ][ AES-128-CTR( Data protobuf ) ]
 //   header   = to(4 LE) from(4 LE) id(4 LE) flags(1) channel(1) next_hop(1) relay(1)
@@ -17,6 +20,7 @@
 #include <string.h>
 
 #include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 
@@ -32,15 +36,9 @@
 
 static const char *TAG = "MESH";
 
-// Commenting out POLYCAST5_MESHTASTIC_MODE in polycast5_macros.h means "off".
-#ifndef POLYCAST5_MESHTASTIC_MODE
-#define POLYCAST5_MESHTASTIC_MODE 0
-#endif
+// lora_task overwrites this at startup from lora_meshtastic_portal_enabled_load_nvs()
+volatile bool g_meshtastic_mode = false;
 
-// Runtime mode flag (see header). Default comes from polycast5_macros.h.
-volatile bool g_meshtastic_mode = POLYCAST5_MESHTASTIC_MODE;
-
-// ── Identity ───────────────────────────────────────────────────────────────
 static uint32_t s_node_num = 0;
 static char     s_node_id[10] = "!00000000"; // "!%08x"
 
@@ -48,15 +46,13 @@ static char     s_node_id[10] = "!00000000"; // "!%08x"
 #define MESH_LONG_NAME  "PolyCast5"
 #define MESH_SHORT_NAME "PC5"
 
-// Optional periodic self-test text TX (0 = disabled). Lets you confirm TX shows
-// up on a nearby phone/node without any UI yet.
-#ifndef MESHTASTIC_TEST_TX_PERIOD_MS
-#define MESHTASTIC_TEST_TX_PERIOD_MS 60000 // 0 = off. >0 sends a test text every N ms (set back to 0 when done — it's the public channel)
-#endif
-// Re-broadcast our NodeInfo on this interval (others expire stale entries).
-#define MESHTASTIC_NODEINFO_PERIOD_MS (15 * 60 * 1000)
+// Re-broadcast our NodeInfo on this interval (others expire stale entries)
+#define MESHTASTIC_NODEINFO_PERIOD_MS (15 * 60 * 1000) // Every 15 minutes
 
-// Default LongFast PSK — meshtastic/firmware Channels.h `defaultpsk`, the
+// Depth of the web-portal -> radio text send queue
+#define MESH_TX_QUEUE_LEN 4
+
+// Default LongFast PSK - meshtastic/firmware Channels.h `defaultpsk`, the
 // 16-byte AES-128 key expanded from the 1-byte PSK 0x01.
 // base64 "1PG7OiApB1nwvP+rz05pAQ==".
 static const uint8_t MESH_DEFAULT_PSK[16] = {
@@ -67,25 +63,326 @@ static const uint8_t MESH_DEFAULT_PSK[16] = {
 // PSA handle for the default PSK (imported once in lora_meshtastic_init).
 static psa_key_id_t s_mesh_key_id = 0;
 
-static void mesh_crypto_init(void); // imports the default PSK; defined below
+static void mesh_crypto_init(void); // Imports the default PSK; defined below
 
-// Serializes multi-command radio state transitions (the TX build sequence and
-// the IRQ task's RX re-arm) so the higher-priority event task can't reconfigure
-// the chip mid-TX-build. The per-call SX126x SPI mutex is finer-grained and does
-// not cover whole sequences. Created in lora_meshtastic_init().
+// Serializes multi-command radio state transitions so the higher-priority event task can't reconfigure mid-TX-build
 static SemaphoreHandle_t s_radio_mtx = NULL;
 
-// Set while a TX is on air so we don't start a second one (half-duplex radio).
-// Single-producer invariant: ONLY the lora_meshtastic_run task issues TX
-// (send_nodeinfo / send_text), so the check-then-set in mesh_send_packet is
-// race-free against other producers; the IRQ task only ever clears it. If a
-// second TX caller is added (e.g. a phase-2 LCD send), make the claim atomic.
+// Set while a TX is on air so we don't start a second one (half-duplex radio)
 static volatile bool s_tx_busy = false;
 
-// Largest application payload we will build for a single TX.
+// True only while the Meshtastic portal page is open
+// Continuous RX (the radio's main current draw) and all TX are gated on this
+static volatile bool s_listening = false;
+
+// Set by listen_start so the run task broadcasts a NodeInfo at session start
+static volatile bool s_announce_pending = false;
+
+// Largest application payload we will build for a single TX
 #define MESH_MAX_TX_PAYLOAD 200
 
-// ── Radio configuration ────────────────────────────────────────────────────
+// Web-portal data plane (message log + TX queue)
+
+// Ring buffer of recent text messages (inbound + our own outbound) exposed to the web portal
+// Written by the event task (RX) and the run task (TX echo), read by the HTTP server task
+POLYCAST5_USE_PSRAM_BSS static lora_meshtastic_msg_t s_log[MESHTASTIC_MSG_LOG_CAP];
+static uint8_t  s_log_head  = 0; // Index of the oldest stored entry
+static uint8_t  s_log_count = 0; // Number of valid entries (<= CAP)
+static uint32_t s_log_seq   = 0; // Last assigned seq (monotonic, 0 = none yet)
+static SemaphoreHandle_t s_log_mtx = NULL;
+
+// Recently stored inbound packet ids, to drop mesh-relayed duplicates of the same message
+static uint32_t s_seen_ids[MESHTASTIC_MSG_LOG_CAP] = {0};
+static uint8_t  s_seen_pos = 0;
+
+// Text queued by the web portal for the run task to broadcast (single-producer TX)
+typedef struct { char text[MESHTASTIC_RX_TEXT_MAX + 1]; } mesh_tx_item_t;
+static QueueHandle_t s_tx_queue = NULL;
+
+// Nodes-heard roster
+// Written by the RX event task (mesh_node_seen/set_names), read by the HTTP task
+typedef struct {
+    uint32_t node_num;
+    char     long_name[MESHTASTIC_NODE_LONG_MAX + 1];
+    char     short_name[MESHTASTIC_NODE_SHORT_MAX + 1];
+    int8_t   rssi;
+    int8_t   snr;
+    uint8_t  hops;
+    uint32_t last_heard_tick;
+} mesh_node_t;
+POLYCAST5_USE_PSRAM_BSS static mesh_node_t s_nodes[MESHTASTIC_NODE_MAX];
+static SemaphoreHandle_t s_nodes_mtx = NULL;
+
+// Largest length <= max that doesn't split a UTF-8 multi-byte sequence. Backs up
+// off any trailing continuation bytes (0b10xxxxxx) so truncated text stays valid
+// UTF-8 - no stray replacement char goes on the mesh or into the portal.
+static size_t mesh_utf8_trunc_len(const uint8_t *s, size_t len, size_t max)
+{
+    if (len <= max) {
+        return len;
+    }
+    size_t i = max;
+    while (i > 0 && (s[i] & 0xC0) == 0x80) {
+        i--; // s[i] is a continuation byte: the char that started earlier straddles max
+    }
+    return i;
+}
+
+// Append one message to the ring (overwriting the oldest when full)
+static void mesh_log_append(uint32_t from_node, bool outbound, int8_t rssi,
+                            int8_t snr, uint8_t hops, const uint8_t *text, size_t len,
+                            uint32_t id, bool failed)
+{
+    if (s_log_mtx == NULL) {
+        return; // Not initialized yet
+    }
+    len = mesh_utf8_trunc_len(text, len, MESHTASTIC_RX_TEXT_MAX);
+
+    xSemaphoreTake(s_log_mtx, portMAX_DELAY);
+
+    uint8_t slot;
+    if (s_log_count < MESHTASTIC_MSG_LOG_CAP) {
+        slot = (uint8_t)((s_log_head + s_log_count) % MESHTASTIC_MSG_LOG_CAP);
+        s_log_count++;
+    } else {
+        slot = s_log_head; // Full: overwrite oldest and advance head
+        s_log_head = (uint8_t)((s_log_head + 1) % MESHTASTIC_MSG_LOG_CAP);
+    }
+
+    lora_meshtastic_msg_t *m = &s_log[slot];
+    m->seq       = ++s_log_seq;
+    m->id        = id;
+    m->outbound  = outbound;
+    m->acked     = false;
+    m->failed    = failed;
+    m->from_node = from_node;
+    m->rssi      = rssi;
+    m->snr       = snr;
+    m->hops      = hops;
+    memcpy(m->text, text, len);
+    m->text[len] = '\0';
+
+    xSemaphoreGive(s_log_mtx);
+}
+
+// Mark our outbound message with packet id `id` as delivered:
+// We heard a neighbour relay our own broadcast back, which is Meshtastic's implicit ACK for a broadcast
+static void mesh_log_mark_acked(uint32_t id)
+{
+    if (s_log_mtx == NULL || id == 0) {
+        return;
+    }
+
+    // Walk the log
+    xSemaphoreTake(s_log_mtx, portMAX_DELAY);
+    for (uint8_t i = 0; i < s_log_count; i++) {
+        lora_meshtastic_msg_t *m = &s_log[(s_log_head + i) % MESHTASTIC_MSG_LOG_CAP];
+        if (m->outbound && m->id == id && !m->acked) {
+            m->acked = true;
+            m->seq   = ++s_log_seq; // Bump so the portal re-fetches the new status
+            break;
+        }
+    }
+    xSemaphoreGive(s_log_mtx);
+}
+
+size_t lora_meshtastic_get_msgs_since(uint32_t since, lora_meshtastic_msg_t *out,
+                                      size_t max_out, uint32_t *newest_seq)
+{
+    if (newest_seq != NULL) {
+        *newest_seq = 0;
+    }
+    if (s_log_mtx == NULL || out == NULL || max_out == 0) {
+        return 0;
+    }
+
+    size_t n = 0;
+    xSemaphoreTake(s_log_mtx, portMAX_DELAY);
+
+    if (newest_seq != NULL) {
+        *newest_seq = s_log_seq;
+    }
+
+    // Reboot detection: s_log_seq restarts at 0 on every boot, so a client cursor
+    // above the current max means the log was reset (device rebooted)
+    // Treat it as a fresh client and replay the whole window, otherwise a still-open browser tab would drop every new message
+    if (since > s_log_seq) {
+        since = 0;
+    }
+    // Walk oldest -> newest; copy the newer-than-'since' tail, capped to max_out.
+    for (uint8_t i = 0; i < s_log_count; i++) {
+        const lora_meshtastic_msg_t *m = &s_log[(s_log_head + i) % MESHTASTIC_MSG_LOG_CAP];
+        if (m->seq <= since) {
+            continue;
+        }
+        if (n == max_out) {
+            // Buffer full: shift window forward so we keep the newest max_out.
+            memmove(out, out + 1, (max_out - 1) * sizeof(*out));
+            n--;
+        }
+        out[n++] = *m;
+    }
+
+    xSemaphoreGive(s_log_mtx);
+    return n;
+}
+
+bool lora_meshtastic_enqueue_text(const char *text)
+{
+    // Reject when no session is active (!s_listening)
+    if (!g_meshtastic_mode || !s_listening || s_tx_queue == NULL || text == NULL || text[0] == '\0') {
+        return false;
+    }
+
+    mesh_tx_item_t item;
+    size_t n = mesh_utf8_trunc_len((const uint8_t *)text, strlen(text), MESHTASTIC_RX_TEXT_MAX);
+    memcpy(item.text, text, n);
+    item.text[n] = '\0';
+    if (item.text[0] == '\0') {
+        return false; // Empty after truncation
+    }
+    return xQueueSend(s_tx_queue, &item, 0) == pdTRUE;
+}
+
+// Nodes-heard roster
+
+// Find the slot holding node_num, or -1. Caller must hold s_nodes_mtx
+static int mesh_node_find(uint32_t node_num)
+{
+    for (int i = 0; i < MESHTASTIC_NODE_MAX; i++) {
+        if (s_nodes[i].node_num == node_num) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// Find (or allocate, evicting the oldest when full) the slot for node_num
+// Caller must hold s_nodes_mtx
+static int mesh_node_slot(uint32_t node_num)
+{
+    int idx = mesh_node_find(node_num);
+    if (idx >= 0) {
+        return idx;
+    }
+
+    TickType_t now = xTaskGetTickCount();
+    int oldest = 0;
+    for (int i = 0; i < MESHTASTIC_NODE_MAX; i++) {
+        if (s_nodes[i].node_num == 0) {
+            oldest = i; // An empty slot is the best possible choice
+            break;
+        }
+
+        // Largest elapsed time = oldest
+        // Compare elapsed (not raw ticks) so this stays correct across a tick-counter wrap, like get_nodes' age_s.
+        if ((TickType_t)(now - s_nodes[i].last_heard_tick) >
+            (TickType_t)(now - s_nodes[oldest].last_heard_tick)) {
+            oldest = i;
+        }
+    }
+
+    // Evict the oldest and return that slot for reuse
+    memset(&s_nodes[oldest], 0, sizeof(s_nodes[oldest]));
+    s_nodes[oldest].node_num = node_num;
+    s_nodes[oldest].rssi = INT8_MIN;
+    s_nodes[oldest].snr  = INT8_MIN;
+    return oldest;
+}
+
+// Record a heard packet from `from`: keep the best signal, latest hops/last-heard
+static void mesh_node_seen(uint32_t from, int8_t rssi, int8_t snr, uint8_t hops)
+{
+    if (s_nodes_mtx == NULL || from == 0 || from == s_node_num) {
+        return; // Don't roster ourselves or a null id
+    }
+
+    xSemaphoreTake(s_nodes_mtx, portMAX_DELAY);
+    mesh_node_t *n = &s_nodes[mesh_node_slot(from)];
+    if (rssi > n->rssi) {
+        n->rssi = rssi;
+    }
+    if (snr > n->snr) {
+        n->snr = snr;
+    }
+    n->hops = hops;
+    n->last_heard_tick = xTaskGetTickCount();
+    xSemaphoreGive(s_nodes_mtx);
+}
+
+// Attach names from a NodeInfo to an already-seen node (seen runs first per packet)
+static void mesh_node_set_names(uint32_t from, const char *long_name, const char *short_name)
+{
+    if (s_nodes_mtx == NULL || from == 0 || from == s_node_num) {
+        return;
+    }
+    
+    xSemaphoreTake(s_nodes_mtx, portMAX_DELAY);
+    int i = mesh_node_find(from);
+    if (i >= 0) {
+        strncpy(s_nodes[i].long_name, long_name, MESHTASTIC_NODE_LONG_MAX);
+        s_nodes[i].long_name[MESHTASTIC_NODE_LONG_MAX] = '\0';
+        strncpy(s_nodes[i].short_name, short_name, MESHTASTIC_NODE_SHORT_MAX);
+        s_nodes[i].short_name[MESHTASTIC_NODE_SHORT_MAX] = '\0';
+    }
+    xSemaphoreGive(s_nodes_mtx);
+}
+
+size_t lora_meshtastic_get_nodes(lora_meshtastic_node_t *out, size_t max_out)
+{
+    if (s_nodes_mtx == NULL || out == NULL || max_out == 0) {
+        return 0;
+    }
+
+    size_t n = 0;
+
+    xSemaphoreTake(s_nodes_mtx, portMAX_DELAY);
+    TickType_t now = xTaskGetTickCount();
+
+    for (int i = 0; i < MESHTASTIC_NODE_MAX && n < max_out; i++) {
+        if (s_nodes[i].node_num == 0) {
+            continue;
+        }
+
+        out[n].node_num = s_nodes[i].node_num;
+        strncpy(out[n].long_name, s_nodes[i].long_name, MESHTASTIC_NODE_LONG_MAX);
+        out[n].long_name[MESHTASTIC_NODE_LONG_MAX] = '\0';
+        strncpy(out[n].short_name, s_nodes[i].short_name, MESHTASTIC_NODE_SHORT_MAX);
+        out[n].short_name[MESHTASTIC_NODE_SHORT_MAX] = '\0';
+        out[n].rssi = s_nodes[i].rssi;
+        out[n].snr  = s_nodes[i].snr;
+        out[n].hops = s_nodes[i].hops;
+
+        // Tick subtraction is wrap-safe; divide by the tick rate for whole seconds
+        out[n].age_s = (uint32_t)((now - s_nodes[i].last_heard_tick) / configTICK_RATE_HZ);
+        n++;
+    }
+    xSemaphoreGive(s_nodes_mtx);
+
+    return n;
+}
+
+size_t lora_meshtastic_node_count(void)
+{
+    if (s_nodes_mtx == NULL) {
+        return 0;
+    }
+
+    size_t c = 0; // Start at 0
+
+    xSemaphoreTake(s_nodes_mtx, portMAX_DELAY);
+    for (int i = 0; i < MESHTASTIC_NODE_MAX; i++) {
+        // Count one for every non-zero node_num
+        if (s_nodes[i].node_num != 0) {
+            c++;
+        }
+    }
+    xSemaphoreGive(s_nodes_mtx);
+
+    return c;
+}
+
+// Radio configuration
 
 void lora_meshtastic_get_radio_params(sx126x_mod_params_lora_t *mod,
                                       sx126x_pkt_params_lora_t *pkt,
@@ -112,19 +409,48 @@ void lora_meshtastic_get_radio_params(sx126x_mod_params_lora_t *mod,
 // Caller MUST hold s_radio_mtx (it mutates radio mode vs the TX sequence).
 static void mesh_enter_rx(void)
 {
+    // Restore the full RX payload length first
+    sx126x_pkt_params_lora_t pkt = {
+        .preamble_len_in_symb = MESHTASTIC_PREAMBLE_SYMB,
+        .header_type          = SX126X_LORA_PKT_EXPLICIT,
+        .pld_len_in_bytes     = MESHTASTIC_MAX_PACKET_LEN,
+        .crc_is_on            = true,
+        .invert_iq_is_on      = false,
+    };
+    if (sx126x_set_lora_pkt_params(NULL, &pkt) != SX126X_STATUS_OK) {
+        ESP_LOGE(TAG, "RX: set pkt params failed");
+    }
+
     sx126x_status_t status = sx126x_set_rx_with_timeout_in_rtc_step(NULL, SX126X_RX_CONTINUOUS);
     if (status != SX126X_STATUS_OK) {
         ESP_LOGE(TAG, "Failed to enter continuous RX");
     }
 }
 
-// ── Identity ───────────────────────────────────────────────────────────────
+// Identity
 
 void lora_meshtastic_init(void)
 {
     if (s_radio_mtx == NULL) {
         s_radio_mtx = xSemaphoreCreateMutex();
     }
+    if (s_log_mtx == NULL) {
+        s_log_mtx = xSemaphoreCreateMutex();
+    }
+    if (s_nodes_mtx == NULL) {
+        s_nodes_mtx = xSemaphoreCreateMutex();
+    }
+    if (s_tx_queue == NULL) {
+        s_tx_queue = xQueueCreate(MESH_TX_QUEUE_LEN, sizeof(mesh_tx_item_t));
+    }
+
+    // Fail loudly at boot if any of these couldn't be allocated, rather than
+    // NULL-dereferencing later in the run loop / IRQ path (matches lora_task)
+    configASSERT(s_radio_mtx);
+    configASSERT(s_log_mtx);
+    configASSERT(s_nodes_mtx);
+    configASSERT(s_tx_queue);
+
     mesh_crypto_init(); // import the default PSK once
 
     if (s_node_num != 0) {
@@ -148,7 +474,12 @@ uint32_t lora_meshtastic_node_num(void)
     return s_node_num;
 }
 
-// ── Crypto (AES-128-CTR) ───────────────────────────────────────────────────
+const char *lora_meshtastic_node_id(void)
+{
+    return s_node_id;
+}
+
+// Crypto (AES-128-CTR)
 
 static void mesh_build_nonce(uint8_t nonce[16], uint32_t from_node, uint32_t packet_id)
 {
@@ -302,9 +633,8 @@ static size_t mesh_encode_data(uint8_t *out, uint8_t portnum,
     return off;
 }
 
-// Build a User message: id (f1), long_name (f2), short_name (f3), all strings.
-// Bounded by out_cap and truncates per-field, so it stays safe if the names ever
-// become runtime/user-configurable (phase-2 LCD).
+// Build a User message: id (f1), long_name (f2), short_name (f3), all strings
+// Bounded by out_cap and truncates per-field, so it stays safe if the names ever become runtime/user-configurable
 static size_t mesh_encode_user(uint8_t *out, size_t out_cap, const char *id,
                                const char *long_name, const char *short_name)
 {
@@ -365,6 +695,12 @@ static bool mesh_radio_tx(const uint8_t *data, uint8_t len)
 
     bool ok = true;
     xSemaphoreTake(s_radio_mtx, portMAX_DELAY);
+
+    // Nothing transmits after the session closed
+    if (!s_listening) {
+        xSemaphoreGive(s_radio_mtx);
+        return false;
+    }
     if (sx126x_set_lora_pkt_params(NULL, &pkt) != SX126X_STATUS_OK) {
         ESP_LOGE(TAG, "TX: set pkt params failed");
         ok = false;
@@ -385,9 +721,14 @@ static bool mesh_radio_tx(const uint8_t *data, uint8_t len)
     return ok;
 }
 
-// Encrypt an application payload into a full Meshtastic broadcast frame and send.
-static bool mesh_send_packet(uint8_t portnum, const uint8_t *payload, size_t payload_len)
+// Encrypt an application payload into a full Meshtastic broadcast frame and send:
+// If out_id is non-NULL it receives the Meshtastic packet id used, so the caller can later match a relayed copy as an ACK
+static bool mesh_send_packet(uint8_t portnum, const uint8_t *payload, size_t payload_len,
+                             uint32_t *out_id)
 {
+    if (out_id != NULL) {
+        *out_id = 0;
+    }
     if (s_node_num == 0) {
         lora_meshtastic_init();
     }
@@ -407,7 +748,10 @@ static bool mesh_send_packet(uint8_t portnum, const uint8_t *payload, size_t pay
     size_t data_len = mesh_encode_data(data, portnum, payload, payload_len);
 
     uint32_t packet_id = mesh_random_id();
-    mesh_aes_ctr(data, data_len, s_node_num, packet_id); // encrypt in place
+    if (out_id != NULL) {
+        *out_id = packet_id; // Report the id even if the radio TX below fails
+    }
+    mesh_aes_ctr(data, data_len, s_node_num, packet_id); // Encrypt in place
 
     uint8_t pkt[16 + sizeof(data)];
     // flags 0x63 = hop_limit 3 | hop_start 3 (want_ack 0, via_mqtt 0)
@@ -417,13 +761,15 @@ static bool mesh_send_packet(uint8_t portnum, const uint8_t *payload, size_t pay
     return mesh_radio_tx(pkt, (uint8_t)(16 + data_len));
 }
 
-bool lora_meshtastic_send_text(const char *text)
+// Broadcast user text. Returns whether the radio TX actually started; the
+// Meshtastic packet id used is written to *out_id (even on failure) so the run
+// loop can later recognise a relayed copy as an implicit delivery ACK.
+static bool mesh_send_user_text(const char *text, uint32_t *out_id)
 {
-    if (s_node_num == 0) {
-        lora_meshtastic_init();
-    }
-    ESP_LOGI(TAG, "TX text → mesh: \"%s\"", text);
-    return mesh_send_packet(MESHTASTIC_PORT_TEXT, (const uint8_t *)text, strlen(text));
+#ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "TX text -> mesh: \"%s\"", text);
+#endif
+    return mesh_send_packet(MESHTASTIC_PORT_TEXT, (const uint8_t *)text, strlen(text), out_id);
 }
 
 bool lora_meshtastic_send_nodeinfo(void)
@@ -431,17 +777,19 @@ bool lora_meshtastic_send_nodeinfo(void)
     if (s_node_num == 0) {
         lora_meshtastic_init();
     }
-    // We emit only id/long_name/short_name. is_licensed is omitted (proto3 default
-    // false), so normal receivers list us; by Meshtastic design a ham-licensed
-    // receiver (owner.is_licensed=true) drops NodeInfo on an is_licensed mismatch,
-    // so we are simply invisible to those nodes — claiming licensed would be wrong.
+
+    // We emit only id/long_name/short_name
+    // is_licensed is omitted (proto3 default false), so normal receivers list us; by Meshtastic design a ham-licensed
+    // receiver (owner.is_licensed=true) drops NodeInfo on an is_licensed mismatch, so we are simply invisible to those nodes
     uint8_t user[96];
     size_t user_len = mesh_encode_user(user, sizeof(user), s_node_id, MESH_LONG_NAME, MESH_SHORT_NAME);
-    ESP_LOGI(TAG, "TX nodeinfo → mesh: %s (%s / %s)", s_node_id, MESH_LONG_NAME, MESH_SHORT_NAME);
-    return mesh_send_packet(MESHTASTIC_PORT_NODEINFO, user, user_len);
+#ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "TX nodeinfo -> mesh: %s (%s / %s)", s_node_id, MESH_LONG_NAME, MESH_SHORT_NAME);
+#endif
+    return mesh_send_packet(MESHTASTIC_PORT_NODEINFO, user, user_len, NULL);
 }
 
-// ── RX decode + print ──────────────────────────────────────────────────────
+// RX decode + print
 
 // Parse a decrypted Data message: extract portnum (f1) and payload (f2).
 static bool mesh_decode_data(const uint8_t *buf, size_t len, uint32_t *portnum,
@@ -495,8 +843,8 @@ static bool mesh_decode_data(const uint8_t *buf, size_t len, uint32_t *portnum,
     return true;
 }
 
-// Decode a User payload and print id / long_name / short_name.
-static void mesh_print_user(const uint8_t *buf, size_t len)
+// Decode a User payload: log it and store the names against the roster node
+static void mesh_handle_user(uint32_t from, const uint8_t *buf, size_t len)
 {
     char id[24] = {0}, ln[40] = {0}, sn[8] = {0};
     const uint8_t *p = buf, *end = buf + len;
@@ -543,7 +891,10 @@ static void mesh_print_user(const uint8_t *buf, size_t len)
             break;
         }
     }
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "   NodeInfo: id=%s long=\"%s\" short=\"%s\"", id, ln, sn);
+#endif
+    mesh_node_set_names(from, ln, sn);
 }
 
 // Decode a Position payload and print lat / lon / alt (no floating point).
@@ -601,13 +952,32 @@ static void mesh_print_position(const uint8_t *buf, size_t len)
         // which abs() would hit as undefined behavior on hostile input).
         uint32_t lat_mag = (lat_i < 0) ? (0u - (uint32_t)lat_i) : (uint32_t)lat_i;
         uint32_t lon_mag = (lon_i < 0) ? (0u - (uint32_t)lon_i) : (uint32_t)lon_i;
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "   Position: lat=%s%u.%07u lon=%s%u.%07u alt=%dm time=%u",
                  (lat_i < 0) ? "-" : "", lat_mag / 10000000u, lat_mag % 10000000u,
                  (lon_i < 0) ? "-" : "", lon_mag / 10000000u, lon_mag % 10000000u,
                  (int)alt, (unsigned)t);
+#endif
     } else {
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "   Position: (no fix) alt=%dm time=%u", (int)alt, (unsigned)t);
+#endif
     }
+}
+
+// Track packet ids we've already stored so mesh relays of the same message
+// don't appear twice in the portal. RX event task only, so no lock needed.
+// Returns true if this id was already seen (and thus should be dropped).
+static bool mesh_rx_is_duplicate(uint32_t id)
+{
+    for (uint8_t i = 0; i < MESHTASTIC_MSG_LOG_CAP; i++) {
+        if (s_seen_ids[i] == id) {
+            return true;
+        }
+    }
+    s_seen_ids[s_seen_pos] = id;
+    s_seen_pos = (uint8_t)((s_seen_pos + 1) % MESHTASTIC_MSG_LOG_CAP);
+    return false;
 }
 
 void lora_meshtastic_process_rx(const uint8_t *buf, size_t len, int8_t rssi, int8_t snr)
@@ -626,16 +996,24 @@ void lora_meshtastic_process_rx(const uint8_t *buf, size_t len, int8_t rssi, int
     uint8_t  chan  = buf[13];
     uint8_t  hop_limit = flags & 0x07;
     uint8_t  hop_start = (flags & 0xE0) >> 5;
+    uint8_t  hops = (hop_start >= hop_limit) ? (uint8_t)(hop_start - hop_limit) : 0;
 
+#ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "RX !%08x → %s id=0x%08x ch=0x%02x hops=%u/%u rssi=%d snr=%d len=%u%s",
              (unsigned)from, (to == 0xFFFFFFFFu) ? "ALL" : "node",
              (unsigned)id, chan, hop_limit, hop_start, rssi, snr, (unsigned)len,
              (from == s_node_num) ? " (self)" : "");
+#endif
+
+    // Roster every node we hear (any channel) with its signal/hops/last-heard; NodeInfo below fills in names
+    mesh_node_seen(from, rssi, snr, hops);
 
     // We only hold the default LongFast key, so only ch 0x08 packets decrypt.
     if (chan != MESHTASTIC_CHANNEL_HASH) {
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "   (channel 0x%02x not ours [0x%02x] — skipping decrypt)",
                  chan, MESHTASTIC_CHANNEL_HASH);
+#endif
         return;
     }
 
@@ -651,12 +1029,25 @@ void lora_meshtastic_process_rx(const uint8_t *buf, size_t len, int8_t rssi, int
         return;
     }
 
+    if (inner == NULL) {
+        inner = payload; // Valid address; inner_len == 0, so nothing is read from it
+    }
+
     switch (portnum) {
     case MESHTASTIC_PORT_TEXT:
+#ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "   TEXT: \"%.*s\"", (int)inner_len, (const char *)inner);
+#endif
+        if (from == s_node_num) {
+            // Our own broadcast relayed back by a neighbour = implicit delivery ACK
+            mesh_log_mark_acked(id);
+        } else if (!(id != 0 && mesh_rx_is_duplicate(id))) {
+            // Surface to the web portal, dropping duplicate relays of a stored one
+            mesh_log_append(from, false, rssi, snr, hops, inner, inner_len, id, false);
+        }
         break;
     case MESHTASTIC_PORT_NODEINFO:
-        mesh_print_user(inner, inner_len);
+        mesh_handle_user(from, inner, inner_len);
         break;
     case MESHTASTIC_PORT_POSITION:
         mesh_print_position(inner, inner_len);
@@ -718,8 +1109,10 @@ void lora_meshtastic_handle_irq(uint16_t irq_flags)
 
     sx126x_clear_irq_status(NULL, SX126X_IRQ_ALL);
 
-    // Re-arm continuous RX, but never while a TX we started is still on air.
-    if (!s_tx_busy) {
+    // Re-arm continuous RX, but never while a TX we started is still on air, and
+    // only while a portal session is active - once the page closes we let the
+    // radio fall to standby (a TX_DONE here just clears s_tx_busy, no re-arm)
+    if (!s_tx_busy && s_listening) {
         mesh_enter_rx();
     }
     xSemaphoreGive(s_radio_mtx);
@@ -737,8 +1130,9 @@ void lora_meshtastic_handle_irq(uint16_t irq_flags)
 
 void lora_meshtastic_resume_rx(void)
 {
-    if (s_radio_mtx == NULL) {
-        return; // Mesh mode never initialized: nothing to resume
+    // Only re-arm if a portal session is active; otherwise the radio should stay in the standby it woke into
+    if (s_radio_mtx == NULL || !s_listening) {
+        return;
     }
     // A light-sleep entry idled the radio (set_standby + clear IRQ) while a TX
     // may have been in flight; that TX is gone, so clear the stale gate and put
@@ -749,47 +1143,95 @@ void lora_meshtastic_resume_rx(void)
     xSemaphoreGive(s_radio_mtx);
 }
 
+void lora_meshtastic_listen_start(void)
+{
+    // Portal page opened: start listening for the mesh and announce ourselves
+    if (!g_meshtastic_mode || s_radio_mtx == NULL) {
+        return;
+    }
+
+    // Start each session with an empty TX queue so a message that somehow survived
+    // a previous session's close (a send racing the reset) can never broadcast now
+    if (s_tx_queue != NULL) {
+        xQueueReset(s_tx_queue);
+    }
+    xSemaphoreTake(s_radio_mtx, portMAX_DELAY);
+    s_tx_busy   = false;
+    s_listening = true;
+    mesh_enter_rx();
+    xSemaphoreGive(s_radio_mtx);
+
+    // Let the run task (sole TX producer) broadcast our NodeInfo for this session
+    s_announce_pending = true;
+#ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "Meshtastic: listening (portal open)");
+#endif
+}
+
+void lora_meshtastic_listen_stop(void)
+{
+    // Portal page closed: idle the radio to standby to stop draining the battery
+    if (s_radio_mtx == NULL) {
+        return;
+    }
+    xSemaphoreTake(s_radio_mtx, portMAX_DELAY);
+    s_listening        = false;
+    s_announce_pending = false;
+    s_tx_busy          = false;
+    sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
+    sx126x_clear_irq_status(NULL, SX126X_IRQ_ALL);
+    xSemaphoreGive(s_radio_mtx);
+
+    // Drop any text queued but not yet transmitted this session
+    if (s_tx_queue != NULL) {
+        xQueueReset(s_tx_queue);
+    }
+
+#ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "Meshtastic: idle (portal closed)");
+#endif
+}
+
 void lora_meshtastic_run(void)
 {
     lora_meshtastic_init();
-
-    ESP_LOGI(TAG, "=== Meshtastic mode ACTIVE ===");
+#ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "=== Meshtastic mode ENABLED (radio idle until portal opens) ===");
     ESP_LOGI(TAG, "Node %s (0x%08x)  LongFast/US  %u.%03u MHz  ch-hash 0x%02x",
              s_node_id, (unsigned)s_node_num,
              (unsigned)(MESHTASTIC_LORA_FREQ_HZ / 1000000UL),
              (unsigned)((MESHTASTIC_LORA_FREQ_HZ / 1000UL) % 1000UL),
              MESHTASTIC_CHANNEL_HASH);
-
-    xSemaphoreTake(s_radio_mtx, portMAX_DELAY);
-    mesh_enter_rx();
-    xSemaphoreGive(s_radio_mtx);
-
-    // Announce ourselves so we appear in other nodes' lists.
-    vTaskDelay(pdMS_TO_TICKS(500));
-    lora_meshtastic_send_nodeinfo();
-
-    TickType_t last_nodeinfo = xTaskGetTickCount();
-#if MESHTASTIC_TEST_TX_PERIOD_MS > 0
-    TickType_t last_test = xTaskGetTickCount();
-    uint32_t   test_seq = 0;
 #endif
+
+    // The radio stays in standby until the user opens the Meshtastic portal page
+    TickType_t last_nodeinfo = xTaskGetTickCount();
 
     while (1) {
         TickType_t now = xTaskGetTickCount();
 
-        if ((now - last_nodeinfo) >= pdMS_TO_TICKS(MESHTASTIC_NODEINFO_PERIOD_MS)) {
-            lora_meshtastic_send_nodeinfo();
-            last_nodeinfo = now;
-        }
+        // Only touch the radio while a portal session is active
+        if (s_listening && !s_tx_busy) {
+            mesh_tx_item_t tx_item;
 
-#if MESHTASTIC_TEST_TX_PERIOD_MS > 0
-        if ((now - last_test) >= pdMS_TO_TICKS(MESHTASTIC_TEST_TX_PERIOD_MS)) {
-            char msg[48];
-            snprintf(msg, sizeof(msg), "PolyCast5 test #%u", (unsigned)(++test_seq));
-            lora_meshtastic_send_text(msg);
-            last_test = now;
+            // Guard the handle too
+            if (s_tx_queue != NULL && xQueueReceive(s_tx_queue, &tx_item, 0) == pdTRUE) {
+                uint32_t tx_id = 0;
+                bool tx_ok = mesh_send_user_text(tx_item.text, &tx_id);
+
+                // Echo our own message into the log so the portal shows what the user sent,
+                // flagged as failed when the radio never actually put it on air
+                mesh_log_append(s_node_num, true, 0, 0, 0,
+                                (const uint8_t *)tx_item.text, strlen(tx_item.text), tx_id, !tx_ok);
+            } else if (s_announce_pending) {
+                lora_meshtastic_send_nodeinfo(); // Announce at session start
+                s_announce_pending = false;
+                last_nodeinfo = now;
+            } else if ((now - last_nodeinfo) >= pdMS_TO_TICKS(MESHTASTIC_NODEINFO_PERIOD_MS)) {
+                lora_meshtastic_send_nodeinfo();
+                last_nodeinfo = now;
+            }
         }
-#endif
 
         vTaskDelay(pdMS_TO_TICKS(100));
     }
