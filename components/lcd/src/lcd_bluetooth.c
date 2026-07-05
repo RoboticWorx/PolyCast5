@@ -295,6 +295,14 @@ static void lcd_bluetooth_setup_keyboard_page(bluetooth_keyboard_menu_t *menu)
 
 static void setup_keyboard_submenu_page(bluetooth_keyboard_menu_t *submenu)
 {
+    // Free any list/styles left over from a previous entry
+    if (submenu->main_list != NULL) {
+        lv_obj_delete(submenu->main_list);
+        submenu->main_list = NULL;
+        lv_style_reset(&submenu->btn_style);
+        lv_style_reset(&submenu->sel_style);
+    }
+
     // Create list
     submenu->main_list = lv_list_create(ACTIVE_SCR);
     lv_obj_set_size(submenu->main_list, 210, 106);
@@ -350,6 +358,14 @@ static void setup_keyboard_submenu_page(bluetooth_keyboard_menu_t *submenu)
 
 static void setup_known_devices_page(bluetooth_peer_menu_t *menu)
 {
+    // Free any list/styles left over from a previous entry
+    if (menu->main_list != NULL) {
+        lv_obj_delete(menu->main_list);
+        menu->main_list = NULL;
+        lv_style_reset(&menu->btn_style);
+        lv_style_reset(&menu->sel_style);
+    }
+
     // Create list
     menu->main_list = lv_list_create(ACTIVE_SCR);
     lv_obj_set_size(menu->main_list, 210, 106);
