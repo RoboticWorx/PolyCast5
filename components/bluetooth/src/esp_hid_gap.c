@@ -823,8 +823,18 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
         ESP_LOGI(TAG, "connection %s; status=%d",
                 event->connect.status == 0 ? "established" : "failed",
                 event->connect.status);
+
+        // A failed connection attempt stops advertising but produces no ADV_COMPLETE
+        // (adv uses BLE_HS_FOREVER) and no DISCONNECT (no link was ever established),
+        // so nothing else re-arms it - restart here or the HID stays unconnectable
+        // until Bluetooth is toggled off/on
+        if (event->connect.status != 0 && bluetooth_state == BT_STATE_RUNNING) {
+            rc = esp_hid_ble_gap_adv_start();
+            if (rc != 0) {
+                ESP_LOGE(TAG, "failed to restart advertising after connect failure; rc=%d", rc);
+            }
+        }
         return 0;
-        break;
     case BLE_GAP_EVENT_DISCONNECT:
         ESP_LOGI(TAG, "disconnect; reason=%d", event->disconnect.reason);
 

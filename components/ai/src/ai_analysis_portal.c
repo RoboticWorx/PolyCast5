@@ -61,8 +61,9 @@ static esp_err_t result_get(httpd_req_t *req)
     cJSON_AddBoolToObject(root, "has_result", has_result);
 
     if (has_result) {
-        // Cap to keep response size reasonable (avoid huge JSON allocations)
-        #define AI_ANALYSIS_MD_CAP (16 * 1024)
+        // Serve up to the full buffered result (s_result is AI_RESPONSE_MAX_LEN);
+        // the transient malloc below lands in PSRAM so the large copy is fine
+        #define AI_ANALYSIS_MD_CAP AI_RESPONSE_MAX_LEN
 
         // Determine copy length
         size_t src_len = strlen(s_result);

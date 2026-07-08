@@ -1037,8 +1037,9 @@ esp_err_t ai_utils_keyboard_prompt_save_nvs(const char *prompt)
         return err;
     }
 
-    // Save prompt string
-    err = nvs_set_str(h, AI_PROMPT_KEYBOARD_KEY, prompt);
+    // Save prompt as a blob (incl. null terminator) so the full AI_PROMPT_NVS_MAX_LEN
+    // ceiling is real; nvs_set_str caps strings at ~4000 bytes
+    err = nvs_set_blob(h, AI_PROMPT_KEYBOARD_KEY, prompt, strlen(prompt) + 1);
 
     // Commit only on success
     if (err == ESP_OK) {
@@ -1066,9 +1067,12 @@ esp_err_t ai_utils_keyboard_prompt_load_nvs(char *out, size_t out_sz)
         return err;
     }
 
-    // Read prompt string (sz is in/out)
+    // Read prompt blob (sz is in/out); guarantee null-termination on success
     size_t sz = out_sz;
-    err = nvs_get_str(h, AI_PROMPT_KEYBOARD_KEY, out, &sz);
+    err = nvs_get_blob(h, AI_PROMPT_KEYBOARD_KEY, out, &sz);
+    if (err == ESP_OK) {
+        out[(sz < out_sz) ? sz : (out_sz - 1)] = '\0';
+    }
 
     // Close handle
     nvs_close(h);
@@ -1091,8 +1095,9 @@ esp_err_t ai_utils_pkt_analysis_prompt_save_nvs(const char *prompt)
         return err;
     }
 
-    // Save prompt string
-    err = nvs_set_str(h, AI_PROMPT_PKT_ANALYSIS_KEY, prompt);
+    // Save prompt as a blob (incl. null terminator) so the full AI_PROMPT_NVS_MAX_LEN
+    // ceiling is real; nvs_set_str caps strings at ~4000 bytes
+    err = nvs_set_blob(h, AI_PROMPT_PKT_ANALYSIS_KEY, prompt, strlen(prompt) + 1);
 
     // Commit only on success
     if (err == ESP_OK) {
@@ -1120,9 +1125,12 @@ esp_err_t ai_utils_pkt_analysis_prompt_load_nvs(char *out, size_t out_sz)
         return err;
     }
 
-    // Read prompt string (sz is in/out)
+    // Read prompt blob (sz is in/out); guarantee null-termination on success
     size_t sz = out_sz;
-    err = nvs_get_str(h, AI_PROMPT_PKT_ANALYSIS_KEY, out, &sz);
+    err = nvs_get_blob(h, AI_PROMPT_PKT_ANALYSIS_KEY, out, &sz);
+    if (err == ESP_OK) {
+        out[(sz < out_sz) ? sz : (out_sz - 1)] = '\0';
+    }
 
     // Close handle
     nvs_close(h);
