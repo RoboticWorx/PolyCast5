@@ -21,6 +21,10 @@ That's it. The script figures out everything else:
     real settings from the build AND cross-checks the chip's efuse state, so if
     you ever turn Flash Encryption off it adapts - and it refuses to flash if
     the build and the chip disagree (which would brick the board).
+  * Mirrors the freshly built images into the repo's bin/ folder (flat
+    filenames plus a matching flash_args), so the committed release binaries -
+    the ones the web Firmware Updater serves - always match the pushed source.
+    Skipped on --dry-run; unchanged files aren't rewritten.
 
 Common usage:
     python flash.py                 # build, then flash whatever changed
@@ -65,10 +69,11 @@ OTA note:
 Exit code: 0 on success (or nothing-to-do), non-zero on any failure.
 
 ----------------------------------------------------------------------------
-Trace map (top to bottom): the flow lives in main(), which runs eight numbered
+Trace map (top to bottom): the flow lives in main(), which runs nine numbered
 steps: 1) build, 2) load build outputs, 3) build a per-partition "plan",
-4) connect + preflight the chip, 5) decide what changed, 6) print the plan,
-7) flash, 8) save state. Everything above main() is a helper those steps call.
+4) mirror the images into bin/, 5) connect + preflight the chip, 6) decide
+what changed, 7) print the plan, 8) flash, 9) save state. Everything above
+main() is a helper those steps call.
 ----------------------------------------------------------------------------
 """
 
@@ -79,6 +84,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -94,6 +100,7 @@ FLASHER_ARGS   = BUILD_DIR / "flasher_args.json"       # offsets + flash params,
 SDKCONFIG_JSON = BUILD_DIR / "config" / "sdkconfig.json"  # resolved config (for the FE setting)
 PARTITIONS_CSV = ROOT / "partitions.csv"               # source of each partition's type/flags
 STATE_FILE     = BUILD_DIR / "flash_state.json"        # our change-tracking manifest
+BIN_DIR        = ROOT / "bin"                          # committed release binaries (web Firmware Updater)
 
 # Data-partition subtypes that the flash-encryption hardware does NOT decrypt
 # on read, so their images must be written as PLAINTEXT even when FE is on.
@@ -285,6 +292,51 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+# ===========================================================================
+# Release-binary export. The repo's bin/ folder carries prebuilt binaries for
+# the web Firmware Updater; mirroring every build into it keeps the committed
+# binaries in lockstep with the committed source.
+# ===========================================================================
+def export_release_bins(plan: list[dict], write_flash_args: list[str]) -> None:
+    """Copy the built images into bin/ (flat basenames) and refresh flash_args.
+
+    Non-fatal: an export problem must never block a flash, so any error just
+    prints a note and returns."""
+    try:
+        BIN_DIR.mkdir(exist_ok=True)
+        updated = 0
+        seen: set[str] = set()
+        for p in plan:
+            name = Path(p["rel"]).name  # flatten bootloader/bootloader.bin -> bootloader.bin
+            if name in seen:
+                # Two images sharing a basename can't coexist in a flat folder.
+                print(yellow(f"Note: duplicate image name {name}; bin/ keeps the first."))
+                continue
+            seen.add(name)
+            dest = BIN_DIR / name
+            # Skip identical files so unchanged builds don't churn mtimes / git status.
+            if dest.exists() and sha256_file(dest) == p["sha"]:
+                continue
+            shutil.copyfile(p["path"], dest)
+            updated += 1
+        # flash_args mirrors the build's flash settings but with the flat names
+        # above, so the folder is flashable as-is (see bin/README.md).
+        lines = [" ".join(write_flash_args)]
+        for p in sorted(plan, key=lambda q: q["offset"]):
+            lines.append(f"{p['offset_hex']} {Path(p['rel']).name}")
+        text = "\n".join(lines) + "\n"
+        fargs = BIN_DIR / "flash_args"
+        if not fargs.exists() or fargs.read_text() != text:
+            fargs.write_text(text)
+            updated += 1
+        if updated:
+            print(cyan(f"Updated bin/ with {updated} file(s) from this build."))
+        else:
+            print(gray("bin/ release binaries already match this build."))
+    except OSError as e:
+        print(yellow(f"Note: couldn't update bin/ release binaries ({e})."))
 
 
 # ===========================================================================
@@ -622,7 +674,14 @@ def main() -> int:
             "sha": sha256_file(path),                        # content hash for change detection
         })
 
-    # -- 4. Port + device preflight (identity + on-chip FE state) -------------
+    # -- 4. Mirror the built images into bin/ ----------------------------------
+    # bin/ holds the committed release binaries (served by the web Firmware
+    # Updater), so refreshing it on every build means pushed source always
+    # ships matching binaries. Dry-run changes nothing, on-chip or in the repo.
+    if not args.dry_run:
+        export_release_bins(plan, write_flash_args)
+
+    # -- 5. Port + device preflight (identity + on-chip FE state) -------------
     if args.dry_run:
         # Dry-run never touches hardware: don't auto-detect or connect.
         port = args.port or "(auto-detect at flash time)"
@@ -661,7 +720,7 @@ def main() -> int:
         else:
             print(green(f"Chip flash-encryption: {'ON' if chip_fe else 'OFF'} (matches build)."))
 
-    # -- 5. Decide what changed -----------------------------------------------
+    # -- 6. Decide what changed -----------------------------------------------
     # `reason` is set when we should flash EVERYTHING (skips per-file hashing).
     # Otherwise we compare each image's hash to the last-flash record.
     state = load_state()
@@ -696,7 +755,7 @@ def main() -> int:
     if reason:
         print(yellow(f"\nFlashing everything: {reason}."))
 
-    # -- 6. Print the plan ----------------------------------------------------
+    # -- 7. Print the plan ----------------------------------------------------
     # One row per partition: FLASH/skip, offset, name, encrypted/plaintext, size, file.
     print(bold(f"\nPlan  (chip {chip}, flash encryption {'ON' if fe else 'OFF'}):"))
     enc_label = lambda e: (green("encrypted") if e else yellow("plaintext "))
@@ -725,7 +784,7 @@ def main() -> int:
     if args.erase:
         confirm_erase(args.yes)  # may abort the whole run
 
-    # -- 7. Flash -------------------------------------------------------------
+    # -- 8. Flash -------------------------------------------------------------
     # Build an ordered list of esptool steps. Order matters so the device resets
     # into the app exactly once, at the very end. Encrypted images go first (one
     # combined --encrypt write), then each plaintext filesystem partition, to
@@ -768,7 +827,7 @@ def main() -> int:
         after = "hard-reset" if i == len(steps) - 1 else "no-reset"
         run(esptool_cmd(port, chip, before, after, *step_args))  # aborts on any failure
 
-    # -- 8. Record new state + optional monitor -------------------------------
+    # -- 9. Record new state + optional monitor -------------------------------
     # Only reached if every step above succeeded. Persist the new on-chip state
     # so the next run can skip unchanged partitions.
     save_state(chip, mac, fe, plan)
