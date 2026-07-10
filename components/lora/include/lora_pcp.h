@@ -26,10 +26,17 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include "esp_err.h"
+
 #define LORA_PCP_NONCE_LENGTH  13
 #define LORA_PCP_MIC_LENGTH    4
 #define LORA_PCP_ENC_KEY_LEN   16
 #define LORA_PCP_INSTR_MAX_LEN 32
+
+// User-selectable LoRa spreading factor range
+#define LORA_PCP_SF_MIN     7  // SX126X_LORA_SF7
+#define LORA_PCP_SF_MAX     12 // SX126X_LORA_SF12
+#define LORA_PCP_SF_DEFAULT 7  // SX126X_LORA_SF7
 
 // Binary wire protocol
 #define LORA_PCP_COMMAND 0x01
@@ -72,6 +79,25 @@ extern volatile bool waiting_for_ack;
  * @brief Loads persisted PCP msg_id counter from NVS
  */
 void lora_pcp_load_msg_id_nvs(void);
+
+/**
+ * @brief Load the persisted LoRa spreading factor from NVS
+ *
+ * @returns The stored SF as a plain numeric value (LORA_PCP_SF_MIN..LORA_PCP_SF_MAX).
+ *          Returns LORA_PCP_SF_DEFAULT when no value is stored or the stored value
+ *          is out of range, so callers always receive a radio-safe SF.
+ */
+uint8_t lora_pcp_load_sf_nvs(void);
+
+/**
+ * @brief Persist the LoRa spreading factor to NVS
+ *
+ * @param [in] sf Spreading factor as a plain numeric value; clamped to
+ *                LORA_PCP_SF_MIN..LORA_PCP_SF_MAX before it is stored.
+ *
+ * @returns ESP_OK on success, otherwise the failing NVS error code.
+ */
+esp_err_t lora_pcp_save_sf_nvs(uint8_t sf);
 
 /**
  * @brief Set the PCP encryption key

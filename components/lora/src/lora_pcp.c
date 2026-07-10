@@ -26,6 +26,9 @@ volatile bool waiting_for_ack = false;
 #define PCP_NVS_NS     "pcp"
 #define PCP_NVS_MSG_ID "msg_id"
 
+#define LORA_CFG_NVS_NS "lora_cfg" // Radio config kept separate from the per-TX msg_id counter
+#define LORA_CFG_NVS_SF "sf"       // Persisted spreading factor
+
 #define PCP_CCM_ALG PSA_ALG_AEAD_WITH_SHORTENED_TAG(PSA_ALG_CCM, LORA_PCP_MIC_LENGTH)
 
 static void save_msg_id_nvs(void)
@@ -72,6 +75,56 @@ void lora_pcp_load_msg_id_nvs(void)
 #ifdef POLYCAST5_DEBUG
 	ESP_LOGI(TAG, "Loaded msg_id_counter=%" PRIu32, msg_id_counter);
 #endif
+}
+
+uint8_t lora_pcp_load_sf_nvs(void)
+{
+	nvs_handle_t h;
+	uint8_t sf = LORA_PCP_SF_DEFAULT; // Default preserves the original hardcoded SF7
+
+	// Open read-only; a missing namespace/key or out-of-range value falls back to the default
+	if (nvs_open(LORA_CFG_NVS_NS, NVS_READONLY, &h) == ESP_OK) {
+		uint8_t stored;
+		if (nvs_get_u8(h, LORA_CFG_NVS_SF, &stored) == ESP_OK &&
+		    stored >= LORA_PCP_SF_MIN && stored <= LORA_PCP_SF_MAX) {
+			sf = stored;
+		}
+		nvs_close(h);
+	}
+
+#ifdef POLYCAST5_DEBUG
+	ESP_LOGI(TAG, "Loaded LoRa SF=%u", sf);
+#endif
+
+	return sf;
+}
+
+esp_err_t lora_pcp_save_sf_nvs(uint8_t sf)
+{
+	// Clamp to the supported range so a bad value can never reach the radio
+	if (sf < LORA_PCP_SF_MIN) {
+		sf = LORA_PCP_SF_MIN;
+	} else if (sf > LORA_PCP_SF_MAX) {
+		sf = LORA_PCP_SF_MAX;
+	}
+
+	nvs_handle_t h;
+	esp_err_t err = nvs_open(LORA_CFG_NVS_NS, NVS_READWRITE, &h);
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lora_pcp_save_sf_nvs: NVS open failed: %s", esp_err_to_name(err));
+		return err;
+	}
+
+	err = nvs_set_u8(h, LORA_CFG_NVS_SF, sf);
+	if (err == ESP_OK) {
+		err = nvs_commit(h);
+	}
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "lora_pcp_save_sf_nvs: NVS write failed: %s", esp_err_to_name(err));
+	}
+
+	nvs_close(h);
+	return err;
 }
 
 void lora_pcp_set_key(const uint8_t *key)

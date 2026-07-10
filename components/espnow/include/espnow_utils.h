@@ -7,6 +7,7 @@
 #define WIFI_CHANNEL 1
 
 #define ESPNOW_MAGIC "PC5: " // Simple magic string to identify our packets
+#define ESPNOW_MAGIC_LEN (sizeof(ESPNOW_MAGIC) - 1) // Length excluding the NUL terminator
 #define ESPNOW_MAC_SIZE 6
 #define LMK_LEN 16
 

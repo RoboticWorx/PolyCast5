@@ -31,6 +31,7 @@
 #include "lis2dh12.h" // lis2dh12_read_temp_c
 #include "lcd_utils.h"
 #include "lcd_settings.h"
+#include "lora_pcp.h" // LoRa spreading factor NVS load/save
 #include "wifi_ota_update.h"
 
 #define TAG "LCD_SETTINGS"
@@ -82,8 +83,8 @@
 
 settings_menu_t settings_menu = {
     .options = {"Check for Updates", SETTINGS_SET_LOCK_TXT, "Change Colors", "LCD Brightness", "Adjust Haptics",
-            "Adjust Sleep Timer", "Adjust RGB LED", "Tips and Tricks", "System Info", "Reboot", "Factory Reset"},
-    .size = 11,
+            "Adjust Sleep Timer", "Adjust RGB LED", "Adjust LoRa SF", "Tips and Tricks", "System Info", "Reboot", "Factory Reset"},
+    .size = 12,
     .index = 0,
     .cont = NULL,
     .pin_menu.pin_set = false,
@@ -2198,6 +2199,193 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
         slider = NULL;
         init = false;
         
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
+}
+
+void lcd_settings_adjust_lora_sf_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
+{
+    #define LORA_SF_TITLE_TXT "LoRa SF %u"
+    #define LORA_SF_INFO_TXT  "Range LoS: ~%s\nRoundtrip: ~%s"
+
+    // Estimates indexed by SF (LORA_PCP_SF_MIN..MAX) for the PCP link (22 dBm TX, BW125, CR4/5)
+    static const char *sf_range_los[] = {"1.5 km", "2 km", "2.5 km", "3 km", "4 km", "5 km"};
+    static const char *sf_roundtrip[] = {"0.2s", "0.4s", "0.7s", "1.2s", "2.5s", "4.5s"};
+
+    // Statics
+    static bool init = false;
+    static uint8_t sel_sf; // Working copy; only persisted on Select
+
+    static lv_obj_t *lbl_title;
+    static lv_obj_t *lbl_hint;
+    static lv_obj_t *slider;
+    static lv_obj_t *lbl_info;
+
+    // Only execute once
+    if (!init) {
+        sel_sf = lora_pcp_load_sf_nvs(); // Already clamped to LORA_PCP_SF_MIN..MAX
+
+        lbl_title = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_title, "", user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, -48);
+        lv_label_set_text_fmt(lbl_title, LORA_SF_TITLE_TXT, sel_sf);
+
+        // Save hint below the title
+        lbl_hint = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_hint, "Press select to save", user_secondary_color,
+                &lv_font_montserrat_14, LV_ALIGN_CENTER, 0, -28);
+
+        // Horizontal slider spanning the SF range
+        slider = lv_slider_create(ACTIVE_SCR);
+        lv_obj_set_size(slider, 160, 8);
+        lv_obj_align(slider, LV_ALIGN_CENTER, 0, -8);
+        lv_slider_set_range(slider, LORA_PCP_SF_MIN, LORA_PCP_SF_MAX);
+        lv_slider_set_value(slider, sel_sf, LV_ANIM_OFF);
+
+        // Range / round-trip tradeoff text
+        lbl_info = lv_label_create(ACTIVE_SCR);
+        lv_obj_set_style_text_align(lbl_info, LV_TEXT_ALIGN_CENTER, 0);
+        lcd_format_label(lbl_info, "", user_secondary_color,
+                &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 28);
+        lv_label_set_text_fmt(lbl_info, LORA_SF_INFO_TXT,
+                sf_range_los[sel_sf - LORA_PCP_SF_MIN], sf_roundtrip[sel_sf - LORA_PCP_SF_MIN]);
+
+        init = true;
+    }
+
+    // Right = more range (higher SF); wrap back to the minimum after the maximum
+    if (ui_btns->right_btn == 1) {
+        if (sel_sf >= LORA_PCP_SF_MAX) {
+            sel_sf = LORA_PCP_SF_MIN;
+        } else {
+            sel_sf++;
+        }
+
+        lv_label_set_text_fmt(lbl_title, LORA_SF_TITLE_TXT, sel_sf);
+        lv_slider_set_value(slider, sel_sf, LV_ANIM_OFF);
+        lv_label_set_text_fmt(lbl_info, LORA_SF_INFO_TXT,
+                sf_range_los[sel_sf - LORA_PCP_SF_MIN], sf_roundtrip[sel_sf - LORA_PCP_SF_MIN]);
+    } else if (ui_btns->left_btn == 1) {
+        if (sel_sf > LORA_PCP_SF_MIN) { // Left = faster round-trip (lower SF)
+            sel_sf--;
+
+            lv_label_set_text_fmt(lbl_title, LORA_SF_TITLE_TXT, sel_sf);
+            lv_slider_set_value(slider, sel_sf, LV_ANIM_OFF);
+            lv_label_set_text_fmt(lbl_info, LORA_SF_INFO_TXT,
+                    sf_range_los[sel_sf - LORA_PCP_SF_MIN], sf_roundtrip[sel_sf - LORA_PCP_SF_MIN]);
+        } else { // Already at the leftmost stop: go back to the settings list without saving
+            // Delete objects
+            lv_obj_delete(lbl_title);
+            lv_obj_delete(lbl_hint);
+            lv_obj_delete(slider);
+            lv_obj_delete(lbl_info);
+
+            // Reset statics
+            lbl_title = NULL;
+            lbl_hint = NULL;
+            slider = NULL;
+            lbl_info = NULL;
+            init = false;
+
+            // Restore the settings list and its scroll arrows
+            lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+            // Hide right
+            lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+            // Switch pages
+            ui_menu->page = SETTINGS_PAGE;
+        }
+    } else if (ui_btns->select_btn == 1) { // Save + reboot to apply the new SF to the radio
+        // Delete objects
+        lv_obj_delete(lbl_title);
+        lv_obj_delete(lbl_hint);
+        lv_obj_delete(slider);
+        lv_obj_delete(lbl_info);
+
+        // Reset statics
+        lbl_title = NULL;
+        lbl_hint = NULL;
+        slider = NULL;
+        lbl_info = NULL;
+        init = false;
+
+        // Notify re-sync needed
+        lv_obj_t *lbl_sync = lv_label_create(ACTIVE_SCR);
+        lv_obj_set_style_text_align(lbl_sync, LV_TEXT_ALIGN_CENTER, 0);
+        lcd_format_label(lbl_sync, "Note: You will\nneed to re-sync\nall PolyPlugs.", user_secondary_color,
+                &lv_font_montserrat_20, LV_ALIGN_CENTER, -17, 0);
+
+        lv_obj_t *lbl_ok = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_ok, "OK", user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
+        lv_timer_handler();
+
+        // Wait for OK or back to be pressed
+        while(1) {
+            // OK
+            if (xSemaphoreTake(xRightButtonSemaphore, 0) == pdTRUE) {
+                lv_obj_delete(lbl_sync);
+                lv_obj_delete(lbl_ok);
+
+                // Persist the selection
+                lora_pcp_save_sf_nvs(sel_sf);
+
+                // Confirmation text
+                lv_obj_t *lbl_rst = lv_label_create(ACTIVE_SCR);
+                lv_obj_set_style_text_align(lbl_rst, LV_TEXT_ALIGN_CENTER, 0);
+                lcd_format_label(lbl_rst, "Saving SF...\nDevice will restart.", user_secondary_color,
+                        &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
+
+                // Hide right
+                lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+                lv_timer_handler();
+                vTaskDelay(pdMS_TO_TICKS(1000));
+
+                // Reboot so lora_task re-reads and applies the new SF (and syncs it to plugs)
+                esp_restart();
+                break; // Won't reach
+
+            // Back
+            } else if (xSemaphoreTake(xLeftButtonSemaphore, 0) == pdTRUE) {
+                lv_obj_delete(lbl_sync);
+                lv_obj_delete(lbl_ok);
+
+                // Restore the settings list and its scroll arrows
+                lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+                // Hide right
+                lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+                // Switch pages
+                ui_menu->page = SETTINGS_PAGE;
+
+                lcd_clear_pending_inputs = true;
+
+                break;
+            }
+            lv_timer_handler();
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+    } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Exit without saving
+        // Delete objects
+        lv_obj_delete(lbl_title);
+        lv_obj_delete(lbl_hint);
+        lv_obj_delete(slider);
+        lv_obj_delete(lbl_info);
+
+        // Reset statics
+        lbl_title = NULL;
+        lbl_hint = NULL;
+        slider = NULL;
+        lbl_info = NULL;
+        init = false;
+
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 }

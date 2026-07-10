@@ -3263,7 +3263,23 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
         
         // Switch pages
         ui_menu->page = SETTINGS_RGB_LED_PAGE;
-    } else if (ui_btns->select_btn == 1 && settings_menu->index == 7) { // Tips and tricks selected
+    } else if (ui_btns->select_btn == 1 && settings_menu->index == 7) { // Adjust LoRa SF selected
+        // Hide settings menu
+        lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Reset static
+        do_once = false;
+
+        // Hide arrows
+        lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+        // Show right
+        lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        // Switch pages
+        ui_menu->page = SETTINGS_LORA_SF_PAGE;
+    } else if (ui_btns->select_btn == 1 && settings_menu->index == 8) { // Tips and tricks selected
         // Hide settings menu
         lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         
@@ -3272,7 +3288,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
         
         // Switch pages
         ui_menu->page = SETTINGS_HELP_PAGE;
-    } else if (ui_btns->select_btn == 1 && settings_menu->index == 8) { // System check selected
+    } else if (ui_btns->select_btn == 1 && settings_menu->index == 9) { // System check selected
         // Hide settings menu
         lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         
@@ -3281,7 +3297,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
         
         // Switch pages
         ui_menu->page = SETTINGS_SYSTEM_PAGE;
-    } else if (ui_btns->select_btn == 1 && settings_menu->index == 9) { // Reboot selected
+    } else if (ui_btns->select_btn == 1 && settings_menu->index == 10) { // Reboot selected
         // Hide settings menu
         lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         
@@ -3294,7 +3310,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
         
         // Reboot
         esp_restart();
-    } else if (ui_btns->select_btn == 1 && settings_menu->index == 10) { // Factory reset selected
+    } else if (ui_btns->select_btn == 1 && settings_menu->index == 11) { // Factory reset selected
         // Hide settings menu
         lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         
@@ -3310,7 +3326,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
     } else if (ui_btns->left_btn == 1) { // Back selected
         // Hide settings menu
         lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-        
+
         // Show selection labels
         lcd_unhide_selection_widgets(ui_menu);
         

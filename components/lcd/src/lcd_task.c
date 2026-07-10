@@ -504,6 +504,9 @@ static void lcd_task(void *pvParameters)
                 case SETTINGS_LCD_PAGE:
                     lcd_settings_adjust_lcd_page(&ui_btns, &ui_menu, &settings_menu);
                     break;
+                case SETTINGS_LORA_SF_PAGE:
+                    lcd_settings_adjust_lora_sf_page(&ui_btns, &ui_menu, &settings_menu);
+                    break;
                 case SETTINGS_HELP_PAGE:
                     lcd_settings_help_page(&ui_btns, &ui_menu, &settings_menu);
                     break;

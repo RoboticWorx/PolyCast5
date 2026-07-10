@@ -89,6 +89,13 @@ static void espnow_task(void *param)
             espnow_enc_key_result_t key_result = { .success = false };
             memcpy(key_result.key, received_enc_key, LORA_PCP_ENC_KEY_LEN);
 
+            // Sync frame: ESPNOW_MAGIC + 16-byte LoRa key + 1-byte spreading factor
+            // Magic tag lets the plug identify this frame by contentand SF makes the plug's RX match remote's TX
+            uint8_t sync_payload[ESPNOW_MAGIC_LEN + LORA_PCP_ENC_KEY_LEN + 1]; // +1 SF len
+            memcpy(sync_payload, ESPNOW_MAGIC, ESPNOW_MAGIC_LEN);
+            memcpy(sync_payload + ESPNOW_MAGIC_LEN, received_enc_key, LORA_PCP_ENC_KEY_LEN);
+            sync_payload[ESPNOW_MAGIC_LEN + LORA_PCP_ENC_KEY_LEN] = lora_pcp_load_sf_nvs();
+
             // Start radio and initialize ESP-NOW
             err = espnow_utils_wifi_radio_start(WIFI_CHANNEL);
             if (err != ESP_OK) {
@@ -104,8 +111,8 @@ static void espnow_task(void *param)
                 continue;
             }
 
-            // Send the data
-            err = espnow_utils_send_data(UNIVERSAL_MAC, received_enc_key, LORA_PCP_ENC_KEY_LEN);
+            // Send the data (magic + key + spreading factor)
+            err = espnow_utils_send_data(UNIVERSAL_MAC, sync_payload, sizeof(sync_payload));
             if (err != ESP_OK) {
                 key_result.success = false;
                 ESP_LOGE(TAG, "espnow_utils_send_data: Failed to send encryption key: %s", esp_err_to_name(err));

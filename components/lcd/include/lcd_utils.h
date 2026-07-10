@@ -148,6 +148,8 @@ enum {
     GAMES_DOOM_PAGE,
 
     LORA_MESHTASTIC_PAGE,
+
+    SETTINGS_LORA_SF_PAGE,
 };
 
 extern uint32_t pin_attempts;

@@ -105,6 +105,11 @@ static void lora_task(void *pvParameters)
     uint8_t lora_sync_word = 0x62; // PCP sync word
     if (g_meshtastic_mode) {
         lora_meshtastic_get_radio_params(&lora_mod_params, &lora_pkt_params, &rf_freq, &lora_sync_word);
+    } else {
+        // Apply the user-selected spreading factor (PCP mode only; Meshtastic sets its own SF above)
+        uint8_t user_sf = lora_pcp_load_sf_nvs();
+        lora_mod_params.sf = (sx126x_lora_sf_t)user_sf;
+        lora_mod_params.ldro = (user_sf > SX126X_LORA_SF10) ? 1 : 0; // LDRO required for SF11/SF12 at BW125
     }
 
     // Define the PA configuration parameters
