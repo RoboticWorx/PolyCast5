@@ -38,6 +38,22 @@
 #define LORA_PCP_SF_MAX     12 // SX126X_LORA_SF12
 #define LORA_PCP_SF_DEFAULT 7  // SX126X_LORA_SF7
 
+// User-selectable LoRa region: picks the RF band that matches the attached antenna
+// The PCP carrier and SX1262 image-calibration band both follow this selection
+typedef enum {
+    LORA_REGION_US = 0, // US 902-928 MHz ISM band
+    LORA_REGION_EU = 1, // EU 863-870 MHz ISM band (ETSI EN 300 220)
+    LORA_REGION_COUNT   // Not a region; count for range clamping
+} lora_region_t;
+
+#define LORA_REGION_DEFAULT LORA_REGION_US // Preserves the original hardcoded 915 MHz behavior
+
+// PCP carrier frequency per region
+#define LORA_PCP_FREQ_US_HZ 915000000UL // US 915 MHz band center
+// EU: the 869.4-869.65 MHz high-power sub-band (ETSI allows 500 mW / 27 dBm, 10% duty), so PCP's 22 dBm TX stays legal
+// BW125 at 869.5 spans 869.4375-869.5625, inside the sub-band
+#define LORA_PCP_FREQ_EU_HZ 869500000UL
+
 // Binary wire protocol
 #define LORA_PCP_COMMAND 0x01
 #define LORA_PCP_ACK     0x02
@@ -98,6 +114,25 @@ uint8_t lora_pcp_load_sf_nvs(void);
  * @returns ESP_OK on success, otherwise the failing NVS error code.
  */
 esp_err_t lora_pcp_save_sf_nvs(uint8_t sf);
+
+/**
+ * @brief Load the persisted LoRa region from NVS
+ *
+ * @returns The stored region (LORA_REGION_US or LORA_REGION_EU). Returns
+ *          LORA_REGION_DEFAULT when no value is stored or the stored value is
+ *          out of range, so callers always receive a valid region.
+ */
+lora_region_t lora_pcp_load_region_nvs(void);
+
+/**
+ * @brief Persist the LoRa region to NVS
+ *
+ * @param [in] region Region to store; clamped to a valid lora_region_t before
+ *                    it is written.
+ *
+ * @returns ESP_OK on success, otherwise the failing NVS error code.
+ */
+esp_err_t lora_pcp_save_region_nvs(lora_region_t region);
 
 /**
  * @brief Set the PCP encryption key

@@ -18,7 +18,7 @@ at boot. This document is the reference for both:
 | **What it is**      | PolyCast5's private point-to-point control link    | Open-source long-range mesh text protocol            |
 | **Talks to**        | PolyPlug smart outlets (paired to this device)     | Any Meshtastic node/phone in range                   |
 | **Goal**            | Send a command, get a confirmed ACK back           | Broadcast text/telemetry across a multi-hop mesh     |
-| **Frequency**       | 915.000 MHz (single fixed channel)                 | 906.875 MHz (LongFast US slot 19)                    |
+| **Frequency**       | 915 MHz (US) / 869.5 MHz (EU), user-selectable     | 906.875 MHz (US) / 869.525 MHz (EU) LongFast slot    |
 | **PHY**             | SF7–SF12 (user-selectable) · BW 125 kHz · CR 4/5   | SF11 · BW 250 kHz · CR 4/5 (the LongFast preset)     |
 | **Sync word**       | `0x62` (private)                                    | `0x2B` (the Meshtastic network-wide value)           |
 | **Crypto**          | AES-128-**CCM** (authenticated, per-pair key)      | AES-128-**CTR** (channel PSK, no per-packet auth)    |
@@ -65,7 +65,7 @@ is a receiver addressed by an `index`.
 
 | Parameter        | Value                                         |
 |------------------|-----------------------------------------------|
-| Frequency        | **915.000 MHz** (fixed)                        |
+| Frequency        | **915 MHz** (US) / **869.5 MHz** (EU)          |
 | Sync word        | **0x62** (private, not the Meshtastic value)   |
 | Spreading factor | **SF7** default, user-selectable **SF7–SF12**  |
 | Bandwidth        | **125 kHz**                                    |
@@ -79,6 +79,15 @@ is a receiver addressed by an `index`.
 
 The spreading factor is stored in NVS (`lora_cfg/sf`) and applied at boot; changing
 it reboots the device and requires re-syncing plugs (they must use the same SF).
+
+The **region** (US 915 MHz / EU 869.5 MHz) is likewise stored in NVS (`lora_cfg/region`)
+and applied at boot. It selects the PCP carrier *and* the SX1262 image-calibration band
+(902-928 MHz for US, 863-870 MHz for EU) so image rejection matches the operating band.
+The EU carrier sits in the **869.4-869.65 MHz** high-power sub-band (ETSI EN 300 220 allows
+500 mW / 27 dBm at 10% duty), so PCP's 22 dBm TX stays within the EU limit — the 25 mW-limited
+868.0-868.6 MHz sub-band would not. Changing region reboots the device and requires re-syncing
+plugs — the region byte rides the ESP-NOW key-sync frame alongside the SF byte, so plugs switch
+to the same RF band.
 
 ### 1.3 Security model
 
@@ -223,6 +232,13 @@ freq = freqStart + bandwidth/2 + channel_num · bandwidth
 > `spacing` is Meshtastic's per-region inter-channel guard; it is **0 for the US
 > region** (and every current region row), so it drops out here — but the real
 > firmware formula includes it.
+>
+> **Region selection:** the above computes the **US** slot (906.875 MHz). When the
+> LoRa region setting is **EU**, PolyCast5 instead uses the **EU_868** LongFast slot
+> at **869.525 MHz** — the EU_868 band (869.4-869.65 MHz) is only one BW-250 channel
+> wide, so `channel_num` collapses to 0: `869.4 + 0.125 = 869.525 MHz`. The modem
+> preset (SF11/BW250/CR4-5) and sync word are region-independent; only the frequency
+> slot moves.
 
 **(b) The `channel` byte in the packet header** - an 8-bit **XOR hash** of the
 channel name XORed with the XOR hash of the PSK. This lets a receiver quickly
@@ -411,7 +427,7 @@ how the format stays forward-compatible.
 
 A device is LongFast-US Meshtastic-compatible **only if all of these match**:
 
-- [ ] RF: 906.875 MHz, SF11, BW 250 kHz, CR 4/5, preamble 16, CRC on, IQ normal, LDRO off
+- [ ] RF: 906.875 MHz (US) / 869.525 MHz (EU_868), SF11, BW 250 kHz, CR 4/5, preamble 16, CRC on, IQ normal, LDRO off
 - [ ] Sync word `0x2B`
 - [ ] Header channel byte `0x08`
 - [ ] AES-128-CTR with the default PSK and the `id|from|0` nonce
@@ -424,19 +440,19 @@ A device is LongFast-US Meshtastic-compatible **only if all of these match**:
 
 ## Appendix - PHY side-by-side
 
-| Parameter    | PCP            | Meshtastic LongFast |
-|--------------|----------------|---------------------|
-| Frequency    | 915.000 MHz    | 906.875 MHz         |
-| Sync word    | 0x62           | 0x2B                |
-| SF           | 7 (7–12)       | 11                  |
-| Bandwidth    | 125 kHz        | 250 kHz             |
-| Coding rate  | 4/5            | 4/5                 |
-| Preamble     | 12 symbols     | 16 symbols          |
-| Header       | Explicit       | Explicit            |
-| CRC          | On             | On                  |
-| IQ           | Normal         | Normal              |
-| Crypto       | AES-128-CCM    | AES-128-CTR         |
-| Auth tag     | 4-byte MIC     | none                |
+| Parameter    | PCP            | Meshtastic LongFast   |
+|--------------|----------------|-----------------------|
+| Frequency    | 915 / 869.5 MHz| 906.875 / 869.525 MHz |
+| Sync word    | 0x62           | 0x2B                  |
+| SF           | 7 (7–12)       | 11                    |
+| Bandwidth    | 125 kHz        | 250 kHz               |
+| Coding rate  | 4/5            | 4/5                   |
+| Preamble     | 12 symbols     | 16 symbols            |
+| Header       | Explicit       | Explicit              |
+| CRC          | On             | On                    |
+| IQ           | Normal         | Normal                |
+| Crypto       | AES-128-CCM    | AES-128-CTR           |
+| Auth tag     | 4-byte MIC     | none                  |
 
 ## Source files
 

@@ -6,6 +6,7 @@
 #include <stddef.h>
 
 #include "sx126x.h"
+#include "lora_pcp.h" // lora_region_t (US/EU frequency slot)
 
 // ───────────────────────────────────────────────────────────────────────────
 // Meshtastic interop — default public LongFast channel, US 902–928 MHz band.
@@ -18,7 +19,8 @@
 // ───────────────────────────────────────────────────────────────────────────
 
 #define MESHTASTIC_LORA_FREQ_HZ    906875000UL // LongFast US default slot (channel_num 19)
-#define MESHTASTIC_SYNC_WORD       0x2B        // → SX126x sync reg 0x24B4 (matches RadioLib)
+#define MESHTASTIC_LORA_FREQ_EU_HZ 869525000UL // LongFast EU_868 slot (869.4-869.65 MHz band, only slot)
+#define MESHTASTIC_SYNC_WORD       0x2B        // -> SX126x sync reg 0x24B4 (matches RadioLib)
 #define MESHTASTIC_PREAMBLE_SYMB   16          // symbols (all presets)
 #define MESHTASTIC_CHANNEL_HASH    0x08        // PacketHeader.channel for the LongFast channel
 #define MESHTASTIC_MAX_PACKET_LEN  255         // LoRa PHY max: 16-byte header + payload
@@ -81,11 +83,14 @@ extern volatile bool g_meshtastic_mode;
 
 /**
  * @brief Fill SX126x modem/packet params + RF frequency + sync word for
- *        Meshtastic LongFast (US). Called by lora_task during radio bring-up.
+ *        Meshtastic LongFast. The RF frequency follows @p region (US slot 19
+ *        906.875 MHz / EU_868 slot 869.525 MHz); the modem preset and sync word
+ *        are region-independent. Called by lora_task during radio bring-up.
  */
 void lora_meshtastic_get_radio_params(sx126x_mod_params_lora_t *mod,
                                       sx126x_pkt_params_lora_t *pkt,
-                                      uint32_t *freq_hz, uint8_t *sync_word);
+                                      uint32_t *freq_hz, uint8_t *sync_word,
+                                      lora_region_t region);
 
 /**
  * @brief Derive our node number / id string from the device MAC. Idempotent.

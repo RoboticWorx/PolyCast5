@@ -100,11 +100,15 @@ static void lora_task(void *pvParameters)
         .invert_iq_is_on = false,
     };
 
+    // User-selected region picks the RF band to match the attached antenna (US 915 MHz / EU 869.5 MHz)
+    lora_region_t lora_region = lora_pcp_load_region_nvs();
+
     // Mode-dependent PHY: PCP defaults above, or Meshtastic LongFast below
-    uint32_t rf_freq = 915000000;  // PCP frequency
+    uint32_t rf_freq = (lora_region == LORA_REGION_EU) ? LORA_PCP_FREQ_EU_HZ : LORA_PCP_FREQ_US_HZ; // PCP frequency
     uint8_t lora_sync_word = 0x62; // PCP sync word
     if (g_meshtastic_mode) {
-        lora_meshtastic_get_radio_params(&lora_mod_params, &lora_pkt_params, &rf_freq, &lora_sync_word);
+        // Region picks the LongFast slot (US 906.875 MHz / EU_868 869.525 MHz) to match the antenna
+        lora_meshtastic_get_radio_params(&lora_mod_params, &lora_pkt_params, &rf_freq, &lora_sync_word, lora_region);
     } else {
         // Apply the user-selected spreading factor (PCP mode only; Meshtastic sets its own SF above)
         uint8_t user_sf = lora_pcp_load_sf_nvs();
@@ -159,7 +163,12 @@ static void lora_task(void *pvParameters)
         ESP_LOGE(TAG, "Failed to set frequency");
     }
 
-    status = sx126x_cal_img_in_mhz(NULL, 902, 928);
+    // Calibrate the image for the active band so image rejection matches the operating frequency
+    if (lora_region == LORA_REGION_EU) {
+        status = sx126x_cal_img_in_mhz(NULL, 863, 870); // EU 863-870 MHz band
+    } else {
+        status = sx126x_cal_img_in_mhz(NULL, 902, 928); // US 902-928 MHz band
+    }
     if (status != SX126X_STATUS_OK) {
         ESP_LOGE(TAG, "Failed to calibrate image");
     }

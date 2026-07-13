@@ -8,7 +8,7 @@
 #define POLYCAST5_PRIORITY_HIGH (tskIDLE_PRIORITY + 2)
 #define POLYCAST5_PRIORITY_INTERRUPT (tskIDLE_PRIORITY + 3)
 
-// Memory control - SRAM currently: 197861/61.65 - Flash currently: 2825007 (app)
+// Memory control - SRAM currently: 171371/53.4 - Flash currently: 2900151 (app)
 #define POLYCAST5_USE_PSRAM_BSS EXT_RAM_BSS_ATTR // For zero-initialized memory
 #define POLYCAST5_USE_PSRAM_DATA EXT_RAM_NOINIT_ATTR // For non zero-initialized memory (initialized at runtime)
 

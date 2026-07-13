@@ -14,6 +14,7 @@
 #include "lora_meshtastic_portal.h"
 #include "lora_meshtastic_portal_html.h"
 #include "lora_meshtastic.h" // node id, message log, TX enqueue
+#include "lora_pcp.h" // LoRa region NVS load (US/EU banner frequency)
 
 #define TAG "MESHTASTIC_WEB_PORTAL"
 
@@ -172,7 +173,29 @@ static esp_err_t root_get(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/html");
 
-    return httpd_resp_send(req, LORA_MESHTASTIC_PORTAL_HTML, HTTPD_RESP_USE_STRLEN);
+    // Head blob (everything up to the RF-info banner)
+    esp_err_t err = httpd_resp_send_chunk(req, LORA_MESHTASTIC_PORTAL_HTML, HTTPD_RESP_USE_STRLEN);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    // RF-info banner reflects the active LoRa region so an EU user sees the real frequency
+    const char *banner = (lora_pcp_load_region_nvs() == LORA_REGION_EU)
+        ? "        <div class=\"netinfo\">LongFast &middot; EU 868 &middot; 869.525 MHz &middot; SF11/BW250</div>\n"
+        : "        <div class=\"netinfo\">LongFast &middot; US 915 &middot; 906.875 MHz &middot; SF11/BW250</div>\n";
+    err = httpd_resp_send_chunk(req, banner, HTTPD_RESP_USE_STRLEN);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    // Tail blob (the PSK banner onward)
+    err = httpd_resp_send_chunk(req, LORA_MESHTASTIC_PORTAL_HTML_TAIL, HTTPD_RESP_USE_STRLEN);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    // Terminate the chunked response
+    return httpd_resp_send_chunk(req, NULL, 0);
 }
 
 // Escape a UTF-8 string into a JSON string body (without the surrounding quotes),

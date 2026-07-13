@@ -83,8 +83,8 @@
 
 settings_menu_t settings_menu = {
     .options = {"Check for Updates", SETTINGS_SET_LOCK_TXT, "Change Colors", "LCD Brightness", "Adjust Haptics",
-            "Adjust Sleep Timer", "Adjust RGB LED", "Adjust LoRa SF", "Tips and Tricks", "System Info", "Reboot", "Factory Reset"},
-    .size = 12,
+            "Adjust Sleep Timer", "Adjust RGB LED", "Adjust LoRa SF", "Change LoRa Region", "Tips and Tricks", "System Info", "Reboot", "Factory Reset"},
+    .size = 13,
     .index = 0,
     .cont = NULL,
     .pin_menu.pin_set = false,
@@ -2367,6 +2367,235 @@ void lcd_settings_adjust_lora_sf_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 
                 lcd_clear_pending_inputs = true;
 
+                break;
+            }
+            lv_timer_handler();
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+    } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Exit without saving
+        // Delete objects
+        lv_obj_delete(lbl_title);
+        lv_obj_delete(lbl_hint);
+        lv_obj_delete(slider);
+        lv_obj_delete(lbl_info);
+
+        // Reset statics
+        lbl_title = NULL;
+        lbl_hint = NULL;
+        slider = NULL;
+        lbl_info = NULL;
+        init = false;
+
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
+}
+
+void lcd_settings_change_lora_region_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
+{
+    #define LORA_REGION_TITLE_TXT "Region: %s"
+    #define LORA_REGION_INFO_TXT  "%s\n%s"
+
+    // Display strings indexed by lora_region_t (LORA_REGION_US, LORA_REGION_EU)
+    static const char *region_name[] = {"US", "EU"};
+    static const char *region_freq[] = {"915 MHz", "869.5 MHz"};
+    static const char *region_band[] = {"902-928 MHz", "863-870 MHz"};
+
+    // Statics
+    static bool init = false;
+    static lora_region_t sel_region; // Working copy; only persisted on Select
+
+    static lv_obj_t *lbl_title;
+    static lv_obj_t *lbl_hint;
+    static lv_obj_t *slider;
+    static lv_obj_t *lbl_info;
+
+    // Only execute once
+    if (!init) {
+        sel_region = lora_pcp_load_region_nvs(); // Already clamped to a valid region
+
+        lbl_title = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_title, "", user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, -48);
+        lv_label_set_text_fmt(lbl_title, LORA_REGION_TITLE_TXT, region_name[sel_region]);
+
+        // Save hint below the title
+        lbl_hint = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_hint, "Press select to save", user_secondary_color,
+                &lv_font_montserrat_14, LV_ALIGN_CENTER, 0, -28);
+
+        // Horizontal slider spanning the two regions
+        slider = lv_slider_create(ACTIVE_SCR);
+        lv_obj_set_size(slider, 160, 8);
+        lv_obj_align(slider, LV_ALIGN_CENTER, 0, -8);
+        lv_slider_set_range(slider, LORA_REGION_US, LORA_REGION_EU);
+        lv_slider_set_value(slider, sel_region, LV_ANIM_OFF);
+
+        // Frequency band text for the selected region
+        lbl_info = lv_label_create(ACTIVE_SCR);
+        lv_obj_set_style_text_align(lbl_info, LV_TEXT_ALIGN_CENTER, 0);
+        lcd_format_label(lbl_info, "", user_secondary_color,
+                &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 28);
+        lv_label_set_text_fmt(lbl_info, LORA_REGION_INFO_TXT,
+                region_freq[sel_region], region_band[sel_region]);
+
+        init = true;
+    }
+
+    // Right = switch to the other region; wrap back to US after EU
+    if (ui_btns->right_btn == 1) {
+        if (sel_region >= LORA_REGION_EU) {
+            sel_region = LORA_REGION_US;
+        } else {
+            sel_region = (lora_region_t)(sel_region + 1);
+        }
+
+        lv_label_set_text_fmt(lbl_title, LORA_REGION_TITLE_TXT, region_name[sel_region]);
+        lv_slider_set_value(slider, sel_region, LV_ANIM_OFF);
+        lv_label_set_text_fmt(lbl_info, LORA_REGION_INFO_TXT,
+                region_freq[sel_region], region_band[sel_region]);
+    } else if (ui_btns->left_btn == 1) {
+        if (sel_region > LORA_REGION_US) { // Left = step back toward US
+            sel_region = (lora_region_t)(sel_region - 1);
+
+            lv_label_set_text_fmt(lbl_title, LORA_REGION_TITLE_TXT, region_name[sel_region]);
+            lv_slider_set_value(slider, sel_region, LV_ANIM_OFF);
+            lv_label_set_text_fmt(lbl_info, LORA_REGION_INFO_TXT,
+                    region_freq[sel_region], region_band[sel_region]);
+        } else { // Already at the leftmost stop: go back to the settings list without saving
+            // Delete objects
+            lv_obj_delete(lbl_title);
+            lv_obj_delete(lbl_hint);
+            lv_obj_delete(slider);
+            lv_obj_delete(lbl_info);
+
+            // Reset statics
+            lbl_title = NULL;
+            lbl_hint = NULL;
+            slider = NULL;
+            lbl_info = NULL;
+            init = false;
+
+            // Restore the settings list and its scroll arrows
+            lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+            // Hide right
+            lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+            // Switch pages
+            ui_menu->page = SETTINGS_PAGE;
+        }
+    } else if (ui_btns->select_btn == 1) { // Save + reboot to apply the new region to the radio
+        // Delete objects
+        lv_obj_delete(lbl_title);
+        lv_obj_delete(lbl_hint);
+        lv_obj_delete(slider);
+        lv_obj_delete(lbl_info);
+
+        // Reset statics
+        lbl_title = NULL;
+        lbl_hint = NULL;
+        slider = NULL;
+        lbl_info = NULL;
+        init = false;
+
+        // Notify re-sync needed (plugs must switch to the same RF band)
+        lv_obj_t *lbl_sync = lv_label_create(ACTIVE_SCR);
+        lv_obj_set_style_text_align(lbl_sync, LV_TEXT_ALIGN_CENTER, 0);
+        lcd_format_label(lbl_sync, "Note: You will\nneed to re-sync\nall PolyPlugs.", user_secondary_color,
+                &lv_font_montserrat_20, LV_ALIGN_CENTER, -17, 0);
+
+        lv_obj_t *lbl_ok = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_ok, "OK", user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -17, -1);
+        lv_timer_handler();
+
+        // Wait for OK, Back, or Home/Power (Home/Power exit without saving)
+        while(1) {
+            // OK
+            if (xSemaphoreTake(xRightButtonSemaphore, 0) == pdTRUE) {
+                lv_obj_delete(lbl_sync);
+                lv_obj_delete(lbl_ok);
+
+                // Persist the selection; only reboot if the write actually stored
+                esp_err_t save_err = lora_pcp_save_region_nvs(sel_region);
+
+                if (save_err == ESP_OK) {
+                    // Confirmation text
+                    lv_obj_t *lbl_rst = lv_label_create(ACTIVE_SCR);
+                    lv_obj_set_style_text_align(lbl_rst, LV_TEXT_ALIGN_CENTER, 0);
+                    lcd_format_label(lbl_rst, "Saving region...\nDevice will restart.", user_secondary_color,
+                            &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
+
+                    // Hide right
+                    lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+                    lv_timer_handler();
+                    vTaskDelay(pdMS_TO_TICKS(1000));
+
+                    // Reboot so lora_task re-reads and applies the new region (and syncs it to plugs)
+                    esp_restart();
+                } else {
+                    // Save failed: report it and return to settings rather than rebooting
+                    // (a reboot here would silently come back up on the old, unchanged region)
+                    lv_obj_t *lbl_rst = lv_label_create(ACTIVE_SCR);
+                    lv_obj_set_style_text_align(lbl_rst, LV_TEXT_ALIGN_CENTER, 0);
+                    lcd_format_label(lbl_rst, "Save failed.\nRegion unchanged.", user_secondary_color,
+                            &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
+
+                    lv_timer_handler();
+                    vTaskDelay(pdMS_TO_TICKS(1500));
+                    lv_obj_delete(lbl_rst);
+
+                    // Restore the settings list and its scroll arrows
+                    lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+                    // Hide right
+                    lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+                    // Switch pages
+                    ui_menu->page = SETTINGS_PAGE;
+
+                    lcd_clear_pending_inputs = true;
+                }
+
+                break;
+
+            // Back
+            } else if (xSemaphoreTake(xLeftButtonSemaphore, 0) == pdTRUE) {
+                lv_obj_delete(lbl_sync);
+                lv_obj_delete(lbl_ok);
+
+                // Restore the settings list and its scroll arrows
+                lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+                // Hide right
+                lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+                // Switch pages
+                ui_menu->page = SETTINGS_PAGE;
+
+                lcd_clear_pending_inputs = true;
+
+                break;
+
+            // Home / Power stay live so the dialog can't trap the UI or defeat sleep (exit without saving)
+            } else if (xHomeButtonSemaphore && xSemaphoreTake(xHomeButtonSemaphore, 0) == pdTRUE) {
+                lv_obj_delete(lbl_sync);
+                lv_obj_delete(lbl_ok);
+
+                lcd_transition_back(true, ui_menu); // Home
+                break;
+            } else if (xPowerButtonSemaphore && xSemaphoreTake(xPowerButtonSemaphore, 0) == pdTRUE) {
+                lv_obj_delete(lbl_sync);
+                lv_obj_delete(lbl_ok);
+
+                lcd_transition_back(false, ui_menu); // Power -> sleep
                 break;
             }
             lv_timer_handler();

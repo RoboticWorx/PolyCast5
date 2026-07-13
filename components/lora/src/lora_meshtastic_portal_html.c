@@ -145,7 +145,12 @@ const char *LORA_MESHTASTIC_PORTAL_HTML =
 "            <button id=\"nodesBtn\" class=\"pill\" type=\"button\">Nodes <b id=\"nodesN\">0</b></button>\n"
 "          </div>\n"
 "        </div>\n"
-"        <div class=\"netinfo\">LongFast &middot; US 915 &middot; 906.875 MHz &middot; SF11/BW250</div>\n"
+;
+
+// The RF-info banner (region-dependent frequency) sits between HEAD and TAIL and
+// is emitted at runtime by root_get() in lora_meshtastic_portal.c, so the served
+// frequency tracks the active LoRa region (US 906.875 MHz / EU_868 869.525 MHz).
+const char *LORA_MESHTASTIC_PORTAL_HTML_TAIL =
 "        <div class=\"netinfo\">Using default PSK: 1PG7OiApB1nwvP+rz05pAQ==</div>\n"
 "      </div>\n"
 "      <div class=\"nodes\" id=\"nodes\"></div>\n"

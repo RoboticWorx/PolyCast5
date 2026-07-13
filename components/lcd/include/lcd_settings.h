@@ -167,6 +167,16 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 void lcd_settings_adjust_lora_sf_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
 
 /**
+ * @brief Executes change LoRa region page so the user can match the RF band to their antenna.
+ *        Left/Right toggle US (915 MHz) / EU (869.5 MHz), Select saves to NVS and reboots to apply.
+ *
+ * @param [in] ui_btns User input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] settings_menu Settings menu structure
+ */
+void lcd_settings_change_lora_region_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
+
+/**
  * @brief Executes factory reset page
  *
  * @param [in] ui_btns User input structure

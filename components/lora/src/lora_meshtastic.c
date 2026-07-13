@@ -33,6 +33,7 @@
 #include "sx126x.h"
 
 #include "lora_meshtastic.h"
+#include "lora_pcp.h" // LoRa region NVS load (US/EU frequency slot)
 
 static const char *TAG = "MESH";
 
@@ -388,10 +389,11 @@ size_t lora_meshtastic_node_count(void)
 
 void lora_meshtastic_get_radio_params(sx126x_mod_params_lora_t *mod,
                                       sx126x_pkt_params_lora_t *pkt,
-                                      uint32_t *freq_hz, uint8_t *sync_word)
+                                      uint32_t *freq_hz, uint8_t *sync_word,
+                                      lora_region_t region)
 {
     // LONG_FAST (sub-GHz): BW 250 kHz, SF 11, CR 4/5. Symbol time
-    // (1<<11)/250 = 8.192 ms < 16 ms → LDRO off, matching RadioLib auto-LDRO.
+    // (1<<11)/250 = 8.192 ms < 16 ms -> LDRO off, matching RadioLib auto-LDRO.
     mod->sf   = SX126X_LORA_SF11;
     mod->bw   = SX126X_LORA_BW_250;
     mod->cr   = SX126X_LORA_CR_4_5;
@@ -403,8 +405,9 @@ void lora_meshtastic_get_radio_params(sx126x_mod_params_lora_t *mod,
     pkt->crc_is_on            = true;
     pkt->invert_iq_is_on      = false;
 
-    *freq_hz   = MESHTASTIC_LORA_FREQ_HZ; // 906,875,000
-    *sync_word = MESHTASTIC_SYNC_WORD;    // 0x2B → reg 0x24B4
+    // US uses LongFast slot 19 (906.875 MHz); EU_868 has a single LongFast slot (869.525 MHz)
+    *freq_hz   = (region == LORA_REGION_EU) ? MESHTASTIC_LORA_FREQ_EU_HZ : MESHTASTIC_LORA_FREQ_HZ;
+    *sync_word = MESHTASTIC_SYNC_WORD;    // 0x2B -> reg 0x24B4
 }
 
 // Put the radio into continuous RX (keeps listening after each packet).
@@ -1251,10 +1254,13 @@ void lora_meshtastic_run(void)
     lora_meshtastic_init();
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "=== Meshtastic mode ENABLED (radio idle until portal opens) ===");
-    ESP_LOGI(TAG, "Node %s (0x%08x)  LongFast/US  %u.%03u MHz  ch-hash 0x%02x",
+    lora_region_t region = lora_pcp_load_region_nvs();
+    uint32_t freq_hz = (region == LORA_REGION_EU) ? MESHTASTIC_LORA_FREQ_EU_HZ : MESHTASTIC_LORA_FREQ_HZ;
+    ESP_LOGI(TAG, "Node %s (0x%08x)  LongFast/%s  %u.%03u MHz  ch-hash 0x%02x",
              s_node_id, (unsigned)s_node_num,
-             (unsigned)(MESHTASTIC_LORA_FREQ_HZ / 1000000UL),
-             (unsigned)((MESHTASTIC_LORA_FREQ_HZ / 1000UL) % 1000UL),
+             region == LORA_REGION_EU ? "EU" : "US",
+             (unsigned)(freq_hz / 1000000UL),
+             (unsigned)((freq_hz / 1000UL) % 1000UL),
              MESHTASTIC_CHANNEL_HASH);
 #endif
 

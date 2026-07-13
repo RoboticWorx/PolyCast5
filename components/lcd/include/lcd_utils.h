@@ -150,6 +150,8 @@ enum {
     LORA_MESHTASTIC_PAGE,
 
     SETTINGS_LORA_SF_PAGE,
+
+    SETTINGS_LORA_REGION_PAGE,
 };
 
 extern uint32_t pin_attempts;
