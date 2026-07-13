@@ -91,9 +91,11 @@ static uint8_t  s_log_count = 0; // Number of valid entries (<= CAP)
 static uint32_t s_log_seq   = 0; // Last assigned seq (monotonic, 0 = none yet)
 static SemaphoreHandle_t s_log_mtx = NULL;
 
-// Recently stored inbound packet ids, to drop mesh-relayed duplicates of the same message
-static uint32_t s_seen_ids[MESHTASTIC_MSG_LOG_CAP] = {0};
-static uint8_t  s_seen_pos = 0;
+POLYCAST5_USE_PSRAM_BSS static struct {
+    uint32_t from, id;
+} s_seen_ids[MESHTASTIC_MSG_LOG_CAP];
+
+static uint8_t s_seen_pos = 0;
 
 // Text queued by the web portal for the run task to broadcast (single-producer TX)
 typedef struct { char text[MESHTASTIC_RX_TEXT_MAX + 1]; } mesh_tx_item_t;
@@ -441,7 +443,10 @@ void lora_meshtastic_init(void)
         s_nodes_mtx = xSemaphoreCreateMutex();
     }
     if (s_tx_queue == NULL) {
-        s_tx_queue = xQueueCreate(MESH_TX_QUEUE_LEN, sizeof(mesh_tx_item_t));
+        POLYCAST5_USE_PSRAM_BSS static StaticQueue_t s_tx_queue_struct;
+        POLYCAST5_USE_PSRAM_BSS static uint8_t s_tx_queue_storage[MESH_TX_QUEUE_LEN * sizeof(mesh_tx_item_t)];
+        s_tx_queue = xQueueCreateStatic(MESH_TX_QUEUE_LEN, sizeof(mesh_tx_item_t),
+                                        s_tx_queue_storage, &s_tx_queue_struct);
     }
 
     // Fail loudly at boot if any of these couldn't be allocated, rather than
@@ -624,16 +629,16 @@ static size_t mesh_encode_data(uint8_t *out, uint8_t portnum,
                                const uint8_t *payload, size_t payload_len)
 {
     size_t off = 0;
-    out[off++] = 0x08;                          // tag: field 1, varint
+    out[off++] = 0x08; // tag: field 1, varint
     off = pb_put_varint(out, off, portnum);
-    out[off++] = 0x12;                          // tag: field 2, length-delimited
+    out[off++] = 0x12; // tag: field 2, length-delimited
     off = pb_put_varint(out, off, payload_len);
     memcpy(out + off, payload, payload_len);
     off += payload_len;
     return off;
 }
 
-// Build a User message: id (f1), long_name (f2), short_name (f3), all strings
+// Build a User message: id (f1), long_name (f2), short_name (f3), all strings, plus role (f7, varint)
 // Bounded by out_cap and truncates per-field, so it stays safe if the names ever become runtime/user-configurable
 static size_t mesh_encode_user(uint8_t *out, size_t out_cap, const char *id,
                                const char *long_name, const char *short_name)
@@ -654,6 +659,13 @@ static size_t mesh_encode_user(uint8_t *out, size_t out_cap, const char *id,
         memcpy(out + off, fields[i], n);
         off += n;
     }
+
+    // role (f7, varint) = CLIENT_MUTE (1): we never rebroadcast others' packets,
+    // so advertise the non-forwarding role instead of the default CLIENT
+    if (off + 2 <= out_cap) {
+        out[off++] = 0x38; // tag: field 7, varint
+        out[off++] = 1;    // Config.DeviceConfig.Role.CLIENT_MUTE
+    }
     return off;
 }
 
@@ -668,7 +680,9 @@ static void mesh_build_header(uint8_t *p, uint32_t to, uint32_t from, uint32_t i
     p[12] = flags;
     p[13] = channel;
     p[14] = 0x00; // next_hop: no preference
-    p[15] = 0x00; // relay_node: none
+    // relay_node: the transmitter's low node-num byte - firmware sets this on
+    // originated packets too (Router::send), mapping a 0 low byte to 0xFF
+    p[15] = ((from & 0xFF) != 0) ? (uint8_t)from : 0xFF;
 }
 
 static uint32_t mesh_random_id(void)
@@ -680,10 +694,16 @@ static uint32_t mesh_random_id(void)
     return id;
 }
 
+// TX outcome of the internal send helpers
+typedef enum {
+    MESH_TX_OK = 0, // Radio TX started
+    MESH_TX_FAIL,   // Session closed or radio error; this attempt is final
+    MESH_TX_DEFER,  // A received packet is still in the radio buffer; retry shortly
+} mesh_tx_status_t;
+
 // Set Meshtastic packet params with the real length, then write + transmit.
-// The whole set_pkt_params → write_buffer → set_tx sequence is held under
-// s_radio_mtx so the IRQ task can't re-arm RX between the steps.
-static bool mesh_radio_tx(const uint8_t *data, uint8_t len)
+// IRQ task can't re-arm RX between steps.
+static mesh_tx_status_t mesh_radio_tx(const uint8_t *data, uint8_t len)
 {
     sx126x_pkt_params_lora_t pkt = {
         .preamble_len_in_symb = MESHTASTIC_PREAMBLE_SYMB,
@@ -699,8 +719,27 @@ static bool mesh_radio_tx(const uint8_t *data, uint8_t len)
     // Nothing transmits after the session closed
     if (!s_listening) {
         xSemaphoreGive(s_radio_mtx);
-        return false;
+        return MESH_TX_FAIL;
     }
+
+    // Config belongs in standby (SX1261-2 DS §13.4.6);
+    // leaving continuous RX here also stops a new packet from landing mid-sequence
+    if (sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC) != SX126X_STATUS_OK) {
+        ESP_LOGE(TAG, "TX: set standby failed"); // Degrades to configuring in RX; later steps have their own checks
+    }
+
+    // Then defer if a good packet already finished arriving
+    uint16_t pending_irq = 0;
+    if (sx126x_get_irq_status(NULL, &pending_irq) == SX126X_STATUS_OK &&
+            (pending_irq & SX126X_IRQ_RX_DONE) && !(pending_irq & SX126X_IRQ_CRC_ERROR)) {
+        xSemaphoreGive(s_radio_mtx);
+        return MESH_TX_DEFER;
+    }
+
+    // Not deferring: any RX flag still latched is a CRC/header-error frame the event task will drop
+    // Clear it so DIO1 is low entering TX - else TX_DONE rides an already-high DIO1, raises no rising edge, and s_tx_busy sticks
+    sx126x_clear_irq_status(NULL, SX126X_IRQ_RX_DONE | SX126X_IRQ_CRC_ERROR | SX126X_IRQ_HEADER_ERROR);
+
     if (sx126x_set_lora_pkt_params(NULL, &pkt) != SX126X_STATUS_OK) {
         ESP_LOGE(TAG, "TX: set pkt params failed");
         ok = false;
@@ -710,21 +749,26 @@ static bool mesh_radio_tx(const uint8_t *data, uint8_t len)
         ok = false;
     }
     if (ok) {
-        s_tx_busy = true; // set before set_tx so a preempting IRQ sees it
+        s_tx_busy = true; // Set before set_tx so a preempting IRQ sees it
         if (sx126x_set_tx(NULL, SX126X_MAX_TIMEOUT_IN_MS) != SX126X_STATUS_OK) {
             s_tx_busy = false;
             ESP_LOGE(TAG, "TX: set_tx failed");
             ok = false;
         }
     }
+    if (!ok) {
+        // We left continuous RX for standby above and no TX IRQ will ever come
+        // to re-arm it, so restore RX here or the node goes deaf
+        mesh_enter_rx();
+    }
     xSemaphoreGive(s_radio_mtx);
-    return ok;
+    return ok ? MESH_TX_OK : MESH_TX_FAIL;
 }
 
 // Encrypt an application payload into a full Meshtastic broadcast frame and send:
 // If out_id is non-NULL it receives the Meshtastic packet id used, so the caller can later match a relayed copy as an ACK
-static bool mesh_send_packet(uint8_t portnum, const uint8_t *payload, size_t payload_len,
-                             uint32_t *out_id)
+static mesh_tx_status_t mesh_send_packet(uint8_t portnum, const uint8_t *payload, size_t payload_len,
+                                         uint32_t *out_id)
 {
     if (out_id != NULL) {
         *out_id = 0;
@@ -734,7 +778,7 @@ static bool mesh_send_packet(uint8_t portnum, const uint8_t *payload, size_t pay
     }
     if (s_tx_busy) {
         ESP_LOGW(TAG, "TX still busy, dropping packet (port %u)", portnum);
-        return false;
+        return MESH_TX_FAIL;
     }
     if (payload_len > MESH_MAX_TX_PAYLOAD) {
         ESP_LOGW(TAG, "payload too long (%u), truncating to %u",
@@ -761,10 +805,11 @@ static bool mesh_send_packet(uint8_t portnum, const uint8_t *payload, size_t pay
     return mesh_radio_tx(pkt, (uint8_t)(16 + data_len));
 }
 
-// Broadcast user text. Returns whether the radio TX actually started; the
-// Meshtastic packet id used is written to *out_id (even on failure) so the run
-// loop can later recognise a relayed copy as an implicit delivery ACK.
-static bool mesh_send_user_text(const char *text, uint32_t *out_id)
+// Broadcast user text:
+// Returns the TX status (DEFER = leave the message queued and retry);
+// the Meshtastic packet id used is written to *out_id (even on failure) so the run loop can later recognise
+// a relayed copy as an implicit delivery ACK
+static mesh_tx_status_t mesh_send_user_text(const char *text, uint32_t *out_id)
 {
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "TX text -> mesh: \"%s\"", text);
@@ -772,13 +817,15 @@ static bool mesh_send_user_text(const char *text, uint32_t *out_id)
     return mesh_send_packet(MESHTASTIC_PORT_TEXT, (const uint8_t *)text, strlen(text), out_id);
 }
 
-bool lora_meshtastic_send_nodeinfo(void)
+// Status-returning core of lora_meshtastic_send_nodeinfo
+// (the run loop needs DEFER to keep an announce pending instead of dropping it)
+static mesh_tx_status_t mesh_send_nodeinfo(void)
 {
     if (s_node_num == 0) {
         lora_meshtastic_init();
     }
 
-    // We emit only id/long_name/short_name
+    // We emit id/long_name/short_name plus role
     // is_licensed is omitted (proto3 default false), so normal receivers list us; by Meshtastic design a ham-licensed
     // receiver (owner.is_licensed=true) drops NodeInfo on an is_licensed mismatch, so we are simply invisible to those nodes
     uint8_t user[96];
@@ -787,6 +834,11 @@ bool lora_meshtastic_send_nodeinfo(void)
     ESP_LOGI(TAG, "TX nodeinfo -> mesh: %s (%s / %s)", s_node_id, MESH_LONG_NAME, MESH_SHORT_NAME);
 #endif
     return mesh_send_packet(MESHTASTIC_PORT_NODEINFO, user, user_len, NULL);
+}
+
+bool lora_meshtastic_send_nodeinfo(void)
+{
+    return mesh_send_nodeinfo() == MESH_TX_OK;
 }
 
 // RX decode + print
@@ -965,24 +1017,26 @@ static void mesh_print_position(const uint8_t *buf, size_t len)
     }
 }
 
-// Track packet ids we've already stored so mesh relays of the same message
-// don't appear twice in the portal. RX event task only, so no lock needed.
-// Returns true if this id was already seen (and thus should be dropped).
-static bool mesh_rx_is_duplicate(uint32_t id)
+// Track (sender, id) pairs we've already stored so mesh relays of the same message don't appear twice in the portal.
+// RX event task only, so no lock needed.
+// Returns true if this pair was already seen (and thus should be dropped).
+static bool mesh_rx_is_duplicate(uint32_t from, uint32_t id)
 {
     for (uint8_t i = 0; i < MESHTASTIC_MSG_LOG_CAP; i++) {
-        if (s_seen_ids[i] == id) {
+        if (s_seen_ids[i].id == id && s_seen_ids[i].from == from) {
             return true;
         }
     }
-    s_seen_ids[s_seen_pos] = id;
+    s_seen_ids[s_seen_pos].from = from;
+    s_seen_ids[s_seen_pos].id   = id;
     s_seen_pos = (uint8_t)((s_seen_pos + 1) % MESHTASTIC_MSG_LOG_CAP);
     return false;
 }
 
 void lora_meshtastic_process_rx(const uint8_t *buf, size_t len, int8_t rssi, int8_t snr)
 {
-    static uint8_t payload[MESHTASTIC_MAX_PACKET_LEN];
+    // PSRAM: decrypt scratch touched only here on the RX event task (CPU-only, no DMA)
+    POLYCAST5_USE_PSRAM_BSS static uint8_t payload[MESHTASTIC_MAX_PACKET_LEN];
 
     if (len < 16) {
         ESP_LOGW(TAG, "RX frame too short (%u bytes)", (unsigned)len);
@@ -1041,7 +1095,7 @@ void lora_meshtastic_process_rx(const uint8_t *buf, size_t len, int8_t rssi, int
         if (from == s_node_num) {
             // Our own broadcast relayed back by a neighbour = implicit delivery ACK
             mesh_log_mark_acked(id);
-        } else if (!(id != 0 && mesh_rx_is_duplicate(id))) {
+        } else if (!(id != 0 && mesh_rx_is_duplicate(from, id))) {
             // Surface to the web portal, dropping duplicate relays of a stored one
             mesh_log_append(from, false, rssi, snr, hops, inner, inner_len, id, false);
         }
@@ -1215,21 +1269,29 @@ void lora_meshtastic_run(void)
             mesh_tx_item_t tx_item;
 
             // Guard the handle too
-            if (s_tx_queue != NULL && xQueueReceive(s_tx_queue, &tx_item, 0) == pdTRUE) {
+            // Peek (don't pop) so a DEFER leaves the message queued for the retry next tick instead of dropping it
+            if (s_tx_queue != NULL && xQueuePeek(s_tx_queue, &tx_item, 0) == pdTRUE) {
                 uint32_t tx_id = 0;
-                bool tx_ok = mesh_send_user_text(tx_item.text, &tx_id);
+                mesh_tx_status_t tx_st = mesh_send_user_text(tx_item.text, &tx_id);
 
-                // Echo our own message into the log so the portal shows what the user sent,
-                // flagged as failed when the radio never actually put it on air
-                mesh_log_append(s_node_num, true, 0, 0, 0,
-                                (const uint8_t *)tx_item.text, strlen(tx_item.text), tx_id, !tx_ok);
+                if (tx_st != MESH_TX_DEFER) { // Sent or failed: this attempt is final
+                    xQueueReceive(s_tx_queue, &tx_item, 0); // Pop it (sole consumer)
+
+                    // Echo our own message into the log so the portal shows what the user sent,
+                    // flagged as failed when the radio never actually put it on air
+                    mesh_log_append(s_node_num, true, 0, 0, 0,
+                                    (const uint8_t *)tx_item.text, strlen(tx_item.text), tx_id,
+                                    tx_st != MESH_TX_OK);
+                }
             } else if (s_announce_pending) {
-                lora_meshtastic_send_nodeinfo(); // Announce at session start
-                s_announce_pending = false;
-                last_nodeinfo = now;
+                if (mesh_send_nodeinfo() != MESH_TX_DEFER) { // Announce at session start
+                    s_announce_pending = false;
+                    last_nodeinfo = now;
+                }
             } else if ((now - last_nodeinfo) >= pdMS_TO_TICKS(MESHTASTIC_NODEINFO_PERIOD_MS)) {
-                lora_meshtastic_send_nodeinfo();
-                last_nodeinfo = now;
+                if (mesh_send_nodeinfo() != MESH_TX_DEFER) {
+                    last_nodeinfo = now;
+                }
             }
         }
 

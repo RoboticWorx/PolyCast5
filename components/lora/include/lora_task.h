@@ -15,9 +15,9 @@ extern QueueHandle_t xLoraSendEncQueue;
 void lora_task_abort_pending(void);
 
 /**
- * @brief Restore the radio after returning from light sleep. In Meshtastic mode
- *        this re-arms the continuous RX that lora_task_abort_pending() idled; in
- *        PCP mode the radio rests in standby between commands, so this is a no-op.
+ * @brief Restore the radio after returning from light sleep.
+ *        In Meshtastic mode this is a defensive re-arm. In PCP mode the radio rests in standby
+ *        between commands, so there is nothing to re-arm.
  */
 void lora_task_resume_after_sleep(void);
 

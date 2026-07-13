@@ -452,7 +452,9 @@ void lora_task_abort_pending(void)
 void lora_task_resume_after_sleep(void)
 {
     if (g_meshtastic_mode) {
-        // Meshtastic mode must be put back into the continuous RX before sleep
+        // The sleep path already ended the portal session via
+        // lora_meshtastic_listen_stop(), so this only re-arms continuous RX in
+        // the unexpected case a session is still marked active
         lora_meshtastic_resume_rx();
     }
     // PCP idles the radio in the standby left by lora_task_abort_pending() and
