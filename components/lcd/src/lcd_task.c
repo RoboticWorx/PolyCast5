@@ -407,6 +407,7 @@ static void lcd_task(void *pvParameters)
                     break;
                 case WIFI_DEAUTH_PAGE:
                     lcd_wifi_deauth_page(&ui_btns, &ui_menu, &wifi_menu);
+                    dont_sleep_on_this_page = true;
                     break;
                 // Tools pages
                 case TOOLS_PAGE:
