@@ -33,7 +33,7 @@
 #include "sx126x.h"
 
 #include "lora_meshtastic.h"
-#include "lora_pcp.h" // LoRa region NVS load (US/EU frequency slot)
+#include "lora_pcp.h" // LoRa region NVS load + region table (LongFast frequency slot)
 
 static const char *TAG = "MESH";
 
@@ -405,8 +405,8 @@ void lora_meshtastic_get_radio_params(sx126x_mod_params_lora_t *mod,
     pkt->crc_is_on            = true;
     pkt->invert_iq_is_on      = false;
 
-    // US uses LongFast slot 19 (906.875 MHz); EU_868 has a single LongFast slot (869.525 MHz)
-    *freq_hz   = (region == LORA_REGION_EU) ? MESHTASTIC_LORA_FREQ_EU_HZ : MESHTASTIC_LORA_FREQ_HZ;
+    // Each region has its own LongFast slot (region table in lora_pcp.c); modem preset is region-independent
+    *freq_hz   = lora_region_get_params(region)->mesh_freq_hz;
     *sync_word = MESHTASTIC_SYNC_WORD;    // 0x2B -> reg 0x24B4
 }
 
@@ -1254,13 +1254,12 @@ void lora_meshtastic_run(void)
     lora_meshtastic_init();
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "=== Meshtastic mode ENABLED (radio idle until portal opens) ===");
-    lora_region_t region = lora_pcp_load_region_nvs();
-    uint32_t freq_hz = (region == LORA_REGION_EU) ? MESHTASTIC_LORA_FREQ_EU_HZ : MESHTASTIC_LORA_FREQ_HZ;
+    const lora_region_params_t *rp = lora_region_get_params(lora_pcp_load_region_nvs());
     ESP_LOGI(TAG, "Node %s (0x%08x)  LongFast/%s  %u.%03u MHz  ch-hash 0x%02x",
              s_node_id, (unsigned)s_node_num,
-             region == LORA_REGION_EU ? "EU" : "US",
-             (unsigned)(freq_hz / 1000000UL),
-             (unsigned)((freq_hz / 1000UL) % 1000UL),
+             rp->name,
+             (unsigned)(rp->mesh_freq_hz / 1000000UL),
+             (unsigned)((rp->mesh_freq_hz / 1000UL) % 1000UL),
              MESHTASTIC_CHANNEL_HASH);
 #endif
 

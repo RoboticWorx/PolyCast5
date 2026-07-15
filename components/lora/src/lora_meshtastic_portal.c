@@ -14,7 +14,7 @@
 #include "lora_meshtastic_portal.h"
 #include "lora_meshtastic_portal_html.h"
 #include "lora_meshtastic.h" // node id, message log, TX enqueue
-#include "lora_pcp.h" // LoRa region NVS load (US/EU banner frequency)
+#include "lora_pcp.h" // LoRa region NVS load + region table (banner frequency)
 
 #define TAG "MESHTASTIC_WEB_PORTAL"
 
@@ -179,10 +179,14 @@ static esp_err_t root_get(httpd_req_t *req)
         return err;
     }
 
-    // RF-info banner reflects the active LoRa region so an EU user sees the real frequency
-    const char *banner = (lora_pcp_load_region_nvs() == LORA_REGION_EU)
-        ? "        <div class=\"netinfo\">LongFast &middot; EU 868 &middot; 869.525 MHz &middot; SF11/BW250</div>\n"
-        : "        <div class=\"netinfo\">LongFast &middot; US 915 &middot; 906.875 MHz &middot; SF11/BW250</div>\n";
+    // RF-info banner reflects the active LoRa region so the user sees the real frequency
+    const lora_region_params_t *rp = lora_region_get_params(lora_pcp_load_region_nvs());
+    char banner[160];
+    snprintf(banner, sizeof(banner),
+             "        <div class=\"netinfo\">LongFast &middot; %s &middot; %u.%03u MHz &middot; SF11/BW250</div>\n",
+             rp->name,
+             (unsigned)(rp->mesh_freq_hz / 1000000UL),
+             (unsigned)((rp->mesh_freq_hz / 1000UL) % 1000UL));
     err = httpd_resp_send_chunk(req, banner, HTTPD_RESP_USE_STRLEN);
     if (err != ESP_OK) {
         return err;

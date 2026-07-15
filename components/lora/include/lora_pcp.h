@@ -39,20 +39,54 @@
 #define LORA_PCP_SF_DEFAULT 7  // SX126X_LORA_SF7
 
 // User-selectable LoRa region: picks the RF band that matches the attached antenna
-// The PCP carrier and SX1262 image-calibration band both follow this selection
+// (KYOCERA AVX M620720, 863-928 MHz). The PCP carrier, Meshtastic LongFast slot, and
+// SX1262 image-calibration band all follow this selection (see region table in lora_pcp.c).
+// APPEND ONLY: the raw enum byte rides the ESP-NOW key-sync frame to PolyPlugs, so
+// existing values must never be renumbered.
 typedef enum {
-    LORA_REGION_US = 0, // US 902-928 MHz ISM band
-    LORA_REGION_EU = 1, // EU 863-870 MHz ISM band (ETSI EN 300 220)
-    LORA_REGION_COUNT   // Not a region; count for range clamping
+    LORA_REGION_US  = 0,  // US 902-928 MHz ISM band
+    LORA_REGION_EU  = 1,  // EU 863-870 MHz ISM band (ETSI EN 300 220)
+    LORA_REGION_ANZ = 2,  // Australia/New Zealand 915-928 MHz
+    LORA_REGION_IN  = 3,  // India 865-867 MHz
+    LORA_REGION_KR  = 4,  // South Korea 920-923 MHz
+    LORA_REGION_JP  = 5,  // Japan 920.5-923.5 MHz (ARIB STD-T108)
+    LORA_REGION_TW  = 6,  // Taiwan 920-925 MHz
+    LORA_REGION_RU  = 7,  // Russia 868.7-869.2 MHz
+    LORA_REGION_TH  = 8,  // Thailand 920-925 MHz
+    LORA_REGION_SG  = 9,  // Singapore 917-925 MHz (Meshtastic SG_923)
+    LORA_REGION_MY  = 10, // Malaysia 919-924 MHz (Meshtastic MY_919)
+    LORA_REGION_COUNT     // Not a region; count for range clamping
 } lora_region_t;
 
 #define LORA_REGION_DEFAULT LORA_REGION_US // Preserves the original hardcoded 915 MHz behavior
 
-// PCP carrier frequency per region
-#define LORA_PCP_FREQ_US_HZ 915000000UL // US 915 MHz band center
-// EU: the 869.4-869.65 MHz high-power sub-band (ETSI allows 500 mW / 27 dBm, 10% duty), so PCP's 22 dBm TX stays legal
-// BW125 at 869.5 spans 869.4375-869.5625, inside the sub-band
-#define LORA_PCP_FREQ_EU_HZ 869500000UL
+/**
+ * @brief Per-region radio parameters: everything the region selection controls.
+ *
+ * One row per lora_region_t (table in lora_pcp.c). Single source of truth for the
+ * PCP carrier, the Meshtastic LongFast frequency slot, the SX1262 image-calibration
+ * band, and the LCD region-page display strings.
+ */
+typedef struct {
+    const char *name;            // Short region code for UI/logs, e.g. "US", "ANZ"
+    const char *full_name;       // Full region name for the LCD region page, e.g. "United States"
+    uint32_t    pcp_freq_hz;     // PCP carrier (band center; BW125 must fit the band)
+    uint32_t    mesh_freq_hz;    // Meshtastic LongFast slot for this region
+    uint16_t    cal_img_mhz_min; // SX1262 image-calibration band, MHz (datasheet standard bands)
+    uint16_t    cal_img_mhz_max;
+    const char *ui_freq;         // LCD region page: PCP carrier label, e.g. "915 MHz"
+    const char *ui_band;         // LCD region page: legal band label, e.g. "902-928 MHz"
+} lora_region_params_t;
+
+/**
+ * @brief Get the radio parameters for a region
+ *
+ * @param [in] region Region to look up; out-of-range values are clamped to
+ *                    LORA_REGION_DEFAULT so callers always get a valid row.
+ *
+ * @returns Pointer to the static const parameter row (never NULL)
+ */
+const lora_region_params_t *lora_region_get_params(lora_region_t region);
 
 // Binary wire protocol
 #define LORA_PCP_COMMAND 0x01
@@ -118,7 +152,7 @@ esp_err_t lora_pcp_save_sf_nvs(uint8_t sf);
 /**
  * @brief Load the persisted LoRa region from NVS
  *
- * @returns The stored region (LORA_REGION_US or LORA_REGION_EU). Returns
+ * @returns The stored region (any valid lora_region_t). Returns
  *          LORA_REGION_DEFAULT when no value is stored or the stored value is
  *          out of range, so callers always receive a valid region.
  */

@@ -6,20 +6,19 @@
 #include <stddef.h>
 
 #include "sx126x.h"
-#include "lora_pcp.h" // lora_region_t (US/EU frequency slot)
+#include "lora_pcp.h" // lora_region_t + lora_region_get_params()
 
 // ───────────────────────────────────────────────────────────────────────────
-// Meshtastic interop — default public LongFast channel, US 902–928 MHz band.
+// Meshtastic interop — default public LongFast channel.
 // All constants verified byte-for-byte against meshtastic/firmware (master):
 //   PHY      MeshRadio.h::modemPresetToParams  → LONG_FAST = BW 250k / SF11 / CR 4/5
-//   freq     RadioInterface.cpp                → slot 19 → 906.875 MHz
+//   freq     RadioInterface.cpp                → e.g. US slot 19 → 906.875 MHz
+//            (per-region LongFast slots live in the region table in lora_pcp.c)
 //   sync     RadioLibInterface.h setSyncWord(0x2b) → SX126x reg 0x24B4
 //   channel  Channels.cpp xorHash("LongFast") ^ xorHash(defaultPSK) = 0x08
 //   crypto   CryptoEngine.cpp AES-128-CTR, nonce = packetId(8 LE)|from(4 LE)|0..0
 // ───────────────────────────────────────────────────────────────────────────
 
-#define MESHTASTIC_LORA_FREQ_HZ    906875000UL // LongFast US default slot (channel_num 19)
-#define MESHTASTIC_LORA_FREQ_EU_HZ 869525000UL // LongFast EU_868 slot (869.4-869.65 MHz band, only slot)
 #define MESHTASTIC_SYNC_WORD       0x2B        // -> SX126x sync reg 0x24B4 (matches RadioLib)
 #define MESHTASTIC_PREAMBLE_SYMB   16          // symbols (all presets)
 #define MESHTASTIC_CHANNEL_HASH    0x08        // PacketHeader.channel for the LongFast channel
@@ -83,8 +82,8 @@ extern volatile bool g_meshtastic_mode;
 
 /**
  * @brief Fill SX126x modem/packet params + RF frequency + sync word for
- *        Meshtastic LongFast. The RF frequency follows @p region (US slot 19
- *        906.875 MHz / EU_868 slot 869.525 MHz); the modem preset and sync word
+ *        Meshtastic LongFast. The RF frequency follows @p region (per-region
+ *        LongFast slot from the region table); the modem preset and sync word
  *        are region-independent. Called by lora_task during radio bring-up.
  */
 void lora_meshtastic_get_radio_params(sx126x_mod_params_lora_t *mod,

@@ -18,7 +18,7 @@ at boot. This document is the reference for both:
 | **What it is**      | PolyCast5's private point-to-point control link    | Open-source long-range mesh text protocol            |
 | **Talks to**        | PolyPlug smart outlets (paired to this device)     | Any Meshtastic node/phone in range                   |
 | **Goal**            | Send a command, get a confirmed ACK back           | Broadcast text/telemetry across a multi-hop mesh     |
-| **Frequency**       | 915 MHz (US) / 869.5 MHz (EU), user-selectable     | 906.875 MHz (US) / 869.525 MHz (EU) LongFast slot    |
+| **Frequency**       | Per-region band center, user-selectable (§1.2.1)   | Per-region LongFast slot (§1.2.1)                    |
 | **PHY**             | SF7–SF12 (user-selectable) · BW 125 kHz · CR 4/5   | SF11 · BW 250 kHz · CR 4/5 (the LongFast preset)     |
 | **Sync word**       | `0x62` (private)                                    | `0x2B` (the Meshtastic network-wide value)           |
 | **Crypto**          | AES-128-**CCM** (authenticated, per-pair key)      | AES-128-**CTR** (channel PSK, no per-packet auth)    |
@@ -65,7 +65,7 @@ is a receiver addressed by an `index`.
 
 | Parameter        | Value                                         |
 |------------------|-----------------------------------------------|
-| Frequency        | **915 MHz** (US) / **869.5 MHz** (EU)          |
+| Frequency        | **Per-region band center** (see §1.2.1)        |
 | Sync word        | **0x62** (private, not the Meshtastic value)   |
 | Spreading factor | **SF7** default, user-selectable **SF7–SF12**  |
 | Bandwidth        | **125 kHz**                                    |
@@ -78,16 +78,50 @@ is a receiver addressed by an `index`.
 | TX power         | 22 dBm                                          |
 
 The spreading factor is stored in NVS (`lora_cfg/sf`) and applied at boot; changing
-it reboots the device and requires re-syncing plugs (they must use the same SF).
+it reboots the device and requires re-pairing plugs (they must use the same SF).
 
-The **region** (US 915 MHz / EU 869.5 MHz) is likewise stored in NVS (`lora_cfg/region`)
-and applied at boot. It selects the PCP carrier *and* the SX1262 image-calibration band
-(902-928 MHz for US, 863-870 MHz for EU) so image rejection matches the operating band.
+The **region** is likewise stored in NVS (`lora_cfg/region`) and applied at boot. It selects
+the PCP carrier, the Meshtastic LongFast slot, *and* the SX1262 image-calibration band (see
+§1.2.1) so image rejection matches the operating band. Changing region reboots the device and
+requires re-pairing plugs — the region byte rides the ESP-NOW key-sync frame alongside the SF
+byte, so plugs switch to the same RF band. The region enum is **append-only** so the byte stays
+wire-compatible with existing PolyPlugs.
+
+### 1.2.1 Region table
+
+One row per `lora_region_t` (the code equivalent lives in
+[`lora_pcp.c`](src/lora_pcp.c) as `region_params[]`). Band definitions mirror
+meshtastic/firmware `RadioInterface.cpp`; every band sits inside the M620720
+antenna's 863-928 MHz range (CN 470 and EU 433 are outside it and therefore
+unsupported). The PCP carrier is the band center; the LongFast slot derivation
+is in §2.2 (`n` = channel count, `slot` = `djb2("LongFast") % n`).
+
+| Region | Legal band (MHz)              | PCP carrier | LongFast slot | LongFast freq | Image-cal band |
+|--------|-------------------------------|-------------|---------------|---------------|----------------|
+| US     | 902-928                       | 915.0 MHz   | n=104, 19     | 906.875 MHz   | 902-928 MHz    |
+| EU     | 869.4-869.65 sub-band         | 869.5 MHz   | n=1, 0        | 869.525 MHz   | 863-870 MHz    |
+| ANZ    | 915-928                       | 921.5 MHz   | n=52, 19      | 919.875 MHz   | 902-928 MHz    |
+| IN     | 865-867                       | 866.0 MHz   | n=8, 3        | 865.875 MHz   | 863-870 MHz    |
+| KR     | 920-923                       | 921.5 MHz   | n=12, 11      | 922.875 MHz   | 902-928 MHz    |
+| JP     | 920.5-923.5                   | 922.0 MHz   | n=12, 11      | 923.375 MHz   | 902-928 MHz    |
+| TW     | 920-925                       | 922.5 MHz   | n=20, 15      | 923.875 MHz   | 902-928 MHz    |
+| RU     | 868.7-869.2                   | 868.95 MHz  | n=2, 1        | 869.075 MHz   | 863-870 MHz    |
+| TH     | 920-925                       | 922.5 MHz   | n=20, 15      | 923.875 MHz   | 902-928 MHz    |
+| SG     | 917-925 (Meshtastic `SG_923`) | 921.0 MHz   | n=32, 3       | 917.875 MHz   | 902-928 MHz    |
+| MY     | 919-924 (Meshtastic `MY_919`) | 921.5 MHz   | n=20, 15      | 922.875 MHz   | 902-928 MHz    |
+
+TW and TH share the same 920-925 MHz band, so their identical frequencies are
+intentional — they are distinct regulatory labels, not a copy-paste error.
+
 The EU carrier sits in the **869.4-869.65 MHz** high-power sub-band (ETSI EN 300 220 allows
 500 mW / 27 dBm at 10% duty), so PCP's 22 dBm TX stays within the EU limit — the 25 mW-limited
-868.0-868.6 MHz sub-band would not. Changing region reboots the device and requires re-syncing
-plugs — the region byte rides the ESP-NOW key-sync frame alongside the SF byte, so plugs switch
-to the same RF band.
+868.0-868.6 MHz sub-band would not.
+
+> **TX power disclaimer:** TX power is fixed at **22 dBm** in every region. Several
+> regions legally allow less (e.g. Japan under ARIB STD-T108, Korea, Russia, and the
+> EU outside the 869.4-869.65 sub-band) and/or impose duty-cycle limits. Selecting
+> the region that matches your location and complying with local power and duty-cycle
+> rules is the user's responsibility.
 
 ### 1.3 Security model
 
@@ -233,12 +267,13 @@ freq = freqStart + bandwidth/2 + channel_num · bandwidth
 > region** (and every current region row), so it drops out here — but the real
 > firmware formula includes it.
 >
-> **Region selection:** the above computes the **US** slot (906.875 MHz). When the
-> LoRa region setting is **EU**, PolyCast5 instead uses the **EU_868** LongFast slot
-> at **869.525 MHz** — the EU_868 band (869.4-869.65 MHz) is only one BW-250 channel
-> wide, so `channel_num` collapses to 0: `869.4 + 0.125 = 869.525 MHz`. The modem
-> preset (SF11/BW250/CR4-5) and sync word are region-independent; only the frequency
-> slot moves.
+> **Region selection:** the above is the worked **US** example (906.875 MHz). The
+> same formula (with spacing 0) yields the LongFast slot for every supported region —
+> the per-region band edges, channel counts, and resulting slots are tabulated in
+> §1.2.1. E.g. the EU_868 band (869.4-869.65 MHz) is only one BW-250 channel wide,
+> so `channel_num` collapses to 0: `869.4 + 0.125 = 869.525 MHz`. The modem preset
+> (SF11/BW250/CR4-5) and sync word are region-independent; only the frequency slot
+> moves.
 
 **(b) The `channel` byte in the packet header** - an 8-bit **XOR hash** of the
 channel name XORed with the XOR hash of the PSK. This lets a receiver quickly
@@ -425,9 +460,9 @@ how the format stays forward-compatible.
 
 ### 2.9 Compatibility checklist
 
-A device is LongFast-US Meshtastic-compatible **only if all of these match**:
+A device is LongFast Meshtastic-compatible **only if all of these match**:
 
-- [ ] RF: 906.875 MHz (US) / 869.525 MHz (EU_868), SF11, BW 250 kHz, CR 4/5, preamble 16, CRC on, IQ normal, LDRO off
+- [ ] RF: the region's LongFast slot (§1.2.1), SF11, BW 250 kHz, CR 4/5, preamble 16, CRC on, IQ normal, LDRO off
 - [ ] Sync word `0x2B`
 - [ ] Header channel byte `0x08`
 - [ ] AES-128-CTR with the default PSK and the `id|from|0` nonce
@@ -442,7 +477,7 @@ A device is LongFast-US Meshtastic-compatible **only if all of these match**:
 
 | Parameter    | PCP            | Meshtastic LongFast   |
 |--------------|----------------|-----------------------|
-| Frequency    | 915 / 869.5 MHz| 906.875 / 869.525 MHz |
+| Frequency    | Per-region     | Per-region (§1.2.1)   |
 | Sync word    | 0x62           | 0x2B                  |
 | SF           | 7 (7–12)       | 11                    |
 | Bandwidth    | 125 kHz        | 250 kHz               |

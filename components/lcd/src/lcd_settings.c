@@ -31,7 +31,7 @@
 #include "lis2dh12.h" // lis2dh12_read_temp_c
 #include "lcd_utils.h"
 #include "lcd_settings.h"
-#include "lora_pcp.h" // LoRa spreading factor NVS load/save
+#include "lora_pcp.h" // LoRa SF/region NVS load/save + region table
 #include "wifi_ota_update.h"
 
 #define TAG "LCD_SETTINGS"
@@ -2315,8 +2315,8 @@ void lcd_settings_adjust_lora_sf_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
         // Notify re-sync needed
         lv_obj_t *lbl_sync = lv_label_create(ACTIVE_SCR);
         lv_obj_set_style_text_align(lbl_sync, LV_TEXT_ALIGN_CENTER, 0);
-        lcd_format_label(lbl_sync, "Note: You will\nneed to re-sync\nall PolyPlugs.", user_secondary_color,
-                &lv_font_montserrat_20, LV_ALIGN_CENTER, -17, 0);
+        lcd_format_label(lbl_sync, "Note: You will\nneed to re-pair\nall PolyPlugs.", user_secondary_color,
+                &lv_font_montserrat_20, LV_ALIGN_CENTER, -20, 0);
 
         lv_obj_t *lbl_ok = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_ok, "OK", user_secondary_color,
@@ -2393,12 +2393,7 @@ void lcd_settings_adjust_lora_sf_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 void lcd_settings_change_lora_region_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
     #define LORA_REGION_TITLE_TXT "Region: %s"
-    #define LORA_REGION_INFO_TXT  "%s\n%s"
-
-    // Display strings indexed by lora_region_t (LORA_REGION_US, LORA_REGION_EU)
-    static const char *region_name[] = {"US", "EU"};
-    static const char *region_freq[] = {"915 MHz", "869.5 MHz"};
-    static const char *region_band[] = {"902-928 MHz", "863-870 MHz"};
+    #define LORA_REGION_INFO_TXT  "%s\n%s\n%s" // Full name, PCP carrier, legal band
 
     // Statics
     static bool init = false;
@@ -2412,55 +2407,58 @@ void lcd_settings_change_lora_region_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu
     // Only execute once
     if (!init) {
         sel_region = lora_pcp_load_region_nvs(); // Already clamped to a valid region
+        const lora_region_params_t *rp = lora_region_get_params(sel_region);
 
         lbl_title = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_title, "", user_secondary_color,
                 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, -48);
-        lv_label_set_text_fmt(lbl_title, LORA_REGION_TITLE_TXT, region_name[sel_region]);
+        lv_label_set_text_fmt(lbl_title, LORA_REGION_TITLE_TXT, rp->name);
 
         // Save hint below the title
         lbl_hint = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_hint, "Press select to save", user_secondary_color,
                 &lv_font_montserrat_14, LV_ALIGN_CENTER, 0, -28);
 
-        // Horizontal slider spanning the two regions
+        // Horizontal slider spanning all regions
         slider = lv_slider_create(ACTIVE_SCR);
         lv_obj_set_size(slider, 160, 8);
         lv_obj_align(slider, LV_ALIGN_CENTER, 0, -8);
-        lv_slider_set_range(slider, LORA_REGION_US, LORA_REGION_EU);
+        lv_slider_set_range(slider, LORA_REGION_US, LORA_REGION_COUNT - 1);
         lv_slider_set_value(slider, sel_region, LV_ANIM_OFF);
 
-        // Frequency band text for the selected region
+        // Region name + frequency band text for the selected region
         lbl_info = lv_label_create(ACTIVE_SCR);
         lv_obj_set_style_text_align(lbl_info, LV_TEXT_ALIGN_CENTER, 0);
         lcd_format_label(lbl_info, "", user_secondary_color,
-                &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 28);
+                &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 34);
         lv_label_set_text_fmt(lbl_info, LORA_REGION_INFO_TXT,
-                region_freq[sel_region], region_band[sel_region]);
+                rp->full_name, rp->ui_freq, rp->ui_band);
 
         init = true;
     }
 
-    // Right = switch to the other region; wrap back to US after EU
+    // Right = next region; wrap back to US after the last region
     if (ui_btns->right_btn == 1) {
-        if (sel_region >= LORA_REGION_EU) {
+        if (sel_region >= LORA_REGION_COUNT - 1) {
             sel_region = LORA_REGION_US;
         } else {
             sel_region = (lora_region_t)(sel_region + 1);
         }
 
-        lv_label_set_text_fmt(lbl_title, LORA_REGION_TITLE_TXT, region_name[sel_region]);
+        const lora_region_params_t *rp = lora_region_get_params(sel_region);
+        lv_label_set_text_fmt(lbl_title, LORA_REGION_TITLE_TXT, rp->name);
         lv_slider_set_value(slider, sel_region, LV_ANIM_OFF);
         lv_label_set_text_fmt(lbl_info, LORA_REGION_INFO_TXT,
-                region_freq[sel_region], region_band[sel_region]);
+                rp->full_name, rp->ui_freq, rp->ui_band);
     } else if (ui_btns->left_btn == 1) {
         if (sel_region > LORA_REGION_US) { // Left = step back toward US
             sel_region = (lora_region_t)(sel_region - 1);
 
-            lv_label_set_text_fmt(lbl_title, LORA_REGION_TITLE_TXT, region_name[sel_region]);
+            const lora_region_params_t *rp = lora_region_get_params(sel_region);
+            lv_label_set_text_fmt(lbl_title, LORA_REGION_TITLE_TXT, rp->name);
             lv_slider_set_value(slider, sel_region, LV_ANIM_OFF);
             lv_label_set_text_fmt(lbl_info, LORA_REGION_INFO_TXT,
-                    region_freq[sel_region], region_band[sel_region]);
+                    rp->full_name, rp->ui_freq, rp->ui_band);
         } else { // Already at the leftmost stop: go back to the settings list without saving
             // Delete objects
             lv_obj_delete(lbl_title);
@@ -2503,8 +2501,8 @@ void lcd_settings_change_lora_region_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu
         // Notify re-sync needed (plugs must switch to the same RF band)
         lv_obj_t *lbl_sync = lv_label_create(ACTIVE_SCR);
         lv_obj_set_style_text_align(lbl_sync, LV_TEXT_ALIGN_CENTER, 0);
-        lcd_format_label(lbl_sync, "Note: You will\nneed to re-sync\nall PolyPlugs.", user_secondary_color,
-                &lv_font_montserrat_20, LV_ALIGN_CENTER, -17, 0);
+        lcd_format_label(lbl_sync, "Note: You will\nneed to re-pair\nall PolyPlugs.", user_secondary_color,
+                &lv_font_montserrat_20, LV_ALIGN_CENTER, -20, 0);
 
         lv_obj_t *lbl_ok = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_ok, "OK", user_secondary_color,

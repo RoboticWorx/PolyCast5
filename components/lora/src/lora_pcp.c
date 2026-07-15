@@ -28,7 +28,7 @@ volatile bool waiting_for_ack = false;
 
 #define LORA_CFG_NVS_NS     "lora_cfg" // Radio config kept separate from the per-TX msg_id counter
 #define LORA_CFG_NVS_SF     "sf"       // Persisted spreading factor
-#define LORA_CFG_NVS_REGION "region"   // Persisted region (US/EU RF band)
+#define LORA_CFG_NVS_REGION "region"   // Persisted region (RF band)
 
 #define PCP_CCM_ALG PSA_ALG_AEAD_WITH_SHORTENED_TAG(PSA_ALG_CCM, LORA_PCP_MIC_LENGTH)
 
@@ -128,6 +128,40 @@ esp_err_t lora_pcp_save_sf_nvs(uint8_t sf)
 	return err;
 }
 
+// Per-region radio parameters - see lora_region_params_t. Rows are keyed by lora_region_t.
+// PCP carrier = band center (EU sits in the 869.4-869.65 MHz high-power sub-band: ETSI allows
+//               500 mW / 27 dBm at 10% duty there, so PCP's 22 dBm TX stays legal; BW125 at
+//               869.5 spans 869.4375-869.5625, inside the sub-band).
+// Mesh slot   = Meshtastic LongFast: slot = djb2("LongFast") % floor((end-start)/0.25),
+//               freq = start + 0.125 + slot*0.25 (BW 250 kHz, spacing 0 in every region).
+//               Band edges mirror meshtastic/firmware RadioInterface.cpp.
+// Cal band    = the SX1262 standard image-cal band containing the region (902-928 or 863-870).
+// Note: TW and TH share the same 920-925 MHz band, so identical frequencies are intentional.
+static const lora_region_params_t region_params[LORA_REGION_COUNT] = {
+	//                    name   full name         PCP carrier  LongFast slot cal img  LCD freq       LCD band
+	[LORA_REGION_US]  = { "US",  "United States",  915000000UL, 906875000UL, 902, 928, "915 MHz",    "902-928 MHz" },     // 902-928, n=104, slot 19
+	[LORA_REGION_EU]  = { "EU",  "Europe",         869500000UL, 869525000UL, 863, 870, "869.5 MHz",  "863-870 MHz" },     // EU_868 869.4-869.65 sub-band, n=1, slot 0
+	[LORA_REGION_ANZ] = { "ANZ", "Australia/NZ",   921500000UL, 919875000UL, 902, 928, "921.5 MHz",  "915-928 MHz" },     // 915-928, n=52, slot 19
+	[LORA_REGION_IN]  = { "IN",  "India",          866000000UL, 865875000UL, 863, 870, "866 MHz",    "865-867 MHz" },     // 865-867, n=8, slot 3
+	[LORA_REGION_KR]  = { "KR",  "South Korea",    921500000UL, 922875000UL, 902, 928, "921.5 MHz",  "920-923 MHz" },     // 920-923, n=12, slot 11
+	[LORA_REGION_JP]  = { "JP",  "Japan",          922000000UL, 923375000UL, 902, 928, "922 MHz",    "920.5-923.5 MHz" }, // 920.5-923.5, n=12, slot 11
+	[LORA_REGION_TW]  = { "TW",  "Taiwan",         922500000UL, 923875000UL, 902, 928, "922.5 MHz",  "920-925 MHz" },     // 920-925, n=20, slot 15
+	[LORA_REGION_RU]  = { "RU",  "Russia",         868950000UL, 869075000UL, 863, 870, "868.95 MHz", "868.7-869.2 MHz" }, // 868.7-869.2, n=2, slot 1
+	[LORA_REGION_TH]  = { "TH",  "Thailand",       922500000UL, 923875000UL, 902, 928, "922.5 MHz",  "920-925 MHz" },     // 920-925, n=20, slot 15
+	[LORA_REGION_SG]  = { "SG",  "Singapore",      921000000UL, 917875000UL, 902, 928, "921 MHz",    "917-925 MHz" },     // SG_923 917-925, n=32, slot 3
+	[LORA_REGION_MY]  = { "MY",  "Malaysia",       921500000UL, 922875000UL, 902, 928, "921.5 MHz",  "919-924 MHz" },     // MY_919 919-924, n=20, slot 15
+};
+
+const lora_region_params_t *lora_region_get_params(lora_region_t region)
+{
+	// Clamp out-of-range inputs
+	int idx = (int)region;
+    if (idx < 0 || idx >= LORA_REGION_COUNT) {
+        idx = LORA_REGION_DEFAULT;
+    }
+    return &region_params[idx];
+}
+
 lora_region_t lora_pcp_load_region_nvs(void)
 {
 	nvs_handle_t h;
@@ -144,7 +178,7 @@ lora_region_t lora_pcp_load_region_nvs(void)
 	}
 
 #ifdef POLYCAST5_DEBUG
-	ESP_LOGI(TAG, "Loaded LoRa region=%s", region == LORA_REGION_EU ? "EU" : "US");
+	ESP_LOGI(TAG, "Loaded LoRa region=%s", lora_region_get_params(region)->name);
 #endif
 
 	return region;
@@ -153,9 +187,11 @@ lora_region_t lora_pcp_load_region_nvs(void)
 esp_err_t lora_pcp_save_region_nvs(lora_region_t region)
 {
 	// Clamp to a valid region so a bad value can never reach the radio
-	if (region >= LORA_REGION_COUNT) {
-		region = LORA_REGION_DEFAULT;
+	int idx = (int)region;
+	if (idx < 0 || idx >= LORA_REGION_COUNT) {
+		idx = LORA_REGION_DEFAULT;
 	}
+	region = (lora_region_t)idx;
 
 	nvs_handle_t h;
 	esp_err_t err = nvs_open(LORA_CFG_NVS_NS, NVS_READWRITE, &h);
