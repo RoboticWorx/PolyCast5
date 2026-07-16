@@ -484,7 +484,7 @@ static void prompt_accel_espnow_qr(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
     lv_obj_align(qr_canvas, LV_ALIGN_CENTER, 11, 12);
     
     // Draw the URL as a QR
-    const char *url = "https://polycast5.com/blogs/tutorials/control-custom-builds-with-accelerometer";
+    const char *url = "https://polycast5.com/blogs/tutorials/control-projects-using-the-ecompass";
     int n = lcd_draw_qr(qr_canvas, url, 100, &qr_buf);
     if (n != 0) {
         ESP_LOGE(TAG, "prompt_accel_espnow_qr lcd_draw_qr failed: %d", n);
@@ -1187,6 +1187,26 @@ void lcd_ecompass_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_men
     } else if (ui_btns->down_btn == 1) { // Previous view mode (wraps)
         accel_mode = (accel_mode + MODE_COUNT - 1) % MODE_COUNT;
         lv_label_set_text(mode_lbl, accel_mode_name(accel_mode));
+    } else if (ui_btns->select_btn) { // Re-zero: recapture "straight ahead" without restarting the stream
+        // Drop any queued samples so the new reference comes from a fresh reading
+        xQueueReset(xAccelReadingsQueue);
+        xQueueReset(xMagReadingsQueue);
+
+        last_refresh = 0; // Trigger a fresh sample request on the next frame
+        arrow_heading = 0.0f;
+        heading_ref = 0.0f;
+        heading_init = false; // Next mag sample becomes the new "straight ahead"
+        arrow_drawn = -1.0f;  // Force the next mag frame to redraw the arrow/arc/pip
+        disp_x = disp_y = disp_z = 0.0f;
+
+        // Snap the visuals back to the zeroed pose until fresh samples arrive
+        lv_image_set_rotation(ball, 0);
+        if (heading_arc) {
+            lv_arc_set_angles(heading_arc, ARC_TOP_DEG, ARC_TOP_DEG); // Zero-length = nothing drawn
+        }
+        if (heading_npip) {
+            lv_obj_add_flag(heading_npip, LV_OBJ_FLAG_HIDDEN); // Hidden until a heading exists again
+        }
     } else if (ui_btns->left_btn) { // Stop streaming, back to the main selection menu
         espnow_ecompass_ctrl_t stop = {
             .start = false
