@@ -20,6 +20,21 @@ typedef struct sx126x_s {
 void lora_radio_set_rx_mode(void);
 
 /**
+ * @brief Log the radio's true state: latched IRQ flags, chip mode, command
+ *        status, device errors (XOSC/PLL/calibration), and the DIO1 ISR edge
+ *        count. Diagnostic for "TX started but no IRQ ever came back":
+ *          - irq shows TX_DONE latched but isr count unchanged -> DIO1 line/ISR
+ *            never fired (wiring / pin mapping)
+ *          - chip_mode TX long after start -> TX never finishing (PA/power)
+ *          - chip_mode STBY_RC + XOSC_START error -> oscillator (TCXO) never
+ *            started, TX/RX silently aborted
+ *          - everything clean -> the TX was never started at all
+ *
+ * @param [in] ctx Short context prefix for the log line
+ */
+void lora_radio_log_health(const char *ctx);
+
+/**
  * @brief Transmits raw data over LoRa
  *
  * @param [in] tx_data Data to transmit

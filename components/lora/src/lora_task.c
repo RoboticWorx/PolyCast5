@@ -19,6 +19,14 @@
 
 #define MAX_RETRIES 2
 
+// TX/ACK watchdog: longest SF12 command TX (~3 s airtime) + 2 s receipt RX + margin
+#define LORA_TX_WATCHDOG_MS 10000
+
+// 32 MHz TCXO configuration (SX1262 TCXO mode, DIO3 as the TCXO supply switch)
+#define LORA_TCXO_VOLTAGE SX126X_TCXO_CTRL_1_8V
+// TX21 specs 2 ms max startup, so this is 2.5x margin
+#define LORA_TCXO_STARTUP_RTC_STEPS 320 // 5 ms in 15.625 us RTC steps
+
 static volatile bool need_to_retry = false;
 static volatile uint8_t retry_count = 0;
 
@@ -35,10 +43,14 @@ QueueHandle_t xLoraSendEncQueue;
 
 static void lora_event_handler_task(void *pvParameters);
 
+volatile uint32_t g_lora_dio1_isr_count = 0;
+
 // ISR handler for DIO1
 static void IRAM_ATTR dio1_isr_handler(void *arg)
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+    g_lora_dio1_isr_count++; // Diagnostic edge counter (lora_radio_log_health)
 
     // Signal the event handler task
     xSemaphoreGiveFromISR(xLoraEventSemaphore, &xHigherPriorityTaskWoken);
@@ -149,6 +161,15 @@ static void lora_task(void *pvParameters)
         ESP_LOGE(TAG, "Failed to set standby");
     }
 
+    // The board's 32 MHz reference is a TCXO, not a crystal
+    status = sx126x_set_dio3_as_tcxo_ctrl(NULL, LORA_TCXO_VOLTAGE, LORA_TCXO_STARTUP_RTC_STEPS);
+    if (status != SX126X_STATUS_OK) {
+        ESP_LOGE(TAG, "Failed to set DIO3 as TCXO control");
+    }
+
+    // In TCXO mode the chip flags XOSC_START at power-up by design,clear it to only reports real faults
+    sx126x_clear_device_errors(NULL);
+
     status = sx126x_cal(NULL, SX126X_CAL_ALL);
     if (status != SX126X_STATUS_OK) {
         ESP_LOGE(TAG, "Failed to calibrate");
@@ -221,6 +242,13 @@ static void lora_task(void *pvParameters)
     }
     sx126x_clear_irq_status(NULL, SX126X_IRQ_ALL); // Clear IRQs at start
 
+    // Oscillator/calibration faults are invisible in the driver's SPI return codes, so check once after bring-up
+    sx126x_errors_mask_t boot_errs = 0;
+    if (sx126x_get_device_errors(NULL, &boot_errs) == SX126X_STATUS_OK && boot_errs != 0) {
+        lora_radio_log_health("Radio bring-up");
+        sx126x_clear_device_errors(NULL);
+    }
+
     // Set up DIO1 interrupt for RX
     gpio_config_t io_conf = {
         .pin_bit_mask = (1ULL << SX126X_DIO1_PIN),
@@ -239,10 +267,24 @@ static void lora_task(void *pvParameters)
 
     lora_pcp_load_msg_id_nvs(); // Load persisted msg_id counter
     lora_pcp_cmd_msg_t cmd_msg = {0}; // Hold binary command to send
+    TickType_t ack_wait_since = 0; // Tick of the last TX start, for the watchdog below
     while (1) {
         // Generate encryption key requested
         if (xSemaphoreTake(xLoraGenerateEncKeySemaphore, 0) == pdTRUE) {
             lora_pcp_generate_random_key();
+        }
+
+        // Watchdog: every sent command must resolve via a DIO1 event
+        // If none ever arrives, waiting_for_ack would stay true forever and wedge the send pipeline with zero logs
+        if (waiting_for_ack && !need_to_retry &&
+                (xTaskGetTickCount() - ack_wait_since) > pdMS_TO_TICKS(LORA_TX_WATCHDOG_MS)) {
+            lora_radio_log_health("TX watchdog: no radio IRQ since TX");
+            sx126x_clear_device_errors(NULL);
+            sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
+            sx126x_clear_irq_status(NULL, SX126X_IRQ_ALL);
+            need_to_retry = false;
+            retry_count = 0;
+            waiting_for_ack = false; // Give up so the next command can dispatch
         }
 
         // If retrying from no receipt
@@ -253,6 +295,7 @@ static void lora_task(void *pvParameters)
             // Encrypt and send the same command again
             if (lora_pcp_encrypt_and_transmit((uint8_t *)&cmd_msg, sizeof(cmd_msg))) {
                 need_to_retry = false;
+                ack_wait_since = xTaskGetTickCount(); // Re-arm the TX watchdog
             } else if (retry_count < MAX_RETRIES) {
                 retry_count++;
                 ESP_LOGE(TAG, "Retry TX failed, will retry next loop");
@@ -295,9 +338,11 @@ static void lora_task(void *pvParameters)
             // Encrypt and send
             if (lora_pcp_encrypt_and_transmit((uint8_t *)&cmd_msg, sizeof(cmd_msg))) {
                 waiting_for_ack = true;
+                ack_wait_since = xTaskGetTickCount(); // Arm the TX watchdog
             } else {
                 // Command is already off the queue: retry it via the retry path (bounded)
                 waiting_for_ack = true;
+                ack_wait_since = xTaskGetTickCount();
                 need_to_retry = true;
                 ESP_LOGE(TAG, "TX failed, will retry next loop");
             }

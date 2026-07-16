@@ -33,7 +33,8 @@
 #include "sx126x.h"
 
 #include "lora_meshtastic.h"
-#include "lora_pcp.h" // LoRa region NVS load + region table (LongFast frequency slot)
+#include "lora_pcp.h"   // LoRa region NVS load + region table (LongFast frequency slot)
+#include "lora_radio.h" // lora_radio_log_health (TX watchdog diagnostics)
 
 static const char *TAG = "MESH";
 
@@ -49,6 +50,10 @@ static char     s_node_id[10] = "!00000000"; // "!%08x"
 
 // Re-broadcast our NodeInfo on this interval (others expire stale entries)
 #define MESHTASTIC_NODEINFO_PERIOD_MS (15 * 60 * 1000) // Every 15 minutes
+
+// TX watchdog: longest SF11 text TX is ~2 s airtime, so s_tx_busy stuck longer
+// than this means the TX_DONE/TIMEOUT IRQ is never coming
+#define MESH_TX_WATCHDOG_MS 10000
 
 // Depth of the web-portal -> radio text send queue
 #define MESH_TX_QUEUE_LEN 4
@@ -1265,9 +1270,37 @@ void lora_meshtastic_run(void)
 
     // The radio stays in standby until the user opens the Meshtastic portal page
     TickType_t last_nodeinfo = xTaskGetTickCount();
+    TickType_t tx_busy_since = 0;    // Tick when s_tx_busy was first seen set
+    bool       tx_busy_seen  = false;
 
     while (1) {
         TickType_t now = xTaskGetTickCount();
+
+        // Watchdog: If no DIO1 event ever arrives it would stay set forever and gate every future TX with zero logs
+        if (s_tx_busy) {
+            if (!tx_busy_seen) {
+                tx_busy_seen  = true;
+                tx_busy_since = now;
+            } else if ((now - tx_busy_since) > pdMS_TO_TICKS(MESH_TX_WATCHDOG_MS)) {
+                xSemaphoreTake(s_radio_mtx, portMAX_DELAY);
+                // Re-check under the lock
+                if (s_tx_busy) {
+                    lora_radio_log_health("TX watchdog: TX_DONE never arrived");
+                    sx126x_clear_device_errors(NULL);
+                    sx126x_clear_irq_status(NULL, SX126X_IRQ_ALL);
+                    s_tx_busy = false;
+                    if (s_listening) {
+                        mesh_enter_rx(); // Back to listening for the session
+                    } else {
+                        sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
+                    }
+                }
+                xSemaphoreGive(s_radio_mtx);
+                tx_busy_seen = false;
+            }
+        } else {
+            tx_busy_seen = false;
+        }
 
         // Only touch the radio while a portal session is active
         if (s_listening && !s_tx_busy) {
@@ -1298,6 +1331,11 @@ void lora_meshtastic_run(void)
                     last_nodeinfo = now;
                 }
             }
+
+            // A TX may have just started: re-base the watchdog so back-to-back
+            // TXs can't inherit the previous TX's timer through the rare case
+            // of a TX_DONE landing between this iteration's two s_tx_busy reads
+            tx_busy_seen = false;
         }
 
         vTaskDelay(pdMS_TO_TICKS(100));
