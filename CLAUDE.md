@@ -45,3 +45,4 @@ The firmware is task-based. `main/main.c` initializes hardware (NVS, I2C, SPI, L
 - Preserve existing comment style (`/** */` vs `//`) and formatting in surrounding code
 - Keep functions separated with blank lines consistent with adjacent code
 - Wrap lines consistently with the file's existing style
+- Never push/commit code. If asked, only create the commit message.

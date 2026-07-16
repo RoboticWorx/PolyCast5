@@ -24,19 +24,32 @@ You can find some relevant links below:
 
 # Functionality
 
-* **[Outlet actuator](https://polycast5.com/blogs/tutorials/using-polyplugs)** - Wirelessly switch outlets/appliances ([PolyPlugs](https://github.com/RoboticWorx/PolyPlug)) over LoRa with one-press on/off, repeating timers, weekly schedules, and an away presence-simulation mode. All secured with per-plug AES encryption.
-* **[Bluetooth controller](https://polycast5.com/blogs/docs/bluetooth-auto-keyboard)** - Behave as a Bluetooth HID ("ordinary" keyboard) except it has a powerful autotype scripting engine (delays, key holds, etc.) to instantly types out repetitive text, snippets, and create custom executable commands. It also includes media remote modes for social media scrolling, pause/play/next/prev, presentation clicking, camera shutters, and more.
-* **Wi-Fi sender and sniffer** - Sniff network data and beacon frames to view active network users, RSSI, security details (WPA2/WPA3/OWE, PMF, WPS), and tons of other network information. Also includes an AI packet analysis tool to have every frame sniffed and interpreted in its entirety by AI, then returned as a easy-to-read `.md` file.
-* **[AI voice keyboard](https://polycast5.com/blogs/docs/ai-keyboard)** - Hold to talk and your request is transcribed, interpreted by AI, and executed live on your paired computer or phone via Bluetooth. Also with modes for plain voice dictation and custom commands. _e.g. you say "break time" -> PC opens chrome, goes to your favorite TV show._
-* **eCompass** - A built-in accelerometer and magnetometer compass for streaming orientation/position data live over ESP-NOW to your other projects. Use your device like a literal steering wheel. Complete with automatic guided calibration.
-* **[ESP32 commander](https://polycast5.com/blogs/tutorials/control-custom-builds)** - Use [ESP-NOW](https://www.espressif.com/en/solutions/low-power-solutions/esp-now) to send instant, optionally-encrypted commands to custom Arduino-compatible ESP32 builds. The perfect universal remote for any custom projects you may build.
-* **[Offline Password manager](https://polycast5.com/blogs/docs/offline-password-manager-ai-keyboard)** - Save your logins securely on-device, then autofill them on any computer or phone over Bluetooth. No cloud, no browser extension, no Wi-Fi. Just ask and let your password get autotyped, all under 6 seconds.
-* **Meshtastic messenger** - Join the the open-source [Meshtastic](https://meshtastic.org/) LoRa mesh network for long-range communication without the need for internet, Wi-Fi, or any subscriptions. PolyCast5 talks to real Meshtastic nodes while hosting an easy-to-use chat portal.
-* **Infrared remote** - Save and replay infrared signals for TVs, air conditioners, lamps, or anything else. Learning is protocol-agnostic (raw capture), and captures are organized into multiple on-device virtual remotes.
-* **Games** - A built-in games featuring a DOOM-style raycasting shooter with procedurally generated levels, plus Tetris, T-Rex Runner, and Flappy Bird. Each with saved high scores and custom accent colors.
-* **Offline tools** - Dice roller, coin flipper, random number generator, Pomodoro timer, spaced-repetition (SRS) study planner, Bitcoin-address QR, an offline docs viewer, and more.
-* **Over-the-air updates** - Check for and install new firmware easily over Wi-Fi. Your device will literally only ever get better over time!
-* **Customizable settings** - Set a security PIN, custom the device colors, haptics, RGB LED configuration, LCD brightness, sleep timer, LoRa region/spreading factor, and more. Complete with many detailed system-info pages reporting battery, memory, versions, and MACs.
+* **Outlet actuator** - [_tutorial_](https://polycast5.com/blogs/tutorials/using-polyplugs)
+  * Wirelessly switch outlets/appliances ([PolyPlugs](https://github.com/RoboticWorx/PolyPlug)) over LoRa with one-press on/off, repeating timers, weekly schedules, and an away presence-simulation mode. All secured with per-plug AES encryption.
+* **Bluetooth controller** - [_tutorial_](https://polycast5.com/blogs/docs/bluetooth-auto-keyboard)
+  * Behave as a Bluetooth HID ("ordinary" keyboard) except it has a powerful autotype scripting engine (delays, key holds, etc.) to instantly types out repetitive text, snippets, and create custom executable commands. It also includes media remote modes for social media scrolling, pause/play/next/prev, presentation clicking, camera shutters, and more.
+* **Wi-Fi sender and sniffer**
+  * Sniff network data and beacon frames to view active network users, RSSI, security details (WPA2/WPA3/OWE, PMF, WPS), and tons of other network information. Also includes an AI packet analysis tool to have every frame sniffed and interpreted in its entirety by AI, then returned as a easy-to-read `.md` file.
+* **AI voice keyboard** - [_tutorial_](https://polycast5.com/blogs/docs/ai-keyboard)
+  * Hold to talk and your request is transcribed, interpreted by AI, and executed live on your paired computer or phone via Bluetooth. Also with modes for plain voice dictation and custom commands. _e.g. you say "break time" -> PC opens chrome, goes to your favorite TV show._
+* **eCompass** - [_tutorial_](https://polycast5.com/blogs/tutorials/control-projects-using-the-ecompass)
+  * A built-in accelerometer and magnetometer compass for streaming orientation/position data live over ESP-NOW to your other projects. Use your device like a literal steering wheel. Complete with automatic guided calibration.
+* **ESP32 commander** - [_tutorial_](https://polycast5.com/blogs/tutorials/control-custom-builds)
+  * Use [ESP-NOW](https://www.espressif.com/en/solutions/low-power-solutions/esp-now) to send instant, optionally-encrypted commands to custom Arduino-compatible ESP32 builds. The perfect universal remote for any custom projects you may build.
+* **Offline password manager** - [_tutorial_](https://polycast5.com/blogs/docs/offline-password-manager-ai-keyboard)
+  * Save your logins securely on-device, then autofill them on any computer or phone over Bluetooth. No cloud, no browser extension, no Wi-Fi. Just ask and let your password get autotyped, all under 6 seconds.
+* **Meshtastic messenger**
+  * Join the the open-source [Meshtastic](https://meshtastic.org/) LoRa mesh network for long-range communication without the need for internet, Wi-Fi, or any subscriptions. PolyCast5 talks to real Meshtastic nodes while hosting an easy-to-use chat portal.
+* **Infrared remote**
+  * Save and replay infrared signals for TVs, air conditioners, lamps, or anything else. Learning is protocol-agnostic (raw capture), and captures are organized into multiple on-device virtual remotes.
+* **Games**
+  * A built-in games featuring a DOOM-style raycasting shooter with procedurally generated levels, plus Tetris, T-Rex Runner, and Flappy Bird. Each with saved high scores and custom accent colors.
+* **Offline tools**
+  * Dice roller, coin flipper, random number generator, Pomodoro timer, spaced-repetition (SRS) study planner, Bitcoin-address QR, an offline docs viewer, and more.
+* **Over-the-air updates**
+  * Check for and install new firmware easily over Wi-Fi. Your device will literally only ever get better over time!
+* **Customizable settings**
+  * Set a security PIN, custom the device colors, haptics, RGB LED configuration, LCD brightness, sleep timer, LoRa region/spreading factor, and more. Complete with many detailed system-info pages reporting battery, memory, versions, and MACs.
 
 PolyCast5 also comes with cool, customizable homescreen animations and hotkeys! Each of the six hotkeys can fire a saved LoRa, ESP-NOW, or infrared command, or jump straight to a page like the AI keyboard, timer, or study planner **instantly**.
 
