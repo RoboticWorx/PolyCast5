@@ -180,13 +180,19 @@ const char *AI_PORTAL_HTML =
 "    <h2>PolyCast5 AI Portal</h2>\n"
 
 "    <p>\n"
+"      <strong>Welcome to the AI Portal!</strong>\n"
+"    </p>\n"
+"    <p>\n"
+"      PolyCast5 uses xAI by default, since they're low-cost and have built-in speech-to-text that can be used under the same API key.\n"
+"    </p>\n"
+"    <p>\n"
 "      Paste your <strong>Grok (xAI)</strong> API key below and click save.\n"
 "      (Typically starts with <code>xai-</code>)\n"
 "    </p>\n"
 "    <p>\n"
 "      If you don't have an API key, visit\n"
 "      <a href=\"https://polycast5.com/blogs/docs/ai-keyboard\" target=\"_blank\" rel=\"noopener noreferrer\">polycast5.com/blogs/docs/ai-keyboard</a>\n"
-"      for a tutorial on how to get one for cheap ($5). <i>Note: You will need to reconnect to your actual Wi-Fi network first to access the website link.</i>\n"
+"      for a tutorial on how to get one for cheap ($5), as well as use the various features of the AI Keyboard. <i>Note: You will need to reconnect to your actual Wi-Fi network first to access the website link.</i>\n"
 "    </p>\n"
 "    <p class=\"small-note\">For security, the key is not displayed after saving.</p>\n"
 
@@ -201,6 +207,7 @@ const char *AI_PORTAL_HTML =
 "    <p>\n"
 "      Below are the default AI system prompts used across various PolyCast5 applications.\n"
 "      Feel free to edit them to tweak responses, create custom commands, or anything else!\n"
+"      <i>A tutorial is also <a href=\"https://polycast5.com/blogs/docs/customize-system-prompts-ai-keyboard\" target=\"_blank\" rel=\"noopener noreferrer\">available here.</a></i>\n"
 "    </p>\n"
 
 "    <div>\n"
