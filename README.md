@@ -27,7 +27,7 @@ You can find some relevant links below:
 * **Outlet actuator** - [_tutorial_](https://polycast5.com/blogs/tutorials/using-polyplugs)
   * Wirelessly switch outlets/appliances ([PolyPlugs](https://github.com/RoboticWorx/PolyPlug)) over LoRa with one-press on/off, repeating timers, weekly schedules, and an away presence-simulation mode. All secured with per-plug AES encryption.
 * **Bluetooth controller** - [_tutorial_](https://polycast5.com/blogs/docs/bluetooth-auto-keyboard)
-  * Behave as a Bluetooth HID ("ordinary" keyboard) except it has a powerful autotype scripting engine (delays, key holds, etc.) to instantly types out repetitive text, snippets, and create custom executable commands. It also includes media remote modes for social media scrolling, pause/play/next/prev, presentation clicking, camera shutters, and more.
+  * Behave as a Bluetooth HID ("ordinary" keyboard) except it's actually a powerful autotype scripting engine (delays, key holds, etc.) to instantly types out repetitive text, snippets, and create custom executable commands. It also includes media remote modes for social media scrolling, pause/play/next/prev, presentation clicking, camera shutters, and more.
 * **Wi-Fi sender and sniffer**
   * Sniff network data and beacon frames to view active network users, RSSI, security details (WPA2/WPA3/OWE, PMF, WPS), and tons of other network information. Also includes an AI packet analysis tool to have every frame sniffed and interpreted in its entirety by AI, then returned as a easy-to-read `.md` file.
 * **AI voice keyboard** - [_tutorial_](https://polycast5.com/blogs/docs/ai-keyboard)
@@ -88,7 +88,7 @@ CONDITIONS OF ANY KIND, either express or implied._
 
 # Development
 
-PolyCast5 is written in C and built on [ESP-IDF](https://github.com/espressif/esp-idf).
+PolyCast5 is written in C and built on [ESP-IDF](https://github.com/espressif/esp-idf) v6.0.1.
 
 ## Cloning
 

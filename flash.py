@@ -95,6 +95,9 @@ from pathlib import Path
 # tool works no matter where it's launched from.
 # ===========================================================================
 ROOT           = Path(__file__).resolve().parent      # repo root (where this file lives)
+# Name of the actually-invoked script (flash.py or lock_it_down.py, which
+# imports these helpers), so shared hints reference the right command.
+PROG           = Path(sys.argv[0]).name or "flash.py"
 BUILD_DIR      = ROOT / "build"                        # idf.py build output dir
 FLASHER_ARGS   = BUILD_DIR / "flasher_args.json"       # offsets + flash params, written by build
 SDKCONFIG_JSON = BUILD_DIR / "config" / "sdkconfig.json"  # resolved config (for the FE setting)
@@ -104,9 +107,9 @@ BIN_DIR        = ROOT / "bin"                          # committed release binar
 
 # Data-partition subtypes that the flash-encryption hardware does NOT decrypt
 # on read, so their images must be written as PLAINTEXT even when FE is on.
-# (nvs has its own NVS-encryption scheme and is likewise not FE-encrypted, but
-# it is not part of the normal flash set.)
-PLAINTEXT_SUBTYPES = {"littlefs", "spiffs", "fat", "fatfs", "nvs"}
+# (nvs has its own NVS-encryption scheme; phy is read via esp_partition_read
+# without decryption; both are unflagged, so neither is FE-encrypted.)
+PLAINTEXT_SUBTYPES = {"littlefs", "spiffs", "fat", "fatfs", "nvs", "phy"}
 
 # Espressif USB vendor id; the built-in USB-Serial-JTAG uses product id 0x1001.
 # Used by autodetect_port() to recognise the board among other COM/tty devices.
@@ -244,8 +247,8 @@ def should_encrypt(fe_enabled: bool, part: Partition | None) -> bool:
     Rules (only relevant when Flash Encryption is enabled):
       * bootloader / partition-table (no entry in partitions.csv) -> encrypted
       * any partition explicitly flagged `encrypted` in partitions.csv -> encrypted
-      * filesystem/NVS data partitions -> PLAINTEXT (HW won't decrypt them)
-      * everything else (app, otadata, phy) -> encrypted
+      * filesystem/NVS/phy data partitions -> PLAINTEXT (read without decryption)
+      * everything else (app, otadata) -> encrypted
     """
     if not fe_enabled:
         return False            # FE off -> nothing is encrypted, ever
@@ -254,8 +257,8 @@ def should_encrypt(fe_enabled: bool, part: Partition | None) -> bool:
     if "encrypted" in part.flags:
         return True             # explicitly flagged in partitions.csv (e.g. nvs_keys)
     if part.subtype in PLAINTEXT_SUBTYPES:
-        return False            # littlefs/spiffs/fat/nvs -> HW won't decrypt -> plaintext
-    return True                 # app, otadata, phy, ... -> encrypted
+        return False            # littlefs/spiffs/fat/nvs/phy -> read raw, not decrypted
+    return True                 # app, otadata, ... -> encrypted
 
 
 # ===========================================================================
@@ -270,6 +273,28 @@ def fe_enabled_from_build() -> bool:
     except Exception:
         return False  # no/unreadable config -> assume FE off (callers also re-check the chip)
     return bool(cfg.get("SECURE_FLASH_ENC_ENABLED", False))
+
+
+def refuse_locked_build() -> None:
+    """Refuse to flash a locked-down (release-mode / Secure Boot v2) build.
+
+    flash.py is the DEV flasher. Both dev and locked builds have
+    SECURE_FLASH_ENC_ENABLED=y, so fe_enabled_from_build() can't tell them
+    apart - but flashing a locked build here would boot the eFuse-burning
+    bootloader and complete the irreversible lockdown with none of
+    lock_it_down.py's safeguards (no confirmation, no key-backup warning, no
+    manual-encrypt probe), and would mirror the signed release images into bin/,
+    clobbering the committed dev binaries. Hand off to the dedicated tool."""
+    try:
+        cfg = json.loads(SDKCONFIG_JSON.read_text())
+    except Exception:
+        return  # can't classify -> the device-side FE guard still protects a locked chip
+    if cfg.get("SECURE_FLASH_ENCRYPTION_MODE_RELEASE") or cfg.get("SECURE_BOOT"):
+        die("this is a LOCKED-DOWN build (release flash encryption / Secure Boot v2).",
+            "flash.py is the dev flasher - flashing it would burn eFuses with no safeguards.",
+            "Use the dedicated one-way tool instead:  python lock_it_down.py",
+            "For normal dev flashing, set POLYCAST5_SECURE_RELEASE=0 in CMakeLists.txt,",
+            "then:  idf.py fullclean && idf.py build")
 
 
 def load_flasher_args() -> dict:
@@ -353,9 +378,12 @@ def esptool_cmd(port: str, chip: str, before: str, after: str, *args: str) -> li
 
 
 def run(cmd: list[str], capture: bool = False, fatal: bool = True):
-    """Run a command. On a native non-zero exit: abort (fatal) or return None.
-
-    capture=True returns a CompletedProcess with .stdout populated."""
+    """Run a command. On a native non-zero exit: abort (fatal), or for
+    capture runs return a CompletedProcess with a non-zero .returncode and
+    .stdout still holding everything the command printed - failure text can
+    be load-bearing (esptool crashes mid-connect on a locked-down device and
+    the only "Secure Download Mode" marker is in that output). Non-capture
+    non-fatal failures return None."""
     # Echo a readable form of the command (shorten the long python path to just
     # "python.exe") so the user can see / copy exactly what's being run.
     pretty = " ".join(Path(c).name if c == sys.executable else c for c in cmd)
@@ -368,8 +396,12 @@ def run(cmd: list[str], capture: bool = False, fatal: bool = True):
         # Stream output live (flash progress bars, build log) to the terminal.
         return subprocess.run(cmd, check=True)
     except subprocess.CalledProcessError as e:
-        # Non-zero exit. Non-fatal callers (preflight) just get None and degrade.
+        # Non-zero exit. Non-fatal callers (preflight) degrade - but capture
+        # callers still get the output so they can scan it before degrading.
         if not fatal:
+            if capture:
+                return subprocess.CompletedProcess(e.cmd, e.returncode,
+                                                   stdout=e.output or "")
             return None
         if capture and e.output:
             print(e.output)  # surface the captured output before dying
@@ -422,7 +454,7 @@ def autodetect_port() -> str:
     ports = list_serial_ports()
     if ports is None:
         die("pyserial is not available, so the port can't be auto-detected.",
-            "Pass the port explicitly, e.g.  python flash.py -p COM7")
+            f"Pass the port explicitly, e.g.  python {PROG} -p COM7")
     if not ports:
         die("no serial ports found.",
             "Plug the device in and check the USB cable, then retry.")
@@ -445,7 +477,7 @@ def autodetect_port() -> str:
             for p in group:
                 print(yellow(f"  {describe_port(p)}"))
             die("ambiguous serial port (more than one board attached).",
-                "Unplug all but one, or pass the right one with  -p COMx",
+                f"Unplug all but one, or pass the right one:  python {PROG} -p COMx",
                 "Use the sn= serial number above to tell identical boards apart.")
 
     # No tier matched but there's exactly one port overall -> it's almost certainly it.
@@ -458,7 +490,7 @@ def autodetect_port() -> str:
     for p in ports:
         print(yellow(f"  {describe_port(p)}"))
     die("ambiguous serial port.",
-        "Pick one and pass it, e.g.  python flash.py -p COM7")
+        f"Pick one and pass it, e.g.  python {PROG} -p COM7")
 
 
 # ===========================================================================
@@ -467,6 +499,20 @@ def autodetect_port() -> str:
 # to "flash everything" rather than aborting, EXCEPT a confirmed FE mismatch,
 # which we refuse because flashing it would brick the board.
 # ===========================================================================
+def die_if_locked_device(out: str) -> None:
+    """Hard-stop if esptool output shows a locked-down device (secure boot /
+    Secure Download Mode). Must be run on FAILED probe output too: over the
+    built-in USB-Serial-JTAG port, esptool crashes during connect on a locked
+    device and the only "Secure Download Mode" marker is in the crash text.
+    esptool itself would NOT refuse the writes - nothing written over USB can
+    boot (the key is sealed in eFuse, download-mode encryption is fused off),
+    it would only corrupt the encrypted firmware."""
+    if re.search(r"Secure Boot:\s*Enabled|Secure Download Mode", out, re.I):
+        die("this device is locked down (secure boot / secure download mode).",
+            f"{PROG} cannot safely write to it - firmware updates must go over OTA.",
+            "See www.polycast5.com/blogs/docs/lock-it-down")
+
+
 def read_chip_mac(port: str, chip: str) -> str | None:
     """Return the board's base MAC, or None if it couldn't be read/parsed."""
     # fatal=False: a flaky read here must not kill the run; we just lose the
@@ -475,9 +521,13 @@ def read_chip_mac(port: str, chip: str) -> str | None:
     proc = run(esptool_cmd(port, chip, "default-reset", "hard-reset", "read-mac"),
                capture=True, fatal=False)
     if proc is None:
-        print(yellow("Couldn't read the chip MAC (connect failed); will flash everything."))
+        print(yellow("Couldn't run esptool for the MAC read; will flash everything."))
         return None
     out = proc.stdout or ""
+    die_if_locked_device(out)  # earliest chance to catch a locked device
+    if proc.returncode != 0:
+        print(yellow("Couldn't read the chip MAC (connect failed); will flash everything."))
+        return None
     # On C5/C6 esptool prints an 8-byte EUI64 on the first "MAC:" line and the
     # real 6-byte address on "BASE MAC:". Prefer BASE MAC; accept exactly 6 octets.
     six = r"([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})"
@@ -496,8 +546,12 @@ def read_chip_fe(port: str, chip: str) -> bool | None:
     proc = run(esptool_cmd(port, chip, "default-reset", "hard-reset", "get-security-info"),
                capture=True, fatal=False)
     if proc is None:
-        return None  # couldn't read -> caller proceeds based on the build config
-    m = re.search(r"Flash[ _]Encryption:\s*(Enabled|Disabled)", proc.stdout or "", re.I)
+        return None  # esptool itself couldn't run - caller decides (fails closed)
+    out = proc.stdout or ""
+    die_if_locked_device(out)  # scans failure output too - see the helper
+    if proc.returncode != 0:
+        return None
+    m = re.search(r"Flash[ _]Encryption:\s*(Enabled|Disabled)", out, re.I)
     if not m:
         return None
     return m.group(1).lower() == "enabled"
@@ -613,6 +667,9 @@ def main() -> int:
     # Everything we flash is described by flasher_args.json; the FE setting comes
     # from the resolved sdkconfig; the partition table tells us encrypt-vs-plaintext.
     fa = load_flasher_args()
+    # A locked-down build must never be flashed by this dev tool - it would
+    # complete the one-way lockdown with no safeguards. Hand off to lock_it_down.py.
+    refuse_locked_build()
     fe = fe_enabled_from_build()                       # is Flash Encryption on in this build?
     extra = fa.get("extra_esptool_args", {})
     chip = extra.get("chip", "esp32c5")                # e.g. "esp32c5"
@@ -697,9 +754,15 @@ def main() -> int:
         # chip's real efuse state - that mismatch is the classic way to brick.
         chip_fe = read_chip_fe(port, chip)
         if chip_fe is None:
-            # Couldn't read it -> proceed on the build's setting (best effort).
-            print(yellow("Couldn't read the chip's flash-encryption state; "
-                         "proceeding based on the build config."))
+            # Fail CLOSED. With locked-down devices in the field (see the
+            # lock-it-down guide), "couldn't tell" is not a safe state to write
+            # in: a locked chip accepts the writes but can never boot them, and
+            # once its firmware is corrupted not even OTA can save it.
+            die("couldn't read the chip's security state (get-security-info failed).",
+                "Close any open idf.py monitor / serial terminal and retry.",
+                "Run this from an ESP-IDF terminal so `python -m esptool` works.",
+                "If this device was locked down, do NOT flash it over USB - it can",
+                "only be updated over OTA. See www.polycast5.com/blogs/docs/lock-it-down")
         elif chip_fe != fe:
             print(red(f"\nFlash-encryption MISMATCH: build expects FE="
                       f"{'ON' if fe else 'OFF'} but the chip reports FE="

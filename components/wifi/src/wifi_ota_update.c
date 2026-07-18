@@ -16,6 +16,7 @@
 #include "esp_crt_bundle.h"
 #include "esp_app_desc.h"
 #include "esp_http_client.h"
+#include "esp_pm.h"
 
 #include "portmacro.h"
 #include "wifi_utils.h"
@@ -42,6 +43,33 @@ POLYCAST5_USE_PSRAM_BSS static char manifest_url_buf[512]; // Manifest URL buffe
 
 static char pending_manifest_ver[64];
 static int manifest_size_bytes = -1;
+
+// C5 errata guard for encrypted flash writes: cap DFS to 160 MHz while writing and
+// restore the previous max after. Returns false if the cap could not be applied --
+// the caller MUST skip the write then (an encrypted write at 240 can corrupt flash).
+static bool ota_flash_write_freq_guard(bool entering)
+{
+#if CONFIG_SECURE_FLASH_ENC_ENABLED
+    // Remember whatever main.c set (240 on rev v1.2+, 160 on v1.0-) so restore is rev-correct
+    // No concurrency: OTA restarts, mark-valid runs once at boot
+    static uint32_t saved_max_mhz = POLYCAST5_CPU_MAX_FREQ_MHZ;
+    esp_pm_config_t pm;
+    if (esp_pm_get_configuration(&pm) != ESP_OK) {
+        return false;
+    }
+
+    if (entering) {
+        saved_max_mhz = pm.max_freq_mhz;
+        pm.max_freq_mhz = POLYCAST5_CPU_FLASH_WRITE_FREQ_MHZ;
+    } else {
+        pm.max_freq_mhz = saved_max_mhz;
+    }
+    return esp_pm_configure(&pm) == ESP_OK;
+#else
+    (void)entering;
+    return true;
+#endif
+}
 
 static void ota_task(void *_)
 {
@@ -80,13 +108,23 @@ static void ota_task(void *_)
     };
 
     esp_https_ota_handle_t h = NULL;
-    
+
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "OTA total size: %d", manifest_size_bytes);
 #endif
-    
+
+    // Everything below writes the (encrypted) OTA app slot and otadata, so cap the
+    // CPU at 160 MHz for the C5 encrypted-write errata
+
+    // If the cap fails, don't write (would corrupt at 240)
+    esp_err_t err = ESP_FAIL;
+    if (!ota_flash_write_freq_guard(true)) {
+        ESP_LOGE(TAG, "Could not cap CPU for encrypted OTA write; aborting");
+        goto out;
+    }
+
     // Opens the URL, validates TLS, selects the inactive OTA partition, and prepares to stream
-    esp_err_t err = esp_https_ota_begin(&ota_cfg, &h);
+    err = esp_https_ota_begin(&ota_cfg, &h);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "ota_begin error: %s", esp_err_to_name(err));
         pending_manifest_ver[0] = '\0'; // Clear pending version
@@ -441,7 +479,16 @@ bool wifi_ota_update_in_progress(void)
 void wifi_ota_update_mark_app_valid(void)
 {
 #ifdef CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
+    // Marking valid writes the (encrypted) otadata partition, so drop to 160 for
+    // the write (C5 errata), then restore
+    
+    // If the cap fails, skip it -- risking a rollback is safer than corrupting otadata at 240 MHz
+    if (!ota_flash_write_freq_guard(true)) {
+        ESP_LOGE(TAG, "Could not cap CPU; skipping mark-app-valid");
+        return;
+    }
     esp_err_t err = esp_ota_mark_app_valid_cancel_rollback();
+    ota_flash_write_freq_guard(false);
 
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Marked app valid");

@@ -48,4 +48,8 @@
 
 //#define POLYCAST5_SRS_CALIBRATING 1 // Calibrate SRS entry table based on const array in srs_memory.c
 
+// Run at 240 MHz for UI perf, dropping to 160 around the only encrypted flash writes (C5 errata)
+#define POLYCAST5_CPU_MAX_FREQ_MHZ 240          // chip rev v1.2+ only
+#define POLYCAST5_CPU_FLASH_WRITE_FREQ_MHZ 160  // Encrypted-write cap (all revs)
+
 #endif // POLYCAST5_MACROS_H

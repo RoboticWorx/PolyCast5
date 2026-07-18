@@ -1,0 +1,65 @@
+# PolyCast5 locked-down security profile.
+# Applied ON TOP of sdkconfig.defaults when POLYCAST5_SECURE_RELEASE is set to 1
+# in CMakeLists.txt (later file wins on conflict). Do not build with this
+# profile until you have read www.polycast5.com/blogs/docs/lock-it-down
+#
+# WARNING: the first boot of this build permanently burns eFuses: the secure
+# boot key digest + SECURE_BOOT_EN, SPI_BOOT_CRYPT_CNT (or its write-protect),
+# DIS_DOWNLOAD_MANUAL_ENCRYPT, SPI_DOWNLOAD_MSPI_DIS, all JTAG-disable bits,
+# DIS_DIRECT_BOOT, secure ROM download mode, and the XTS DPA pseudo-round
+# level. None can ever be un-burned. Plaintext USB re-flashing is permanently
+# disabled - OTA becomes the only firmware update path - and espefuse stops
+# working. Do not cut power during the first boot.
+#
+# Devices upgrading from the dev-mode profile keep their existing flash
+# encryption key; main.c completes the remaining release eFuses on the first
+# boot after the signed bootloader is flashed (lockdown_complete_release_mode).
+
+# Flash Encryption: DEVELOPMENT -> RELEASE (permanent)
+CONFIG_SECURE_FLASH_ENCRYPTION_MODE_RELEASE=y
+
+# Secure Boot v2 with ECDSA-P256 - hardware-accelerated on the C5
+# (~5.6 ms boot-time verify vs ~12.1 ms for RSA-3072). The scheme line is
+# load-bearing: without it the C5 Kconfig default silently resolves to
+# RSA-3072, which would mismatch the ecdsa256 key. Generate the key first:
+#   idf.py secure-generate-signing-key --version 2 --scheme ecdsa256 secure_boot_signing_key.pem
+# Back the .pem up offline - losing it permanently bricks future OTA updates.
+CONFIG_SECURE_BOOT=y
+CONFIG_SECURE_BOOT_V2_ENABLED=y
+CONFIG_SECURE_SIGNED_APPS_ECDSA_V2_SCHEME=y
+CONFIG_SECURE_BOOT_ECDSA_KEY_LEN_256_BITS=y
+CONFIG_SECURE_BOOT_SIGNING_KEY="secure_boot_signing_key.pem"
+
+# Let `idf.py flash` include the signed bootloader (normally skipped when
+# secure boot is on). Safe here: after lockdown, serial writes can't produce
+# a bootable image anyway, so the guard only complicates the initial flash.
+CONFIG_SECURE_BOOT_FLASH_BOOTLOADER_DEFAULT=y
+
+# ROM download mode drops to Secure mode (the C5 release-mode default, made
+# explicit): only basic flash write and get-security-info remain. espefuse,
+# flash read-back, and the esptool flasher stub stop working permanently.
+CONFIG_SECURE_ENABLE_SECURE_ROM_DL_MODE=y
+
+# Defer write-protecting the WR_DIS bit shared by SECURE_BOOT_SHA384_EN and
+# XTS_DPA_PSEUDO_LEVEL. Without this, esp_security_init() write-protects the
+# group before app_main on the first secure boot, and devices upgrading from
+# the dev profile (XTS_DPA_PSEUDO_LEVEL still 0) could never burn the DPA
+# pseudo-round level - release-mode verification would fail forever.
+# main.c applies the deferred write-protect once the release state verifies.
+# SECURE_BOOT_INSECURE is required for the SKIP line to take effect: it only
+# unhides the Kconfig menu the option lives in (zero references in C code,
+# enables no insecure behavior by itself) - without it the assignment is
+# silently dropped in release builds.
+# NOTE: never enable ESP_CRYPTO_FORCE_ECC_CONSTANT_TIME_POINT_MUL in a later
+# OTA of locked devices - its eFuse shares this write-protect bit and the
+# failed burn would abort() every boot.
+CONFIG_SECURE_BOOT_INSECURE=y
+CONFIG_SECURE_BOOT_SKIP_WRITE_PROTECTION_SCA=y
+
+# NOTE: this profile intentionally inherits the base -Og optimization
+# (COMPILER_OPTIMIZATION_DEBUG) - the same level the shipping dev firmware uses.
+# Raising it to -O2/-Os turns on GCC -Wstringop-truncation / -Wformat-truncation,
+# which IDF escalates to errors; several existing components (lora, ai) use the
+# safe strncpy+manual-terminate and snprintf truncation idioms that trip those
+# pedantic warnings even though the code is correct. Bumping the optimization is
+# a separate cleanup, not part of the lockdown - so it is deliberately not set here.

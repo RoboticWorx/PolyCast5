@@ -2,6 +2,7 @@
 #include <stdio.h>
 
 #include "polycast5_gpios.h"
+#include "polycast5_macros.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
@@ -17,6 +18,15 @@
 #include "esp_littlefs.h" // POLYCAST5_DEBUG_FS
 #include "esp_psram.h" // POLYCAST5_DEBUG_RAM
 #include "esp_random.h"
+#if CONFIG_SECURE_FLASH_ENCRYPTION_MODE_RELEASE
+#include "esp_flash_encrypt.h"
+#include "esp_secure_boot.h"
+#include "esp_efuse.h"
+#include "esp_efuse_table.h"
+#include "esp_system.h"
+#endif
+
+#include "esp_chip_info.h"
 
 #include "sx126x_hal.h"
 #include "tca9535.h"
@@ -59,8 +69,79 @@ static void spi_sx126x_init()
     assert(ret == ESP_OK);
 }
 
+#if CONFIG_SECURE_FLASH_ENCRYPTION_MODE_RELEASE
+// Locked-down builds only (POLYCAST5_SECURE_RELEASE=1 in CMakeLists.txt)
+// A device upgraded from dev-mode flash encryption keeps its DEVELOPMENT eFuses:
+// the bootloader only burns them on the very first encryption pass. Finish the job here.
+// See www.polycast5.com/blogs/docs/lock-it-down
+static void lockdown_complete_release_mode(void)
+{
+    if (!esp_secure_boot_enabled()) {
+        ESP_LOGE(TAG, "LOCKDOWN INCOMPLETE: secure boot eFuse is not set - not burning "
+                      "flash-encryption release eFuses on an unsecured device. Flash the "
+                      "signed bootloader over USB to proceed (see lock-it-down docs)");
+        return;
+    }
+
+    // Guard against the abort() inside esp_flash_encryption_set_release_mode()
+    if (!esp_flash_encryption_cfg_verify_release_mode()) {
+        // A power cut during a previous attempt can leave DIS_DOWNLOAD_MANUAL_ENCRYPT
+        // unburned but already write-protected (shared WR_DIS bit with DIS_ICACHE)
+        
+        // Retrying would abort() into a permanent boot loop - keep the device running
+        if (esp_efuse_read_field_bit(ESP_EFUSE_WR_DIS_DIS_ICACHE) &&
+            !esp_efuse_read_field_bit(ESP_EFUSE_DIS_DOWNLOAD_MANUAL_ENCRYPT)) {
+            ESP_LOGE(TAG, "Release-mode eFuses partially burned and now write-protected; "
+                          "cannot complete lockdown on this unit (device still works, OTA only)");
+            return;
+        }
+        ESP_LOGW(TAG, "Completing dev -> release flash-encryption eFuse transition...");
+        esp_flash_encryption_set_release_mode();
+
+        // Self-heal after a power cut during an earlier attempt: once the mode already
+        // reads RELEASE, set_release_mode() early-returns without burning the remaining bits
+        
+        // Both burns below are no-ops when already done and still writable here
+        uint8_t xts_level = 0;
+        esp_efuse_read_field_blob(ESP_EFUSE_XTS_DPA_PSEUDO_LEVEL, &xts_level, ESP_EFUSE_XTS_DPA_PSEUDO_LEVEL[0]->bit_count);
+        if (xts_level == 0) {
+            xts_level = 1; // ESP_XTS_AES_PSEUDO_ROUNDS_LOW
+            esp_efuse_write_field_blob(ESP_EFUSE_XTS_DPA_PSEUDO_LEVEL, &xts_level, ESP_EFUSE_XTS_DPA_PSEUDO_LEVEL[0]->bit_count);
+        }
+        esp_efuse_write_field_bit(ESP_EFUSE_WR_DIS_DIS_ICACHE);
+        if (!esp_flash_encryption_cfg_verify_release_mode()) {
+            ESP_LOGE(TAG, "Failed to put flash encryption into release mode");
+            return;
+        }
+        ESP_LOGW(TAG, "Lockdown complete, restarting...");
+        esp_restart();
+    }
+
+    // Release state verified
+    // SECURE_BOOT_SKIP_WRITE_PROTECTION_SCA deferred the write-protect of the SECURE_BOOT_SHA384_EN / XTS_DPA_PSEUDO_LEVEL eFuse group,
+    // so upgraded devices could still burn the DPA level above
+    esp_err_t wp_err = esp_efuse_write_field_bit(ESP_EFUSE_WR_DIS_SECURE_BOOT_SHA384_EN);
+    if (wp_err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to write-protect the SECURE_BOOT_SHA384_EN eFuse group (%s)", esp_err_to_name(wp_err));
+    }
+
+    // Both features verified - normal locked-down boot
+    
+    // Note: both release-mode audits log a benign "SOFT_DIS_JTAG is set but HMAC key..." warning;
+    // they fall back to the hard-JTAG eFuse checks, which pass
+    ESP_LOGI(TAG, "Flash encryption: release mode verified");
+    ESP_LOGI(TAG, "Secure boot: enabled%s", esp_secure_boot_cfg_verify_release_mode()
+             ? ", release mode verified" : " (release-mode eFuse check FAILED, see log above)");
+}
+#endif
+
 void app_main(void)
 {
+#if CONFIG_SECURE_FLASH_ENCRYPTION_MODE_RELEASE
+    // Verify (and if upgrading from a dev-mode device, complete) the lockdown
+    lockdown_complete_release_mode();
+#endif
+
 #ifdef POLYCAST5_DEBUG_RAM
     // Prints PSRAM chip size
     size_t psram_size = esp_psram_get_size();
@@ -80,18 +161,28 @@ void app_main(void)
 
     // DFS scales CPU between min/max based on load
     // Explicitly request 240 MHz max even though Kconfig caps boot at 160 MHz
-    // esp_flash_write_encrypted() automatically drops CPU to 160 MHz (v1.2+) during encrypted writes to avoid the silicon errata
+    // The 240->160 drop is only errata-safe on chip rev v1.2+; v1.0/below stay at a steady 160 MHz
+    esp_chip_info_t chip_info;
+    esp_chip_info(&chip_info);
+    int max_freq_mhz = (chip_info.revision >= 102)               // v1.2+ : 240
+                           ? POLYCAST5_CPU_MAX_FREQ_MHZ
+                           : POLYCAST5_CPU_FLASH_WRITE_FREQ_MHZ; // v1.0- : 160 steady
+    if (max_freq_mhz != POLYCAST5_CPU_MAX_FREQ_MHZ) {
+        ESP_LOGE(TAG, "Chip rev v1.0- detected: CPU will run at 160 MHz steady (no DFS)");
+    }
     esp_pm_config_t pm_cfg = {
-        .max_freq_mhz = 240,
+        .max_freq_mhz = max_freq_mhz,
         .min_freq_mhz = 40,
         .light_sleep_enable = false,
     };
     esp_err_t pm_err = esp_pm_configure(&pm_cfg);
-    if (pm_err != ESP_OK) {
-        ESP_LOGE(TAG, "240 MHz PM config rejected (%s), falling back to 160 MHz", esp_err_to_name(pm_err));
-        pm_cfg.max_freq_mhz = 160;
-        ESP_ERROR_CHECK(esp_pm_configure(&pm_cfg));
+    if (pm_err != ESP_OK && pm_cfg.max_freq_mhz != POLYCAST5_CPU_FLASH_WRITE_FREQ_MHZ) {
+        ESP_LOGE(TAG, "%d MHz PM config rejected (%s), falling back to %d MHz",
+                pm_cfg.max_freq_mhz, esp_err_to_name(pm_err), POLYCAST5_CPU_FLASH_WRITE_FREQ_MHZ);
+        pm_cfg.max_freq_mhz = POLYCAST5_CPU_FLASH_WRITE_FREQ_MHZ;
+        pm_err = esp_pm_configure(&pm_cfg);
     }
+    ESP_ERROR_CHECK(pm_err);
 
     // Allocate Wi-Fi buffers now without fragmentation
     ESP_ERROR_CHECK(espnow_utils_wifi_driver_init());

@@ -30,5 +30,8 @@ idf_component_register(
         esp_driver_uart
         esp_psram
         esp_pm
+        bootloader_support
+        esp_app_format
+        efuse
         joltwallet__littlefs
 )

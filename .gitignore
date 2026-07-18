@@ -3,6 +3,9 @@ managed_components/
 __pycache__/
 dependencies.lock
 sdkconfig
+sdkconfig.old
+sdkconfig.secure
+sdkconfig.secure.old
 
 BUGS*.md
 PSRAM-*.md

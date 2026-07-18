@@ -6,12 +6,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 PolyCast5 is an open-source multi-tool wireless remote firmware for ESP32-C5, built on ESP-IDF v6.0.1 (C:\Espressif\.espressif\v6.0.1\esp-idf). It controls outlets (via LoRa), Bluetooth devices (HID), infrared remotes, custom ESP32 builds (ESP-NOW), and Wi-Fi/MQTT targets. Written in C.
 
-## Build Commands
-
-Do not run build commands, user will confirm build success manually.
-
-There is no test framework; validation is done by flashing to hardware.
-
 ## Hardware & Memory
 
 - **Target**: ESP32-C5, 16MB flash (DIO/80MHz), 8MB PSRAM (quad/80MHz)
@@ -40,9 +34,14 @@ The firmware is task-based. `main/main.c` initializes hardware (NVS, I2C, SPI, L
 - `polycast5_gpios.h` — All hardware pin definitions
 - `polycast5_macros.h` — Task priorities, PSRAM macros, debug flags, animation selection
 
+## Other Notes
+
+- Never push/commit code. If asked, only create the commit message.
+- Do not run build commands, user will confirm build success manually.
+- There is no test framework; validation is done by flashing to hardware.
+
 ## Code Style
 
 - Preserve existing comment style (`/** */` vs `//`) and formatting in surrounding code
 - Keep functions separated with blank lines consistent with adjacent code
 - Wrap lines consistently with the file's existing style
-- Never push/commit code. If asked, only create the commit message.

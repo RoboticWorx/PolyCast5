@@ -18,6 +18,10 @@
   ],
   "idf.currentSetup": "C:\\Espressif\\.espressif\\v6.0.1\\esp-idf",
 
+  "cmake.configureOnOpen": false,
+  "cmake.configureOnEdit": false,
+  "cmake.automaticReconfigure": false,
+
   "C_Cpp.errorSquiggles": "enabled",
   "diffEditor.renderSideBySide": false,
   "idf.flashType": "UART",
