@@ -259,10 +259,32 @@ void bluetooth_utils_send_media(uint8_t cmd, bool key_pressed)
 /* Keyboard helpers */
 #define HID_KB_IN_RPT_LEN 8
 
-// Wrap esp_hidd_dev_input_set; it wants a non-const buffer
-static inline void hid_input_send(uint8_t rpt_id, const uint8_t *data, size_t len)
+// Number of times a report is re-offered to NimBLE before giving up, one tick apart:
+// NimBLE fails the send (ESP_FAIL) when its mbuf pool is momentarily empty because reports
+// were queued faster than the radio retired them; that clears within a few connection events
+#define HID_SEND_MAX_TRIES 200
+
+// Wrap esp_hidd_dev_input_set; it wants a non-const buffer. Retries on transient failure so a
+// full mbuf pool stalls typing instead of silently dropping the character.
+static void hid_input_send(uint8_t rpt_id, const uint8_t *data, size_t len)
 {
-    esp_hidd_dev_input_set(ble_hid_param.hid_dev, 0, rpt_id, (uint8_t *)data, len);
+    for (int attempt = 0; attempt < HID_SEND_MAX_TRIES; ++attempt) {
+        // Stop retrying if the link went away, or we would spin until the cap
+        if (bluetooth_state != BT_STATE_RUNNING) {
+            return;
+        }
+
+        if (esp_hidd_dev_input_set(ble_hid_param.hid_dev, 0, rpt_id, (uint8_t *)data, len) == ESP_OK) {
+            return;
+        }
+
+        // Pool is dry; wait a tick so in-flight buffers can be freed, then retry
+        vTaskDelay(1);
+    }
+
+#ifdef POLYCAST5_DEBUG
+    ESP_LOGW(TAG, "HID report dropped after retries; rpt_id=%u", (unsigned)rpt_id);
+#endif
 }
 
 static void kbd_send_raw(uint8_t modifiers, const uint8_t keys[6])
@@ -535,6 +557,9 @@ static bool kbd_type_char(char c, uint32_t tap_ms)
     // Exit if char not mapped
     uint8_t mod, kc;
     if (!ascii_to_hid(c, &mod, &kc)) {
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "Unmapped byte 0x%02X skipped", (unsigned)(unsigned char)c);
+#endif
         return false;
     }
 
@@ -546,6 +571,47 @@ static bool kbd_type_char(char c, uint32_t tap_ms)
     vTaskDelay(pdMS_TO_TICKS(tap_ms));
 
     return true;
+}
+
+// UTF-8 punctuation the HID keycode table has no key for:
+// AI replies are full of these, and without folding them every byte of the sequence
+// is unmapped and silently dropped, so the text arrives quietly corrupted
+static const struct {
+    const char *utf8;
+    const char *ascii;
+} UTF8_PUNCT[] = {
+    { "\xE2\x80\x98", "'" },   // Left single quote
+    { "\xE2\x80\x99", "'" },   // Right single quote / apostrophe
+    { "\xE2\x80\x9A", "'" },   // Low single quote
+    { "\xE2\x80\x9C", "\"" },  // Left double quote
+    { "\xE2\x80\x9D", "\"" },  // Right double quote
+    { "\xE2\x80\x9E", "\"" },  // Low double quote
+    { "\xE2\x80\x93", "-" },   // En dash
+    { "\xE2\x80\x94", "-" },   // Em dash
+    { "\xE2\x80\x92", "-" },   // Figure dash
+    { "\xE2\x88\x92", "-" },   // Minus sign
+    { "\xE2\x80\xA6", "..." }, // Ellipsis
+    { "\xE2\x80\xB2", "'" },   // Prime
+    { "\xE2\x80\xB3", "\"" },  // Double prime
+    { "\xE2\x80\xA2", "*" },   // Bullet
+    { "\xC2\xA0",     " " },   // Non-breaking space
+    { "\xC2\xB7",     "-" },   // Middle dot
+};
+
+// If s starts with a foldable UTF-8 sequence, point *ascii at its replacement and return the
+// number of bytes to consume. Returns 0 when s is not one of them.
+static size_t utf8_punct_fold(const char *s, const char **ascii)
+{
+    for (size_t i = 0; i < sizeof(UTF8_PUNCT) / sizeof(UTF8_PUNCT[0]); ++i) {
+        size_t len = strlen(UTF8_PUNCT[i].utf8);
+
+        if (strncmp(s, UTF8_PUNCT[i].utf8, len) == 0) {
+            *ascii = UTF8_PUNCT[i].ascii;
+            return len;
+        }
+    }
+
+    return 0;
 }
 
 // Case-insensitive strcmp
@@ -1029,6 +1095,25 @@ void bluetooth_utils_send_script(const char *script, uint32_t tap_ms)
             // Malformed tag: no '>' -> type the '<' literally
         }
 
+        // Fold UTF-8 punctuation (smart quotes, dashes, ellipsis) down to keys the HID
+        // table has, so a multi-byte sequence types its ASCII equivalent instead of vanishing
+        const char *fold = NULL;
+        size_t folded = utf8_punct_fold(s, &fold);
+        if (folded) {
+            while (*fold) {
+                if (kbd_type_char(*fold++, tap_ms)) {
+                    typed_count++;
+                }
+            }
+            s += folded;
+
+            if (bt_typing_should_abort()) {
+                break;
+            }
+
+            continue;
+        }
+
         // Ordinary text path, keep typing
         char c = *s;
         if (kbd_type_char(c, tap_ms)) {
@@ -1064,6 +1149,22 @@ void bluetooth_utils_send_literal(const char *text, uint32_t tap_ms)
 
     // Type each character literally, no tag parsing
     while (*text) {
+        // Fold UTF-8 punctuation down to keys the HID table has (see send_script)
+        const char *fold = NULL;
+        size_t folded = utf8_punct_fold(text, &fold);
+        if (folded) {
+            while (*fold) {
+                kbd_type_char(*fold++, tap_ms);
+            }
+            text += folded;
+
+            if (bt_typing_should_abort()) {
+                break;
+            }
+
+            continue;
+        }
+
         kbd_type_char(*text++, tap_ms);
 
         // Media command pending (init/deinit) or cancel cmd: abort typing
