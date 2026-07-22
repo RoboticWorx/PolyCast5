@@ -167,6 +167,12 @@ unlock_fail:
     return ret;
 }
 
+// True once boot-time init found and configured the chip (used by the hardware self-test)
+bool mmc5603_is_present(void)
+{
+    return s_dev != NULL;
+}
+
 esp_err_t mmc5603_read_raw(uint32_t *x, uint32_t *y, uint32_t *z)
 {
     if (s_dev == NULL) { // Not initialized (or init failed)

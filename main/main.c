@@ -44,6 +44,7 @@
 #include "espnow_utils.h"
 #include "wifi_task.h"
 #include "ai_task.h"
+#include "verify_hardware.h"
 
 // Logging tag
 static const char *TAG = "MAIN";
@@ -212,6 +213,8 @@ void app_main(void)
     esp_err_t err = gpio_utils_init();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "gpio_utils_init failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "VERIFY_HW: GPIO expander (I2C 0x20) unreachable - "
+                      "check assembly; boot halted (every peripheral depends on it)");
         return;
     }
     
@@ -248,6 +251,9 @@ void app_main(void)
     // Seed random number generation XORWOW PRNG core: TRNG at boot
     uint8_t seed[32];
     esp_fill_random(seed, sizeof(seed));
+
+    // Verify every external IC responds before the tasks take over the buses
+    verify_hardware_run();
 
     // Create tasks
     gpio_task_create();

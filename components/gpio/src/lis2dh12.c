@@ -127,6 +127,12 @@ out:
     return ret;
 }
 
+// True once boot-time init found and configured the chip (used by the hardware self-test)
+bool lis2dh12_is_present(void)
+{
+    return s_dev != NULL;
+}
+
 // The sensor is mounted rotated 180 deg on the PCB:
 static inline void remap_axes_i16(int16_t *x, int16_t *y, int16_t *z)
 {

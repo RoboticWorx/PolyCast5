@@ -110,6 +110,95 @@ void spi_master_init(TFT_t * dev, int16_t GPIO_MOSI, int16_t GPIO_SCLK, int16_t 
     dev->_SPIHandle = handle;
 }
 
+// Boot hardware self-test readback: re-register the panel as a low-clock
+// read-capable SPI device, clock in 2 bytes each after RDDMADCTL (0x0B) and
+// RDDCOLMOD (0x0C), then restore the original write-only 20 MHz registration.
+// The raw bytes are returned; the caller decides what they mean (the panel's
+// SDO pin may not be wired, in which case the reads float). The device swap is
+// needed because two devices cannot share one CS pin, and the write-only
+// registration (SPI_DEVICE_NO_DUMMY at 20 MHz) is out of read timing spec.
+// Boot-time only: the SPI bus must be otherwise idle.
+esp_err_t lcdReadbackProbe(TFT_t * dev, uint8_t madctl[2], uint8_t colmod[2])
+{
+    esp_err_t ret = spi_bus_remove_device(dev->_SPIHandle);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+    dev->_SPIHandle = NULL;
+
+    spi_device_interface_config_t rdcfg;
+    memset(&rdcfg, 0, sizeof(rdcfg));
+    rdcfg.clock_speed_hz = 1 * 1000 * 1000; // Panel read spec tops out well below write speed
+    rdcfg.queue_size = 1;
+    rdcfg.mode = 3;
+    rdcfg.spics_io_num = ST7789_CS_PIN;
+
+    spi_device_handle_t rddev;
+    ret = spi_bus_add_device(HOST_ID, &rdcfg, &rddev);
+    if (ret == ESP_OK) {
+        ret = spi_device_acquire_bus(rddev, portMAX_DELAY);
+        if (ret == ESP_OK) {
+            struct {
+                uint8_t cmd;
+                uint8_t *out;
+            } reads[2] = {
+                { 0x0B, madctl }, // RDDMADCTL
+                { 0x0C, colmod }, // RDDCOLMOD
+            };
+            for (int i = 0; i < 2 && ret == ESP_OK; i++) {
+                // Command byte with CS held so the read phase stays in-frame.
+                // USE_TXDATA sends the byte from the inline struct field (no
+                // separate DMA-capable buffer needed for a 1-byte transfer).
+                spi_transaction_t t_cmd;
+                memset(&t_cmd, 0, sizeof(t_cmd));
+                t_cmd.flags = SPI_TRANS_USE_TXDATA | SPI_TRANS_CS_KEEP_ACTIVE;
+                t_cmd.length = 8;
+                t_cmd.tx_data[0] = reads[i].cmd;
+                gpio_set_level(dev->_dc, SPI_Command_Mode);
+                ret = spi_device_polling_transmit(rddev, &t_cmd);
+                if (ret != ESP_OK) {
+                    break;
+                }
+
+                // Clock in 2 bytes (the parameter, plus margin for a dummy-clock shift)
+                spi_transaction_t t_rd;
+                memset(&t_rd, 0, sizeof(t_rd));
+                t_rd.flags = SPI_TRANS_USE_RXDATA;
+                t_rd.length = 16;
+                gpio_set_level(dev->_dc, SPI_Data_Mode);
+                ret = spi_device_polling_transmit(rddev, &t_rd);
+                if (ret == ESP_OK) {
+                    reads[i].out[0] = t_rd.rx_data[0];
+                    reads[i].out[1] = t_rd.rx_data[1];
+                }
+            }
+            spi_device_release_bus(rddev);
+        }
+        spi_bus_remove_device(rddev);
+    }
+
+    // Restore the original write-only registration (mirrors spi_master_init)
+    spi_device_interface_config_t devcfg;
+    memset(&devcfg, 0, sizeof(devcfg));
+    devcfg.clock_speed_hz = clock_speed_hz;
+    devcfg.queue_size = 7;
+    devcfg.mode = 3;
+    devcfg.flags = SPI_DEVICE_NO_DUMMY;
+    devcfg.spics_io_num = ST7789_CS_PIN;
+
+    spi_device_handle_t handle;
+    esp_err_t re_ret = spi_bus_add_device(HOST_ID, &devcfg, &handle);
+    if (re_ret != ESP_OK) {
+        // Catastrophic: the panel can no longer be driven. Surface it loudly and
+        // report it in preference to the read result the caller was after.
+        ESP_LOGE(TAG, "lcdReadbackProbe: failed to restore LCD SPI device: %s", esp_err_to_name(re_ret));
+        return re_ret; // _SPIHandle is already NULL from the remove above
+    }
+    dev->_SPIHandle = handle;
+
+    return ret;
+}
+
 bool spi_master_write_byte(spi_device_handle_t SPIHandle, const uint8_t* Data, size_t DataLength)
 {
     spi_transaction_t SPITransaction;

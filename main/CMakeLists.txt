@@ -2,6 +2,7 @@
 # for more information about component CMakeLists.txt files.
 
 # Register components
+# Note: GLOB is evaluated at configure time - touch this file when adding sources
 file(GLOB_RECURSE SRCS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.c")
 
 idf_component_register(

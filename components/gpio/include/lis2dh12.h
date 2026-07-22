@@ -2,6 +2,7 @@
 #define LIS2DH12_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "esp_err.h"
 
 // I2C 7-bit address with SA0 tied to VDD
@@ -20,6 +21,14 @@ typedef struct accel_deg_t {
  * @return ESP_OK on success, ESP_ERR_NOT_FOUND if WHO_AM_I mismatch, or I2C error.
  */
 esp_err_t lis2dh12_init(void);
+
+/**
+ * @brief Whether boot-time init found the chip (WHO_AM_I matched and config stuck).
+ *        Used by the boot hardware self-test.
+ *
+ * @return true if the accelerometer is present and initialized
+ */
+bool lis2dh12_is_present(void);
 
 /**
  * @brief Read the latest X/Y/Z acceleration as raw signed 10-bit counts.

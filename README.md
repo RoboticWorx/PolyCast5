@@ -22,6 +22,14 @@ You can find some relevant links below:
   * Button pusher
   * and more!
 
+<p align="center">
+  <img
+    src="https://raw.githubusercontent.com/RoboticWorx/PolyCast5/main/scripts/dev/pc5_side_by_side.png"
+    alt="White and Transparent Versions"
+    width="66%"
+  />
+</p>
+
 # Functionality
 
 * **Outlet actuator** - [_tutorial_](https://polycast5.com/blogs/tutorials/using-polyplugs)

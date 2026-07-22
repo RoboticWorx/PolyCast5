@@ -386,6 +386,19 @@ void gpio_utils_en_tsop_receiver(bool enable)
     gpio_utils_write_output(TCA9535_TSOP_EN_PIN, !enable);
 }
 
+// Undo divider + op amp: Vbat = (Vadc + off) / gain
+static float battery_vadc_to_vbat(float Vadc)
+{
+    const float R42 = 10000, R43 = 27400;
+    const float R44 = 10000, R45 = 27400;
+    const float R40 = 2200, R41 = 22000;
+    const float Vref = 3.30f * (R41 / (R40 + R41));
+    const float gain = (1.0f + R45 / R44) * (R43 / (R42+R43));
+    const float off = (R45 / R44) * Vref;
+
+    return (Vadc + off) / gain;
+}
+
 float gpio_utils_get_battery_voltage(void)
 {
     uint32_t sum = 0;
@@ -436,16 +449,37 @@ float gpio_utils_get_battery_voltage(void)
 #endif
     
     //return Vadc;
-    
-    // Undo divider + op amp: Vbat = (Vadc + off) / gain
-    const float R42 = 10000, R43 = 27400;
-    const float R44 = 10000, R45 = 27400;
-    const float R40 = 2200, R41 = 22000;
-    const float Vref = 3.30f * (R41 / (R40 + R41));
-    const float gain = (1.0f + R45 / R44) * (R43 / (R42+R43));
-    const float off = (R45 / R44) * Vref;
 
-    return (Vadc + off) / gain;
+    return battery_vadc_to_vbat(Vadc);
+}
+
+float gpio_utils_battery_selftest_voltage(void)
+{
+    // Short standalone burst for the boot hardware self-test
+    // Runs before the gpio/adc tasks exist, so briefly owning the ADC handles here is safe
+    gpio_utils_init_battery_adc();
+
+    uint32_t sum = 0;
+    uint32_t valid_samples = 0;
+    for (int i = 0; i < 64; i++) {
+        int raw = 0;
+        if (adc_oneshot_read(adc1_handle, ADC_CH, &raw) == ESP_OK) {
+            sum += raw;
+            valid_samples++;
+        }
+        esp_rom_delay_us(5);
+    }
+
+    float vbat = 0.0f;
+    if (valid_samples > 0) {
+        int pin_mv = 0;
+        if (adc_cali_raw_to_voltage(cali_handle, sum / valid_samples, &pin_mv) == ESP_OK) {
+            vbat = battery_vadc_to_vbat(pin_mv / 1000.0f);
+        }
+    }
+
+    gpio_utils_deinit_battery_adc();
+    return vbat;
 }
 
 uint8_t gpio_utils_volts_to_soc(float voltage)

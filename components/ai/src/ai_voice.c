@@ -289,6 +289,71 @@ esp_err_t ai_voice_force_sleep_pins_low(void)
     return err;
 }
 
+esp_err_t ai_voice_mic_selftest(bool *alive)
+{
+    if (!alive) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    *alive = false;
+
+    esp_err_t err = ai_voice_init();
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    // Pull SD low so a floating (mic absent) line reads zeros instead of picking up crosstalk
+    gpio_set_pull_mode(I2S_T5848_SD_PIN, GPIO_PULLDOWN_ONLY);
+
+    enum { PROBE_WORDS = 512 }; // 256 stereo frames, ~5.3 ms per read at 48 kHz
+    size_t nonzero = 0;
+    size_t total = 0;
+    int32_t s24_min = INT32_MAX; // Range of the nonzero samples (variation check)
+    int32_t s24_max = INT32_MIN;
+    int32_t *words = malloc(PROBE_WORDS * sizeof(int32_t));
+    if (words == NULL) {
+        err = ESP_ERR_NO_MEM;
+        goto out;
+    }
+
+    // Discard the first 16 reads (~85 ms) so the mic has been clocked for a while
+    // before anything counts, then score the next 4 (~85-107 ms)
+    for (int block = 0; block < 20; block++) {
+        size_t bytes_read = 0;
+        err = i2s_channel_read(i2s_rx_channel, words, PROBE_WORDS * sizeof(int32_t), &bytes_read, 200); // Timeout in ms
+        if (err != ESP_OK) {
+            break;
+        }
+        if (block < 16) {
+            continue; // Warm-up: discard
+        }
+        for (size_t i = 0; i < bytes_read / sizeof(int32_t); i++) {
+            int32_t s24 = words[i] >> 8; // 24-bit payload lives in bits [31:8]
+            if (s24 != 0) {
+                if (s24 < s24_min) s24_min = s24;
+                if (s24 > s24_max) s24_max = s24;
+                nonzero++;
+            }
+            total++;
+        }
+    }
+
+    // Liveness = enough nonzero samples AND variation among them
+    // The mic only drives its slot of the stereo frame, so even a silent room yields a noise
+    // floor dithering across many codes on ~half the words
+    
+    // All-zero means no mic on the line; one constant nonzero value (min == max) means the SD line is
+    // stuck high or bridged to a clock, not a live mic
+    if (err == ESP_OK && total > 0) {
+        *alive = (nonzero > total / 64) && (s24_min != s24_max);
+    }
+
+out:
+    free(words);
+    gpio_set_pull_mode(I2S_T5848_SD_PIN, GPIO_FLOATING);
+    ai_voice_deinit();
+    return err;
+}
+
 // Records audio from the I2S microphone, downsamples it to 16kHz mono 16-bit PCM
 #define INITIAL_BUFFER_SAMPLES 16000  // Start with 1 second @16kHz, then double as needed
 

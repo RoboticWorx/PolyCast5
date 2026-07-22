@@ -273,6 +273,11 @@ void lcd_init_driver(void)
     tft._offsety = 53; // 52 if 270 | 53 if 90
 }
 
+esp_err_t lcd_probe_panel(uint8_t madctl[2], uint8_t colmod[2])
+{
+    return lcdReadbackProbe(&tft, madctl, colmod);
+}
+
 static void lv_tick_cb(void *arg)
 {
     (void)arg;

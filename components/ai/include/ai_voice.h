@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 #include "esp_err.h"
 
 // Returned when the API rejects the request with HTTP 429 (out of credits / rate limited)
@@ -28,6 +29,20 @@ esp_err_t ai_voice_init(void);
  * @returns ESP error status
  */
 esp_err_t ai_voice_deinit(void);
+
+/**
+ * @brief Boot hardware self-test: verify the T5848 mic is driving the I2S data line.
+ *        Brings the I2S channel up, samples ~110 ms of data with a pull-down on SD
+ *        (so an absent mic reads all-zero, and a stuck/shorted line reads one
+ *        constant value), then tears the channel back down.
+ *        Boot-time only: must not run concurrently with dictation.
+ *
+ * @param alive Set true if the data line shows a live, varying signal;
+ *              false if silent or stuck at a constant value
+ *
+ * @returns ESP_OK if the probe ran (see *alive), or the I2S/memory error that stopped it
+ */
+esp_err_t ai_voice_mic_selftest(bool *alive);
 
 /**
  * @brief Records audio from the I2S microphone and downsamples it to 16kHz mono 16-bit PCM

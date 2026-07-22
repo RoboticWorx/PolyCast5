@@ -212,6 +212,18 @@ void lcd_init_driver(void);
  */
 void lcd_lvgl_init(void);
 
+/**
+ * @brief Boot hardware self-test readback probe of the ST7789 panel.
+ *        Must run after lcd_init_driver() and before tasks are created
+ *        (see lcdReadbackProbe in st7789.c)
+ *
+ * @param [out] madctl Two raw bytes clocked in after the RDDMADCTL (0x0B) command
+ * @param [out] colmod Two raw bytes clocked in after the RDDCOLMOD (0x0C) command
+ *
+ * @return ESP_OK if the SPI transactions completed
+ */
+esp_err_t lcd_probe_panel(uint8_t madctl[2], uint8_t colmod[2]);
+
 #ifdef POLYCAST5_PERSIST_SELECTION_INDEX
 /**
  * @brief Load the previous selection index from NVS

@@ -2,6 +2,7 @@
 #define MMC5603_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "esp_err.h"
 
 // I2C 7-bit address (factory default, three address LSBs = 000)
@@ -25,6 +26,14 @@ typedef struct {
  *         match, ESP_ERR_INVALID_STATE if the bus is not up, or an I2C error.
  */
 esp_err_t mmc5603_init(void);
+
+/**
+ * @brief Whether boot-time init found the chip (Product ID matched and config stuck).
+ *        Used by the boot hardware self-test.
+ *
+ * @return true if the magnetometer is present and initialized
+ */
+bool mmc5603_is_present(void);
 
 /**
  * @brief Read the latest X/Y/Z field as raw 20-bit unsigned output counts.

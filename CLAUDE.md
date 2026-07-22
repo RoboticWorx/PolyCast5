@@ -10,7 +10,7 @@ PolyCast5 is an open-source multi-tool wireless remote firmware for ESP32-C5, bu
 
 - **Target**: ESP32-C5, 16MB flash (DIO/80MHz), 8MB PSRAM (quad/80MHz)
 - **Partition layout** (`partitions.csv`): 256KB NVS, dual 4.0MiB OTA slots, 7.6875MiB LittleFS for assets
-- **Memory strategy**: Use `POLYCAST5_USE_PSRAM_BSS` / `POLYCAST5_USE_PSRAM_DATA` macros for large allocations in PSRAM. `CONFIG_SPIRAM_USE_MALLOC` is enabled so `malloc()` falls back to PSRAM.
+- **Memory strategy**: Use `POLYCAST5_USE_PSRAM_BSS` / `POLYCAST5_USE_PSRAM_DATA` macros for allocations in PSRAM whenever possible as long as it doesn't impact performance. `CONFIG_SPIRAM_USE_MALLOC` is enabled so `malloc()` falls back to PSRAM.
 - **Key peripherals**: SPI2 (SX1262 LoRa), I2C (TCA9535 GPIO expander), RMT (IR TX/RX), ADC (battery), LEDC (LCD backlight), I2S (audio codec)
 
 ## Architecture
