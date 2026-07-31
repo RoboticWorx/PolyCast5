@@ -17,6 +17,7 @@
 #include "core/lv_obj_scroll.h"
 #include "misc/lv_style.h"
 #include "misc/lv_area.h"
+#include "misc/lv_anim.h"
 #include "widgets/label/lv_label.h"
 
 #include "lcd_utils.h"
@@ -24,6 +25,7 @@
 #include "lcd_bluetooth.h"
 #include "lcd_hotkey.h"
 #include "bluetooth_utils.h"
+#include "ble_flood.h"
 #include "wifi_utils.h"
 #include "ai_utils.h"
 #include "ai_key_portal.h"
@@ -67,7 +69,7 @@ static void keyboard_menu_rebuild_lvlist(bluetooth_keyboard_menu_t *km)
     // If no rows to show, render a disabled placeholder and return
     if (km->size <= 0) {
         // Create single disabled-looking row
-        lv_obj_t *btn = lv_list_add_btn(km->main_list, NULL, "No scripts added");
+        lv_obj_t *btn = lv_list_add_button(km->main_list, NULL, "No scripts added");
         lv_obj_set_size(btn, 200, 30);
 
         // Apply base style so it still fits the UI
@@ -91,7 +93,7 @@ static void keyboard_menu_rebuild_lvlist(bluetooth_keyboard_menu_t *km)
 
     // Create a button for each row we currently have
     for (int i = 0; i < km->size; ++i) {
-        km->btns[i] = lv_list_add_btn(km->main_list, NULL, km->options[i]);
+        km->btns[i] = lv_list_add_button(km->main_list, NULL, km->options[i]);
         lv_obj_set_size(km->btns[i], 200, 30);
 
         // Style selected
@@ -421,7 +423,7 @@ void lcd_bluetooth_setup_page(bluetooth_menu_t *menu)
     static const char *bt_options[] = {
         "Pair Device", "Auto Keyboard", "AI Keyboard", "Media Controller",
         "Page Scroller", "PowerPoint Clicker", "Camera Clicker",
-        "Socials Scroller", "Forget All Devices", "Known Devices"
+        "Socials Scroller", "BLE Spam", "Forget All Devices", "Known Devices"
     };
     _Static_assert(sizeof(bt_options) / sizeof(bt_options[0]) == NUM_BLUETOOTH_OPTIONS, "lcd_bluetooth_setup_page: Option count mismatch");
     memcpy(menu->options, bt_options, sizeof(bt_options));
@@ -496,7 +498,7 @@ void lcd_bluetooth_setup_page(bluetooth_menu_t *menu)
     
     // Create button for each option
     for (int i = 0; i < menu->size; ++i) {
-        menu->btns[i] = lv_list_add_btn(menu->main_list, NULL, menu->options[i]);
+        menu->btns[i] = lv_list_add_button(menu->main_list, NULL, menu->options[i]);
         lv_obj_set_size(menu->btns[i], 200, 30);
 
         // Style selected
@@ -2366,7 +2368,7 @@ static void peer_menu_build(bluetooth_peer_menu_t *pm)
 
     // Row 0
     strncpy(pm->labels[0], "Pair Another", sizeof(pm->labels[0]));
-    pm->btns[0] = lv_list_add_btn(pm->main_list, NULL, pm->labels[0]);
+    pm->btns[0] = lv_list_add_button(pm->main_list, NULL, pm->labels[0]);
     lv_obj_set_size(pm->btns[0], 200, 30);
 
     // Style selected
@@ -2400,7 +2402,7 @@ static void peer_menu_build(bluetooth_peer_menu_t *pm)
         pm->labels[row][sizeof(pm->labels[row]) - 1] = '\0';
 
         // Style button
-        pm->btns[row] = lv_list_add_btn(pm->main_list, NULL, pm->labels[row]);
+        pm->btns[row] = lv_list_add_button(pm->main_list, NULL, pm->labels[row]);
         lv_obj_set_size(pm->btns[row], 200, 30);
 
         // Style selected
@@ -2966,6 +2968,304 @@ void lcd_bluetooth_forget_all_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
         do_once = false;
         
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
+}
+
+// BLE Flood target labels (order matches ble_flood_mode_t: Apple, FastPair, SwiftPair, Samsung, All)
+static const char *ble_flood_target_labels[] = {
+    "Apple", "Google Fast Pair", "Microsoft Swift Pair", "Samsung", "All"
+};
+#define BLE_FLOOD_TARGET_COUNT (sizeof(ble_flood_target_labels) / sizeof(ble_flood_target_labels[0]))
+
+// Target chosen on the picker page, consumed by the active flood page
+static ble_flood_mode_t ble_flood_selected_mode = BLE_FLOOD_MODE_ALL;
+
+void lcd_bluetooth_ble_flood_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
+{
+    // Statics
+    static bool do_once = false;
+    static bool styles_init = false;
+    static int index = 0;
+    static lv_obj_t *list = NULL;
+    static lv_obj_t *btns[BLE_FLOOD_TARGET_COUNT];
+    static lv_style_t btn_style;
+    static lv_style_t sel_style;
+
+    // Only execute once
+    if (!do_once) {
+        index = 0;
+
+        // Create list
+        list = lv_list_create(ACTIVE_SCR);
+        lv_obj_set_size(list, 210, 106);
+        lv_obj_set_style_bg_color(list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_align(list, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_set_style_border_width(list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lcd_apply_scrollbar_style(list);
+        lv_obj_set_scroll_dir(list, LV_DIR_VER);
+
+        // Init styles once (the list is rebuilt each entry but styles persist)
+        if (!styles_init) {
+            // Unselected button style
+            lv_style_init(&btn_style);
+            lv_style_set_radius(&btn_style, 8);
+            lv_style_set_bg_color(&btn_style, user_primary_color);
+            lv_style_set_border_width(&btn_style, 2);
+            lv_style_set_border_color(&btn_style, user_secondary_color);
+            lv_style_set_border_side(&btn_style, LV_BORDER_SIDE_FULL);
+            lv_style_set_pad_top(&btn_style, 3);
+            lv_style_set_pad_bottom(&btn_style, 3);
+            lv_style_set_text_font(&btn_style, &lv_font_montserrat_16);
+            lv_style_set_text_color(&btn_style, user_secondary_color);
+            lv_style_set_text_align(&btn_style, LV_TEXT_ALIGN_CENTER);
+
+            // Selected button style
+            lv_style_init(&sel_style);
+            lv_style_set_radius(&sel_style, 8);
+            lv_style_set_bg_color(&sel_style, user_secondary_color);
+            lv_style_set_border_width(&sel_style, 2);
+            lv_style_set_border_color(&sel_style, user_secondary_color);
+            lv_style_set_border_side(&sel_style, LV_BORDER_SIDE_FULL);
+            lv_style_set_pad_top(&sel_style, 3);
+            lv_style_set_pad_bottom(&sel_style, 3);
+            lv_style_set_text_font(&sel_style, &lv_font_montserrat_16);
+            lv_style_set_text_color(&sel_style, user_primary_color);
+            lv_style_set_text_align(&sel_style, LV_TEXT_ALIGN_CENTER);
+
+            styles_init = true;
+        }
+
+        // Create button for each target
+        for (int i = 0; i < (int)BLE_FLOOD_TARGET_COUNT; ++i) {
+            btns[i] = lv_list_add_button(list, NULL, ble_flood_target_labels[i]);
+            lv_obj_set_size(btns[i], 200, 30);
+            lv_obj_add_style(btns[i], i == index ? &sel_style : &btn_style, 0);
+
+            lv_obj_t *lbl = lv_obj_get_child(btns[i], 0);
+            lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+            lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+            lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+        }
+
+        // Format buttons as container
+        lv_obj_t *cont = lv_obj_get_parent(btns[0]);
+        lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_gap(cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+        do_once = true;
+    }
+
+    // User input
+    if (ui_btns->up_btn == 1 || ui_btns->down_btn == 1) { // Move selection
+        index += (ui_btns->down_btn == 1) ? 1 : -1;
+        if (index >= (int)BLE_FLOOD_TARGET_COUNT) {
+            index = 0;
+        } else if (index < 0) {
+            index = (int)BLE_FLOOD_TARGET_COUNT - 1;
+        }
+
+        // Re-highlight current selection
+        for (int i = 0; i < (int)BLE_FLOOD_TARGET_COUNT; ++i) {
+            lv_obj_remove_style(btns[i], &sel_style, 0);
+            lv_obj_remove_style(btns[i], &btn_style, 0);
+            lv_obj_add_style(btns[i], i == index ? &sel_style : &btn_style, 0);
+        }
+        lv_obj_scroll_to_view(btns[index], LV_ANIM_ON);
+    } else if (ui_btns->select_btn == 1) { // Target chosen -> start the flood
+        ble_flood_selected_mode = (ble_flood_mode_t)index;
+
+        // Delete list (deletes child buttons)
+        lv_obj_delete(list);
+        list = NULL;
+        do_once = false;
+
+        // Active page is a status screen, no scroll list
+        lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+        // Switch pages
+        ui_menu->page = BLUETOOTH_BLE_FLOOD_ACTIVE_PAGE;
+    } else if (ui_btns->left_btn == 1) { // Back selected
+        // Delete list
+        lv_obj_delete(list);
+        list = NULL;
+        do_once = false;
+
+        // Show bluetooth list
+        lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Switch pages
+        ui_menu->page = BLUETOOTH_PAGE;
+    } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off selected
+        // Delete list
+        lv_obj_delete(list);
+        list = NULL;
+        do_once = false;
+
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
+}
+
+// BLE flood active-page "broadcast wave" graphic
+#define BLE_FLOOD_RING_CNT 3    // Concentric rings emitted from the icon
+#define BLE_FLOOD_RING_MIN 5   // Ring diameter at birth (px)
+#define BLE_FLOOD_RING_MAX 100   // Ring diameter when it fades out (px)
+#define BLE_FLOOD_RING_MS  1600 // Time for one ring to travel out and fade
+
+// Grow the ring and fade its border as it expands, keeping it centred on the emitter
+static void ble_flood_ring_anim_cb(void *var, int32_t v)
+{
+    lv_obj_t *ring = (lv_obj_t *)var; // v runs 0 -> 1000
+    lv_coord_t sz  = BLE_FLOOD_RING_MIN + (lv_coord_t)((v * (BLE_FLOOD_RING_MAX - BLE_FLOOD_RING_MIN)) / 1000);
+    lv_opa_t   opa = (lv_opa_t)(LV_OPA_COVER - (v * LV_OPA_COVER) / 1000);
+    lv_obj_set_size(ring, sz, sz);
+    lv_obj_set_style_border_opa(ring, opa, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_align(ring, LV_ALIGN_CENTER, 0, 0);
+}
+
+void lcd_bluetooth_ble_flood_active_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
+{
+    // Statics
+    static bool do_once = false;
+    static bool started = false;
+    static uint32_t last_count = 0;
+
+    static lv_obj_t *lbl_title = NULL;
+    static lv_obj_t *lbl_count = NULL;
+    static lv_obj_t *lbl_caption = NULL;
+    static lv_obj_t *graphic = NULL; // Holds emitter icon + rings; deletes them with it
+    static lv_obj_t *rings[BLE_FLOOD_RING_CNT] = {0};
+
+    // Only execute once
+    if (!do_once) {
+        // Target device type up top
+        lbl_title = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_title, ble_flood_target_labels[ble_flood_selected_mode], user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 8);
+
+        // Bring up the broadcaster and start flooding
+        esp_err_t err = ble_flood_start(ble_flood_selected_mode);
+        started = (err == ESP_OK);
+
+        if (started) {
+            // Invisible container centred on screen; the rings + emitter live inside it
+            graphic = lv_obj_create(ACTIVE_SCR);
+            lv_obj_set_size(graphic, BLE_FLOOD_RING_MAX + 6, BLE_FLOOD_RING_MAX + 6);
+            lv_obj_set_style_bg_opa(graphic, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_border_width(graphic, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_pad_all(graphic, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_remove_flag(graphic, LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_align(graphic, LV_ALIGN_CENTER, 0, -14);
+
+            // Rings radiating outward, phase-staggered for a continuous pulse
+            for (int i = 0; i < BLE_FLOOD_RING_CNT; ++i) {
+                rings[i] = lv_obj_create(graphic);
+                lv_obj_set_style_bg_opa(rings[i], LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+                lv_obj_set_style_radius(rings[i], LV_RADIUS_CIRCLE, LV_PART_MAIN | LV_STATE_DEFAULT);
+                lv_obj_set_style_border_width(rings[i], 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+                lv_obj_set_style_border_color(rings[i], user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+                lv_obj_set_style_pad_all(rings[i], 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+                lv_obj_remove_flag(rings[i], LV_OBJ_FLAG_SCROLLABLE);
+                lv_obj_set_size(rings[i], BLE_FLOOD_RING_MIN, BLE_FLOOD_RING_MIN);
+                lv_obj_align(rings[i], LV_ALIGN_CENTER, 0, 0);
+
+                lv_anim_t a;
+                lv_anim_init(&a);
+                lv_anim_set_var(&a, rings[i]);
+                lv_anim_set_exec_cb(&a, ble_flood_ring_anim_cb);
+                lv_anim_set_values(&a, 0, 1000);
+                lv_anim_set_time(&a, BLE_FLOOD_RING_MS);
+                lv_anim_set_delay(&a, (BLE_FLOOD_RING_MS / BLE_FLOOD_RING_CNT) * i);
+                lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+                lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+                lv_anim_start(&a);
+            }
+
+            // Solid backing disc so the rings pass BEHIND the icon instead of
+            // bleeding through the transparent gaps of the glyph
+            
+            // Same color as the screen, so it reads as the icon floating above the waves
+            lv_obj_t *puck = lv_obj_create(graphic);
+            lv_obj_set_size(puck, 34, 34);
+            lv_obj_set_style_radius(puck, LV_RADIUS_CIRCLE, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_bg_color(puck, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_bg_opa(puck, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_border_width(puck, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_pad_all(puck, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_remove_flag(puck, LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_align(puck, LV_ALIGN_CENTER, 0, 0);
+
+            // Bluetooth emitter icon, centred on the disc and kept above the rings
+            lv_obj_t *emitter = lv_label_create(puck);
+            lcd_format_label(emitter, LV_SYMBOL_BLUETOOTH, user_secondary_color,
+                    &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 0);
+            lv_obj_move_foreground(puck);
+
+            // Big live counter + caption near the bottom
+            lbl_count = lv_label_create(ACTIVE_SCR);
+            lcd_format_label(lbl_count, "0", user_secondary_color,
+                    &lv_font_montserrat_24, LV_ALIGN_BOTTOM_MID, 0, -30);
+            lbl_caption = lv_label_create(ACTIVE_SCR);
+            lcd_format_label(lbl_caption, "packets sent", user_secondary_color,
+                    &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, -10);
+            last_count = 0;
+        } else {
+            // Couldn't grab the radio (HID Bluetooth still up)
+            lbl_count = lv_label_create(ACTIVE_SCR);
+            lcd_format_label(lbl_count, "Radio busy", user_secondary_color,
+                    &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, -6);
+            lbl_caption = lv_label_create(ACTIVE_SCR);
+            lcd_format_label(lbl_caption, "Turn Bluetooth off\nand try again.", user_secondary_color,
+                    &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -10);
+        }
+
+        do_once = true;
+    }
+
+    // Live packet counter
+    if (started) {
+        uint32_t n = ble_flood_get_count();
+        if (n != last_count) {
+            last_count = n;
+            lv_label_set_text_fmt(lbl_count, "%u", (unsigned)n);
+        }
+    }
+
+    // User input (both exits tear the flood + graphic down the same way)
+    if (ui_btns->left_btn == 1 || ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+        bool go_back_to_picker = (ui_btns->left_btn == 1);
+
+        ble_flood_stop();
+
+        // Stop ring animations before their objects are freed
+        for (int i = 0; i < BLE_FLOOD_RING_CNT; ++i) {
+            if (rings[i]) {
+                lv_anim_delete(rings[i], ble_flood_ring_anim_cb);
+                rings[i] = NULL;
+            }
+        }
+
+        // Delete objects (deleting graphic frees the rings + emitter it holds)
+        if (graphic)     { lv_obj_delete(graphic);     graphic = NULL; }
+        if (lbl_title)   { lv_obj_delete(lbl_title);   lbl_title = NULL; }
+        if (lbl_count)   { lv_obj_delete(lbl_count);   lbl_count = NULL; }
+        if (lbl_caption) { lv_obj_delete(lbl_caption); lbl_caption = NULL; }
+
+        // Reset statics
+        started = false;
+        do_once = false;
+
+        if (go_back_to_picker) {
+            // Show up/down arrows again for the picker list
+            lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+            // Switch pages
+            ui_menu->page = BLUETOOTH_BLE_FLOOD_PAGE;
+        } else {
+            lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+        }
     }
 }
 

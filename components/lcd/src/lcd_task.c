@@ -581,6 +581,13 @@ static void lcd_task(void *pvParameters)
                 case BLUETOOTH_RENAME_PEER_PAGE:
                     lcd_bluetooth_rename_peer_page(&ui_btns, &ui_menu, &bluetooth_menu);
                     break;
+                case BLUETOOTH_BLE_FLOOD_PAGE:
+                    lcd_bluetooth_ble_flood_page(&ui_btns, &ui_menu, &bluetooth_menu);
+                    break;
+                case BLUETOOTH_BLE_FLOOD_ACTIVE_PAGE:
+                    lcd_bluetooth_ble_flood_active_page(&ui_btns, &ui_menu, &bluetooth_menu);
+                    dont_sleep_on_this_page = true;
+                    break;
                 // GPIO pages
                 case GPIO_PAGE:
                     lcd_gpio_page(&ui_btns, &ui_menu, &gpio_menu);

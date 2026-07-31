@@ -21,6 +21,7 @@
 
 #include "bluetooth_utils.h"
 #include "bluetooth_nvs.h"
+#include "ble_flood.h"
 #include "gpio_utils.h"
 #include "gpio_task.h"
 #include "bluetooth_task.h"
@@ -1370,6 +1371,12 @@ void bluetooth_utils_init(void)
     esp_bt_controller_status_t st = esp_bt_controller_get_status();
     if (st != ESP_BT_CONTROLLER_STATUS_IDLE) {
         ESP_LOGE(TAG, "Refusing init: BT controller not idle (status=%d)", st);
+        return;
+    }
+
+    // The BLE flood broadcaster owns the same NimBLE host; never bring HID up under it
+    if (ble_flood_is_active()) {
+        ESP_LOGE(TAG, "Refusing BT init: BLE flood broadcaster is active");
         return;
     }
 

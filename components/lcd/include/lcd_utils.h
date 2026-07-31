@@ -147,11 +147,12 @@ enum {
     GAMES_FLAPPY_PAGE,
     GAMES_DOOM_PAGE,
 
+    // Append pages to end here on out not to break NVS
     LORA_MESHTASTIC_PAGE,
-
     SETTINGS_LORA_SF_PAGE,
-
     SETTINGS_LORA_REGION_PAGE,
+    BLUETOOTH_BLE_FLOOD_PAGE,
+    BLUETOOTH_BLE_FLOOD_ACTIVE_PAGE,
 };
 
 extern uint32_t pin_attempts;

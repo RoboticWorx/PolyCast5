@@ -13,5 +13,5 @@ idf_component_register(
         common esp_hid bt
     
     PRIV_REQUIRES
-        gpio wifi ai nvs_flash esp_http_server esp_wifi esp_netif esp_driver_sdspi
+        gpio wifi ai nvs_flash esp_http_server esp_wifi esp_netif esp_driver_sdspi esp_hw_support
 )
