@@ -2781,7 +2781,50 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
             gateway_ping_lbl = dns_ping_lbl = NULL;
             
             ui_menu->page = WIFI_SCAN_DEAUTH_PAGE;
-        } else if (ui_btns->select_btn == 1 && wifi_menu->index == 4) { // Sync with PolyPlug
+        } else if (ui_btns->select_btn == 1 && wifi_menu->index == 4) { // ARP Spoofer (whole subnet)
+            // Hide Wi-Fi menu
+            lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+            // ARP spoof requires being on the LAN
+            if (xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT) {
+                // Delete ping labels
+                lv_obj_delete(gateway_ping_lbl);
+                lv_obj_delete(dns_ping_lbl);
+
+                // Reset statics
+                do_once = false;
+                gateway_ping_lbl = dns_ping_lbl = NULL;
+
+                ui_menu->page = WIFI_ARP_SPOOF_PAGE;
+            } else { // Not on LAN
+                lbl_conf = lv_label_create(ACTIVE_SCR);
+
+                lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+                lv_obj_set_style_text_align(lbl_conf, LV_TEXT_ALIGN_CENTER, 0); // Centered text style
+                lcd_format_label(lbl_conf, "Please connect to\ntarget network first!", user_secondary_color,
+                        &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+
+                lv_timer_handler();
+                vTaskDelay(pdMS_TO_TICKS(1300));
+
+                lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+                lv_timer_handler();
+
+                lv_obj_delete(lbl_conf);
+                lbl_conf = NULL;
+
+                lcd_clear_pending_inputs = true;
+
+                // Show Wi-Fi menu
+                lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+            }
+        } else if (ui_btns->select_btn == 1 && wifi_menu->index == 5) { // Sync with PolyPlug
             // Hide Wi-Fi menu
             lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 

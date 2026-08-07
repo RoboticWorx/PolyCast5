@@ -16,6 +16,7 @@
 #include "nvs.h"
 #include "esp_log.h"
 #include "esp_random.h"
+#include "esp_netif.h"
 
 #include "lcd_wifi.h"
 #include "wifi_task.h"
@@ -23,6 +24,8 @@
 #include "wifi_mqtt.h"
 #include "wifi_ping.h"
 #include "wifi_deauth.h"
+#include "arp_spoof.h"
+#include "ndp_spoof.h"
 #include "wifi_ota_update.h"
 #include "espnow_task.h"
 #include "espnow_utils.h"
@@ -48,7 +51,7 @@
 #define MAX_PASSWORD_LEN 32
 #define NUM_CHAR_ROWS 4
 
-#define WIFI_MENU_START_SIZE 5 // First WIFI_MENU_START_SIZE default options
+#define WIFI_MENU_START_SIZE 6 // First WIFI_MENU_START_SIZE default options
 
 #define MQTT_READY_TXT "0 = OFF     1 = ON\n   255 = UPDATE" // 'UPDATE' refers to checking and performing an OTA firmware update if available
 #define MQTT_SENDING_TXT "Sending via\nMQTT broker..." 
@@ -61,11 +64,14 @@ extern char raw_frames_hex_buf[]; // Accumulated hex strings
 extern size_t raw_frames_hex_len; // Current length
 extern uint32_t raw_frames_captured; // Counter
 
+// wifi_ping.c: gateway learned on IP_EVENT_STA_GOT_IP
+extern esp_ip4_addr_t sta_gw;
+
 // gpio_task.c
 extern volatile bool gpio_select_btn_held;
 
 wifi_menu_t wifi_menu = {
-    .options = {"Connect to Network", "Monitor Packets", "AI Packet Analysis", "Deauthenticator", "Sync With PolyPlug"},
+    .options = {"Connect to Network", "Monitor Packets", "AI Packet Analysis", "Deauthenticator", "ARP Spoofer", "Sync With PolyPlug"},
     .size = WIFI_MENU_START_SIZE,
     .index = 0,
     .cont = NULL,
@@ -81,6 +87,17 @@ static wifi_sniff_t sniff_network;
 
 static deauth_target_t deauth_target = {0};
 static deauth_stats_t deauth_stats = {0};
+
+static arp_spoof_target_t arp_spoof_target = {0};
+static arp_spoof_stats_t arp_spoof_stats = {0};
+
+static ndp_spoof_target_t ndp_spoof_target = {0};
+static ndp_spoof_stats_t ndp_spoof_stats = {0};
+
+// ARP page mode (both cover v4 + v6):
+// 0 = Poison (v4 ARP drop + v6 NDP kill),
+// 1 = Forward (v4 ARP relay + v6 NDP MitM)
+static int arp_page_mode = 0;
 
 static uint8_t mqtt_key[16];
 static bool wifi_menu_overwrite = false;
@@ -1154,6 +1171,261 @@ void lcd_wifi_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *w
 
         // Stop deauth if ongoing
         xEventGroupSetBits(xWifiEventGroup, WIFI_STOP_DEAUTH_BIT);
+
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
+}
+
+// Sets the mode value label to match arp_page_mode (0 = Poison, 1 = Forward; both cover v4 + v6)
+static void lcd_wifi_arp_set_mode_label(lv_obj_t *lbl_mode)
+{
+    lv_label_set_text(lbl_mode, arp_page_mode == 1 ? "Forward" : "Poison");
+}
+
+void lcd_wifi_arp_spoof_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
+{
+    #define ARP_X_POS -38
+    #define ARP_SPOOF_DURATION_SEC 3600 // One hour: Runs until the user backs out
+
+    static bool init = true;
+    static lv_obj_t *lbl_mode_box = NULL;
+    static lv_obj_t *lbl_mode = NULL;
+    static lv_obj_t *lbl_mode_up = NULL;
+    static lv_obj_t *lbl_mode_down = NULL;
+    static lv_obj_t *lbl_ins = NULL;
+    static lv_obj_t *lbl_send = NULL;
+    static lv_obj_t *lbl_stats = NULL;
+    static lv_obj_t *lbl_gw = NULL;
+    static lv_obj_t *lbl_v6 = NULL;
+    static bool running = false; // True between start and the backend's "stopped" stats
+    static bool arp_active = false; // v4 (ARP) stack still spoofing, per its latest stats
+    static bool ndp_active = false; // v6 (NDP) stack still spoofing, per its latest stats
+
+    if (init) {
+        // Drop any stale stats left over from a previous run
+        xQueueReset(xWifiArpSpoofStatsQueue);
+        xQueueReset(xWifiNdpSpoofStatsQueue);
+
+        running = false;
+        arp_active = false;
+        ndp_active = false;
+
+        // Whole-subnet target; poison (v4) by default
+        arp_page_mode = 0;
+        arp_spoof_target.duration_sec = ARP_SPOOF_DURATION_SEC;
+        ndp_spoof_target.duration_sec = ARP_SPOOF_DURATION_SEC;
+
+        // Focused control: hide the menu scroll arrows, show the "start" arrow
+        lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        lbl_mode = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_mode, "", user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_CENTER, ARP_X_POS, 8);
+        lcd_wifi_arp_set_mode_label(lbl_mode);
+
+        lbl_mode_box = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_mode_box, "", user_secondary_color,
+                &lv_font_montserrat_24, LV_ALIGN_CENTER, ARP_X_POS, 8);
+
+        lbl_send = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_send, "START", user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -16, -1);
+
+        lbl_mode_up = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_mode_up, LV_SYMBOL_UP, user_secondary_color,
+                &lv_font_montserrat_14, LV_ALIGN_CENTER, ARP_X_POS, -22);
+
+        lbl_mode_down = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_mode_down, LV_SYMBOL_DOWN, user_secondary_color,
+                &lv_font_montserrat_14, LV_ALIGN_CENTER, ARP_X_POS, 38);
+
+        lbl_ins = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_ins, "Spoof mode:", user_secondary_color,
+                &lv_font_montserrat_16, LV_ALIGN_CENTER, ARP_X_POS, -47);
+
+        lbl_stats = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_stats, "", user_secondary_color,
+                &lv_font_montserrat_16, LV_ALIGN_RIGHT_MID, -5, 22);
+
+        // Show the gateway we're impersonating so the target is unambiguous
+        lbl_gw = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_gw, "", user_secondary_color,
+                &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 2);
+        lv_label_set_text_fmt(lbl_gw, "Subnet via " IPSTR, IP2STR(&sta_gw));
+        lv_obj_align(lbl_gw, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+        // IPv6 (NDP) status line, populated in both modes
+        lbl_v6 = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_v6, "", user_secondary_color,
+                &lv_font_montserrat_14, LV_ALIGN_RIGHT_MID, -5, 42);
+
+        // Create a style for the mode box
+        static lv_style_t style_cmd;
+        static bool style_cmd_init = false;
+        if (style_cmd_init) {
+            lv_style_reset(&style_cmd);
+        } else {
+            lv_style_init(&style_cmd);
+            style_cmd_init = true;
+        }
+
+        lv_style_set_radius(&style_cmd, 8);
+        lv_style_set_bg_color(&style_cmd, user_primary_color);
+        lv_style_set_border_width(&style_cmd, 2);
+        lv_style_set_border_color(&style_cmd, user_secondary_color);
+        lv_style_set_border_side(&style_cmd, LV_BORDER_SIDE_FULL);
+        lv_style_set_text_color(&style_cmd, user_secondary_color);
+
+        lv_color_t darker_user_primary_color = lv_color_darken(user_primary_color, 100);
+        lv_style_set_shadow_spread(&style_cmd, 3);
+        lv_style_set_shadow_width(&style_cmd, 6);
+        lv_style_set_shadow_offset_x(&style_cmd, 3);
+        lv_style_set_shadow_offset_y(&style_cmd, 3);
+        lv_style_set_shadow_color(&style_cmd, darker_user_primary_color);
+
+        lv_style_set_pad_left(&style_cmd, 45);
+        lv_style_set_pad_right(&style_cmd, 45);
+        lv_style_set_pad_top(&style_cmd, 25);
+        lv_style_set_pad_bottom(&style_cmd, 25);
+
+        lv_obj_add_style(lbl_mode_box, &style_cmd, 0);
+
+        init = false;
+    }
+
+    // ARP (v4) stats: track whether the v4 stack is still active and surface its counters
+    if (xQueueReceive(xWifiArpSpoofStatsQueue, &arp_spoof_stats, 0) == pdPASS) {
+        arp_active = arp_spoof_stats.spoofing;
+        if (arp_spoof_stats.spoofing) { // In forward mode also surface the relay drop count
+            lcd_anim_loading_stop();
+
+            if (arp_spoof_stats.tx_drops > 0) {
+                lv_label_set_text_fmt(lbl_stats, "%" PRIu32 "p %" PRIu32 "d",
+                        arp_spoof_stats.pkts_handled, arp_spoof_stats.tx_drops);
+            } else {
+                lv_label_set_text_fmt(lbl_stats, "%" PRIu32 " pkts", arp_spoof_stats.pkts_handled);
+            }
+        } else {
+            lv_label_set_text(lbl_stats, "");
+        }
+    }
+
+    // NDP (v6) stats: track whether the v6 stack is still active and surface its status
+    if (xQueueReceive(xWifiNdpSpoofStatsQueue, &ndp_spoof_stats, 0) == pdPASS) {
+        ndp_active = ndp_spoof_stats.spoofing;
+        if (!ndp_spoof_stats.spoofing) {
+            lv_label_set_text(lbl_v6, "");
+        } else if (!ndp_spoof_stats.router_learned) {
+            lv_label_set_text(lbl_v6, "v6: search...");
+        } else if (arp_page_mode == 1) { // Forward -> MitM relay. Surface the relay drop count too.
+            lcd_anim_loading_stop();
+
+            if (ndp_spoof_stats.tx_drops > 0) {
+                lv_label_set_text_fmt(lbl_v6, "v6: mitm %" PRIu32 "d", ndp_spoof_stats.tx_drops);
+            } else {
+                lv_label_set_text(lbl_v6, "v6: mitm");
+            }
+        } else { // Poison -> RA-kill
+            lv_label_set_text_fmt(lbl_v6, "v6: %" PRIu32 " RA", ndp_spoof_stats.ras_sent);
+        }
+    }
+
+    // Revert to START only once BOTH stacks report stopped
+    if (running && !arp_active && !ndp_active) {
+        running = false;
+        lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(lbl_stats, "");
+        lcd_format_label(lbl_send, "START", user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -10, -1);
+        lcd_anim_loading_stop();
+    }
+
+    // User input
+    if (ui_btns->right_btn == 1 && !running && !arp_spoof_is_running() && !ndp_spoof_is_running()) { // Start (ignored while running, or while a previous run is still tearing down)
+        // Clear any stale stop requests
+        xEventGroupClearBits(xWifiEventGroup, WIFI_STOP_ARP_SPOOF_BIT | WIFI_STOP_NDP_SPOOF_BIT);
+
+        // v4: Forward relays (MitM); Poison drops
+        arp_spoof_target.mode = (arp_page_mode == 1) ? ARP_MODE_FORWARD : ARP_MODE_POISON;
+        if (xQueueSend(xWifiArpSpoofTargetQueue, &arp_spoof_target, portMAX_DELAY) != pdPASS) {
+            ESP_LOGE(TAG, "lcd_wifi_arp_spoof_page: failed: xWifiArpSpoofTargetQueue data");
+        }
+
+        // v6 (both modes): Forward -> NDP MitM (relay); Poison -> NDP RA-kill (drop)
+        ndp_spoof_target.mode = (arp_page_mode == 1) ? NDP_MODE_MITM : NDP_MODE_KILL;
+        if (xQueueSend(xWifiNdpSpoofTargetQueue, &ndp_spoof_target, portMAX_DELAY) != pdPASS) {
+            ESP_LOGE(TAG, "lcd_wifi_arp_spoof_page: failed: xWifiNdpSpoofTargetQueue data");
+        }
+
+        running = true; // Reverts once BOTH stacks report stopped (see the combined check above)
+        arp_active = true; // Optimistic; each stack's next stats update corrects this
+        ndp_active = true;
+
+        // Hide start arrow
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        // Update label to show running state
+        lcd_format_label(lbl_send, "RUNNING", user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -3, -1);
+
+        LCD_LOADING_ANIM_START_DEFAULT();
+    } else if ((ui_btns->up_btn == 1 || ui_btns->down_btn == 1) && !running) { // Toggle mode (idle only)
+        arp_page_mode = (arp_page_mode + 1) % 2; // Frozen while running so the v6 label can't lie
+        lcd_wifi_arp_set_mode_label(lbl_mode);
+    } else if (ui_btns->left_btn == 1) { // Go back
+        // Delete objects
+        lv_obj_delete(lbl_mode);
+        lv_obj_delete(lbl_mode_box);
+        lv_obj_delete(lbl_send);
+        lv_obj_delete(lbl_mode_up);
+        lv_obj_delete(lbl_mode_down);
+        lv_obj_delete(lbl_ins);
+        lv_obj_delete(lbl_stats);
+        lv_obj_delete(lbl_gw);
+        lv_obj_delete(lbl_v6);
+
+        // Reset statics
+        init = true;
+        lbl_mode = lbl_mode_box = lbl_send = lbl_mode_up = lbl_mode_down = lbl_ins = lbl_stats = lbl_gw = lbl_v6 = NULL;
+
+        lcd_anim_loading_stop();
+
+        // Stop both stacks' spoofs if ongoing
+        xEventGroupSetBits(xWifiEventGroup, WIFI_STOP_ARP_SPOOF_BIT | WIFI_STOP_NDP_SPOOF_BIT);
+
+        // Restore menu scroll arrows, hide start arrow
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        ui_menu->page = WIFI_PAGE;
+    } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off
+        // Delete objects
+        lv_obj_delete(lbl_mode);
+        lv_obj_delete(lbl_mode_box);
+        lv_obj_delete(lbl_send);
+        lv_obj_delete(lbl_mode_up);
+        lv_obj_delete(lbl_mode_down);
+        lv_obj_delete(lbl_ins);
+        lv_obj_delete(lbl_stats);
+        lv_obj_delete(lbl_gw);
+        lv_obj_delete(lbl_v6);
+
+        // Reset statics
+        init = true;
+        lbl_mode = lbl_mode_box = lbl_send = lbl_mode_up = lbl_mode_down = lbl_ins = lbl_stats = lbl_gw = lbl_v6 = NULL;
+
+        lcd_anim_loading_stop();
+
+        // Stop both stacks' spoofs if ongoing
+        xEventGroupSetBits(xWifiEventGroup, WIFI_STOP_ARP_SPOOF_BIT | WIFI_STOP_NDP_SPOOF_BIT);
+
+        // Restore menu scroll arrows, hide start arrow (leave shared arrows in a clean state)
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }

@@ -10,6 +10,7 @@
 
 #include "esp_log.h"
 #include "esp_wifi.h"
+#include "esp_pm.h"
 #include "esp_netif.h"
 #include "esp_err.h"
 #include "esp_sntp.h"
@@ -37,6 +38,48 @@
 // extern to wifi_ping.c
 extern esp_ip4_addr_t sta_gw;
 extern bool sta_gw_valid;
+
+// Keep the radio awake and the CPU at full clock while a spoof relay (ARP forward / NDP MitM) is
+// active, so relayed traffic sn't delayed by Wi-Fi modem sleep or DFS
+static portMUX_TYPE s_relay_lowlat_mux = portMUX_INITIALIZER_UNLOCKED;
+static int s_relay_lowlat_refs = 0;
+static esp_pm_lock_handle_t s_relay_pm_lock = NULL;
+static wifi_ps_type_t s_relay_saved_ps = WIFI_PS_MIN_MODEM; // PS mode to restore, captured at acquire
+
+void wifi_utils_relay_lowlatency(bool enable)
+{
+    bool act; // Only the 0<->1 transition touches the radio/PM state
+    taskENTER_CRITICAL(&s_relay_lowlat_mux);
+    if (enable) {
+        act = (s_relay_lowlat_refs++ == 0);
+    } else {
+        act = (s_relay_lowlat_refs > 0 && --s_relay_lowlat_refs == 0);
+    }
+    taskEXIT_CRITICAL(&s_relay_lowlat_mux);
+
+    if (!act) {
+        return;
+    }
+
+    if (enable) {
+        // Capture the current power-save mode so we restore exactly that, not an assumed default
+        if (esp_wifi_get_ps(&s_relay_saved_ps) != ESP_OK) {
+            s_relay_saved_ps = WIFI_PS_MIN_MODEM; // Fall back to the IDF default if the query fails
+        }
+        esp_wifi_set_ps(WIFI_PS_NONE); // Stop the AP buffering our frames until the next beacon
+        if (s_relay_pm_lock == NULL) {
+            esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "relay", &s_relay_pm_lock);
+        }
+        if (s_relay_pm_lock != NULL) {
+            esp_pm_lock_acquire(s_relay_pm_lock); // Hold max CPU (blocks DFS downscale / light sleep)
+        }
+    } else {
+        if (s_relay_pm_lock != NULL) {
+            esp_pm_lock_release(s_relay_pm_lock);
+        }
+        esp_wifi_set_ps(s_relay_saved_ps); // Restore whatever mode was active before we took the hold
+    }
+}
 
 extern bool last_known_network_conn_failed; // wifi_autoconnect.c
 
@@ -713,6 +756,13 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 
         // Notify we disconnected
         xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_MQTT_CONNECTED_BIT | WIFI_CONNECTING_BIT);
+
+        // Stop any active ARP/NDP spoof
+        xEventGroupSetBits(xWifiEventGroup, WIFI_STOP_ARP_SPOOF_BIT | WIFI_STOP_NDP_SPOOF_BIT);
+
+        // Gateway is no longer valid once the link drops (don't leave a stale gw for later callers)
+        sta_gw_valid = false;
+        sta_gw.addr = 0;
 
         // Disconnected icon
         xEventGroupClearBits(xConnectionIconEventGroup, ICON_BIT_WIFI_CONNECTED);

@@ -17,6 +17,8 @@
 #include "wifi_ping.h"
 #include "wifi_mqtt.h"
 #include "wifi_deauth.h"
+#include "arp_spoof.h"
+#include "ndp_spoof.h"
 #include "wifi_autoconnect.h"
 #include "wifi_ota_update.h"
 #include "wifi_claude.h"
@@ -43,6 +45,8 @@ POLYCAST5_USE_PSRAM_BSS static wifi_scan_t wifi_scan[WIFI_MAX_NETWORKS];
 POLYCAST5_USE_PSRAM_BSS static wifi_scan_deauth_t wifi_scan_deauth[WIFI_MAX_NETWORKS];
 
 static deauth_target_t deauth_target = {0};
+static arp_spoof_target_t arp_spoof_target = {0};
+static ndp_spoof_target_t ndp_spoof_target = {0};
 static wifi_login_t selected_network = {0};
 static wifi_sniff_t sniff_network = {0};
 
@@ -54,6 +58,10 @@ QueueHandle_t xWifiScanQueue;
 QueueHandle_t xWifiDeauthScanQueue;
 QueueHandle_t xWifiDeauthTargetQueue;
 QueueHandle_t xWifiDeauthStatsQueue;
+QueueHandle_t xWifiArpSpoofTargetQueue;
+QueueHandle_t xWifiArpSpoofStatsQueue;
+QueueHandle_t xWifiNdpSpoofTargetQueue;
+QueueHandle_t xWifiNdpSpoofStatsQueue;
 QueueHandle_t xWifiSelectedNetworkQueue;
 QueueHandle_t xWifiSniffQueue;
 QueueHandle_t xWifiBeaconQueue;
@@ -113,6 +121,14 @@ static void wifi_task(void *param)
     configASSERT(xWifiDeauthTargetQueue);
     xWifiDeauthStatsQueue = xQueueCreate(1, sizeof(deauth_stats_t));
     configASSERT(xWifiDeauthStatsQueue);
+    xWifiArpSpoofTargetQueue = xQueueCreate(1, sizeof(arp_spoof_target_t));
+    configASSERT(xWifiArpSpoofTargetQueue);
+    xWifiArpSpoofStatsQueue = xQueueCreate(1, sizeof(arp_spoof_stats_t));
+    configASSERT(xWifiArpSpoofStatsQueue);
+    xWifiNdpSpoofTargetQueue = xQueueCreate(1, sizeof(ndp_spoof_target_t));
+    configASSERT(xWifiNdpSpoofTargetQueue);
+    xWifiNdpSpoofStatsQueue = xQueueCreate(1, sizeof(ndp_spoof_stats_t));
+    configASSERT(xWifiNdpSpoofStatsQueue);
     xWifiSelectedNetworkQueue = xQueueCreate(1, sizeof(wifi_login_t));
     configASSERT(xWifiSelectedNetworkQueue);
     xWifiSniffQueue = xQueueCreate(1, sizeof(wifi_sniff_t));
@@ -296,6 +312,27 @@ static void wifi_task(void *param)
             esp_err_t err = wifi_deauth_send_for_duration(&deauth_target);
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "xWifiDeauthTargetQueue: wifi_deauth_send_for_duration failed: %s", esp_err_to_name(err));
+            }
+        }
+
+        // Received target to ARP spoof
+        if (xQueueReceive(xWifiArpSpoofTargetQueue, &arp_spoof_target, 0) == pdTRUE) {
+            esp_err_t err = arp_spoof_start(&arp_spoof_target);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "xWifiArpSpoofTargetQueue: arp_spoof_start failed: %s", esp_err_to_name(err));
+                // Signal the LCD the start was rejected so it reverts RUNNING -> START
+                arp_spoof_stats_t fail = {0}; // .spoofing = false
+                xQueueOverwrite(xWifiArpSpoofStatsQueue, &fail);
+            }
+        }
+
+        // Received target to IPv6 NDP spoof (RA-kill)
+        if (xQueueReceive(xWifiNdpSpoofTargetQueue, &ndp_spoof_target, 0) == pdTRUE) {
+            esp_err_t err = ndp_spoof_start(&ndp_spoof_target);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "xWifiNdpSpoofTargetQueue: ndp_spoof_start failed: %s", esp_err_to_name(err));
+                ndp_spoof_stats_t fail = {0}; // .spoofing = false
+                xQueueOverwrite(xWifiNdpSpoofStatsQueue, &fail);
             }
         }
 

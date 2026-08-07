@@ -5,7 +5,7 @@
 
 #include "esp_err.h"
 
-#define MAX_WIFI_OPTIONS 20
+#define MAX_WIFI_OPTIONS 21 // 6 built-in entries + 15 user PolyPlugs (see WIFI_MENU_START_SIZE)
 #define MAX_WIFI_SUBOPTIONS 40 // WIFI_MAX_NETWORKS
 #define TOPIC_KEY_LEN 16
 
@@ -132,6 +132,15 @@ void lcd_wifi_scan_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu
  * @param [in] wifi_menu Wi-Fi menu structure
  */
 void lcd_wifi_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
+
+/**
+ * @brief Whole-subnet ARP spoof page: pick mode (poison/forward), start, and show live stats
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] wifi_menu Wi-Fi menu structure
+ */
+void lcd_wifi_arp_spoof_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
 
 /**
  * @brief Gets network password via user input

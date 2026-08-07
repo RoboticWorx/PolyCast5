@@ -171,6 +171,16 @@ esp_err_t wifi_utils_radio_stop(void);
 esp_err_t wifi_utils_radio_cycle(void);
 
 /**
+ * @brief Hold/release "relay low-latency" mode while a spoof relay (ARP forward / NDP MitM) runs:
+ *        disables Wi-Fi modem sleep and pins the CPU clock so relayed traffic (especially victims'
+ *        TCP ACKs) isn't delayed by power save. Refcounted; the default modem sleep is restored
+ *        once every caller has released. Increases power draw while held - use only while relaying.
+ *
+ * @param [in] enable true to request low-latency (relay start), false to release (relay stop)
+ */
+void wifi_utils_relay_lowlatency(bool enable);
+
+/**
  * @brief Initializes Wi-Fi promiscuous mode to sniff packets
  *
  * @param [in] network Network to sniff

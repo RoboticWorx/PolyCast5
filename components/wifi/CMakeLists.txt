@@ -13,5 +13,5 @@ idf_component_register(
         common
     
     PRIV_REQUIRES
-        ai bluetooth lora esp_wifi esp_netif espnow gpio app_update esp_https_ota esp_http_server esp_pm
+        ai bluetooth lora esp_wifi esp_netif espnow gpio app_update esp_https_ota esp_http_server esp_pm lwip
 )

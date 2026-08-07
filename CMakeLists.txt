@@ -25,5 +25,12 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 set(PROJECT_VER "0.1.0")
 project(PolyCast5)
 
+# Wire the custom lwIP IPv4-input hook used by the Wi-Fi ARP feature
+# ESP_IDF_LWIP_HOOK_FILENAME is included by lwIP's option processing; the header just installs
+# a LWIP_HOOK_IP4_INPUT macro pointing at arp_spoof_lwip_ip4_input_hook()
+idf_component_get_property(lwip_lib lwip COMPONENT_LIB)
+target_compile_options(${lwip_lib} PRIVATE "-DESP_IDF_LWIP_HOOK_FILENAME=\"arp_spoof_lwip_hooks.h\"")
+target_include_directories(${lwip_lib} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/components/wifi/include")
+
 # Build a LittleFS image
 littlefs_create_partition_image(assets "${CMAKE_SOURCE_DIR}/assets" FLASH_IN_PROJECT)
