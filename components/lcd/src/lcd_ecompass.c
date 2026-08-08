@@ -607,6 +607,11 @@ void lcd_ecompass_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
         // Bubble view with the rotating arrow + heading-trace rim arc, tick dial and North pip
         accel_build_bubble(ui_menu, cont, &ball, &mode_lbl, &val_lbl, &heading_arc, &heading_npip);
 
+        // Small "CAL" calibration hint text for bottom arrow
+        lv_obj_t *cali_hint = lv_label_create(cont);
+        lcd_format_label(cali_hint, "CAL", user_secondary_color, &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 7);
+        lv_obj_remove_flag(cali_hint, LV_OBJ_FLAG_SCROLLABLE);
+
         // Drop any stale readings left in the queues from a previous visit
         xQueueReset(xAccelReadingsQueue);
         xQueueReset(xMagReadingsQueue);
