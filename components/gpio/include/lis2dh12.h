@@ -54,6 +54,22 @@ esp_err_t lis2dh12_read_raw(int16_t *x, int16_t *y, int16_t *z);
 esp_err_t lis2dh12_read_g(float *x, float *y, float *z);
 
 /**
+ * @brief Bounded-latency variant of lis2dh12_read_g() for the LCD render path.
+ *        Does not wait on the shared I2C bus (returns ESP_ERR_TIMEOUT if it is busy)
+ *        and bounds the I2C transaction itself to I2C_TIMEOUT_FAST_MS, so neither a
+ *        busy nor a wedged bus can stall lcd_task. Worst case is ~20 ms rather than the
+ *        ~100 ms a task-context read may take. The caller keeps its last value on miss.
+ *
+ * @param [out] x  X axis in g
+ * @param [out] y  Y axis in g
+ * @param [out] z  Z axis in g
+ *
+ * @return ESP_OK on success, ESP_ERR_TIMEOUT if the bus was busy,
+ *         ESP_ERR_INVALID_STATE if not initialized, ESP_FAIL on I2C error
+ */
+esp_err_t lis2dh12_read_g_nonblocking(float *x, float *y, float *z);
+
+/**
  * @brief Read the board tilt as pitch/roll angles in degrees, derived from the
  *        gravity vector. Meaningful only while the device is roughly static
  *        (linear acceleration is indistinguishable from gravity).

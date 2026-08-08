@@ -23,7 +23,8 @@
 
 #define LIS2DH12_AUTO_INC_BIT 0x80
 
-#define I2C_TIMEOUT_MS 100 // Per-transaction I2C timeout
+#define I2C_TIMEOUT_MS 100 // Per-transaction I2C timeout (task-context callers)
+#define I2C_TIMEOUT_FAST_MS 20
 
 #define RAD_TO_DEG 57.295779513082320876f // 180 / pi
 
@@ -172,22 +173,34 @@ esp_err_t lis2dh12_read_raw(int16_t *x, int16_t *y, int16_t *z)
     return ESP_OK;
 }
 
-esp_err_t lis2dh12_read_g(float *x, float *y, float *z)
+// Shared body for the two g-readers
+// Reads OUT_X_L..OUT_Z_H directly (auto-incremented) with a per-call transaction timeout;
+// the ST driver's acceleration_raw_get assembles the same left-justified 16-bit counts,
+// so lis2dh12_from_fs2_nm_to_mg() applies unchanged
+static esp_err_t read_g_locked(float *x, float *y, float *z, TickType_t bus_wait, uint32_t txn_timeout_ms)
 {
     if (s_dev == NULL) { // Not initialized (or init failed)
         return ESP_ERR_INVALID_STATE;
     }
 
     // Fetch the six output registers under the bus lock
-    int16_t raw[3];
-    xSemaphoreTake(xI2CBusMutex, portMAX_DELAY);
-    int32_t r = lis2dh12_acceleration_raw_get(&s_ctx, raw);
+    uint8_t reg = LIS2DH12_OUT_X_L | LIS2DH12_AUTO_INC_BIT;
+    uint8_t buf[6];
+    if (xSemaphoreTake(xI2CBusMutex, bus_wait) != pdTRUE) {
+        return ESP_ERR_TIMEOUT; // Bus busy; caller keeps its last value
+    }
+    esp_err_t e = i2c_master_transmit_receive(s_dev, &reg, 1, buf, sizeof(buf), txn_timeout_ms);
     xSemaphoreGive(xI2CBusMutex);
-    if (r != 0) { // I2C read failed
+    if (e != ESP_OK) { // NAK or bus/transaction timeout
         return ESP_FAIL;
     }
 
-    // Helper converts raw left-justified value to mg for +-2 g normal mode
+    // Reassemble the left-justified 16-bit counts, then convert to g (+-2 g normal mode)
+    int16_t raw[3] = {
+        (int16_t)((uint16_t)buf[1] << 8 | buf[0]),
+        (int16_t)((uint16_t)buf[3] << 8 | buf[2]),
+        (int16_t)((uint16_t)buf[5] << 8 | buf[4]),
+    };
     if (x) *x = lis2dh12_from_fs2_nm_to_mg(raw[0]) / 1000.0f; // mg -> g
     if (y) *y = lis2dh12_from_fs2_nm_to_mg(raw[1]) / 1000.0f;
     if (z) *z = lis2dh12_from_fs2_nm_to_mg(raw[2]) / 1000.0f;
@@ -195,6 +208,16 @@ esp_err_t lis2dh12_read_g(float *x, float *y, float *z)
     remap_axes_f(x, y, z);
 
     return ESP_OK;
+}
+
+esp_err_t lis2dh12_read_g(float *x, float *y, float *z)
+{
+    return read_g_locked(x, y, z, portMAX_DELAY, I2C_TIMEOUT_MS);
+}
+
+esp_err_t lis2dh12_read_g_nonblocking(float *x, float *y, float *z)
+{
+    return read_g_locked(x, y, z, 0, I2C_TIMEOUT_FAST_MS);
 }
 
 esp_err_t lis2dh12_read_deg(float *pitch, float *roll)

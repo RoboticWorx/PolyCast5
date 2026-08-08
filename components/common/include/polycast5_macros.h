@@ -8,7 +8,7 @@
 #define POLYCAST5_PRIORITY_HIGH (tskIDLE_PRIORITY + 2)
 #define POLYCAST5_PRIORITY_INTERRUPT (tskIDLE_PRIORITY + 3)
 
-// Memory control - SRAM currently: 171881/53.56 - Flash currently: 2933563 (app)
+// Memory control - SRAM currently: 171969/53.58 - Flash currently: 2945759 (app)
 #define POLYCAST5_USE_PSRAM_BSS EXT_RAM_BSS_ATTR // For zero-initialized memory
 #define POLYCAST5_USE_PSRAM_DATA EXT_RAM_NOINIT_ATTR // For non zero-initialized memory (initialized at runtime)
 
@@ -33,12 +33,14 @@
 #endif
 
 // Animation settings
-// EXACTLY 3 MUST BE ENABLED: Default build enables CITY, BLACK_HOLE, and MATRIX. To use PYRAMID, disable CITY and vice versa.
+// EXACTLY 3 ASSET-BACKED FLIPBOOKS MUST BE ENABLED: Default build enables CITY, BLACK_HOLE, and MATRIX. To use PYRAMID, disable CITY and vice versa.
 // After switching EN macro, deleted the disabled folder from assets/anim/... and copy the new there from anims/...
+// WATER is procedural (no LittleFS assets) so it does NOT count against the 3-flipbook limit and can stay enabled alongside them.
 #define POLYCAST5_EN_CITY_ANIM 1 // Enables city night homescreen animation (60 frames)
 #define POLYCAST5_EN_BLACK_HOLE_ANIM 1 // Enables black hole homescreen animation (18 frames)
 #define POLYCAST5_EN_MATRIX_RAIN_ANIM 1 // Enables matrix rain homescreen animation (42 frames)
 // #define POLYCAST5_EN_PYRAMID_ANIM 1 // Enables pyramid-alien homescreen animation (56 frames)
+#define POLYCAST5_EN_WATER_ANIM 1 // Enables accelerometer-driven water-slosh homescreen animation (procedural, no assets)
 
 // Settings/testing
 //#define POLYCAST5_PERSIST_SELECTION_INDEX 1 // Persist selected menu option across NVS and home

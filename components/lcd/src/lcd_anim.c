@@ -23,13 +23,13 @@
 
 #include "lcd_asset_macros.h"
 #include "lcd_anim.h"
+#include "lcd_anim_fluid.h" // WATER animation implementation (esp32-fluidbox port)
 #include "lcd_utils.h"
 
 #define LCD_ANIM_NS "anim_data"
 #define LCD_ANIM_KEY "selected"
 
 /* Animation macros */
-#define NUM_ANIMS 3
 
 // Frame periods (ms)
 #ifdef POLYCAST5_EN_CITY_ANIM
@@ -45,7 +45,7 @@
     #define PYRAMID_FRAME_PERIOD 120
 #endif
 
-// Number each sequentially
+// Number each sequentially. ANIM_COUNT stays last so NUM_ANIMS tracks the enabled set automatically.
 enum
 {
 #ifdef POLYCAST5_EN_CITY_ANIM
@@ -58,9 +58,15 @@ enum
     MATRIX_RAIN,
 #endif
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
-    PYRAMID
+    PYRAMID,
 #endif
+#ifdef POLYCAST5_EN_WATER_ANIM
+    WATER,
+#endif
+    ANIM_COUNT // Must stay last
 };
+
+#define NUM_ANIMS ANIM_COUNT
 
 static const char *TAG = "LCD_ANIM";
 
@@ -70,6 +76,10 @@ static bool label_y_anim_busy = false;
 static lv_obj_t *loading_anim_cont = NULL; // Loading animation container
 
 static uint8_t anim_active = 0; // Default determined in lcd_anim_nvs_load
+
+#ifdef POLYCAST5_EN_WATER_ANIM
+static bool s_water_available = false; // WATER canvas/timer created OK; when false WATER is skipped
+#endif
 
 /* Animation */
 typedef struct {
@@ -189,6 +199,9 @@ static anim_t pyramid_anim = {
 };
 #endif
 
+// The WATER animation is a procedural 3D particle fluid implemented in lcd_anim_fluid.c
+// The lifecycle hooks below delegate to lcd_anim_fluid_*(); there is no per-frame state
+
 static void warm_anim(const char **paths, int cnt)
 {
     lv_image_decoder_dsc_t dsc;
@@ -272,6 +285,8 @@ esp_err_t lcd_anim_nvs_load(void)
             anim_active = MATRIX_RAIN;
 #elif defined(POLYCAST5_EN_PYRAMID_ANIM)
             anim_active = PYRAMID;
+#elif defined(POLYCAST5_EN_WATER_ANIM)
+            anim_active = WATER;
 #else
             anim_active = this is an error in lcd_anim_nvs_load;
 #endif
@@ -280,7 +295,12 @@ esp_err_t lcd_anim_nvs_load(void)
         default:
             break;
     }
-    
+
+    // Guard against a stale index stored by a build with a different animation set
+    if (anim_active >= NUM_ANIMS) {
+        anim_active = 0;
+    }
+
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Loaded NVS animation: %u", anim_active);
 #endif
@@ -392,6 +412,20 @@ void lcd_anim_init_images(void)
         lv_timer_pause(pyramid_anim.timer);
     }
 #endif
+
+    // Water (procedural 3D particle fluid, implemented in lcd_anim_fluid.c)
+#ifdef POLYCAST5_EN_WATER_ANIM
+    s_water_available = lcd_anim_fluid_init(ACTIVE_SCR); // Creates the canvas + running timer
+    if (!s_water_available && anim_active == WATER) {
+        // Canvas/timer alloc failed: don't leave a blank homescreen on a persisted WATER selection
+        ESP_LOGE(TAG, "WATER animation unavailable; falling back to animation 0");
+        anim_active = 0;
+        lcd_anim_start_animation(); // Show + resume the fallback animation
+    }
+    if (anim_active != WATER) {
+        lcd_anim_fluid_stop(); // Hide + pause unless it's the active animation
+    }
+#endif
 }
 
 void lcd_anim_start_animation(void)
@@ -421,6 +455,11 @@ void lcd_anim_start_animation(void)
         lv_timer_resume(pyramid_anim.timer);
     }
 #endif
+#ifdef POLYCAST5_EN_WATER_ANIM
+    if (anim_active == WATER) {
+        lcd_anim_fluid_start();
+    }
+#endif
 }
 
 static void pause_animations(void)
@@ -437,6 +476,9 @@ static void pause_animations(void)
 #endif
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
     lv_timer_pause(pyramid_anim.timer);
+#endif
+#ifdef POLYCAST5_EN_WATER_ANIM
+    lcd_anim_fluid_pause();
 #endif
 }
 
@@ -457,6 +499,9 @@ void lcd_anim_stop_animations(void)
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
     lv_obj_add_flag(pyramid_anim.img, LV_OBJ_FLAG_HIDDEN);
 #endif
+#ifdef POLYCAST5_EN_WATER_ANIM
+    lcd_anim_fluid_stop();
+#endif
 }
 
 void lcd_anim_transition_animation(bool dir)
@@ -468,7 +513,19 @@ void lcd_anim_transition_animation(bool dir)
     } else {
         anim_active = (anim_active + NUM_ANIMS - 1) % NUM_ANIMS; // - 1 with wrap
     }
-    
+
+#ifdef POLYCAST5_EN_WATER_ANIM
+    // Skip WATER while its canvas is unavailable (alloc failed at init)
+    // WATER is a single index, so one more step in the same direction lands on an available animation
+    if (anim_active == WATER && !s_water_available && NUM_ANIMS > 1) {
+        if (dir) {
+            anim_active = (anim_active + 1) % NUM_ANIMS;
+        } else {
+            anim_active = (anim_active + NUM_ANIMS - 1) % NUM_ANIMS;
+        }
+    }
+#endif
+
     lcd_anim_start_animation();
     
     // Save choice to NVS
