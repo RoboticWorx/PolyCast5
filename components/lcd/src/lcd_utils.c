@@ -252,7 +252,48 @@ void lcd_device_sleep(void)
     
     // Require pin re-entry if sleeping from home page
     settings_menu.pin_menu.prompt_pin = true;
-    
+
+}
+
+void lcd_device_deep_sleep(void)
+{
+    xQueueReset(xWifiCanSleepSemaphore);
+
+    // Disconnect from Wi-Fi if connected
+    xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+
+    lcd_panel_sleep(); // Put ST7789 to sleep
+    gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_OFF); // BL low
+
+    // Wait for the triggering (SELECT) button to be released before powering down
+    while (gpio_utils_read_input(TCA9535_USER_BUTTON_SELECT_PIN) != 1) {
+        vTaskDelay(pdMS_TO_TICKS(25));
+        lv_timer_handler();
+    }
+
+    // Wait for Wi-Fi to shut off if on
+    xSemaphoreTake(xWifiCanSleepSemaphore, pdMS_TO_TICKS(1000));
+
+    lora_task_abort_pending(); // Cancel any in-flight LoRa retries and idle the radio (no-op in Meshtastic mode)
+
+    // In Meshtastic mode abort_pending() above is a no-op, so this is the ONLY path that idles the radio before sleep
+    lora_meshtastic_listen_stop();
+
+    // Quiesce the shared buses so no task is caught mid-transaction at power-down
+    // Deep sleep wakes via a full reboot that re-initialises every pin, and a hold latched here would survive that reboot
+    xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
+    xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus (parks gpio_task)
+
+    // Final INT-latch clear, as late as possible
+    uint8_t tca_inputs;
+    TCA9535ReadSingleRegister(TCA9535_INPUT_REG0, &tca_inputs);
+
+#ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "Entering deep sleep: esp_deep_sleep_start");
+#endif
+
+    // Wakes on the boot-configured TCA9535 INT ext1 source and triggers a full reboot, so this call never returns
+    esp_deep_sleep_start();
 }
 
 void lcd_init_driver(void)
@@ -3374,7 +3415,16 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
         
         // Reboot
         esp_restart();
-    } else if (ui_btns->select_btn == 1 && settings_menu->index == 12) { // Factory reset selected
+    } else if (ui_btns->select_btn == 1 && settings_menu->index == 12) { // Enter deep sleep selected
+        // Hide settings menu
+        lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Reset static
+        do_once = false;
+
+        // Switch to the deep sleep page (required for hotkeys)
+        ui_menu->page = SETTINGS_DEEP_SLEEP_PAGE;
+    } else if (ui_btns->select_btn == 1 && settings_menu->index == 13) { // Factory reset selected
         // Hide settings menu
         lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         

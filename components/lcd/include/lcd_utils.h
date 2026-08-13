@@ -154,6 +154,7 @@ enum {
     BLUETOOTH_BLE_FLOOD_PAGE,
     BLUETOOTH_BLE_FLOOD_ACTIVE_PAGE,
     WIFI_ARP_SPOOF_PAGE,
+    SETTINGS_DEEP_SLEEP_PAGE,
 };
 
 extern uint32_t pin_attempts;
@@ -199,10 +200,15 @@ typedef struct ui_btns_t {
 
 extern ui_btns_t ui_btns;
 
-/** 
- * @brief Put device and LCD into sleep mode
+/**
+ * @brief Put device and LCD into light sleep mode
  */
 void lcd_device_sleep(void);
+
+/**
+ * @brief Put device and LCD into deep sleep mode (wakes via a full reboot)
+ */
+void lcd_device_deep_sleep(void);
 
 /** 
  * @brief Initialise SPI bus + ST7789 panel (blocking)

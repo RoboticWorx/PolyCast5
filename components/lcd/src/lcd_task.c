@@ -524,6 +524,9 @@ static void lcd_task(void *pvParameters)
                 case SETTINGS_FACTORY_RST_PAGE:
                     lcd_settings_factory_rst_page(&ui_btns, &ui_menu, &settings_menu);
                     break;
+                case SETTINGS_DEEP_SLEEP_PAGE:
+                    lcd_settings_deep_sleep_page(&ui_btns, &ui_menu, &settings_menu);
+                    break;
                 // Bluetooth pages
                 case BLUETOOTH_PAGE:
                     lcd_bluetooth_page(&ui_btns, &ui_menu, &bluetooth_menu);
