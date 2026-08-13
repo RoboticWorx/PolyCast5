@@ -155,6 +155,16 @@ enum {
     BLUETOOTH_BLE_FLOOD_ACTIVE_PAGE,
     WIFI_ARP_SPOOF_PAGE,
     SETTINGS_DEEP_SLEEP_PAGE,
+    SECURITY_DISCLAIMER_PAGE,
+};
+
+// Security features that show a one-time authorized/educational-use disclaimer before their first use
+// These values are persisted as NVS bit positions, so only append new entries to the end
+enum {
+    SEC_DISCLAIMER_DEAUTH,
+    SEC_DISCLAIMER_BLE_FLOOD,
+    SEC_DISCLAIMER_ARP,
+    SEC_DISCLAIMER_COUNT
 };
 
 extern uint32_t pin_attempts;
@@ -363,6 +373,24 @@ esp_err_t lcd_save_first_boot(void);
 bool lcd_is_first_boot(void);
 
 /**
+ * @brief Check whether the one-time authorized-use disclaimer for a security
+ *        feature has already been acknowledged.
+ *
+ * @param [in] feature One of the SEC_DISCLAIMER_* values
+ *
+ * @returns True if already acknowledged (skip the disclaimer)
+ */
+bool lcd_security_disclaimer_acked(int feature);
+
+/**
+ * @brief Persist that the one-time disclaimer for a security feature has been
+ *        acknowledged so it is never shown again.
+ *
+ * @param [in] feature One of the SEC_DISCLAIMER_* values
+ */
+void lcd_security_disclaimer_ack(int feature);
+
+/**
  * @brief Format a clean scrollbar indicator
  *
  * @param [in] obj Object to apply the scrollbar to
@@ -535,6 +563,18 @@ void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t
  * @param [in] gpio_menu GPIO menu structure
  */
 void lcd_gpio_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu);
+
+/**
+ * @brief One-time authorized/educational-use disclaimer shown before a security
+ *        feature (deauther, BLE spam, ARP spoofer) is first entered. The user
+ *        must scroll to the bottom before the right button confirms and the
+ *        acknowledgement is persisted so it is not shown again.
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] wifi_menu Wi-Fi menu structure (needed to reveal the deauth scan list on confirm)
+ */
+void lcd_security_disclaimer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
 
 
 #endif /* LCD_FUNCS_H */
