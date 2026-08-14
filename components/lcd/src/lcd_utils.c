@@ -3087,10 +3087,26 @@ void lcd_tools_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_
 
         // Switch pages
         ui_menu->page = TOOLS_CLAUDE_USAGE_PAGE;
+    } else if (ui_btns->select_btn == 1 && tools_menu->index == 8) { // Motion Sense selected
+        // Hide tools menu
+        lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Hide up/down arrow
+        lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+        // Show right arrow, the intro page asks the user to press it to start
+        lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        // Reset static
+        do_once = false;
+
+        // Switch pages
+        ui_menu->page = TOOLS_CSI_INTRO_PAGE;
     } else if (ui_btns->left_btn == 1) { // Back selected
         // Hide tools menu
         lv_obj_add_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-        
+
         // Show selection labels
         lcd_unhide_selection_widgets(ui_menu);
         

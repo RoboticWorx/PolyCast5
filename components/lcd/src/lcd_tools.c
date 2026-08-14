@@ -40,8 +40,8 @@
 
 tools_menu_t tools_menu = {
     .options = {"Coin Flipper", "Dice Roller", "Number Generator", "Read the Docs", "Bitcoin QR",
-            "Pomodoro Timer", "SRS Planner", "Claude Usage"},
-    .size = 8,
+            "Pomodoro Timer", "SRS Planner", "Claude Usage", "Motion Sense"},
+    .size = 9,
     .index = 0,
     .cont = NULL,
 };

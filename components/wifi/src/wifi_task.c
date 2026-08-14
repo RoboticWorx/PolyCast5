@@ -14,6 +14,7 @@
 #include "esp_random.h"
 
 #include "wifi_utils.h"
+#include "wifi_csi.h"
 #include "wifi_ping.h"
 #include "wifi_mqtt.h"
 #include "wifi_deauth.h"
@@ -51,6 +52,7 @@ static wifi_login_t selected_network = {0};
 static wifi_sniff_t sniff_network = {0};
 
 static wifi_mqtt_t wifi_mqtt = {0};
+static wifi_csi_cmd_t csi_cmd = {0};
 
 EventGroupHandle_t xWifiEventGroup;
 
@@ -69,6 +71,8 @@ QueueHandle_t xWifiDataQueue;
 QueueHandle_t xWifiMqttCmdQueue;
 QueueHandle_t xWifiPingQueue;
 QueueHandle_t xWifiAiRawSniffQueue;
+QueueHandle_t xWifiCsiCmdQueue;
+QueueHandle_t xWifiCsiStatusQueue;
 
 SemaphoreHandle_t xWifiCanSleepSemaphore;
 SemaphoreHandle_t xWifiCycleSemaphore;
@@ -145,6 +149,10 @@ static void wifi_task(void *param)
     configASSERT(xWifiPingQueue);
     xWifiAiRawSniffQueue = xQueueCreate(1, sizeof(char *));
     configASSERT(xWifiAiRawSniffQueue);
+    xWifiCsiCmdQueue = xQueueCreate(1, sizeof(wifi_csi_cmd_t));
+    configASSERT(xWifiCsiCmdQueue);
+    xWifiCsiStatusQueue = xQueueCreate(1, sizeof(wifi_csi_status_t));
+    configASSERT(xWifiCsiStatusQueue);
 
     xConnectionIconEventGroup = xEventGroupCreate();
     configASSERT(xConnectionIconEventGroup);
@@ -305,6 +313,25 @@ static void wifi_task(void *param)
                     sniff_network.target_bssid[3], sniff_network.target_bssid[4], sniff_network.target_bssid[5]);
 #endif
             wifi_utils_init_promiscuous(&sniff_network);
+        }
+
+        // Received a CSI sensing session request
+        if (xQueueReceive(xWifiCsiCmdQueue, &csi_cmd, 0) == pdTRUE) {
+            if (csi_cmd.start) {
+                esp_err_t err = wifi_csi_session_start(&csi_cmd);
+
+                if (err == ESP_OK) {
+                    xEventGroupSetBits(xWifiEventGroup, WIFI_CSI_ACTIVE_BIT);
+                } else {
+#ifdef POLYCAST5_DEBUG
+                    ESP_LOGE(TAG, "wifi_csi_session_start failed: %s", esp_err_to_name(err));
+#endif
+                    xEventGroupClearBits(xWifiEventGroup, WIFI_CSI_ACTIVE_BIT);
+                }
+            } else {
+                wifi_csi_session_stop();
+                xEventGroupClearBits(xWifiEventGroup, WIFI_CSI_ACTIVE_BIT);
+            }
         }
 
         // Received target to deauth

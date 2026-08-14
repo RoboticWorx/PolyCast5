@@ -9,6 +9,7 @@
 #include "lcd_hotkey.h"
 #include "lcd_gpio.h"
 #include "lcd_ecompass.h"
+#include "lcd_csi.h"
 
 #include "lcd_task.h"
 #include "gpio_task.h"
@@ -450,6 +451,13 @@ static void lcd_task(void *pvParameters)
                 case TOOLS_CLAUDE_USAGE_PAGE:
                     lcd_tools_claude_usage_page(&ui_btns, &ui_menu, &tools_menu);
                     dont_sleep_on_this_page = true;
+                    break;
+                case TOOLS_CSI_INTRO_PAGE:
+                    lcd_csi_intro_page(&ui_btns, &ui_menu, &tools_menu);
+                    break;
+                case TOOLS_CSI_LOCAL_PAGE:
+                    lcd_csi_local_page(&ui_btns, &ui_menu, &tools_menu);
+                    dont_sleep_on_this_page = true; // Capture must survive an unattended run
                     break;
                 case TOOLS_CLAUDE_SETUP_PAGE:
                     lcd_tools_claude_setup_page(&ui_btns, &ui_menu, &tools_menu);

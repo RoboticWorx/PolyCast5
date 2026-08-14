@@ -181,6 +181,15 @@ esp_err_t wifi_utils_radio_cycle(void);
 void wifi_utils_relay_lowlatency(bool enable);
 
 /**
+ * @brief Convert a Wi-Fi channel number to its centre frequency
+ *
+ * @param [in] channel Channel number (1-14 for 2.4 GHz, 36-165 for 5 GHz)
+ *
+ * @return Centre frequency in MHz, or 0 if the channel is out of range
+ */
+uint32_t wifi_utils_channel_to_freq(uint8_t channel);
+
+/**
  * @brief Initializes Wi-Fi promiscuous mode to sniff packets
  *
  * @param [in] network Network to sniff

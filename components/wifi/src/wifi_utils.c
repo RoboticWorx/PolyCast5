@@ -20,6 +20,7 @@
 #include "cJSON.h"
 
 #include "wifi_utils.h"
+#include "wifi_csi.h"
 #include "wifi_autoconnect.h"
 #include "wifi_mqtt.h"
 #include "wifi_ping.h"
@@ -79,6 +80,19 @@ void wifi_utils_relay_lowlatency(bool enable)
         }
         esp_wifi_set_ps(s_relay_saved_ps); // Restore whatever mode was active before we took the hold
     }
+}
+
+uint32_t wifi_utils_channel_to_freq(uint8_t channel)
+{
+    if (channel >= 1 && channel < 14) {
+        return 2412 + 5 * (channel - 1);
+    } else if (channel == 14) {
+        return 2484; // Special case
+    } else if (channel >= 36 && channel <= 165) {
+        return 5000 + (5 * channel);
+    }
+
+    return 0;
 }
 
 extern bool last_known_network_conn_failed; // wifi_autoconnect.c
@@ -918,6 +932,10 @@ esp_err_t wifi_utils_radio_start(const char *ssid, const uint8_t* bssid, const c
 
 esp_err_t wifi_utils_radio_stop(void)
 {
+    // Tear down CSI sensing first: this is the single funnel every radio-down path goes through,
+    // so a capture session can never outlive the radio it depends on
+    wifi_csi_teardown();
+
     // Stop promiscuous sniffing if enabled
     (void)esp_wifi_set_promiscuous(false);
     (void)esp_wifi_set_promiscuous_rx_cb(NULL);
@@ -1325,14 +1343,7 @@ static void wifi_sniffer_beacon_cb(void* buf, wifi_promiscuous_pkt_type_t type)
     }
     
     // Calculate network frequency
-    int freq_mhz = 0;
-    if (channel >= 1  && channel < 14) {
-        freq_mhz = 2412 + 5 * (channel - 1);
-    } else if (channel == 14) {
-        freq_mhz = 2484; // Special case
-    } else if (channel >= 36 && channel <= 165) {
-        freq_mhz = 5000 + (5 * channel);
-    }
+    int freq_mhz = (int)wifi_utils_channel_to_freq(channel);
 
     // Decide Wi-Fi PHY type
     beacon.he = has_he;

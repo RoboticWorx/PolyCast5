@@ -48,6 +48,7 @@ extern EventGroupHandle_t xWiFiPortalEventGroup;
 #define WIFI_DATE_TIME_FAILED_BIT  (1U << 14) // SNTP sync gave up (pairs with WIFI_GOT_DATE_TIME_BIT)
 #define WIFI_STOP_ARP_SPOOF_BIT    (1U << 15)
 #define WIFI_STOP_NDP_SPOOF_BIT    (1U << 16)
+#define WIFI_CSI_ACTIVE_BIT        (1U << 17) // A CSI sensing session owns the radio
 extern EventGroupHandle_t xWifiEventGroup;
 
 extern QueueHandle_t xWifiScanQueue;
@@ -65,6 +66,8 @@ extern QueueHandle_t xWifiDataQueue;
 extern QueueHandle_t xWifiMqttCmdQueue;
 extern QueueHandle_t xWifiPingQueue;
 extern QueueHandle_t xWifiAiRawSniffQueue;
+extern QueueHandle_t xWifiCsiCmdQueue;
+extern QueueHandle_t xWifiCsiStatusQueue;
 
 extern SemaphoreHandle_t xWifiCanSleepSemaphore;
 extern SemaphoreHandle_t xWifiCycleSemaphore;
