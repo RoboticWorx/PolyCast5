@@ -83,8 +83,8 @@
 
 settings_menu_t settings_menu = {
     .options = {"Check for Updates", SETTINGS_SET_LOCK_TXT, "Change Colors", "LCD Brightness", "Adjust Haptics",
-            "Adjust Sleep Timer", "Adjust RGB LED", "Adjust LoRa SF", "Change LoRa Region", "Tips and Tricks", "System Info", "Reboot", "Factory Reset"},
-    .size = 13,
+            "Adjust Sleep Timer", "Adjust RGB LED", "Adjust LoRa SF", "Change LoRa Region", "Tips and Tricks", "System Info", "Reboot", "Enter Deep Sleep", "Factory Reset"},
+    .size = 14,
     .index = 0,
     .cont = NULL,
     .pin_menu.pin_set = false,
@@ -2739,6 +2739,33 @@ void lcd_settings_pin_lockout_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
 
     // Ignore navigation while counting down
     (void)ui_btns;
+}
+
+void lcd_settings_deep_sleep_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
+{
+    (void)ui_btns;
+    (void)settings_menu;
+
+    // If a hotkey is being armed, this page is the chosen target: capture it under the active hotkey slot and return home WITHOUT sleeping
+    if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+        lcd_hotkey_save_page_as_hotkey(ui_menu); // Save this page as a hotkey
+        lcd_transition_back(true, ui_menu); // Back to home
+        return;
+    }
+
+    // Hide arrows
+    lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+
+    // Direct selection from Settings, or a hotkey firing from home: confirm, then power down
+    lv_obj_t *lbl_sleep = lv_label_create(ACTIVE_SCR);
+    lcd_format_label(lbl_sleep, "Entering Deep Sleep...", user_secondary_color,
+            &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+    lv_timer_handler();
+    vTaskDelay(pdMS_TO_TICKS(750)); // Let the user read it before the screen turns off
+
+    lcd_device_deep_sleep();
 }
 
 void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)

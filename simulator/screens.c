@@ -925,7 +925,7 @@ void screen_settings(void)
     static const char *sett_options[] = {
         "Check for Updates", "Set Unlock PIN", "Change Colors", "LCD Brightness",
         "Adjust Haptics", "Adjust Sleep Timer", "Adjust RGB LED", "Tips and Tricks",
-        "System Info", "Reboot", "Factory Reset"
+        "System Info", "Reboot", "Enter Deep Sleep", "Factory Reset"
     };
     int num_options = sizeof(sett_options) / sizeof(sett_options[0]);
     int selected = 0; /* firmware default */

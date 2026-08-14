@@ -414,6 +414,10 @@ static void lcd_task(void *pvParameters)
                     lcd_wifi_arp_spoof_page(&ui_btns, &ui_menu, &wifi_menu);
                     dont_sleep_on_this_page = true;
                     break;
+                case SECURITY_DISCLAIMER_PAGE:
+                    lcd_security_disclaimer_page(&ui_btns, &ui_menu, &wifi_menu);
+                    dont_sleep_on_this_page = true; // Let the user read at their own pace
+                    break;
                 // Tools pages
                 case TOOLS_PAGE:
                     lcd_tools_page(&ui_btns, &ui_menu, &tools_menu);
@@ -531,6 +535,9 @@ static void lcd_task(void *pvParameters)
                     break;
                 case SETTINGS_FACTORY_RST_PAGE:
                     lcd_settings_factory_rst_page(&ui_btns, &ui_menu, &settings_menu);
+                    break;
+                case SETTINGS_DEEP_SLEEP_PAGE:
+                    lcd_settings_deep_sleep_page(&ui_btns, &ui_menu, &settings_menu);
                     break;
                 // Bluetooth pages
                 case BLUETOOTH_PAGE:

@@ -273,6 +273,7 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
                 " - AI Keyboard\n"
                 " - SRS Planner\n"
                 " - Pomodoro Timer\n"
+                " - Deep Sleep\n"
                 "";
 
         lv_label_set_text_fmt(ending_lbl, ending_text, button_press, button_name);        

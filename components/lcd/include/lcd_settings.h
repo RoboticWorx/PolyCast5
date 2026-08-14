@@ -187,6 +187,17 @@ void lcd_settings_change_lora_region_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu
 void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
 
 /**
+ * @brief Deep sleep page. On direct selection or a firing hotkey it confirms then powers
+ *        the device down (lcd_device_deep_sleep). While a hotkey is being armed it instead
+ *        saves itself as the hotkey and returns home without sleeping.
+ *
+ * @param [in] ui_btns User input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] settings_menu Settings menu structure
+ */
+void lcd_settings_deep_sleep_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
+
+/**
  * @brief Show system information such as heap, FW version, etc.
  *
  * @param [in] ui_btns User input structure

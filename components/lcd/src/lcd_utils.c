@@ -68,6 +68,10 @@
 #define LCD_FIRST_BOOT_NS "first_boot"
 #define LCD_FIRST_BOOT_KEY "exists"
 
+#define SEC_DISCLAIMER_NS "sec_disc" // Security-feature disclaimer namespace
+#define SEC_DISCLAIMER_KEY "acked" // u8 bitmask, one bit per SEC_DISCLAIMER_* feature
+#define SEC_DISCLAIMER_SCROLL_STEP 36 // Pixels scrolled per up/down press on the disclaimer
+
 /* Hotkey macros */
 #define HOTKEY_SHORT_HOME_IDX 0
 #define HOTKEY_LONG_HOME_IDX 1
@@ -252,7 +256,48 @@ void lcd_device_sleep(void)
     
     // Require pin re-entry if sleeping from home page
     settings_menu.pin_menu.prompt_pin = true;
-    
+
+}
+
+void lcd_device_deep_sleep(void)
+{
+    xQueueReset(xWifiCanSleepSemaphore);
+
+    // Disconnect from Wi-Fi if connected
+    xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+
+    lcd_panel_sleep(); // Put ST7789 to sleep
+    gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_OFF); // BL low
+
+    // Wait for the triggering (SELECT) button to be released before powering down
+    while (gpio_utils_read_input(TCA9535_USER_BUTTON_SELECT_PIN) != 1) {
+        vTaskDelay(pdMS_TO_TICKS(25));
+        lv_timer_handler();
+    }
+
+    // Wait for Wi-Fi to shut off if on
+    xSemaphoreTake(xWifiCanSleepSemaphore, pdMS_TO_TICKS(1000));
+
+    lora_task_abort_pending(); // Cancel any in-flight LoRa retries and idle the radio (no-op in Meshtastic mode)
+
+    // In Meshtastic mode abort_pending() above is a no-op, so this is the ONLY path that idles the radio before sleep
+    lora_meshtastic_listen_stop();
+
+    // Quiesce the shared buses so no task is caught mid-transaction at power-down
+    // Deep sleep wakes via a full reboot that re-initialises every pin, and a hold latched here would survive that reboot
+    xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
+    xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus (parks gpio_task)
+
+    // Final INT-latch clear, as late as possible
+    uint8_t tca_inputs;
+    TCA9535ReadSingleRegister(TCA9535_INPUT_REG0, &tca_inputs);
+
+#ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "Entering deep sleep: esp_deep_sleep_start");
+#endif
+
+    // Wakes on the boot-configured TCA9535 INT ext1 source and triggers a full reboot, so this call never returns
+    esp_deep_sleep_start();
 }
 
 void lcd_init_driver(void)
@@ -910,10 +955,266 @@ bool lcd_is_first_boot(void)
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Loaded lcd_is_first_boot: %d", stored);
 #endif
-    
+
     // Close NVS
     nvs_close(h);
     return false;
+}
+
+// Which security feature the disclaimer page is currently presenting
+static int s_sec_disclaimer_feature = SEC_DISCLAIMER_DEAUTH;
+
+// Check whether a security feature's one-time disclaimer was already acknowledged
+bool lcd_security_disclaimer_acked(int feature)
+{
+    // Guard against an out-of-range feature: fail open so a bad index never
+    // wedges an otherwise-valid feature behind a disclaimer that can't be set
+    if (feature < 0 || feature >= SEC_DISCLAIMER_COUNT) {
+        return true;
+    }
+
+    nvs_handle_t h;
+
+    // Open NVS (namespace only exists once something has been acknowledged)
+    esp_err_t err = nvs_open(SEC_DISCLAIMER_NS, NVS_READONLY, &h);
+    if (err != ESP_OK) {
+        // Not found -> nothing acknowledged yet
+        return false;
+    }
+
+    // Read the acknowledgement bitmask
+    uint8_t mask = 0;
+    err = nvs_get_u8(h, SEC_DISCLAIMER_KEY, &mask);
+
+    // Close NVS
+    nvs_close(h);
+
+    if (err != ESP_OK) {
+        return false;
+    }
+
+    return (mask & (1u << feature)) != 0;
+}
+
+// Persist that a security feature's one-time disclaimer has been acknowledged
+void lcd_security_disclaimer_ack(int feature)
+{
+    if (feature < 0 || feature >= SEC_DISCLAIMER_COUNT) {
+        return;
+    }
+
+    nvs_handle_t h;
+
+    // Open NVS
+    esp_err_t err = nvs_open(SEC_DISCLAIMER_NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "lcd_security_disclaimer_ack nvs_open failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    // Merge the new bit into any existing mask (ignore not-found -> mask stays 0)
+    uint8_t mask = 0;
+    nvs_get_u8(h, SEC_DISCLAIMER_KEY, &mask);
+    mask |= (1u << feature);
+
+    // Save and commit
+    err = nvs_set_u8(h, SEC_DISCLAIMER_KEY, mask);
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "lcd_security_disclaimer_ack save failed: %s", esp_err_to_name(err));
+    }
+
+    // Close NVS
+    nvs_close(h);
+}
+
+void lcd_security_disclaimer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
+{
+    // Statics
+    static bool init = false;
+    static lv_obj_t *cont = NULL;
+    static lv_obj_t *title_lbl = NULL;
+    static lv_obj_t *body_lbl = NULL;
+    static bool reached_bottom = false; // Sticky once the user scrolls to the end
+
+    // Which feature we are gating (locked in at entry, constant while displayed)
+    int feature = s_sec_disclaimer_feature;
+
+    if (!init) {
+        reached_bottom = false;
+
+        // Per-feature title and body text
+        const char *title_text = "Authorized Use";
+        const char *body_text = "";
+        switch (feature) {
+            case SEC_DISCLAIMER_DEAUTH:
+                title_text = "Deauther";
+                body_text =
+                        "This Wi-Fi deauthentication tool transmits frames that forcibly "
+                        "disconnect devices from their networks.\n\n"
+                        "Use it ONLY on networks and devices you own or have explicit, "
+                        "written permission to test.\n\n"
+                        "Interfering with networks you do not control is illegal in most "
+                        "places and may carry criminal penalties.\n\n"
+                        "By continuing you confirm you are the owner or an authorized tester "
+                        "and accept full responsibility for its use.\n\n"
+                        "Scroll all the way to the bottom, then press the right button to acknowledge. "
+                        "This notice appears only once.";
+                break;
+            case SEC_DISCLAIMER_BLE_FLOOD:
+                title_text = "BLE Spam";
+                body_text =
+                        "This BLE advertising flood broadcasts crafted Bluetooth Low Energy "
+                        "packets that can spam or disrupt nearby devices.\n\n"
+                        "Use it ONLY on devices you own or are explicitly authorized to test, "
+                        "for education and security research.\n\n"
+                        "Broadcasting to devices without permission may be illegal and can "
+                        "disturb people around you.\n\n"
+                        "By continuing you confirm you are authorized and accept full "
+                        "responsibility for its use.\n\n"
+                        "Scroll all the way to the bottom, then press the right button to acknowledge. "
+                        "This notice appears only once.";
+                break;
+            case SEC_DISCLAIMER_ARP:
+                title_text = "ARP Spoofer";
+                body_text =
+                        "This ARP/NDP spoofer redirects traffic on the local network by "
+                        "impersonating the gateway (man-in-the-middle).\n\n"
+                        "Use it ONLY on networks you own or have explicit, written permission "
+                        "to test.\n\n"
+                        "Intercepting or disrupting traffic on networks you do not control is "
+                        "illegal in most jurisdictions.\n\n"
+                        "By continuing you confirm you are the owner or an authorized tester "
+                        "and accept full responsibility for its use.\n\n"
+                        "Scroll all the way to the bottom, then press the right button to acknowledge. "
+                        "This notice appears only once.";
+                break;
+            default:
+                break;
+        }
+
+        // Scrollable container (mirrors the hotkey option page layout)
+        cont = lv_obj_create(ACTIVE_SCR);
+        lv_obj_set_size(cont, 210, 106);
+        lv_obj_center(cont);
+        lv_obj_set_style_bg_color(cont, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(cont, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_color(cont, user_secondary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_radius(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
+        lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+        lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+        // Title label
+        title_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(title_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(title_lbl, lv_pct(100));
+        lv_label_set_text(title_lbl, title_text);
+        lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
+        lv_obj_set_style_text_align(title_lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
+
+        // Body label (scrollable if longer than the container)
+        body_lbl = lv_label_create(cont);
+        lv_label_set_long_mode(body_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(body_lbl, lv_pct(100));
+        lv_label_set_text(body_lbl, body_text);
+        lv_obj_set_style_text_font(body_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(body_lbl, user_secondary_color, 0);
+        lv_obj_align_to(body_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 8);
+
+        // Arrows: scroll (top/bot) and back (left) available; confirm (right)
+        // stays hidden until the user has scrolled to the bottom
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        // Compute layout now so the first scroll measurement is valid
+        lv_obj_update_layout(cont);
+
+        init = true;
+    }
+
+    // Once the user reaches the bottom, reveal the confirm (right) arrow and keep it available
+    if (!reached_bottom && lv_obj_get_scroll_bottom(cont) <= 0) {
+        reached_bottom = true;
+        lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    // User input
+    if (ui_btns->up_btn == 1) { // Scroll up
+        lv_obj_scroll_by_bounded(cont, 0, SEC_DISCLAIMER_SCROLL_STEP, LV_ANIM_ON);
+    } else if (ui_btns->down_btn == 1) { // Scroll down
+        lv_obj_scroll_by_bounded(cont, 0, -SEC_DISCLAIMER_SCROLL_STEP, LV_ANIM_ON);
+    } else if (ui_btns->right_btn == 1 && reached_bottom) { // Confirm (only after reading)
+        // Persist acknowledgement so this feature never shows the disclaimer again
+        lcd_security_disclaimer_ack(feature);
+
+        // Tear down the disclaimer UI
+        lv_obj_delete(cont); // Deletes children
+        cont = NULL;
+        title_lbl = body_lbl = NULL;
+        init = false;
+        reached_bottom = false;
+
+        // Restore a neutral arrow state for the feature page that follows
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        // Enter the actual feature (same target as its normal entry point)
+        switch (feature) {
+            case SEC_DISCLAIMER_DEAUTH:
+                lv_obj_remove_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+                ui_menu->page = WIFI_SCAN_DEAUTH_PAGE;
+                break;
+            case SEC_DISCLAIMER_BLE_FLOOD:
+                ui_menu->page = BLUETOOTH_BLE_FLOOD_PAGE;
+                break;
+            case SEC_DISCLAIMER_ARP:
+                ui_menu->page = WIFI_ARP_SPOOF_PAGE;
+                break;
+            default:
+                ui_menu->page = HOME_PAGE;
+                break;
+        }
+    } else if (ui_btns->left_btn == 1) { // Back without acknowledging (will show again)
+        // Tear down the disclaimer UI
+        lv_obj_delete(cont); // Deletes children
+        cont = NULL;
+        title_lbl = body_lbl = NULL;
+        init = false;
+        reached_bottom = false;
+
+        // Restore the parent menu's neutral arrow state
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        // Return to the feature's parent menu
+        ui_menu->page = (feature == SEC_DISCLAIMER_BLE_FLOOD) ? BLUETOOTH_PAGE : WIFI_PAGE;
+    } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off
+        // Tear down the disclaimer UI
+        lv_obj_delete(cont); // Deletes children
+        cont = NULL;
+        title_lbl = body_lbl = NULL;
+        init = false;
+        reached_bottom = false;
+
+        // Leave shared arrows in a clean state
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
 }
 
 void lcd_apply_scrollbar_style(lv_obj_t *obj)
@@ -2768,10 +3069,7 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
         } else if (ui_btns->select_btn == 1 && wifi_menu->index == 3) { // Scan for networks to deauth as
             // Hide Wi-Fi menu
             lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-                
-            // Show scan menu
-            lv_obj_remove_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
-            
+
             // Delete ping labels
             lv_obj_delete(gateway_ping_lbl);
             lv_obj_delete(dns_ping_lbl);
@@ -2779,8 +3077,17 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
             // Reset statics
             do_once = false;
             gateway_ping_lbl = dns_ping_lbl = NULL;
-            
-            ui_menu->page = WIFI_SCAN_DEAUTH_PAGE;
+
+            if (lcd_security_disclaimer_acked(SEC_DISCLAIMER_DEAUTH)) {
+                // Show scan menu
+                lv_obj_remove_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+
+                ui_menu->page = WIFI_SCAN_DEAUTH_PAGE;
+            } else {
+                // First use: show the one-time authorized-use disclaimer
+                s_sec_disclaimer_feature = SEC_DISCLAIMER_DEAUTH;
+                ui_menu->page = SECURITY_DISCLAIMER_PAGE;
+            }
         } else if (ui_btns->select_btn == 1 && wifi_menu->index == 4) { // ARP Spoofer (whole subnet)
             // Hide Wi-Fi menu
             lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -2795,7 +3102,13 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
                 do_once = false;
                 gateway_ping_lbl = dns_ping_lbl = NULL;
 
-                ui_menu->page = WIFI_ARP_SPOOF_PAGE;
+                if (lcd_security_disclaimer_acked(SEC_DISCLAIMER_ARP)) {
+                    ui_menu->page = WIFI_ARP_SPOOF_PAGE;
+                } else {
+                    // First use: show the one-time authorized-use disclaimer
+                    s_sec_disclaimer_feature = SEC_DISCLAIMER_ARP;
+                    ui_menu->page = SECURITY_DISCLAIMER_PAGE;
+                }
             } else { // Not on LAN
                 lbl_conf = lv_label_create(ACTIVE_SCR);
 
@@ -3390,7 +3703,16 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
         
         // Reboot
         esp_restart();
-    } else if (ui_btns->select_btn == 1 && settings_menu->index == 12) { // Factory reset selected
+    } else if (ui_btns->select_btn == 1 && settings_menu->index == 12) { // Enter deep sleep selected
+        // Hide settings menu
+        lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Reset static
+        do_once = false;
+
+        // Switch to the deep sleep page (required for hotkeys)
+        ui_menu->page = SETTINGS_DEEP_SLEEP_PAGE;
+    } else if (ui_btns->select_btn == 1 && settings_menu->index == 13) { // Factory reset selected
         // Hide settings menu
         lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         
@@ -3589,8 +3911,14 @@ void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t
         // Reset static
         do_once = false;
 
-        // Switch pages
-        ui_menu->page = BLUETOOTH_BLE_FLOOD_PAGE;
+        if (lcd_security_disclaimer_acked(SEC_DISCLAIMER_BLE_FLOOD)) {
+            // Switch pages
+            ui_menu->page = BLUETOOTH_BLE_FLOOD_PAGE;
+        } else {
+            // First use: show the one-time authorized-use disclaimer
+            s_sec_disclaimer_feature = SEC_DISCLAIMER_BLE_FLOOD;
+            ui_menu->page = SECURITY_DISCLAIMER_PAGE;
+        }
     } else if (ui_btns->select_btn == 1 && bluetooth_menu->index == 9) { // Forget all devices selected
         // Hide top and bottom arrows
         lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
