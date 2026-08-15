@@ -12,6 +12,7 @@
 
 #include "wifi_task.h"
 #include "gpio_task.h"
+#include "claw_link.h"
 #include "ai_key_portal.h"
 #include "bluetooth_task.h"
 
@@ -199,7 +200,9 @@ static void ai_task(void *pvParameters)
 
         const char *query = NULL;
 
-        if (cmd.type == AI_CMD_KEYBOARD_START_REC) {
+        // The Claw expansion captures audio exactly like the AI keyboard does
+        // Only what happens to the finished transcript differs
+        if (cmd.type == AI_CMD_KEYBOARD_START_REC || cmd.type == AI_CMD_CLAW_START_REC) {
             if (!mic_recording) {
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGW(TAG, "START_REC received but mic_recording is false; ignoring");
@@ -231,7 +234,7 @@ static void ai_task(void *pvParameters)
                 }
             }
             continue;
-        } else if (cmd.type == AI_CMD_KEYBOARD_ABORT_REC) { // Page exited mid-recording
+        } else if (cmd.type == AI_CMD_KEYBOARD_ABORT_REC || cmd.type == AI_CMD_CLAW_ABORT_REC) { // Page exited mid-recording
             // No STT: just release the mic and the abandoned capture
             esp_err_t deinit_err = ai_voice_deinit();
             if (deinit_err != ESP_OK) {
@@ -308,6 +311,54 @@ static void ai_task(void *pvParameters)
             // Free the PCM buffer in PSRAM
             // The mic was already torn down so STT had the DMA-capable internal SRAM it needed for the AES-encrypted upload
             ai_voice_free_pcm(&pcm);
+        } else if (cmd.type == AI_CMD_CLAW_DONE_REC) { // Transcribe, then hand the text to the Claw expansion
+            memset(user_transcript, 0, sizeof(user_transcript)); // Clear previous contents
+
+            // Tear down the mic before STT so the I2S DMA buffers are released back to the heap
+            // The PCM payload lives in PSRAM, so it survives this
+            esp_err_t deinit_err = ai_voice_deinit();
+            if (deinit_err != ESP_OK) {
+                ESP_LOGE(TAG, "ai_voice_deinit failed: %s", esp_err_to_name(deinit_err));
+            }
+
+#ifdef POLYCAST5_DEBUG
+            ESP_LOGI(TAG, "Claw STT uploading PCM: samples=%u", (unsigned)pcm.samples);
+#endif
+
+            // Transcribe via xAI /v1/stt REST endpoint
+            err = ai_voice_stt_transcribe_pcm16_xai(pcm.pcm16, pcm.samples, user_transcript, sizeof(user_transcript));
+
+            // Free the PCM buffer in PSRAM now that the upload is done
+            ai_voice_free_pcm(&pcm);
+
+            // Every failure path below must raise a bit, or the Claw page waits forever
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Claw STT failed: %s", esp_err_to_name(err));
+
+                // Signal specific error type
+                if (err == AI_VOICE_ERR_RATE_LIMITED) {
+                    xEventGroupSetBits(xAiEventGroup, AI_RATE_LIMITED_BIT);
+                } else {
+                    xEventGroupSetBits(xAiEventGroup, AI_THINKING_FAILED_BIT);
+                }
+                continue;
+            }
+
+#ifdef POLYCAST5_DEBUG
+            ESP_LOGI(TAG, "Claw STT transcript: %s", user_transcript);
+#endif
+
+            // No local interpretation here: the expansion's own agent decides what the command means
+            err = claw_link_send_command(user_transcript);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "claw_link_send_command failed: %s", esp_err_to_name(err));
+                xEventGroupSetBits(xAiEventGroup, AI_CLAW_LINK_FAILED_BIT);
+            } else {
+                xEventGroupSetBits(xAiEventGroup, AI_CLAW_SENT_BIT); // Page starts polling the expansion
+            }
+
+            // Skip the Bluetooth dispatch below: this transcript never gets typed
+            continue;
         } else if (cmd.type == AI_CMD_RAW_FRAMES) { // Organizing raw Wi-Fi frames
 #ifdef POLYCAST5_DEBUG
             size_t msg_len = (cmd.msg_len != 0) ? cmd.msg_len : strlen(cmd.msg);

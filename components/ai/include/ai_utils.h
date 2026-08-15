@@ -9,6 +9,14 @@
 #define XAI_NS "xai"
 #define XAI_KEY "api_key"
 
+// xAI endpoint and model. Also handed to the PolyCast5-Claw expansion so its
+// on-device agent runs against the same account and model as this device
+#define XAI_MODEL "grok-4.3"
+#define XAI_BASE_URL "https://api.x.ai/v1"
+
+#define XAI_REASONING_LEVEL "medium"
+#define XAI_NONREASONING_LEVEL "none"
+
 #define AI_PROMPT_NVS_MAX_LEN (1024 * 8)
 
 // This is also the size of all BT autotype script send buffers!
@@ -29,6 +37,9 @@ typedef enum {
     AI_CMD_DICTATE,
     AI_CMD_RAW_FRAMES,
     AI_CMD_KEYBOARD_ABORT_REC, // Page exited mid-recording: deinit mic + free capture, no STT
+    AI_CMD_CLAW_START_REC, // Same capture as the keyboard, but the transcript goes to the Claw expansion
+    AI_CMD_CLAW_DONE_REC, // Transcribe, then hand the text to the Claw expansion over I2C
+    AI_CMD_CLAW_ABORT_REC, // Claw page exited mid-recording: deinit mic + free capture, no STT
 } ai_cmd_type_t;
 
 typedef struct {

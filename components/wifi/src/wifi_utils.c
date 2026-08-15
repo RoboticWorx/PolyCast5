@@ -909,7 +909,10 @@ esp_err_t wifi_utils_radio_start(const char *ssid, const uint8_t* bssid, const c
     if (err != ESP_OK) {
         return err;
     }
-    
+
+    // Can get around captive portal issues by cloning the MAC of an authorized device
+    esp_wifi_set_mac(WIFI_IF_STA, (uint8_t[]){0x32,0x46,0xD1,0x0E,0x8D,0x43});
+
     // Start the driver
     err = esp_wifi_start();
     

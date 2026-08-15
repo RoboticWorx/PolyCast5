@@ -346,8 +346,8 @@ static void wifi_task(void *param)
                 continue;
             }
 
-            // Initial pings
-            wifi_ping_t wifi_ping = {0};
+            // Initial pings (-1 marks a failed/unmeasured probe)
+            wifi_ping_t wifi_ping = { .rtt_gateway = -1, .rtt_dns = -1 };
 
             // Ping the gateway
             esp_err_t err = wifi_ping_gateway(&wifi_ping.rtt_gateway);

@@ -89,7 +89,7 @@ void screen_wifi_data(void);
 void screen_ai_keyboard(void);
 
 /**
- * Render the GPIO submenu (How It Works / Terminal / I2C Scanner).
+ * Render the GPIO submenu (How It Works / Terminal / PolyCast5-Claw / I2C Scanner).
  */
 void screen_gpio(void);
 

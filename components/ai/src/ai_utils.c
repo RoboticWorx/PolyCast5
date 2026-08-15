@@ -26,9 +26,7 @@
 
 #define TAG "AI_UTILS"
 
-#define XAI_MODEL "grok-4.3"
-#define XAI_REASONING_LEVEL "medium"
-#define XAI_NONREASONING_LEVEL "none"
+// XAI_xx lives in ai_utils.h b/c the Claw expansion is told to run the same model
 
 // Hard ceiling so a bad response doesn't eat all RAM
 #define AI_HTTP_BODY_MAX_CAP (128 * 1024)

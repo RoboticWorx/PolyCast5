@@ -2938,9 +2938,17 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
 
     // Check for network ping results
     if (xQueueReceive(xWifiPingQueue, &wifi_ping, 0) == pdTRUE) {
-        // Set text
-        lv_label_set_text_fmt(gateway_ping_lbl, "Router: %" PRId32 " ms", wifi_ping.rtt_gateway);
-        lv_label_set_text_fmt(dns_ping_lbl, "DNS: %" PRId32 " ms", wifi_ping.rtt_dns);
+        // Set text (negative RTT means the probe got no reply)
+        if (wifi_ping.rtt_gateway < 0) {
+            lv_label_set_text(gateway_ping_lbl, "Router: FAIL");
+        } else {
+            lv_label_set_text_fmt(gateway_ping_lbl, "Router: %" PRId32 " ms", wifi_ping.rtt_gateway);
+        }
+        if (wifi_ping.rtt_dns < 0) {
+            lv_label_set_text(dns_ping_lbl, "DNS: FAIL");
+        } else {
+            lv_label_set_text_fmt(dns_ping_lbl, "DNS: %" PRId32 " ms", wifi_ping.rtt_dns);
+        }
 
         // Realign labels
         lv_obj_align(gateway_ping_lbl, LV_ALIGN_BOTTOM_LEFT, 2, 2);
@@ -3971,7 +3979,18 @@ void lcd_gpio_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_men
 
         // Switch pages
         ui_menu->page = GPIO_TERMINAL_PAGE;
-    } else if (ui_btns->select_btn == 1 && gpio_menu->index == 2) { // I2C scanner selected
+    } else if (ui_btns->select_btn == 1 && gpio_menu->index == 2) { // PolyCast5-Claw selected
+        // Hide GPIO menu
+        lv_obj_add_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Reset static
+        do_once = false;
+
+        lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Show right arrow
+
+        // Explain the expansion first; right advances to the actual page
+        ui_menu->page = GPIO_CLAW_HOW_PAGE;
+    } else if (ui_btns->select_btn == 1 && gpio_menu->index == 3) { // I2C scanner selected
         // Hide GPIO menu
         lv_obj_add_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 

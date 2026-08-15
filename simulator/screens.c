@@ -1973,7 +1973,7 @@ void screen_gpio(void)
 
     /* ── Options — matches the static initializer in lcd_gpio.c. ── */
     static const char *gpio_options[] = {
-        "How It Works", "Terminal", "I2C Scanner"
+        "How It Works", "Terminal", "PolyCast5-Claw", "I2C Scanner"
     };
     int num_options = sizeof(gpio_options) / sizeof(gpio_options[0]);
     int selected = 0;

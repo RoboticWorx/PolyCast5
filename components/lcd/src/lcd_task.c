@@ -613,6 +613,13 @@ static void lcd_task(void *pvParameters)
                 case GPIO_SCANNER_PAGE:
                     lcd_gpio_scanner_page(&ui_btns, &ui_menu, &gpio_menu);
                     break;
+                case GPIO_CLAW_HOW_PAGE:
+                    lcd_gpio_claw_how_page(&ui_btns, &ui_menu, &gpio_menu);
+                    break;
+                case GPIO_CLAW_PAGE:
+                    lcd_gpio_claw_page(&ui_btns, &ui_menu, &gpio_menu);
+                    dont_sleep_on_this_page = true;
+                    break;
                 default:
                     break;
             }
