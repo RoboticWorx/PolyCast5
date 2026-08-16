@@ -463,6 +463,10 @@ static void lcd_task(void *pvParameters)
                     lcd_csi_local_page(&ui_btns, &ui_menu, &tools_menu);
                     dont_sleep_on_this_page = true; // Capture must survive an unattended run
                     break;
+                case TOOLS_CSI_RUVIEW_PAGE:
+                    lcd_csi_ruview_page(&ui_btns, &ui_menu, &tools_menu);
+                    dont_sleep_on_this_page = true; // Streaming must survive an unattended run
+                    break;
                 case TOOLS_CLAUDE_SETUP_PAGE:
                     lcd_tools_claude_setup_page(&ui_btns, &ui_menu, &tools_menu);
                     dont_sleep_on_this_page = true;

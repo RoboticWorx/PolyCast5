@@ -88,7 +88,10 @@ uint32_t wifi_utils_channel_to_freq(uint8_t channel)
         return 2412 + 5 * (channel - 1);
     } else if (channel == 14) {
         return 2484; // Special case
-    } else if (channel >= 36 && channel <= 165) {
+    } else if (channel >= 36 && channel <= 177) {
+        // Upper bound is 177, not 165: this chip enumerates the UNII-3 extension channels
+        // 169/173/177, and returning 0 for them silently disables VHT capture and sends a
+        // zero centre frequency downstream
         return 5000 + (5 * channel);
     }
 
@@ -923,6 +926,9 @@ esp_err_t wifi_utils_radio_start(const char *ssid, const uint8_t* bssid, const c
     if (err != ESP_OK) {
         return err;
     }
+
+    // Can get around captive portal issues by cloning the MAC of an authorized device
+    esp_wifi_set_mac(WIFI_IF_STA, (uint8_t[]){0xAA,0x25,0x4E,0x47,0xE6,0x74});
     
     // Start the driver
     err = esp_wifi_start();

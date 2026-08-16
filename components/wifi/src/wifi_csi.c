@@ -22,6 +22,8 @@
 #include "freertos/idf_additions.h"
 
 #include "wifi_csi.h"
+#include "wifi_csi_ruview.h"
+#include "wifi_ping.h"
 #include "wifi_task.h"
 #include "wifi_utils.h"
 
@@ -58,11 +60,16 @@ static wifi_csi_cmd_t s_cmd;
 static bool s_lowlat_held = false;
 static bool s_promisc_held = false;
 static bool s_cb_held = false;
+static bool s_sound_held = false;
+static bool s_ruview_held = false;
 
 // Teardown is reachable from wifi_task, espnow_task and the esp_event handler. Same idiom as
 // wifi_utils_relay_lowlatency(): a portMUX around the test-and-set of the guard flag.
 static portMUX_TYPE s_csi_mux = portMUX_INITIALIZER_UNLOCKED;
 static bool s_in_teardown = false;
+
+// Defined below, but session_start needs to know whether it actually owned the unwind
+static bool wifi_csi_teardown_inner(void);
 
 // Chosen once per session by a short survey, everything after must match or it is a mismatch
 #define CSI_SURVEY_FRAMES 64   // Under a second at any usable capture rate
@@ -481,6 +488,35 @@ static bool wifi_csi_lock_geometry(const wifi_csi_record_t *rec)
 }
 
 /**
+ * @brief Map this chip's PHY format onto the value RuView expects in header byte 18
+ *
+ * The host locks each node onto one (subcarrier count, ppdu_type) pair and silently discards
+ * frames that disagree, so this has to be derived consistently rather than guessed per frame.
+ * Sending cur_bb_format raw would be misread: the host's enum is a small bucketed set, so a
+ * legacy frame reporting format 1 would arrive tagged as HE-SU.
+ */
+static uint8_t csi_ppdu_type(uint8_t bb_format)
+{
+    switch (bb_format) {
+        case RX_BB_FORMAT_11B:
+        case RX_BB_FORMAT_11G:
+        case RX_BB_FORMAT_HT:
+        case RX_BB_FORMAT_VHT:
+        case RX_BB_FORMAT_VHT_MU:
+            return 0; // Legacy and HT/VHT all share the host's "not HE" bucket
+        case RX_BB_FORMAT_HE_SU:
+        case RX_BB_FORMAT_HE_ERSU:
+            return 1;
+        case RX_BB_FORMAT_HE_MU:
+            return 2;
+        case RX_BB_FORMAT_HE_TB:
+            return 3;
+        default:
+            return 0xFF; // Host's explicit "unknown"
+    }
+}
+
+/**
  * @brief Drain one staged record into the analysis ring and hand it to the consumers
  */
 static void wifi_csi_consume(const wifi_csi_record_t *rec)
@@ -506,7 +542,11 @@ static void wifi_csi_consume(const wifi_csi_record_t *rec)
     (void)n_sc;
 #endif
 
-    // Consumers are wired up in later milestones
+    if (s_cmd.consumers & WIFI_CSI_CONSUMER_RUVIEW) {
+        wifi_csi_ruview_send(rec, csi_ppdu_type(rec->bb_format));
+    }
+
+    // The on-device detector arrives with the local DSP milestone
 }
 
 static void csi_task(void *pv)
@@ -589,6 +629,17 @@ static void wifi_csi_release_radio(void)
         s_cb_held = false;
     }
 
+    if (s_sound_held) {
+        wifi_ping_sound_stop();
+        s_sound_held = false;
+    }
+
+    // The UDP socket is deliberately NOT closed here. csi_task sends on it, and closing while that
+    // task is still alive leaves a window between its "is the socket open" check and its sendto()
+    // where the descriptor could be closed and the number reused by another socket. Callers close
+    // it after the task has been joined; the failure path below closes it directly, because there
+    // no task exists yet.
+
     if (s_promisc_held) {
         (void)esp_wifi_set_promiscuous(false);
         s_promisc_held = false;
@@ -612,7 +663,15 @@ esp_err_t wifi_csi_session_start(const wifi_csi_cmd_t *cmd)
         return ESP_ERR_INVALID_ARG;
     }
 
-    wifi_csi_teardown();
+    // A teardown already in flight elsewhere returns immediately rather than waiting, so building
+    // a new session on top of it would race that unwind over the same hold flags and leak every
+    // one of them. Refuse instead; the caller retries on its next pass.
+    if (!wifi_csi_teardown_inner()) {
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "Teardown in progress elsewhere, refusing to start");
+#endif
+        return ESP_ERR_INVALID_STATE;
+    }
 
     // Never run two consumers against the single-producer/single-consumer stage ring: a stranded
     // task would double-advance the tail past the head and wedge the drain loop
@@ -651,12 +710,15 @@ esp_err_t wifi_csi_session_start(const wifi_csi_cmd_t *cmd)
         return err;
     }
 
+    // Both sources capture in promiscuous mode. On the associated path this is what lets us see
+    // the ping replies and ACKs the AP sends us, which is the same arrangement RuView's own
+    // reference firmware uses.
+    wifi_promiscuous_filter_t filter = {
+        .filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT | WIFI_PROMIS_FILTER_MASK_DATA,
+    };
+
     if (s_cmd.source == WIFI_CSI_SRC_PROMISC) {
         // Passive capture needs no credentials, so this is the fastest path to proving the silicon
-        wifi_promiscuous_filter_t filter = {
-            .filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT | WIFI_PROMIS_FILTER_MASK_DATA,
-        };
-
         err = esp_wifi_set_channel(s_cmd.channel, WIFI_SECOND_CHAN_NONE);
         if (err != ESP_OK) {
 #ifdef POLYCAST5_DEBUG
@@ -664,18 +726,34 @@ esp_err_t wifi_csi_session_start(const wifi_csi_cmd_t *cmd)
 #endif
             goto fail;
         }
-
-        (void)esp_wifi_set_promiscuous_filter(&filter);
-
-        err = esp_wifi_set_promiscuous(true);
-        if (err != ESP_OK) {
+    } else {
+        // Associated: the caller is responsible for having brought the link up, because only it
+        // knows which network to join and can show progress while that happens
+        if (!(xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT)) {
 #ifdef POLYCAST5_DEBUG
-            ESP_LOGE(TAG, "esp_wifi_set_promiscuous failed: %s", esp_err_to_name(err));
+            ESP_LOGE(TAG, "Associated capture requested with no connection");
 #endif
+            err = ESP_ERR_INVALID_STATE;
             goto fail;
         }
+    }
 
-        s_promisc_held = true;
+    (void)esp_wifi_set_promiscuous_filter(&filter);
+
+    // Holds that are PRIVATE to this module and idempotent to release are claimed BEFORE they are
+    // acquired: teardown runs from the esp_event handler and can preempt at any instruction, so
+    // claiming afterwards would leave a window where teardown sees no owner and the hold outlives
+    // the session. Releasing one of these when it was never taken is harmless.
+    //
+    // The refcounted low-latency hold below is the exception and must be claimed AFTER, see there.
+    s_promisc_held = true;
+
+    err = esp_wifi_set_promiscuous(true);
+    if (err != ESP_OK) {
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGE(TAG, "esp_wifi_set_promiscuous failed: %s", esp_err_to_name(err));
+#endif
+        goto fail;
     }
 
     // Ask the driver which channel we actually ended up on rather than assuming: the associated
@@ -691,8 +769,15 @@ esp_err_t wifi_csi_session_start(const wifi_csi_cmd_t *cmd)
     // CSI only exists while the radio is receiving, so modem sleep has to go, and a DFS clock
     // downscale mid-session would jitter the sampling. The relay helper already refcounts exactly
     // that pair (PS off + CPU pinned) and restores whatever mode was active before.
+    // Claimed AFTER the acquire, unlike every other hold here. This one is a REFCOUNT shared with
+    // arp_spoof and ndp_spoof, so releasing it when we never took it does not no-op: it decrements
+    // their count and hands their pinned clock and power-save override back underneath them. If a
+    // teardown lands between these two lines the flag is still false, release skips, and the hold
+    // we just took stays owned. Same ordering arp_spoof uses for the identical refcount.
     wifi_utils_relay_lowlatency(true);
     s_lowlat_held = true;
+
+    s_cb_held = true;
 
     err = esp_wifi_set_csi_rx_cb(wifi_csi_rx_cb, NULL);
     if (err != ESP_OK) {
@@ -701,8 +786,6 @@ esp_err_t wifi_csi_session_start(const wifi_csi_cmd_t *cmd)
 #endif
         goto fail;
     }
-
-    s_cb_held = true;
 
     err = wifi_csi_apply_config(freq_mhz);
     if (err != ESP_OK) {
@@ -718,6 +801,38 @@ esp_err_t wifi_csi_session_start(const wifi_csi_cmd_t *cmd)
         ESP_LOGE(TAG, "esp_wifi_set_csi failed: %s", esp_err_to_name(err));
 #endif
         goto fail;
+    }
+
+    // Uplink before the sounder, so the first frames the sounding traffic produces have somewhere
+    // to go rather than being counted as drops
+    if (s_cmd.consumers & WIFI_CSI_CONSUMER_RUVIEW) {
+        s_ruview_held = true;
+
+        err = wifi_csi_ruview_start(s_cmd.host_ip, s_cmd.host_port, s_cmd.node_id);
+        if (err != ESP_OK) {
+#ifdef POLYCAST5_DEBUG
+            ESP_LOGE(TAG, "wifi_csi_ruview_start failed: %s", esp_err_to_name(err));
+#endif
+            goto fail;
+        }
+    }
+
+    // Ambient traffic alone is slow and comes from wherever, so on an associated link drive our
+    // own steady stream off one fixed transmitter
+    if (s_cmd.source == WIFI_CSI_SRC_ASSOC_PING) {
+        uint16_t interval = s_cmd.sound_interval_ms ? s_cmd.sound_interval_ms : 20;
+
+        // Claimed first: esp_ping_new_session spawns a task and makes blocking lwIP calls, so this
+        // is the widest preemption window in the whole function. An unclaimed session here is an
+        // infinite ping that nothing ever stops.
+        s_sound_held = true;
+
+        if (wifi_ping_sound_start(interval) != ESP_OK) {
+            // Not fatal: ambient traffic still yields CSI, just slower and less uniform
+#ifdef POLYCAST5_DEBUG
+            ESP_LOGW(TAG, "Sounding ping unavailable, falling back to ambient traffic");
+#endif
+        }
     }
 
 #ifdef POLYCAST5_DEBUG_CSI
@@ -746,6 +861,14 @@ esp_err_t wifi_csi_session_start(const wifi_csi_cmd_t *cmd)
 
 fail:
     wifi_csi_release_radio();
+
+    // Safe to close directly here: csi_task is only created once every step above has succeeded,
+    // so on this path nothing else can be holding the socket
+    if (s_ruview_held) {
+        wifi_csi_ruview_stop();
+        s_ruview_held = false;
+    }
+
     return err;
 }
 
@@ -759,7 +882,13 @@ bool wifi_csi_is_active(void)
     return s_csi_active;
 }
 
-void wifi_csi_teardown(void)
+/**
+ * @brief Unwind a session
+ *
+ * @return true if this call owned the unwind, false if another context was already inside one and
+ *         this call did nothing. A caller that is about to rebuild state must not proceed on false.
+ */
+static bool wifi_csi_teardown_inner(void)
 {
     bool busy;
 
@@ -771,18 +900,17 @@ void wifi_csi_teardown(void)
     taskEXIT_CRITICAL(&s_csi_mux);
 
     if (busy) {
-        return;
+        return false;
     }
 
     bool was_active = s_csi_active || s_csi_task;
+    bool exited = false;
 
     // Stop the flow of new frames and give back every hold, whether or not a session ever became
     // active: a start that failed halfway still owns some of these
     wifi_csi_release_radio();
 
     if (s_csi_task) {
-        bool exited = false;
-
         s_stop_req = true;
 
         // Bounded wait: a starved consumer must not wedge whoever is taking the radio down
@@ -806,6 +934,17 @@ void wifi_csi_teardown(void)
         }
     } else {
         s_stop_req = false;
+        exited = true; // Nothing was running, so the socket has no user
+    }
+
+    // Only once csi_task is provably gone is it safe to close the socket it was sending on.
+    // Closing it while that task still lives could free the descriptor between its open-check and
+    // its sendto(), and a number reused by another socket in that gap would be handed CSI frames.
+    // On the timeout path the hold is deliberately left standing: session_start refuses to start
+    // while s_csi_task is non-NULL, and the next teardown reclaims the socket once the task exits.
+    if (exited && s_ruview_held) {
+        wifi_csi_ruview_stop();
+        s_ruview_held = false;
     }
 
     s_csi_active = false;
@@ -824,4 +963,11 @@ void wifi_csi_teardown(void)
 #else
     (void)was_active;
 #endif
+
+    return true;
+}
+
+void wifi_csi_teardown(void)
+{
+    (void)wifi_csi_teardown_inner();
 }

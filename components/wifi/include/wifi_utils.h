@@ -183,7 +183,7 @@ void wifi_utils_relay_lowlatency(bool enable);
 /**
  * @brief Convert a Wi-Fi channel number to its centre frequency
  *
- * @param [in] channel Channel number (1-14 for 2.4 GHz, 36-165 for 5 GHz)
+ * @param [in] channel Channel number (1-14 for 2.4 GHz, 36-177 for 5 GHz)
  *
  * @return Centre frequency in MHz, or 0 if the channel is out of range
  */
