@@ -19,7 +19,7 @@
 
 #define TAG "BLUETOOTH_WEB_PORTAL"
 
-#define WIFI_PASS_NS "wifi_pass" // TODO: change to "bt_wifi"
+#define WIFI_PASS_NS "wifi_pass"
 #define WIFI_PASS_KEY "pass"
 
 // All indexed by the same global script index: BT_SCRIPT_KEY_FMT, BT_SCRIPT_CAT_KEY_FMT, BT_SCRIPT_MENU_KEY_FMT
@@ -34,6 +34,14 @@
 #define BT_SCRIPT_MENU_KEY_FMT "item_%02d"
 
 #define MAX_HTTP_BODY_TXT AI_RESPONSE_MAX_LEN
+
+// Import carries every script at once; a single body can be ~64KB and JSON
+// escaping roughly doubles the wire size, so allow well above MAX_HTTP_BODY_TXT.
+#define MAX_IMPORT_BODY_TXT (512 * 1024)
+
+// Backup file format tag + version (validated on import)
+#define BT_EXPORT_FMT_TAG "polycast5-autotype"
+#define BT_EXPORT_VER 1
 
 extern char bt_wifi_portal_pass[]; // bluetooth_task.c
 
@@ -169,7 +177,7 @@ uint8_t bluetooth_portal_script_count_get_nvs(void)
             ESP_LOGE(TAG, "bluetooth_script_count_get nvs_get_u8 failed: %s", esp_err_to_name(err));
 #endif
         }
-         
+
         // Close NVS
         nvs_close(h);
     } else {
@@ -888,6 +896,14 @@ static esp_err_t script_one_post(httpd_req_t *req)
     const char *name_in = jname->valuestring;
     const char *body_in = jbody->valuestring;
 
+    // Cap body so the stored blob (strlen+1) fits the runtime send buffer (AI_RESPONSE_MAX_LEN);
+    // a boundary-sized body would otherwise save but never execute
+    if (strlen(body_in) >= MAX_HTTP_BODY_TXT) {
+        cJSON_Delete(j);
+        free(buf);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "body too large");
+    }
+
     // Parse/Default category
     uint8_t cat = 0;
     bool has_cat = false;
@@ -1303,6 +1319,371 @@ static esp_err_t category_one_delete(httpd_req_t *req)
     return httpd_resp_sendstr(req, "{\"ok\":true}");
 }
 
+/* ========== Backup / Restore ========== */
+
+// GET /api/export -> downloadable JSON of every category + script
+// { "fmt":"polycast5-autotype", "ver":1, "categories":[...], "scripts":[{label,cat,body},...] }
+static esp_err_t export_get(httpd_req_t *req)
+{
+    // Nothing to export? Don't hand back an empty file.
+    uint8_t script_count = bluetooth_portal_script_count_get_nvs();
+    uint8_t cat_count = bluetooth_portal_category_count_get_nvs();
+    if (script_count == 0 && cat_count == 0) {
+        return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "nothing to export");
+    }
+
+    // Allocate a JSON root object
+    cJSON *root = cJSON_CreateObject();
+    if (root == NULL) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+    }
+
+    // Format tag + version so import can validate the file
+    if ((cJSON_AddStringToObject(root, "fmt", BT_EXPORT_FMT_TAG) == NULL) ||
+        (cJSON_AddNumberToObject(root, "ver", BT_EXPORT_VER) == NULL)) {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+    }
+
+    // Categories array (array index == category id)
+    cJSON *cats = cJSON_AddArrayToObject(root, "categories");
+    if (cats == NULL) {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+    }
+
+    for (uint8_t i = 0; i < cat_count; ++i) {
+        char nm[BT_CAT_LABEL_MAX_LEN + 1];
+        const char *name = (bluetooth_portal_category_name_get_nvs(i, nm, sizeof(nm)) == ESP_OK) ? nm : "(unnamed)";
+
+        // Check the allocation so a failure can't silently drop a category from the backup
+        cJSON *item = cJSON_CreateString(name);
+        if (item == NULL) {
+            cJSON_Delete(root);
+            return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+        }
+        cJSON_AddItemToArray(cats, item);
+    }
+
+    // Scripts array ({label, cat, body} per entry)
+    cJSON *scr = cJSON_AddArrayToObject(root, "scripts");
+    if (scr == NULL) {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+    }
+
+    // One reusable scratch buffer for bodies (cJSON copies strings, so reuse is safe)
+    char *body = (char *)malloc(MAX_HTTP_BODY_TXT + 1);
+    if (body == NULL) {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+    }
+
+    for (uint8_t i = 0; i < script_count; ++i) {
+        char lbl[BT_SCRIPT_LABEL_MAX_LEN + 1] = {0};
+        uint8_t cat = 0;
+        size_t blen = 0;
+
+        // Label/cat are cosmetic with safe defaults (missing label -> "", missing cat -> 0),
+        // so a failed read there is tolerated.
+        bluetooth_portal_script_label_get_nvs(i, lbl, sizeof(lbl));
+        bluetooth_portal_script_cat_idx_get_nvs(i, &cat);
+
+        // The body is the actual payload. If it can't be fully read (NVS error, or a legacy
+        // body larger than the buffer that the getter would silently skip, leaving blen == 0),
+        // abort rather than hand back a backup that quietly dropped a script's data.
+        body[0] = '\0';
+        esp_err_t berr = bluetooth_portal_script_body_get_nvs(i, body, MAX_HTTP_BODY_TXT + 1, &blen);
+        if ((berr != ESP_OK) || (blen == 0)) {
+            free(body);
+            cJSON_Delete(root);
+            return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "read failed");
+        }
+
+        // Build the per-script object
+        cJSON *o = cJSON_CreateObject();
+        if (o == NULL) {
+            free(body);
+            cJSON_Delete(root);
+            return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+        }
+        // Check each field so an allocation failure can't silently drop a script's data
+        if ((cJSON_AddStringToObject(o, "label", lbl) == NULL) ||
+            (cJSON_AddNumberToObject(o, "cat", cat) == NULL) ||
+            (cJSON_AddStringToObject(o, "body", body) == NULL)) {
+            cJSON_Delete(o);
+            free(body);
+            cJSON_Delete(root);
+            return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+        }
+        cJSON_AddItemToArray(scr, o);
+    }
+
+    // Serialize then free the tree + scratch buffer
+    char *txt = cJSON_PrintUnformatted(root);
+    free(body);
+    cJSON_Delete(root);
+
+    if (txt == NULL) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+    }
+
+    // Send as a downloadable attachment
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"polycast5-autotype.json\"");
+    esp_err_t err = httpd_resp_sendstr(req, txt);
+    free(txt);
+
+    if (err != ESP_OK) {
+#ifdef POLYCAST5_DEBUG
+       ESP_LOGE(TAG, "export_get httpd_resp_sendstr failed: %s", esp_err_to_name(err));
+#endif
+    }
+
+    return err;
+}
+
+// Send a JSON error for the import handler so the browser can show a specific reason.
+// Every call site below fires BEFORE the NVS wipe, so existing data is left untouched.
+static esp_err_t import_error(httpd_req_t *req, const char *status, const char *code)
+{
+    char j[64];
+    snprintf(j, sizeof(j), "{\"ok\":false,\"error\":\"%s\"}", code);
+    httpd_resp_set_status(req, status);
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, j);
+}
+
+// POST /api/import  { "fmt":"polycast5-autotype", "ver":1, "categories":[...], "scripts":[...] }
+// Replace-all: validate fully BEFORE touching NVS, then wipe autotype data and restore from the file.
+static esp_err_t import_post(httpd_req_t *req)
+{
+    // Reject empty/oversized bodies (content_len is size_t, so == 0 catches empty)
+    if (req->content_len == 0 || req->content_len > MAX_IMPORT_BODY_TXT) {
+        return import_error(req, "400 Bad Request", "bad_length");
+    }
+
+    // Allocate buffer
+    char *buf = (char *)malloc((size_t)req->content_len + 1);
+    if (buf == NULL) {
+        return import_error(req, "500 Internal Server Error", "oom");
+    }
+
+    // Read full body
+    size_t off = 0;
+    while (off < (size_t)req->content_len) {
+        int n = httpd_req_recv(req, buf + off, req->content_len - (int)off);
+
+        // If recv failed, bail
+        if (n <= 0) {
+            free(buf);
+            return import_error(req, "500 Internal Server Error", "recv");
+        }
+
+        off += (size_t)n;
+    }
+    buf[off] = '\0';
+
+    // Parse JSON
+    cJSON *root = cJSON_Parse(buf);
+    if (root == NULL) {
+        free(buf);
+        return import_error(req, "400 Bad Request", "bad_json");
+    }
+
+    // Validate format tag + version BEFORE any NVS change (a bad file must not wipe data)
+    cJSON *jfmt = cJSON_GetObjectItemCaseSensitive(root, "fmt");
+    cJSON *jver = cJSON_GetObjectItemCaseSensitive(root, "ver");
+
+    if (!cJSON_IsString(jfmt) || (jfmt->valuestring == NULL) || (strcmp(jfmt->valuestring, BT_EXPORT_FMT_TAG) != 0)) {
+        cJSON_Delete(root);
+        free(buf);
+        return import_error(req, "400 Bad Request", "bad_format");
+    }
+    if (!cJSON_IsNumber(jver) || (jver->valueint != BT_EXPORT_VER)) {
+        cJSON_Delete(root);
+        free(buf);
+        return import_error(req, "400 Bad Request", "bad_version");
+    }
+
+    // Both arrays are required
+    cJSON *cats = cJSON_GetObjectItemCaseSensitive(root, "categories");
+    cJSON *scr = cJSON_GetObjectItemCaseSensitive(root, "scripts");
+    if (!cJSON_IsArray(cats) || !cJSON_IsArray(scr)) {
+        cJSON_Delete(root);
+        free(buf);
+        return import_error(req, "400 Bad Request", "bad_structure");
+    }
+
+    // Reject over-limit files BEFORE any NVS change (don't silently drop entries and
+    // then report success). Valid range: up to BT_MAX_CATEGORIES categories and
+    // BT_MAX_KEYBOARD_SCRIPTS scripts (indices 0..254, so a count of 255 is valid).
+    int cat_n = cJSON_GetArraySize(cats);
+    int script_n = cJSON_GetArraySize(scr);
+    if (cat_n > BT_MAX_CATEGORIES || script_n > BT_MAX_KEYBOARD_SCRIPTS) {
+        cJSON_Delete(root);
+        free(buf);
+        return import_error(req, "400 Bad Request", "too_many");
+    }
+
+    // Validate every entry BEFORE wiping, so a damaged-but-parseable file can't replace good
+    // data with empty/placeholder records. Each category must be a non-null string; each script
+    // must be an object with a string body. cat/label stay optional (safe defaults on restore).
+    for (int i = 0; i < cat_n; ++i) {
+        cJSON *c = cJSON_GetArrayItem(cats, i);
+        if (!cJSON_IsString(c) || (c->valuestring == NULL)) {
+            cJSON_Delete(root);
+            free(buf);
+            return import_error(req, "400 Bad Request", "bad_entry");
+        }
+    }
+    for (int i = 0; i < script_n; ++i) {
+        cJSON *s = cJSON_GetArrayItem(scr, i);
+        if (!cJSON_IsObject(s)) {
+            cJSON_Delete(root);
+            free(buf);
+            return import_error(req, "400 Bad Request", "bad_entry");
+        }
+
+        cJSON *jb = cJSON_GetObjectItemCaseSensitive(s, "body");
+        if (!cJSON_IsString(jb) || (jb->valuestring == NULL)) {
+            cJSON_Delete(root);
+            free(buf);
+            return import_error(req, "400 Bad Request", "bad_entry");
+        }
+
+        // Cap at MAX_HTTP_BODY_TXT-1 so the stored blob (strlen+1) still fits the runtime send
+        // buffer (send_buf[AI_RESPONSE_MAX_LEN]) and every 64KB reader; a boundary-sized body
+        // would otherwise import but never execute.
+        if (strlen(jb->valuestring) >= MAX_HTTP_BODY_TXT) {
+            cJSON_Delete(root);
+            free(buf);
+            return import_error(req, "400 Bad Request", "script_too_large");
+        }
+    }
+
+    // Validation passed. Wipe keyb_menu (script count + labels) FIRST and check the result: if
+    // that erase fails, nothing has been destroyed yet, so abort with the old data fully intact
+    // instead of later publishing count 0 over still-present, now-hidden scripts.
+    nvs_handle_t h;
+    esp_err_t menu_wipe = ESP_FAIL;
+    if (nvs_open(BT_SCRIPT_MENU_NS, NVS_READWRITE, &h) == ESP_OK) {
+        menu_wipe = nvs_erase_all(h);
+        if (menu_wipe == ESP_OK) {
+            menu_wipe = nvs_commit(h);
+        }
+        nvs_close(h);
+    }
+    if (menu_wipe != ESP_OK) {
+        cJSON_Delete(root);
+        free(buf);
+        return import_error(req, "500 Internal Server Error", "wipe_failed");
+    }
+
+    // keyb_menu is now empty, so the old scripts are already gone. The bt_portal wipe is
+    // best-effort: correctness comes from overwriting every record and setting both counts
+    // explicitly, so we continue even if it fails (aborting now would strand an emptied index).
+    if (nvs_open(BT_SCRIPT_NS, NVS_READWRITE, &h) == ESP_OK) {
+        nvs_erase_all(h);
+        nvs_commit(h);
+        nvs_close(h);
+    }
+
+    // Write categories ascending 0..cat_n-1 (set_nvs bumps cat_count only on append)
+    int cats_written = 0;
+    for (int i = 0; i < cat_n; ++i) {
+        cJSON *c = cJSON_GetArrayItem(cats, i);
+        char nm[BT_CAT_LABEL_MAX_LEN + 1];
+
+        if (cJSON_IsString(c) && (c->valuestring != NULL)) {
+            strncpy(nm, c->valuestring, BT_CAT_LABEL_MAX_LEN);
+            nm[BT_CAT_LABEL_MAX_LEN] = '\0';
+        } else {
+            strcpy(nm, "(unnamed)");
+        }
+
+        // Stop on first failure so cat_count stays contiguous with the names written
+        if (bluetooth_portal_category_set_nvs((uint8_t)i, nm) != ESP_OK) {
+            break;
+        }
+        cats_written++;
+    }
+
+    // Force cat_count to exactly the categories written. category_set_nvs only grows the count
+    // on append, so if the bt_portal wipe failed a stale-high count could otherwise survive and
+    // expose orphaned category names. Setting it explicitly (like the script count) makes
+    // correctness independent of the best-effort wipe.
+    esp_err_t cat_count_err = ESP_FAIL;
+    if (nvs_open(BT_SCRIPT_NS, NVS_READWRITE, &h) == ESP_OK) {
+        cat_count_err = nvs_set_u8(h, BT_SCRIPT_CAT_COUNT, (uint8_t)cats_written);
+        if (cat_count_err == ESP_OK) {
+            cat_count_err = nvs_commit(h);
+        }
+        nvs_close(h);
+    }
+
+    // Write scripts (label + body + cat per slot); count is written LAST
+    int scripts_written = 0;
+    for (int i = 0; i < script_n; ++i) {
+        cJSON *s = cJSON_GetArrayItem(scr, i);
+
+        // Label (truncate to 32; default if missing)
+        char label[BT_SCRIPT_LABEL_MAX_LEN + 1];
+        cJSON *jl = cJSON_IsObject(s) ? cJSON_GetObjectItemCaseSensitive(s, "label") : NULL;
+        if (cJSON_IsString(jl) && (jl->valuestring != NULL)) {
+            strncpy(label, jl->valuestring, BT_SCRIPT_LABEL_MAX_LEN);
+            label[BT_SCRIPT_LABEL_MAX_LEN] = '\0';
+        } else {
+            snprintf(label, sizeof(label), "Script %02d", i);
+        }
+
+        // Category (clamp out-of-range to 0)
+        cJSON *jc = cJSON_IsObject(s) ? cJSON_GetObjectItemCaseSensitive(s, "cat") : NULL;
+        uint8_t cat = 0;
+        if (cJSON_IsNumber(jc) && (jc->valueint >= 0) && (jc->valueint < cat_n)) {
+            cat = (uint8_t)jc->valueint;
+        }
+
+        // Body (default empty if missing)
+        cJSON *jb = cJSON_IsObject(s) ? cJSON_GetObjectItemCaseSensitive(s, "body") : NULL;
+        const char *body_in = (cJSON_IsString(jb) && (jb->valuestring != NULL)) ? jb->valuestring : "";
+
+        // Persist the slot; stop on first failure so count never exposes a half-written slot
+        esp_err_t err = bluetooth_script_label_set_nvs((uint8_t)i, label);
+        if (err == ESP_OK) {
+            err = bluetooth_script_body_set_nvs((uint8_t)i, body_in);
+        }
+        if (err == ESP_OK) {
+            err = bluetooth_portal_script_cat_idx_set_nvs((uint8_t)i, cat);
+        }
+        if (err != ESP_OK) {
+            break;
+        }
+
+        scripts_written++;
+    }
+
+    // Count last: only fully-written slots become visible
+    esp_err_t count_err = bluetooth_script_count_set_nvs((uint8_t)scripts_written);
+
+    cJSON_Delete(root);
+    free(buf);
+
+    // Success: every category and script was written and both counts committed
+    char okjson[80];
+    if ((count_err == ESP_OK) && (cat_count_err == ESP_OK) && (scripts_written == script_n) && (cats_written == cat_n)) {
+        snprintf(okjson, sizeof(okjson), "{\"ok\":true,\"categories\":%d,\"scripts\":%d}", cats_written, scripts_written);
+        httpd_resp_set_type(req, "application/json");
+        return httpd_resp_sendstr(req, okjson);
+    }
+
+    // Partial restore after wipe: report failure but keep the counts so the UI can show progress
+    snprintf(okjson, sizeof(okjson), "{\"ok\":false,\"categories\":%d,\"scripts\":%d,\"error\":\"nvs\"}", cats_written, scripts_written);
+    httpd_resp_set_status(req, "500 Internal Server Error");
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, okjson);
+}
+
 /* ========== HTTP server bootstrap ========== */
 
 // Start the embedded HTTP server and register endpoints
@@ -1348,6 +1729,13 @@ static httpd_handle_t start_http(void)
 
     httpd_uri_t c1d = {.uri="/api/category",   .method=HTTP_DELETE, .handler=category_one_delete};
     httpd_register_uri_handler(srv, &c1d);
+
+    // Backup / Restore API
+    httpd_uri_t ex = {.uri="/api/export", .method=HTTP_GET,  .handler=export_get};
+    httpd_register_uri_handler(srv, &ex);
+
+    httpd_uri_t im = {.uri="/api/import", .method=HTTP_POST, .handler=import_post};
+    httpd_register_uri_handler(srv, &im);
 
     return srv;
 }
