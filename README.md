@@ -16,11 +16,7 @@ You can find some relevant links below:
 
 * [**PolyCast5 official website.**](https://polycast5.com/) A graphical explanation of what you can do with it and how it works!
 * [**PolyCast5 user documentation.**](https://polycast5.com/pages/docs) How to use it and unleash its full capabilities.
-* [**PolyCast5 attachment tutorials.**](https://polycast5.com/pages/tutorials) Custom builds you can control with your PolyCast5. Including:
-  * Home light switcher
-  * Door locker/unlocker
-  * Button pusher
-  * and more!
+* [**PolyCast5 attachment tutorials.**](https://polycast5.com/pages/tutorials) Custom builds you can control with your PolyCast5.
 
 <p align="center">
   <img
