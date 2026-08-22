@@ -337,7 +337,7 @@ static void bluetooth_task(void *arg)
                 // Menu has 2 fixed rows before user scripts:
                 // So the first user script is menu_idx == 2 -> NVS index 0
                 if (menu_idx >= BT_NUM_KEYBOARD_BASE) {
-                    uint8_t script_idx = (uint8_t)(menu_idx - BT_NUM_KEYBOARD_BASE); // 0-based NVS slot
+                    uint16_t script_idx = (uint16_t)(menu_idx - BT_NUM_KEYBOARD_BASE); // 0-based NVS slot
 
                     size_t blen = 0;
 

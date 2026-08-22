@@ -188,11 +188,11 @@ static void keyboard_submenu_refresh_from_nvs(bluetooth_keyboard_menu_t *km, uin
 
     // Pull labels for each user script i that matches category
     int s = 0;
-    memset(km->script_indices, 255, sizeof(km->script_indices)); // 255 = invalid; only filled slots hold real script indices
+    memset(km->script_indices, 0xFF, sizeof(km->script_indices)); // 0xFF byte-fill -> UINT16_MAX per slot = invalid; only filled slots hold real script indices
 
     for (uint32_t i = 0; i < count; ++i) {
         uint8_t cat = 0;
-        esp_err_t err = bluetooth_portal_script_cat_idx_get_nvs((uint8_t)i, &cat);
+        esp_err_t err = bluetooth_portal_script_cat_idx_get_nvs((uint16_t)i, &cat);
 
         if (err == ESP_OK && cat == category) {
             // Fill default label first
@@ -200,14 +200,14 @@ static void keyboard_submenu_refresh_from_nvs(bluetooth_keyboard_menu_t *km, uin
 
             // Read label from NVS (namespace/keys match the portal)
             size_t len = sizeof(script_labels[s]);
-            err = bluetooth_portal_script_label_get_nvs((uint8_t)i, script_labels[s], len);
+            err = bluetooth_portal_script_label_get_nvs((uint16_t)i, script_labels[s], len);
             if (err != ESP_OK) {
                 // On error, show a placeholder rather than leaving a blank
                 snprintf(script_labels[s], sizeof(script_labels[s]), "Script %u", (unsigned)i);
             }
 
             km->options[s] = script_labels[s];
-            km->script_indices[s] = (uint8_t)i;
+            km->script_indices[s] = (uint16_t)i;
             s++;
         }
     }
@@ -216,7 +216,7 @@ static void keyboard_submenu_refresh_from_nvs(bluetooth_keyboard_menu_t *km, uin
     if (s == 0) {
         snprintf(script_labels[0], sizeof(script_labels[0]), "No scripts");
         km->options[0] = script_labels[0];
-        km->script_indices[0] = 255; // Invalid index to skip execution on select
+        km->script_indices[0] = UINT16_MAX; // Invalid index to skip execution on select
         s = 1;
     }
 
@@ -2039,8 +2039,8 @@ void lcd_bluetooth_keyboard_sub_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blu
         submenu->index++;
         update_keyboard_submenu(submenu);
     } else if (ui_btns->select_btn == 1) { // Select script
-        // If no scripts in this category (255 = placeholder row), ignore select
-        if (submenu->script_indices[submenu->index] == 255) {
+        // If no scripts in this category (UINT16_MAX = placeholder row), ignore select
+        if (submenu->script_indices[submenu->index] == UINT16_MAX) {
 #ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "No scripts in selected category");
 #endif
@@ -2048,7 +2048,7 @@ void lcd_bluetooth_keyboard_sub_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blu
         }
 
         // Send the script to type out
-        uint8_t script_idx = submenu->script_indices[submenu->index];
+        uint16_t script_idx = submenu->script_indices[submenu->index];
         uint16_t cmd = BLUETOOTH_SCRIPT_OFFSET + BT_NUM_KEYBOARD_BASE + script_idx;
         xQueueSend(xBluetoothMediaCmdQueue, &cmd, 0);
     } else if (ui_btns->left_btn == 1) { // Back

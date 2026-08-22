@@ -37,7 +37,7 @@ typedef struct {
     lv_style_t sel_style;
     lv_obj_t *cont;
     char cat_labels[BT_MAX_CATEGORIES][BT_CAT_LABEL_MAX_LEN + 1]; // For dynamic category names
-    uint8_t script_indices[BT_MAX_KEYBOARD_SCRIPTS]; // For mapping submenu positions to script indices
+    uint16_t script_indices[BT_MAX_KEYBOARD_SCRIPTS]; // For mapping submenu positions to script indices (UINT16_MAX = invalid)
 } bluetooth_keyboard_menu_t;
 
 typedef struct {

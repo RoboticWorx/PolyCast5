@@ -368,7 +368,7 @@ const char *BLUETOOTH_WEB_PORTAL_HTML =
 "    <div>\n"
 "      <label for=\"script_local_index_input\">Script index (local)</label>\n"
 "      <div class=\"row\">\n"
-"        <input id=\"script_local_index_input\" type=\"number\" min=\"0\" max=\"254\" value=\"0\" />\n"
+"        <input id=\"script_local_index_input\" type=\"number\" min=\"0\" max=\"997\" value=\"0\" />\n"
 "        <button id=\"script_load_button\" class=\"fit\" type=\"button\">Load</button>\n"
 "      </div>\n"
 "    </div>\n"
@@ -487,7 +487,7 @@ const char *BLUETOOTH_WEB_PORTAL_HTML =
 "        const nextIdx = (catIdx < categoryScriptCounts.length) ? categoryScriptCounts[catIdx] : 0;\n"
 
 "        const scriptStatusText = getElementByIdSafe('script_status_text');\n"
-"        if (nextIdx >= 255) {\n"
+"        if (nextIdx >= 998) {\n"
 "          setTextIfExists(scriptStatusText, 'Max scripts reached');\n"
 "          return;\n"
 "        }\n"

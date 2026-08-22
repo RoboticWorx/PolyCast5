@@ -45,8 +45,12 @@ typedef struct {
     bool caps_alloc; // True if allocated via heap_caps_* (PSRAM/8BIT), false if malloc/realloc
 } http_accum_t;
 
-POLYCAST5_USE_PSRAM_BSS static char candidate_creds[18432];
-POLYCAST5_USE_PSRAM_BSS static char user_cred_msg[18432 + 1024];
+// The AI candidate catalog holds one "index|cat_name|label\n" line per script that passes the category filter
+#define AI_CATALOG_LINE_MAX (5 + 2 + 1 + BT_CAT_LABEL_MAX_LEN + BT_SCRIPT_LABEL_MAX_LEN)
+#define AI_CATALOG_MAX      ((BT_MAX_KEYBOARD_SCRIPTS * AI_CATALOG_LINE_MAX) + 64)
+
+POLYCAST5_USE_PSRAM_BSS static char candidate_creds[AI_CATALOG_MAX];
+POLYCAST5_USE_PSRAM_BSS static char user_cred_msg[AI_CATALOG_MAX + 1024];
 
 // NVS keys for AI prompt override
 #define AI_PROMPT_NS "ai_prompt"
@@ -1228,7 +1232,7 @@ esp_err_t ai_utils_lookup_custom(const char *query, char *out_script, size_t out
     out_script[0] = '\0';
 
     // Build a compact catalog of saved BT scripts (global order)
-    uint8_t total = bluetooth_portal_script_count_get_nvs();
+    uint16_t total = bluetooth_portal_script_count_get_nvs();
     if (total == 0) {
 #ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "ai_utils_lookup_custom: no saved BT scripts");
@@ -1241,7 +1245,7 @@ esp_err_t ai_utils_lookup_custom(const char *query, char *out_script, size_t out
     size_t used = 0;
 
     // Loop through all saved BT scripts
-    for (uint8_t i = 0; i < total; ++i) {
+    for (uint16_t i = 0; i < total; ++i) {
         char label[BT_SCRIPT_LABEL_MAX_LEN + 1] = {0};
         uint8_t cat_idx = 0;
         char cat_name[BT_CAT_LABEL_MAX_LEN + 1] = {0};
@@ -1325,7 +1329,7 @@ esp_err_t ai_utils_lookup_custom(const char *query, char *out_script, size_t out
 
     // Load the chosen script body
     size_t blen = 0;
-    err = bluetooth_portal_script_body_get_nvs((uint8_t)idx, out_script, out_sz, &blen);
+    err = bluetooth_portal_script_body_get_nvs((uint16_t)idx, out_script, out_sz, &blen);
     if (err != ESP_OK || out_script[0] == '\0') {
         ESP_LOGE(TAG, "Failed to load script body for index %ld", idx);
         return ESP_ERR_NOT_FOUND;
@@ -1351,7 +1355,7 @@ esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out
     out_script[0] = '\0';
 
     // Build a compact catalog of saved BT scripts (global order)
-    uint8_t total = bluetooth_portal_script_count_get_nvs(); // Get total saved scripts
+    uint16_t total = bluetooth_portal_script_count_get_nvs(); // Get total saved scripts
     if (total == 0) {
 #ifdef POLYCAST5_DEBUG
         ESP_LOGW(TAG, "ai_utils_lookup_creds: no saved BT scripts");
@@ -1365,7 +1369,7 @@ esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out
     size_t used = 0;
 
     // Loop through all saved BT scripts
-    for (uint8_t i = 0; i < total; ++i) {
+    for (uint16_t i = 0; i < total; ++i) {
         char label[BT_SCRIPT_LABEL_MAX_LEN + 1] = {0};
         uint8_t cat_idx = 0;
         char cat_name[BT_CAT_LABEL_MAX_LEN + 1] = {0};
@@ -1446,7 +1450,7 @@ esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out
 
     // Load the chosen script body
     size_t blen = 0;
-    err = bluetooth_portal_script_body_get_nvs((uint8_t)idx, out_script, out_sz, &blen);
+    err = bluetooth_portal_script_body_get_nvs((uint16_t)idx, out_script, out_sz, &blen);
     if (err != ESP_OK || out_script[0] == '\0') {
         ESP_LOGE(TAG, "Failed to load script body for index %ld", idx);
         return ESP_ERR_NOT_FOUND;

@@ -3,7 +3,10 @@
 
 #include "esp_err.h"
 
-#define BT_MAX_KEYBOARD_SCRIPTS 255 // Max u8, must change type if increased
+// Hard architectural ceiling for saved autotype scripts (count/index are uint16_t)
+// 998 is the largest index+1 that still encodes below the special-command block:
+// Script commands are BLUETOOTH_SCRIPT_OFFSET(1000) + BT_NUM_KEYBOARD_BASE(2) + idx and must stay below BLUETOOTH_SCRIPT_PRESENTATION_START(2000)
+#define BT_MAX_KEYBOARD_SCRIPTS 998
 #define BT_NUM_KEYBOARD_BASE 2
 #define BT_SCRIPT_LABEL_MAX_LEN 32
 
@@ -81,7 +84,7 @@ esp_err_t bluetooth_portal_category_delete_nvs(uint8_t idx);
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_portal_script_cat_idx_set_nvs(uint8_t idx, uint8_t cat);
+esp_err_t bluetooth_portal_script_cat_idx_set_nvs(uint16_t idx, uint8_t cat);
 
 /** 
  * @brief Gets the category index of a given script
@@ -91,14 +94,14 @@ esp_err_t bluetooth_portal_script_cat_idx_set_nvs(uint8_t idx, uint8_t cat);
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_portal_script_cat_idx_get_nvs(uint8_t idx, uint8_t *cat);
+esp_err_t bluetooth_portal_script_cat_idx_get_nvs(uint16_t idx, uint8_t *cat);
 
 /** 
  * @brief Gets the number of user-added scripts
  *
  * @returns Number of user added scripts
  */
-uint8_t bluetooth_portal_script_count_get_nvs(void);
+uint16_t bluetooth_portal_script_count_get_nvs(void);
 
 /** 
  * @brief Gets the label of a given script by index
@@ -109,7 +112,7 @@ uint8_t bluetooth_portal_script_count_get_nvs(void);
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_portal_script_label_get_nvs(uint8_t idx, char *buf, size_t buflen);
+esp_err_t bluetooth_portal_script_label_get_nvs(uint16_t idx, char *buf, size_t buflen);
 
 /** 
  * @brief Gets the body of a given script
@@ -121,7 +124,7 @@ esp_err_t bluetooth_portal_script_label_get_nvs(uint8_t idx, char *buf, size_t b
  *
  * @returns ESP error status
  */
-esp_err_t bluetooth_portal_script_body_get_nvs(uint8_t idx, char *buf, size_t buflen, size_t *outlen);
+esp_err_t bluetooth_portal_script_body_get_nvs(uint16_t idx, char *buf, size_t buflen, size_t *outlen);
 
 /** 
  * @brief Save a randomly generated Wi-Fi password to NVS

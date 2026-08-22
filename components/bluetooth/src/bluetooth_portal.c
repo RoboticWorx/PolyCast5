@@ -52,7 +52,7 @@ static char s_ip[16] = "192.168.4.1";
 /* =============== NVS =============== */
 
 // Write a payload body for the given script index
-static esp_err_t bluetooth_script_body_set_nvs(uint8_t idx, const char *body)
+static esp_err_t bluetooth_script_body_set_nvs(uint16_t idx, const char *body)
 {
     nvs_handle_t h;
      
@@ -88,16 +88,16 @@ static esp_err_t bluetooth_script_body_set_nvs(uint8_t idx, const char *body)
 }
 
 // Persist the count of user scripts
-static esp_err_t bluetooth_script_count_set_nvs(uint8_t count)
+static esp_err_t bluetooth_script_count_set_nvs(uint16_t count)
 {
     nvs_handle_t h;
-    
-    // Always false w/ BT_MAX_KEYBOARD_SCRIPTS as max u8
-    // if (count > BT_MAX_KEYBOARD_SCRIPTS) {
-    //    count = BT_MAX_KEYBOARD_SCRIPTS;
-    //    ESP_LOGW(TAG, "bluetooth_script_count_set BT_MAX_KEYBOARD_SCRIPTS reached: %d", BT_MAX_KEYBOARD_SCRIPTS);
-    // }
-     
+
+    // Clamp to max (count is uint16_t and could exceed BT_MAX_KEYBOARD_SCRIPTS)
+    if (count > BT_MAX_KEYBOARD_SCRIPTS) {
+       count = BT_MAX_KEYBOARD_SCRIPTS;
+       ESP_LOGW(TAG, "bluetooth_script_count_set BT_MAX_KEYBOARD_SCRIPTS reached: %d", BT_MAX_KEYBOARD_SCRIPTS);
+    }
+
     // Open NVS
     esp_err_t err = nvs_open(BT_SCRIPT_MENU_NS, NVS_READWRITE, &h);
     if (err != ESP_OK) {
@@ -108,14 +108,14 @@ static esp_err_t bluetooth_script_count_set_nvs(uint8_t count)
        return err;
     }
     
-    // Set count
-    err = nvs_set_u8(h, BT_SCRIPT_MENU_KEY_COUNT, count);
+    // Set count (u16: supports up to BT_MAX_KEYBOARD_SCRIPTS > 255)
+    err = nvs_set_u16(h, BT_SCRIPT_MENU_KEY_COUNT, count);
     if (err == ESP_OK) {
        // Commit changes on success
        err = nvs_commit(h);
     } else {
 #ifdef POLYCAST5_DEBUG
-       ESP_LOGE(TAG, "bluetooth_script_count_set nvs_set_u8 failed: %s", esp_err_to_name(err));
+       ESP_LOGE(TAG, "bluetooth_script_count_set nvs_set_u16 failed: %s", esp_err_to_name(err));
 #endif
     }
     
@@ -125,7 +125,7 @@ static esp_err_t bluetooth_script_count_set_nvs(uint8_t count)
 }
 
 // Write a label for the given script index
-static esp_err_t bluetooth_script_label_set_nvs(uint8_t idx, const char *label)
+static esp_err_t bluetooth_script_label_set_nvs(uint16_t idx, const char *label)
 {
     nvs_handle_t h;
     
@@ -160,43 +160,60 @@ static esp_err_t bluetooth_script_label_set_nvs(uint8_t idx, const char *label)
 }
 
 // Read the count of user scripts
-uint8_t bluetooth_portal_script_count_get_nvs(void)
+uint16_t bluetooth_portal_script_count_get_nvs(void)
 {
     nvs_handle_t h;
-    uint8_t count = 0;
-    
+    uint16_t count = 0;
+
     // Open NVS
     esp_err_t err = nvs_open(BT_SCRIPT_MENU_NS, NVS_READONLY, &h);
     if (err == ESP_OK) {
-        // Get count
-        if (nvs_get_u8(h, BT_SCRIPT_MENU_KEY_COUNT, &count) != ESP_OK) {
-            // 0 if DNE
-            count = 0;
-              
-#ifdef POLYCAST5_DEBUG
-            ESP_LOGE(TAG, "bluetooth_script_count_get nvs_get_u8 failed: %s", esp_err_to_name(err));
-#endif
-        }
-
-        // Close NVS
+        // Get count (stored as u16)
+        err = nvs_get_u16(h, BT_SCRIPT_MENU_KEY_COUNT, &count);
         nvs_close(h);
+
+        if (err != ESP_OK) {
+            // No u16 count found: either a fresh namespace, or a legacy device whose count is still stored as u8. 
+            // Probe for a legacy u8 count read-only (a truly fresh device never gets a namespace/flash write) and migrate it to u16 if present; otherwise count stays 0
+            count = 0;
+            uint8_t legacy = 0;
+
+            if (nvs_open(BT_SCRIPT_MENU_NS, NVS_READONLY, &h) == ESP_OK) {
+                esp_err_t lerr = nvs_get_u8(h, BT_SCRIPT_MENU_KEY_COUNT, &legacy);
+                nvs_close(h);
+
+                if (lerr == ESP_OK) {
+                    // Recovered a legacy u8 count: return it this boot regardless of the rewrite result
+                    // A failed rewrite simply retries on the next boot
+                    count = legacy;
+
+                    // Rewrite as u16 so future reads are clean
+                    if (nvs_open(BT_SCRIPT_MENU_NS, NVS_READWRITE, &h) == ESP_OK) {
+                        if (nvs_set_u16(h, BT_SCRIPT_MENU_KEY_COUNT, count) == ESP_OK) {
+                            nvs_commit(h);
+                        }
+                        nvs_close(h);
+                    }
+                }
+            }
+        }
     } else {
 #ifdef POLYCAST5_DEBUG
        ESP_LOGE(TAG, "bluetooth_script_count_get nvs_open failed: %s", esp_err_to_name(err));
 #endif
     }
-    
-    // Always false w/ BT_MAX_KEYBOARD_SCRIPTS as max u8
-    // if (count > BT_MAX_KEYBOARD_SCRIPTS) {
-    //     count = BT_MAX_KEYBOARD_SCRIPTS;
-    //     ESP_LOGW(TAG, "bluetooth_script_count_get BT_MAX_KEYBOARD_SCRIPTS reached: %d", BT_MAX_KEYBOARD_SCRIPTS);
-    // }
-    
+
+    // Clamp to max
+    if (count > BT_MAX_KEYBOARD_SCRIPTS) {
+        count = BT_MAX_KEYBOARD_SCRIPTS;
+        ESP_LOGW(TAG, "bluetooth_script_count_get BT_MAX_KEYBOARD_SCRIPTS reached: %d", BT_MAX_KEYBOARD_SCRIPTS);
+    }
+
     return count;
 }
 
 // Read a script label into caller buffer (buflen should be >= BLUETOOTH_SCRIPT_LABEL_MAX_LEN + 1)
-esp_err_t bluetooth_portal_script_label_get_nvs(uint8_t idx, char *buf, size_t buflen)
+esp_err_t bluetooth_portal_script_label_get_nvs(uint16_t idx, char *buf, size_t buflen)
 {
     nvs_handle_t h;
     
@@ -230,7 +247,7 @@ esp_err_t bluetooth_portal_script_label_get_nvs(uint8_t idx, char *buf, size_t b
 }
 
 // Read a payload body into caller buffer (need must fit into buflen)
-esp_err_t bluetooth_portal_script_body_get_nvs(uint8_t idx, char *buf, size_t buflen, size_t *outlen)
+esp_err_t bluetooth_portal_script_body_get_nvs(uint16_t idx, char *buf, size_t buflen, size_t *outlen)
 {
     nvs_handle_t h;
 
@@ -296,7 +313,7 @@ uint8_t bluetooth_portal_category_count_get_nvs(void)
 
 // Persist the category id for a given script index
 // Note: idx is the GLOBAL script index (matches script body + label indexing)
-esp_err_t bluetooth_portal_script_cat_idx_set_nvs(uint8_t idx, uint8_t cat)
+esp_err_t bluetooth_portal_script_cat_idx_set_nvs(uint16_t idx, uint8_t cat)
 {
     // Open NVS under the same namespace used for bodies/cats
     nvs_handle_t h;
@@ -330,7 +347,7 @@ esp_err_t bluetooth_portal_script_cat_idx_set_nvs(uint8_t idx, uint8_t cat)
     return err;
 }
 
-esp_err_t bluetooth_portal_script_cat_idx_get_nvs(uint8_t idx, uint8_t *cat)
+esp_err_t bluetooth_portal_script_cat_idx_get_nvs(uint16_t idx, uint8_t *cat)
 {
     nvs_handle_t h;
     
@@ -474,12 +491,12 @@ esp_err_t bluetooth_portal_category_delete_nvs(uint8_t idx)
     // Delete scripts belonging to the removed category and update remaining cat indices
     // Iterate in reverse so that shift operations only affect already-processed positions
     esp_err_t script_err = ESP_OK;
-    uint8_t sc = bluetooth_portal_script_count_get_nvs();
+    uint16_t sc = bluetooth_portal_script_count_get_nvs();
     char next_label[BT_SCRIPT_LABEL_MAX_LEN + 1];
 
     for (int s = (int)sc - 1; s >= 0; --s) {
         uint8_t cat = 0;
-        if (bluetooth_portal_script_cat_idx_get_nvs((uint8_t)s, &cat) != ESP_OK) {
+        if (bluetooth_portal_script_cat_idx_get_nvs((uint16_t)s, &cat) != ESP_OK) {
             script_err = ESP_FAIL;
             continue;
         }
@@ -489,7 +506,7 @@ esp_err_t bluetooth_portal_category_delete_nvs(uint8_t idx)
             // Track per-script success so we only finalize (decrement/clear) on full success
             bool shift_ok = true;
 
-            for (uint8_t i = (uint8_t)s; i + 1 < sc; ++i) {
+            for (uint16_t i = (uint16_t)s; i + 1 < sc; ++i) {
                 next_label[0] = '\0';
                 size_t blen = 0;
                 uint8_t next_cat = 0;
@@ -528,7 +545,7 @@ esp_err_t bluetooth_portal_category_delete_nvs(uint8_t idx)
             }
         } else if (cat > idx) {
             // Category index shifted down, update to match
-            if (bluetooth_portal_script_cat_idx_set_nvs((uint8_t)s, cat - 1) != ESP_OK) {
+            if (bluetooth_portal_script_cat_idx_set_nvs((uint16_t)s, cat - 1) != ESP_OK) {
                 script_err = ESP_FAIL;
             }
         }
@@ -605,7 +622,7 @@ static esp_err_t root_get(httpd_req_t *req)
 static esp_err_t scripts_list_get(httpd_req_t *req)
 {
     // Get num current scripts
-    uint8_t count = bluetooth_portal_script_count_get_nvs();
+    uint16_t count = bluetooth_portal_script_count_get_nvs();
 
     // Allocate a JSON root object
     cJSON *root = cJSON_CreateObject();
@@ -620,7 +637,7 @@ static esp_err_t scripts_list_get(httpd_req_t *req)
     cJSON *labels = cJSON_AddArrayToObject(root, "labels");
 
     // Loop over each saved script index
-    for (uint8_t i = 0; i < count; ++i) {
+    for (uint16_t i = 0; i < count; ++i) {
         char lbl[BT_SCRIPT_LABEL_MAX_LEN + 1] = {0}; // Buffer
         
         // Add the label or "" to the array
@@ -659,14 +676,14 @@ static esp_err_t scripts_list_get(httpd_req_t *req)
 // Map (category, local_index) -> global script index in NVS
 // If create==true and local_index == current number of scripts in that category:
 // return the next free global index (append)
-static bool resolve_global_index_for_local(uint8_t cat, uint8_t local_index, bool create, uint8_t *out_global)
+static bool resolve_global_index_for_local(uint8_t cat, uint16_t local_index, bool create, uint16_t *out_global)
 {
     // Get total script count
-    uint8_t total = bluetooth_portal_script_count_get_nvs();
-    
+    uint16_t total = bluetooth_portal_script_count_get_nvs();
+
     // Count how many scripts belong to 'cat' and remember their global positions in order.
-    uint8_t seen = 0;
-    for (uint8_t i = 0; i < total; ++i) {
+    uint16_t seen = 0;
+    for (uint16_t i = 0; i < total; ++i) {
         uint8_t c = 0;
         (void)bluetooth_portal_script_cat_idx_get_nvs(i, &c);
 
@@ -683,8 +700,8 @@ static bool resolve_global_index_for_local(uint8_t cat, uint8_t local_index, boo
     // If not found and caller wants to create at the tail of this category,
     // allow appending a brand-new script at the end of the global list
     // when local_index == number of scripts in this category.
-    // Reject if at capacity: total < 255 allows append at index 254 (count->255)
-    // total == 255 would append at 255, and count 255+1 overflows uint8 to 0
+    // Reject if at capacity: total < BT_MAX_KEYBOARD_SCRIPTS allows append at the last
+    // valid index (bumping count to BT_MAX_KEYBOARD_SCRIPTS); total == max is full
     if (create && local_index == seen && total < BT_MAX_KEYBOARD_SCRIPTS) {
         *out_global = total; // append at tail (new global index)
         return true;
@@ -715,10 +732,10 @@ static esp_err_t script_one_get(httpd_req_t *req)
     bool has_cat = (httpd_query_key_value(qstr, "cat", cat_str, sizeof(cat_str)) == ESP_OK);
 
     // Resolve to GLOBAL index
-    uint8_t global_idx = 0;
+    uint16_t global_idx = 0;
     if (has_cat) {
         // Interpret index as local within category
-        uint8_t local_idx = (uint8_t)atoi(idx_str);
+        uint16_t local_idx = (uint16_t)atoi(idx_str);
         uint8_t cat = (uint8_t)atoi(cat_str);
 
         // Resolve (no create)
@@ -727,7 +744,7 @@ static esp_err_t script_one_get(httpd_req_t *req)
         }
     } else {
         // Treat as global directly
-        global_idx = (uint8_t)atoi(idx_str);
+        global_idx = (uint16_t)atoi(idx_str);
 
         // Validate range
         if (global_idx >= bluetooth_portal_script_count_get_nvs()) {
@@ -883,16 +900,16 @@ static esp_err_t script_one_post(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing index/name/body");
     }
 
-    // Validate index range before uint8 cast (254 max: 255 is LCD sentinel,
-    // and appending at 255 would overflow count to 0 via uint8 wrap)
-    if (jidx->valueint < 0 || jidx->valueint > 254) {
+    // Validate index range
+    // Valid indices are 0..BT_MAX_KEYBOARD_SCRIPTS-1; appending at the last index bumps count to BT_MAX_KEYBOARD_SCRIPTS (the ceiling)
+    if (jidx->valueint < 0 || jidx->valueint >= BT_MAX_KEYBOARD_SCRIPTS) {
         cJSON_Delete(j);
         free(buf);
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "index out of range");
     }
 
     // Pull values
-    uint8_t idx_local_or_global = (uint8_t)jidx->valueint;
+    uint16_t idx_local_or_global = (uint16_t)jidx->valueint;
     const char *name_in = jname->valuestring;
     const char *body_in = jbody->valuestring;
 
@@ -918,7 +935,7 @@ static esp_err_t script_one_post(httpd_req_t *req)
     }
 
     // Resolve to GLOBAL index
-    uint8_t global_idx = idx_local_or_global;
+    uint16_t global_idx = idx_local_or_global;
     if (has_cat) {
         // Resolve local -> global (allow create if local==tail)
         if (!resolve_global_index_for_local(cat, idx_local_or_global, true, &global_idx)) {
@@ -928,7 +945,7 @@ static esp_err_t script_one_post(httpd_req_t *req)
         }
     } else {
         // Treat as global (edit or append at tail)
-        uint8_t total = bluetooth_portal_script_count_get_nvs();
+        uint16_t total = bluetooth_portal_script_count_get_nvs();
 
         // If index past tail, reject
         if (global_idx > total) {
@@ -951,17 +968,8 @@ static esp_err_t script_one_post(httpd_req_t *req)
         }
     }
 
-    // If appending, bump count first
-    uint8_t count = bluetooth_portal_script_count_get_nvs();
-    if (global_idx >= count) {
-        esp_err_t ecount = bluetooth_script_count_set_nvs((uint8_t)(global_idx + 1));
-
-        if (ecount != ESP_OK) {
-            cJSON_Delete(j);
-            free(buf);
-            return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "nvs-count");
-        }
-    }
+    // Persist the slot BEFORE bumping the count so a failed write (e.g. NVS full) never leaves a counted-but-empty slot
+    // On append this writes index == count, currently beyond the count and therefore invisible; the count bump below reveals it only after every write succeeds
 
     // Persist label
     esp_err_t err = bluetooth_script_label_set_nvs(global_idx, label);
@@ -976,11 +984,23 @@ static esp_err_t script_one_post(httpd_req_t *req)
         err = bluetooth_portal_script_cat_idx_set_nvs(global_idx, cat);
     }
 
-    // If any write failed, report
+    // If any write failed, report (count not yet bumped, so no empty slot is exposed)
     if (err != ESP_OK) {
         cJSON_Delete(j);
         free(buf);
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "nvs");
+    }
+
+    // All slot writes succeeded. If appending, reveal the new tail by bumping the count LAST
+    uint16_t count = bluetooth_portal_script_count_get_nvs();
+    if (global_idx >= count) {
+        esp_err_t ecount = bluetooth_script_count_set_nvs((uint16_t)(global_idx + 1));
+
+        if (ecount != ESP_OK) {
+            cJSON_Delete(j);
+            free(buf);
+            return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "nvs-count");
+        }
     }
 
     // Respond with GLOBAL index
@@ -1022,9 +1042,9 @@ static esp_err_t script_one_delete(httpd_req_t *req)
     bool has_cat = (httpd_query_key_value(qstr, "cat", cat_str, sizeof(cat_str)) == ESP_OK);
 
     // Resolve to GLOBAL index
-    uint8_t global_idx = 0;
+    uint16_t global_idx = 0;
     if (has_cat) {
-        uint8_t local_idx = (uint8_t)atoi(idx_str);
+        uint16_t local_idx = (uint16_t)atoi(idx_str);
         uint8_t cat = (uint8_t)atoi(cat_str);
 
         // Resolve local -> global (no create on delete)
@@ -1032,11 +1052,11 @@ static esp_err_t script_one_delete(httpd_req_t *req)
             return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "not found");
         }
     } else {
-        global_idx = (uint8_t)atoi(idx_str);
+        global_idx = (uint16_t)atoi(idx_str);
     }
 
     // Validate range
-    uint8_t count = bluetooth_portal_script_count_get_nvs();
+    uint16_t count = bluetooth_portal_script_count_get_nvs();
     if (global_idx >= count) {
         return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "not found");
     }
@@ -1052,7 +1072,7 @@ static esp_err_t script_one_delete(httpd_req_t *req)
     size_t blen = 0;
     uint8_t next_cat = 0;
 
-    for (uint8_t i = global_idx; i + 1 < count; ++i) {
+    for (uint16_t i = global_idx; i + 1 < count; ++i) {
         // Read from next slot
         next_label[0] = '\0';
         blen = 0;
@@ -1112,10 +1132,10 @@ static esp_err_t categories_get(httpd_req_t *req)
     }
 
     // Count scripts per category in a single pass over all scripts
-    uint8_t total_scripts = bluetooth_portal_script_count_get_nvs();
-    uint8_t per_cat[BT_MAX_CATEGORIES] = {0};
+    uint16_t total_scripts = bluetooth_portal_script_count_get_nvs();
+    uint16_t per_cat[BT_MAX_CATEGORIES] = {0};
 
-    for (uint8_t s = 0; s < total_scripts; ++s) {
+    for (uint16_t s = 0; s < total_scripts; ++s) {
         uint8_t c = 0;
         if (bluetooth_portal_script_cat_idx_get_nvs(s, &c) == ESP_OK && c < count) {
             per_cat[c]++;
@@ -1326,7 +1346,7 @@ static esp_err_t category_one_delete(httpd_req_t *req)
 static esp_err_t export_get(httpd_req_t *req)
 {
     // Nothing to export? Don't hand back an empty file.
-    uint8_t script_count = bluetooth_portal_script_count_get_nvs();
+    uint16_t script_count = bluetooth_portal_script_count_get_nvs();
     uint8_t cat_count = bluetooth_portal_category_count_get_nvs();
     if (script_count == 0 && cat_count == 0) {
         return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "nothing to export");
@@ -1379,7 +1399,7 @@ static esp_err_t export_get(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
     }
 
-    for (uint8_t i = 0; i < script_count; ++i) {
+    for (uint16_t i = 0; i < script_count; ++i) {
         char lbl[BT_SCRIPT_LABEL_MAX_LEN + 1] = {0};
         uint8_t cat = 0;
         size_t blen = 0;
@@ -1517,7 +1537,7 @@ static esp_err_t import_post(httpd_req_t *req)
 
     // Reject over-limit files BEFORE any NVS change (don't silently drop entries and
     // then report success). Valid range: up to BT_MAX_CATEGORIES categories and
-    // BT_MAX_KEYBOARD_SCRIPTS scripts (indices 0..254, so a count of 255 is valid).
+    // BT_MAX_KEYBOARD_SCRIPTS scripts (indices 0..BT_MAX_KEYBOARD_SCRIPTS-1)
     int cat_n = cJSON_GetArraySize(cats);
     int script_n = cJSON_GetArraySize(scr);
     if (cat_n > BT_MAX_CATEGORIES || script_n > BT_MAX_KEYBOARD_SCRIPTS) {
@@ -1649,12 +1669,12 @@ static esp_err_t import_post(httpd_req_t *req)
         const char *body_in = (cJSON_IsString(jb) && (jb->valuestring != NULL)) ? jb->valuestring : "";
 
         // Persist the slot; stop on first failure so count never exposes a half-written slot
-        esp_err_t err = bluetooth_script_label_set_nvs((uint8_t)i, label);
+        esp_err_t err = bluetooth_script_label_set_nvs((uint16_t)i, label);
         if (err == ESP_OK) {
-            err = bluetooth_script_body_set_nvs((uint8_t)i, body_in);
+            err = bluetooth_script_body_set_nvs((uint16_t)i, body_in);
         }
         if (err == ESP_OK) {
-            err = bluetooth_portal_script_cat_idx_set_nvs((uint8_t)i, cat);
+            err = bluetooth_portal_script_cat_idx_set_nvs((uint16_t)i, cat);
         }
         if (err != ESP_OK) {
             break;
@@ -1664,7 +1684,7 @@ static esp_err_t import_post(httpd_req_t *req)
     }
 
     // Count last: only fully-written slots become visible
-    esp_err_t count_err = bluetooth_script_count_set_nvs((uint8_t)scripts_written);
+    esp_err_t count_err = bluetooth_script_count_set_nvs((uint16_t)scripts_written);
 
     cJSON_Delete(root);
     free(buf);
