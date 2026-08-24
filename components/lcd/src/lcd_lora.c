@@ -19,6 +19,7 @@
 #include "esp_log.h"
 
 #include "lcd_lora.h"
+#include "lcd_text_input.h"
 #include "lora_task.h"
 #include "lora_pcp.h"
 #include "lora_meshtastic_portal.h"
@@ -44,7 +45,6 @@
 
 #define LORA_PLAN_SEL_INS "Select day(s)"
 
-#define LORA_NUM_CHAR_ROWS 4
 
 #define LORA_PAIR_KEY_TIMEOUT_MS 10000 // Max wait for the pairing key result
 #define LORA_PAIR_FAIL_SHOW_MS 2500 // How long the 'Pairing failed' notice shows
@@ -72,15 +72,8 @@ static const int submenu_count = sizeof(submenu_options)/sizeof(submenu_options[
 
 static char plan_selected_days[8]; // Up to 7 days + NULL
 
-static char name_buf[MAX_CUSTOM_NAME_LEN + 1] = {0};
 static bool lora_menu_overwrite = false;
 
-static const char *lora_char_rows[LORA_NUM_CHAR_ROWS] = {
-    "_ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-    "abcdefghijklmnopqrstuvwxyz",
-    "0123456789",
-    "!@#$%^&*()-_=+[]{};:'\",.<>/?\\|`~"
-};
 
 
 void lcd_lora_setup_page(ui_menu_t *ui_menu, lora_menu_t *menu)
@@ -686,227 +679,35 @@ void lcd_lora_meshtastic_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_
     }
 }
 
-static void update_name_label_lcd(lv_obj_t *lbl_display, char cur_char, int cur_pos)
-{
-    char display[MAX_CUSTOM_NAME_LEN + 2]; // Buffer
-    
-    int len = cur_pos + 1; // Current length of name
-    
-    // Cap
-    if (len > MAX_CUSTOM_NAME_LEN + 1) {
-        len = MAX_CUSTOM_NAME_LEN + 1;
-    }
-    
-    // Copy name into display buffer
-    if (cur_pos > 0) {
-        memcpy(display, name_buf, cur_pos);
-    }
-    
-    // Get current
-    display[cur_pos] = cur_char;
-    display[len] = '\0';
-    
-    // Set text and re-center
-    lv_label_set_text(lbl_display, display);
-    lv_obj_align(lbl_display, LV_ALIGN_CENTER, 0, 30);
-}
-
 void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu)
 {
     static espnow_enc_key_result_t enc_key_result;
 
-    // Declare statics
+    static lcd_text_input_t ti;
     static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
-    static int cur_pos = 0; // User position
-    static int row_idx = 0; // Which character row is active
-    static int char_idx = 0; // Index within that row
-    static char cur_char = '_';
-    static lv_obj_t *lbl_dirs = NULL;
-    static lv_obj_t *lbl_chars = NULL;
-    static lv_obj_t *lbl_user_in = NULL;
-    
-    // Create initial label
-    if (!lbl_user_in) {
-        // If renaming, autofill what was there previously
-        if (lora_menu_overwrite) {
-            // Copy the old name into buffer
-            strncpy(name_buf, lora_menu->options[lora_menu->index], MAX_CUSTOM_NAME_LEN);
 
-            // Place cursor at the end
-            cur_pos = strlen(name_buf);
-        } else { // Else blank slate
-            memset(name_buf, 0, sizeof name_buf);
-            cur_pos = 0;
-        }
-        
-        // Starting char
-        row_idx = 0;
-        char_idx = 0;
-        cur_char = lora_char_rows[row_idx][char_idx];
-        
-        lbl_user_in = lv_label_create(ACTIVE_SCR);
-        lcd_format_label(lbl_user_in, "", user_secondary_color,
-                &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 30);
-                         
-        lbl_dirs = lv_label_create(ACTIVE_SCR);
-        lcd_format_label(lbl_dirs, "        Enter plug name:\nPress HOME to cycle chars.", user_secondary_color,
-                &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -31);
-                         
-        if (lora_menu_overwrite) {
-            lv_label_set_text(lbl_dirs, "    Enter new plug name:\nPress HOME to cycle chars.");
-        }
-        
-        lbl_chars = lv_label_create(ACTIVE_SCR);
-        lcd_format_label(lbl_chars, "(Up to 12 characters)", user_secondary_color,
-                         &lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0);
-                         
-        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+    if (!ti.active) {
+        ti.buf = saved_name;
+        ti.buf_size = sizeof saved_name;
+        ti.title = lora_menu_overwrite ? "Enter new plug name" : "Enter plug name";
+        ti.hint = "(Up to 12 characters)";
+        ti.prefill = lora_menu_overwrite ? lora_menu->options[lora_menu->index] : NULL;
+        ti.lock_until_submit = !lora_menu_overwrite;
+        ti.arrow_top = ui_menu->arrow_top;
+        ti.arrow_bot = ui_menu->arrow_bot;
+        ti.arrow_left = ui_menu->arrow_left;
+        ti.arrow_right = ui_menu->arrow_right;
+        lcd_text_input_start(&ti);
     }
 
-    /* User input */
-    // Cycle chars
-    if (ui_btns->home_btn) {
-        // Cycle character row
-        row_idx = (row_idx + 1) % LORA_NUM_CHAR_ROWS;
-        char_idx = 0; // Reset within row
-        
-        // New current char
-        cur_char = lora_char_rows[row_idx][char_idx];
-        
-        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-    } else if (ui_btns->up_btn) { // If up, iterate up
-        // Increment with wrap
-        size_t row_len = strlen(lora_char_rows[row_idx]);
-        char_idx = (char_idx + 1) % (int)row_len;
-        cur_char = lora_char_rows[row_idx][char_idx];
-        
-        // Save to array
-        name_buf[cur_pos] = cur_char;
-        
-        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-    } else if (ui_btns->down_btn) { // If down, iterate down
-        // Decrement with wrap
-        size_t row_len = strlen(lora_char_rows[row_idx]);
-        char_idx = (char_idx + (int)row_len - 1) % (int)row_len;
-        cur_char = lora_char_rows[row_idx][char_idx];
-        
-        // Save to array
-        name_buf[cur_pos] = cur_char;
-        
-        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-    } else if (ui_btns->left_btn && cur_pos == 0 && lora_menu_overwrite) { // Can back out if at start and renaming
-        // Delete labels since no longer used
-        lv_obj_delete(lbl_user_in);
-        lv_obj_delete(lbl_dirs);
-        lv_obj_delete(lbl_chars);
-        
-        // Reset statics for next time
-        lbl_user_in = lbl_chars = lbl_dirs = NULL;
-        cur_pos = row_idx = char_idx = 0;
-        cur_char = '_';
-        memset(name_buf, 0, sizeof name_buf);
-        
-        lora_menu_overwrite = false; // Switch back
-        
-        // Reset submenu to first index
-        lora_menu->submenu.index = 0;
-        lcd_lora_update_submenu(lora_menu);
-        
-         ui_menu->page = LORA_SUBPAGE;
-        return;
-    } else if (ui_btns->pwr_btn && lora_menu_overwrite) { // Go home or power off if ranaming
-        // Delete labels since no longer used
-        lv_obj_delete(lbl_user_in);
-        lv_obj_delete(lbl_dirs);
-        lv_obj_delete(lbl_chars);
-        
-        // Reset statics for next time
-        lbl_user_in = lbl_chars = lbl_dirs = NULL;
-        cur_pos = row_idx = char_idx = 0;
-        cur_char = '_';
-        memset(name_buf, 0, sizeof name_buf);
-        
-        lora_menu_overwrite = false; // Switch back
-        
-        // Reset submenu to first index
-        lora_menu->submenu.index = 0;
-        lcd_lora_update_submenu(lora_menu);
-        
-        // Hide
-        lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
-        
-         lcd_transition_back(false, ui_menu); // True = home, false = sleep
-    } else if (ui_btns->left_btn && cur_pos != 0) { // If left and not at start
-        // Clear the current slot
-        name_buf[cur_pos] = '\0';
-    
-        // De-increment left
-        if (cur_pos > 0) {
-            cur_pos--;
-        }
-    
-        // Reload row/idx from the new slot's char
-        char target = name_buf[cur_pos] ? name_buf[cur_pos] : '_';
-        for (row_idx = 0; row_idx < LORA_NUM_CHAR_ROWS; row_idx++) {
-            const char *row = lora_char_rows[row_idx];
-            const char *p = strchr(row, target);
-            
-            if (p) {
-                char_idx = (int)(p - row);
-                break;
-            }
-        }
-        // Char not found in any row; fall back to first row/char
-        if (row_idx >= LORA_NUM_CHAR_ROWS) {
-            row_idx = 0;
-            char_idx = 0;
-        }
-        cur_char = lora_char_rows[row_idx][char_idx];
-        
-        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-    } else if (ui_btns->right_btn) { // If right
-        // Handle case where up/down wasn't pressed
-        name_buf[cur_pos] = cur_char;
-        
-        // If not yet at end
-        if (cur_pos < MAX_CUSTOM_NAME_LEN - 1) {
-            cur_pos++;
-            name_buf[cur_pos] = '\0';
-            char_idx = 0;
-            cur_char = lora_char_rows[row_idx][char_idx];
-        } else {
-            name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
-        }
-        
-        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-    } else if (ui_btns->select_btn) { // If save button pressed
-        // Save final
-        if (cur_pos < MAX_CUSTOM_NAME_LEN) {
-            name_buf[cur_pos] = cur_char;
+    switch (lcd_text_input_tick(&ti, ui_btns)) {
+        case LCD_TI_PENDING:
+            return;
 
-            // Terminate one past the last written char if room, else clamp
-            size_t term = (cur_pos + 1 <= MAX_CUSTOM_NAME_LEN) ? (cur_pos + 1) : MAX_CUSTOM_NAME_LEN;
-            name_buf[term] = '\0';
-        }
-        
-        name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
-        memcpy(saved_name, name_buf, MAX_CUSTOM_NAME_LEN + 1);
-        
+        case LCD_TI_SUBMITTED: {
 #ifdef POLYCAST5_DEBUG
-        ESP_LOGI(TAG, "%s", saved_name);
+            ESP_LOGI(TAG, "%s", saved_name);
 #endif
-        
-        // Delete labels since no longer used
-        lv_obj_delete(lbl_user_in);
-        lv_obj_delete(lbl_dirs);
-        lv_obj_delete(lbl_chars);
-        
-        // Reset statics for next time
-        lbl_user_in = lbl_chars = lbl_dirs = NULL;
-        cur_pos = row_idx = char_idx = 0;
-        cur_char = '_';
-        memset(name_buf, 0, sizeof name_buf);
-
         // Update options
         // If overwriting an existing as a rename
         if (lora_menu_overwrite) {
@@ -1038,6 +839,32 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
         // Switch to previous page
         ui_menu->page = LORA_PAGE;
         return;
+        }
+
+        case LCD_TI_CANCELLED: {
+            lora_menu_overwrite = false; // Switch back
+
+            // Reset submenu to first index
+            lora_menu->submenu.index = 0;
+            lcd_lora_update_submenu(lora_menu);
+
+            ui_menu->page = LORA_SUBPAGE;
+            return;
+        }
+
+        case LCD_TI_POWER_OFF: {
+            lora_menu_overwrite = false; // Switch back
+
+            // Reset submenu to first index
+            lora_menu->submenu.index = 0;
+            lcd_lora_update_submenu(lora_menu);
+
+            // Hide
+            lv_obj_add_flag(lora_menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
+
+            lcd_transition_back(false, ui_menu); // True = home, false = sleep
+            return;
+        }
     }
 }
 

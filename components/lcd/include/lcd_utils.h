@@ -292,6 +292,20 @@ void lcd_transition_back(bool home, ui_menu_t *ui_menu);
 void lcd_format_label(lv_obj_t *label, const char *text, lv_color_t  color, const lv_font_t *font, lv_align_t  alignment, lv_coord_t  x_offset, lv_coord_t  y_offset);
 
 /**
+ * @brief Set a text-entry label so the end of the string stays on screen
+ *
+ * For the character-cycling text inputs (Wi-Fi password, custom names, etc.),
+ * the full string can grow wider than the display. This shows only the trailing
+ * characters that fit within the screen width, keeping the character currently
+ * being entered visible. Short strings are displayed unchanged. The label's own
+ * font/letter-spacing is used to measure, so it adapts to the caller's style.
+ *
+ * @param [in] lbl_display Text-entry label to update
+ * @param [in] full        Full NUL-terminated string being entered
+ */
+void lcd_set_input_label_text(lv_obj_t *lbl_display, const char *full);
+
+/**
  * @brief Swap labels for scroll animation
  *
  * @param [in] lbl_top Top label

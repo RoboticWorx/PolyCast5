@@ -14,6 +14,7 @@
 #include "widgets/list/lv_list.h"
 
 #include "lcd_infrared.h"
+#include "lcd_text_input.h"
 #include "lcd_utils.h"
 #include "infrared_utils.h"
 #include "infrared_task.h"
@@ -23,7 +24,6 @@
 
 #define TAG "LCD_INFRARED"
 
-#define IR_NUM_CHAR_ROWS 4
 
 ir_menu_t ir_menu = {
     .size = 0,
@@ -33,19 +33,12 @@ ir_menu_t ir_menu = {
 
 extern size_t ir_signal_length;
 
-static char name_buf[MAX_CUSTOM_NAME_LEN + 1] = {0};
 
 static bool ir_menu_overwrite = false;
 static uint8_t ir_index_overwrite = 0;
 static int edit_idx = 0;
 static bool new_remote = false;
 
-static const char *ir_char_rows[IR_NUM_CHAR_ROWS] = {
-    "_ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-    "abcdefghijklmnopqrstuvwxyz",
-    "0123456789",
-    "!@#$%^&*()-_=+[]{};:'\",<>/?\\|`~"
-};
 
 void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_menu)
 {
@@ -292,268 +285,60 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
     }
 }
 
-static void update_name_label_lcd(lv_obj_t *lbl_display, char cur_char, int cur_pos)
-{
-    char display[MAX_CUSTOM_NAME_LEN + 2]; // Buffer
-    
-    int len = cur_pos + 1; // Current length of name
-    
-    // Cap
-    if (len > MAX_CUSTOM_NAME_LEN + 1) {
-        len = MAX_CUSTOM_NAME_LEN + 1;
-    }
-    
-    // Copy name into display buffer
-    if (cur_pos > 0) {
-        memcpy(display, name_buf, cur_pos);
-    }
-    
-    // Get current
-    display[cur_pos] = cur_char;
-    display[len] = '\0';
-    
-    // Set text and re-center
-    lv_label_set_text(lbl_display, display);
-    lv_obj_align(lbl_display, LV_ALIGN_CENTER, 0, 32);
-}
-
 void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_menu)
 {
-    // Declare statics
+    static lcd_text_input_t ti;
     static char saved_name[MAX_CUSTOM_NAME_LEN + 1] = {0};
-    static int cur_pos = 0; // User position
-    static char cur_char = '_';
-    static int row_idx = 0; // Active character row
-    static int char_idx = 0; // Index within that row
+    static char prefill[MAX_CUSTOM_NAME_LEN + 1] = {0};
 
-    static lv_obj_t *lbl_dirs = NULL;
-    static lv_obj_t *lbl_chars = NULL;
-    static lv_obj_t *lbl_user_in = NULL;
-    
-    // Do once
-    if (!lbl_user_in) {
-        // If renaming, autofill what was there previously
+    if (!ti.active) {
+        const char *title;
+        prefill[0] = '\0';
+
+        // If renaming, autofill what was there previously and pick the matching title
         if (ir_menu_overwrite) {
-            // Renaming remote
             if (ir_index_overwrite == 0) {
-                // Copy the old remote name into buffer
+                // Renaming remote
+                title = "Enter new remote name";
                 xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
-                strncpy(name_buf, remotes[ir_current_remote].name, MAX_CUSTOM_NAME_LEN);
+                strncpy(prefill, remotes[ir_current_remote].name, MAX_CUSTOM_NAME_LEN);
                 xSemaphoreGive(xInfraredDataMutex); // Release IR
-            } else { // Renaming signal
-                // Copy the old signal name into buffer
+            } else {
+                // Renaming signal
                 size_t sig_idx = ir_index_overwrite - 3; // Offset by default options
+                title = "Enter new signal name";
                 xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
-                strncpy(name_buf, remotes[ir_current_remote].signal_names[sig_idx], MAX_CUSTOM_NAME_LEN);
+                strncpy(prefill, remotes[ir_current_remote].signal_names[sig_idx], MAX_CUSTOM_NAME_LEN);
                 xSemaphoreGive(xInfraredDataMutex); // Release IR
             }
-            name_buf[MAX_CUSTOM_NAME_LEN] = '\0'; // Force termination
+            prefill[MAX_CUSTOM_NAME_LEN] = '\0'; // Force termination
+        } else if (new_remote) {
+            title = "Enter new remote name";
+        } else {
+            title = "Enter signal name";
+        }
 
-            // Place cursor at the end
-            cur_pos = strlen(name_buf);
-            
-            // Start with '_'
-            cur_char = '_';
-        } else { // Else adding new signal
-            // Zero out
-            memset(name_buf, 0, sizeof name_buf);
-            cur_pos = 0;
-            
-            // Hide left arrow: can't go back if adding signal
-            lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-        }
-        
-        // Start at first char of first row (underscore row)
-        row_idx = 0;
-        char_idx = 0;
-        cur_char = ir_char_rows[row_idx][char_idx];
-        
-        // Create labels
-        lbl_user_in = lv_label_create(ACTIVE_SCR);
-        lcd_format_label(lbl_user_in, "", user_secondary_color,
-                &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 40);
-        
-        lbl_dirs = lv_label_create(ACTIVE_SCR);
-        lcd_format_label(lbl_dirs, "       Enter signal name:\nPress HOME to cycle chars.", user_secondary_color,
-                &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -31);
-        
-        // Adjust label
-        if (ir_menu_overwrite) {
-            // Changing remote name
-            if (ir_index_overwrite == 0) {
-                lv_label_set_text(lbl_dirs, " Enter new remote name:\nPress HOME to cycle chars.");
-            } else { // Changing signal name
-                lv_label_set_text(lbl_dirs, "   Enter new signal name:\nPress HOME to cycle chars.");
-            }
-        } else if (new_remote) { // If adding new remote
-            lv_label_set_text(lbl_dirs, " Enter new remote name:\nPress HOME to cycle chars.");
-        }
-        
-        lbl_chars = lv_label_create(ACTIVE_SCR);
-        lcd_format_label(lbl_chars, "(Up to 12 characters)", user_secondary_color,
-                &lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0);
-        
-        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
+        ti.buf = saved_name;
+        ti.buf_size = sizeof saved_name;
+        ti.title = title;
+        ti.hint = "(Up to 12 characters)";
+        ti.prefill = ir_menu_overwrite ? prefill : NULL;
+        ti.lock_until_submit = !ir_menu_overwrite; // Adding new can only finish via OK
+        ti.arrow_top = ui_menu->arrow_top;
+        ti.arrow_bot = ui_menu->arrow_bot;
+        ti.arrow_left = ui_menu->arrow_left;
+        ti.arrow_right = ui_menu->arrow_right;
+        lcd_text_input_start(&ti);
     }
 
-    /* User input */
-    // Cycle rows
-    if (ui_btns->home_btn) {
-        row_idx = (row_idx + 1) % IR_NUM_CHAR_ROWS; // Next row
-        char_idx = 0; // Reset within row
-        cur_char = ir_char_rows[row_idx][char_idx];
+    switch (lcd_text_input_tick(&ti, ui_btns)) {
+        case LCD_TI_PENDING:
+            return;
 
-        // Left-arrow visibility on first slot
-        if (lv_obj_has_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN) && !(cur_pos == 0 && cur_char == '_' && !ir_menu_overwrite)) {
-            lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-        } else if (!ir_menu_overwrite && cur_pos == 0 && cur_char == '_') {
-            lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-        }
-
-        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-    } else if (ui_btns->up_btn) { // If up, iterate up
-        // Increment with wrap
-        size_t row_len = strlen(ir_char_rows[row_idx]);
-        char_idx = (char_idx + 1) % row_len;
-        cur_char = ir_char_rows[row_idx][char_idx];
-        
-        // Save to array
-        name_buf[cur_pos] = cur_char;
-        
-        // If left arrow hidden -> remove
-        if (lv_obj_has_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN)) {
-            lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-        } else if (!ir_menu_overwrite && cur_pos == 0 && cur_char == '_') {
-            lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-        }
-        
-        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-    } else if (ui_btns->down_btn) { // If down, iterate down
-        // Decrement with wrap
-        size_t row_len = strlen(ir_char_rows[row_idx]);
-        char_idx = (int)((char_idx + row_len - 1) % row_len);
-        cur_char = ir_char_rows[row_idx][char_idx];
-        
-        // Save to array
-        name_buf[cur_pos] = cur_char;
-        
-        // If left arrow hidden -> remove
-        if (lv_obj_has_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN)) {
-            lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-        } else if (!ir_menu_overwrite && cur_pos == 0 && cur_char == '_') {
-            lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-        }
-        
-        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-    } else if (ui_btns->left_btn && cur_pos == 0 && ir_menu_overwrite) { // If left pressed and at start and overwriting
-        // Delete objects
-        lv_obj_delete(lbl_user_in);
-        lv_obj_delete(lbl_dirs);
-        lv_obj_delete(lbl_chars);
-        
-        // Reset statics
-        lbl_user_in = lbl_dirs = lbl_chars = NULL;
-        cur_pos = char_idx = row_idx = 0;
-        cur_char = '_';
-        memset(name_buf, 0, sizeof name_buf);
-        
-        ir_menu_overwrite = false;
-        
-        ui_menu->page = INFRARED_REMOTE_EDIT_PAGE;
-        return;
-    } else if (ui_btns->pwr_btn && ir_menu_overwrite) { // If power off and overwriting
-        // Delete objects
-        lv_obj_delete(lbl_user_in);
-        lv_obj_delete(lbl_dirs);
-        lv_obj_delete(lbl_chars);
-        
-        // Reset statics
-        lbl_user_in = lbl_dirs = lbl_chars = NULL;
-        cur_pos = char_idx = row_idx = 0;
-        cur_char = '_';
-        memset(name_buf, 0, sizeof name_buf);
-        
-        ir_menu_overwrite = false;
-        
-        lcd_transition_back(false, ui_menu); // True = home, false = sleep
-    } else if (ui_btns->left_btn) { // If left and not at start
-        // Clear the current slot
-        name_buf[cur_pos] = '\0';
-    
-        // De-increment left
-        if (cur_pos > 0) {
-            cur_pos--;
-        }
-    
-        // Resync row_idx/char_idx to target
-        char target = name_buf[cur_pos] ? name_buf[cur_pos] : '_';
-        for (int r = 0; r < IR_NUM_CHAR_ROWS; r++) {
-            const char *row = ir_char_rows[r];
-            const char *p = strchr(row, target);
-            
-            if (p) {
-                row_idx = r;
-                char_idx = (int)(p - row);
-                break;
-            }
-        }
-        cur_char = ir_char_rows[row_idx][char_idx];
-        
-        // If not able to go back and on first position
-        if (cur_pos == 0 && cur_char == '_' && !ir_menu_overwrite) {
-            lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-        }
-        
-        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-    } else if (ui_btns->right_btn) { // If right
-        // Handle case where up/down wasn't pressed
-        name_buf[cur_pos] = cur_char;
-        
-        // If not yet at end
-        if (cur_pos < MAX_CUSTOM_NAME_LEN - 1) {
-            cur_pos++;
-            name_buf[cur_pos] = '\0';
-            char_idx = 0;
-            cur_char = ir_char_rows[row_idx][char_idx];
-        } else {
-            name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
-        }
-        
-        // If left arrow hidden -> remove
-        if (lv_obj_has_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN)) {
-            lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
-        }
-        
-        update_name_label_lcd(lbl_user_in, cur_char, cur_pos);
-    } else if (ui_btns->select_btn) { // If save button pressed
-        // Push final
-        if (cur_pos < MAX_CUSTOM_NAME_LEN) {
-            name_buf[cur_pos] = cur_char;
-
-            // Terminate one past the last written char if room, else clamp
-            size_t term = (cur_pos + 1 <= MAX_CUSTOM_NAME_LEN) ? (cur_pos + 1) : MAX_CUSTOM_NAME_LEN;
-            name_buf[term] = '\0';
-        }
-        
-        // Save final
-        name_buf[MAX_CUSTOM_NAME_LEN] = '\0';
-        memcpy(saved_name, name_buf, MAX_CUSTOM_NAME_LEN + 1);
-        
+        case LCD_TI_SUBMITTED: {
 #ifdef POLYCAST5_DEBUG
-        ESP_LOGI(TAG, "%s", saved_name);
+            ESP_LOGI(TAG, "%s", saved_name);
 #endif
-        
-        // Delete objects
-        lv_obj_delete(lbl_user_in);
-        lv_obj_delete(lbl_dirs);
-        lv_obj_delete(lbl_chars);
-        
-        // Reset statics
-        lbl_user_in = lbl_dirs = lbl_chars = NULL;
-        cur_pos = char_idx = row_idx = 0;
-        cur_char = '_';
-        memset(name_buf, 0, sizeof name_buf);
-
         /* Update options */
         // If overwriting an existing as a rename
         if (ir_menu_overwrite) {
@@ -586,6 +371,10 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
                 // Limit check
                 if (num_remotes >= MAX_REMOTES) {
                     ESP_LOGW(TAG, "Max remotes reached");
+                    // Widget already torn down; escape instead of trapping the user on the locked
+                    // name page (which would just re-open the keyboard with no EXIT).
+                    new_remote = false;
+                    ui_menu->page = INFRARED_REMOTE_EDIT_PAGE;
                     return;
                 }
                 
@@ -636,6 +425,20 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
         
         // Go back
         ui_menu->page = INFRARED_PAGE;
+            return;
+        }
+
+        case LCD_TI_CANCELLED: {
+            ir_menu_overwrite = false;
+            ui_menu->page = INFRARED_REMOTE_EDIT_PAGE;
+            return;
+        }
+
+        case LCD_TI_POWER_OFF: {
+            ir_menu_overwrite = false;
+            lcd_transition_back(false, ui_menu); // True = home, false = sleep
+            return;
+        }
     }
 }
 

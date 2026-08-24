@@ -30,6 +30,7 @@
 #include "draw/lv_image_decoder_private.h"
 #include "draw/lv_image_decoder.h"
 #include "misc/lv_timer.h"
+#include "misc/lv_text.h"
 
 #include "lcd_asset_macros.h"
 #include "lcd_bluetooth.h"
@@ -424,6 +425,29 @@ void lcd_format_label(lv_obj_t *label, const char *text, lv_color_t color, const
     lv_obj_set_style_text_color(label, color, 0);
     lv_obj_set_style_text_font(label, font, 0);
     lv_obj_align(label, alignment, x_offset, y_offset);
+}
+
+void lcd_set_input_label_text(lv_obj_t *lbl_display, const char *full)
+{
+    // Usable width: full panel minus a small side margin so the trailing glyph never sits flush against the screen edge
+    const int32_t max_w = HOR_RES - 12;
+
+    // Measure with the label's own style so this adapts to whatever font and letter spacing the caller applied
+    const lv_font_t *font = lv_obj_get_style_text_font(lbl_display, LV_PART_MAIN);
+    int32_t letter_space = lv_obj_get_style_text_letter_space(lbl_display, LV_PART_MAIN);
+
+    // Walk the start forward one character at a time until the remaining tail fits
+    // The character currently being entered is last in the string, so it always stays on screen
+    const char *start = full;
+    while (*start != '\0') {
+        int32_t w = lv_text_get_width(start, (uint32_t)strlen(start), font, letter_space);
+        if (w <= max_w) {
+            break;
+        }
+        start++;
+    }
+
+    lv_label_set_text(lbl_display, start);
 }
 
 void lcd_scroll_up(lv_obj_t *lbl_top, lv_obj_t *lbl_mid, lv_obj_t *lbl_bot, const char *new_bot_text)
