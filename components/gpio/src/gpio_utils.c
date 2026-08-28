@@ -181,12 +181,16 @@ esp_err_t gpio_utils_init(void)
     // 1 = input
     // 0 = output
 
-    // Assert the 3V3_EN power latch value and make Port1 drive it before the
-    // Port0 config below can early-return: on battery the device powers itself
-    // off if P12 is left undriven once the power-button bootstrap releases
-    ret = gpio_utils_write_output(TCA9535_3V3_EN_PIN, 1);
+    // Assert the 3V3_EN power latch value and make Port1 drive it before the Port0 config below can early-return
+    ret = ESP_FAIL;
+    for (int attempt = 0; attempt < 10 && ret != ESP_OK; attempt++) {
+        if (attempt > 0) {
+            esp_rom_delay_us(2000); // 2 ms settle
+        }
+        ret = gpio_utils_write_output(TCA9535_3V3_EN_PIN, 1);
+    }
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to preload 3V3_EN high: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to preload 3V3_EN high after retries: %s", esp_err_to_name(ret));
         return ret;
     }
 
