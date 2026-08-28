@@ -14,6 +14,7 @@ extern SemaphoreHandle_t xGpioLeftBtnMutex;
 // Regular
 extern SemaphoreHandle_t xPowerButtonSemaphore;
 extern SemaphoreHandle_t xStartAdcBatSemaphore;
+extern SemaphoreHandle_t xAdcBatDoneSemaphore; // Given by adc_task when a battery reading + cutoff evaluation finishes
 
 // Short presses
 extern SemaphoreHandle_t xUpButtonSemaphore; // Up btn pressed
@@ -44,6 +45,9 @@ extern QueueHandle_t xAdcBatBluetoothQueue;
 extern QueueHandle_t xLEDQueue;
 extern QueueHandle_t xAccelReadingsQueue;
 extern QueueHandle_t xMagReadingsQueue;
+
+// Latest raw measured battery voltage (volts), updated by adc_task
+extern volatile float gpio_battery_voltage;
 
 /**
  * @brief  Create the GPIO task.

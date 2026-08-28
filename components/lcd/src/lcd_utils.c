@@ -73,6 +73,9 @@
 #define SEC_DISCLAIMER_KEY "acked" // u8 bitmask, one bit per SEC_DISCLAIMER_* feature
 #define SEC_DISCLAIMER_SCROLL_STEP 36 // Pixels scrolled per up/down press on the disclaimer
 
+// How often light sleep ("power off") wakes to sample the battery
+#define SLEEP_BATTERY_CHECK_INTERVAL_US (6ULL * 60ULL * 60ULL * 1000000ULL) // 6 hours
+
 /* Hotkey macros */
 #define HOTKEY_SHORT_HOME_IDX 0
 #define HOTKEY_LONG_HOME_IDX 1
@@ -83,6 +86,7 @@
 
 extern volatile bool gpio_left_to_exit; // gpio_task.c
 extern volatile bool gpio_waiting_for_left; // gpio_task.c
+extern int8_t lcd_ledc_brightness; // gpio_task.c
 
 extern bool monitoring_packets;
 
@@ -180,6 +184,30 @@ static void lcd_panel_wake(void)
     xSemaphoreGive(xSPIBusMutex); // Release SPI bus
 }
 
+// The backlight pin is owned by LEDC (init_ledc_pwm), not the GPIO output
+// register, so gpio_set_level() on it has no effect at the pad: set duty instead
+static void lcd_backlight_set(bool on)
+{
+    uint32_t duty = 0;
+    xSemaphoreTake(xLEDCMutex, portMAX_DELAY); // Lock LEDC
+
+    if (on) {
+        int8_t pct = lcd_ledc_brightness;
+
+        // Cap min max
+        if (pct < 0) {
+            pct = 0;
+        } else if (pct > 100) {
+            pct = 100;
+        }
+        duty = ((uint32_t)pct * ((1 << LCD_LEDC_RESOLUTION) - 1)) / 100;
+    }
+
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CHANNEL, duty);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CHANNEL);
+    xSemaphoreGive(xLEDCMutex); // Release LEDC
+}
+
 void lcd_device_sleep(void)
 {
     xQueueReset(xWifiCanSleepSemaphore);
@@ -188,7 +216,7 @@ void lcd_device_sleep(void)
     xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
     lcd_panel_sleep(); // Put ST7789 to sleep
-    gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_OFF); // BL low
+    lcd_backlight_set(false); // BL off
 
     // Don't auto wake
     while (gpio_utils_read_input(TCA9535_USER_BUTTON_POWER_PIN) != 1) {
@@ -204,43 +232,85 @@ void lcd_device_sleep(void)
     // In Meshtastic mode abort_pending() above is a no-op, so this is the ONLY path that idles the radio before sleep
     lora_meshtastic_listen_stop();
 
-    xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
-    xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
+    // Light-sleep loop: normally the device wakes on the power button and resumes immediately
+    // Wakes every SLEEP_BATTERY_CHECK_INTERVAL_US on a timer to sample the battery
+    bool woke_by_button = false;
+    while (!woke_by_button) {
+        xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
+        xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
 
-    // Hold GPIO states during peripheral power-down in light sleep
-    // SPI bus is idle: MOSI/SCLK LOW, CS lines HIGH (deselected)
-    gpio_hold_en(ST7789_DC_PIN); // D/C line
-    gpio_hold_en(SPI_MOSI_PIN); // SPI MOSI (idle LOW)
-    gpio_hold_en(SPI_SCLK_PIN); // SPI SCLK (idle LOW)
-    gpio_hold_en(ST7789_CS_PIN); // LCD CS (idle HIGH)
-    gpio_hold_en(SX126X_CS_PIN); // SX126x CS (idle HIGH)
-    gpio_hold_en(SX126X_BUSY_PIN); // Preserve input pull-up
-    gpio_hold_en(SX126X_DIO1_PIN); // Preserve input pull-up
-    gpio_hold_en(RMT_TX_GPIO_PIN); // IR TX (idle LOW)
+        // Hold GPIO states during peripheral power-down in light sleep
+        // SPI bus is idle: MOSI/SCLK LOW, CS lines HIGH (deselected)
+        gpio_hold_en(ST7789_DC_PIN); // D/C line
+        gpio_hold_en(SPI_MOSI_PIN); // SPI MOSI (idle LOW)
+        gpio_hold_en(SPI_SCLK_PIN); // SPI SCLK (idle LOW)
+        gpio_hold_en(ST7789_CS_PIN); // LCD CS (idle HIGH)
+        gpio_hold_en(SX126X_CS_PIN); // SX126x CS (idle HIGH)
+        gpio_hold_en(SX126X_BUSY_PIN); // Preserve input pull-up
+        gpio_hold_en(SX126X_DIO1_PIN); // Preserve input pull-up
+        gpio_hold_en(RMT_TX_GPIO_PIN); // IR TX (idle LOW)
+
+        // Periodic timer wake for the battery check
+        esp_sleep_enable_timer_wakeup(SLEEP_BATTERY_CHECK_INTERVAL_US);
+
+        // Clear any pending TCA9535 INT latch right before sleeping
+        uint8_t tca_int_clear;
+        TCA9535ReadSingleRegister(TCA9535_INPUT_REG0, &tca_int_clear);
 
 #ifdef POLYCAST5_DEBUG
-    ESP_LOGI(TAG, "Entering light sleep: esp_light_sleep_start");
+        ESP_LOGI(TAG, "Entering light sleep: esp_light_sleep_start");
 #endif
 
-    ESP_ERROR_CHECK(esp_light_sleep_start());
+        esp_err_t sleep_err = esp_light_sleep_start();
 
-    // Release holds so peripherals can reclaim their pins
-    gpio_hold_dis(ST7789_DC_PIN);
-    gpio_hold_dis(SPI_MOSI_PIN);
-    gpio_hold_dis(SPI_SCLK_PIN);
-    gpio_hold_dis(ST7789_CS_PIN);
-    gpio_hold_dis(SX126X_CS_PIN);
-    gpio_hold_dis(SX126X_BUSY_PIN);
-    gpio_hold_dis(SX126X_DIO1_PIN);
-    gpio_hold_dis(RMT_TX_GPIO_PIN);
+        esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER); // Don't leak the timer into later sleeps
 
-    xSemaphoreGive(xSPIBusMutex); // Release SPI bus
-    xSemaphoreGive(xI2CBusMutex); // Release I2C bus
+        // Release holds so peripherals can reclaim their pins
+        gpio_hold_dis(ST7789_DC_PIN);
+        gpio_hold_dis(SPI_MOSI_PIN);
+        gpio_hold_dis(SPI_SCLK_PIN);
+        gpio_hold_dis(ST7789_CS_PIN);
+        gpio_hold_dis(SX126X_CS_PIN);
+        gpio_hold_dis(SX126X_BUSY_PIN);
+        gpio_hold_dis(SX126X_DIO1_PIN);
+        gpio_hold_dis(RMT_TX_GPIO_PIN);
+
+        xSemaphoreGive(xSPIBusMutex); // Release SPI bus
+        xSemaphoreGive(xI2CBusMutex); // Release I2C bus
+
+        if (sleep_err != ESP_OK) {
+            // Sleep rejected (a wake source was already pending, e.g. the INT line
+            // re-asserting): retry, re-clearing the latch above, instead of aborting
+#ifdef POLYCAST5_DEBUG
+            ESP_LOGW(TAG, "Light sleep rejected: %s; retrying", esp_err_to_name(sleep_err));
+#endif
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
+
+        uint32_t wake_causes = esp_sleep_get_wakeup_causes();
+
+        // Only a real user wake (ext1 on the TCA9535 INT) resumes the UI
+        if (wake_causes & (1UL << ESP_SLEEP_WAKEUP_EXT1)) {
+            woke_by_button = true;
+        } else {
+            lcd_backlight_set(false); // Not the user: keep the screen fully dark
+
+            // Sample the battery only when this was the periodic check
+            // Any other source just goes straight back to sleep
+            if (wake_causes & (1UL << ESP_SLEEP_WAKEUP_TIMER)) {
+                // Nudge adc_task to take a reading and wait for it to finish
+                xSemaphoreTake(xAdcBatDoneSemaphore, 0); // Drain any stale completion
+                xSemaphoreGive(xStartAdcBatSemaphore);
+                xSemaphoreTake(xAdcBatDoneSemaphore, pdMS_TO_TICKS(10000));
+            }
+        }
+    }
 
     lora_task_resume_after_sleep(); // Re-arm LoRa RX (Meshtastic continuous RX) after sleep
 
     lcd_panel_wake(); // Wake up ST7789
-    gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_ON); // BL high
+    lcd_backlight_set(true); // BL back to the user's brightness
     
     xSemaphoreGive(xStartAdcBatSemaphore); // Start new battery ADC reading
     
@@ -268,7 +338,7 @@ void lcd_device_deep_sleep(void)
     xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
     lcd_panel_sleep(); // Put ST7789 to sleep
-    gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_OFF); // BL low
+    lcd_backlight_set(false); // BL off
 
     // Wait for the triggering (SELECT) button to be released before powering down
     while (gpio_utils_read_input(TCA9535_USER_BUTTON_SELECT_PIN) != 1) {
@@ -2446,7 +2516,7 @@ void lcd_transition_back(bool home, ui_menu_t *ui_menu)
 
         ui_menu->page = HOME_PAGE;
     } else { // Transition to sleep
-        gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_OFF); // BL low so user doesn't see redraw
+        lcd_backlight_set(false); // BL off so user doesn't see redraw
     
         lcd_anim_start_animation();
 

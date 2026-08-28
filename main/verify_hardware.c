@@ -251,8 +251,8 @@ void verify_hardware_run(void)
     int vbat_mv = (int)(vbat * 1000.0f + 0.5f);
     if (vbat <= 0.0f) {
         vh_record("Battery voltage sense (ADC)", VH_FAIL, "ADC read/calibration failed");
-    } else if (vbat < 3.05f || vbat > 4.40f) {
-        // The divider/op-amp math bottoms out at ~3.0 V when the sense pin reads
+    } else if (vbat < 2.15f || vbat > 4.40f) {
+        // The divider/op-amp math bottoms out at ~2.0 V when the sense pin reads
         // 0 V, so a value pinned there means a dead sense path or a flat battery
         vh_record("Battery voltage sense (ADC)", VH_WARN,
                 "implausible reading %d.%03d V - check battery and sense path", vbat_mv / 1000, vbat_mv % 1000);

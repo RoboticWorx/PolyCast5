@@ -42,21 +42,6 @@ static TimerHandle_t haptic_timer;
 static adc_oneshot_unit_handle_t adc1_handle = NULL;
 static adc_cali_handle_t cali_handle = NULL;
 
-typedef struct {
-    float volt;
-    uint8_t soc; // State-of-charge (percentage)
-} soc_point_t;
-
-// LiPo voltage and corresponding discharge state based on typical LiPo voltage discharge curve
-static const soc_point_t soc_table[] = { // {V, %}
-    {4.20, 100}, {4.15, 95},  {4.11, 90},  {4.08, 85},  {4.02, 80},
-    {3.98, 75},  {3.95, 70},  {3.91, 65},  {3.87, 60},  {3.85, 55},
-    {3.84, 50},  {3.82, 45},  {3.80, 40},  {3.79, 35},  {3.77, 30},
-    {3.75, 25},  {3.73, 20},  {3.69, 15},  {3.61, 10},  {3.50, 5},
-    {3.27, 0},
-};
-static const int TABLE_LEN = sizeof(soc_table) / sizeof(soc_table[0]);
-
 void gpio_utils_init_nvs(void)
 {
     // Notice that release mode encryption and secure boot are intentionally disabled by default
@@ -196,19 +181,29 @@ esp_err_t gpio_utils_init(void)
     // 1 = input
     // 0 = output
 
+    // Assert the 3V3_EN power latch value and make Port1 drive it before the
+    // Port0 config below can early-return: on battery the device powers itself
+    // off if P12 is left undriven once the power-button bootstrap releases
+    ret = gpio_utils_write_output(TCA9535_3V3_EN_PIN, 1);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to preload 3V3_EN high: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    // Port1: all outputs
+    // bit7 bit6 bit5 bit4 bit3 bit2 bit1 bit0
+    //    0    0    0    0    0    0    0    0    = 0x00
+    ret = TCA9535WriteSingleRegister(TCA9535_CONFIG_REG1, 0x00);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure Port1 outputs: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
     // Port0 = all inputs (0xFF)
     ret = TCA9535WriteSingleRegister(TCA9535_CONFIG_REG0, 0xFF);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Config0 write failed: %s", esp_err_to_name(ret));
         return ret;
-    }
-    
-    // Port1: pin 2 input, others output
-    // bit7 bit6 bit5 bit4 bit3 bit2 bit1 bit0
-    //    0    0    0    0    0    1    0    0    = 0x04
-    ret = TCA9535WriteSingleRegister(TCA9535_CONFIG_REG1, 0x04);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Config1 write failed: %s", esp_err_to_name(ret));
     }
 
     // Configure outputs
@@ -224,7 +219,7 @@ esp_err_t gpio_utils_init(void)
     
     // Default states
     gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_ON); // LCD BL high
-    gpio_utils_write_output(TCA9535_HAPTIC_PIN, 0); // Haptic motor low 
+    gpio_utils_write_output(TCA9535_HAPTIC_PIN, 0); // Haptic motor low
     gpio_utils_write_output(TCA9535_RED_RGB_LED_PIN, 0); // Red LED off
     gpio_utils_write_output(TCA9535_GREEN_RGB_LED_PIN, 0); // Green LED off
     gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, 0); // Blue LED off
@@ -389,12 +384,20 @@ void gpio_utils_en_tsop_receiver(bool enable)
 // Undo divider + op amp: Vbat = (Vadc + off) / gain
 static float battery_vadc_to_vbat(float Vadc)
 {
-    const float R42 = 10000, R43 = 27400;
-    const float R44 = 10000, R45 = 27400;
-    const float R40 = 2200, R41 = 22000;
-    const float Vref = 3.30f * (R41 / (R40 + R41));
-    const float gain = (1.0f + R45 / R44) * (R43 / (R42+R43));
-    const float off = (R45 / R44) * Vref;
+    // VIN+ divider: V+ = Vbat * (R36+R37+R38+R39)/(R35+R36+R37+R38+R39)
+    const float R35 = 100000, R36 = 100000, R37 = 100000, R38 = 10000, R39 = 10000;
+    const float d = (R36 + R37 + R38 + R39) / (R35 + R36 + R37 + R38 + R39); // 0.6875
+
+    // Reference node: 3V3 through R28+R29, R34 to GND
+    const float R28 = 10000, R29 = 10000, R34 = 100000;
+    const float Vref = 3.30f * (R34 / (R28 + R29 + R34)); // 2.75V
+
+    // Difference-amp gain: k = Rf/Rin = (R31+R32+R33)/R30
+    const float R30 = 100000, R31 = 100000, R32 = 24, R33 = 24;
+    const float k = (R31 + R32 + R33) / R30; // ~1.0005
+
+    const float gain = (1.0f + k) * d; // ~1.3753
+    const float off = k * Vref;        // ~2.7513
 
     return (Vadc + off) / gain;
 }
@@ -484,24 +487,31 @@ float gpio_utils_battery_selftest_voltage(void)
 
 uint8_t gpio_utils_volts_to_soc(float voltage)
 {
-    voltage = voltage + 0.09; // Add expected offset (users want to see it at 100%): Actual ~ +.04
+    voltage += 0.13; // Offset max error high (users want to see it at 100%)
 
-    // Clamp at max
+    // Typical LiPo discharge curve, but the voltages are this board's MEASURED (ADC) readings rather than true cell voltage
+    static const struct { float volt; uint8_t soc; } soc_table[] = { // {measured V, %}
+        {4.20, 100}, {4.15, 95},  {4.11, 90},  {4.08, 85},  {4.02, 80},
+        {3.98, 75},  {3.95, 70},  {3.91, 65},  {3.87, 60},  {3.85, 55},
+        {3.84, 50},  {3.82, 45},  {3.80, 40},  {3.79, 35},  {3.77, 30},
+        {3.75, 25},  {3.73, 20},  {3.69, 15},  {3.61, 10},  {3.50, 5},
+        {3.27, 0},
+    };
+    const int n = sizeof(soc_table) / sizeof(soc_table[0]);
+
+    // Clamp above full / below empty (empty sits just above BATT_CUTOFF_VBAT)
     if (voltage >= soc_table[0].volt) {
         return 100;
     }
-    
     // Clamp at min
-    if (voltage <= soc_table[TABLE_LEN - 1].volt) {
+    if (voltage <= soc_table[n - 1].volt) {
         return 1;
     }
 
-    // Search for where the voltage lives between on soc_table
-    for (int i = 0; i < TABLE_LEN - 1; i++) {
-        // Neighboring high and low voltage
+    // Interpolate along the curve
+    for (int i = 0; i < n - 1; i++) {
         float v_hi = soc_table[i].volt;
         float v_lo = soc_table[i + 1].volt;
-        
         // If 'voltage' lives between them
         if (voltage >= v_lo && voltage <= v_hi) {
             // Get neighboring SoC
@@ -519,8 +529,7 @@ uint8_t gpio_utils_volts_to_soc(float voltage)
         }
     }
 
-    // Fallback
-    return 1;
+    return 1; // Fallback
 }
 
 void gpio_utils_spin_haptic(uint32_t ms)

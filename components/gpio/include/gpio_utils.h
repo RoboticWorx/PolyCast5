@@ -23,6 +23,11 @@
 #define RGB_TOTAL_MAX_MS 500
 #define RGB_TOTAL_MIN_MS 40
 
+// Battery under-voltage cutoff, in volts as measured through the ADC front end
+#define BATT_CUTOFF_VBAT      3.35f // Drop 3V3_EN below this
+#define BATT_CUTOFF_RECOVER   3.40f // Re-assert 3V3_EN at or above this
+#define BATT_CUTOFF_MIN_VALID 2.15f // Below this the reading is failed/implausible (the conversion floor is ~2.00V)
+
 // RGB LED states
 enum {
     RGB_SET_OFF,

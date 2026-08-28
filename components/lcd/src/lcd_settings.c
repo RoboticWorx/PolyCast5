@@ -1758,9 +1758,20 @@ static void system_build_info(char *buf, size_t n)
         snprintf(temp_str, sizeof(temp_str), "--");
     }
 
+    // Latest raw measured battery voltage (volts, pre-SoC-offset) from adc_task.
+    // 0 means no valid reading yet (adc_task only stores plausible reads): show "--"
+    float vbat_now = gpio_battery_voltage;
+    char vbat_str[16];
+    if (vbat_now > 0.0f) {
+        snprintf(vbat_str, sizeof(vbat_str), "%.2f V", (double)vbat_now);
+    } else {
+        snprintf(vbat_str, sizeof(vbat_str), "--");
+    }
+
     // Compose buffer text
     snprintf(buf, n,
-        "Battery Temp: %s\n\n"
+        "Battery Temp: %s\n"
+        "Battery: %s\n\n"
 
         "Total uptime:\n"
         "%" PRIu64 " days\n"
@@ -1794,6 +1805,7 @@ static void system_build_info(char *buf, size_t n)
         "MAC: %s",
 
         temp_str,
+        vbat_str,
 
         uptime_d, uptime_h, uptime_m, uptime_s,
 
@@ -1825,7 +1837,7 @@ static void system_refresh_cb(lv_timer_t *t)
 {
     lv_obj_t *label = (lv_obj_t *)lv_timer_get_user_data(t);
     
-    POLYCAST5_USE_PSRAM_BSS static char text[512];
+    POLYCAST5_USE_PSRAM_BSS static char text[768];
     memset(text, 0, sizeof(text));
     system_build_info(text, sizeof(text));
     
@@ -1874,7 +1886,7 @@ void lcd_settings_system_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_m
         lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
         lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
-        POLYCAST5_USE_PSRAM_BSS static char boot_text[512]; // instr_lbl buffer
+        POLYCAST5_USE_PSRAM_BSS static char boot_text[768]; // instr_lbl buffer
         memset(boot_text, 0, sizeof(boot_text));
         system_build_info(boot_text, sizeof(boot_text));
         lv_label_set_text(instr_lbl, boot_text);

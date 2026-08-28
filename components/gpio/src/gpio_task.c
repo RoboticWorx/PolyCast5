@@ -31,6 +31,7 @@ SemaphoreHandle_t xGpioLeftBtnMutex;
 
 SemaphoreHandle_t xPowerButtonSemaphore;
 SemaphoreHandle_t xStartAdcBatSemaphore;
+SemaphoreHandle_t xAdcBatDoneSemaphore;
 
 // Short presses
 SemaphoreHandle_t xUpButtonSemaphore;
@@ -87,6 +88,9 @@ int8_t lcd_ledc_brightness = 100;
 
 static const TickType_t adc_timer_interval = pdMS_TO_TICKS(20000); // 20s
 
+// Latest raw measured battery voltage (volts, pre-SoC-offset), updated by adc_task
+volatile float gpio_battery_voltage = 0.0f;
+
 static uint8_t rgb_data = 255;
 
 static const uint32_t lcd_max_duty = (1 << LCD_LEDC_RESOLUTION) - 1;
@@ -127,6 +131,40 @@ static inline void give_long(size_t i) {
     xSemaphoreGive(*longSems[i]);
 }
 
+// Release or re-assert the 3V3_EN power latch based on measured battery voltage
+static void battery_power_latch_update(float vbat)
+{
+    static bool gpio_battery_latched_off = false;
+
+    // Latch state is shared with the boot check (gpio_utils.c) so a cutoff that
+    // happened before the tasks started is still re-asserted on recovery here
+    if (vbat < BATT_CUTOFF_MIN_VALID) {
+        return; // Failed / implausible ADC read: ignore
+    }
+
+    if (vbat < BATT_CUTOFF_VBAT) {
+        if (!gpio_battery_latched_off) {
+#ifdef POLYCAST5_DEBUG
+            ESP_LOGW(TAG, "Battery %.2fV below %.2fV cutoff; dropping 3V3_EN to power off", vbat, BATT_CUTOFF_VBAT);
+#endif
+
+            // Only latch once the write actually lands: on I2C failure leave the
+            // flag clear so the next reading retries instead of silently giving
+            // up on the cutoff
+            if (gpio_utils_write_output(TCA9535_3V3_EN_PIN, 0) == ESP_OK) { // USB 5V holds power if present
+                gpio_battery_latched_off = true;
+            }
+        }
+    } else if (vbat >= BATT_CUTOFF_RECOVER && gpio_battery_latched_off) {
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGI(TAG, "Battery %.2fV recovered; re-asserting 3V3_EN latch", vbat);
+#endif
+        if (gpio_utils_write_output(TCA9535_3V3_EN_PIN, 1) == ESP_OK) {
+            gpio_battery_latched_off = false; // Retry on next reading if the write failed
+        }
+    }
+}
+
 static void adc_task(void *arg)
 {
     static uint8_t last_percentage = 100;
@@ -138,7 +176,11 @@ static void adc_task(void *arg)
     ESP_LOGI(TAG, "Startup voltage: %f", v);
 #endif
     gpio_utils_deinit_battery_adc();
-        
+    battery_power_latch_update(v);
+    if (v >= BATT_CUTOFF_MIN_VALID) {
+        gpio_battery_voltage = v; // Expose the latest reading (also goes to system info page)
+    }
+
     uint8_t percentage = gpio_utils_volts_to_soc(v);
 #ifdef POLYCAST5_DEBUG_ADC
     ESP_LOGI(TAG, "Startup percentage: %u%%", percentage);
@@ -161,7 +203,17 @@ static void adc_task(void *arg)
             gpio_utils_init_battery_adc();
             float v = gpio_utils_get_battery_voltage();
             gpio_utils_deinit_battery_adc();
-                        
+            battery_power_latch_update(v);
+            xSemaphoreGive(xAdcBatDoneSemaphore); // Reading + cutoff evaluation done (the sleep loop waits on this)
+
+            // A failed ADC read returns 0.0f: keep the last shown gauge/voltage
+            // rather than blipping to 1% / "0.00 V" (the cutoff already ignores it)
+            if (v < BATT_CUTOFF_MIN_VALID) {
+                vTaskDelay(pdMS_TO_TICKS(10));
+                continue;
+            }
+            gpio_battery_voltage = v; // Expose the latest reading
+
             uint8_t percentage = gpio_utils_volts_to_soc(v);
             
 #ifdef POLYCAST5_DEBUG_ADC
@@ -229,6 +281,8 @@ static void gpio_task(void *arg)
     
     xStartAdcBatSemaphore = xSemaphoreCreateBinary();
     configASSERT(xStartAdcBatSemaphore);
+    xAdcBatDoneSemaphore = xSemaphoreCreateBinary();
+    configASSERT(xAdcBatDoneSemaphore);
 
     xLEDCSemaphore = xSemaphoreCreateBinary();
     configASSERT(xLEDCSemaphore);

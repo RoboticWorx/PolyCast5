@@ -36,6 +36,7 @@
 // TCA9535 output port pins
 #define TCA9535_HAPTIC_PIN 0
 #define TCA9535_RED_RGB_LED_PIN 1
+#define TCA9535_3V3_EN_PIN 2 // 3V3 regulator enable (self-hold power latch)
 #define TCA9535_GREEN_RGB_LED_PIN 3
 #define TCA9535_TSOP_EN_PIN 4
 #define TCA9535_BLUE_RGB_LED_PIN 5
