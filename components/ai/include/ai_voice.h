@@ -69,11 +69,13 @@ void ai_voice_free_pcm(ai_voice_pcm_t *p);
 esp_err_t ai_voice_force_sleep_pins_low(void);
 
 /**
- * @brief Send PCM16 mono 16kHz to xAI /v1/stt REST endpoint and return the transcript
+ * @brief Send PCM16 mono 16kHz to the selected STT provider and return the transcript
  *
- * Wraps the PCM in a 44-byte WAV (RIFF) header and POSTs as multipart/form-data
- * with model=grok-stt, format=json, language=en. Streams the body so memory use
- * stays bounded even for ~30s recordings. Returns AI_VOICE_ERR_RATE_LIMITED on HTTP 429.
+ * Endpoint, model, and format field name come from the provider registry via
+ * ai_provider_resolve_stt() (e.g. xAI grok-stt or OpenAI/Groq Whisper), using the
+ * separate STT key when one is configured. Wraps the PCM in a 44-byte WAV (RIFF)
+ * header and POSTs as multipart/form-data with language=en. Streams the body so
+ * memory use stays bounded even for ~30s recordings. Returns AI_VOICE_ERR_RATE_LIMITED on HTTP 429.
  *
  * @param pcm16 Pointer to PCM16 samples
  * @param samples Number of samples in pcm16

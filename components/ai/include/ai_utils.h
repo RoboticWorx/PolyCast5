@@ -64,12 +64,40 @@ esp_err_t ai_utils_save_api_key_nvs(const char *api_key);
  */
 esp_err_t ai_utils_load_api_key_nvs(char *out, size_t out_sz);
 
+/**
+ * @brief Whether the selected AI provider is configured and usable right now.
+ *
+ * True when the chat provider resolves (custom endpoints have a URL) AND either the provider is
+ * keyless (local) or a usable API key stamped for that provider is stored. Use this to decide
+ * whether to enter an AI feature or route the user to the web config portal - it correctly
+ * handles keyless local providers (which have no stored key) and erased keys.
+ *
+ * @returns true if AI features can run, false if the user should be sent to the config page.
+ */
+bool ai_config_is_ready(void);
+
+/**
+ * @brief Whether voice dictation (speech-to-text) can actually run right now.
+ *
+ * Stricter than ai_config_is_ready(): in addition to a usable chat provider, this requires a
+ * resolvable STT endpoint AND a usable STT key, mirroring the key-selection rules in
+ * ai_voice_stt_transcribe_pcm16_xai(). Use this to gate the voice-only AI keyboard page so a
+ * chat-only provider (has_stt=false) with no separate STT configured routes the user to the
+ * config portal instead of into a page where every dictation attempt fails.
+ *
+ * @returns true if voice input can run, false if the user should be sent to the config page.
+ */
+bool ai_config_is_ready_for_voice(void);
+
 /** 
- * @brief Send command to xAI Grok and get autokey script response
+ * @brief Send command to the selected AI chat provider and get autokey script response
+ *
+ * Endpoint, model, and reasoning behavior come from the provider registry via
+ * ai_provider_resolve_chat() (xAI by default; OpenAI/Groq/DeepSeek/OpenRouter/custom).
  *
  * @param [in] system_prompt The system prompt string to use
  * @param [in] command The user command string to send
- * @param [out] response_buf Buffer to store the Grok response script
+ * @param [out] response_buf Buffer to store the model response script
  * @param [in] buf_sz Size of the response buffer
  * @param [in] reasoning True to use reasoning model, false for non-reasoning
  *
@@ -88,7 +116,7 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
 typedef esp_err_t (*ai_stream_cb_t)(const char *delta_text, void *user_ctx);
 
 /**
- * @brief Send command to xAI Grok with SSE streaming, invoking a callback for each content delta
+ * @brief Send command to the selected AI chat provider with SSE streaming, invoking a callback for each content delta
  *
  * The full assembled response is also written into response_buf (same as the non-streaming variant).
  * If on_delta is NULL this behaves identically to ai_utils_send_command_xai().

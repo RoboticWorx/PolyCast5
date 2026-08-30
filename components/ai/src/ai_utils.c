@@ -21,14 +21,13 @@
 #include "wifi_task.h"
 #include "gpio_task.h"
 #include "ai_utils.h"
+#include "ai_provider.h"
 #include "ai_prompts.h"
 #include "ai_task.h"
 
 #define TAG "AI_UTILS"
 
-#define XAI_MODEL "grok-4.3"
-#define XAI_REASONING_LEVEL "medium"
-#define XAI_NONREASONING_LEVEL "none"
+// Provider endpoint/model/reasoning now come from the ai_provider registry (ai_provider.c)
 
 // Hard ceiling so a bad response doesn't eat all RAM
 #define AI_HTTP_BODY_MAX_CAP (128 * 1024)
@@ -98,6 +97,78 @@ esp_err_t ai_utils_load_api_key_nvs(char *out, size_t out_sz)
     // Close handle
     nvs_close(h);
     return err;
+}
+
+bool ai_config_is_ready(void)
+{
+    // LCD-task-only helper (never called from ai_task), so PSRAM-BSS statics are race-free.
+    // resolve_chat memsets *out at entry, so chat needs no separate per-call clear.
+    POLYCAST5_USE_PSRAM_BSS static ai_chat_cfg_t chat;
+    if (ai_provider_resolve_chat(&chat) != ESP_OK) {
+        return false; // e.g. custom provider selected but no URL configured
+    }
+    if (!chat.key_required) {
+        return true;  // keyless local / custom endpoint
+    }
+
+    POLYCAST5_USE_PSRAM_BSS static char key[AI_API_KEY_MAX_LEN];
+    memset(key, 0, sizeof(key)); // static persists across calls - clear stale bytes
+    if (ai_utils_load_api_key_nvs(key, sizeof(key)) != ESP_OK || key[0] == '\0') {
+        return false; // no key (covers both missing and erased "")
+    }
+
+    // A key stored for a different provider is not usable here
+    return (ai_provider_load_key_provider_nvs() == chat.provider_idx);
+}
+
+bool ai_config_is_ready_for_voice(void)
+{
+    // The chat provider must be usable first
+    if (!ai_config_is_ready()) {
+        return false;
+    }
+
+    // Resolve the STT endpoint/model + which key applies (separate STT vs the primary key).
+    // LCD-task-only helper, so PSRAM-BSS statics are race-free; resolve_stt memsets *out at entry.
+    POLYCAST5_USE_PSRAM_BSS static ai_stt_cfg_t stt;
+    if (ai_provider_resolve_stt(&stt) != ESP_OK || !stt.available) {
+        return false; // chat-only provider with no separate STT provider set
+    }
+
+    // Determine whether a usable STT key exists, following ai_voice's selection order exactly
+    POLYCAST5_USE_PSRAM_BSS static char key[AI_API_KEY_MAX_LEN];
+    memset(key, 0, sizeof(key)); // static persists across calls - clear stale bytes
+    bool used_separate = false;
+    if (stt.use_separate_key) {
+        // A dedicated STT key counts only when present and stamped for this STT provider
+        if (ai_provider_load_stt_key_nvs(key, sizeof(key)) == ESP_OK && key[0] != '\0' &&
+            ai_provider_load_stt_key_provider_nvs() == stt.provider_idx) {
+            used_separate = true;
+        } else if (stt.primary_key_ok) {
+            // No usable dedicated key, but the STT provider matches the chat provider, so the
+            // primary key is a valid fallback there
+            key[0] = '\0';
+            if (ai_utils_load_api_key_nvs(key, sizeof(key)) != ESP_OK) {
+                key[0] = '\0';
+            }
+        } else {
+            return false; // separate STT selected, no usable dedicated key, no same-provider fallback
+        }
+    } else {
+        // Shared mode: STT rides on the primary/chat key
+        if (ai_utils_load_api_key_nvs(key, sizeof(key)) != ESP_OK) {
+            key[0] = '\0';
+        }
+    }
+    if (key[0] == '\0') {
+        return false; // no key stored (covers both missing and erased "")
+    }
+
+    // Final key<->provider binding guard (matches ai_voice's last check): the key that would be
+    // sent must be stamped for the STT provider it targets
+    uint8_t key_prov = used_separate ? ai_provider_load_stt_key_provider_nvs()
+                                     : ai_provider_load_key_provider_nvs();
+    return (key_prov == stt.provider_idx);
 }
 
 /* String cleanup helpers */
@@ -484,10 +555,28 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
     // Default output to empty
     response_buf[0] = '\0';
 
-    // Load xAI API key from NVS
-    char api_key[AI_API_KEY_MAX_LEN] = {0};
-    if (ai_utils_load_api_key_nvs(api_key, sizeof(api_key)) != ESP_OK || api_key[0] == '\0') {
-        ESP_LOGE(TAG, "Failed to load xAI API key from NVS");
+    // Resolve the selected provider's chat endpoint/model/reasoning
+    POLYCAST5_USE_PSRAM_BSS static ai_chat_cfg_t chat;
+    if (ai_provider_resolve_chat(&chat) != ESP_OK) {
+        ESP_LOGE(TAG, "No chat provider configured (custom URL missing?)");
+        return ESP_FAIL;
+    }
+
+    // Load API key from NVS (may be empty for keyless local providers;
+    // memset first to clear any stale bytes from a prior call)
+    POLYCAST5_USE_PSRAM_BSS static char api_key[AI_API_KEY_MAX_LEN];
+    memset(api_key, 0, sizeof(api_key));
+    esp_err_t key_err = ai_utils_load_api_key_nvs(api_key, sizeof(api_key));
+    bool have_key = (key_err == ESP_OK && api_key[0] != '\0');
+
+    // Key<->provider binding: only use a key that was saved for THIS provider, so a key for one
+    // service is never disclosed to another (or to a user-controlled custom endpoint)
+    bool key_usable = have_key && (ai_provider_load_key_provider_nvs() == chat.provider_idx);
+    if (have_key && !key_usable) {
+        ESP_LOGW(TAG, "Saved API key belongs to a different provider; not sending it - re-enter the key for the selected provider");
+    }
+    if (!key_usable && chat.key_required) {
+        ESP_LOGE(TAG, "No usable API key for the selected provider");
         return ESP_FAIL;
     }
 
@@ -509,11 +598,13 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
         return ESP_ERR_NO_MEM;
     }
 
-    // grok-4.3 replaces the retired grok-4-1-fast-* pair (xAI May-15 retirement).
-    // reasoning_effort picks the behavior: "low" mimics the fast-reasoning variant,
-    // "none" mimics the non-reasoning variant.
-    cJSON_AddStringToObject(root, "model", XAI_MODEL);
-    cJSON_AddStringToObject(root, "reasoning_effort", reasoning ? XAI_REASONING_LEVEL : XAI_NONREASONING_LEVEL);
+    // Model + optional reasoning_effort come from the resolved provider row.
+    // reasoning_effort is only sent when the provider supports it (otherwise some
+    // OpenAI-compatible servers 400 on the unknown/invalid field).
+    cJSON_AddStringToObject(root, "model", chat.model);
+    if (chat.send_reasoning_effort) {
+        cJSON_AddStringToObject(root, "reasoning_effort", reasoning ? chat.reasoning_on : chat.reasoning_off);
+    }
 
     // Messages array
     cJSON *messages = cJSON_AddArrayToObject(root, "messages");
@@ -554,14 +645,18 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
 
     // Configure HTTPS request for xAI endpoint
     esp_http_client_config_t config = {
-        .url = "https://api.x.ai/v1/chat/completions",
+        .url = chat.url,
         .method = HTTP_METHOD_POST,
 
-        // Use ESP-IDF CA bundle for TLS verification
+        // Use ESP-IDF CA bundle for TLS verification (ignored automatically for http:// URLs)
         .crt_bundle_attach = esp_crt_bundle_attach,
 
         // Large prompts can take longer end-to-end (network + model generation)
         .timeout_ms = 120000,
+
+        // Never follow a redirect: an https->http Location would otherwise resend the POST
+        // (Authorization header included) in cleartext, defeating the https-only key gate below
+        .disable_auto_redirect = true,
 
         // Capture response body via callback
         .event_handler = http_evt,
@@ -575,12 +670,21 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
         return ESP_FAIL;
     }
 
-    // Build Authorization header: "Bearer <xai_key>"
+    // Build Authorization header: "Bearer <key>".
+    // key_usable already required a present key stamped for this provider; the https check here
+    // ensures it is only ever sent over TLS, never to a plaintext http:// endpoint (e.g. a local
+    // Ollama box). Keyless local providers have no key to send.
     POLYCAST5_USE_PSRAM_BSS static char auth_header[512];
-    snprintf(auth_header, sizeof(auth_header), "Bearer %s", api_key); // NULL terminates
+    if (key_usable) {
+        if (strncmp(chat.url, "https://", 8) == 0) {
+            snprintf(auth_header, sizeof(auth_header), "Bearer %s", api_key); // NULL terminates
+            esp_http_client_set_header(client, "Authorization", auth_header);
+        } else {
+            ESP_LOGW(TAG, "Endpoint is not https:// - omitting Authorization header so the API key is not sent in cleartext");
+        }
+    }
 
     // Set headers
-    esp_http_client_set_header(client, "Authorization", auth_header);
     esp_http_client_set_header(client, "Content-Type", "application/json");
     esp_http_client_set_header(client, "Accept", "application/json");
 
@@ -879,10 +983,30 @@ esp_err_t ai_utils_send_command_xai_stream(const char *system_prompt, const char
 
     response_buf[0] = '\0';
 
-    // Load xAI API key from NVS
-    char api_key[AI_API_KEY_MAX_LEN] = {0};
-    if (ai_utils_load_api_key_nvs(api_key, sizeof(api_key)) != ESP_OK || api_key[0] == '\0') {
-        ESP_LOGE(TAG, "Failed to load xAI API key from NVS");
+    // Resolve the selected provider's chat endpoint/model/reasoning.
+    // Static PSRAM scratch (not re-entrant, but ai_task calls this serially): keeps the
+    // config + key off this task's small stack for the duration of the TLS session
+    POLYCAST5_USE_PSRAM_BSS static ai_chat_cfg_t chat;
+    if (ai_provider_resolve_chat(&chat) != ESP_OK) {
+        ESP_LOGE(TAG, "No chat provider configured (custom URL missing?)");
+        return ESP_FAIL;
+    }
+
+    // Load API key from NVS (may be empty for keyless local providers;
+    // memset first to clear any stale bytes from a prior call)
+    POLYCAST5_USE_PSRAM_BSS static char api_key[AI_API_KEY_MAX_LEN];
+    memset(api_key, 0, sizeof(api_key));
+    esp_err_t key_err = ai_utils_load_api_key_nvs(api_key, sizeof(api_key));
+    bool have_key = (key_err == ESP_OK && api_key[0] != '\0');
+
+    // Key<->provider binding: only use a key that was saved for THIS provider, so a key for one
+    // service is never disclosed to another (or to a user-controlled custom endpoint)
+    bool key_usable = have_key && (ai_provider_load_key_provider_nvs() == chat.provider_idx);
+    if (have_key && !key_usable) {
+        ESP_LOGW(TAG, "Saved API key belongs to a different provider; not sending it - re-enter the key for the selected provider");
+    }
+    if (!key_usable && chat.key_required) {
+        ESP_LOGE(TAG, "No usable API key for the selected provider");
         return ESP_FAIL;
     }
 
@@ -892,9 +1016,11 @@ esp_err_t ai_utils_send_command_xai_stream(const char *system_prompt, const char
         return ESP_ERR_NO_MEM;
     }
 
-    // grok-4.3 replaces the retired grok-4-1-fast-* pair
-    cJSON_AddStringToObject(root, "model", XAI_MODEL);
-    cJSON_AddStringToObject(root, "reasoning_effort", reasoning ? XAI_REASONING_LEVEL : XAI_NONREASONING_LEVEL);
+    // Model + optional reasoning_effort come from the resolved provider row
+    cJSON_AddStringToObject(root, "model", chat.model);
+    if (chat.send_reasoning_effort) {
+        cJSON_AddStringToObject(root, "reasoning_effort", reasoning ? chat.reasoning_on : chat.reasoning_off);
+    }
 
     // Messages array
     cJSON *messages = cJSON_AddArrayToObject(root, "messages");
@@ -944,10 +1070,12 @@ esp_err_t ai_utils_send_command_xai_stream(const char *system_prompt, const char
 
     // Configure HTTPS request
     esp_http_client_config_t config = {
-        .url = "https://api.x.ai/v1/chat/completions",
+        .url = chat.url,
         .method = HTTP_METHOD_POST,
         .crt_bundle_attach = esp_crt_bundle_attach,
         .timeout_ms = 120000,
+        // Never follow a redirect: an https->http Location would resend the key in cleartext
+        .disable_auto_redirect = true,
         .event_handler = http_evt_stream,
         .user_data = &sctx,
     };
@@ -959,12 +1087,19 @@ esp_err_t ai_utils_send_command_xai_stream(const char *system_prompt, const char
         return ESP_FAIL;
     }
 
-    // Build Authorization header: "Bearer <xai_key>"
+    // Build Authorization header: "Bearer <key>" (see the non-streaming variant):
+    // requires a present key stamped for this provider, and is only sent over https://
     POLYCAST5_USE_PSRAM_BSS static char auth_header[512];
-    snprintf(auth_header, sizeof(auth_header), "Bearer %s", api_key); // NULL terminates
+    if (key_usable) {
+        if (strncmp(chat.url, "https://", 8) == 0) {
+            snprintf(auth_header, sizeof(auth_header), "Bearer %s", api_key); // NULL terminates
+            esp_http_client_set_header(client, "Authorization", auth_header);
+        } else {
+            ESP_LOGW(TAG, "Endpoint is not https:// - omitting Authorization header so the API key is not sent in cleartext");
+        }
+    }
 
     // Set headers
-    esp_http_client_set_header(client, "Authorization", auth_header);
     esp_http_client_set_header(client, "Content-Type", "application/json");
     esp_http_client_set_header(client, "Accept", "text/event-stream");
 
@@ -1183,8 +1318,10 @@ static bool strcasestr_local_bool(const char *hay, const char *needle)
     return false;
 }
 
+// True if a script's category name looks credential-related (username/password/login/email/...)
 static bool is_cred_candidate(const char *cat_name)
 {
+    // Treat a NULL category as empty so the matches below never deref NULL
     const char *cat = cat_name ? cat_name : "";
 
     // Category-first filter: treat any "credential-ish" category as eligible
@@ -1209,10 +1346,13 @@ static bool is_cred_candidate(const char *cat_name)
             strcasestr_local_bool(cat, "user names");
 }
 
+// True if a script's category name marks the user's "Custom" command bucket
 static bool is_custom_candidate(const char *cat_name)
 {
+    // Treat a NULL category as empty so the matches below never deref NULL
     const char *cat = cat_name ? cat_name : "";
 
+    // Category-first filter: only the user's "Custom" command categories are eligible
     return strcasestr_local_bool(cat, "custom") ||
             strcasestr_local_bool(cat, "customs") ||
             strcasestr_local_bool(cat, "custom command") ||

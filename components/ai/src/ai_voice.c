@@ -24,6 +24,7 @@
 #include "ai_task.h"
 #include "ai_voice.h"
 #include "ai_utils.h"
+#include "ai_provider.h"
 
 #define TAG "AI_VOICE"
 
@@ -40,8 +41,7 @@
 
 #define SOUND_ANIM_THRESHOLD 100
 
-// xAI REST STT
-#define XAI_STT_URL            "https://api.x.ai/v1/stt"
+// STT endpoint/model come from the ai_provider registry (ai_provider.c)
 #define STT_HTTP_TIMEOUT_MS    30000
 #define STT_WRITE_CHUNK_BYTES  4096
 #define STT_RESPONSE_MAX_BYTES (32 * 1024)
@@ -591,12 +591,47 @@ esp_err_t ai_voice_stt_transcribe_pcm16_xai(const int16_t *pcm16, size_t samples
     char *resp_buf = NULL;
     size_t resp_len = 0;
 
-    // Load xAI API key from NVS (memset first to clear any stale bytes from a prior call)
+    // Resolve the selected STT provider (endpoint/model/field + which key to use)
+    POLYCAST5_USE_PSRAM_BSS static ai_stt_cfg_t stt;
+    if (ai_provider_resolve_stt(&stt) != ESP_OK || !stt.available) {
+        ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: no STT provider configured (enable a separate STT provider for chat-only models)");
+        return ESP_FAIL;
+    }
+
+    // Load the STT API key: the separate key when configured, otherwise the primary/chat key
     POLYCAST5_USE_PSRAM_BSS static char api_key[AI_API_KEY_MAX_LEN] = {0};
     memset(api_key, 0, sizeof(api_key));
-    err = ai_utils_load_api_key_nvs(api_key, sizeof(api_key));
+    bool used_separate = false;
+    if (stt.use_separate_key) {
+        err = ai_provider_load_stt_key_nvs(api_key, sizeof(api_key));
+        if (err == ESP_OK && api_key[0] != '\0' &&
+            ai_provider_load_stt_key_provider_nvs() != stt.provider_idx) {
+            // A dedicated key stamped for a different provider must never be sent here.
+            // Treat it as absent so the same-provider fallback below still works
+            ESP_LOGW(TAG, "ai_voice_stt_transcribe_pcm16_xai: ignoring saved STT key stamped for a different provider");
+            memset(api_key, 0, sizeof(api_key));
+        }
+        if (api_key[0] != '\0') {
+            used_separate = true;
+        } else if (stt.primary_key_ok) {
+            // No usable dedicated STT key, but the STT provider matches the chat provider,
+            // so the primary key is valid there - fall back to it
+            err = ai_utils_load_api_key_nvs(api_key, sizeof(api_key));
+        }
+    } else {
+        err = ai_utils_load_api_key_nvs(api_key, sizeof(api_key));
+    }
     if (err != ESP_OK || api_key[0] == '\0') {
-        ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: ai_utils_load_api_key_nvs failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: no usable STT API key (%s) - re-enter the key for the selected STT provider", esp_err_to_name(err));
+        return ESP_FAIL;
+    }
+
+    // Key<->provider binding (final guard): refuse to send a key saved for a different provider
+    // to this STT endpoint (e.g. a stale OpenAI key while the STT dropdown now points at xAI)
+    uint8_t key_prov = used_separate ? ai_provider_load_stt_key_provider_nvs()
+                                     : ai_provider_load_key_provider_nvs();
+    if (key_prov != stt.provider_idx) {
+        ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: saved STT key belongs to a different provider - re-enter the key for the selected STT provider");
         return ESP_FAIL;
     }
 
@@ -610,22 +645,42 @@ esp_err_t ai_voice_stt_transcribe_pcm16_xai(const int16_t *pcm16, size_t samples
     POLYCAST5_USE_PSRAM_BSS static char mp_prefix[1024];
     POLYCAST5_USE_PSRAM_BSS static char mp_suffix[128];
 
-    // Build the multipart prefix: four form-data parts (model, format, language, file headers).
+    // Build the multipart prefix. The two STT flavors differ (all fields come from the provider registry):
+    //  - OpenAI/Groq (Whisper): a "model" part + "<fmt_field>=json" (response_format=json)
+    //  - xAI (/v1/stt): no "model" part; "format" is a boolean ("true" => Inverse Text Normalization,
+    //    so spoken numbers/currency come back written, e.g. "$100"). The response is JSON either way.
     // The file part's *body* (WAV + PCM) is appended separately so we don't embed binary in snprintf.
-    int prefix_len = snprintf(mp_prefix, sizeof(mp_prefix),
-        "--%s\r\n"
-        "Content-Disposition: form-data; name=\"model\"\r\n\r\n"
-        "grok-stt\r\n" // Want STT model
-        "--%s\r\n"
-        "Content-Disposition: form-data; name=\"format\"\r\n\r\n"
-        "json\r\n" // Response as JSON
-        "--%s\r\n"
-        "Content-Disposition: form-data; name=\"language\"\r\n\r\n"
-        "en\r\n" // English language
-        "--%s\r\n"
-        "Content-Disposition: form-data; name=\"file\"; filename=\"audio.wav\"\r\n"
-        "Content-Type: audio/wav\r\n\r\n",
-        boundary, boundary, boundary, boundary);
+    int prefix_len;
+    if (stt.send_model) {
+        // OpenAI/Groq Whisper: model + format field (response_format=json)
+        prefix_len = snprintf(mp_prefix, sizeof(mp_prefix),
+            "--%s\r\n"
+            "Content-Disposition: form-data; name=\"model\"\r\n\r\n"
+            "%s\r\n" // STT model (e.g. whisper-1 / whisper-large-v3-turbo)
+            "--%s\r\n"
+            "Content-Disposition: form-data; name=\"%s\"\r\n\r\n"
+            "%s\r\n" // Format field value ("json")
+            "--%s\r\n"
+            "Content-Disposition: form-data; name=\"language\"\r\n\r\n"
+            "en\r\n" // English language
+            "--%s\r\n"
+            "Content-Disposition: form-data; name=\"file\"; filename=\"audio.wav\"\r\n"
+            "Content-Type: audio/wav\r\n\r\n",
+            boundary, stt.model, boundary, stt.fmt_field, stt.fmt_value, boundary, boundary);
+    } else {
+        // xAI /v1/stt: omit the model part entirely; format field carries a boolean ("true")
+        prefix_len = snprintf(mp_prefix, sizeof(mp_prefix),
+            "--%s\r\n"
+            "Content-Disposition: form-data; name=\"%s\"\r\n\r\n"
+            "%s\r\n" // Format field value ("true" => Inverse Text Normalization)
+            "--%s\r\n"
+            "Content-Disposition: form-data; name=\"language\"\r\n\r\n"
+            "en\r\n" // English language
+            "--%s\r\n"
+            "Content-Disposition: form-data; name=\"file\"; filename=\"audio.wav\"\r\n"
+            "Content-Type: audio/wav\r\n\r\n",
+            boundary, stt.fmt_field, stt.fmt_value, boundary, boundary);
+    }
 
     // Closing delimiter: CRLF terminates the file part body, then "--boundary--" closes the envelope
     int suffix_len = snprintf(mp_suffix, sizeof(mp_suffix), "\r\n--%s--\r\n", boundary);
@@ -652,9 +707,9 @@ esp_err_t ai_voice_stt_transcribe_pcm16_xai(const int16_t *pcm16, size_t samples
     POLYCAST5_USE_PSRAM_BSS static char ctype_header[128];
     snprintf(ctype_header, sizeof(ctype_header), "multipart/form-data; boundary=%s", boundary);
 
-    // Configure HTTPS request for xAI /v1/stt (TLS via ESP-IDF CA bundle, 30s overall timeout)
+    // Configure request for the resolved STT endpoint (TLS via ESP-IDF CA bundle, 30s overall timeout)
     esp_http_client_config_t cfg = {
-        .url = XAI_STT_URL,
+        .url = stt.url,
         .method = HTTP_METHOD_POST,
         .crt_bundle_attach = esp_crt_bundle_attach,
         .timeout_ms = STT_HTTP_TIMEOUT_MS,

@@ -1728,10 +1728,8 @@ static void go_to_page_from_hotkey(ui_menu_t *ui_menu)
     // Handle the specific page selected
     switch (ui_menu->page) {
         case BLUETOOTH_AI_KEYBOARD_PAGE:
-            char api_key[AI_API_KEY_MAX_LEN] = {0};
-            esp_err_t err = ai_utils_load_api_key_nvs(api_key, AI_API_KEY_MAX_LEN);
-            if (err != ESP_OK) {
-                ESP_LOGW(TAG, "Failed to load xAI API key from NVS: err %s, switching to AI config page.", esp_err_to_name(err));
+            if (!ai_config_is_ready_for_voice()) {
+                ESP_LOGW(TAG, "AI provider not configured/usable, switching to AI config page.");
 
                 // Switch pages
                 ui_menu->page = BLUETOOTH_AI_CONFIG_PAGE;
@@ -3899,10 +3897,8 @@ void lcd_bluetooth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t
         // Reset static
         do_once = false;
 
-        char api_key[AI_API_KEY_MAX_LEN] = {0};
-        esp_err_t err = ai_utils_load_api_key_nvs(api_key, AI_API_KEY_MAX_LEN);
-        if (err != ESP_OK) {
-            ESP_LOGW(TAG, "Failed to load xAI API key from NVS: err %s, switching to AI config page.", esp_err_to_name(err));
+        if (!ai_config_is_ready_for_voice()) {
+            ESP_LOGW(TAG, "AI provider not configured/usable, switching to AI config page.");
 
             // Switch pages
             ui_menu->page = BLUETOOTH_AI_CONFIG_PAGE;

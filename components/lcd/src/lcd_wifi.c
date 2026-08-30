@@ -1568,11 +1568,9 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 		// Ensure disconnected at start
 		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
-        // Check for API key
-        char api_key[AI_API_KEY_MAX_LEN] = {0};
-        esp_err_t err = ai_utils_load_api_key_nvs(api_key, AI_API_KEY_MAX_LEN);
-        if (err != ESP_OK) {
-            ESP_LOGW(TAG, "Failed to load xAI API key from NVS: err=%s, switching to AI config page.", esp_err_to_name(err));
+        // Check that an AI provider is configured and usable
+        if (!ai_config_is_ready()) {
+            ESP_LOGW(TAG, "AI provider not configured/usable, switching to AI config page.");
 
             // Switch pages
             ui_menu->page = WIFI_AI_CONFIG_PAGE;
