@@ -25,6 +25,12 @@ That's it. The script figures out everything else:
     filenames plus a matching flash_args), so the committed release binaries -
     the ones the web Firmware Updater serves - always match the pushed source.
     Skipped on --dry-run; unchanged files aren't rewritten.
+  * Distills every build's linker map into bin/size_report.txt - an
+    idf.py-size-style breakdown (SRAM/flash/PSRAM usage, image-vs-partition
+    budgets, per-component sizes) committed alongside the binaries, so
+    `git log -p bin/size_report.txt` shows how each commit moved the firmware's
+    footprint. Deterministic output: identical builds produce identical
+    reports. Also skipped on --dry-run.
 
 Common usage:
     python flash.py                 # build, then flash whatever changed
@@ -71,9 +77,9 @@ Exit code: 0 on success (or nothing-to-do), non-zero on any failure.
 ----------------------------------------------------------------------------
 Trace map (top to bottom): the flow lives in main(), which runs nine numbered
 steps: 1) build, 2) load build outputs, 3) build a per-partition "plan",
-4) mirror the images into bin/, 5) connect + preflight the chip, 6) decide
-what changed, 7) print the plan, 8) flash, 9) save state. Everything above
-main() is a helper those steps call.
+4) mirror the images into bin/ + write the size report, 5) connect + preflight
+the chip, 6) decide what changed, 7) print the plan, 8) flash, 9) save state.
+Everything above main() is a helper those steps call.
 ----------------------------------------------------------------------------
 """
 
@@ -362,6 +368,256 @@ def export_release_bins(plan: list[dict], write_flash_args: list[str]) -> None:
             print(gray("bin/ release binaries already match this build."))
     except OSError as e:
         print(yellow(f"Note: couldn't update bin/ release binaries ({e})."))
+
+
+# ===========================================================================
+# Size report (bin/size_report.txt). Every run distills the build's linker map
+# into a committed, diff-friendly size analysis: the `idf.py size` /
+# `idf.py size-components` numbers plus each image's partition budget. Because
+# the output is deterministic (no timestamps, machine paths, or unstable
+# ordering), the file only changes when sizes change, and
+# `git log -p bin/size_report.txt` becomes a per-commit size trend - replacing
+# the hand-updated "SRAM currently: ..." comment in polycast5_macros.h.
+# ===========================================================================
+SIZE_REPORT = BIN_DIR / "size_report.txt"
+
+# The board's PSRAM chip is 8 MB, but it's auto-sized at runtime so there is no
+# sdkconfig value to read and the linker map carries no total for it. Used only
+# to show static External RAM usage as a percentage.
+PSRAM_TOTAL_BYTES = 8 * 1024 * 1024
+
+# Fixed display order for memory types (scarcest first). Anything the tool
+# reports beyond these is appended alphabetically so nothing is ever dropped;
+# a FIXED order (not size-sorted) keeps diffs from reshuffling whole tables.
+MEM_TYPE_ORDER = ("HP SRAM", "Flash", "External RAM", "LP SRAM")
+
+# Short column headers for the per-archive table (falls back to the full name).
+MEM_TYPE_SHORT = {"External RAM": "Ext RAM"}
+
+
+def find_map_file() -> Path | None:
+    """Locate the app's linker map in build/ (e.g. PolyCast5.map)."""
+    # Preferred: derive <project>.map from the build's project description.
+    try:
+        desc = json.loads((BUILD_DIR / "project_description.json").read_text())
+        cand = BUILD_DIR / f"{desc['project_name']}.map"
+        if cand.exists():
+            return cand
+    except Exception:
+        pass  # fall through to the glob
+    # Fallback: any .map at the top of build/ (there's only ever the app's).
+    maps = sorted(BUILD_DIR.glob("*.map"))
+    return maps[0] if maps else None
+
+
+def run_size_tool(map_file: Path, *extra: str):
+    """Run esp-idf-size on the map file and return its parsed JSON, or None.
+
+    sys.executable is the ESP-IDF venv python, which bundles esp_idf_size
+    (IDF v6 ships the "ng" rewrite; --format json2 is its machine format).
+    stderr is kept SEPARATE from stdout so tool warnings can't corrupt the
+    JSON. Any failure returns None - the report is never worth blocking a
+    flash over."""
+    cmd = [sys.executable, "-m", "esp_idf_size", "--format", "json2",
+           *extra, str(map_file)]
+    try:
+        proc = subprocess.run(cmd, text=True, timeout=120,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if proc.returncode != 0:
+            return None
+        return json.loads(proc.stdout)
+    except Exception:
+        return None
+
+
+def pct(used: int, total: int) -> str:
+    # "53.73%" - two decimals, matching the precision tracked by hand so far.
+    return f"{used / total * 100:.2f}%" if total > 0 else "-"
+
+
+def generate_size_report(plan: list[dict], parts: dict[int, Partition]) -> None:
+    """Write bin/size_report.txt from the linker map + the flash plan.
+
+    Non-fatal by design, same contract as export_release_bins(): any problem
+    prints a note and returns, because a size-report hiccup (missing map,
+    esp_idf_size format change, ...) must never block a flash."""
+    try:
+        # Either skip below leaves the OLD report in place next to freshly
+        # mirrored binaries, so both warn that the committed report may now be
+        # stale (regenerating needs an ESP-IDF terminal, where sys.executable
+        # is the IDF venv python that bundles esp_idf_size).
+        map_file = find_map_file()
+        if map_file is None:
+            print(yellow("Note: no linker map in build/; size report skipped "
+                         "(bin/size_report.txt may be stale)."))
+            return
+        summary = run_size_tool(map_file)
+        if not isinstance(summary, dict) or "layout" not in summary:
+            print(yellow("Note: esp-idf-size failed; size report not refreshed and "
+                         "bin/size_report.txt may be stale."))
+            print(yellow("  Re-run from an ESP-IDF terminal to regenerate it."))
+            return
+        archives = run_size_tool(map_file, "--archives")  # optional section
+
+        # ---- Memory types, in fixed order --------------------------------
+        layout = {m["name"]: m for m in summary["layout"] if isinstance(m, dict)}
+        ordered = [n for n in MEM_TYPE_ORDER if n in layout]
+        ordered += sorted(n for n in layout if n not in MEM_TYPE_ORDER)
+
+        # The tool reports no capacity for External RAM (see PSRAM_TOTAL_BYTES);
+        # patch one in - but only if a future version doesn't start providing it.
+        ext = layout.get("External RAM")
+        psram_patched = bool(ext and not ext.get("total"))
+        if psram_patched:
+            ext["total"] = PSRAM_TOTAL_BYTES
+            ext["free"] = PSRAM_TOTAL_BYTES - ext["used"]
+
+        # ---- One-line summary (console + report header) ------------------
+        app = next((p for p in plan if p["is_app"]), None)
+        brief = []
+        sram = layout.get("HP SRAM")
+        if sram:
+            brief.append(f"HP SRAM {sram['used']}/{pct(sram['used'], sram['total'])}")
+        if app:
+            slot = app["part"].size if app["part"] else 0
+            brief.append(f"app {app['size']}/{pct(app['size'], slot)} of {app['name']}")
+        brief_line = " | ".join(brief) or "n/a"
+
+        lines = [
+            "PolyCast5 size report",
+            "=====================",
+            f"Static size analysis of the last build (esp-idf-size over "
+            f"build/{map_file.name}),",
+            "regenerated by every flash.py run so it always matches the binaries "
+            "alongside it.",
+            "All sizes are bytes. Output is deterministic - the file only changes "
+            "when sizes",
+            "change - so trends live in git:  git log -p bin/size_report.txt",
+            "",
+            f"Summary: {brief_line}",
+            "",
+        ]
+
+        # ---- Static memory usage (the `idf.py size` view) ----------------
+        # One row per memory type, then its sections indented below it,
+        # name-sorted so lines never reshuffle as relative sizes drift.
+        lines += ["== Static memory usage (linker map) ==", ""]
+        nw = max([len("memory type")] +
+                 [len(f"  {s}") for m in layout.values() for s in m["parts"]] +
+                 [len(n) for n in ordered])
+        lines.append(f"{'memory type':<{nw}} {'used':>10} {'total':>10} "
+                     f"{'used%':>8} {'free':>10}")
+        for name in ordered:
+            m = layout[name]
+            total, used = m.get("total", 0), m.get("used", 0)
+            note = "  [1]" if name == "External RAM" and psram_patched else ""
+            lines.append(f"{name:<{nw}} {used:>10} "
+                         f"{(total or '-'):>10} {pct(used, total):>8} "
+                         f"{(m.get('free', 0) if total else '-'):>10}{note}")
+            for sec, info in sorted(m["parts"].items()):
+                if info.get("size"):
+                    lines.append(f"  {sec:<{nw - 2}} {info['size']:>10}")
+        if psram_patched:
+            lines += ["",
+                      "[1] PSRAM capacity is the board's 8 MB chip (auto-sized, so absent from the",
+                      "    map). Static allocations only; the rest of 'free' is claimed by the",
+                      "    runtime heap (CONFIG_SPIRAM_USE_MALLOC)."]
+        lines.append("")
+
+        # ---- Images vs their flash budgets -------------------------------
+        # Each image against the partition it's flashed into. Images without a
+        # partitions.csv row (bootloader, partition table) get the gap up to
+        # the next known offset as their budget.
+        lines += ["== Images vs flash partitions ==", ""]
+        offsets = sorted(set(parts) | {p["offset"] for p in plan})
+        iw = max(len("image"), max(len(Path(p["rel"]).name) for p in plan))
+        lines.append(f"{'image':<{iw}} {'size':>10} {'capacity':>10} "
+                     f"{'used%':>8} {'free':>10}   flashed to")
+        for p in sorted(plan, key=lambda q: q["offset"]):
+            if p["part"] is not None:
+                cap = p["part"].size
+            else:
+                nxt = [o for o in offsets if o > p["offset"]]
+                cap = (nxt[0] - p["offset"]) if nxt else 0
+            lines.append(f"{Path(p['rel']).name:<{iw}} {p['size']:>10} "
+                         f"{(cap or '-'):>10} {pct(p['size'], cap):>8} "
+                         f"{(cap - p['size'] if cap else '-'):>10}   "
+                         f"{p['offset_hex']} {p['name']}")
+        lines.append("")
+
+        # ---- Per-component breakdown (the `idf.py size-components` view) --
+        if isinstance(archives, dict):
+            # Report by basename (abbrev_name) - full archive keys can be
+            # absolute toolchain paths, which must not leak into a committed,
+            # machine-independent file. Two DIFFERENT archives can share a
+            # basename (the project's libespnow.a vs the esp_wifi blob's, both
+            # linked into this app), so duplicates keep their parent directory
+            # name as a prefix instead of silently summing unrelated libraries.
+            counts: dict[str, int] = {}
+            for key, info in archives.items():
+                base = info.get("abbrev_name") or Path(key).name
+                counts[base] = counts.get(base, 0) + 1
+            rows: dict[str, dict] = {}
+            cols = list(ordered)
+            for key, info in archives.items():
+                name = info.get("abbrev_name") or Path(key).name
+                if counts[name] > 1:
+                    name = f"{Path(key).parent.name or '?'}/{name}"
+                row = rows.setdefault(name, {"total": 0, "by": {}})
+                row["total"] += info.get("size", 0)
+                for tname, tinfo in info.get("memory_types", {}).items():
+                    row["by"][tname] = row["by"].get(tname, 0) + tinfo.get("size", 0)
+            # Memory types only the archives report (none today) are appended
+            # sorted, keeping the column order machine- and run-independent.
+            cols += sorted({t for r in rows.values() for t in r["by"]} - set(cols))
+            lines += ["== Per-component contribution (archives) ==", ""]
+            aw = max([len("archive")] + [len(n) for n in rows])
+            heads = [MEM_TYPE_SHORT.get(c, c) for c in cols]
+            lines.append(f"{'archive':<{aw}} {'total':>10} "
+                         + " ".join(f"{h:>10}" for h in heads))
+            # Size-descending with the name as tie-break, so equal-sized
+            # archives can't swap lines between two otherwise-identical runs.
+            shown = 0
+            for name, row in sorted(rows.items(), key=lambda kv: (-kv[1]["total"], kv[0])):
+                if not row["total"]:
+                    continue  # linked but contributing nothing - noise
+                shown += 1
+                lines.append(f"{name:<{aw}} {row['total']:>10} "
+                             + " ".join(f"{(row['by'].get(c) or '-'):>10}" for c in cols))
+            sums = [sum(r["by"].get(c, 0) for r in rows.values()) for c in cols]
+            lines.append(f"{f'(sum of {shown} archives)':<{aw}} "
+                         f"{sum(r['total'] for r in rows.values()):>10} "
+                         + " ".join(f"{s:>10}" for s in sums))
+        else:
+            lines.append("(per-component breakdown unavailable: "
+                         "esp-idf-size --archives failed)")
+        lines.append("")
+
+        # ---- Write (only when the content actually changed) --------------
+        text = "\n".join(lines)
+        try:
+            # read_bytes, NOT read_text: text mode would translate CRLF -> LF
+            # and a newline-mangled old report (editor save, autocrlf checkout)
+            # would compare "unchanged" forever instead of self-healing to the
+            # canonical LF bytes the write below produces.
+            old = SIZE_REPORT.read_bytes().decode("utf-8")
+        except (OSError, ValueError):
+            # Missing, unreadable, or invalid-UTF-8 (hand-mangled) old report:
+            # treat as different so it gets rewritten below.
+            old = None
+        if old == text:
+            print(gray(f"Size report unchanged ({brief_line})."))
+            return
+        BIN_DIR.mkdir(exist_ok=True)
+        # newline="\n" pins LF on every platform, keeping the committed file
+        # byte-identical no matter which OS ran the flash.
+        with SIZE_REPORT.open("w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+        print(cyan(f"Size report: {brief_line} -> bin/{SIZE_REPORT.name}"))
+    except Exception as e:
+        # Broad on purpose: a tool-format change must degrade to a note, not
+        # kill the flash run.
+        print(yellow(f"Note: couldn't generate the size report ({e})."))
 
 
 # ===========================================================================
@@ -731,12 +987,15 @@ def main() -> int:
             "sha": sha256_file(path),                        # content hash for change detection
         })
 
-    # -- 4. Mirror the built images into bin/ ----------------------------------
+    # -- 4. Mirror the built images into bin/ + refresh the size report -------
     # bin/ holds the committed release binaries (served by the web Firmware
     # Updater), so refreshing it on every build means pushed source always
-    # ships matching binaries. Dry-run changes nothing, on-chip or in the repo.
+    # ships matching binaries; the size report rides along so every commit
+    # also carries its size analysis. Dry-run changes nothing, on-chip or in
+    # the repo.
     if not args.dry_run:
         export_release_bins(plan, write_flash_args)
+        generate_size_report(plan, parts)
 
     # -- 5. Port + device preflight (identity + on-chip FE state) -------------
     if args.dry_run:
