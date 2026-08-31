@@ -2758,19 +2758,12 @@ void lcd_settings_deep_sleep_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
     (void)ui_btns;
     (void)settings_menu;
 
-    // If a hotkey is being armed, this page is the chosen target: capture it under the active hotkey slot and return home WITHOUT sleeping
-    if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
-        lcd_hotkey_save_page_as_hotkey(ui_menu); // Save this page as a hotkey
-        lcd_transition_back(true, ui_menu); // Back to home
-        return;
-    }
-
     // Hide arrows
     lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
 
-    // Direct selection from Settings, or a hotkey firing from home: confirm, then power down
+    // Direct selection from Settings: confirm, then power down
     lv_obj_t *lbl_sleep = lv_label_create(ACTIVE_SCR);
     lcd_format_label(lbl_sleep, "Entering Deep Sleep...", user_secondary_color,
             &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);

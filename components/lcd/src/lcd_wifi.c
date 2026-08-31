@@ -1522,7 +1522,6 @@ void lcd_wifi_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
     }
 }
 
-// TODO: Add MAC spoofing
 void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {
     #define WIFI_AI_PKT_CONN_FAILED_TXT "Connection failed!\nPlease connect to your\nWi-Fi network at least\nonce in the 'Wi-Fi'\nmenu and make sure\nyou are in range."
@@ -1565,6 +1564,11 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
     static TickType_t reconnect_start_tick = 0;
 
     if (init) {
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+
 		// Ensure disconnected at start
 		xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 

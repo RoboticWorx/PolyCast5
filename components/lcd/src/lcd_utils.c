@@ -1756,6 +1756,39 @@ static void go_to_page_from_hotkey(ui_menu_t *ui_menu)
             
             // ui_menu->page already set
             break;
+        /* Tools/games that also use the right arrow (left/top/bottom already shown) */
+        case TOOLS_DICE_PAGE:
+        case TOOLS_NUM_GEN_PAGE:
+        case TOOLS_BTC_ADDR_PAGE:
+        case GAMES_TETRIS_PAGE:
+            // Show right arrow
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            break;
+        /* Full-screen games with no on-screen nav arrows */
+        case GAMES_DOOM_PAGE:
+        case GAMES_TREX_PAGE:
+        case GAMES_FLAPPY_PAGE:
+            // Hide all arrows
+            lv_obj_add_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+            break;
+        /* Coin flipper: only the left (back) arrow is used */
+        case TOOLS_COIN_PAGE:
+            // Hide top and bottom arrows
+            lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+            break;
+        /* Media pads: up/down are media keys, not scroll arrows */
+        case BLUETOOTH_MEDIA_CLASSIC_PAGE:
+        case BLUETOOTH_MEDIA_SCROLL_PAGE:
+        case BLUETOOTH_MEDIA_PRESENTATION_PAGE:
+        case BLUETOOTH_MEDIA_CAMERA_PAGE:
+        case BLUETOOTH_MEDIA_SOCIALS_PAGE:
+            // Hide top and bottom arrows
+            lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+            break;
         default:
             break;
     }
@@ -2507,9 +2540,12 @@ void lcd_transition_back(bool home, ui_menu_t *ui_menu)
     xQueueReset(xDownButtonLongSemaphore);
     xQueueReset(xLeftButtonLongSemaphore);
     xQueueReset(xRightButtonLongSemaphore);
-    
+
+    // Cancel any pending hotkey-pick mode when leaving to home/sleep
+    xEventGroupClearBits(xConnectionIconEventGroup, ICON_BIT_HOTKEY_ACTIVE);
+
     // Transition to home
-    if (home) {        
+    if (home) {
         lcd_anim_start_animation();
 
         ui_menu->page = HOME_PAGE;

@@ -173,6 +173,11 @@ void lcd_tools_coin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
     
     // Only execute once
     if (!do_once) {
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+
         lbl_ins = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_ins, "Press select to flip!", user_secondary_color,
                      &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 15);
@@ -422,6 +427,11 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
     
     // Only execute once
     if (!do_once) {
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+
         user_idx = 0;
         roll_log_buf[0] = 0; // Write null terminator into first element
         
@@ -710,6 +720,11 @@ void lcd_tools_num_gen_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
 
     // Only execute once
     if (!do_once) {
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+
         // Default values
         user_idx = 0;
         min_val = 1;
@@ -2195,7 +2210,12 @@ void lcd_tools_btc_addr_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_
     static lv_obj_t *instr_lbl = NULL;
     static lv_obj_t *qr_canvas = NULL;
     
-    if (!init) {        
+    if (!init) {
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+
         // Create a scrollable container for the instructions
         cont = lv_obj_create(ACTIVE_SCR);
         lv_obj_set_size(cont, 210, 106);

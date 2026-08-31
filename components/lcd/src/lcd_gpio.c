@@ -281,6 +281,11 @@ void lcd_gpio_scanner_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *
     static lv_obj_t *addrs_lbl = NULL;
 
     if (!init) {
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+        
         // Create a scrollable container for the instructions
         cont = lv_obj_create(ACTIVE_SCR);
         lv_obj_set_size(cont, 210, 106);
@@ -415,6 +420,11 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
  
      // Do once
     if (!init) {
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+
         // Create a scrollable container for the instructions
         cont = lv_obj_create(ACTIVE_SCR);
         lv_obj_set_size(cont, 210, 106);

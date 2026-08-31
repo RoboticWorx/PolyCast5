@@ -582,6 +582,11 @@ void lcd_games_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t 
     static lv_draw_buf_t canvas_buf; // Metadata struct (small, internal SRAM)
 
     if (!init) {
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+
         // Reset game state
         memset(tetris_board, 0, sizeof(tetris_board));
         tetris_score = 0;
@@ -1535,6 +1540,11 @@ void lcd_games_trex_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *g
     static lv_draw_buf_t canvas_buf; // Metadata struct (small, internal SRAM)
 
     if (!trex_init) {
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+
         // Load persisted high score once per session, reset run state
         trex_high_score = trex_high_score_nvs_load();
         trex_reset_run();
@@ -2342,6 +2352,11 @@ void lcd_games_flappy_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t 
     POLYCAST5_USE_PSRAM_BSS static lv_draw_buf_t canvas_buf; // Metadata struct (PSRAM)
 
     if (!flappy_init) {
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+        
         // Load persisted high score once per session, reset run state
         flappy_high_score = flappy_high_score_nvs_load();
         flappy_reset_run();

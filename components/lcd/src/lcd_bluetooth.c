@@ -798,6 +798,11 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
 
     // Build initial UI elements
     if (!init) {
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+
         // Create home label
         lbl_home = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_home, "HOME", user_secondary_color,
@@ -1898,6 +1903,11 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
     
     // Only execute once
     if (!do_once) {
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+
         // Reset long semaphore to avoid false triggers
         xQueueReset(xRightButtonLongSemaphore);
 
@@ -2445,6 +2455,11 @@ void lcd_bluetooth_known_devices_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bl
     
     // Init once
     if (!init) {
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+
         // Fetch menu
         setup_known_devices_page(peer_menu);
         peer_menu_build(peer_menu);
@@ -2833,6 +2848,11 @@ void lcd_bluetooth_ble_flood_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blueto
 
     // Only execute once
     if (!do_once) {
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+
         index = 0;
 
         // Create list

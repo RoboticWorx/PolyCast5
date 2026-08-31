@@ -1448,6 +1448,11 @@ void lcd_games_doom_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *g
     POLYCAST5_USE_PSRAM_BSS static lv_draw_buf_t canvas_buf;
 
     if (!doom_init) {
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+        
         // Framebuffer in PSRAM (RGB565)
         size_t buf_size = (size_t)DOOM_VIEW_W * DOOM_VIEW_H * 2;
         doom_fb = heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
