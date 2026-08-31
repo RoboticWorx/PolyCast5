@@ -459,6 +459,10 @@ static void lcd_task(void *pvParameters)
                     lcd_tools_claude_setup_page(&ui_btns, &ui_menu, &tools_menu);
                     dont_sleep_on_this_page = true;
                     break;
+                case TOOLS_U2F_PAGE:
+                    lcd_tools_u2f_page(&ui_btns, &ui_menu, &tools_menu);
+                    dont_sleep_on_this_page = true;
+                    break;
                 // Games pages
                 case GAMES_PAGE:
                     lcd_games_page(&ui_btns, &ui_menu, &games_menu);

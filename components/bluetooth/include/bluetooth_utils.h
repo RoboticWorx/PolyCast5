@@ -187,9 +187,26 @@ typedef struct {
 #define BLUETOOTH_CMD_VOLUME_UP 233
 #define BLUETOOTH_CMD_VOLUME_DOWN 234
 
+/* U2F security key (see u2f.h). Values sit above the 2000-2011 preset block so
+ * they can never collide with a script index, but the dispatcher must still test
+ * them before its BLUETOOTH_SCRIPT_OFFSET catch-all. */
+#define BLUETOOTH_CMD_U2F_START 3000
+#define BLUETOOTH_CMD_U2F_STOP 3001
+#define BLUETOOTH_CMD_U2F_APPROVE 3002
+#define BLUETOOTH_CMD_U2F_DENY 3003
+
 typedef enum {
     BT_STATE_OFF = 0, BT_STATE_INITING, BT_STATE_RUNNING, BT_STATE_DEINITING
 } bluetooth_state_t;
+
+/* Which persona currently owns the radio. Only one may be up at a time, and the
+ * teardown differs: HID goes through esp_hid, U2F owns the NimBLE host directly. */
+typedef enum {
+    BT_PERSONA_NONE = 0, BT_PERSONA_HID, BT_PERSONA_U2F
+} bluetooth_persona_t;
+
+extern volatile bluetooth_state_t bluetooth_state;
+extern volatile bluetooth_persona_t bluetooth_persona;
 
 /** 
  * @brief Initialize bluetooth and start advertising to connect with last known

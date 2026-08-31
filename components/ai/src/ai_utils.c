@@ -32,9 +32,6 @@
 // Hard ceiling so a bad response doesn't eat all RAM
 #define AI_HTTP_BODY_MAX_CAP (128 * 1024)
 
-// TODO: Add mutexes if these are shared across tasks
-extern bluetooth_state_t bluetooth_state;
-
 typedef struct {
     char *buf; // Accumulated body bytes (NUL-terminated for convenience)
     size_t len; // Current length (not including NUL)

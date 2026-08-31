@@ -12,6 +12,7 @@
 #include "bluetooth_utils.h"
 #include "portmacro.h"
 #include "bluetooth_task.h"
+#include "u2f.h"
 #include "bluetooth_nvs.h"
 #include "gpio_task.h"
 #include "gpio_utils.h"
@@ -241,6 +242,28 @@ static void bluetooth_task(void *arg)
 
                 bluetooth_utils_deinit();
             }
+            /* U2F security key */
+            // Tested before the BLUETOOTH_SCRIPT_OFFSET catch-all below, which
+            // would otherwise swallow these as script indices
+            else if (bluetooth_cmd == BLUETOOTH_CMD_U2F_START) {
+                esp_err_t u2f_err = u2f_ble_start();
+                if (u2f_err != ESP_OK) {
+                    ESP_LOGE(TAG, "u2f_ble_start failed: %s", esp_err_to_name(u2f_err));
+
+                    // Status bits are only refreshed while the persona is up, so
+                    // clear them here or the page reports a stale session
+                    xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_U2F_ACTIVE_BIT
+                            | BLUETOOTH_U2F_BONDED_BIT | BLUETOOTH_U2F_PRESENCE_BIT);
+                }
+            } else if (bluetooth_cmd == BLUETOOTH_CMD_U2F_STOP) {
+                u2f_ble_stop();
+                xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_U2F_ACTIVE_BIT
+                        | BLUETOOTH_U2F_BONDED_BIT | BLUETOOTH_U2F_PRESENCE_BIT);
+            } else if (bluetooth_cmd == BLUETOOTH_CMD_U2F_APPROVE) {
+                u2f_presence_approve();
+            } else if (bluetooth_cmd == BLUETOOTH_CMD_U2F_DENY) {
+                u2f_presence_deny();
+            }
             /* Media commands */
             // Vol-up command received
             else if (bluetooth_cmd == BLUETOOTH_CMD_VOLUME_UP && bluetooth_state == BT_STATE_RUNNING) {
@@ -410,6 +433,27 @@ static void bluetooth_task(void *arg)
             }
         }
 
+        /* Pump the U2F state machine. Non-blocking: it picks up an assembled
+           request, runs crypto, and emits KEEPALIVE while the host waits on the
+           user-presence test. */
+        if (u2f_ble_is_active()) {
+            u2f_service();
+
+            // Mirror U2F status out to the LCD page
+            EventBits_t u2f_bits = BLUETOOTH_U2F_ACTIVE_BIT;
+            if (u2f_ble_is_connected()) {
+                u2f_bits |= BLUETOOTH_U2F_BONDED_BIT;
+            }
+            if (u2f_presence_pending()) {
+                u2f_bits |= BLUETOOTH_U2F_PRESENCE_BIT;
+            }
+
+            xEventGroupClearBits(xBluetoothEventGroup,
+                    (BLUETOOTH_U2F_ACTIVE_BIT | BLUETOOTH_U2F_BONDED_BIT
+                            | BLUETOOTH_U2F_PRESENCE_BIT) & ~u2f_bits);
+            xEventGroupSetBits(xBluetoothEventGroup, u2f_bits);
+        }
+
         // Get device battery level
         xQueueReceive(xAdcBatBluetoothQueue, &battery_percentage, 0);
         
@@ -426,7 +470,7 @@ static void bluetooth_task(void *arg)
 
 void bluetooth_task_create(void)
 {
-    if (xTaskCreate(bluetooth_task, "bluetooth_task", 1024 * 4, NULL, POLYCAST5_PRIORITY_MEDIUM, NULL) != pdPASS) {
+    if (xTaskCreate(bluetooth_task, "bluetooth_task", 1024 * 8, NULL, POLYCAST5_PRIORITY_MEDIUM, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start bluetooth_task");
     }
 }

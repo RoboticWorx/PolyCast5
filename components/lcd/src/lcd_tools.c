@@ -1,10 +1,13 @@
 #include <time.h>
+#include <inttypes.h>
+#include <stdio.h>
 #include <sys/param.h>
 
 #include "font/lv_font.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
+#include "freertos/event_groups.h"
 
 #include "gpio_task.h"
 #include "misc/lv_color.h"
@@ -32,6 +35,11 @@
 
 #include "srs_memory.h"
 
+#include "bluetooth_task.h"
+#include "bluetooth_utils.h"
+#include "bluetooth_nvs.h"
+#include "gpio_utils.h"
+
 #include "img_coin_heads.h"
 #include "img_coin_tails.h"
 #include "img_clawd.h"
@@ -40,8 +48,8 @@
 
 tools_menu_t tools_menu = {
     .options = {"Coin Flipper", "Dice Roller", "Number Generator", "Read the Docs", "Bitcoin QR",
-            "Pomodoro Timer", "SRS Planner", "Claude Usage"},
-    .size = 8,
+            "Pomodoro Timer", "SRS Planner", "Claude Usage", "Security Key"},
+    .size = 9,
     .index = 0,
     .cont = NULL,
 };
@@ -2442,5 +2450,155 @@ void lcd_tools_btc_addr_setup_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools
         xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_BTC_START_BIT);
         
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
+}
+
+
+/* =============== U2F security key =============== */
+
+// Controller sync alone can take 2 s, so allow for it before reporting failure
+#define U2F_START_GRACE_MS 4000
+
+// Page objects, file-scope so the three exit paths can share one teardown
+static bool u2f_do_once = false;
+static lv_obj_t *u2f_lbl_title = NULL;
+static lv_obj_t *u2f_lbl_status = NULL;
+static lv_obj_t *u2f_lbl_hint = NULL;
+static bool u2f_was_pending = false;
+static uint32_t u2f_pair_code = 0;
+static TickType_t u2f_started_tick = 0;
+
+static void lcd_tools_u2f_teardown(ui_menu_t *ui_menu, tools_menu_t *tools_menu)
+{
+    // Hand the radio back so the HID keyboard can claim it again
+    uint16_t cmd = BLUETOOTH_CMD_U2F_STOP;
+    xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+
+    // Delete objects
+    if (u2f_lbl_title) {
+        lv_obj_delete(u2f_lbl_title);
+    }
+    if (u2f_lbl_status) {
+        lv_obj_delete(u2f_lbl_status);
+    }
+    if (u2f_lbl_hint) {
+        lv_obj_delete(u2f_lbl_hint);
+    }
+
+    // Reset statics
+    u2f_lbl_title = u2f_lbl_status = u2f_lbl_hint = NULL;
+    u2f_was_pending = false;
+    u2f_do_once = false;
+
+    // Show tools list
+    lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+    // Show top and bottom arrows
+    lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+}
+
+void lcd_tools_u2f_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
+{
+    static char status_buf[48];
+
+    // Only execute once
+    if (!u2f_do_once) {
+        u2f_lbl_title = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(u2f_lbl_title, "Security Key", user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 8);
+
+        u2f_lbl_status = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(u2f_lbl_status, "Starting...", user_secondary_color,
+                &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
+
+        u2f_lbl_hint = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(u2f_lbl_hint, "", user_secondary_color,
+                &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -8);
+
+        // Read once on entry rather than every frame; it cannot change here
+        u2f_pair_code = 0;
+        bluetooth_nvs_pairing_key_load(&u2f_pair_code);
+
+        // Bring the FIDO persona up; it takes the radio from the HID keyboard
+        uint16_t cmd = BLUETOOTH_CMD_U2F_START;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+
+        u2f_started_tick = xTaskGetTickCount();
+        u2f_was_pending = false;
+        u2f_do_once = true;
+    }
+
+    EventBits_t bits = xEventGroupGetBits(xBluetoothEventGroup);
+    bool active = (bits & BLUETOOTH_U2F_ACTIVE_BIT) != 0;
+    bool bonded = (bits & BLUETOOTH_U2F_BONDED_BIT) != 0;
+    bool pending = (bits & BLUETOOTH_U2F_PRESENCE_BIT) != 0;
+
+    if (pending) {
+        // A host is blocked on the user-presence test
+        lv_label_set_text(u2f_lbl_title, "Approve login?");
+        lv_label_set_text(u2f_lbl_status, "A site is asking to\nverify this key.");
+        lv_label_set_text(u2f_lbl_hint, "SELECT approve  BACK deny");
+
+        // Buzz once on the rising edge, not every tick the prompt is up
+        if (!u2f_was_pending) {
+            xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics
+            gpio_utils_spin_haptic(150);
+            xSemaphoreGive(xHapticsMutex); // Release haptics
+        }
+    } else if (bonded) {
+        lv_label_set_text(u2f_lbl_title, "Security Key");
+        lv_label_set_text(u2f_lbl_status, "Connected.\nWaiting for a login.");
+        lv_label_set_text(u2f_lbl_hint, "BACK to exit");
+    } else if (active) {
+        // Windows and Android ask for this code while pairing
+        snprintf(status_buf, sizeof(status_buf),
+                "Pair \"PolyCast5-U2F\"\nPair code: %06" PRIu32, u2f_pair_code);
+
+        lv_label_set_text(u2f_lbl_title, "Security Key");
+        lv_label_set_text(u2f_lbl_status, status_buf);
+        lv_label_set_text(u2f_lbl_hint, "BACK to exit");
+    } else if (xTaskGetTickCount() - u2f_started_tick < pdMS_TO_TICKS(U2F_START_GRACE_MS)) {
+        /* Bringing the radio up waits on controller sync, so the active bit lags
+           the command by up to a couple of seconds. Do not call that a failure yet. */
+        lv_label_set_text(u2f_lbl_status, "Starting...");
+        lv_label_set_text(u2f_lbl_hint, "BACK to exit");
+    } else {
+        lv_label_set_text(u2f_lbl_status, "Radio busy.\nTurn Bluetooth off first.");
+        lv_label_set_text(u2f_lbl_hint, "BACK to exit");
+    }
+
+    u2f_was_pending = pending;
+
+    // Approve the pending request
+    if (ui_btns->select_btn == 1 && pending) {
+        uint16_t cmd = BLUETOOTH_CMD_U2F_APPROVE;
+        xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+        return;
+    }
+
+    if (ui_btns->left_btn == 1) {
+        // While a request is parked, BACK denies it rather than leaving the page
+        if (pending) {
+            uint16_t cmd = BLUETOOTH_CMD_U2F_DENY;
+            xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
+            return;
+        }
+
+        lcd_tools_u2f_teardown(ui_menu, tools_menu);
+
+        // Switch pages
+        ui_menu->page = TOOLS_PAGE;
+    } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off selected
+        bool home = ui_btns->home_btn == 1;
+
+        lcd_tools_u2f_teardown(ui_menu, tools_menu);
+
+        if (home) {
+            // Switch pages
+            ui_menu->page = TOOLS_PAGE;
+        } else {
+            lcd_transition_back(false, ui_menu); // True = home, false = sleep
+        }
     }
 }

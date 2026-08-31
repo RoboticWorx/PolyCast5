@@ -22,6 +22,7 @@
 #include "bluetooth_utils.h"
 #include "bluetooth_nvs.h"
 #include "ble_flood.h"
+#include "u2f.h"
 #include "gpio_utils.h"
 #include "gpio_task.h"
 #include "bluetooth_task.h"
@@ -68,6 +69,7 @@
 #define HID_CC_IN_RPT_LEN 2 // 2-byte CC report
 
 volatile bluetooth_state_t bluetooth_state = BT_STATE_OFF;
+volatile bluetooth_persona_t bluetooth_persona = BT_PERSONA_NONE;
 
 /* BLE HID state */
 typedef struct {
@@ -1380,6 +1382,12 @@ void bluetooth_utils_init(void)
         return;
     }
 
+    // Same for the U2F security key, which also owns the host directly
+    if (u2f_ble_is_active()) {
+        ESP_LOGE(TAG, "Refusing BT init: U2F security key is active");
+        return;
+    }
+
     bluetooth_state = BT_STATE_INITING;
 
     esp_err_t ret;
@@ -1437,6 +1445,7 @@ void bluetooth_utils_init(void)
 #endif
 
     bluetooth_state = BT_STATE_RUNNING;
+    bluetooth_persona = BT_PERSONA_HID;
 
     // Re-sync NVS bonds to drop any NimBLE bonds that aren't in NVS
     bluetooth_utils_reconcile_bonds();
@@ -1451,6 +1460,14 @@ void bluetooth_utils_deinit(void)
 
     // If already off or deiniting, exit
     if (bluetooth_state == BT_STATE_OFF || bluetooth_state == BT_STATE_DEINITING) {
+        return;
+    }
+
+    /* The U2F persona owns the host without esp_hid, so it must tear itself
+     * down; running the HID teardown over it would stop a GATT context it never
+     * created. */
+    if (bluetooth_persona == BT_PERSONA_U2F) {
+        ESP_LOGW(TAG, "Refusing HID deinit: U2F security key owns the radio");
         return;
     }
 
@@ -1502,6 +1519,7 @@ void bluetooth_utils_deinit(void)
     // Safety net: clear icon in case HID disconnect event didn't fire during stop
     xEventGroupClearBits(xConnectionIconEventGroup, ICON_BIT_BT_CONNECTED);
 
+    bluetooth_persona = BT_PERSONA_NONE;
     bluetooth_state = BT_STATE_OFF;
 }
 

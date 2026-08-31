@@ -14,4 +14,5 @@ idf_component_register(
     
     PRIV_REQUIRES
         gpio wifi ai nvs_flash esp_http_server esp_wifi esp_netif esp_driver_sdspi esp_hw_support
+        mbedtls
 )

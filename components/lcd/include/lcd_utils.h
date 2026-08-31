@@ -156,6 +156,7 @@ enum {
     WIFI_ARP_SPOOF_PAGE,
     SETTINGS_DEEP_SLEEP_PAGE,
     SECURITY_DISCLAIMER_PAGE,
+    TOOLS_U2F_PAGE,
 };
 
 // Security features that show a one-time authorized/educational-use disclaimer before their first use
