@@ -273,8 +273,8 @@ void lora_pcp_generate_random_key(void)
 
 void lora_pcp_process_received_message(uint8_t *message, size_t message_len)
 {
-    // Minimum valid packet: nonce + ACK ciphertext + MIC
-    size_t min_len = LORA_PCP_NONCE_LENGTH + LORA_PCP_ACK_CIPHERTEXT_LEN + LORA_PCP_MIC_LENGTH;
+    // Minimum valid packet: nonce + smallest (v1) ACK ciphertext + MIC
+    size_t min_len = LORA_PCP_NONCE_LENGTH + LORA_PCP_ACK_V1_CIPHERTEXT_LEN + LORA_PCP_MIC_LENGTH;
     if (message_len < min_len) {
         ESP_LOGE(TAG, "Received message too short!");
         return;
@@ -315,21 +315,20 @@ void lora_pcp_process_received_message(uint8_t *message, size_t message_len)
 
     uint8_t msg_type = plaintext[0];
 
-    if (msg_type == LORA_PCP_ACK && plaintext_len == LORA_PCP_ACK_CIPHERTEXT_LEN) {
-        lora_pcp_ack_msg_t ack;
-        memcpy(&ack, plaintext, sizeof(ack));
+    // Accept both ACK forms: v2 carries the relay state byte, v1 (older PolyPlug
+    // firmware) stops after the msg_id and is reported as "no state"
+    if (msg_type == LORA_PCP_ACK &&
+            (plaintext_len == LORA_PCP_ACK_CIPHERTEXT_LEN || plaintext_len == LORA_PCP_ACK_V1_CIPHERTEXT_LEN)) {
+        lora_pcp_ack_msg_t ack = { .state = LORA_PCP_ACK_STATE_NONE }; // v1 leaves state at NONE
+        memcpy(&ack, plaintext, plaintext_len);
 
         if (ack.msg_id == expected_rx_id) {
 #ifdef POLYCAST5_DEBUG
-            ESP_LOGI(TAG, "ACK matches id=%" PRIu32, ack.msg_id);
+            ESP_LOGI(TAG, "ACK matches id=%" PRIu32 " state=0x%02X", ack.msg_id, ack.state);
 #endif
             waiting_for_ack = false; // Done; a queued next command dispatches normally
 
-            // Only signal delivered if no newer command is already queued -
-            // the UI checkmark must never show for a command that hasn't been sent yet
-            if (uxQueueMessagesWaiting(xLoraSendEncQueue) == 0) {
-                xSemaphoreGive(xLoraReceiptValidSemaphore);
-            }
+            lora_task_post_ack(ack.state); // Publishes the outcome for the UI
         } else {
 #ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "ACK ID wrong (got=%" PRIu32 ", want=%" PRIu32 ")", ack.msg_id, expected_rx_id);

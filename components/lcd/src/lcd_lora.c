@@ -59,6 +59,14 @@ lora_menu_t lora_menu = {
 
 lora_plan_menu_t lora_plan_menu = {0};
 
+#define LORA_SUBMENU_GPIO_IDX 4 // "GPIO" row; the GPIO page renders only its own result
+
+// Who the outcome waiting on xLoraReceiptQueue belongs to. A command can still be
+// in flight while the user moves to another PolyPlug or another page, so each page
+// checks these before rendering rather than assuming the result is its own.
+static int receipt_plug = -1; // lora_menu index the command was sent to
+static int receipt_cmd = -1;  // submenu index of the command that was sent
+
 static const char *submenu_options[] = {
     LV_SYMBOL_UPLOAD "\nSEND",
     LV_SYMBOL_LOOP "\nLOOP",
@@ -283,12 +291,54 @@ void lcd_lora_update_menu(lora_menu_t *menu)
     lv_obj_scroll_to_view(menu->btns[menu->index], LV_ANIM_ON); // LV_ANIM_OFF
 }
 
+/**
+ * @brief Render a command outcome onto a label.
+ *
+ * A toggle reports the relay level the PolyPlug settled on ("1" on, "0" off) or
+ * an X once every retry is exhausted. Every other command type keeps the plain
+ * delivered tick it has always shown.
+ *
+ * @param [in] receipt Outcome reported by lora_task
+ *
+ * @returns The glyph to display
+ */
+static const char *lora_receipt_symbol(lora_receipt_t receipt)
+{
+    switch (receipt) {
+        case LORA_RECEIPT_RELAY_ON:  return "1";
+        case LORA_RECEIPT_RELAY_OFF: return "0";
+        case LORA_RECEIPT_FAILED:    return LV_SYMBOL_CLOSE;
+        default:                     return LV_SYMBOL_OK;
+    }
+}
+
+/**
+ * @brief Queue a LoRa command raised from a page and record who owns its outcome.
+ *
+ * @param [in] cmd Command to send
+ * @param [in] plug_idx lora_menu index of the target PolyPlug
+ */
+static void lora_send_ui_cmd(const lora_pcp_cmd_t *cmd, int plug_idx)
+{
+    receipt_plug = plug_idx;
+    receipt_cmd = cmd->index;
+
+    lora_send_req_t req = { .cmd = *cmd, .ui_origin = true };
+    xQueueOverwrite(xLoraSendEncQueue, &req);
+
+    if (xLoraReceiptQueue) {
+        xQueueReset(xLoraReceiptQueue); // Drain a stale outcome so only this command's shows
+    }
+}
+
 void lcd_lora_update_submenu(lora_menu_t *menu)
 {
     // Hide and reset receipt label
     lv_obj_add_flag(menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
     lv_label_set_text(menu->submenu.lbl_receipt, "");
-    xSemaphoreTake(xLoraReceiptValidSemaphore, 0); // Drop any receipt latched while away (e.g. a hotkey command's ACK)
+    if (xLoraReceiptQueue) {
+        xQueueReset(xLoraReceiptQueue); // Drop an outcome already latched from elsewhere
+    }
 
     // Reveal
     lv_obj_remove_flag(menu->submenu.cont, LV_OBJ_FLAG_HIDDEN);
@@ -1009,6 +1059,11 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
             // Remove entry from NVS
             lcd_lora_menu_nvs_delete(del_idx);
             lcd_lora_key_nvs_delete(del_idx);
+
+            // The list is renumbered, so a recorded owner index no longer means
+            // the same PolyPlug; forget it rather than let a slot inherit it
+            receipt_plug = -1;
+            receipt_cmd = -1;
         
             // Refresh the list UI
             lcd_lora_update_menu(lora_menu);
@@ -1038,11 +1093,13 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
 
 void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu) 
 {    
-    // If received a valid receipt from the receiver
-    if (xSemaphoreTake(xLoraReceiptValidSemaphore, 0) == pdTRUE) {
-        // Show check in top left corner
+    // If the receiver reported an outcome for the last command sent from here
+    lora_receipt_t receipt;
+    if (xLoraReceiptQueue && xQueueReceive(xLoraReceiptQueue, &receipt, 0) == pdTRUE &&
+            receipt_plug == lora_menu->index) { // Ours, not another plug's
+        // Show the result in top left corner
         lv_obj_remove_flag(lora_menu->submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
-        lv_label_set_text(lora_menu->submenu.lbl_receipt, LV_SYMBOL_OK);
+        lv_label_set_text(lora_menu->submenu.lbl_receipt, lora_receipt_symbol(receipt));
     }
     
     // Scroll right
@@ -1130,8 +1187,7 @@ void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_
         }
         
         // Send the command
-        xQueueOverwrite(xLoraSendEncQueue, &lora_cmd);
-        xSemaphoreTake(xLoraReceiptValidSemaphore, 0); // Drain stale receipt so only this command's ACK shows
+        lora_send_ui_cmd(&lora_cmd, lora_menu->index);
 
         // RGB indicator
         uint8_t rgb_state = RGB_BLINK_TEAL;
@@ -1343,8 +1399,7 @@ void lcd_lora_loop_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
                     &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
             lv_timer_handler();
 
-            xQueueOverwrite(xLoraSendEncQueue, &lora_cmd); // Send the command
-            xSemaphoreTake(xLoraReceiptValidSemaphore, 0); // Drain stale receipt so only this command's ACK shows
+            lora_send_ui_cmd(&lora_cmd, lora_menu->index); // Send the command
             vTaskDelay(pdMS_TO_TICKS(500));
         }
 
@@ -1437,6 +1492,9 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
     if (!init) {
         tx_success = false;
         cmd_to_send = 1;
+        if (xLoraReceiptQueue) {
+            xQueueReset(xLoraReceiptQueue); // Drop an outcome already latched from another page
+        }
         
         // Create labels
         lbl_send_tx = lv_label_create(ACTIVE_SCR);
@@ -1525,8 +1583,11 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
         lv_label_set_text(lbl_send_tx, GPIO_TX_TXT LV_SYMBOL_OK);
         tx_success = false; // Update once
     }
-    // If got a receipt
-    if (xSemaphoreTake(xLoraReceiptValidSemaphore, 0) == pdTRUE) {
+    // If got a receipt for this page's own command. A toggle still in flight from
+    // the submenu resolves to the same PolyPlug, so the command must match too.
+    lora_receipt_t gpio_receipt;
+    if (xLoraReceiptQueue && xQueueReceive(xLoraReceiptQueue, &gpio_receipt, 0) == pdTRUE &&
+            receipt_plug == lora_menu->index && receipt_cmd == LORA_SUBMENU_GPIO_IDX) {
         lv_label_set_text(lbl_send_rx, GPIO_RX_TXT LV_SYMBOL_OK);
     }
     
@@ -1576,8 +1637,7 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
             memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
             snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "gpio %d", cmd_to_send);
 
-            xQueueOverwrite(xLoraSendEncQueue, &lora_cmd); // Send the command
-            xSemaphoreTake(xLoraReceiptValidSemaphore, 0); // Drain stale receipt so only this command's ACK shows
+            lora_send_ui_cmd(&lora_cmd, lora_menu->index); // Send the command
 
             // TX confirmation
             tx_success = true;
@@ -2178,8 +2238,7 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
             lcd_format_label(lbl_send_conf, "Sending to PolyPlug...", user_secondary_color,
                     &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
             lv_timer_handler();
-            xQueueOverwrite(xLoraSendEncQueue, &lora_cmd); // Send the command
-            xSemaphoreTake(xLoraReceiptValidSemaphore, 0); // Drain stale receipt so only this command's ACK shows
+            lora_send_ui_cmd(&lora_cmd, lora_menu->index); // Send the command
 
             vTaskDelay(pdMS_TO_TICKS(1000)); // Wait 1000ms
             lv_obj_delete(lbl_send_conf); // Delete label
@@ -2461,8 +2520,7 @@ void lcd_lora_away_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
                     &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
             lv_timer_handler();
 
-            xQueueOverwrite(xLoraSendEncQueue, &lora_cmd); // Send
-            xSemaphoreTake(xLoraReceiptValidSemaphore, 0); // Drain stale receipt so only this command's ACK shows
+            lora_send_ui_cmd(&lora_cmd, lora_menu->index); // Send
             vTaskDelay(pdMS_TO_TICKS(500)); // Wait additional 500ms
 
             lv_obj_delete(lbl_send_conf); // Delete label
@@ -2632,8 +2690,7 @@ void lcd_lora_away_custom_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_m
                     &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
             lv_timer_handler();
 
-            xQueueOverwrite(xLoraSendEncQueue, &lora_cmd); // Send
-            xSemaphoreTake(xLoraReceiptValidSemaphore, 0); // Drain stale receipt so only this command's ACK shows
+            lora_send_ui_cmd(&lora_cmd, lora_menu->index); // Send
             vTaskDelay(pdMS_TO_TICKS(500)); // Wait additional 500ms
             lcd_clear_pending_inputs = true;
 

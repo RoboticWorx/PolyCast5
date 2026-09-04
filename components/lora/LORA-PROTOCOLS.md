@@ -159,24 +159,47 @@ All multi-byte integers are the on-wire layout of the packed C structs
 | Type    | 1 B  | `0x01` = COMMAND                                     |
 | Msg ID  | 4 B  | uint32, monotonic; the ACK must echo this            |
 | Index   | 1 B  | which plug in the paired set                         |
-| Instr   | 32 B | NUL-terminated instruction string (`"0"` if none)    |
+| Instr   | 32 B | NUL-terminated instruction string. A toggle (index 0) carries `LORA_PCP_INSTR_TOGGLE` (`"0s"`) when the remote wants the relay level back; `"0"` is the filler for any other command with no arguments |
 
-**ACK packet - 22 bytes on air**
+**ACK packet - 23 bytes on air (v2), or 22 bytes (v1)**
 
 ```
 ┌───────────────┬──────────────────────────────────────────────┬────────────┐
-│  Nonce (13B)  │             AES-CCM Ciphertext (5B)          │  MIC (4B)  │
-│   random      ├──────┬───────────────────────────────────────┤  auth tag  │
-│               │ Type │                Msg ID                 │            │
-│               │  1B  │                4B u32                 │            │
-│               │ 0x02 │                                       │            │
-└───────────────┴──────┴───────────────────────────────────────┴────────────┘
+│  Nonce (13B)  │             AES-CCM Ciphertext (6B)          │  MIC (4B)  │
+│   random      ├──────┬────────────────────────────┬──────────┤  auth tag  │
+│               │ Type │           Msg ID           │  State   │            │
+│               │  1B  │           4B u32           │  1B u8   │            │
+│               │ 0x02 │                            │          │            │
+└───────────────┴──────┴────────────────────────────┴──────────┴────────────┘
 ```
 
-| Field  | Size | Meaning                          |
-|--------|------|----------------------------------|
-| Type   | 1 B  | `0x02` = ACK                     |
-| Msg ID | 4 B  | uint32; echoes the command's id  |
+| Field  | Size | Meaning                                                               |
+|--------|------|-----------------------------------------------------------------------|
+| Type   | 1 B  | `0x02` = ACK                                                          |
+| Msg ID | 4 B  | uint32; echoes the command's id                                       |
+| State  | 1 B  | relay level after a toggle: `0x00` off, `0x01` on, `0xFF` not reported |
+
+**The two ACK forms.** State is the last field, so dropping it yields exactly the
+original 22-byte packet. Which form the PolyPlug sends is decided per command, by
+the command itself, so a remote and a plug on different firmware versions keep
+working in both directions:
+
+- A remote that wants the relay level sends `LORA_PCP_INSTR_TOGGLE` (`"0s"`) as
+  the instruction of a toggle command (index 0). `lora_task` injects it at
+  dispatch, and only for a command whose outcome will actually be displayed - a
+  hotkey's result is discarded, so it does not ask and the plug does not hold its
+  ACK waiting for the relay.
+- A PolyPlug replies with the 23-byte v2 ACK **only** for a toggle carrying that
+  marker. Every other command, and any toggle from a remote that does not ask,
+  gets the 22-byte v1 ACK.
+- Older plugs ignore the instruction field for toggles entirely, so they answer
+  with v1. The remote reads that as `0xFF` (delivered, level unknown) and shows
+  the plain tick.
+
+The plug reports the level the relay actually reached: it waits up to 500 ms for
+`gpio_task` to apply the toggle and publish the resulting level, matched by
+message id so a level left over from an earlier command cannot be misreported. If
+that wait expires the ACK still goes out, carrying `0xFF`.
 
 ### 1.5 Message flow
 
@@ -192,10 +215,26 @@ LCD/UI ──► xLoraSendEncQueue ──► lora_task
                  ┌──────────────────┼───────────────────┐
                  ▼                  ▼                   ▼
           ACK, id matches     ACK id wrong /      RX timeout /
-          → delivered ✓       CRC fail            header/CRC error
+          → delivered         CRC fail            header/CRC error
                               → retry (≤ 2)       → retry (≤ 2)
                                                    then give up
 ```
+
+**What the UI shows.** The outcome is published on `xLoraReceiptQueue` and
+rendered by the LoRa pages:
+
+| Outcome                | Toggle (index 0) | Timer / plan / away / GPIO |
+|------------------------|------------------|----------------------------|
+| ACK, relay ended on    | `1`              | -                          |
+| ACK, relay ended off   | `0`              | -                          |
+| ACK, no level reported | ✓                | ✓                          |
+| Every retry exhausted  | ✗                | nothing                    |
+
+Only commands raised from a LoRa page publish an outcome. A hotkey fired from the
+homescreen is tagged `ui_origin = false` and stays silent, so its result can never
+be painted onto whichever page the user opens next. An outcome is also withheld
+when a newer command is already queued, so what is shown always belongs to the
+most recent send.
 
 The `waiting_for_ack` / `need_to_retry` state machine lives in
 [`lora_task.c`](src/lora_task.c); encryption, key handling, and ACK validation are
@@ -211,6 +250,10 @@ in [`lora_pcp.c`](src/lora_pcp.c).
 | `LORA_PCP_INSTR_MAX_LEN` | 32    | instruction string capacity    |
 | `LORA_PCP_COMMAND`       | 0x01  | command type byte              |
 | `LORA_PCP_ACK`           | 0x02  | ACK type byte                  |
+| `LORA_PCP_ACK_STATE_OFF` | 0x00  | ACK state: relay ended off     |
+| `LORA_PCP_ACK_STATE_ON`  | 0x01  | ACK state: relay ended on      |
+| `LORA_PCP_ACK_STATE_NONE`| 0xFF  | ACK state: no level reported   |
+| `LORA_PCP_INSTR_TOGGLE`  | `"0s"`| toggle instr asking for state  |
 | `MAX_RETRIES`            | 2     | retransmits before giving up   |
 
 ---

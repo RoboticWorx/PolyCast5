@@ -10,14 +10,17 @@
 // │             │  1B  │    4B    │  1B   │        32B        │            │
 // │             │ 0x01 │  uint32  │ uint8 │      char[32]     │            │
 // ├─────────────┴──────┴──────────┴───────┴───────────────────┴────────────┤
-// │                      ACK Packet (22 bytes on air)                      │
+// │                   ACK Packet (23 bytes on air, v2)                     │
 // ├─────────────┬─────────────────────────────────────────────┬────────────┤
-// │ Nonce (13B) │           AES-CCM Ciphertext (5B)           │  MIC (4B)  │
-// │  Random     ├──────┬──────────────────────────────────────┤  Auth Tag  │
-// │             │ Type │                Msg ID                │            │
-// │             │  1B  │                  4B                  │            │
-// │             │ 0x02 │                uint32                │            │
-// └─────────────┴──────┴──────────────────────────────────────┴────────────┘
+// │ Nonce (13B) │           AES-CCM Ciphertext (6B)           │  MIC (4B)  │
+// │  Random     ├──────┬───────────────────────────┬──────────┤  Auth Tag  │
+// │             │ Type │           Msg ID          │  State   │            │
+// │             │  1B  │             4B            │    1B    │            │
+// │             │ 0x02 │           uint32          │  uint8   │            │
+// └─────────────┴──────┴───────────────────────────┴──────────┴────────────┘
+// The trailing State byte is the post-toggle relay level and is only appended
+// when the command asked for it (see LORA_PCP_INSTR_TOGGLE). Without it the ACK
+// is the original 22-byte, 5-byte-ciphertext v1 packet, which is still accepted.
 
 #ifndef LORA_PCP_H
 #define LORA_PCP_H
@@ -100,15 +103,30 @@ typedef struct __attribute__((packed)) {
     char     instr[LORA_PCP_INSTR_MAX_LEN];
 } lora_pcp_cmd_msg_t;
 
-// ACK message (5 bytes plaintext, 5 bytes ciphertext - no padding with CCM)
+// ACK message (6 bytes plaintext, 6 bytes ciphertext - no padding with CCM)
+// 'state' reports the relay level the PolyPlug settled on after a toggle command,
+// so the UI can show the real outcome instead of a bare "delivered" tick.
 typedef struct __attribute__((packed)) {
     uint8_t  type;
     uint32_t msg_id;
+    uint8_t  state;
 } lora_pcp_ack_msg_t;
+
+// Relay level carried by the ACK 'state' byte
+#define LORA_PCP_ACK_STATE_OFF  0x00 // Toggle left the relay OFF
+#define LORA_PCP_ACK_STATE_ON   0x01 // Toggle left the relay ON
+#define LORA_PCP_ACK_STATE_NONE 0xFF // No relay level reported (non-toggle command, or outcome unknown)
+
+// Instruction marker that asks the PolyPlug for a state-carrying (v2) ACK.
+// The plug ignores 'instr' for toggle commands, so an older plug simply replies
+// with the v1 ACK and an older remote never sends the marker at all - which is
+// what keeps mixed-firmware pairs working in both directions.
+#define LORA_PCP_INSTR_TOGGLE "0s"
 
 // Ciphertext sizes per message type (plaintext size, no block padding)
 #define LORA_PCP_CMD_CIPHERTEXT_LEN (sizeof(lora_pcp_cmd_msg_t)) // 38
-#define LORA_PCP_ACK_CIPHERTEXT_LEN (sizeof(lora_pcp_ack_msg_t)) // 5
+#define LORA_PCP_ACK_CIPHERTEXT_LEN (sizeof(lora_pcp_ack_msg_t)) // 6
+#define LORA_PCP_ACK_V1_CIPHERTEXT_LEN 5 // Pre-state ACK, still accepted from older PolyPlugs
 
 // Max ciphertext size (command message)
 #define LORA_PCP_CIPHERTEXT_LENGTH (LORA_PCP_CMD_CIPHERTEXT_LEN)
@@ -121,6 +139,20 @@ typedef struct {
     uint8_t key[LORA_PCP_ENC_KEY_LEN];
     int index;
 } lora_pcp_cmd_t;
+
+/**
+ * @brief Outcome of a sent command, as shown by the LoRa pages.
+ *
+ * RELAY_OFF/RELAY_ON only ever describe a toggle command (index 0); every other
+ * command type reports ACKED. FAILED is raised for a toggle whose retries were
+ * all exhausted without a valid ACK.
+ */
+typedef enum {
+    LORA_RECEIPT_FAILED = 0, // No valid ACK after every retry
+    LORA_RECEIPT_ACKED,      // Delivered and ACKed, no relay level reported
+    LORA_RECEIPT_RELAY_OFF,  // Toggle ACKed; relay ended OFF
+    LORA_RECEIPT_RELAY_ON,   // Toggle ACKed; relay ended ON
+} lora_receipt_t;
 
 extern volatile uint32_t expected_rx_id;
 extern volatile bool waiting_for_ack;
