@@ -2522,9 +2522,6 @@ void lcd_bluetooth_known_devices_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bl
         // Clean up
         lv_obj_clean(peer_menu->main_list);
         
-        // Show bluetooth menu
-        lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-        
         // Reset init
         init = false;
         
