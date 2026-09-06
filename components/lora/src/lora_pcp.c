@@ -321,15 +321,11 @@ void lora_pcp_process_received_message(uint8_t *message, size_t message_len)
 
         if (ack.msg_id == expected_rx_id) {
 #ifdef POLYCAST5_DEBUG
-            ESP_LOGI(TAG, "ACK matches id=%" PRIu32, ack.msg_id);
+            ESP_LOGI(TAG, "ACK matches id=%" PRIu32 " state=0x%02X", ack.msg_id, ack.state);
 #endif
             waiting_for_ack = false; // Done; a queued next command dispatches normally
 
-            // Only signal delivered if no newer command is already queued -
-            // the UI checkmark must never show for a command that hasn't been sent yet
-            if (uxQueueMessagesWaiting(xLoraSendEncQueue) == 0) {
-                xSemaphoreGive(xLoraReceiptValidSemaphore);
-            }
+            lora_task_post_ack(ack.state); // Publishes the outcome for the UI
         } else {
 #ifdef POLYCAST5_DEBUG
             ESP_LOGW(TAG, "ACK ID wrong (got=%" PRIu32 ", want=%" PRIu32 ")", ack.msg_id, expected_rx_id);

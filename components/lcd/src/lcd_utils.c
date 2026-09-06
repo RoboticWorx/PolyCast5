@@ -1928,7 +1928,8 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
             
             // Send the command
-            xQueueOverwrite(xLoraSendEncQueue, &hotkey_cmd.lora_cmd[HOTKEY_LONG_HOME_IDX]); // Never block the UI; latest command wins
+            lora_send_req_t lora_req = { .cmd = hotkey_cmd.lora_cmd[HOTKEY_LONG_HOME_IDX], .ui_origin = false };
+            xQueueOverwrite(xLoraSendEncQueue, &lora_req); // Never block the UI; latest command wins
         } else if (hotkey_cmd.has_espnow[HOTKEY_LONG_HOME_IDX]) { // Else ESP-NOW
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_TEAL;
@@ -1970,7 +1971,8 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
             
             // Send the command
-            xQueueOverwrite(xLoraSendEncQueue, &hotkey_cmd.lora_cmd[HOTKEY_LONG_LEFT_IDX]); // Never block the UI; latest command wins
+            lora_send_req_t lora_req = { .cmd = hotkey_cmd.lora_cmd[HOTKEY_LONG_LEFT_IDX], .ui_origin = false };
+            xQueueOverwrite(xLoraSendEncQueue, &lora_req); // Never block the UI; latest command wins
         } else if (hotkey_cmd.has_espnow[HOTKEY_LONG_LEFT_IDX]) { // Else ESP-NOW
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_TEAL;
@@ -2012,7 +2014,8 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
             
             // Send the command
-            xQueueOverwrite(xLoraSendEncQueue, &hotkey_cmd.lora_cmd[HOTKEY_LONG_RIGHT_IDX]); // Never block the UI; latest command wins
+            lora_send_req_t lora_req = { .cmd = hotkey_cmd.lora_cmd[HOTKEY_LONG_RIGHT_IDX], .ui_origin = false };
+            xQueueOverwrite(xLoraSendEncQueue, &lora_req); // Never block the UI; latest command wins
         } else if (hotkey_cmd.has_espnow[HOTKEY_LONG_RIGHT_IDX]) { // Else ESP-NOW
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_TEAL;
@@ -2054,7 +2057,8 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
             
             // Send the command
-            xQueueOverwrite(xLoraSendEncQueue, &hotkey_cmd.lora_cmd[HOTKEY_LONG_SELECT_IDX]); // Never block the UI; latest command wins
+            lora_send_req_t lora_req = { .cmd = hotkey_cmd.lora_cmd[HOTKEY_LONG_SELECT_IDX], .ui_origin = false };
+            xQueueOverwrite(xLoraSendEncQueue, &lora_req); // Never block the UI; latest command wins
         } else if (hotkey_cmd.has_espnow[HOTKEY_LONG_SELECT_IDX]) { // Else ESP-NOW
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_TEAL;
@@ -2094,7 +2098,8 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
             
             // Send the command
-            xQueueOverwrite(xLoraSendEncQueue, &hotkey_cmd.lora_cmd[HOTKEY_SHORT_HOME_IDX]); // Never block the UI; latest command wins
+            lora_send_req_t lora_req = { .cmd = hotkey_cmd.lora_cmd[HOTKEY_SHORT_HOME_IDX], .ui_origin = false };
+            xQueueOverwrite(xLoraSendEncQueue, &lora_req); // Never block the UI; latest command wins
         } else if (hotkey_cmd.has_espnow[HOTKEY_SHORT_HOME_IDX]) { // Else ESP-NOW
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_TEAL;
@@ -2134,7 +2139,8 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
             
             // Send the command
-            xQueueOverwrite(xLoraSendEncQueue, &hotkey_cmd.lora_cmd[HOTKEY_SHORT_RIGHT_IDX]); // Never block the UI; latest command wins
+            lora_send_req_t lora_req = { .cmd = hotkey_cmd.lora_cmd[HOTKEY_SHORT_RIGHT_IDX], .ui_origin = false };
+            xQueueOverwrite(xLoraSendEncQueue, &lora_req); // Never block the UI; latest command wins
         } else if (hotkey_cmd.has_espnow[HOTKEY_SHORT_RIGHT_IDX]) { // Else ESP-NOW
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_TEAL;
