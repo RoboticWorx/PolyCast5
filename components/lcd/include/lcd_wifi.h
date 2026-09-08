@@ -5,7 +5,7 @@
 
 #include "esp_err.h"
 
-#define MAX_WIFI_OPTIONS 21 // 6 built-in entries + 15 user PolyPlugs (see WIFI_MENU_START_SIZE)
+#define MAX_WIFI_OPTIONS 22 // 7 built-in entries + 15 user PolyPlugs (see WIFI_MENU_START_SIZE)
 #define MAX_WIFI_SUBOPTIONS 40 // WIFI_MAX_NETWORKS
 #define TOPIC_KEY_LEN 16
 
@@ -177,6 +177,24 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
  * @param [in] wifi_menu Wi-Fi menu structure
  */
 void lcd_wifi_sync_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
+
+/**
+ * @brief Lists saved Wi-Fi networks and lets the user forget them
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] wifi_menu Wi-Fi menu structure
+ */
+void lcd_wifi_manage_networks_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
+
+/**
+ * @brief Shows a saved network's details (SSID, password) and lets the user forget it
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] wifi_menu Wi-Fi menu structure
+ */
+void lcd_wifi_network_info_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
 
 /**
  * @brief Executes Wi-Fi send page to send data via MQTT

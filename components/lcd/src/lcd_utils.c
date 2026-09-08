@@ -3271,7 +3271,21 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
                 // Show Wi-Fi menu
                 lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
             }
-        } else if (ui_btns->select_btn == 1 && wifi_menu->index == 5) { // Sync with PolyPlug
+        } else if (ui_btns->select_btn == 1 && wifi_menu->index == 5) { // Manage saved networks
+            // Hide Wi-Fi menu
+            lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+            // Delete ping labels
+            lv_obj_delete(gateway_ping_lbl);
+            lv_obj_delete(dns_ping_lbl);
+
+            // Reset statics
+            do_once = false;
+            gateway_ping_lbl = dns_ping_lbl = NULL;
+
+            // Switch pages
+            ui_menu->page = WIFI_MANAGE_NETWORKS_PAGE;
+        } else if (ui_btns->select_btn == 1 && wifi_menu->index == 6) { // Sync with PolyPlug
             // Hide Wi-Fi menu
             lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 

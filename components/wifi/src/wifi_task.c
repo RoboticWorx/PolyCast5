@@ -397,6 +397,12 @@ static void wifi_task(void *param)
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "WIFI_RECONNECT_BIT: wifi_autoconnect_pick_known_network failed: %s. Falling back.", esp_err_to_name(err));
                     selected_network = wifi_utils_get_prev();
+
+                    // Don't fall back to a network that's no longer saved (e.g. one that was
+                    // forgotten but still lingers in esp_wifi's flash STA config)
+                    if (selected_network.ssid[0] != '\0' && !wifi_autoconnect_is_known(selected_network.ssid)) {
+                        selected_network.ssid[0] = '\0';
+                    }
                 }
 
                 // Skip reconnect if no SSID available

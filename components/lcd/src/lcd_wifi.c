@@ -22,6 +22,7 @@
 #include "lcd_text_input.h"
 #include "wifi_task.h"
 #include "wifi_utils.h"
+#include "wifi_autoconnect.h"
 #include "wifi_mqtt.h"
 #include "wifi_ping.h"
 #include "wifi_deauth.h"
@@ -32,6 +33,7 @@
 #include "espnow_utils.h"
 #include "gpio_task.h"
 #include "lcd_utils.h"
+#include "lcd_hotkey.h"
 #include "ai_task.h"
 #include "ai_utils.h"
 #include "ai_key_portal.h"
@@ -51,7 +53,7 @@
 
 #define MAX_PASSWORD_LEN 32
 
-#define WIFI_MENU_START_SIZE 6 // First WIFI_MENU_START_SIZE default options
+#define WIFI_MENU_START_SIZE 7 // First WIFI_MENU_START_SIZE default options
 
 #define MQTT_READY_TXT "0 = OFF     1 = ON\n   255 = UPDATE" // 'UPDATE' refers to checking and performing an OTA firmware update if available
 #define MQTT_SENDING_TXT "Sending via\nMQTT broker..." 
@@ -71,7 +73,7 @@ extern esp_ip4_addr_t sta_gw;
 extern volatile bool gpio_select_btn_held;
 
 wifi_menu_t wifi_menu = {
-    .options = {"Connect to Network", "Monitor Packets", "AI Packet Analysis", "Deauthenticator", "ARP Spoofer", "Sync With PolyPlug"},
+    .options = {"Connect to Network", "Monitor Packets", "AI Packet Analysis", "Deauthenticator", "ARP Spoofer", "Manage Networks", "Sync With PolyPlug"},
     .size = WIFI_MENU_START_SIZE,
     .index = 0,
     .cont = NULL,
@@ -3647,4 +3649,339 @@ void lcd_wifi_dump_wifi_topic_nvs(void)
     nvs_close(h);
 }
 #endif
+
+/* ---- Manage saved Wi-Fi networks (forget) ---- */
+
+#define MANAGE_NET_MAX 20 // Must mirror MAX_KNOWN_NETWORKS in wifi_autoconnect.c
+
+static lv_obj_t *manage_net_list = NULL;
+static lv_obj_t *manage_net_empty_lbl = NULL;
+static lv_obj_t *manage_net_btns[MANAGE_NET_MAX];
+static lv_style_t manage_net_btn_style;
+static lv_style_t manage_net_sel_style;
+static int manage_net_size = 0;
+static int manage_net_index = 0;
+static char manage_net_sel_ssid[33];
+
+static void lcd_wifi_manage_setup_list(void)
+{
+    // Create list
+    manage_net_list = lv_list_create(ACTIVE_SCR);
+    lv_obj_set_size(manage_net_list, 210, 106);
+
+    // Format
+    lv_obj_set_style_bg_color(manage_net_list, user_primary_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_align(manage_net_list, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_border_width(manage_net_list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lcd_apply_scrollbar_style(manage_net_list);
+    lv_obj_set_scroll_dir(manage_net_list, LV_DIR_VER);
+
+    // Create button style
+    lv_style_init(&manage_net_btn_style);
+
+    lv_style_set_radius(&manage_net_btn_style, 8);
+    lv_style_set_bg_color(&manage_net_btn_style, user_primary_color);
+
+    lv_style_set_border_width(&manage_net_btn_style, 2);
+    lv_style_set_border_color(&manage_net_btn_style, user_secondary_color);
+    lv_style_set_border_side(&manage_net_btn_style, LV_BORDER_SIDE_FULL);
+
+    lv_style_set_pad_top(&manage_net_btn_style, 3);
+    lv_style_set_pad_bottom(&manage_net_btn_style, 3);
+
+    lv_style_set_text_font(&manage_net_btn_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&manage_net_btn_style, user_secondary_color);
+    lv_style_set_text_align(&manage_net_btn_style, LV_TEXT_ALIGN_CENTER);
+
+    // Create selected button style
+    lv_style_init(&manage_net_sel_style);
+
+    lv_style_set_radius(&manage_net_sel_style, 8);
+    lv_style_set_bg_color(&manage_net_sel_style, user_secondary_color);
+
+    lv_style_set_border_width(&manage_net_sel_style, 2);
+    lv_style_set_border_color(&manage_net_sel_style, user_secondary_color);
+    lv_style_set_border_side(&manage_net_sel_style, LV_BORDER_SIDE_FULL);
+
+    lv_style_set_pad_top(&manage_net_sel_style, 3);
+    lv_style_set_pad_bottom(&manage_net_sel_style, 3);
+
+    lv_style_set_text_font(&manage_net_sel_style, &lv_font_montserrat_16);
+    lv_style_set_text_color(&manage_net_sel_style, user_primary_color);
+    lv_style_set_text_align(&manage_net_sel_style, LV_TEXT_ALIGN_CENTER);
+
+    manage_net_index = 0;
+}
+
+static void lcd_wifi_manage_build_list(void)
+{
+    size_t count = wifi_autoconnect_get_known_count();
+
+    manage_net_size = 0;
+
+    // Empty state: overlay a label (the empty list is invisible: no border, bg = screen)
+    if (count == 0) {
+        manage_net_empty_lbl = lv_label_create(ACTIVE_SCR);
+        lv_obj_set_style_text_align(manage_net_empty_lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lcd_format_label(manage_net_empty_lbl, "No saved networks.", user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+        return;
+    }
+
+    // Create a button for each known SSID
+    for (size_t i = 0; i < count && manage_net_size < MANAGE_NET_MAX; ++i) {
+        char ssid[33] = {0};
+        if (!wifi_autoconnect_get_known_ssid(i, ssid, sizeof(ssid)) || ssid[0] == '\0') {
+            continue;
+        }
+
+        manage_net_btns[manage_net_size] = lv_list_add_btn(manage_net_list, NULL, ssid);
+        lv_obj_set_size(manage_net_btns[manage_net_size], 200, 30);
+
+        // Style selected
+        if (manage_net_size == manage_net_index) {
+            lv_obj_add_style(manage_net_btns[manage_net_size], &manage_net_sel_style, 0);
+        } else {
+            lv_obj_add_style(manage_net_btns[manage_net_size], &manage_net_btn_style, 0);
+        }
+
+        // Create and format text label
+        lv_obj_t *lbl = lv_obj_get_child(manage_net_btns[manage_net_size], 0);
+        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
+        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
+
+        manage_net_size++;
+    }
+
+    // Format buttons as container
+    if (manage_net_size > 0) {
+        lv_obj_t *cont = lv_obj_get_parent(manage_net_btns[0]);
+        lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_gap(cont, 8, LV_PART_MAIN | LV_STATE_DEFAULT); // Set button spacing
+    }
+
+    // Clamp index
+    if (manage_net_index >= manage_net_size) {
+        manage_net_index = manage_net_size - 1;
+    }
+    if (manage_net_index < 0) {
+        manage_net_index = 0;
+    }
+
+    // Scroll selected into view
+    if (manage_net_size > 0) {
+        lv_obj_scroll_to_view(manage_net_btns[manage_net_index], LV_ANIM_OFF);
+    }
+}
+
+static void lcd_wifi_manage_update_menu(void)
+{
+    // Nothing to highlight if empty
+    if (manage_net_size == 0) {
+        manage_net_index = 0;
+        return;
+    }
+
+    // Wrap index
+    if (manage_net_index >= manage_net_size) {
+        manage_net_index = 0;
+    } else if (manage_net_index < 0) {
+        manage_net_index = manage_net_size - 1;
+    }
+
+    // Reset every button to unselected
+    for (int i = 0; i < manage_net_size; ++i) {
+        lv_obj_remove_style(manage_net_btns[i], &manage_net_sel_style, 0);
+        lv_obj_add_style(manage_net_btns[i], &manage_net_btn_style, 0);
+    }
+
+    // Highlight only the current index
+    lv_obj_remove_style(manage_net_btns[manage_net_index], &manage_net_btn_style, 0);
+    lv_obj_add_style(manage_net_btns[manage_net_index], &manage_net_sel_style, 0);
+
+    // Enable scrolling if list gets too long
+    lv_obj_scroll_to_view(manage_net_btns[manage_net_index], LV_ANIM_ON);
+}
+
+static void lcd_wifi_manage_teardown(void)
+{
+    if (manage_net_empty_lbl) {
+        lv_obj_delete(manage_net_empty_lbl);
+        manage_net_empty_lbl = NULL;
+    }
+
+    if (manage_net_list) {
+        lv_obj_delete(manage_net_list); // Deletes child buttons
+        manage_net_list = NULL;
+
+        // Free the style property maps
+        lv_style_reset(&manage_net_btn_style);
+        lv_style_reset(&manage_net_sel_style);
+    }
+
+    manage_net_size = 0;
+    for (int i = 0; i < MANAGE_NET_MAX; ++i) {
+        manage_net_btns[i] = NULL;
+    }
+}
+
+// Selected network's detail view. A real page (not a blocking modal) so Home/Power and
+// the inactivity sleep timer keep working while it is shown -- important since it displays
+// the saved password, which should not linger on screen.
+static lv_obj_t *info_lbl_ssid = NULL;
+static lv_obj_t *info_lbl_pw = NULL;
+static lv_obj_t *info_lbl_prompt = NULL;
+
+static void lcd_wifi_network_info_teardown(void)
+{
+    if (info_lbl_ssid) { lv_obj_delete(info_lbl_ssid); info_lbl_ssid = NULL; }
+    if (info_lbl_pw) { lv_obj_delete(info_lbl_pw); info_lbl_pw = NULL; }
+    if (info_lbl_prompt) { lv_obj_delete(info_lbl_prompt); info_lbl_prompt = NULL; }
+}
+
+void lcd_wifi_network_info_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
+{
+    (void)wifi_menu;
+
+    static bool init = false;
+
+    // Init once
+    if (!init) {
+        // Right = forget, Left = back; hide the vertical arrows
+        lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+        // Look up the stored password for the selected SSID
+        wifi_login_t rec = {0};
+        bool have = wifi_autoconnect_get_known_info(manage_net_sel_ssid, &rec);
+        const char *pw_text = !have ? "(unknown)"
+                : (rec.password[0] == '\0' ? "(open network)" : rec.password);
+
+        // SSID at the top
+        info_lbl_ssid = lv_label_create(ACTIVE_SCR);
+        lv_label_set_long_mode(info_lbl_ssid, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(info_lbl_ssid, 220);
+        lv_obj_set_style_text_align(info_lbl_ssid, LV_TEXT_ALIGN_CENTER, 0);
+        lcd_format_label(info_lbl_ssid, manage_net_sel_ssid, user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 14);
+
+        // Password beneath the SSID
+        info_lbl_pw = lv_label_create(ACTIVE_SCR);
+        lv_label_set_long_mode(info_lbl_pw, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(info_lbl_pw, 220);
+        lv_obj_set_style_text_align(info_lbl_pw, LV_TEXT_ALIGN_CENTER, 0);
+        lcd_format_label(info_lbl_pw, pw_text, user_secondary_color,
+                &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 0);
+        lv_obj_align_to(info_lbl_pw, info_lbl_ssid, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+
+        // Forget prompt at the bottom
+        info_lbl_prompt = lv_label_create(ACTIVE_SCR);
+        lv_obj_set_style_text_align(info_lbl_prompt, LV_TEXT_ALIGN_CENTER, 0);
+        lcd_format_label(info_lbl_prompt, "Press RIGHT to forget", user_secondary_color,
+                &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -10);
+
+        init = true;
+    }
+
+    if (ui_btns->right_btn == 1) { // Forget
+        // esp_wifi's stored STA config holds the SSID we're connected to OR mid-connect to in
+        // every window, so match it (BEFORE the forget clears it) rather than the CONNECTED/
+        // CONNECTING event bits, which are unreliable here -- the Wi-Fi page clears CONNECTING.
+        // Disconnecting aborts an in-flight join so it can't re-remember the network afterward.
+        wifi_login_t prev = wifi_utils_get_prev();
+        bool forgetting_current =
+                (prev.ssid[0] != '\0') &&
+                (strncmp(prev.ssid, manage_net_sel_ssid, sizeof(prev.ssid)) == 0);
+
+        esp_err_t ferr = wifi_autoconnect_forget_network(manage_net_sel_ssid);
+
+        if (forgetting_current) {
+            xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+        }
+
+        lcd_wifi_network_info_teardown();
+        init = false;
+
+        // Surface a persistence failure so the user knows the removal may not survive a reboot
+        if (ferr != ESP_OK && ferr != ESP_ERR_NOT_FOUND) {
+            lv_obj_t *lbl_err = lv_label_create(ACTIVE_SCR);
+            lv_obj_set_style_text_align(lbl_err, LV_TEXT_ALIGN_CENTER, 0);
+            lcd_format_label(lbl_err, "Forget may not\nhave saved!", user_secondary_color,
+                    &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+            lv_timer_handler();
+            vTaskDelay(pdMS_TO_TICKS(1200));
+            lv_obj_delete(lbl_err);
+            lcd_clear_pending_inputs = true;
+        }
+
+        ui_menu->page = WIFI_MANAGE_NETWORKS_PAGE;
+    } else if (ui_btns->left_btn == 1) { // Back to the list
+        lcd_wifi_network_info_teardown();
+        init = false;
+
+        ui_menu->page = WIFI_MANAGE_NETWORKS_PAGE;
+    } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home / power off / inactivity sleep
+        lcd_wifi_network_info_teardown();
+        init = false;
+
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
+}
+
+void lcd_wifi_manage_networks_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
+{
+    static bool init = false;
+
+    // Init once
+    if (!init) {
+        lcd_wifi_manage_setup_list();
+        lcd_wifi_manage_build_list();
+
+        // Scroll arrows for the list; no right action here
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        init = true;
+    }
+
+    if (ui_btns->up_btn == 1 && manage_net_size > 0) { // Scroll up
+        manage_net_index--;
+        lcd_wifi_manage_update_menu();
+    } else if (ui_btns->down_btn == 1 && manage_net_size > 0) { // Scroll down
+        manage_net_index++;
+        lcd_wifi_manage_update_menu();
+    } else if (ui_btns->select_btn == 1 && manage_net_size > 0) { // Show details / forget
+        // Capture the highlighted SSID from its button label
+        lv_obj_t *lbl = lv_obj_get_child(manage_net_btns[manage_net_index], 0);
+        strlcpy(manage_net_sel_ssid, lv_label_get_text(lbl), sizeof(manage_net_sel_ssid));
+
+        // Tear down the list, then open the detail page
+        lcd_wifi_manage_teardown();
+        init = false;
+
+        ui_menu->page = WIFI_NETWORK_INFO_PAGE;
+    } else if (ui_btns->left_btn == 1) { // Back to Wi-Fi menu
+        lcd_wifi_manage_teardown();
+        init = false;
+
+        // Restore scroll arrows for the Wi-Fi menu
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+        // Show Wi-Fi menu
+        lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        ui_menu->page = WIFI_PAGE;
+    } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off
+        lcd_wifi_manage_teardown();
+        init = false;
+
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
+}
 

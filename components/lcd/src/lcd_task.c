@@ -399,6 +399,12 @@ static void lcd_task(void *pvParameters)
                 case WIFI_SYNC_PAGE:
                     lcd_wifi_sync_page(&ui_btns, &ui_menu, &wifi_menu);
                     break;
+                case WIFI_MANAGE_NETWORKS_PAGE:
+                    lcd_wifi_manage_networks_page(&ui_btns, &ui_menu, &wifi_menu);
+                    break;
+                case WIFI_NETWORK_INFO_PAGE:
+                    lcd_wifi_network_info_page(&ui_btns, &ui_menu, &wifi_menu);
+                    break;
                 case WIFI_SEND_PAGE:
                     lcd_wifi_send_page(&ui_btns, &ui_menu, &wifi_menu);
                     break;
