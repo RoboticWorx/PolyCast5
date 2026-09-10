@@ -129,12 +129,40 @@ static void pcm_normalize_peak(int16_t *x, size_t n, int16_t target_peak)
     pcm_apply_gain_clip(x, n, gain);
 }
 
+// Counts I2S receive-queue overflows since the last ai_voice_init_ex()
+// A consumer that cares about sample continuity (ai_freq.c) snapshots this before filling
+// an analysis window and discards the window if the count moved
+static volatile uint32_t i2s_ovf_count = 0;
+
+// ISR context: keep it to a single increment
+static IRAM_ATTR bool i2s_rx_ovf_cb(i2s_chan_handle_t handle, i2s_event_data_t *event, void *user_ctx)
+{
+    (void)handle;
+    (void)event;
+    (void)user_ctx;
+
+    i2s_ovf_count++;
+
+    return false; // No higher-priority task woken
+}
+
 // Initializes the I2S microphone input for the system
-esp_err_t ai_voice_init(void)
+// dma_desc_num/dma_frame_num size the DMA ring: the STT path is fine with the historical
+// 4 x 200 (16.7ms), but spectral analysis needs far more slack because lcd_task runs at a
+// higher priority on a single core and one LVGL flush can block longer than that
+// NOTE: a DMA descriptor caps at 4092 bytes and a stereo 32-bit frame is 8 bytes, so
+// dma_frame_num must stay <= 480. Scale the ring depth with dma_desc_num instead
+esp_err_t ai_voice_init_ex(int dma_desc_num, int dma_frame_num)
 {
     // If already initialized, do nothing
     if (voice_inited) {
         return ESP_OK;
+    }
+
+    // Validate args
+    if (dma_desc_num < 2 || dma_frame_num < 8 || dma_frame_num > 480) {
+        ESP_LOGE(TAG, "ai_voice_init_ex: bad DMA config %d x %d", dma_desc_num, dma_frame_num);
+        return ESP_ERR_INVALID_ARG;
     }
 
     esp_err_t err;
@@ -172,8 +200,8 @@ esp_err_t ai_voice_init(void)
 
     // Create an RX channel
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
-    chan_cfg.dma_desc_num = 4;
-    chan_cfg.dma_frame_num = 200;
+    chan_cfg.dma_desc_num = (uint32_t)dma_desc_num;
+    chan_cfg.dma_frame_num = (uint32_t)dma_frame_num;
     err = i2s_new_channel(&chan_cfg, NULL, &i2s_rx_channel);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "ai_voice_init: i2s_new_channel failed: %s", esp_err_to_name(err));
@@ -208,6 +236,17 @@ esp_err_t ai_voice_init(void)
         return err;
     }
 
+    // Watch for receive-queue overflows so a consumer can tell when samples were dropped
+    // Non-fatal: the STT path ignores the count, it only matters to spectral analysis
+    i2s_ovf_count = 0;
+    i2s_event_callbacks_t cbs = {
+        .on_recv_q_ovf = i2s_rx_ovf_cb,
+    };
+    err = i2s_channel_register_event_callback(i2s_rx_channel, &cbs, NULL);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "ai_voice_init_ex: overflow callback not registered: %s", esp_err_to_name(err));
+    }
+
     // Enable I2S channel (RX)
     err = i2s_channel_enable(i2s_rx_channel);
     if (err != ESP_OK) {
@@ -219,9 +258,39 @@ esp_err_t ai_voice_init(void)
 
     voice_inited = true;
 #ifdef POLYCAST5_DEBUG
-    ESP_LOGI(TAG, "Mic init OK (48k stereo, 32-bit slots).");
+    ESP_LOGI(TAG, "Mic init OK (48k stereo, 32-bit slots, DMA %d x %d).", dma_desc_num, dma_frame_num);
 #endif
     return ESP_OK;
+}
+
+// Initializes the I2S microphone input with the DMA sizing the STT path has always used
+esp_err_t ai_voice_init(void)
+{
+    return ai_voice_init_ex(4, 200);
+}
+
+// Reads raw 32-bit I2S slots straight off the RX channel
+// Keeps i2s_rx_channel private while letting a caller run its own capture loop
+esp_err_t ai_voice_read_raw(int32_t *dst, size_t dst_bytes, size_t *out_bytes, uint32_t timeout_ms)
+{
+    // Validate args
+    if (!dst || dst_bytes == 0 || !out_bytes) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    *out_bytes = 0;
+
+    if (!voice_inited || !i2s_rx_channel) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    return i2s_channel_read(i2s_rx_channel, dst, dst_bytes, out_bytes, timeout_ms);
+}
+
+// Number of I2S receive-queue overflows since the last ai_voice_init_ex()
+uint32_t ai_voice_get_ovf_count(void)
+{
+    return i2s_ovf_count;
 }
 
 // Deinitializes the I2S microphone input for the system

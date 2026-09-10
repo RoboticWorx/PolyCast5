@@ -136,5 +136,15 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
  */
 void lcd_tools_claude_setup_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu);
 
+/**
+ * @brief Frequency meter: listens on the mic and shows the fundamental frequency of a
+ *        plucked belt (Voron sonic belt-tensioning method)
+ *
+ * @param [in] ui_btns User input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] tools_menu Tools menu structure
+ */
+void lcd_tools_freq_meter_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu);
+
 
 #endif // LCD_TOOLS_H

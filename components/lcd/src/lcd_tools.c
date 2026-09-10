@@ -21,6 +21,10 @@
 #include "misc/lv_timer.h"
 #include "widgets/label/lv_label.h"
 
+#include "ai_task.h"
+#include "ai_utils.h"
+#include "ai_freq.h"
+
 #include "wifi_btc_portal.h"
 #include "wifi_claude.h"
 #include "wifi_claude_portal.h"
@@ -38,10 +42,12 @@
 
 #define TAG "LCD_TOOLS"
 
+extern volatile bool mic_recording; // ai_task.c
+
 tools_menu_t tools_menu = {
     .options = {"Coin Flipper", "Dice Roller", "Number Generator", "Read the Docs", "Bitcoin QR",
-            "Pomodoro Timer", "SRS Planner", "Claude Usage"},
-    .size = 8,
+            "Pomodoro Timer", "SRS Planner", "Claude Usage", "Frequency Meter"},
+    .size = 9,
     .index = 0,
     .cont = NULL,
 };
@@ -2462,5 +2468,316 @@ void lcd_tools_btc_addr_setup_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools
         xEventGroupClearBits(xWiFiPortalEventGroup, WIFI_PORTAL_BTC_START_BIT);
         
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
+}
+
+/* ---------------------------------------------------------------------------------- */
+/* Frequency meter (Voron sonic belt-tensioning method)                                  */
+/* ---------------------------------------------------------------------------------- */
+
+#define FM_STRIP_W      231  // 29 bars * 7px + 28 gaps * 1px
+#define FM_STRIP_H      26
+#define FM_BAR_W        7
+#define FM_IDLE_MS      180000 // Own sleep guard: the mic is live while this page is open
+#define FM_STOP_WAIT_MS 800    // Bound on the ai_task teardown handshake
+#define FM_SEND_WAIT_MS 500    // Never block lcd_task indefinitely on ai_task
+#define FM_BAR_OPA_DIM  LV_OPA_40 // Non-peak spectrum columns; the fundamental goes to COVER
+
+// Page state is file-scope (not function-static) so the teardown helper below can be the
+// single choke point for every exit path. Releasing the mic is too important to duplicate
+// across four branches and hope they stay in sync.
+static bool fm_init = false;
+static lv_obj_t *fm_lbl_status = NULL;
+static lv_obj_t *fm_lbl_hz = NULL;
+static lv_obj_t *fm_lbl_level = NULL;
+static lv_obj_t *fm_strip = NULL;
+static lv_obj_t *fm_bars[AI_FREQ_BARS] = {0};
+
+static uint32_t fm_last_seq = 0;
+static uint8_t fm_last_peak = AI_FREQ_BAR_NONE;
+static uint32_t fm_held_mhz = 0;
+static uint32_t fm_last_results = 0;
+static bool fm_hold = false;
+static bool fm_started = false; // Command was accepted by ai_task, so a stop handshake is owed
+static TickType_t fm_idle_since = 0;
+
+// Renders the big readout from a milli-hertz value (integer math: no %f needed)
+static void fm_render_hz(uint32_t mhz)
+{
+    if (!fm_lbl_hz) {
+        return;
+    }
+
+    if (mhz == 0U) {
+        lv_label_set_text(fm_lbl_hz, "--- Hz");
+        return;
+    }
+
+    lv_label_set_text_fmt(fm_lbl_hz, "%lu.%lu Hz",
+            (unsigned long)(mhz / 1000U), (unsigned long)((mhz % 1000U) / 100U));
+}
+
+// Releases the mic, waits for ai_task to confirm I2S is down, then tears the UI down.
+// The wait matters: lcd_device_sleep() calls esp_light_sleep_start() and relies on the
+// SCK/WS pins already being held low, which only happens inside ai_voice_deinit().
+static void fm_teardown(ui_menu_t *ui_menu)
+{
+    ai_freq_running = false;
+
+    // Only owed a handshake if ai_task actually accepted the command
+    if (fm_started && xAiEventGroup) {
+        TickType_t t0 = xTaskGetTickCount();
+        while (!(xEventGroupGetBits(xAiEventGroup) & AI_FREQ_STOPPED_BIT)) {
+            if ((xTaskGetTickCount() - t0) >= pdMS_TO_TICKS(FM_STOP_WAIT_MS)) {
+                ESP_LOGE(TAG, "Frequency meter: timed out waiting for mic release");
+
+                // ai_task never dequeued our command (it is stuck in a long job), so it is
+                // still sitting in the only slot of the length-1 queue. Left there, the next
+                // portMAX_DELAY send from this task -- lcd_bluetooth.c and lcd_wifi.c both do
+                // that -- would block lcd_task and freeze the entire UI until ai_task drained
+                // it. Every producer of this queue runs on lcd_task, which is us, so nothing
+                // can be racing a send and dropping the stale command here is safe.
+                if (xAiCmdQueue) {
+                    xQueueReset(xAiCmdQueue);
+                }
+                break; // ai_freq_run still deinits on its own, so do not wedge the UI
+            }
+            lv_timer_handler();
+            vTaskDelay(pdMS_TO_TICKS(20)); // FreeRTOS tick is 10ms: never delay below that
+        }
+    }
+
+    // The wait above ran the LCD loop without sampling buttons, so gpio_task may have queued
+    // presses meant for this page. Drop them or the page we return to consumes them.
+    lcd_clear_pending_inputs = true;
+
+    // Delete objects
+    if (fm_strip) {
+        lv_obj_delete(fm_strip); // Deletes the child bars
+        fm_strip = NULL;
+    }
+    for (int i = 0; i < AI_FREQ_BARS; ++i) {
+        fm_bars[i] = NULL;
+    }
+    if (fm_lbl_status) {
+        lv_obj_delete(fm_lbl_status);
+        fm_lbl_status = NULL;
+    }
+    if (fm_lbl_hz) {
+        lv_obj_delete(fm_lbl_hz);
+        fm_lbl_hz = NULL;
+    }
+    if (fm_lbl_level) {
+        lv_obj_delete(fm_lbl_level);
+        fm_lbl_level = NULL;
+    }
+
+    // Reset statics
+    fm_init = false;
+    fm_last_seq = 0;
+    fm_last_peak = AI_FREQ_BAR_NONE;
+    fm_held_mhz = 0;
+    fm_last_results = 0;
+    fm_hold = false;
+    fm_started = false;
+
+    // Show arrows
+    lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+}
+
+void lcd_tools_freq_meter_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
+{
+    // Do once
+    if (!fm_init) {
+        // If picking this page as a hotkey
+        if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
+            lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
+        }
+
+        // Defensive: if the AI keyboard page was left mid-dictation this could still be
+        // true, leaving ai_task blocked inside the record loop and never dequeuing our
+        // command. Clearing it lets that loop fall out within one DMA read.
+        mic_recording = false;
+
+        // Status line
+        fm_lbl_status = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(fm_lbl_status, "Starting mic...", user_secondary_color,
+                &lv_font_montserrat_12, LV_ALIGN_TOP_MID, 0, 14);
+
+        // Big readout
+        fm_lbl_hz = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(fm_lbl_hz, "--- Hz", user_secondary_color,
+                &lv_font_montserrat_30, LV_ALIGN_TOP_MID, 0, 32);
+
+        // Range + input level share one line, so the spectrum keeps its room
+        fm_lbl_level = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(fm_lbl_level, "Belt 39-300Hz  ----------", user_secondary_color,
+                &lv_font_montserrat_12, LV_ALIGN_TOP_MID, 0, 74);
+
+        // Spectrum strip: a flex row of vertical bars (lv_bar goes vertical when h > w).
+        // Lets the user see the fundamental against its harmonics, which is what makes an
+        // octave error obvious instead of silently wrong.
+        fm_strip = lv_obj_create(ACTIVE_SCR);
+        lv_obj_remove_style_all(fm_strip);
+        lv_obj_set_size(fm_strip, FM_STRIP_W, FM_STRIP_H);
+        lv_obj_align(fm_strip, LV_ALIGN_BOTTOM_MID, 0, -4);
+        lv_obj_remove_flag(fm_strip, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_flex_flow(fm_strip, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(fm_strip, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_END);
+        lv_obj_set_style_pad_column(fm_strip, 1, 0);
+
+        for (int i = 0; i < AI_FREQ_BARS; ++i) {
+            fm_bars[i] = lv_bar_create(fm_strip);
+            lv_obj_set_size(fm_bars[i], FM_BAR_W, FM_STRIP_H);
+            lv_bar_set_range(fm_bars[i], 0, 100);
+            lv_bar_set_value(fm_bars[i], 0, LV_ANIM_OFF);
+            lv_obj_set_style_bg_color(fm_bars[i], user_secondary_color, LV_PART_MAIN);
+            lv_obj_set_style_bg_opa(fm_bars[i], LV_OPA_20, LV_PART_MAIN);
+            lv_obj_set_style_bg_color(fm_bars[i], user_secondary_color, LV_PART_INDICATOR);
+            // The fundamental is marked by opacity, not hue: lightening the colour would be a
+            // no-op on the default white secondary and near-invisible on the other bright ones
+            lv_obj_set_style_bg_opa(fm_bars[i], FM_BAR_OPA_DIM, LV_PART_INDICATOR);
+            lv_obj_set_style_radius(fm_bars[i], 1, LV_PART_MAIN | LV_PART_INDICATOR);
+        }
+
+        // Drop any snapshot left over from a previous visit, or the first peek below would
+        // latch that stale reading and present it as if it had just been measured
+        if (xAiFreqResultQueue) {
+            xQueueReset(xAiFreqResultQueue);
+        }
+
+        // Clear the stop flag before handing over, or a bit left set by the previous session
+        // makes the teardown handshake return instantly without ai_task having done anything
+        if (xAiEventGroup) {
+            xEventGroupClearBits(xAiEventGroup, AI_FREQ_STOPPED_BIT);
+        }
+
+        // Hand the mic to ai_task, which is its single owner
+        ai_freq_running = true;
+
+        ai_cmd_t cmd = {0};
+        cmd.type = AI_CMD_FREQ_START;
+
+        if (!xAiCmdQueue || xQueueSend(xAiCmdQueue, &cmd, pdMS_TO_TICKS(FM_SEND_WAIT_MS)) != pdPASS) {
+            ESP_LOGE(TAG, "Failed: xAiCmdQueue AI_CMD_FREQ_START");
+            ai_freq_running = false;
+            fm_started = false;
+            lv_label_set_text(fm_lbl_status, "Mic busy - go back and retry");
+        } else {
+            fm_started = true;
+        }
+
+        fm_last_seq = 0;
+        fm_last_peak = AI_FREQ_BAR_NONE;
+        fm_held_mhz = 0;
+        fm_last_results = 0;
+        fm_hold = false;
+        fm_idle_since = xTaskGetTickCount();
+        fm_init = true;
+    }
+
+    // Drain the newest snapshot without blocking
+    if (xAiFreqResultQueue) {
+        ai_freq_result_t r;
+
+        if (xQueuePeek(xAiFreqResultQueue, &r, 0) == pdTRUE && r.seq != fm_last_seq) {
+            fm_last_seq = r.seq;
+
+            // Spectrum
+            for (int i = 0; i < AI_FREQ_BARS; ++i) {
+                lv_bar_set_value(fm_bars[i], r.bars[i], LV_ANIM_OFF);
+            }
+
+            // Highlight whichever column holds the detected fundamental
+            if (r.peak_bar != fm_last_peak) {
+                if (fm_last_peak != AI_FREQ_BAR_NONE && fm_last_peak < AI_FREQ_BARS) {
+                    lv_obj_set_style_bg_opa(fm_bars[fm_last_peak], FM_BAR_OPA_DIM,
+                            LV_PART_INDICATOR);
+                }
+                if (r.peak_bar != AI_FREQ_BAR_NONE && r.peak_bar < AI_FREQ_BARS) {
+                    lv_obj_set_style_bg_opa(fm_bars[r.peak_bar], LV_OPA_COVER,
+                            LV_PART_INDICATOR);
+                }
+                fm_last_peak = r.peak_bar;
+            }
+
+            // r.results only moves when a NEW reading was latched, so this cannot miss one
+            // even though the publish rate (171ms) is faster than this dispatch (200ms)
+            if (r.results != fm_last_results) {
+                fm_last_results = r.results;
+                fm_idle_since = xTaskGetTickCount(); // A pluck counts as activity
+
+                if (!fm_hold && r.f_mhz) {
+                    fm_held_mhz = r.f_mhz;
+                    fm_render_hz(fm_held_mhz);
+                }
+            }
+
+            // Status
+            const char *msg = (r.mode == AI_FREQ_MODE_BELT) ? "Pluck the belt..."
+                                                             : "Play a note...";
+            switch (r.state) {
+                case AI_FREQ_ST_WARMUP:    msg = "Starting mic..."; break;
+                case AI_FREQ_ST_RESEED:    msg = "Changing range..."; break;
+                case AI_FREQ_ST_MEASURING: msg = "Listening..."; break;
+                case AI_FREQ_ST_OVERRUN:   msg = "Dropped audio, retrying"; break;
+                // ERROR covers both a mic that would not start and a failed buffer allocation
+                case AI_FREQ_ST_ERROR:     msg = "Cannot start (mic/memory)"; break;
+                case AI_FREQ_ST_NOISY:     msg = "Too noisy - quiet the machine"; break;
+                default: break;
+            }
+            lv_label_set_text(fm_lbl_status, fm_hold ? "Held - select to resume" : msg);
+
+            // Level meter drawn as text so it costs no extra LVGL objects
+            char lvl[16];
+            int filled = (int)r.level_pct / 10;
+            for (int i = 0; i < 10; ++i) {
+                lvl[i] = (i < filled) ? '#' : '-';
+            }
+            lvl[10] = '\0';
+
+            // Echo the mode the frame was measured in, not the one just requested, so the
+            // label never claims a range the reading did not come from
+            lv_label_set_text_fmt(fm_lbl_level, "%s %u-%uHz  %s",
+                    ai_freq_mode_name(r.mode),
+                    (unsigned)ai_freq_mode_lo_hz(r.mode),
+                    (unsigned)ai_freq_mode_hi_hz(r.mode), lvl);
+        }
+    }
+
+    // User input (one-shot edges, dispatched every 200ms)
+    if (ui_btns->select_btn == 1) { // Freeze/unfreeze the reading
+        fm_hold = !fm_hold;
+        fm_idle_since = xTaskGetTickCount();
+    } else if (ui_btns->right_btn == 1) { // Cycle measurement range
+        // ai_freq_run picks this up on its next hop and re-seeds the decimator; the mic is
+        // never dropped, so there is no teardown handshake to do here
+        ai_freq_mode = (uint8_t)((ai_freq_mode + 1) % AI_FREQ_MODE_COUNT);
+
+        fm_held_mhz = 0;
+        fm_hold = false;
+        fm_render_hz(0);
+        lv_label_set_text(fm_lbl_status, "Changing range...");
+        fm_idle_since = xTaskGetTickCount();
+    } else if (ui_btns->left_btn == 1) { // Back selected
+        fm_teardown(ui_menu);
+
+        // Show tools list
+        lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Switch pages
+        ui_menu->page = TOOLS_PAGE;
+    } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off selected
+        fm_teardown(ui_menu);
+
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    } else if ((xTaskGetTickCount() - fm_idle_since) >= pdMS_TO_TICKS(FM_IDLE_MS)) {
+        // dont_sleep_on_this_page suppresses the global timer, so run our own: the mic
+        // must never be left clocking because the user walked away
+        fm_teardown(ui_menu);
+
+        lcd_transition_back(false, ui_menu); // Sleep
     }
 }

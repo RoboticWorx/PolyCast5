@@ -461,6 +461,10 @@ static void lcd_task(void *pvParameters)
                     lcd_tools_claude_usage_page(&ui_btns, &ui_menu, &tools_menu);
                     dont_sleep_on_this_page = true;
                     break;
+                case TOOLS_FREQ_METER_PAGE:
+                    lcd_tools_freq_meter_page(&ui_btns, &ui_menu, &tools_menu);
+                    dont_sleep_on_this_page = true; // Page runs its own idle timeout (mic is live)
+                    break;
                 case TOOLS_CLAUDE_SETUP_PAGE:
                     lcd_tools_claude_setup_page(&ui_btns, &ui_menu, &tools_menu);
                     dont_sleep_on_this_page = true;

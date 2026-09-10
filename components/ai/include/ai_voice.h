@@ -18,10 +18,54 @@ typedef struct {
 
 /**
  * @brief Initialize mic capture: Creates an I2S RX channel, configures and enables it
- * 
+ *
  * @returns ESP error status
  */
 esp_err_t ai_voice_init(void);
+
+/**
+ * @brief Initialize mic capture with an explicit DMA ring size
+ *
+ * ai_voice_init() forwards the historical 4 x 200 frames (~16.7ms), which suits the STT
+ * path. Spectral analysis needs a deeper ring: lcd_task runs at a higher priority on a
+ * single core, and one LVGL flush can stall the reader for longer than 16.7ms, which
+ * drops samples and corrupts the analysis window.
+ *
+ * A DMA descriptor caps at 4092 bytes and a stereo 32-bit frame is 8 bytes, so
+ * dma_frame_num must stay <= 480 -- grow the ring with dma_desc_num instead.
+ *
+ * @param dma_desc_num Number of DMA descriptors (>= 2)
+ * @param dma_frame_num Stereo frames per descriptor (8..480)
+ *
+ * @returns ESP error status
+ */
+esp_err_t ai_voice_init_ex(int dma_desc_num, int dma_frame_num);
+
+/**
+ * @brief Read raw 32-bit I2S slots from the mic's RX channel
+ *
+ * Each stereo frame is two 32-bit slots; the T5848 drives the left slot (index 0) and the
+ * 24-bit payload sits in bits [31:8]. Lets a caller run its own capture/conversion loop
+ * without exposing the channel handle.
+ *
+ * @param dst Destination buffer for raw slot words
+ * @param dst_bytes Size of dst in bytes
+ * @param out_bytes Set to the number of bytes actually read
+ * @param timeout_ms Read timeout in milliseconds
+ *
+ * @returns ESP error status, or ESP_ERR_INVALID_STATE if the mic is not initialized
+ */
+esp_err_t ai_voice_read_raw(int32_t *dst, size_t dst_bytes, size_t *out_bytes, uint32_t timeout_ms);
+
+/**
+ * @brief Number of I2S receive-queue overflows since the last ai_voice_init_ex()
+ *
+ * A non-zero delta across a capture window means samples were dropped and the window is
+ * discontinuous, so any spectral result derived from it should be discarded.
+ *
+ * @returns Overflow count
+ */
+uint32_t ai_voice_get_ovf_count(void);
 
 /**
  * @brief Deinitialize mic capture and free resources

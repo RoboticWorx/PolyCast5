@@ -29,6 +29,7 @@ typedef enum {
     AI_CMD_DICTATE,
     AI_CMD_RAW_FRAMES,
     AI_CMD_KEYBOARD_ABORT_REC, // Page exited mid-recording: deinit mic + free capture, no STT
+    AI_CMD_FREQ_START,         // Frequency meter: capture + FFT until ai_freq_running clears
 } ai_cmd_type_t;
 
 typedef struct {

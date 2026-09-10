@@ -7,6 +7,7 @@
 #define AI_THINKING_FAILED_BIT (1U << 1) // Generic failure
 #define AI_RATE_LIMITED_BIT    (1U << 2) // Out of API credits
 #define AI_NO_MATCH_BIT        (1U << 3) // No saved entry matched a cred/custom lookup
+#define AI_FREQ_STOPPED_BIT    (1U << 4) // Frequency meter released the mic (I2S down, pins parked)
 extern EventGroupHandle_t xAiEventGroup;
 
 extern QueueHandle_t xAiCmdQueue;

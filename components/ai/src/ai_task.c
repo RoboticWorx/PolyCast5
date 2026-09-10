@@ -19,6 +19,7 @@
 #include "ai_utils.h"
 #include "ai_task.h"
 #include "ai_voice.h"
+#include "ai_freq.h"
 
 #define TAG "AI_TASK"
 
@@ -31,6 +32,10 @@ SemaphoreHandle_t xAiSoundHeardSemaphore;
 char ai_wifi_portal_pass[64];
 
 volatile bool mic_recording = false; // To lcd_bluetooth.c
+
+volatile bool ai_freq_running = false;              // To lcd_tools.c (frequency meter)
+volatile uint8_t ai_freq_mode = AI_FREQ_MODE_BELT;  // Measurement range, set by lcd_tools.c
+QueueHandle_t xAiFreqResultQueue;                   // Length 1 snapshot: ai_freq.c -> lcd_tools.c
 
 POLYCAST5_USE_PSRAM_BSS static char prompt_buf[AI_PROMPT_NVS_MAX_LEN] = {0};
 POLYCAST5_USE_PSRAM_BSS static char ai_response[AI_RESPONSE_MAX_LEN] = {0};
@@ -143,6 +148,10 @@ static void ai_task(void *pvParameters)
     xAiEventGroup = xEventGroupCreate();
     configASSERT(xAiEventGroup);
 
+    // Latest frequency-meter snapshot; the LCD page peeks it without blocking
+    xAiFreqResultQueue = xQueueCreate(1, sizeof(ai_freq_result_t));
+    configASSERT(xAiFreqResultQueue);
+
     esp_err_t err = ESP_OK;
 
     // If Wi-Fi AI portal password NVS doesn't exist yet, set it
@@ -238,6 +247,37 @@ static void ai_task(void *pvParameters)
                 ESP_LOGE(TAG, "ai_voice_deinit failed: %s", esp_err_to_name(deinit_err));
             }
             ai_voice_free_pcm(&pcm);
+            continue;
+        } else if (cmd.type == AI_CMD_FREQ_START) { // Frequency meter (belt tensioning)
+            if (!ai_freq_running) {
+#ifdef POLYCAST5_DEBUG
+                ESP_LOGW(TAG, "FREQ_START received but ai_freq_running is false; ignoring");
+#endif
+                // The page may already be waiting on this bit (it exited before we dequeued)
+                // and the mic was never taken, so release it or that wait burns its timeout
+                xEventGroupSetBits(xAiEventGroup, AI_FREQ_STOPPED_BIT);
+                continue;
+            }
+
+            xEventGroupClearBits(xAiEventGroup, AI_FREQ_STOPPED_BIT);
+
+            // Owns the mic for its whole lifetime; blocks until the LCD clears the flag
+            err = ai_freq_run(&ai_freq_running);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "ai_freq_run failed: %s", esp_err_to_name(err));
+            }
+
+            // ai_freq_run already released the mic on every path; idempotent insurance
+            ai_voice_deinit();
+
+#ifdef POLYCAST5_DEBUG
+            ESP_LOGI(TAG, "ai_freq_run done, ai_task stack high water: %u",
+                    (unsigned)uxTaskGetStackHighWaterMark(NULL));
+#endif
+
+            // The LCD page waits on this before it lets the device sleep, so the I2S pins
+            // are provably parked before esp_light_sleep_start()
+            xEventGroupSetBits(xAiEventGroup, AI_FREQ_STOPPED_BIT);
             continue;
         } else if (cmd.type == AI_CMD_KEYBOARD_DONE_REC) { // Process transcription
             memset(user_transcript, 0, sizeof(user_transcript)); // Clear previous contents

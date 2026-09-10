@@ -158,6 +158,7 @@ enum {
     SECURITY_DISCLAIMER_PAGE,
     WIFI_MANAGE_NETWORKS_PAGE,
     WIFI_NETWORK_INFO_PAGE,
+    TOOLS_FREQ_METER_PAGE,
 };
 
 // Security features that show a one-time authorized/educational-use disclaimer before their first use

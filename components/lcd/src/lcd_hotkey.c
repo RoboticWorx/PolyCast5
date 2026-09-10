@@ -279,6 +279,7 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
                 " - Pomodoro Timer\n"
                 " - SRS Planner\n"
                 " - Claude Usage\n"
+                " - Frequency Meter\n"
                 "Games:\n"
                 " - DOOM\n"
                 " - Tetris\n"
