@@ -272,7 +272,7 @@ def check_device_state(port: str) -> None:
     if m.group(1).lower() != "enabled":
         die("flash encryption is NOT active on this device (fresh chip?).",
             "This script is only for devices already running dev-mode flash",
-            "encryption. For a fresh chip just use:  idf.py -p PORT flash")
+            "encryption. For a fresh chip use:  python flash.py --first")
 
     # Best effort: confirm the ROM can still encrypt on our behalf
     # (DIS_DOWNLOAD_MANUAL_ENCRYPT unburned - true for every dev-profile

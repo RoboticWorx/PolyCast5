@@ -21,6 +21,9 @@ That's it. The script figures out everything else:
     real settings from the build AND cross-checks the chip's efuse state, so if
     you ever turn Flash Encryption off it adapts - and it refuses to flash if
     the build and the chip disagree (which would brick the board).
+  * Handles the very first flash of a brand-new board with --first: a virgin
+    chip has no encryption key burned yet, so everything goes on as plaintext
+    and the bootloader encrypts the flash itself on the first boot.
   * Mirrors the freshly built images into the repo's bin/ folder (flat
     filenames plus a matching flash_args), so the committed release binaries -
     the ones the web Firmware Updater serves - always match the pushed source.
@@ -37,8 +40,11 @@ Common usage:
     python flash.py --no-build      # flash whatever changed (you built already)
     python flash.py --all           # force-flash every partition (safe recovery)
     python flash.py --monitor       # flash, then open idf.py monitor
+    python flash.py --first         # BRAND-NEW board, efuses not burned yet
+    python flash.py --first --monitor   # ...and watch it encrypt itself on first boot
     python flash.py -p COM7         # skip auto-detect, use this port
     python flash.py --dry-run       # show the plan, flash nothing
+    python flash.py --monitoronly   # just open the monitor (no build, no flash)
     python flash.py --list-ports    # just list detected serial ports and exit
     python flash.py --erase --yes   # full chip erase + reflash (DESTROYS NVS,
                                     #   saved Wi-Fi/keys/settings - last resort)
@@ -66,6 +72,42 @@ Why a separate plaintext write for assets:
         idf.py -p PORT encrypted-flash
         esptool --chip esp32c5 -p PORT erase-region 0x850000 0x7B0000
         esptool --chip esp32c5 -p PORT write-flash 0x850000 build/assets.bin
+
+First flash of a brand-new board (--first):
+    Flash Encryption is on in this build, but a board straight from the factory
+    has no encryption key: its efuses are blank and the hardware decrypts
+    nothing. Writing the normal ENCRYPTED images to it would store ciphertext
+    the chip reads back as garbage - an unbootable board. So the first flash has
+    to be PLAINTEXT, which is what --first does:
+
+        python flash.py --first --monitor
+
+    Every image (bootloader, partition table, otadata, app AND assets) is
+    written unencrypted - the same set of bytes a plain `idf.py -p PORT flash`
+    puts on the chip. Then, on the very first boot, the bootloader generates a
+    flash-encryption key, burns it into efuse, and re-encrypts the flash in
+    place. (`idf.py flash` stops short of that: on an encrypted build it leaves
+    the chip in download mode, so you decide when to boot. --first boots it for
+    you, which is what makes --monitor useful here.)
+
+    That first boot is ONE-WAY. Besides the encryption key it burns DIS_PAD_JTAG
+    and DIS_USB_JTAG - JTAG debugging is gone for good - plus DIS_DIRECT_BOOT and
+    SPI_DOWNLOAD_MSPI_DIS. (DIS_DOWNLOAD_MANUAL_ENCRYPT is NOT burned: this build
+    sets CONFIG_SECURE_FLASH_UART_BOOTLOADER_ALLOW_ENC=y, which is what keeps
+    lock_it_down.py's encrypted-serial transition possible later.) Let it finish:
+    don't unplug, reset, or point any tool at the port until the console shows
+    "Flash encryption completed",
+    "Resetting with flash encryption enabled...", and then the app banner on the
+    second boot. Interrupting it leaves an encrypted bootloader header the ROM
+    can't boot - the board looks dead and needs another --first flash to recover.
+    Development-mode encryption keeps the board re-flashable over USB afterwards,
+    so from the second flash on just run `python flash.py` with no --first; the
+    script writes encrypted images from then on.
+
+    --first refuses to run against a board whose efuses are already burned
+    (plaintext on an encrypted chip is the same brick in reverse), and a normal
+    run refuses a virgin board and points you back here - so whichever way round
+    you get it, the script stops before the damage.
 
 OTA note:
     This tool always targets the ota_0 app slot (0x50000) and re-writes otadata
@@ -769,12 +811,13 @@ def die_if_locked_device(out: str) -> None:
             "See www.polycast5.com/blogs/docs/lock-it-down")
 
 
-def read_chip_mac(port: str, chip: str) -> str | None:
+def read_chip_mac(port: str, chip: str, after: str = "hard-reset") -> str | None:
     """Return the board's base MAC, or None if it couldn't be read/parsed."""
     # fatal=False: a flaky read here must not kill the run; we just lose the
     # identity check and fall back to flashing everything. hard-reset leaves the
-    # board running its app afterwards (in case we end up flashing nothing).
-    proc = run(esptool_cmd(port, chip, "default-reset", "hard-reset", "read-mac"),
+    # board running its app afterwards (in case we end up flashing nothing);
+    # callers pass after="no-reset" when booting the app would be unsafe.
+    proc = run(esptool_cmd(port, chip, "default-reset", after, "read-mac"),
                capture=True, fatal=False)
     if proc is None:
         print(yellow("Couldn't run esptool for the MAC read; will flash everything."))
@@ -795,11 +838,11 @@ def read_chip_mac(port: str, chip: str) -> str | None:
     return None
 
 
-def read_chip_fe(port: str, chip: str) -> bool | None:
+def read_chip_fe(port: str, chip: str, after: str = "hard-reset") -> bool | None:
     """Return the chip's actual Flash Encryption state (True/False), or None if
     it couldn't be determined."""
     # esptool's get-security-info prints a line "Flash Encryption: Enabled/Disabled".
-    proc = run(esptool_cmd(port, chip, "default-reset", "hard-reset", "get-security-info"),
+    proc = run(esptool_cmd(port, chip, "default-reset", after, "get-security-info"),
                capture=True, fatal=False)
     if proc is None:
         return None  # esptool itself couldn't run - caller decides (fails closed)
@@ -825,13 +868,20 @@ def load_state() -> dict | None:
         return None
 
 
-def save_state(chip: str, mac: str | None, fe: bool, plan: list[dict]) -> None:
+def save_state(chip: str, mac: str | None, fe: bool, plan: list[dict],
+               first: bool = False) -> None:
     # Record what is now on the chip: per-offset file + hash + encrypt flag,
     # keyed by offset, plus the chip identity (mac) and FE setting. Next run
     # compares fresh hashes against this to decide what to skip.
+    # `fe` is the encryption the images were WRITTEN with; `first` marks a
+    # --first (plaintext) flash, after which the bootloader re-encrypts the flash
+    # itself - so the recorded images no longer describe the chip's bytes and the
+    # next run has to write the whole encrypted set once.
     files = {p["offset_hex"]: {"file": p["rel"], "sha256": p["sha"], "encrypted": p["encrypt"]}
              for p in plan}
     state = {"chip": chip, "mac": mac, "flash_encryption": fe, "files": files}
+    if first:
+        state["first_flash"] = True
     try:
         STATE_FILE.write_text(json.dumps(state, indent=2))
     except Exception as e:
@@ -879,6 +929,10 @@ def main() -> int:
                         help="Don't run `idf.py build` first (use existing build/).")
     parser.add_argument("--all", "--full", dest="all", action="store_true",
                         help="Flash every partition, ignoring change detection (safe recovery).")
+    parser.add_argument("--first", action="store_true",
+                        help="FIRST flash of a brand-new board (efuses not burned yet): write "
+                             "every image as plaintext and let the bootloader enable flash "
+                             "encryption on the first boot.")
     parser.add_argument("--erase", action="store_true",
                         help="FULL chip erase before flashing (DESTROYS NVS/keys/settings; "
                              "last-resort recovery - prefer --all).")
@@ -886,6 +940,11 @@ def main() -> int:
                         help="Skip the interactive confirmation for --erase.")
     parser.add_argument("--monitor", action="store_true",
                         help="Open `idf.py monitor` after flashing.")
+    parser.add_argument("--monitoronly", "--monitor-only", dest="monitoronly",
+                        action="store_true",
+                        help="Only open `idf.py monitor` on the auto-detected port - no "
+                             "build step, no flash, no bin/ or size-report writes. Add "
+                             "--first to attach without resetting the board.")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show the plan but don't touch the device.")
     parser.add_argument("--list-ports", action="store_true",
@@ -904,6 +963,21 @@ def main() -> int:
         for p in ports:
             print(f"  {describe_port(p)}")
         return 0
+
+    # --monitoronly is the other pure utility: find the board and hand straight
+    # off to the serial monitor. No build step, no device probe, no flash, and
+    # no bin/ or size-report writes.
+    # Combined with --first it attaches WITHOUT resetting, which is the only
+    # safe way to watch a board that is mid-way through its first-boot
+    # encryption pass (see open_monitor).
+    if args.monitoronly:
+        port = args.port or autodetect_port()
+        if args.dry_run:
+            print(gray(f"[dry-run] would open the monitor on {port}; "
+                       "device untouched."))
+            return 0
+        # The monitor IS this command's whole job, so its exit code is ours.
+        return open_monitor(port, no_reset=args.first)
 
     # -- 1. Build (default on) -------------------------------------------------
     # Build first so the binaries always match the current source. The build is
@@ -936,9 +1010,36 @@ def main() -> int:
 
     if not flash_files:
         die("no flash_files in flasher_args.json - nothing to flash.")
+
+    # --first says this board is straight out of the box: no encryption key is
+    # burned into its efuses yet, so the hardware decrypts nothing on read. The
+    # images therefore have to go on as PLAINTEXT, and the bootloader encrypts
+    # the flash in place on the first boot. write_fe is the encryption THIS run
+    # writes with; fe stays the build's setting (what the chip ends up using).
+    write_fe = fe
+    burning = bool(args.first and fe)  # this run ends in the one-way efuse burn
+    if args.first:
+        if fe:
+            write_fe = False
+            print(yellow(bold("\n--first: treating this as a BRAND-NEW board.")))
+            print(yellow("    Every image is written PLAINTEXT because the chip has no"))
+            print(yellow("    flash-encryption key yet. On its FIRST BOOT the bootloader"))
+            print(yellow("    generates that key, burns it into efuse and re-encrypts the"))
+            print(yellow("    flash in place. That boot is ONE-WAY: besides the key it also"))
+            print(yellow("    burns DIS_PAD_JTAG + DIS_USB_JTAG (JTAG debugging off for good),"))
+            print(yellow("    DIS_DIRECT_BOOT and SPI_DOWNLOAD_MSPI_DIS."))
+            print(yellow("    Development-mode encryption keeps the board re-flashable over"))
+            print(yellow(f"    USB, so from the next flash on run `python {PROG}` WITHOUT --first."))
+        else:
+            print(gray("\n--first given, but this build has flash encryption off, so nothing "
+                       "would be encrypted either way;"))
+            print(gray("  it only forces a full flash here."))
+
     # Under FE we MUST know each partition's subtype to avoid encrypting littlefs;
     # a missing partition table would force us to guess, so refuse instead.
-    if fe and not parts:
+    # Keyed on write_fe: with --first everything is plaintext, so there is no
+    # encrypt-vs-plaintext call to get wrong and the table isn't load-bearing.
+    if write_fe and not parts:
         die("Flash Encryption is on but partitions.csv couldn't be read.",
             "partitions.csv is required to decide which partitions are encrypted;",
             "refusing to flash blind (would risk corrupting littlefs or bricking boot).")
@@ -960,7 +1061,7 @@ def main() -> int:
         part = parts.get(off)  # the matching partitions.csv row, or None for boot/PT
         # A flash_files offset with no partitions.csv match, sitting at or above
         # the first partition, is something we can't classify safely under FE.
-        if fe and part is None and off >= first_part_off:
+        if write_fe and part is None and off >= first_part_off:
             die(f"offset {off_hex} isn't in partitions.csv; can't decide "
                 f"encrypted-vs-plaintext safely under Flash Encryption.",
                 "Check that partitions.csv matches the build.")
@@ -983,7 +1084,7 @@ def main() -> int:
             "name": name,
             "is_app": bool(part and part.ptype == "app"),    # is this the app slot?
             "is_otadata": bool(part and part.subtype == "ota"),  # is this the otadata partition?
-            "encrypt": should_encrypt(fe, part),             # THE encrypt-vs-plaintext decision
+            "encrypt": should_encrypt(write_fe, part),       # THE encrypt-vs-plaintext decision
             "sha": sha256_file(path),                        # content hash for change detection
         })
 
@@ -1005,13 +1106,19 @@ def main() -> int:
     else:
         port = args.port or autodetect_port()
         print(cyan("Connecting to device..."))
-        mac = read_chip_mac(port, chip)  # also serves as the connectivity check
+        # On a --first run that can actually burn, leave the chip in download
+        # mode between probes. A board that already holds a plaintext app but
+        # hasn't burned its efuses yet would otherwise start the one-way
+        # encryption pass on the first probe's hard-reset, and the next probe's
+        # reset would interrupt it.
+        probe_after = "no-reset" if burning else "hard-reset"
+        mac = read_chip_mac(port, chip, probe_after)  # also the connectivity check
         if mac:
             print(green(f"Connected. Chip MAC: {mac}"))
 
         # Refuse to flash if the build's encryption assumption disagrees with the
         # chip's real efuse state - that mismatch is the classic way to brick.
-        chip_fe = read_chip_fe(port, chip)
+        chip_fe = read_chip_fe(port, chip, probe_after)
         if chip_fe is None:
             # Fail CLOSED. With locked-down devices in the field (see the
             # lock-it-down guide), "couldn't tell" is not a safe state to write
@@ -1022,6 +1129,20 @@ def main() -> int:
                 "Run this from an ESP-IDF terminal so `python -m esptool` works.",
                 "If this device was locked down, do NOT flash it over USB - it can",
                 "only be updated over OTA. See www.polycast5.com/blogs/docs/lock-it-down")
+        elif burning:
+            # --first asserts "virgin board". The one thing that MUST hold is
+            # that the chip really has no key burned: writing plaintext over an
+            # already-encrypted chip is the same brick in reverse. (Only when
+            # the build has FE on - an FE-off --first falls through to the
+            # ordinary mismatch check below, which words it better.)
+            if chip_fe:
+                die("--first was given, but this chip ALREADY has flash encryption burned.",
+                    "--first writes plaintext images, which an encrypted chip cannot boot.",
+                    "This board has been flashed before - drop --first and run:",
+                    f"    python {PROG}          (or --all to force every partition)",
+                    "The board was left in download mode by the check above; the next",
+                    "flash (or a power-cycle) boots it again.")
+            print(green("Chip flash-encryption: OFF - a virgin board, as --first expects."))
         elif chip_fe != fe:
             print(red(f"\nFlash-encryption MISMATCH: build expects FE="
                       f"{'ON' if fe else 'OFF'} but the chip reports FE="
@@ -1030,9 +1151,10 @@ def main() -> int:
                 # Build wants encrypted images but the chip has no FE key yet.
                 die("flashing encrypted images to a chip that doesn't have flash "
                     "encryption enabled would brick it.",
-                    "If this is a brand-new board, do the FIRST flash with "
-                    "`idf.py -p PORT flash` (plaintext) - the bootloader enables flash "
-                    "encryption on first boot - then use this script for every flash after.",
+                    "If this is a brand-new board, re-run with --first: it writes every "
+                    "image as plaintext and the bootloader turns encryption on itself "
+                    "during the first boot.",
+                    f"    python {PROG} --first --monitor",
                     "Otherwise rebuild with the encryption setting that matches the board.")
             else:
                 # Chip is encrypted but the build is plaintext - the reverse brick.
@@ -1047,7 +1169,9 @@ def main() -> int:
     # Otherwise we compare each image's hash to the last-flash record.
     state = load_state()
     reason = None
-    if args.all or args.erase:
+    if args.first:
+        reason = "first-time flash (--first)"             # virgin chip holds nothing to keep
+    elif args.all or args.erase:
         reason = "forced (--all/--erase)"
     elif state is None:
         reason = "no previous flash record"
@@ -1055,6 +1179,11 @@ def main() -> int:
         reason = "device identity unknown"               # can't trust the record for this board
     elif not args.dry_run and state.get("mac") != mac:
         reason = "different board (MAC mismatch)"         # record belongs to another unit
+    elif state.get("first_flash") and not state.get("flash_encryption"):
+        # Last run was the plaintext --first flash. The bootloader has since
+        # re-encrypted the flash itself, so the recorded images no longer
+        # describe the chip's bytes - write the encrypted set once, in full.
+        reason = "previous run was the plaintext --first flash"
     elif state.get("flash_encryption") != fe:
         reason = "flash-encryption setting changed"       # encrypt flags may all differ now
 
@@ -1079,7 +1208,9 @@ def main() -> int:
 
     # -- 7. Print the plan ----------------------------------------------------
     # One row per partition: FLASH/skip, offset, name, encrypted/plaintext, size, file.
-    print(bold(f"\nPlan  (chip {chip}, flash encryption {'ON' if fe else 'OFF'}):"))
+    fe_label = ("OFF for this write, ON after the first boot" if burning
+                else ("ON" if write_fe else "OFF"))
+    print(bold(f"\nPlan  (chip {chip}, flash encryption {fe_label}):"))
     enc_label = lambda e: (green("encrypted") if e else yellow("plaintext "))
     for p in plan:
         tag = bold(red("FLASH")) if p["changed"] else gray("skip ")
@@ -1094,7 +1225,7 @@ def main() -> int:
               + gray("  (based on this script's last flash; use --all if it was "
                      "flashed another way or erased.)"))
         if args.monitor and not args.dry_run:
-            open_monitor(port)
+            open_monitor(port, no_reset=burning)
         return 0
 
     if args.dry_run:
@@ -1125,16 +1256,25 @@ def main() -> int:
             pairs += [p["offset_hex"], str(p["path"])]
         steps.append(["write-flash", "--encrypt", *write_flash_args, *pairs])
 
+    plain_pairs: list[str] = []
     for p in sorted(plain_to_flash, key=lambda p: p["offset"]):
         part = p["part"]
         # write-flash erases the sectors it writes, so a partition-filling image
         # already wipes any stale (possibly encrypted) bytes. Only when the image
         # is smaller than the partition do we erase the tail first - and on an
         # FE-enabled chip that erase needs --force to pass esptool's safety gate.
-        if part is not None and p["size"] < part.size:
+        # A --first chip has no efuse key (preflight confirmed it), so there is
+        # nothing stale to wipe - and `idf.py flash`, the path --first automates,
+        # erases nothing either.
+        if not burning and part is not None and p["size"] < part.size:
             steps.append(["erase-region", "--force", p["offset_hex"], f"0x{part.size:x}"])
-        # Plaintext write (no --encrypt) - this is the assets/littlefs partition.
-        steps.append(["write-flash", *write_flash_args, p["offset_hex"], str(p["path"])])
+        plain_pairs += [p["offset_hex"], str(p["path"])]
+    if plain_pairs:
+        # One combined plaintext write (no --encrypt), mirroring the encrypted
+        # branch above. Normally that is just assets/littlefs; on --first it is
+        # every image, and folding them into a single esptool run means one
+        # USB-Serial-JTAG connect instead of five that could each flake.
+        steps.append(["write-flash", *write_flash_args, *plain_pairs])
 
     if args.erase:
         # Full chip erase runs first of all. erase-flash is gated behind --force
@@ -1152,24 +1292,55 @@ def main() -> int:
     # -- 9. Record new state + optional monitor -------------------------------
     # Only reached if every step above succeeded. Persist the new on-chip state
     # so the next run can skip unchanged partitions.
-    save_state(chip, mac, fe, plan)
+    # Record what was actually WRITTEN (write_fe), not what the build wants -
+    # after a --first flash the chip is still plaintext until it reboots, and the
+    # first_flash marker tells the next run why it has to re-flash everything.
+    save_state(chip, mac, write_fe, plan, first=burning)
     print(green(bold("\nDone. Firmware flashed successfully.")))
 
+    if burning:
+        print(yellow(bold("\nThe board is now booting for the first time.")))
+        print(yellow("    It is generating its flash-encryption key, burning it into efuse"))
+        print(yellow("    and re-encrypting the flash in place. Until that is done, do NOT"))
+        print(yellow(f"    unplug the board, reset it, or run {PROG} against it - any of"))
+        print(yellow("    those interrupts the pass and leaves a board that looks dead"))
+        print(yellow("    (recover by re-running --first). To watch it safely, attach"))
+        print(yellow(f"    without resetting:  python {PROG} --monitoronly --first"))
+        print(yellow("    On the console the pass ends with:"))
+        print(yellow("        I (...) flash_encrypt: Flash encryption completed"))
+        print(yellow("        I (...) boot: Resetting with flash encryption enabled..."))
+        print(yellow("    then the board reboots and the app banner appears. An error line"))
+        print(yellow("    about 0x450000 having an invalid magic byte is expected - that is"))
+        print(yellow("    the empty ota_1 slot, and it is skipped."))
+        print(yellow(f"    After the app comes up, flash normally:  python {PROG}   (no --first)"))
+
     if args.monitor:
-        open_monitor(port)
+        open_monitor(port, no_reset=burning)
     return 0
 
 
-def open_monitor(port: str) -> None:
+def open_monitor(port: str, no_reset: bool = False) -> int:
     # Hand off to `idf.py monitor`. Needs IDF_PATH (same as the build step).
+    # Returns the monitor's exit code so --monitoronly, whose only job this is,
+    # can report failure; the post-flash --monitor ignores it, because there the
+    # exit code documents whether the FLASH succeeded.
     idf_py = find_idf_py()
     if idf_py is None:
         print(yellow("Can't open monitor: IDF_PATH not set."))
-        return
+        print(yellow(f"  Run this from an ESP-IDF terminal, or:  idf.py -p {port} monitor"))
+        return 1
     print(cyan(f"\nOpening monitor on {port} (Ctrl-] to exit)...\n"))
+    cmd = [sys.executable, str(idf_py), "-C", str(ROOT), "monitor", "-p", port]
+    if no_reset:
+        # After a --first flash the board is already booting, generating its
+        # key and encrypting the flash in place. idf.py monitor resets the MCU
+        # on startup unless told not to, and a reset landing inside that pass
+        # leaves an encrypted bootloader header the ROM bootloader reads as
+        # noise - the board then looks dead until it is re-flashed plaintext.
+        # (--no-reset is only accepted together with -p, which we always pass.)
+        cmd.append("--no-reset")
     # Blocks until the user exits the monitor; output streams straight through.
-    subprocess.run([sys.executable, str(idf_py), "-C", str(ROOT),
-                    "monitor", "-p", port])
+    return subprocess.run(cmd).returncode
 
 
 if __name__ == "__main__":
