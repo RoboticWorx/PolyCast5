@@ -14,6 +14,7 @@ idf_component_register(
     REQUIRES
         gpio
         lcd
+        expansions
         lora
         infrared
         espnow

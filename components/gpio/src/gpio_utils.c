@@ -91,35 +91,47 @@ static void haptic_off_cb(TimerHandle_t xTimer)
 }
 
 // Called every RGB_BLINK_PERIOD_MS to toggle the LED
+// Non-blocking throughout
 static void rgb_blink_cb(TimerHandle_t xTimer)
 {
-    rgb_blink_state = !rgb_blink_state;
+    const bool next = !rgb_blink_state;
+    esp_err_t err = ESP_OK;
+
     // Turn the LEDs on or off based on rgb_blink_color + state
     switch(rgb_blink_color) {
         case RGB_SET_RED:
-            gpio_utils_write_output(TCA9535_RED_RGB_LED_PIN, rgb_blink_state);
+            err = gpio_utils_write_output_nb(TCA9535_RED_RGB_LED_PIN, next);
             break;
         
         case RGB_SET_GREEN:
-            gpio_utils_write_output(TCA9535_GREEN_RGB_LED_PIN, rgb_blink_state);
+            err = gpio_utils_write_output_nb(TCA9535_GREEN_RGB_LED_PIN, next);
             break;
             
         case RGB_SET_BLUE:
-            gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, rgb_blink_state);
+            err = gpio_utils_write_output_nb(TCA9535_BLUE_RGB_LED_PIN, next);
             break;
             
         case RGB_SET_PURPLE:
-            gpio_utils_write_output(TCA9535_RED_RGB_LED_PIN, rgb_blink_state);
-            gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, rgb_blink_state);
+            err = gpio_utils_write_output_nb(TCA9535_RED_RGB_LED_PIN, next);
+            if (gpio_utils_write_output_nb(TCA9535_BLUE_RGB_LED_PIN, next) != ESP_OK) {
+                err = ESP_ERR_TIMEOUT;
+            }
             break;
             
         case RGB_SET_TEAL:
-            gpio_utils_write_output(TCA9535_GREEN_RGB_LED_PIN, rgb_blink_state);
-            gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, rgb_blink_state);
+            err = gpio_utils_write_output_nb(TCA9535_GREEN_RGB_LED_PIN, next);
+            if (gpio_utils_write_output_nb(TCA9535_BLUE_RGB_LED_PIN, next) != ESP_OK) {
+                err = ESP_ERR_TIMEOUT;
+            }
             break;
             
         default:
             break;
+    }
+
+    // Committed only once the edge reached the hardware
+    if (err == ESP_OK) {
+        rgb_blink_state = next;
     }
 }
 // Called once after RGB_BLINK_TOTAL_MS to stop blinking
@@ -129,9 +141,14 @@ static void rgb_blink_stop_cb(TimerHandle_t xTimer)
     xTimerStop(rgb_blink_timer, 0);
 
     // Ensure all LEDs off
-    gpio_utils_write_output(TCA9535_RED_RGB_LED_PIN, 0);
-    gpio_utils_write_output(TCA9535_GREEN_RGB_LED_PIN, 0);
-    gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, 0);
+    static const uint8_t pins[3] = {
+        TCA9535_RED_RGB_LED_PIN, TCA9535_GREEN_RGB_LED_PIN, TCA9535_BLUE_RGB_LED_PIN,
+    };
+    for (size_t i = 0; i < 3; ++i) {
+        if (gpio_utils_write_output_nb(pins[i], 0) != ESP_OK) {
+            gpio_utils_write_output(pins[i], 0);
+        }
+    }
 }
 
 static void init_ledc_pwm(void)
@@ -283,34 +300,52 @@ esp_err_t gpio_utils_init(void)
     return ret;
 }
 
+// One register read answers every input: they are all port-0 bits
+// Preferred over gpio_utils_read_input() per pin, which takes xI2CBusMutex once per pin
+esp_err_t gpio_utils_read_inputs(uint8_t *inputs)
+{
+    if (inputs == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
+    uint8_t raw = 0;
+    esp_err_t err = TCA9535ReadSingleRegister(TCA9535_INPUT_REG0, &raw);
+    xSemaphoreGive(xI2CBusMutex); // Release I2C bus
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "gpio_utils_read_inputs: I2C read failed: %s", esp_err_to_name(err));
+    }
+
+    // 0xFF, never the raw byte, on failure
+    *inputs = (err == ESP_OK) ? raw : 0xFF;
+    return err;
+}
+
 int gpio_utils_read_input(uint8_t pin)
 {
     if (pin > 7) {
         ESP_LOGE(TAG, "Invalid input pin %d", pin);
         return -1;
     }
-    
-    xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
-    uint8_t inputs = 0xFF; // Default: all released (active-low buttons)
-    esp_err_t err = TCA9535ReadSingleRegister(TCA9535_INPUT_REG0, &inputs);
-    xSemaphoreGive(xI2CBusMutex); // Release I2C bus
 
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "gpio_utils_read_input: I2C read failed: %s", esp_err_to_name(err));
-        return 1; // Default: released (active-low)
-    }
+    uint8_t inputs = 0xFF;
+    (void)gpio_utils_read_inputs(&inputs); // Logs its own failure; 0xFF reads as released
 
     return (inputs >> pin) & 0x1;
 }
 
-esp_err_t gpio_utils_write_output(uint8_t pin, bool level)
+// wait == 0 fails instead of blocking on a busy bus, for the timer daemon; every other caller passes portMAX_DELAY
+static esp_err_t gpio_utils_write_output_wait(uint8_t pin, bool level, TickType_t wait)
 {
     if (pin > 7) {
         ESP_LOGE(TAG, "Invalid output pin %d", pin);
         return ESP_ERR_INVALID_ARG;
     }
-    
-    xSemaphoreTake(xI2CBusMutex, portMAX_DELAY); // Lock I2C bus
+
+    if (xSemaphoreTake(xI2CBusMutex, wait) != pdTRUE) {
+        return ESP_ERR_TIMEOUT; // Bus busy and the caller cannot wait
+    }
 
     uint8_t out = 0;
     esp_err_t err = TCA9535ReadSingleRegister(TCA9535_OUTPUT_REG1, &out);
@@ -333,6 +368,16 @@ esp_err_t gpio_utils_write_output(uint8_t pin, bool level)
     }
 
     return err;
+}
+
+esp_err_t gpio_utils_write_output(uint8_t pin, bool level)
+{
+    return gpio_utils_write_output_wait(pin, level, portMAX_DELAY);
+}
+
+esp_err_t gpio_utils_write_output_nb(uint8_t pin, bool level)
+{
+    return gpio_utils_write_output_wait(pin, level, 0);
 }
 
 void gpio_utils_init_battery_adc(void)

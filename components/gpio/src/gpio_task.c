@@ -320,10 +320,14 @@ static void gpio_task(void *arg)
 
     while (1)
     {
+        // One I2C read serves every input below
+        uint8_t tca_inputs = 0xFF; // 0xFF on failure = all released (active low)
+        (void)gpio_utils_read_inputs(&tca_inputs);
+
         // Press + auto-repeat state machine
         for (size_t i = 0; i < 6; ++i) {
             btn_state_t *b = &buttons[i]; // Get the button
-            bool level = gpio_utils_read_input(b->pin); // Read its state: 0 = pressed, 1 = released
+            bool level = (tca_inputs >> b->pin) & 0x1; // Its state: 0 = pressed, 1 = released
 
             // Track raw held state for select + directional buttons (for games)
             switch (i) {
@@ -423,13 +427,13 @@ static void gpio_task(void *arg)
             }
         }
 
-        // Go to sleep requested
-        if (gpio_utils_read_input(TCA9535_USER_BUTTON_POWER_PIN) == 0) {
+        // Go to sleep requested. Same snapshot, so every input in this pass is consistent
+        if (((tca_inputs >> TCA9535_USER_BUTTON_POWER_PIN) & 0x1) == 0) {
             xSemaphoreGive(xPowerButtonSemaphore);
         }
         
         // Update LCD based on if charging or not
-        bool is_charging = (gpio_utils_read_input(TCA9535_CHG_IND_PIN) == 0);
+        bool is_charging = (((tca_inputs >> TCA9535_CHG_IND_PIN) & 0x1) == 0);
         if (is_charging != was_charging) { // Only update on state change
             // LiPo is charging    
             if (is_charging) {

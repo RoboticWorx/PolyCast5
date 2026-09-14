@@ -41,7 +41,7 @@ Common usage:
     python flash.py --all           # force-flash every partition (safe recovery)
     python flash.py --monitor       # flash, then open idf.py monitor
     python flash.py --first         # BRAND-NEW board, efuses not burned yet
-    python flash.py --first --monitor   # ...and watch it encrypt itself on first boot
+    python flash.py --first         # (never with --monitor - see below)
     python flash.py -p COM7         # skip auto-detect, use this port
     python flash.py --dry-run       # show the plan, flash nothing
     python flash.py --monitoronly   # just open the monitor (no build, no flash)
@@ -80,7 +80,7 @@ First flash of a brand-new board (--first):
     the chip reads back as garbage - an unbootable board. So the first flash has
     to be PLAINTEXT, which is what --first does:
 
-        python flash.py --first --monitor
+        python flash.py --first
 
     Every image (bootloader, partition table, otadata, app AND assets) is
     written unencrypted - the same set of bytes a plain `idf.py -p PORT flash`
@@ -953,6 +953,23 @@ def main() -> int:
 
     print(bold(cyan("\n=== PolyCast5 flash ===")))
 
+    # A monitor cannot be attached while the first boot is encrypting the flash.
+    # esp_idf_monitor drives RTS/DTR LOW->HIGH every time it opens the port
+    # (base/serial_reader.py open_serial(), on first open AND on every
+    # reconnect), and --no-reset only skips its explicit hard() call. On the
+    # built-in USB-Serial-JTAG those two lines ARE the reset mechanism, so the
+    # attach itself resets the chip. A reset between the bootloader being
+    # encrypted and CRYPT_CNT being burned leaves ciphertext the ROM reads as
+    # noise ("invalid header") - an unbootable board.
+    if args.first and (args.monitor or args.monitoronly):
+        die("--first cannot be combined with --monitor / --monitoronly.",
+            "Opening a serial monitor resets the board, and during the first-boot",
+            "encryption pass a reset leaves it unbootable ('invalid header').",
+            "There is no way around it on the built-in USB-Serial-JTAG: the monitor",
+            "toggles RTS/DTR whenever it opens the port, and that IS the reset line.",
+            f"Run `python {PROG} --first` on its own, leave the board completely",
+            "alone until it finishes (the screen comes up), then attach a monitor.")
+
     # --list-ports is a pure utility: print ports and exit before doing anything.
     if args.list_ports:
         ports = list_serial_ports()
@@ -966,10 +983,9 @@ def main() -> int:
 
     # --monitoronly is the other pure utility: find the board and hand straight
     # off to the serial monitor. No build step, no device probe, no flash, and
-    # no bin/ or size-report writes.
-    # Combined with --first it attaches WITHOUT resetting, which is the only
-    # safe way to watch a board that is mid-way through its first-boot
-    # encryption pass (see open_monitor).
+    # no bin/ or size-report writes. Note that attaching the monitor DOES reset
+    # the board (see the --first guard above); that is fine and usually wanted
+    # here, it just makes this unusable during a first-boot encryption pass.
     if args.monitoronly:
         port = args.port or autodetect_port()
         if args.dry_run:
@@ -977,7 +993,7 @@ def main() -> int:
                        "device untouched."))
             return 0
         # The monitor IS this command's whole job, so its exit code is ours.
-        return open_monitor(port, no_reset=args.first)
+        return open_monitor(port)
 
     # -- 1. Build (default on) -------------------------------------------------
     # Build first so the binaries always match the current source. The build is
@@ -1154,7 +1170,7 @@ def main() -> int:
                     "If this is a brand-new board, re-run with --first: it writes every "
                     "image as plaintext and the bootloader turns encryption on itself "
                     "during the first boot.",
-                    f"    python {PROG} --first --monitor",
+                    f"    python {PROG} --first",
                     "Otherwise rebuild with the encryption setting that matches the board.")
             else:
                 # Chip is encrypted but the build is plaintext - the reverse brick.
@@ -1225,7 +1241,7 @@ def main() -> int:
               + gray("  (based on this script's last flash; use --all if it was "
                      "flashed another way or erased.)"))
         if args.monitor and not args.dry_run:
-            open_monitor(port, no_reset=burning)
+            open_monitor(port)
         return 0
 
     if args.dry_run:
@@ -1304,8 +1320,10 @@ def main() -> int:
         print(yellow("    and re-encrypting the flash in place. Until that is done, do NOT"))
         print(yellow(f"    unplug the board, reset it, or run {PROG} against it - any of"))
         print(yellow("    those interrupts the pass and leaves a board that looks dead"))
-        print(yellow("    (recover by re-running --first). To watch it safely, attach"))
-        print(yellow(f"    without resetting:  python {PROG} --monitoronly --first"))
+        print(yellow("    (recover by simply re-running --first - the chip is still"))
+        print(yellow("    unencrypted, so a plaintext reflash is still the right write)."))
+        print(yellow("    Do NOT attach a serial monitor until the screen comes up:"))
+        print(yellow("    opening the port toggles RTS/DTR, which resets the board."))
         print(yellow("    On the console the pass ends with:"))
         print(yellow("        I (...) flash_encrypt: Flash encryption completed"))
         print(yellow("        I (...) boot: Resetting with flash encryption enabled..."))
@@ -1315,11 +1333,11 @@ def main() -> int:
         print(yellow(f"    After the app comes up, flash normally:  python {PROG}   (no --first)"))
 
     if args.monitor:
-        open_monitor(port, no_reset=burning)
+        open_monitor(port)
     return 0
 
 
-def open_monitor(port: str, no_reset: bool = False) -> int:
+def open_monitor(port: str) -> int:
     # Hand off to `idf.py monitor`. Needs IDF_PATH (same as the build step).
     # Returns the monitor's exit code so --monitoronly, whose only job this is,
     # can report failure; the post-flash --monitor ignores it, because there the
@@ -1330,15 +1348,11 @@ def open_monitor(port: str, no_reset: bool = False) -> int:
         print(yellow(f"  Run this from an ESP-IDF terminal, or:  idf.py -p {port} monitor"))
         return 1
     print(cyan(f"\nOpening monitor on {port} (Ctrl-] to exit)...\n"))
+    # NOTE: attaching resets the board, and idf.py's --no-reset does NOT prevent
+    # that on the built-in USB-Serial-JTAG - esp_idf_monitor toggles RTS/DTR on
+    # every port open regardless, and those lines are the reset mechanism. The
+    # --first guard in main() exists because of exactly that.
     cmd = [sys.executable, str(idf_py), "-C", str(ROOT), "monitor", "-p", port]
-    if no_reset:
-        # After a --first flash the board is already booting, generating its
-        # key and encrypting the flash in place. idf.py monitor resets the MCU
-        # on startup unless told not to, and a reset landing inside that pass
-        # leaves an encrypted bootloader header the ROM bootloader reads as
-        # noise - the board then looks dead until it is re-flashed plaintext.
-        # (--no-reset is only accepted together with -p, which we always pass.)
-        cmd.append("--no-reset")
     # Blocks until the user exits the monitor; output streams straight through.
     return subprocess.run(cmd).returncode
 

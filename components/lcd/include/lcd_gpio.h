@@ -4,7 +4,7 @@
 #include "misc/lv_style.h"
 #include "misc/lv_types.h"
 
-#define MAX_GPIO_OPTIONS 4
+#define MAX_GPIO_OPTIONS 6 // Backs both options[] and btns[]; leave headroom
 
 // Forward-declare structs (from lcd_utils.h)
 typedef struct ui_btns_t ui_btns_t;
@@ -63,6 +63,15 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
  * @param [in] gpio_menu GPIO menu structure
  */
 void lcd_gpio_scanner_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu);
+
+/**
+ * @brief Infrared expansion module: live thermal camera with range and spot temperature
+ *
+ * @param [in] ui_btns UI input structure
+ * @param [in] ui_menu UI menu structure
+ * @param [in] gpio_menu GPIO menu structure
+ */
+void lcd_gpio_ir_exp_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu);
 
 
 #endif // LCD_GPIO_H

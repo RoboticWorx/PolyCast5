@@ -299,6 +299,7 @@ void lcd_hotkey_option_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, hotkey_menu_
                 "GPIO:\n"
                 " - I2C Scanner\n"
                 " - Terminal\n"
+                " - Infrared Expansion\n"
                 "";
 
         lv_label_set_text_fmt(ending_lbl, ending_text, button_press, button_name);        

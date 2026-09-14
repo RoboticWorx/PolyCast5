@@ -30,6 +30,7 @@
 
 #include "sx126x_hal.h"
 #include "tca9535.h"
+#include "ir_exp_task.h"
 
 #include "lora_task.h"
 #include "lora_radio.h"
@@ -264,6 +265,9 @@ void app_main(void)
     wifi_task_create();
     bluetooth_task_create();
     ai_task_create();
+    
+    // Task created on entry to its page and freed on the way out - sleep expansion at boot
+    ir_exp_cold_park_all();
 
 #ifdef POLYCAST5_DEBUG_RAM
     // Wait for tasks to allocate

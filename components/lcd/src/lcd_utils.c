@@ -49,6 +49,7 @@
 #include "ai_utils.h"
 #include "lora_meshtastic_portal.h" // lora_meshtastic_portal_enabled_load_nvs
 #include "lora_meshtastic.h"        // g_meshtastic_mode, lora_meshtastic_listen_stop
+#include "ir_exp_task.h"            // ir_exp_task_park
 
 #define DRAW_LINES 20
 #define FLUSH_CHUNK 2
@@ -232,6 +233,9 @@ void lcd_device_sleep(void)
     // In Meshtastic mode abort_pending() above is a no-op, so this is the ONLY path that idles the radio before sleep
     lora_meshtastic_listen_stop();
 
+    // Park the IR expansion module (~29 mA) before the bus is locked
+    ir_exp_task_park();
+
     // Light-sleep loop: normally the device wakes on the power button and resumes immediately
     // Wakes every SLEEP_BATTERY_CHECK_INTERVAL_US on a timer to sample the battery
     bool woke_by_button = false;
@@ -353,6 +357,9 @@ void lcd_device_deep_sleep(void)
 
     // In Meshtastic mode abort_pending() above is a no-op, so this is the ONLY path that idles the radio before sleep
     lora_meshtastic_listen_stop();
+
+    // Park the IR expansion module (~29 mA) while the bus is still free
+    ir_exp_task_park();
 
     // Quiesce the shared buses so no task is caught mid-transaction at power-down
     // Deep sleep wakes via a full reboot that re-initialises every pin, and a hold latched here would survive that reboot
@@ -4126,6 +4133,15 @@ void lcd_gpio_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_men
 
         // Switch pages
         ui_menu->page = GPIO_SCANNER_PAGE;
+    } else if (ui_btns->select_btn == 1 && gpio_menu->index == 3) { // Infrared expansion selected
+        // Hide GPIO menu
+        lv_obj_add_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Reset static
+        do_once = false;
+
+        // Switch pages
+        ui_menu->page = GPIO_IR_EXPANSION_PAGE;
     } else if (ui_btns->left_btn == 1) { // Back selected
         // Hide GPIO menu
         lv_obj_add_flag(gpio_menu->main_list, LV_OBJ_FLAG_HIDDEN);

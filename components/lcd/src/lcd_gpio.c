@@ -27,8 +27,8 @@
 #define TAG "LCD_GPIO"
 
 gpio_menu_t gpio_menu = {
-    .options = {"How It Works", "Terminal", "I2C Scanner"},
-    .size = 3,
+    .options = {"How It Works", "Terminal", "I2C Scanner", "Infrared Expansion"},
+    .size = 4,
     .index = 1,
     .cont = NULL,
 };

@@ -69,6 +69,18 @@ esp_err_t gpio_utils_init(void);
 int gpio_utils_read_input(uint8_t pin);
 
 /**
+ * @brief Read every TCA9535 port-0 input in one transaction
+ *
+ *        Preferred over repeated gpio_utils_read_input() calls when more than one pin is
+ *        wanted: it takes the shared I2C bus once instead of once per pin.
+ *
+ * @param [out] inputs  Raw port-0 byte; set to 0xFF (all released) if the read fails
+ *
+ * @return ESP_OK, or the I2C error (inputs is still written with the released default)
+ */
+esp_err_t gpio_utils_read_inputs(uint8_t *inputs);
+
+/**
  * @brief Drive one pin on Port 1 (0…7)
  *
  * @param [in] pin Pin index (0…7)
@@ -77,6 +89,19 @@ int gpio_utils_read_input(uint8_t pin);
  * @return ESP_OK on success
  */
 esp_err_t gpio_utils_write_output(uint8_t pin, bool level);
+
+/**
+ * @brief As gpio_utils_write_output(), but fails instead of waiting for the I2C bus
+ *
+ *        For callers that must never block - notably FreeRTOS timer callbacks, which stall
+ *        every other software timer if they wait on the bus behind a thermal frame read.
+ *
+ * @param [in] pin    Output pin on TCA9535 port 1 (0-7)
+ * @param [in] level  Desired level
+ *
+ * @return ESP_OK, ESP_ERR_TIMEOUT if the bus was busy, or an I2C error
+ */
+esp_err_t gpio_utils_write_output_nb(uint8_t pin, bool level);
 
 /** 
  * @brief Cycle through the RGB LED to make sure it is working
