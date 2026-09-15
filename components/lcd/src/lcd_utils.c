@@ -347,6 +347,7 @@ void lcd_device_sleep(void)
 
 }
 
+#ifdef POLYCAST5_EN_DEEP_SLEEP
 void lcd_device_deep_sleep(void)
 {
     // Stop the homescreen animation before the panel sleeps
@@ -393,6 +394,7 @@ void lcd_device_deep_sleep(void)
     // Wakes on the boot-configured TCA9535 INT ext1 source and triggers a full reboot, so this call never returns
     esp_deep_sleep_start();
 }
+#endif
 
 void lcd_init_driver(void)
 {
@@ -2278,7 +2280,7 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
         ESP_LOGI(TAG, "Got pin: %s", input_pin);
 #endif
 
-#ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_DEBUG_PASSWORDS
         ESP_LOGI(TAG, "Need pin: %s", settings_menu->pin_menu.unlock_pin);
 #endif
         
@@ -3858,6 +3860,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
         
         // Reboot
         esp_restart();
+#ifdef POLYCAST5_EN_DEEP_SLEEP
     } else if (ui_btns->select_btn == 1 && settings_menu->index == 12) { // Enter deep sleep selected
         // Hide settings menu
         lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -3865,9 +3868,10 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
         // Reset static
         do_once = false;
 
-        // Switch to the deep sleep page (required for hotkeys)
+        // Switch to the confirm-then-sleep page
         ui_menu->page = SETTINGS_DEEP_SLEEP_PAGE;
-    } else if (ui_btns->select_btn == 1 && settings_menu->index == 13) { // Factory reset selected
+#endif
+    } else if (ui_btns->select_btn == 1 && settings_menu->index == SETTINGS_FACTORY_RST_IDX) { // Factory reset selected
         // Hide settings menu
         lv_obj_add_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         

@@ -182,11 +182,11 @@ static void wifi_task(void *param)
         // Save that version to NVS
         wifi_btc_pass_save_nvs(btc_wifi_portal_pass);
         
-#ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_DEBUG_PASSWORDS
         ESP_LOGW(TAG, "Setting first time BTC Wi-Fi portal password: %s", btc_wifi_portal_pass);
 #endif
     } else {
-#ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_DEBUG_PASSWORDS
         ESP_LOGI(TAG, "Using pre-set BTC Wi-Fi portal password: '%s'", btc_wifi_portal_pass);
 #endif
     }
@@ -262,8 +262,13 @@ static void wifi_task(void *param)
         
         // Specific network to connect selected
         if (xQueueReceive(xWifiSelectedNetworkQueue, &selected_network, 0) == pdTRUE) {
-#ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG_PASSWORDS
             ESP_LOGI(TAG, "xWifiSelectedNetworkQueue received: SSID='%s', pass='%s'", selected_network.ssid, selected_network.password);
+            ESP_LOGI(TAG, "xWifiSelectedNetworkQueue received: BSSID='%02x:%02x:%02x:%02x:%02x:%02x'",
+                    selected_network.bssid[0], selected_network.bssid[1], selected_network.bssid[2],
+                    selected_network.bssid[3], selected_network.bssid[4], selected_network.bssid[5]);
+#else
+            ESP_LOGI(TAG, "xWifiSelectedNetworkQueue received: SSID='%s'", selected_network.ssid);
             ESP_LOGI(TAG, "xWifiSelectedNetworkQueue received: BSSID='%02x:%02x:%02x:%02x:%02x:%02x'",
                     selected_network.bssid[0], selected_network.bssid[1], selected_network.bssid[2],
                     selected_network.bssid[3], selected_network.bssid[4], selected_network.bssid[5]);

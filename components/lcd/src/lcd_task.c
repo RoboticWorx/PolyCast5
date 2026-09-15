@@ -1,3 +1,5 @@
+#include "polycast5_macros.h"
+
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -534,9 +536,11 @@ static void lcd_task(void *pvParameters)
                 case SETTINGS_FACTORY_RST_PAGE:
                     lcd_settings_factory_rst_page(&ui_btns, &ui_menu, &settings_menu);
                     break;
+#ifdef POLYCAST5_EN_DEEP_SLEEP
                 case SETTINGS_DEEP_SLEEP_PAGE:
                     lcd_settings_deep_sleep_page(&ui_btns, &ui_menu, &settings_menu);
                     break;
+#endif
                 // Bluetooth pages
                 case BLUETOOTH_PAGE:
                     lcd_bluetooth_page(&ui_btns, &ui_menu, &bluetooth_menu);

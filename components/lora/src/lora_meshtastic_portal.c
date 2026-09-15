@@ -136,7 +136,7 @@ void lora_meshtastic_portal_pass_init(void)
     if (meshtastic_portal_pass_load_nvs(s_pass, sizeof(s_pass)) == ESP_OK) {
         s_pass_ready = true;
 
-#ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_DEBUG_PASSWORDS
         ESP_LOGI(TAG, "Using pre-set Meshtastic Wi-Fi portal password: '%s'", s_pass);
 #endif
         return;
@@ -161,7 +161,7 @@ void lora_meshtastic_portal_pass_init(void)
     // Save that version to NVS
     meshtastic_portal_pass_save_nvs(s_pass);
 
-#ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_DEBUG_PASSWORDS
     ESP_LOGW(TAG, "Setting first time Meshtastic Wi-Fi portal password: %s", s_pass);
 #endif
 }

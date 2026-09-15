@@ -161,11 +161,11 @@ static void ai_task(void *pvParameters)
         // Save that version to NVS
         ai_key_portal_pass_save_nvs(ai_wifi_portal_pass);
         
-#ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_DEBUG_PASSWORDS
         ESP_LOGW(TAG, "Setting first time AI Wi-Fi portal password: %s", ai_wifi_portal_pass);
 #endif
     } else {
-#ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_DEBUG_PASSWORDS
         ESP_LOGI(TAG, "Using pre-set AI Wi-Fi portal password: '%s'", ai_wifi_portal_pass);
 #endif
     }

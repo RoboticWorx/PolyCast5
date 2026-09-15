@@ -1,6 +1,8 @@
 #ifndef LCD_SETTINGS_H
 #define LCD_SETTINGS_H
 
+#include "polycast5_macros.h" // POLYCAST5_EN_DEEP_SLEEP: gates the settings indices below
+
 #include "esp_err.h"
 
 #include "misc/lv_style.h"
@@ -12,6 +14,14 @@
 #define SETTINGS_SET_LOCK_TXT "Set Unlock PIN"
 
 #define SETTINGS_LOCK_IDX 1
+
+// Keep in sync with settings_menu.options in lcd_settings.c
+// "Enter Deep Sleep" sits ahead of "Factory Reset" only when POLYCAST5_EN_DEEP_SLEEP is defined
+#ifdef POLYCAST5_EN_DEEP_SLEEP
+#define SETTINGS_FACTORY_RST_IDX 13
+#else
+#define SETTINGS_FACTORY_RST_IDX 12
+#endif
 
 #define MAX_SETTINGS_OPTIONS 20
 
@@ -186,16 +196,18 @@ void lcd_settings_change_lora_region_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu
  */
 void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
 
+#ifdef POLYCAST5_EN_DEEP_SLEEP // Disabled b/c a deep sleeping device cannot check battery levels every 6h to prevent over-discharge
 /**
- * @brief Deep sleep page. On direct selection or a firing hotkey it confirms then powers
- *        the device down (lcd_device_deep_sleep). While a hotkey is being armed it instead
- *        saves itself as the hotkey and returns home without sleeping.
+ * @brief Deep sleep page. Confirms on screen, then powers the device down via
+ *        lcd_device_deep_sleep(), which never returns. Reached from
+ *        Settings > "Enter Deep Sleep".
  *
  * @param [in] ui_btns User input structure
  * @param [in] ui_menu UI menu structure
  * @param [in] settings_menu Settings menu structure
  */
 void lcd_settings_deep_sleep_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu);
+#endif
 
 /**
  * @brief Show system information such as heap, FW version, etc.

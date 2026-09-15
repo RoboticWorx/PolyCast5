@@ -266,9 +266,10 @@ esp_err_t wifi_autoconnect_pick_known_network(wifi_login_t *out)
         wifi_autoconnect_fill_password_from_known(&last_known_pick);
         *out = last_known_pick;
         KNOWN_UNLOCK();
-#ifdef POLYCAST5_DEBUG
-        ESP_LOGI(TAG, "Using last known network: SSID='%s', pass='%s'",
-                out->ssid, out->password);
+#ifdef POLYCAST5_DEBUG_PASSWORDS
+        ESP_LOGI(TAG, "Using last known network: SSID='%s', pass='%s'", out->ssid, out->password);
+#else
+        ESP_LOGI(TAG, "Using last known network: SSID='%s'", out->ssid);
 #endif
         return ESP_OK;
     }
@@ -428,10 +429,16 @@ esp_err_t wifi_autoconnect_pick_known_network(wifi_login_t *out)
     last_known_network_conn_failed = false;
     KNOWN_UNLOCK();
     *out = best;
-#ifdef POLYCAST5_DEBUG
+#ifdef POLYCAST5_DEBUG_PASSWORDS
     ESP_LOGI(TAG, "Found best network: "
             "Selected SSID='%s', pass='%s', BSSID='%02x:%02x:%02x:%02x:%02x:%02x', RSSI='%d'",
             best.ssid, best.password,
+            best.bssid[0], best.bssid[1], best.bssid[2], best.bssid[3], best.bssid[4], best.bssid[5],
+            best_rssi);
+#else
+    ESP_LOGI(TAG, "Found best network: "
+            "Selected SSID='%s', BSSID='%02x:%02x:%02x:%02x:%02x:%02x', RSSI='%d'",
+            best.ssid,
             best.bssid[0], best.bssid[1], best.bssid[2], best.bssid[3], best.bssid[4], best.bssid[5],
             best_rssi);
 #endif

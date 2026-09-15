@@ -5,6 +5,8 @@
 
 #include "lvgl.h"
 
+#include "polycast5_macros.h" // POLYCAST5_EN_DEEP_SLEEP: gates lcd_device_deep_sleep below
+
 #include "lcd_anim.h"
 #include "lcd_infrared.h"
 #include "lcd_lora.h"
@@ -147,14 +149,14 @@ enum {
     GAMES_FLAPPY_PAGE,
     GAMES_DOOM_PAGE,
 
-    // Append pages to end here-on-out not to break NVS
+    // Append pages to end here-on-out not to break NVS, and never remove one
     LORA_MESHTASTIC_PAGE,
     SETTINGS_LORA_SF_PAGE,
     SETTINGS_LORA_REGION_PAGE,
     BLUETOOTH_BLE_FLOOD_PAGE,
     BLUETOOTH_BLE_FLOOD_ACTIVE_PAGE,
     WIFI_ARP_SPOOF_PAGE,
-    SETTINGS_DEEP_SLEEP_PAGE,
+    SETTINGS_DEEP_SLEEP_PAGE, // NVS-pinned: Keep this slot even when POLYCAST5_EN_DEEP_SLEEP is off
     SECURITY_DISCLAIMER_PAGE,
     WIFI_MANAGE_NETWORKS_PAGE,
     WIFI_NETWORK_INFO_PAGE,
@@ -218,10 +220,12 @@ extern ui_btns_t ui_btns;
  */
 void lcd_device_sleep(void);
 
+#ifdef POLYCAST5_EN_DEEP_SLEEP
 /**
  * @brief Put device and LCD into deep sleep mode (wakes via a full reboot)
  */
 void lcd_device_deep_sleep(void);
+#endif
 
 /** 
  * @brief Initialise SPI bus + ST7789 panel (blocking)

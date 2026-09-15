@@ -16,6 +16,7 @@
 #define POLYCAST5_DEBUG 1 // If debugging: enables all ESP_LOGI/W
 
 #ifdef POLYCAST5_DEBUG
+    //#define POLYCAST5_DEBUG_PASSWORDS 1 // Show password logs for debugging
     //#define POLYCAST5_DEBUG_GPIO 1 // If debugging user buttons
     //#define POLYCAST5_DEBUG_ADC 1 // If debugging battery ADC
     //#define POLYCAST5_DEBUG_RAM 1 // Print RAM heap state on boot
@@ -48,9 +49,9 @@
 
 // Settings/testing
 //#define POLYCAST5_PERSIST_SELECTION_INDEX 1 // Persist selected menu option across NVS and home
-//#define POLYCAST5_PASS_DEBUG 1 // Show password logs for debugging
 //#define POLYCAST5_CYCLE_RGB_ON_BOOT 1 // Cycle through the RGB LED to make sure it is working
 //#define POLYCAST5_CHECK_OTA_ON_CONN 1 // Check for OTA update on regular Wi-Fi connect
+//#define POLYCAST5_EN_DEEP_SLEEP 1 // KEEP DISABLED: Deep sleep cannot run the 6 h light-sleep battery check, so a sleeping pack can over-discharge
 
 //#define POLYCAST5_SRS_CALIBRATING 1 // Calibrate SRS entry table based on const array in srs_memory.c
 

@@ -181,11 +181,11 @@ static void bluetooth_task(void *arg)
         // Save that version to NVS
         bluetooth_portal_wifi_pass_save_nvs(bt_wifi_portal_pass);
         
-#ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_DEBUG_PASSWORDS
         ESP_LOGW(TAG, "Setting first time BT Wi-Fi portal password: %s", bt_wifi_portal_pass);
 #endif
     } else {
-#ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_DEBUG_PASSWORDS
         ESP_LOGI(TAG, "Using pre-set BT Wi-Fi portal password: '%s'", bt_wifi_portal_pass);
 #endif
     }
@@ -199,11 +199,11 @@ static void bluetooth_task(void *arg)
         // Save that version to NVS
         bluetooth_nvs_pairing_key_save(pairing_key);
         
-#ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_DEBUG_PASSWORDS
         ESP_LOGW(TAG, "Setting first time BT pairing key: %d", pairing_key);
 #endif
     } else {
-#ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_DEBUG_PASSWORDS
         ESP_LOGI(TAG, "Using pre-set BT pairing key: '%d'", pairing_key);
 #endif
     }

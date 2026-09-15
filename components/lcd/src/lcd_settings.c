@@ -81,10 +81,15 @@
 #define SLEEP_TIMER_MIN_S 5 // 5 sec
 #define SLEEP_TIMER_MAX_S 120 // 2 min
 
+// Order matters: SETTINGS_*_IDX in lcd_settings.h must match this list
 settings_menu_t settings_menu = {
     .options = {"Check for Updates", SETTINGS_SET_LOCK_TXT, "Change Colors", "LCD Brightness", "Adjust Haptics",
-            "Adjust Sleep Timer", "Adjust RGB LED", "Adjust LoRa SF", "Change LoRa Region", "Tips and Tricks", "System Info", "Reboot", "Enter Deep Sleep", "Factory Reset"},
-    .size = 14,
+            "Adjust Sleep Timer", "Adjust RGB LED", "Adjust LoRa SF", "Change LoRa Region", "Tips and Tricks", "System Info", "Reboot",
+#ifdef POLYCAST5_EN_DEEP_SLEEP
+            "Enter Deep Sleep",
+#endif
+            "Factory Reset"},
+    .size = SETTINGS_FACTORY_RST_IDX + 1, // "Factory Reset" is the last entry
     .index = 0,
     .cont = NULL,
     .pin_menu.pin_set = false,
@@ -2753,6 +2758,7 @@ void lcd_settings_pin_lockout_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
     (void)ui_btns;
 }
 
+#ifdef POLYCAST5_EN_DEEP_SLEEP
 void lcd_settings_deep_sleep_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
     (void)ui_btns;
@@ -2772,6 +2778,7 @@ void lcd_settings_deep_sleep_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
 
     lcd_device_deep_sleep();
 }
+#endif
 
 void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {

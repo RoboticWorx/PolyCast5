@@ -967,7 +967,7 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
             }
             pkey.passkey = pairing_key; // This is the passkey to be entered on peer
             
-#ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_DEBUG_PASSWORDS
             ESP_LOGI(TAG, "Enter passkey %" PRIu32 " on the peer side", pkey.passkey);
 #endif
             rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
@@ -997,7 +997,7 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
             }
             pkey.passkey = pairing_key;
             
-#ifdef POLYCAST5_PASS_DEBUG
+#ifdef POLYCAST5_DEBUG_PASSWORDS
             ESP_LOGI(TAG, "Input not supported passing -> %d", pairing_key);
 #endif
 
