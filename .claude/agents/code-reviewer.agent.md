@@ -136,8 +136,8 @@ You are a senior embedded systems engineer specializing in code reviews for ESP-
   - Component `CMakeLists.txt` correctly declares `REQUIRES` and `PRIV_REQUIRES` dependencies
 
 - **Partition & Flash**:
-  - Changes don't exceed partition size limits (4.0MiB per OTA slot, 7.6875MiB LittleFS)
-  - Binary assets added to LittleFS are size-conscious given the 7.6875MiB budget
+  - Changes don't exceed partition size limits (5.0MiB per OTA slot, 5.6875MiB LittleFS)
+  - Binary assets added to LittleFS are size-conscious given the 5.6875MiB budget (174 spare 4 KiB blocks)
 
 ## Review Process
 

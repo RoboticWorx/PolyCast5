@@ -24,6 +24,7 @@
 #include "lcd_asset_macros.h"
 #include "lcd_anim.h"
 #include "lcd_anim_fluid.h" // WATER animation implementation (esp32-fluidbox port)
+#include "lcd_anim_matrix.h" // MATRIX_RAIN animation implementation (procedural glyph grid)
 #include "lcd_utils.h"
 
 #define LCD_ANIM_NS "anim_data"
@@ -37,9 +38,6 @@
 #endif
 #ifdef POLYCAST5_EN_BLACK_HOLE_ANIM
     #define BLACK_HOLE_FRAME_PERIOD 120
-#endif
-#ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
-    #define MATRIX_RAIN_FRAME_PERIOD 100
 #endif
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
     #define PYRAMID_FRAME_PERIOD 120
@@ -76,10 +74,27 @@ static bool label_y_anim_busy = false;
 static lv_obj_t *loading_anim_cont = NULL; // Loading animation container
 
 static uint8_t anim_active = 0; // Default determined in lcd_anim_nvs_load
+static bool anim_running = false; // Shown and ticking; see lcd_anim_is_running()
 
+#ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
+static bool s_matrix_available = false; // MATRIX_RAIN canvas/timer created OK; when false it is skipped
+#endif
 #ifdef POLYCAST5_EN_WATER_ANIM
 static bool s_water_available = false; // WATER canvas/timer created OK; when false WATER is skipped
 #endif
+
+// Both procedural animations own a 64,800 B PSRAM canvas and can fail to allocate at init
+static bool anim_is_available(uint8_t idx)
+{
+#ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
+    if (idx == MATRIX_RAIN) return s_matrix_available;
+#endif
+#ifdef POLYCAST5_EN_WATER_ANIM
+    if (idx == WATER) return s_water_available;
+#endif
+    (void)idx;
+    return true;
+}
 
 /* Animation */
 typedef struct {
@@ -116,20 +131,6 @@ const char *black_hole_paths[BLACK_HOLE_FRAME_CNT] = {
     ANIM_BLACK_HOLE_6, ANIM_BLACK_HOLE_7, ANIM_BLACK_HOLE_8, ANIM_BLACK_HOLE_9, ANIM_BLACK_HOLE_10,
     ANIM_BLACK_HOLE_11, ANIM_BLACK_HOLE_12, ANIM_BLACK_HOLE_13, ANIM_BLACK_HOLE_14, ANIM_BLACK_HOLE_15,
     ANIM_BLACK_HOLE_16, ANIM_BLACK_HOLE_17, ANIM_BLACK_HOLE_18
-};
-#endif
-
-#ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
-const char *matrix_rain_paths[MATRIX_RAIN_FRAME_CNT] = {
-    ANIM_MATRIX_RAIN_1, ANIM_MATRIX_RAIN_2, ANIM_MATRIX_RAIN_3, ANIM_MATRIX_RAIN_4,    ANIM_MATRIX_RAIN_5,
-    ANIM_MATRIX_RAIN_6, ANIM_MATRIX_RAIN_7, ANIM_MATRIX_RAIN_8, ANIM_MATRIX_RAIN_9,    ANIM_MATRIX_RAIN_10,
-    ANIM_MATRIX_RAIN_11, ANIM_MATRIX_RAIN_12, ANIM_MATRIX_RAIN_13, ANIM_MATRIX_RAIN_14, ANIM_MATRIX_RAIN_15,
-    ANIM_MATRIX_RAIN_16, ANIM_MATRIX_RAIN_17, ANIM_MATRIX_RAIN_18, ANIM_MATRIX_RAIN_19, ANIM_MATRIX_RAIN_20,
-    ANIM_MATRIX_RAIN_21, ANIM_MATRIX_RAIN_22, ANIM_MATRIX_RAIN_23, ANIM_MATRIX_RAIN_24, ANIM_MATRIX_RAIN_25,
-    ANIM_MATRIX_RAIN_26, ANIM_MATRIX_RAIN_27, ANIM_MATRIX_RAIN_28, ANIM_MATRIX_RAIN_29, ANIM_MATRIX_RAIN_30,
-    ANIM_MATRIX_RAIN_31, ANIM_MATRIX_RAIN_32, ANIM_MATRIX_RAIN_33, ANIM_MATRIX_RAIN_34, ANIM_MATRIX_RAIN_35,
-    ANIM_MATRIX_RAIN_36, ANIM_MATRIX_RAIN_37, ANIM_MATRIX_RAIN_38, ANIM_MATRIX_RAIN_39, ANIM_MATRIX_RAIN_40,
-    ANIM_MATRIX_RAIN_41, ANIM_MATRIX_RAIN_42
 };
 #endif
 
@@ -175,18 +176,6 @@ static anim_t black_hole_anim = {
 };
 #endif
 
-#ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
-static anim_t matrix_rain_anim = {
-    .frames = matrix_rain_paths,
-    .frame_cnt = MATRIX_RAIN_FRAME_CNT,
-    .pingpong = false,
-    .forward = true,
-    .cur = 0,
-    .img = NULL,
-    .timer = NULL
-};
-#endif
-
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
 static anim_t pyramid_anim = {
     .frames = pyramid_paths,
@@ -199,8 +188,9 @@ static anim_t pyramid_anim = {
 };
 #endif
 
-// The WATER animation is a procedural 3D particle fluid implemented in lcd_anim_fluid.c
-// The lifecycle hooks below delegate to lcd_anim_fluid_*(); there is no per-frame state
+// MATRIX_RAIN and WATER are procedural, implemented in lcd_anim_matrix.c and
+// lcd_anim_fluid.c. The lifecycle hooks below delegate to lcd_anim_matrix_*() and
+// lcd_anim_fluid_*(); neither keeps per-frame state here
 
 static void warm_anim(const char **paths, int cnt)
 {
@@ -221,9 +211,6 @@ void lcd_anim_warm_all(void)
 #endif
 #ifdef POLYCAST5_EN_BLACK_HOLE_ANIM
     warm_anim(black_hole_paths, BLACK_HOLE_FRAME_CNT);
-#endif
-#ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
-    warm_anim(matrix_rain_paths, MATRIX_RAIN_FRAME_CNT);
 #endif
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
     warm_anim(pyramid_paths, PYRAMID_FRAME_CNT);
@@ -379,21 +366,9 @@ void lcd_anim_init_images(void)
     }
 #endif
     
-    /* Matrix rain */
+    // Matrix rain (procedural glyph-grid rain, implemented in lcd_anim_matrix.c)
 #ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
-    // Create image
-    matrix_rain_anim.img = lv_img_create(ACTIVE_SCR);
-    lv_image_set_src(matrix_rain_anim.img, matrix_rain_anim.frames[0]);
-    lv_obj_center(matrix_rain_anim.img);
-    
-    // Create timer
-    matrix_rain_anim.timer = lv_timer_create(anim_timer_cb, MATRIX_RAIN_FRAME_PERIOD, &matrix_rain_anim);
-    
-    // Check if set
-    if (anim_active != MATRIX_RAIN) {
-        lv_obj_add_flag(matrix_rain_anim.img, LV_OBJ_FLAG_HIDDEN);
-        lv_timer_pause(matrix_rain_anim.timer);
-    }
+    s_matrix_available = lcd_anim_matrix_init(ACTIVE_SCR); // Creates the canvas + running timer
 #endif
     
     /* Pyramid */
@@ -416,20 +391,41 @@ void lcd_anim_init_images(void)
     // Water (procedural 3D particle fluid, implemented in lcd_anim_fluid.c)
 #ifdef POLYCAST5_EN_WATER_ANIM
     s_water_available = lcd_anim_fluid_init(ACTIVE_SCR); // Creates the canvas + running timer
-    if (!s_water_available && anim_active == WATER) {
-        // Canvas/timer alloc failed: don't leave a blank homescreen on a persisted WATER selection
-        ESP_LOGE(TAG, "WATER animation unavailable; falling back to animation 0");
-        anim_active = 0;
+#endif
+
+    // Resolve the fallback only now that every procedural module has reported in, so we
+    // can never fall back onto one that has not been initialized yet
+    if (!anim_is_available(anim_active)) {
+        ESP_LOGE(TAG, "Animation %u unavailable; falling back", anim_active);
+        uint8_t tries = 0;
+        while (!anim_is_available(anim_active) && tries++ < NUM_ANIMS) {
+            anim_active = (anim_active + 1) % NUM_ANIMS;
+        }
+
+        // Deliberately NOT saved to NVS: a transient PSRAM shortage should not silently
+        // rewrite the user selection - retry the real one on the next boot
         lcd_anim_start_animation(); // Show + resume the fallback animation
     }
-    if (anim_active != WATER) {
-        lcd_anim_fluid_stop(); // Hide + pause unless it's the active animation
+
+    // Hide + pause each procedural animation unless it is the active one
+#ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
+    if (anim_active != MATRIX_RAIN) {
+        lcd_anim_matrix_stop();
     }
 #endif
+#ifdef POLYCAST5_EN_WATER_ANIM
+    if (anim_active != WATER) {
+        lcd_anim_fluid_stop();
+    }
+#endif
+
+    anim_running = true;
 }
 
 void lcd_anim_start_animation(void)
 {
+    anim_running = true;
+
     // Start the active
 #ifdef POLYCAST5_EN_CITY_ANIM
     if (anim_active == CITY) {
@@ -445,8 +441,7 @@ void lcd_anim_start_animation(void)
 #endif
 #ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
     if (anim_active == MATRIX_RAIN) {
-        lv_obj_remove_flag(matrix_rain_anim.img,  LV_OBJ_FLAG_HIDDEN);
-        lv_timer_resume(matrix_rain_anim.timer);
+        lcd_anim_matrix_start();
     }
 #endif
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
@@ -472,7 +467,7 @@ static void pause_animations(void)
     lv_timer_pause(black_hole_anim.timer);
 #endif
 #ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
-    lv_timer_pause(matrix_rain_anim.timer);
+    lcd_anim_matrix_pause();
 #endif
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
     lv_timer_pause(pyramid_anim.timer);
@@ -484,6 +479,8 @@ static void pause_animations(void)
 
 void lcd_anim_stop_animations(void)
 {
+    anim_running = false;
+
     pause_animations();
 
     // Hide paused animations
@@ -494,7 +491,7 @@ void lcd_anim_stop_animations(void)
     lv_obj_add_flag(black_hole_anim.img, LV_OBJ_FLAG_HIDDEN);
 #endif
 #ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
-    lv_obj_add_flag(matrix_rain_anim.img, LV_OBJ_FLAG_HIDDEN);
+    lcd_anim_matrix_stop();
 #endif
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
     lv_obj_add_flag(pyramid_anim.img, LV_OBJ_FLAG_HIDDEN);
@@ -502,6 +499,11 @@ void lcd_anim_stop_animations(void)
 #ifdef POLYCAST5_EN_WATER_ANIM
     lcd_anim_fluid_stop();
 #endif
+}
+
+bool lcd_anim_is_running(void)
+{
+    return anim_running;
 }
 
 void lcd_anim_transition_animation(bool dir)
@@ -514,17 +516,14 @@ void lcd_anim_transition_animation(bool dir)
         anim_active = (anim_active + NUM_ANIMS - 1) % NUM_ANIMS; // - 1 with wrap
     }
 
-#ifdef POLYCAST5_EN_WATER_ANIM
-    // Skip WATER while its canvas is unavailable (alloc failed at init)
-    // WATER is a single index, so one more step in the same direction lands on an available animation
-    if (anim_active == WATER && !s_water_available && NUM_ANIMS > 1) {
+    // Skip any animation whose canvas failed to allocate at init
+    for (uint8_t tries = 0; tries < NUM_ANIMS && !anim_is_available(anim_active); ++tries) {
         if (dir) {
             anim_active = (anim_active + 1) % NUM_ANIMS;
         } else {
             anim_active = (anim_active + NUM_ANIMS - 1) % NUM_ANIMS;
         }
     }
-#endif
 
     lcd_anim_start_animation();
     

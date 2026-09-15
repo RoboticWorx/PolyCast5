@@ -29,11 +29,6 @@
 #else
     #define BLACK_HOLE_FRAME_CNT 0
 #endif
-#ifdef POLYCAST5_EN_MATRIX_RAIN_ANIM
-    #define MATRIX_RAIN_FRAME_CNT 42
-#else
-    #define MATRIX_RAIN_FRAME_CNT 0
-#endif
 #ifdef POLYCAST5_EN_PYRAMID_ANIM
     #define PYRAMID_FRAME_CNT 56
 #else
@@ -73,6 +68,16 @@ void lcd_anim_start_animation(void);
  * @brief Stop all animations by hiding them and pausing their timers
  */
 void lcd_anim_stop_animations(void);
+
+/**
+ * @brief Check whether an animation is currently shown and ticking
+ *
+ * Lets a caller that stops the animations (the sleep path) restore only what was
+ * actually running, rather than starting one on a page that had none.
+ *
+ * @returns True between lcd_anim_start_animation() and lcd_anim_stop_animations()
+ */
+bool lcd_anim_is_running(void);
 
 /**
  * @brief Transition to the next or previous animation based on the direction parameter, and save the selection to NVS

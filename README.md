@@ -63,7 +63,7 @@ PolyCast5 is task-based: `main` brings up the hardware, then spawns one FreeRTOS
 
 * `main` - The `app_main` entry point. Initializes NVS, the SPI/I2C buses, the LCD/LVGL stack, and the LoRa radio, then launches the tasks below.
 * `assets` - UI media (icons, QR codes, and homescreen animation frames) stored as raw `.bin` files and flashed to a LittleFS partition.
-* `anim` - The full library of homescreen animation frame sequences - City, Black Hole, Matrix Rain, and Pyramid - from which the selected animations are copied into `assets`.
+* `anim` - The full library of homescreen animation frame sequences - City, Black Hole, and Pyramid - from which the selected animations are copied into `assets`. Matrix Rain is kept here for reference only: it is generated on-device now (`components/lcd/src/lcd_anim_matrix.c`) and can no longer be swapped in as a flipbook.
 * `bin` - Precompiled release binaries, kept in sync by `flash.py` for the OTA updater and web flasher.
 * `scripts` - Bluetooth autotype examples, Arduino ESP-NOW receiver sketches, and miscellaneous development tooling.
 * `simulator` - Desktop LVGL + SDL2 build that renders the device screens in a window, for previewing and testing UI layout without hardware.

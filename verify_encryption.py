@@ -57,6 +57,10 @@ import sys
 import time
 from pathlib import Path
 
+# Reuse flash.py's partition parsing so both tools read the same partitions.csv,
+# exactly as lock_it_down.py already does.
+from flash import Partition, die, load_partitions
+
 
 # ===========================================================================
 # Partition layout (from partitions.csv).
@@ -66,13 +70,36 @@ from pathlib import Path
 # decryption, no MMU translation - so encrypted partitions come back as
 # ciphertext.
 # ===========================================================================
-DUMPS: list[tuple[str, str, int, int]] = [
-    ("bootloader",  "dump_bootloader.bin",     0x002000, 0x00E000),  # FE-encrypted
-    ("nvs_keys",    "dump_nvs_keys.bin",       0x011000, 0x001000),  # FE-encrypted
-    ("nvs",         "dump_nvs.bin",            0x012000, 0x03B000),  # values NVS-encrypted
-    ("app",         "dump_app.bin",            0x050000, 0x400000),  # FE-encrypted
-    ("assets",      "dump_littlefs_sample.bin", 0x850000, 0x010000), # plaintext (assets)
-]
+# Derived from partitions.csv rather than hardcoded, so this can never drift from the
+# real layout - the way lock_it_down.py already reuses flash.py helpers. A stale offset
+# here is not a cosmetic bug: sampling the OLD assets offset after a repartition reads
+# whatever is still physically resident there and can make the plaintext check pass while
+# looking at the wrong region entirely.
+def _build_dumps() -> list[tuple[str, str, int, int]]:
+    by_name = {p.name: p for p in load_partitions().values()}
+    if not by_name:
+        die("partitions.csv not found or unparseable - refusing to verify blind")
+
+    def part(name: str) -> "Partition":
+        p = by_name.get(name)
+        if p is None:
+            die(f"partitions.csv has no '{name}' row; verification offsets would be wrong")
+        return p
+
+    assets = part("assets")
+    return [
+        # The bootloader has no partitions.csv row - it lives below the table, at a fixed
+        # offset the table offset pins - so it stays literal here.
+        ("bootloader", "dump_bootloader.bin",      0x002000, 0x00E000),             # FE-encrypted
+        ("nvs_keys",   "dump_nvs_keys.bin",        part("nvs_keys").offset, part("nvs_keys").size),   # FE-encrypted
+        ("nvs",        "dump_nvs.bin",             part("nvs").offset,      part("nvs").size),        # values NVS-encrypted
+        ("app",        "dump_app.bin",             part("ota_0").offset,    part("ota_0").size),      # FE-encrypted
+        # First 64 KB only: enough to prove the LittleFS image is not over-encrypted.
+        ("assets",     "dump_littlefs_sample.bin", assets.offset, min(0x010000, assets.size)),
+    ]
+
+
+DUMPS: list[tuple[str, str, int, int]] = _build_dumps()
 
 BUILD_BOOTLOADER = Path("build") / "bootloader" / "bootloader.bin"
 BUILD_APP        = Path("build") / "PolyCast5.bin"
@@ -233,16 +260,15 @@ def main() -> int:
     # -----------------------------------------------------------------------
     # STEP 1 - Read raw flash partitions over UART.
     #
-    # Offsets and lengths come from partitions.csv:
-    #   bootloader      @ 0x2000   size 0xE000   (FE-encrypted)
-    #   nvs_keys        @ 0x11000  size 0x1000   (FE-encrypted)
-    #   nvs             @ 0x12000  size 0x3B000  (NOT FE-encrypted - but
-    #                                              values inside are NVS-
-    #                                              encrypted)
-    #   ota_0 (app)     @ 0x50000  size 0x400000 (FE-encrypted)
-    #   assets          @ 0x850000 size 0x10000  (PLAINTEXT - first 64 KB
-    #                                              sample, enough to verify
-    #                                              it's not over-encrypted)
+    # Offsets and lengths are PARSED from partitions.csv at import time (see
+    # _build_dumps above) rather than written out here, so this comment cannot
+    # go stale the way a hardcoded list would. The set sampled is:
+    #   bootloader      (FE-encrypted)
+    #   nvs_keys        (FE-encrypted)
+    #   nvs             (NOT FE-encrypted - but values inside are NVS-encrypted)
+    #   ota_0 (app)     (FE-encrypted)
+    #   assets          (PLAINTEXT - first 64 KB sample, enough to verify it is
+    #                    not over-encrypted)
     # -----------------------------------------------------------------------
     if args.skip_dump:
         print(gray("=== Skipping dump (using existing dump_*.bin files) ==="))

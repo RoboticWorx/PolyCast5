@@ -70,8 +70,8 @@ Why a separate plaintext write for assets:
     the mount fails. This script writes it as plaintext - the automated
     equivalent of the manual recovery:
         idf.py -p PORT encrypted-flash
-        esptool --chip esp32c5 -p PORT erase-region 0x850000 0x7B0000
-        esptool --chip esp32c5 -p PORT write-flash 0x850000 build/assets.bin
+        esptool --chip esp32c5 -p PORT erase-region 0xA50000 0x5B0000
+        esptool --chip esp32c5 -p PORT write-flash 0xA50000 build/assets.bin
 
 First flash of a brand-new board (--first):
     Flash Encryption is on in this build, but a board straight from the factory
@@ -358,7 +358,7 @@ def load_flasher_args() -> dict:
 
 
 def sha256_file(path: Path) -> str:
-    # Stream the file in 1 MiB chunks so hashing the 7.6 MB assets image doesn't
+    # Stream the file in 1 MiB chunks so hashing the 5.96 MB assets image doesn't
     # load it all into memory. The digest is what change-detection compares.
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -1328,7 +1328,7 @@ def main() -> int:
         print(yellow("        I (...) flash_encrypt: Flash encryption completed"))
         print(yellow("        I (...) boot: Resetting with flash encryption enabled..."))
         print(yellow("    then the board reboots and the app banner appears. An error line"))
-        print(yellow("    about 0x450000 having an invalid magic byte is expected - that is"))
+        print(yellow("    about 0x550000 having an invalid magic byte is expected - that is"))
         print(yellow("    the empty ota_1 slot, and it is skipped."))
         print(yellow(f"    After the app comes up, flash normally:  python {PROG}   (no --first)"))
 

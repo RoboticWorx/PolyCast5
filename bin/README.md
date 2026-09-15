@@ -20,7 +20,7 @@ This folder is kept in sync automatically: every `python flash.py` run mirrors t
 - `0x10000`  `partition-table.bin`
 - `0x4d000`  `ota_data_initial.bin`
 - `0x50000`  `PolyCast5.bin`
-- `0x850000` `assets.bin`
+- `0xA50000` `assets.bin`
 
 ## Manual flashing (esptool.py)
 
@@ -32,5 +32,5 @@ esptool.py -p COMx -b 460800 write_flash --flash_mode dio --flash_freq 80m --fla
   0x10000 partition-table.bin \
   0x4d000 ota_data_initial.bin \
   0x50000 PolyCast5.bin \
-  0x850000 assets.bin
+  0xA50000 assets.bin
 ```

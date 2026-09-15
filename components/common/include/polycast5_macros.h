@@ -33,12 +33,16 @@
 #endif
 
 // Animation settings
-// EXACTLY 3 ASSET-BACKED FLIPBOOKS MUST BE ENABLED: Default build enables CITY, BLACK_HOLE, and MATRIX. To use PYRAMID, disable CITY and vice versa.
-// After switching EN macro, deleted the disabled folder from assets/anim/... and copy the new there from anims/...
-// WATER is procedural (no LittleFS assets) so it does NOT count against the 3-flipbook limit and can stay enabled alongside them.
+// EXACTLY 2 ASSET-BACKED FLIPBOOKS MUST BE ENABLED: Default build enables CITY and BLACK_HOLE. To use PYRAMID, disable CITY and vice versa.
+// After switching EN macro, delete the disabled folder from assets/anim/... and copy the new one there from anim/...
+// WATER and MATRIX_RAIN are procedural (no LittleFS assets) so they do NOT count against the 2-flipbook limit.
+// Capacity against the 0x5B0000 assets partition (1456 LittleFS blocks of 4096 B):
+//   CITY(960)    + BLACK_HOLE(288) + img(18) + qr(4) + 6 dir pairs(12) = 1282 blocks, 174 spare
+//   PYRAMID(896) + BLACK_HOLE(288) + img(18) + qr(4) + 6 dir pairs(12) = 1218 blocks, 238 spare
+//   CITY + PYRAMID together = 2178 blocks: does NOT fit (unchanged by the procedural switch).
 #define POLYCAST5_EN_CITY_ANIM 1 // Enables city night homescreen animation (60 frames)
 #define POLYCAST5_EN_BLACK_HOLE_ANIM 1 // Enables black hole homescreen animation (18 frames)
-#define POLYCAST5_EN_MATRIX_RAIN_ANIM 1 // Enables matrix rain homescreen animation (42 frames)
+#define POLYCAST5_EN_MATRIX_RAIN_ANIM 1 // Enables matrix rain homescreen animation (procedural, no assets)
 // #define POLYCAST5_EN_PYRAMID_ANIM 1 // Enables pyramid-alien homescreen animation (56 frames)
 #define POLYCAST5_EN_WATER_ANIM 1 // Enables accelerometer-driven water-slosh homescreen animation (procedural, no assets)
 

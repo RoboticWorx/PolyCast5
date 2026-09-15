@@ -211,6 +211,12 @@ static void lcd_backlight_set(bool on)
 
 void lcd_device_sleep(void)
 {
+    // Remember whether anything was running before we stop it
+    bool anim_was_running = lcd_anim_is_running();
+
+    // Stop the homescreen animation before the panel sleeps
+    lcd_anim_stop_animations();
+
     xQueueReset(xWifiCanSleepSemaphore);
 
     // Disconnect from Wi-Fi if connected
@@ -314,6 +320,13 @@ void lcd_device_sleep(void)
     lora_task_resume_after_sleep(); // Re-arm LoRa RX (Meshtastic continuous RX) after sleep
 
     lcd_panel_wake(); // Wake up ST7789
+
+    // Repaint before the backlight comes up
+    if (anim_was_running) {
+        lcd_anim_start_animation(); // Resume only what we stopped on the way in
+        lv_refr_now(disp); // Push a real frame while the panel is still dark
+    }
+
     lcd_backlight_set(true); // BL back to the user's brightness
     
     xSemaphoreGive(xStartAdcBatSemaphore); // Start new battery ADC reading
@@ -336,6 +349,9 @@ void lcd_device_sleep(void)
 
 void lcd_device_deep_sleep(void)
 {
+    // Stop the homescreen animation before the panel sleeps
+    lcd_anim_stop_animations();
+
     xQueueReset(xWifiCanSleepSemaphore);
 
     // Disconnect from Wi-Fi if connected
@@ -438,8 +454,8 @@ void lcd_lvgl_init(void)
     lv_fs_posix_init();
     
     // Size the decoded-image caches
-    // Sized in bytes to fit every fullscreen frame of the LARGEST enabled animation
-    lv_image_cache_resize(LV_MAX3(CITY_FRAME_CNT, BLACK_HOLE_FRAME_CNT, MATRIX_RAIN_FRAME_CNT)
+    // Sized in bytes to fit every fullscreen frame of the LARGEST enabled flipbook animation
+    lv_image_cache_resize(LV_MAX3(CITY_FRAME_CNT, BLACK_HOLE_FRAME_CNT, PYRAMID_FRAME_CNT)
             * (HOR_RES * VER_RES * 2 + 12) + 256 * 1024, false);
     lv_image_header_cache_resize(160, false); // Count-based, tiny entries
 
