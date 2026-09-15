@@ -17,9 +17,8 @@
 
 #include "screens.h"
 #include "lvgl.h"
-#include "img_ai_orb_1.h"
-#include "img_ai_orb_2.h"
-#include "img_ai_orb_3.h"
+#include "lcd_voice_orb.h"
+#include "sim_compat.h"
 
 #define DEFAULT_BATTERY_LV "92%"
 
@@ -1545,24 +1544,26 @@ void screen_wifi_data(void)
  * connected, orb hidden, reasoning toggle footer shown.
  *
  * Simulator hook: pressing Down toggles the recording state, mirroring the
- * firmware's select-button recording behavior — hides the text prompts,
- * shows the orb, and spins/pulses it via an lv_anim rotation + periodic
- * image-source swap to mimic voice pickup. */
+ * firmware's select-button recording behavior — hides the text prompts and
+ * shows the orb.  The orb itself is the real lcd_voice_orb module compiled
+ * for the desktop; all this file supplies is a fake microphone level, so what
+ * you see here is exactly what the device draws. */
 
 /* Handles of widgets the recording animation manipulates. */
 static lv_obj_t  *aikb_lbl_ins       = NULL;
 static lv_obj_t  *aikb_lbl_reasoning = NULL;
 static lv_obj_t  *aikb_lbl_config    = NULL;
 static lv_obj_t  *aikb_arrow_bot     = NULL;
-static lv_obj_t  *aikb_orb           = NULL;
 static lv_timer_t *aikb_pulse_timer  = NULL;
 static bool       aikb_recording     = false;
 
-/* Orb burst state machine — cycles frames 1→2→3→2→1 to mimic a voice
- * burst, then sleeps a randomized gap before the next burst.  step 0 =
- * idle gap, 1..5 = positions within the 5-frame sequence. */
+/* Fake microphone envelope.  aikb_pulse_step counts down the syllable currently
+ * being "spoken" and aikb_pulse_gap the silence after it; ai_voice_take_level_peak()
+ * below turns that into the same peak magnitude the real mic would report. */
 static int aikb_pulse_step = 0;
 static int aikb_pulse_gap  = 0;
+static int aikb_syl_len    = 0;
+static uint16_t aikb_peak  = 0;
 
 /* Loading dot (ported from lcd_anim_loading_start) — a pulsing circle
  * that slides across a small invisible container, running continuously
@@ -1570,75 +1571,55 @@ static int aikb_pulse_gap  = 0;
 static lv_obj_t *aikb_loading_cont = NULL;
 static lv_obj_t *aikb_loading_dot  = NULL;
 
-/* Re-center the orb's rotation pivot for its current image size. The three
- * orb frames are different sizes (45/60/75 px) so the pivot must be
- * recomputed each time the source image changes, otherwise rotation
- * happens around a fixed pixel offset that's only the center of one
- * frame. Re-align to CENTER so the newly-sized image doesn't shift off. */
-static void aikb_orb_recenter_pivot(void)
+/* The shared voice-orb module reads the theme through these; on the device they
+ * are owned by lcd_task.c and loaded from NVS. */
+lv_color_t user_primary_color;
+lv_color_t user_secondary_color;
+
+/* Fake microphone: the level the orb would be reading on the device.
+ *
+ * Speech arrives as syllables of varying loudness separated by gaps, which is
+ * what makes the envelope worth looking at — a metronome pulse would hide both
+ * the fast attack and the slow release.  Weighted gaps give run-on words,
+ * normal word spacing and the occasional phrase pause. */
+uint16_t ai_voice_take_level_peak(void)
 {
-    if (!aikb_orb) return;
-    lv_obj_update_layout(aikb_orb);
-    int w = lv_obj_get_width(aikb_orb);
-    int h = lv_obj_get_height(aikb_orb);
-    lv_obj_set_style_transform_pivot_x(aikb_orb, w / 2, 0);
-    lv_obj_set_style_transform_pivot_y(aikb_orb, h / 2, 0);
-    lv_obj_align(aikb_orb, LV_ALIGN_CENTER, 0, 0);
+    uint16_t peak = aikb_peak;
+    aikb_peak = 0;
+
+    return peak;
 }
 
-/* Pulse timer: cycles the orb through the fixed 1→2→3→2→1 burst
- * sequence to imitate a voice burst, then waits a random gap before the
- * next burst. The deterministic sequence keeps the animation looking
- * correct (grow then shrink) while the randomized gaps make bursts feel
- * natural — short pauses between words / phonemes. */
+/* Advances the fake envelope one tick.  Runs at the orb's own frame rate so a
+ * syllable lasts a believable number of frames. */
 static void aikb_pulse_cb(lv_timer_t *t)
 {
     (void)t;
-    if (!aikb_orb) return;
 
-    static const void *const frames[] = {
-        &img_ai_orb_1, &img_ai_orb_2, &img_ai_orb_3
-    };
-    /* Indices into frames[] for the burst sequence: 1, 2, 3, 2, 1. */
-    static const uint8_t BURST_SEQ[5] = { 0, 1, 2, 1, 0 };
-
-    if (aikb_pulse_step == 0) {
-        /* Between bursts — decrement gap; stay on the smallest frame. */
-        if (aikb_pulse_gap > 0) {
-            aikb_pulse_gap--;
-            return;
-        }
-        /* Gap elapsed; fall through to play step 0 of a new burst. */
+    if (aikb_pulse_gap > 0) { /* Silence between syllables */
+        aikb_pulse_gap--;
+        aikb_peak = 0;
+        return;
     }
 
-    lv_image_set_src(aikb_orb, frames[BURST_SEQ[aikb_pulse_step]]);
-    aikb_orb_recenter_pivot();
+    if (aikb_pulse_step <= 0) { /* Start a new syllable */
+        aikb_syl_len  = 3 + (rand() % 5);   /* 3-7 frames, ~100-230 ms */
+        aikb_pulse_step = aikb_syl_len;
+    }
 
-    aikb_pulse_step++;
-    if (aikb_pulse_step >= 5) {
-        /* Burst complete — pick a weighted-random gap so bursts arrive at
-         * unpredictable intervals, mimicking words of varying length and
-         * natural pauses between phrases. The sequence itself is always
-         * 1→2→3→2→1 (rising-then-falling) so the shape stays correct. */
-        aikb_pulse_step = 0;
+    /* Loud at the onset, tailing off - roughly how a spoken syllable looks */
+    int pos = aikb_syl_len - aikb_pulse_step;          /* 0 at the attack */
+    int amp = 4000 + (rand() % 7000);                  /* Syllable loudness */
+    int env = (aikb_syl_len - pos) * 256 / aikb_syl_len;
+    aikb_peak = (uint16_t)((amp * env) >> 8);
+
+    aikb_pulse_step--;
+    if (aikb_pulse_step <= 0) {
         int r = rand() % 10;
-        if (r < 4) {
-            /* 40%: near-zero gap — rapid-fire run-on words. */
-            aikb_pulse_gap = rand() % 2;          /* 0–1 tick   */
-        } else if (r < 8) {
-            /* 40%: short gap — normal word spacing. */
-            aikb_pulse_gap = 2 + (rand() % 3);    /* 2–4 ticks  */
-        } else {
-            /* 20%: long gap — pause between phrases / thinking. */
-            aikb_pulse_gap = 8 + (rand() % 12);   /* 8–19 ticks */
-        }
+        if (r < 4)       aikb_pulse_gap = rand() % 2;        /* Run-on words   */
+        else if (r < 8)  aikb_pulse_gap = 2 + (rand() % 3);  /* Word spacing   */
+        else             aikb_pulse_gap = 8 + (rand() % 12); /* Phrase pause   */
     }
-}
-
-/* lv_anim exec-cb: drives continuous rotation of the orb. */
-static void aikb_orb_rotate_cb(void *var, int32_t v)
-{
-    lv_obj_set_style_transform_rotation((lv_obj_t *)var, v, 0);
 }
 
 /* ── Loading dot animation (ported from lcd_anim_loading_*) ──
@@ -1740,38 +1721,23 @@ static void aikb_loading_stop(void)
 
 static void aikb_start_recording(void)
 {
-    if (!aikb_orb || aikb_recording) return;
+    if (aikb_recording) return;
 
     /* Hide text + down arrow; show orb.  Settings gear stays visible
      * throughout (gives a persistent right-side affordance while talking). */
     lv_obj_add_flag(aikb_lbl_ins, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(aikb_lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(aikb_arrow_bot, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_remove_flag(aikb_orb, LV_OBJ_FLAG_HIDDEN);
-    lv_image_set_src(aikb_orb, &img_ai_orb_1);
-    aikb_orb_recenter_pivot();
+    lcd_voice_orb_start();
 
-    /* Continuous rotation: 2 s per revolution, looping forever. */
-    lv_anim_t a;
-    lv_anim_init(&a);
-    lv_anim_set_var(&a, aikb_orb);
-    lv_anim_set_values(&a, 0, 3600);
-    lv_anim_set_duration(&a, 2000);
-    lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
-    lv_anim_set_exec_cb(&a, aikb_orb_rotate_cb);
-    lv_anim_start(&a);
-
-    /* Start burst state machine at the beginning of sequence with no gap
-     * so the first burst fires on the next timer tick. */
+    /* Start the fake mic silent, so the first syllable arrives on a tick. */
     aikb_pulse_step = 0;
     aikb_pulse_gap  = 0;
+    aikb_peak       = 0;
     if (!aikb_pulse_timer) {
-        /* 30 ms/tick → a 5-frame burst plays in ~150 ms, snappy enough to
-         * read as an individual word.  Weighted-random gaps then cluster
-         * bursts into run-ons, normal word-spaced groups, and occasional
-         * phrase pauses — so the orb looks like it's catching random
-         * words rather than a metronome pulse. */
-        aikb_pulse_timer = lv_timer_create(aikb_pulse_cb, 30, NULL);
+        /* 33 ms/tick, matching the orb's own frame period, so a syllable spans
+         * the same number of frames here as it would on the device. */
+        aikb_pulse_timer = lv_timer_create(aikb_pulse_cb, 33, NULL);
     }
 
     aikb_recording = true;
@@ -1779,19 +1745,15 @@ static void aikb_start_recording(void)
 
 static void aikb_stop_recording(void)
 {
-    if (!aikb_orb || !aikb_recording) return;
+    if (!aikb_recording) return;
 
-    /* Stop spin + pulse. */
-    lv_anim_delete(aikb_orb, aikb_orb_rotate_cb);
+    /* Stop the fake mic, then the orb. */
     if (aikb_pulse_timer) {
         lv_timer_delete(aikb_pulse_timer);
         aikb_pulse_timer = NULL;
     }
-
-    /* Reset orb appearance then hide. */
-    lv_image_set_src(aikb_orb, &img_ai_orb_1);
-    lv_obj_set_style_transform_rotation(aikb_orb, 0, 0);
-    lv_obj_add_flag(aikb_orb, LV_OBJ_FLAG_HIDDEN);
+    aikb_peak = 0;
+    lcd_voice_orb_stop();
 
     /* Restore text + down arrow (settings gear was never hidden). */
     lv_obj_remove_flag(aikb_lbl_ins, LV_OBJ_FLAG_HIDDEN);
@@ -1821,16 +1783,16 @@ static void aikb_cleanup(void)
         lv_timer_delete(aikb_pulse_timer);
         aikb_pulse_timer = NULL;
     }
-    if (aikb_orb) {
-        lv_anim_delete(aikb_orb, NULL);
-    }
+    /* Frees the orb's canvas and framebuffer before lv_obj_clean() takes the screen. */
+    lcd_voice_orb_deinit();
     /* Loading dot lives for the page's lifetime — cancel its anims before
      * lv_obj_clean() destroys the objects. */
     aikb_loading_stop();
     aikb_lbl_ins = aikb_lbl_reasoning = aikb_lbl_config = NULL;
-    aikb_arrow_bot = aikb_orb = NULL;
+    aikb_arrow_bot = NULL;
     aikb_pulse_step = 0;
     aikb_pulse_gap  = 0;
+    aikb_peak       = 0;
     aikb_recording  = false;
 }
 
@@ -1859,17 +1821,13 @@ void screen_ai_keyboard(void)
     format_label(aikb_lbl_config, LV_SYMBOL_SETTINGS, secondary,
                  &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -16, 0);
 
-    /* ── AI orb image (hidden until recording starts) ── */
-    aikb_orb = lv_image_create(scr);
-    lv_image_set_src(aikb_orb, &img_ai_orb_1);
-    lv_obj_align(aikb_orb, LV_ALIGN_CENTER, 0, 0);
-    /* Give rotation some headroom so diagonals aren't clipped. */
-    lv_obj_set_style_transform_width(aikb_orb, 8, 0);
-    lv_obj_set_style_transform_height(aikb_orb, 8, 0);
-    /* Pivot is re-computed each pulse frame (images are 45/60/75 px, so a
-     * fixed pivot would only be centered for one of them). */
-    aikb_orb_recenter_pivot();
-    lv_obj_add_flag(aikb_orb, LV_OBJ_FLAG_HIDDEN);
+    /* ── Procedural voice orb (hidden until recording starts) ──
+     * The real firmware module, so this is exactly what the device draws. */
+    user_primary_color   = primary;
+    user_secondary_color = secondary;
+    if (!lcd_voice_orb_init(scr)) {
+        fprintf(stderr, "voice orb init failed\n");
+    }
 
     /* ── Persistent Wi-Fi + BT connected icons (top-left, stacked) ──
      * Offsets match lcd_update_icons() in lcd_utils.c for the wifi+bt-both

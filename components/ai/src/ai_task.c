@@ -26,8 +26,6 @@ QueueHandle_t xAiCmdQueue;
 
 EventGroupHandle_t xAiEventGroup;
 
-SemaphoreHandle_t xAiSoundHeardSemaphore;
-
 char ai_wifi_portal_pass[64];
 
 volatile bool mic_recording = false; // To lcd_bluetooth.c
@@ -136,9 +134,6 @@ static void ai_task(void *pvParameters)
     // Holds actual command text
     xAiCmdQueue = xQueueCreate(1, sizeof(ai_cmd_t));
     configASSERT(xAiCmdQueue);
-
-    xAiSoundHeardSemaphore = xSemaphoreCreateBinary();
-    configASSERT(xAiSoundHeardSemaphore);
 
     xAiEventGroup = xEventGroupCreate();
     configASSERT(xAiEventGroup);

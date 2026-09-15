@@ -39,7 +39,8 @@
 #define AI_VOICE_NORMALIZE_TARGET_PEAK 12000
 #define AI_VOICE_NORMALIZE_MAX_GAIN    20.0f
 
-#define SOUND_ANIM_THRESHOLD 100
+// Voice-orb level floor: below this a block counts as silence (100/32767 is about -50 dBFS)
+#define AI_VOICE_LEVEL_FLOOR 50
 
 // STT endpoint/model come from the ai_provider registry (ai_provider.c)
 #define STT_HTTP_TIMEOUT_MS    30000
@@ -49,6 +50,9 @@
 
 static i2s_chan_handle_t i2s_rx_channel = NULL;
 static bool voice_inited = false;
+
+// Loudest block peak since the consumer last read it
+static volatile uint16_t s_level_peak = 0;
 
 // Converts a 32-bit I2S slot value (from the microphone) into a standard 16-bit signed PCM audio sample
 static inline int16_t slot32_to_pcm16(int32_t w)
@@ -449,9 +453,9 @@ esp_err_t ai_voice_record_pcm16_16k(volatile bool *keep_recording, ai_voice_pcm_
                 block_peak = abs_mag;
             }
         }
-        // If sound detected, notify LCD
-        if (block_peak > SOUND_ANIM_THRESHOLD) {
-            xSemaphoreGive(xAiSoundHeardSemaphore);
+        // Publish the level for the voice orb (see s_level_peak)
+        if (block_peak > AI_VOICE_LEVEL_FLOOR && (uint16_t)block_peak > s_level_peak) {
+            s_level_peak = (uint16_t)block_peak;
         }
 
         // Note: Any remaining frames (<3) are discarded (~1-2 frames max, <1.25ms @48kHz)
@@ -480,6 +484,17 @@ esp_err_t ai_voice_record_pcm16_16k(volatile bool *keep_recording, ai_voice_pcm_
     out->pcm16 = pcm16;
     out->samples = out_idx;
     return ESP_OK;
+}
+
+// Hands the voice orb the loudest block since it last looked, and resets the accumulator
+uint16_t ai_voice_take_level_peak(void)
+{
+    // Read-and-clear, so every block the recording loop published since the last call is
+    // represented by the loudest of them and nothing is counted twice
+    uint16_t peak = s_level_peak;
+    s_level_peak = 0;
+
+    return peak;
 }
 
 // Frees the PCM buffer allocated by ai_voice_record_pcm16_16k()

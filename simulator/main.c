@@ -62,8 +62,11 @@ static volatile int quit_requested =  0;
 
 static void load_screen(int index)
 {
-    lv_obj_clean(lv_scr_act());
+    /* Order matters: screen_menu_reset() runs the outgoing screen's cleanup hook, which frees
+     * resources that belong to its widgets (the AI keyboard's orb owns a canvas and a PSRAM
+     * framebuffer). Cleaning the screen first would delete those widgets underneath it. */
     screen_menu_reset();
+    lv_obj_clean(lv_scr_act());
     screens[index].render();
     current_screen = index;
     printf("[%d/%d] %s\n", index + 1, (int)NUM_SCREENS, screens[index].name);

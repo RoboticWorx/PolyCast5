@@ -11,8 +11,6 @@ extern EventGroupHandle_t xAiEventGroup;
 
 extern QueueHandle_t xAiCmdQueue;
 
-extern SemaphoreHandle_t xAiSoundHeardSemaphore;
-
 /** 
  * @brief Create and start the ai_task
  */

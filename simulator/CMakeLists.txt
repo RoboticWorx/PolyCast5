@@ -50,15 +50,19 @@ add_executable(polycast5_sim
     main.c
     screens.c
     ../components/lcd/media/src/img_save_new_remote.c
-    ../components/lcd/media/src/img_ai_orb_1.c
-    ../components/lcd/media/src/img_ai_orb_2.c
-    ../components/lcd/media/src/img_ai_orb_3.c
+    ../components/lcd/src/lcd_voice_orb.c
 )
+
+# Shared firmware modules are compiled here with POLYCAST5_SIM so they pick up sim_compat.h
+# instead of the ESP-IDF headers. Lets the voice orb be tuned on the desktop before flashing.
+target_compile_definitions(polycast5_sim PRIVATE POLYCAST5_SIM=1)
 
 target_include_directories(polycast5_sim PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${LVGL_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/../components/lcd/media/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../components/lcd/include"
+    "${LVGL_DIR}/src" # Shared lcd headers include "core/lv_obj.h", as the firmware build does
 )
 
 target_link_libraries(polycast5_sim PRIVATE lvgl)

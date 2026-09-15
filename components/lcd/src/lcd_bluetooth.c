@@ -36,9 +36,7 @@
 #include "bluetooth_nvs.h"
 #include "ai_task.h"
 
-#include "img_ai_orb_1.h"
-#include "img_ai_orb_2.h"
-#include "img_ai_orb_3.h"
+#include "lcd_voice_orb.h"
 
 #define TAG "LCD_BLUETOOTH"
 
@@ -1393,6 +1391,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     #define AI_KEYB_NONREASONING_TXT "Use: non-reasoning"
     #define AI_KEYB_REASONING_TXT "Use: reasoning"
     #define AI_KEYB_THINKING_TXT "Thinking..."
+    #define AI_KEYB_LISTENING_TXT "Listening..." // Only shown if the orb failed to allocate
     #define AI_KEYB_DONE_TXT "Done! Typing..."
     #define AI_KEYB_READY_FONT lv_font_montserrat_22
 
@@ -1410,8 +1409,6 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     static lv_obj_t *lbl_ins = NULL;
     static lv_obj_t *lbl_reasoning = NULL;
     static lv_obj_t *lbl_config = NULL;
-    static lv_obj_t *ai_orb = NULL;
-    static int16_t orb_angle = 0; // 0.1 degree units
 
     static ai_keyb_state_t state = AI_KEYB_IDLE;
     static bool last_select = false;
@@ -1432,7 +1429,6 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         xEventGroupClearBits(xAiEventGroup, AI_NO_MATCH_BIT);
         xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT);
         xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_CANCEL_TYPING_BIT);
-        xQueueReset(xAiSoundHeardSemaphore);
 
         // Default to non-reasoning (faster and cheaper, but less accurate)
         use_reasoning = false;
@@ -1453,28 +1449,14 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         lv_label_set_text(lbl_reasoning, use_reasoning ? AI_KEYB_REASONING_TXT : AI_KEYB_NONREASONING_TXT);
         lv_obj_add_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
 
-        ai_orb = lv_image_create(ACTIVE_SCR);
-        lv_image_set_src(ai_orb, &img_ai_orb_1);
-        lv_obj_align(ai_orb, LV_ALIGN_CENTER, 0, 0);
+        // Builds its palette from the current theme, so this has to happen per page visit
+        if (!lcd_voice_orb_init(ACTIVE_SCR)) {
+            ESP_LOGE(TAG, "Voice orb unavailable; page continues without it");
+        }
 
         lbl_config = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_config, LV_SYMBOL_SETTINGS, user_secondary_color,
                 &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -16, 0);
-
-        lv_obj_update_layout(ai_orb); // Save current layout
-
-        // Set pivot to center so it spins around its middle
-        int w = lv_obj_get_width(ai_orb);
-        int h = lv_obj_get_height(ai_orb);
-        lv_obj_set_style_transform_pivot_x(ai_orb, w / 2, 0);
-        lv_obj_set_style_transform_pivot_y(ai_orb, h / 2, 0);
-
-        // Give some extra draw area so rotation isn't clipped
-        lv_obj_set_style_transform_width(ai_orb, 8, 0);
-        lv_obj_set_style_transform_height(ai_orb, 8, 0);
-
-        // Hide orb for now
-        lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
 
         lv_timer_handler();
         vTaskDelay(pdMS_TO_TICKS(50)); // Allow time to render
@@ -1505,7 +1487,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
                 state = AI_KEYB_IDLE;
             } else if (status == LCD_WAIT_FOR_BIT_BETTER_TIMEOUT) { // Timeout
                 // Hide unused and center error label
-                lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
+                lcd_voice_orb_stop();
                 lv_obj_add_flag(lbl_config, LV_OBJ_FLAG_HIDDEN);
 
                 lv_label_set_text(lbl_ins, AI_BT_FAILED_TXT);
@@ -1555,7 +1537,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
                     state = AI_KEYB_IDLE;
                 } else if (status == LCD_WAIT_FOR_BIT_BETTER_TIMEOUT) { // Timeout
                     // Hide unused and center error label
-                    lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
+                    lcd_voice_orb_stop();
                     lv_obj_add_flag(lbl_config, LV_OBJ_FLAG_HIDDEN);
 
                     lv_label_set_text(lbl_ins, AI_BT_FAILED_TXT);
@@ -1565,7 +1547,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
                 }
             } else if (status == LCD_WAIT_FOR_BIT_BETTER_TIMEOUT) { // Timeout
                 // Hide unused and center error label
-                lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
+                lcd_voice_orb_stop();
                 lv_obj_add_flag(lbl_config, LV_OBJ_FLAG_HIDDEN);
 
                 lv_label_set_text(lbl_ins, AI_WIFI_FAILED_TXT);
@@ -1591,7 +1573,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     if (xEventGroupGetBits(xAiEventGroup) & AI_RATE_LIMITED_BIT) {
         lv_obj_remove_flag(lbl_ins, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
-        lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
+        lcd_voice_orb_stop();
         lv_label_set_text(lbl_ins, "Out of API credits!\nCheck your usage:\nconsole.x.ai");
         lv_obj_remove_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
@@ -1604,7 +1586,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
 
         // Hide orb
-        lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
+        lcd_voice_orb_stop();
 
         // Show error
         lv_label_set_text(lbl_ins, "Thinking failed!\nPlease try again.");
@@ -1625,7 +1607,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
 
         // Hide orb
-        lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
+        lcd_voice_orb_stop();
 
         // Show no-match message
         lv_label_set_text(lbl_ins, "No matches found!\nTry different wording.");
@@ -1653,10 +1635,15 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         }
 
         // Show orb
-        lv_obj_remove_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
+        lcd_voice_orb_start();
 
-        // Hide text labels
-        lv_obj_add_flag(lbl_ins, LV_OBJ_FLAG_HIDDEN);
+        // Hide text labels - if the orb could not allocate, keep a label up instead
+        if (lcd_voice_orb_is_available()) {
+            lv_obj_add_flag(lbl_ins, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_set_style_text_font(lbl_ins, &AI_KEYB_READY_FONT, 0);
+            lv_label_set_text(lbl_ins, AI_KEYB_LISTENING_TXT);
+        }
         lv_obj_add_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 
@@ -1665,10 +1652,6 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 
     // While held: update count - stop only on release (or buffer full)
     if (state == AI_KEYB_RECORDING) {
-        // Rotate the orb
-        orb_angle = (orb_angle + 50) % 3600; // 5 degrees per frame
-        lv_obj_set_style_transform_rotation(ai_orb, orb_angle, 0);
-
         // When done capturing
         if (select_released) {
             // Stop mic_recording
@@ -1685,7 +1668,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
             }
 
             // Hide orb
-            lv_obj_add_flag(ai_orb, LV_OBJ_FLAG_HIDDEN);
+            lcd_voice_orb_stop();
 
             // Show instructions
             lv_obj_remove_flag(lbl_ins, LV_OBJ_FLAG_HIDDEN);
@@ -1694,25 +1677,6 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 
             // Switched to AI_KEYB_DONE_TXT in xQueueReceive xWifiAiRawSniffQueue
             state = AI_KEYB_RESPONSE_WAITING; // Waiting for analysis to complete
-        }
-    }
-
-    // Pulse orb on sound heard
-    if ((xSemaphoreTake(xAiSoundHeardSemaphore, 0) == pdPASS) && state == AI_KEYB_RECORDING) {
-        for (int i = 0; i < 5; ++i) {
-            if      (i == 0) lv_image_set_src(ai_orb, &img_ai_orb_1);
-            else if (i == 1) lv_image_set_src(ai_orb, &img_ai_orb_2);
-            else if (i == 2) lv_image_set_src(ai_orb, &img_ai_orb_3);
-            else if (i == 3) lv_image_set_src(ai_orb, &img_ai_orb_2);
-            else if (i == 4) lv_image_set_src(ai_orb, &img_ai_orb_1);
-            lv_obj_update_layout(ai_orb);
-            int w = lv_obj_get_width(ai_orb);
-            int h = lv_obj_get_height(ai_orb);
-            lv_obj_set_style_transform_pivot_x(ai_orb, w / 2, 0);
-            lv_obj_set_style_transform_pivot_y(ai_orb, h / 2, 0);
-            lv_obj_align(ai_orb, LV_ALIGN_CENTER, 0, 0);
-            lv_refr_now(NULL);
-            vTaskDelay(1 / portTICK_PERIOD_MS);
         }
     }
 
@@ -1786,12 +1750,12 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         // Delete objects
         lv_obj_delete(lbl_ins);
         lv_obj_delete(lbl_reasoning);
-        lv_obj_delete(ai_orb);
+        lcd_voice_orb_deinit();
         lv_obj_delete(lbl_config);
         
         // Reset statics
         do_once = false;
-        lbl_ins = lbl_reasoning = ai_orb = lbl_config = NULL;
+        lbl_ins = lbl_reasoning = lbl_config = NULL;
         lcd_anim_label_x_animate_reset();
         lcd_anim_label_y_animate_reset();
 
@@ -1832,12 +1796,12 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         // Delete objects
         lv_obj_delete(lbl_ins);
         lv_obj_delete(lbl_reasoning);
-        lv_obj_delete(ai_orb);
+        lcd_voice_orb_deinit();
         lv_obj_delete(lbl_config);
         
         // Reset statics
         do_once = false;
-        lbl_ins = lbl_reasoning = ai_orb = lbl_config = NULL;
+        lbl_ins = lbl_reasoning = lbl_config = NULL;
         lcd_anim_label_x_animate_reset();
         lcd_anim_label_y_animate_reset();
 
@@ -1883,12 +1847,12 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         // Delete objects
         lv_obj_delete(lbl_ins);
         lv_obj_delete(lbl_reasoning);
-        lv_obj_delete(ai_orb);
+        lcd_voice_orb_deinit();
         lv_obj_delete(lbl_config);
         
         // Reset statics
         do_once = false;
-        lbl_ins = lbl_reasoning = ai_orb = lbl_config = NULL;
+        lbl_ins = lbl_reasoning = lbl_config = NULL;
         lcd_anim_label_x_animate_reset();
         lcd_anim_label_y_animate_reset();
         

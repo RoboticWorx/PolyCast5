@@ -55,6 +55,19 @@ esp_err_t ai_voice_mic_selftest(bool *alive);
 esp_err_t ai_voice_record_pcm16_16k(volatile bool *keep_recording, ai_voice_pcm_t *out);
 
 /**
+ * @brief Read and clear the loudest microphone block peak seen since the last call
+ *
+ * Fed by ai_voice_record_pcm16_16k() while a recording is running, which evaluates one
+ * peak per ~5.33ms I2S block. The value is a peak-hold accumulator rather than the most
+ * recent block, so a caller polling far more slowly (the voice orb renders every ~33ms)
+ * still sees every syllable onset. Returns 0 when nothing above the silence floor has
+ * arrived, including when no recording is in progress.
+ *
+ * @returns Peak sample magnitude, 0..32767
+ */
+uint16_t ai_voice_take_level_peak(void);
+
+/**
  * @brief Free the PCM buffer used by ai_voice_record_pcm16_16k()
  * 
  * @param p Pointer to ai_voice_pcm_t struct to free
