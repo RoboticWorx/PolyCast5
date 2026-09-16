@@ -166,6 +166,11 @@ static void espnow_task(void *param)
             );
 
 #ifdef POLYCAST5_DEBUG
+            ESP_LOGI(TAG, "Sending MQTT: ssid_len=%d pw_len=%d key=set (%d B payload)",
+                    (int)strlen(espnow_mqtt.ssid), (int)strlen(espnow_mqtt.password), len);
+#endif
+#ifdef POLYCAST5_DEBUG_PASSWORDS
+            // payload is "<ssid>:<password>:<32 hex of MQTT key>"
             ESP_LOG_BUFFER_HEX("Sending MQTT KEY", espnow_mqtt.key, 16);
             ESP_LOGI(TAG, "Sending MQTT: %s", payload);
 #endif
@@ -215,6 +220,8 @@ static void espnow_task(void *param)
 #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Sending: %s", tx_payload);
             ESP_LOG_BUFFER_HEX("To MAC", espnow_cmd.mac_selected, ESPNOW_MAC_SIZE);
+#endif
+#ifdef POLYCAST5_DEBUG_PASSWORDS
             if (espnow_cmd.enc) {
                 ESP_LOG_BUFFER_HEX("LMK", espnow_cmd.lmk, LMK_LEN);
             }

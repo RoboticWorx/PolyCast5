@@ -822,6 +822,8 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
 
 #ifdef POLYCAST5_DEBUG
                         ESP_LOGI(TAG, "Key saved at slot %d:", lora_menu->size - 1);
+#endif
+#ifdef POLYCAST5_DEBUG_PASSWORDS
                         ESP_LOG_BUFFER_HEX("SAVED IN QUEUE", lora_menu->keys[lora_menu->size - 1], LORA_PCP_ENC_KEY_LEN);
 #endif
                     } else {

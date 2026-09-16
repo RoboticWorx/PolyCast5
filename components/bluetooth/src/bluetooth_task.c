@@ -346,6 +346,10 @@ static void bluetooth_task(void *arg)
                     if (err == ESP_OK && blen > 0 && send_buf[0] != '\0') {
                         // NVS returns a C-string: Just send it
 #ifdef POLYCAST5_DEBUG
+                        ESP_LOGI(TAG, "Sending script: idx=%u (%u bytes)", (unsigned)script_idx, (unsigned)blen);
+#endif
+#ifdef POLYCAST5_DEBUG_PASSWORDS
+                        // Autotype body is the user's stored credential/keystrokes
                         ESP_LOGI(TAG, "Sending script: %s", send_buf);
 #endif
                         // Send the script

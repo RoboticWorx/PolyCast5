@@ -722,7 +722,11 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
         return ESP_FAIL;
     }
 
-    // Log a safe snippet for debugging
+#ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "xAI HTTP %d body len=%d", status, (int)acc.len);
+#endif
+#ifdef POLYCAST5_DEBUG_PASSWORDS
+    // Response body can be the resolved credential/password in the creds path
     const int snip = (acc.len > 300) ? 300 : (int)acc.len;
     ESP_LOGI(TAG, "xAI HTTP %d body[0:%d]=%.*s%s",
             status,
@@ -730,6 +734,7 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
             snip,
             acc.buf,
             (acc.len > (size_t)snip) ? "..." : "");
+#endif
 
     // Non-200 still might include useful error JSON in body (already logged)
     if (status != 200) {

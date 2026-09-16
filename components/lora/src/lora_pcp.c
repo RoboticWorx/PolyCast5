@@ -259,6 +259,9 @@ void lora_pcp_generate_random_key(void)
     esp_fill_random(encryption_key, sizeof(encryption_key));
 
 #ifdef POLYCAST5_DEBUG
+    ESP_LOGI("LORA", "LoRa PCP key generated (%d bytes)", (int)sizeof(encryption_key));
+#endif
+#ifdef POLYCAST5_DEBUG_PASSWORDS
     ESP_LOG_BUFFER_HEX("LORA KEY GENERATED", encryption_key, sizeof(encryption_key));
 #endif
 

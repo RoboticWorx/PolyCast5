@@ -559,6 +559,10 @@ static bool kbd_type_char(char c, uint32_t tap_ms)
     uint8_t mod, kc;
     if (!ascii_to_hid(c, &mod, &kc)) {
 #ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "Unmapped byte skipped");
+#endif
+#ifdef POLYCAST5_DEBUG_PASSWORDS
+        // The byte value is a character of the keystroke/credential stream
         ESP_LOGW(TAG, "Unmapped byte 0x%02X skipped", (unsigned)(unsigned char)c);
 #endif
         return false;

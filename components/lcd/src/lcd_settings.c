@@ -794,6 +794,9 @@ void lcd_settings_pin_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu
         settings_menu->pin_menu.unlock_pin[num_filled] = '\0'; // Ensure termination
             
 #ifdef POLYCAST5_DEBUG
+        ESP_LOGI(TAG, "Entered pin (len=%d)", num_filled);
+#endif
+#ifdef POLYCAST5_DEBUG_PASSWORDS
         ESP_LOGI(TAG, "Entered pin: %s", settings_menu->pin_menu.unlock_pin);
 #endif
         

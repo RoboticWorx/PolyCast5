@@ -158,6 +158,10 @@ void wifi_mqtt_client_publish(char *payload, const uint8_t key[16])
             key[12], key[13], key[14], key[15]);
     
 #ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "Active MQTT ACK topic set");
+#endif
+#ifdef POLYCAST5_DEBUG_PASSWORDS
+    // Topic embeds the 16-byte shared MQTT key as hex
     ESP_LOGI(TAG, "Active MQTT ACK:%s", mqtt_active_ack_topic);
 #endif
     
@@ -167,6 +171,9 @@ void wifi_mqtt_client_publish(char *payload, const uint8_t key[16])
     if (msg_id != -1) {
 #ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "MQTT send success: %d", msg_id);
+#endif
+#ifdef POLYCAST5_DEBUG_PASSWORDS
+        // topic_cmd embeds the 16-byte shared MQTT key as hex
         ESP_LOGI(TAG, "Sent '%s' to topic '%s'", payload, topic_cmd);
 #endif
     } else {

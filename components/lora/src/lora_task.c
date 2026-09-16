@@ -406,6 +406,8 @@ static void lora_task(void *pvParameters)
             cmd_msg.instr[sizeof(cmd_msg.instr) - 1] = '\0';
 #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "SENDING idx=%d instr=%s msg_id=%" PRIu32, cmd_msg.index, cmd_msg.instr, cmd_msg.msg_id);
+#endif
+#ifdef POLYCAST5_DEBUG_PASSWORDS
             ESP_LOG_BUFFER_HEX("LORA_TASK: Using encryption_key", lora_req.cmd.key, LORA_PCP_ENC_KEY_LEN);
 #endif
             // Encrypt and send

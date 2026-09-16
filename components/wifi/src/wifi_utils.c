@@ -895,6 +895,8 @@ esp_err_t wifi_utils_radio_start(const char *ssid, const uint8_t* bssid, const c
     // ESP_LOGI(TAG, "Setting Wi-Fi config BSSID=%02x:%02x:%02x:%02x:%02x:%02x",
     //         bssid[0], bssid[1], bssid[2],
     //         bssid[3], bssid[4], bssid[5]);
+#endif
+#ifdef POLYCAST5_DEBUG_PASSWORDS
     ESP_LOGI(TAG, "Setting Wi-Fi config password='%s'", password);
 #endif
     

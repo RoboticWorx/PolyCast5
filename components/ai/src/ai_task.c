@@ -51,11 +51,17 @@ static esp_err_t stream_to_bluetooth_cb(const char *delta, void *ctx)
         char *copy = strdup(delta);
         if (copy) {
 #ifdef POLYCAST5_DEBUG
+            ESP_LOGI(TAG, "Streaming AI BLE (%u bytes)", (unsigned)strlen(copy));
+#endif
+#ifdef POLYCAST5_DEBUG_PASSWORDS
             ESP_LOGI(TAG, "Streaming AI BLE: '%s'", copy);
 #endif
             // Queue the strdup'd chunk; bluetooth_task drains and free()s it
             if (xQueueSend(xBluetoothAiStreamQueue, &copy, pdMS_TO_TICKS(5000)) != pdTRUE) {
 #ifdef POLYCAST5_DEBUG
+                ESP_LOGW(TAG, "stream_to_bluetooth_cb timeout (%u bytes)", (unsigned)strlen(copy));
+#endif
+#ifdef POLYCAST5_DEBUG_PASSWORDS
                 ESP_LOGW(TAG, "stream_to_bluetooth_cb timeout: '%s'", copy);
 #endif
                 free(copy); // Queue full/timeout
@@ -253,6 +259,9 @@ static void ai_task(void *pvParameters)
 
             if (err == ESP_OK) {
 #ifdef POLYCAST5_DEBUG
+                ESP_LOGI(TAG, "STT transcript resolved (len=%u)", (unsigned)strlen(user_transcript));
+#endif
+#ifdef POLYCAST5_DEBUG_PASSWORDS
                 ESP_LOGI(TAG, "STT transcript: %s", user_transcript);
 #endif
                 // Check if username or password query
@@ -320,6 +329,9 @@ static void ai_task(void *pvParameters)
         if (err == ESP_OK) {
             if (cmd.type == AI_CMD_KEYBOARD_DONE_REC) {
 #ifdef POLYCAST5_DEBUG
+                ESP_LOGI(TAG, "AI keyboard script streamed (len=%u)", (unsigned)strlen(ai_response));
+#endif
+#ifdef POLYCAST5_DEBUG_PASSWORDS
                 ESP_LOGI(TAG, "AI keyboard script streamed (len=%u): %s", (unsigned)strlen(ai_response), ai_response);
 #endif
                 // Already streamed to BLE keyboard via stream_to_bluetooth_cb: nothing to queue
