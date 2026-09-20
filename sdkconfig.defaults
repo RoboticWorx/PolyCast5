@@ -26,6 +26,38 @@ CONFIG_BOOTLOADER_LOG_LEVEL_INFO=y
 # wifi_ota_update.c manually drops to 160 around encrypted flash writes.
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 
+# PINNED, DO NOT REMOVE. RTC FAST RAM must stay out of the heap. That region runs on the
+# APB clock, and reading it from a 240 MHz core drops address bit 0x40000000: the heap
+# control pointer 0x500000bc reads back as 0x100000bc, so ANY caller that walks every
+# internal heap takes a load fault. heap_caps_get_largest_free_block() is one, and
+# spi_flash's get_buffer_malloc() calls it on every unaligned esp_flash_read -- so this
+# reliably kills LittleFS reads (observed 2026-09-19 loading /assets/anim/...).
+# Costs 15 KiB of the ~200 KiB internal pool. Deep-sleep retention is placed by the
+# linker, not the allocator, so nothing else is affected.
+# This line was silently lost once already and the crash came straight back; if it
+# disappears from sdkconfig again, put it back before debugging anything else.
+CONFIG_ESP_SYSTEM_ALLOW_RTC_FAST_MEM_AS_HEAP=n
+
+# IRAM budget: buy back some of the 15.8 KiB the line above costs us.
+# These three place light-sleep code in IRAM purely for entry/exit LATENCY -- Kconfig quantifies
+# PM_SLP_IRAM_OPT as "about 2.1KB ... and chip would sleep longer for 310us at 160MHz ... each
+# time". Correctness does not depend on them; anything that genuinely must run with the cache
+# down is IRAM_ATTR unconditionally.
+# We DO use light sleep (lcd_utils.c 6 h battery check, and main.c ext1 wake on TCA9535_INT for
+# the power-off state) -- but only a couple of entries per day, not tickless, so ~310 us per
+# entry is noise. ESP_WIFI_SLP_IRAM_OPT would matter for Wi-Fi modem sleep, which is frequent,
+# except we call espnow_utils_wifi_radio_stop() at boot and keep the radio off by default.
+CONFIG_ESP_WIFI_SLP_IRAM_OPT=n
+CONFIG_PM_SLEEP_FUNC_IN_IRAM=n
+CONFIG_PM_SLP_IRAM_OPT=n
+# Keep these in IRAM even though PM_SLEEP_FUNC_IN_IRAM no longer selects them:
+# RTC_CLK is the DFS hot path (rtc_clk_cpu_freq_set_config_fast on every 240<->160<->40 switch),
+# and PERIPH_CTRL / REGI2C are documented as needing to be "IRAM-safe and able to be called in
+# the other IRAM interrupt context" -- we have ESP_INTR_IN_IRAM=y and RMT ISRs for IR.
+CONFIG_RTC_CLK_FUNC_IN_IRAM=y
+CONFIG_ESP_PERIPH_CTRL_FUNC_IN_IRAM=y
+CONFIG_ESP_REGI2C_CTRL_FUNC_IN_IRAM=y
+
 # PSRAM / SPIRAM
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_QUAD=y
@@ -141,8 +173,37 @@ CONFIG_ESP_WIFI_SOFTAP_SUPPORT=y
 CONFIG_ESP_WIFI_ESPNOW_MAX_ENCRYPT_NUM=7
 CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=y
 
+# Core voltage. ON, which is also IDF's default and what Kconfig calls "a must for stable
+# mass production" (a fixed dbias would stop tracking temperature).
+# Stated explicitly only because PVT was investigated and EXONERATED on 2026-09-19: our two
+# batches differ in eFuse block rev (v0.3 vs v0.4) and the v0.3 stock reads PVT_DBIAS = 0,
+# which looked like an uncharacterised auto-dbias loop. It was not the cause. The crashes
+# were RTC FAST RAM in the heap plus the ROM TLSF (see the two pinned settings above/below),
+# and they persisted with PVT off and stopped with PVT on. Do not disable this again.
+CONFIG_ESP_ENABLE_PVT=y
+
 # Heap
 CONFIG_HEAP_PLACE_FUNCTION_INTO_FLASH=y
+# Build TLSF from IDF source instead of calling the ROM copy. Two reasons, both live:
+# (1) ROM faults carry no symbols, so every TLSF crash we chased decoded to unrelated ROM
+#     names (lldesc_build_chain, sip_from_host_avail_cb) and cost days.
+# (2) ROM cannot receive fixes -- esp_rom_caps.h already declares ESP_ROM_TLSF_CHECK_PATCH
+#     for C5 ("ROM does not contain the patch of tlsf_check_pool()"). The ROM copy also has
+#     poison fill/check function pointers that IDF only registers when poisoning is compiled
+#     in; with poisoning off those hooks are never set, and one crash was an indirect jump to
+#     0x00000000 with RA inside ROM TLSF. The IDF source has no such indirection at all.
+# Costs IRAM in general, but HEAP_PLACE_FUNCTION_INTO_FLASH above puts it in flash anyway.
+# PROVEN LOAD-BEARING 2026-09-19, do not remove. Single-variable A/B on one unit, all
+# else held constant (poisoning off, PVT off, 240 MHz, PSRAM 80M):
+#   ROM TLSF    -> "assert failed: block_locate_free tlsf/tlsf.c:569" within minutes,
+#                  PSRAM heap TLSF control block (0x423b70f4) implicated, frame in ROM
+#   source TLSF -> clean
+# Not a detection artefact: the IDF source carries the identical tlsf_assert and
+# ASSERTION_LEVEL=2 keeps it live, so the same corruption would have aborted identically.
+# The two are genuinely different implementations - IDF's source parameterises control_t
+# at runtime (fl_index_count / sl_index_count / small_block_size), a rework postdating the
+# ROM freeze - which is the case Kconfig warns about: ROM cannot receive bug fixes.
+CONFIG_HEAP_TLSF_USE_ROM_IMPL=n
 
 # FreeRTOS
 CONFIG_FREERTOS_HZ=100
