@@ -35,17 +35,17 @@ static esp_err_t save_ceiling_nvs(uint32_t ceiling)
         return err;
     }
 
-    // Marker first
-    err = nvs_set_u8(h, ESPNOW_AUTH_NVS_SEED, 1);
+    err = nvs_set_u32(h, ESPNOW_AUTH_NVS_CTR, ceiling);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "save_ceiling_nvs: seed marker failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "save_ceiling_nvs: NVS set failed: %s", esp_err_to_name(err));
         nvs_close(h);
         return err;
     }
 
-    err = nvs_set_u32(h, ESPNOW_AUTH_NVS_CTR, ceiling);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "save_ceiling_nvs: NVS set failed: %s", esp_err_to_name(err));
+    // Marker after the ceiling and non-fatal
+    esp_err_t seed_err = nvs_set_u8(h, ESPNOW_AUTH_NVS_SEED, 1);
+    if (seed_err != ESP_OK) {
+        ESP_LOGE(TAG, "save_ceiling_nvs: seed marker failed: %s", esp_err_to_name(seed_err));
     }
 
     nvs_close(h);
