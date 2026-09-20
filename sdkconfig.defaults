@@ -212,6 +212,13 @@ CONFIG_MBEDTLS_HARDWARE_MPI=y
 CONFIG_MBEDTLS_HARDWARE_SHA=y
 CONFIG_MBEDTLS_HARDWARE_ECC=y
 CONFIG_MBEDTLS_HARDWARE_ECDSA_VERIFY=y
+# Pinned, do not trim: with hardware AES the PSA AEAD dispatch calls the ESP GCM driver first, and
+# this option is what lets a non-GCM algorithm fall through to software. Turning it off makes the
+# driver's PSA_ERROR_NOT_SUPPORTED the final answer, so every AES-CCM call fails at runtime while
+# still building clean - which would silently kill both lora_pcp and espnow_auth.
+CONFIG_MBEDTLS_GCM_SUPPORT_NON_AES_CIPHER=y
+# Pinned: lora_task and espnow_task share PSA key slots, so the PSA core must be mutex-protected.
+CONFIG_MBEDTLS_THREADING_C=y
 
 # FATFS
 CONFIG_FATFS_ALLOC_PREFER_EXTRAM=y

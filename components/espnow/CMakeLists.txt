@@ -13,5 +13,5 @@ idf_component_register(
         common esp_wifi lora
 
     PRIV_REQUIRES
-        esp_netif wifi gpio
+        esp_netif wifi gpio mbedtls nvs_flash
 )

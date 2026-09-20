@@ -9,6 +9,9 @@
  * where <cmd> is an unsigned integer you can act on.
  *
  * No pairing or key exchange needed - just flash and go.
+ *
+ * NOTE: The prefix is a tag, not a password, and anyone in
+ * Wi-Fi range can broadcast one. Use this for prototyping.
  */
 
 #include <WiFi.h>

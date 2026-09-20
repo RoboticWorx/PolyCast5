@@ -12,6 +12,7 @@
 #include "portmacro.h"
 
 #include "lora_pcp.h"
+#include "espnow_auth.h"
 #include "espnow_utils.h"
 #include "espnow_task.h"
 #include "wifi_utils.h"
@@ -79,6 +80,9 @@ static void espnow_task(void *param)
     configASSERT(xEspEcompassStreamCtrlQueue);
     xEspEcompassStreamQueue = xQueueCreate(1, sizeof(espnow_ecompass_t));
     configASSERT(xEspEcompassStreamQueue);
+
+    // Resume the authenticated-frame send counter before any command can be built
+    espnow_auth_load_counter_nvs();
 
     while (1) {
         // Key generated and requesting send for LoRa handshake
@@ -207,18 +211,39 @@ static void espnow_task(void *param)
                 continue;
             }
 
-            // Build a text payload from the cmd (more secure)
-            char tx_payload[ESP_NOW_MAX_DATA_LEN];
-            int tx_payload_len = snprintf(tx_payload, sizeof(tx_payload), ESPNOW_MAGIC "%u", espnow_cmd.cmd_to_send); // Send only number of bytes needed
-            // Check payload
-            if (tx_payload_len < 0 || tx_payload_len >= sizeof(tx_payload)) {
-                ESP_LOGE(TAG, "Payload snprintf failed or too long.");
-                tx_payload_len = 0;
-                continue;
+            // Build the payload
+            // With an LMK there is a shared secret to authenticate with, so send the authenticated frame the peer can verify and replay-check
+            // ESP-NOW's own encryption is kept on underneath it but only buys confidentiality
+            uint8_t tx_payload[ESP_NOW_MAX_DATA_LEN];
+            int tx_payload_len;
+
+            if (espnow_cmd.enc) { // Yes encryption
+                if (!espnow_auth_build_frame(espnow_cmd.lmk, espnow_cmd.cmd_to_send, tx_payload)) {
+                    ESP_LOGE(TAG, "Failed to build authenticated frame");
+                    xSemaphoreGive(xEspCmdTxFailedSemaphore);
+                    espnow_utils_espnow_deinit();
+                    espnow_utils_wifi_radio_stop();
+                    continue;
+                }
+                tx_payload_len = ESPNOW_AUTH_FRAME_LEN;
+            } else { // No encryption
+                tx_payload_len = snprintf((char *)tx_payload, sizeof(tx_payload), ESPNOW_MAGIC "%u", espnow_cmd.cmd_to_send); // Send only number of bytes needed
+                // Check payload
+                if (tx_payload_len < 0 || tx_payload_len >= (int)sizeof(tx_payload)) {
+                    ESP_LOGE(TAG, "Payload snprintf failed or too long.");
+                    xSemaphoreGive(xEspCmdTxFailedSemaphore);
+                    espnow_utils_espnow_deinit();
+                    espnow_utils_wifi_radio_stop();
+                    continue;
+                }
             }
 
 #ifdef POLYCAST5_DEBUG
-            ESP_LOGI(TAG, "Sending: %s", tx_payload);
+            if (espnow_cmd.enc) {
+                ESP_LOGI(TAG, "Sending cmd %u as an authenticated frame", espnow_cmd.cmd_to_send);
+            } else {
+                ESP_LOGI(TAG, "Sending: %s", (char *)tx_payload);
+            }
             ESP_LOG_BUFFER_HEX("To MAC", espnow_cmd.mac_selected, ESPNOW_MAC_SIZE);
 #endif
 #ifdef POLYCAST5_DEBUG_PASSWORDS
@@ -226,9 +251,8 @@ static void espnow_task(void *param)
                 ESP_LOG_BUFFER_HEX("LMK", espnow_cmd.lmk, LMK_LEN);
             }
 #endif
-
             // Send the data
-            if (espnow_utils_send_data(espnow_cmd.mac_selected, (uint8_t*)tx_payload, tx_payload_len) == ESP_OK) {
+            if (espnow_utils_send_data(espnow_cmd.mac_selected, tx_payload, tx_payload_len) == ESP_OK) {
                 // Notify the LCD that the transmission was successful
                 xSemaphoreGive(xEspCmdTxSuccessSemaphore);
             } else {
@@ -306,7 +330,8 @@ static void espnow_task(void *param)
 
 void espnow_task_create(void)
 {
-    if (xTaskCreate(espnow_task, "espnow_task", 1024 * 3, NULL, POLYCAST5_PRIORITY_MEDIUM, NULL) != pdPASS) {
+    // 4KB: the authenticated-frame path runs AES-CCM through PSA on this stack
+    if (xTaskCreate(espnow_task, "espnow_task", 1024 * 4, NULL, POLYCAST5_PRIORITY_MEDIUM, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start espnow_task");
     }
 }
