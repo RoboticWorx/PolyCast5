@@ -65,6 +65,7 @@
 
 // Per-device handle on the shared bus; stays NULL until init succeeds, which the read
 // functions use as a "not ready" guard.
+static esp_err_t s_init_status = ESP_ERR_INVALID_STATE; // Outcome of the one boot-time init
 static i2c_master_dev_handle_t s_dev = NULL;
 
 // Write one register. On the wire: START, addr+W, register number, value, STOP.
@@ -84,7 +85,7 @@ static esp_err_t mmc_read(uint8_t reg, uint8_t *buf, size_t len)
     return i2c_master_transmit_receive(s_dev, &reg, 1, buf, len, I2C_TIMEOUT_MS);
 }
 
-esp_err_t mmc5603_init(void)
+static esp_err_t mmc5603_init_impl(void)
 {
     // The shared bus must already exist
     if (i2c_bus_handle == NULL) {
@@ -167,10 +168,24 @@ unlock_fail:
     return ret;
 }
 
+// Thin wrapper so the outcome is recorded from every exit path of the impl above
+esp_err_t mmc5603_init(void)
+{
+    s_init_status = mmc5603_init_impl();
+    return s_init_status;
+}
+
 // True once boot-time init found and configured the chip (used by the hardware self-test)
 bool mmc5603_is_present(void)
 {
     return s_dev != NULL;
+}
+
+// Why init failed, for the hardware self-test
+// ESP_ERR_NOT_FOUND means the part answered but its Product ID was wrong
+esp_err_t mmc5603_init_status(void)
+{
+    return s_init_status;
 }
 
 esp_err_t mmc5603_read_raw(uint32_t *x, uint32_t *y, uint32_t *z)

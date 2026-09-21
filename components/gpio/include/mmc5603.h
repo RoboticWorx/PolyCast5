@@ -36,6 +36,15 @@ esp_err_t mmc5603_init(void);
 bool mmc5603_is_present(void);
 
 /**
+ * @brief Outcome of the one boot-time init, for the hardware self-test.
+ *
+ * ESP_ERR_NOT_FOUND means the part answered but its Product ID was wrong (wrong part
+ * fitted). Any other error is a transfer failure; note the software reset is written
+ * before the ID is read, so on that path the ID was never examined.
+ */
+esp_err_t mmc5603_init_status(void);
+
+/**
  * @brief Read the latest X/Y/Z field as raw 20-bit unsigned output counts.
  *        Zero field sits at mid-scale (2^19 = 524288 counts).
  *

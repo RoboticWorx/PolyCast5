@@ -216,9 +216,15 @@ void app_main(void)
         ESP_LOGE(TAG, "gpio_utils_init failed: %s", esp_err_to_name(err));
         ESP_LOGE(TAG, "VERIFY_HW: GPIO expander (I2C 0x20) unreachable - "
                       "check assembly; boot halted (every peripheral depends on it)");
+
+        // The normal self-test never gets to run on this path, so do a bus-only pass
+        verify_hardware_run_bus_only(err);
         return;
     }
-    
+
+    // Expander/IO checks run here, not with the rest
+    verify_hardware_run_early();
+
     // Create SPI mutex before any SPI usage
     xSPIBusMutex = xSemaphoreCreateMutex();
     configASSERT(xSPIBusMutex);
@@ -253,7 +259,7 @@ void app_main(void)
     uint8_t seed[32];
     esp_fill_random(seed, sizeof(seed));
 
-    // Verify every external IC responds before the tasks take over the buses
+    // Verify every remaining external IC responds before the tasks take over the buses, then print the report
     verify_hardware_run();
 
     // Create tasks

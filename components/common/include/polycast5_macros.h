@@ -50,6 +50,7 @@
 // Settings/testing
 //#define POLYCAST5_PERSIST_SELECTION_INDEX 1 // Persist selected menu option across NVS and home
 //#define POLYCAST5_CYCLE_RGB_ON_BOOT 1 // Cycle through the RGB LED to make sure it is working
+//#define POLYCAST5_FACTORY_TEST 1 // Production self-test: adds intrusive hardware checks to verify_hardware (expander port-1 bridge sweep, button pull-up float test, BOOT0 NOR loopback). KEEP DISABLED for shipping firmware
 //#define POLYCAST5_CHECK_OTA_ON_CONN 1 // Check for OTA update on regular Wi-Fi connect
 //#define POLYCAST5_EN_DEEP_SLEEP 1 // KEEP DISABLED: Deep sleep cannot run the 6 h light-sleep battery check, so a sleeping pack can over-discharge
 

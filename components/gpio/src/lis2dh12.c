@@ -28,6 +28,7 @@
 
 #define RAD_TO_DEG 57.295779513082320876f // 180 / pi
 
+static esp_err_t s_init_status = ESP_ERR_INVALID_STATE; // Outcome of the one boot-time init
 static i2c_master_dev_handle_t s_dev = NULL; // I2C device handle (NULL until init succeeds)
 static stmdev_ctx_t s_ctx; // ST driver context
 
@@ -62,7 +63,8 @@ static int32_t platform_read(void *handle, uint8_t reg, uint8_t *buf, uint16_t l
 }
 
 // Probe and configure the accelerometer. Must run after the shared I2C bus is up.
-esp_err_t lis2dh12_init(void)
+// Split from lis2dh12_init() so every exit path, including the early returns below, is recorded in s_init_status
+static esp_err_t lis2dh12_init_impl(void)
 {
     // The shared bus must already exist
     if (i2c_bus_handle == NULL) {
@@ -128,10 +130,23 @@ out:
     return ret;
 }
 
+esp_err_t lis2dh12_init(void)
+{
+    s_init_status = lis2dh12_init_impl();
+    return s_init_status;
+}
+
 // True once boot-time init found and configured the chip (used by the hardware self-test)
 bool lis2dh12_is_present(void)
 {
     return s_dev != NULL;
+}
+
+// Why init failed, for the hardware self-test
+// ESP_ERR_NOT_FOUND means the part answered but its WHO_AM_I was wrong
+esp_err_t lis2dh12_init_status(void)
+{
+    return s_init_status;
 }
 
 // The sensor is mounted rotated 180 deg on the PCB:

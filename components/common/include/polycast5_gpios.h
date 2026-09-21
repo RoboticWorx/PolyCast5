@@ -43,6 +43,12 @@
 #define TCA9535_SX126X_NRST_PIN 6
 #define TCA9535_LCD_NRST_PIN 7
 
+// The port-1 output state gpio_utils_init() establishes
+#define TCA9535_PORT1_REST ((1 << TCA9535_3V3_EN_PIN) |     \
+                            (1 << TCA9535_TSOP_EN_PIN) |    \
+                            (1 << TCA9535_SX126X_NRST_PIN) | \
+                            (1 << TCA9535_LCD_NRST_PIN))
+
 
 /* Infrared */
 // RMT infrared pins for IR transmit and receive

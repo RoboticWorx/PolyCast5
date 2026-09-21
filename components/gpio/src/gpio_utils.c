@@ -198,20 +198,22 @@ esp_err_t gpio_utils_init(void)
     // 1 = input
     // 0 = output
 
-    // Assert the 3V3_EN power latch value and make Port1 drive it before the Port0 config below can early-return
+    // Load the whole Port1 output latch BEFORE enabling the drivers below
+    // The expander powers up with CONFIG = 0xFF (all inputs, high-Z) and OUTPUT = 0xFF (every latch high)
+    // Flipping CONFIG_REG1 to 0x00 first would push that 0xFF onto the pins
     ret = ESP_FAIL;
     for (int attempt = 0; attempt < 10 && ret != ESP_OK; attempt++) {
         if (attempt > 0) {
             esp_rom_delay_us(2000); // 2 ms settle
         }
-        ret = gpio_utils_write_output(TCA9535_3V3_EN_PIN, 1);
+        ret = TCA9535WriteSingleRegister(TCA9535_OUTPUT_REG1, TCA9535_PORT1_REST);
     }
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to preload 3V3_EN high after retries: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to preload Port1 outputs after retries: %s", esp_err_to_name(ret));
         return ret;
     }
 
-    // Port1: all outputs
+    // Port1: all outputs, now driving the rest state loaded above
     // bit7 bit6 bit5 bit4 bit3 bit2 bit1 bit0
     //    0    0    0    0    0    0    0    0    = 0x00
     ret = TCA9535WriteSingleRegister(TCA9535_CONFIG_REG1, 0x00);
@@ -240,11 +242,28 @@ esp_err_t gpio_utils_init(void)
     
     // Default states
     gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_ON); // LCD BL high
-    gpio_utils_write_output(TCA9535_HAPTIC_PIN, 0); // Haptic motor low
-    gpio_utils_write_output(TCA9535_RED_RGB_LED_PIN, 0); // Red LED off
-    gpio_utils_write_output(TCA9535_GREEN_RGB_LED_PIN, 0); // Green LED off
-    gpio_utils_write_output(TCA9535_BLUE_RGB_LED_PIN, 0); // Blue LED off
-    gpio_utils_write_output(TCA9535_TSOP_EN_PIN, 1); // TSOP OFF (active low)
+
+    // Port1 already holds the rest state from the preload above - haptic and all
+    // three LEDs off, TSOP off, 3V3_EN asserted, both resets released - so no
+    // per-pin clears are needed
+    uint8_t port1_rb = 0;
+    bool port1_ok = false;
+    for (int attempt = 0; attempt < 10 && !port1_ok; attempt++) {
+        if (attempt > 0) {
+            esp_rom_delay_us(2000); // 2 ms settle, matching the preload loop above
+            (void)TCA9535WriteSingleRegister(TCA9535_OUTPUT_REG1, TCA9535_PORT1_REST);
+        }
+        port1_rb = 0;
+        if (TCA9535ReadSingleRegister(TCA9535_OUTPUT_REG1, &port1_rb) == ESP_OK &&
+            port1_rb == TCA9535_PORT1_REST) {
+            port1_ok = true;
+        }
+    }
+    if (!port1_ok) {
+        ESP_LOGE(TAG, "Port1 outputs read 0x%02X, expected 0x%02X after retries - "
+                      "haptic/LEDs may be stuck on; continuing so the fault is reportable",
+                port1_rb, (unsigned)TCA9535_PORT1_REST);
+    }
     
     // Configure inputs
     /*gpio_config_t io_conf_in = {

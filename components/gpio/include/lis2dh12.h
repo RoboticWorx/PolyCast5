@@ -31,6 +31,15 @@ esp_err_t lis2dh12_init(void);
 bool lis2dh12_is_present(void);
 
 /**
+ * @brief Outcome of the one boot-time init, for the hardware self-test.
+ *
+ * ESP_ERR_NOT_FOUND means the part answered but its WHO_AM_I was wrong (wrong part
+ * fitted). Any other error is a read or config-write failure, which points at the
+ * solder joints or the bus rather than the silicon.
+ */
+esp_err_t lis2dh12_init_status(void);
+
+/**
  * @brief Read the latest X/Y/Z acceleration as raw signed 10-bit counts.
  *        In +-2 g normal mode, 1 count = 4 mg.
  *
