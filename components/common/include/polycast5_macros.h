@@ -60,4 +60,7 @@
 #define POLYCAST5_CPU_MAX_FREQ_MHZ 240          // chip rev v1.2+ only
 #define POLYCAST5_CPU_FLASH_WRITE_FREQ_MHZ 160  // Encrypted-write cap (all revs)
 
+// Oldest eFuse block revision (major * 100 + minor) allowed to run 240 MHz with ENCRYPTED PSRAM
+#define POLYCAST5_CPU_240_MIN_EFUSE_BLK_REV 4
+
 #endif // POLYCAST5_MACROS_H

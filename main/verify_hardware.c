@@ -53,6 +53,11 @@
 #include "driver/gpio.h"
 #include "driver/i2c_master.h"
 
+#include "esp_efuse.h"
+#include "esp_efuse_table.h"
+#include "hal/efuse_hal.h"
+#include "hal/mmu_ll.h"
+
 #include "polycast5_gpios.h"
 #include "polycast5_macros.h"
 
@@ -1323,6 +1328,41 @@ void verify_hardware_run(void)
         vh_record("tsop-idle", VH_G_IR, "TSOP IR receiver (GPIO6)", VH_FAIL, VH_NO_VALUE,
                 "went low after power on (receiver dropping out, or saturated by ambient IR)");
     }
+
+    // Silicon lot and PSRAM encryption state, the two inputs to app_main's clock decision
+    // The eFuse blk rev v0.3 lot corrupts ENCRYPTED PSRAM at 240 MHz; plaintext PSRAM or 160 MHz are both clean
+    uint32_t chip_rev = efuse_hal_chip_revision(); // major * 100 + minor
+    uint32_t blk_rev = efuse_hal_blk_version();
+    uint32_t hp_dbias = 0, vol_gap = 0, pvt_dbias = 0;
+    esp_efuse_read_field_blob(ESP_EFUSE_ACTIVE_HP_DBIAS, &hp_dbias, 4);
+    esp_efuse_read_field_blob(ESP_EFUSE_LP_HP_DBIAS_VOL_GAP, &vol_gap, 5);
+    esp_efuse_read_block(EFUSE_BLK2, &pvt_dbias, 249, 5);
+    uint32_t fixed_dbias = (hp_dbias == 0) ? 28 : ((hp_dbias + 19 > 31) ? 31 : hp_dbias + 19);
+
+    // Raw MMU entry for a PSRAM page: mmu_ll_read_entry() strips the bit, so read the registers.
+    // Same fail-closed rule as app_main, and the index/content pair is held against interrupts
+    bool psram_xts = esp_psram_is_initialized();
+    if (psram_xts) {
+        void *psram_probe = heap_caps_malloc(16, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (psram_probe != NULL) {
+            portMUX_TYPE mmu_mux = portMUX_INITIALIZER_UNLOCKED;
+            portENTER_CRITICAL(&mmu_mux);
+            REG_WRITE(SPI_MEM_MMU_ITEM_INDEX_REG(0), mmu_ll_get_entry_id(0, (uint32_t)psram_probe));
+            psram_xts = (REG_READ(SPI_MEM_MMU_ITEM_CONTENT_REG(0)) & SOC_MMU_SENSITIVE) != 0;
+            portEXIT_CRITICAL(&mmu_mux);
+            heap_caps_free(psram_probe);
+        }
+    }
+    bool lot_needs_cap = psram_xts && (blk_rev < POLYCAST5_CPU_240_MIN_EFUSE_BLK_REV);
+
+    vh_record("efuse-rev", VH_G_IDENTITY, "Silicon lot (eFuse block rev)",
+            lot_needs_cap ? VH_WARN : VH_PASS, (long)blk_rev,
+            "chip v%lu.%lu blk v%lu.%lu HP_DBIAS %lu->%lu gap %lu PVT_DBIAS %lu PSRAM XTS %s (%s)",
+            (unsigned long)(chip_rev / 100), (unsigned long)(chip_rev % 100),
+            (unsigned long)(blk_rev / 100), (unsigned long)(blk_rev % 100),
+            (unsigned long)hp_dbias, (unsigned long)fixed_dbias, (unsigned long)vol_gap,
+            (unsigned long)pvt_dbias, psram_xts ? "on" : "off",
+            lot_needs_cap ? "240 MHz unsafe on this lot, capped to 160" : "240 MHz eligible");
 
     // CPU clock, MEASURED rather than asked for: the Kconfig boot frequency, the DFS ceiling and
     // what the core is actually running at are three different numbers, and only the last matters

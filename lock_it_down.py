@@ -292,6 +292,23 @@ def check_device_state(port: str) -> None:
         print(yellow("Couldn't confirm DIS_DOWNLOAD_MANUAL_ENCRYPT (espefuse "
                      "parse failed); esptool will still refuse if it is burned."))
 
+    # Silicon lot, for information only. A locked build keeps PSRAM encrypted, and the eFuse
+    # blk rev v0.3 lot corrupts encrypted PSRAM at 240 MHz, so the firmware caps those units at
+    # 160 MHz. Dev builds map PSRAM plaintext and keep 240 MHz. Surfaced here because locking is
+    # irreversible and this is where the operator decides.
+    proc = run([sys.executable, "-m", "espefuse", "--chip", CHIP, "-p", port,
+                "--before", "default-reset", "--after", "hard-reset",
+                "summary", "BLK_VERSION_MINOR"],
+               capture=True, fatal=False)
+    m = re.search(r"BLK_VERSION_MINOR.*?=\s*(\d+)", (proc.stdout or "") if proc else "", re.S)
+    if m and int(m.group(1)) < 4:
+        print(yellow(f"eFuse block revision is v0.{m.group(1)}. Locked firmware encrypts PSRAM, "
+                     "and this lot corrupts encrypted PSRAM at 240 MHz, so this unit will run "
+                     "at 160 MHz. The UI will be slower than a dev-mode unit. This is expected."))
+    elif not m:
+        print(yellow("Couldn't read BLK_VERSION_MINOR (espefuse parse failed); the firmware "
+                     "still picks its own clock from the eFuse at boot."))
+
 
 # ===========================================================================
 # Confirmation prompt. A single gate for a one-way operation: 'LOCK' at the end,

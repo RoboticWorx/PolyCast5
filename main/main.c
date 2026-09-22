@@ -27,6 +27,9 @@
 #endif
 
 #include "esp_chip_info.h"
+#include "esp_heap_caps.h"
+#include "hal/efuse_hal.h" // eFuse block revision: which silicon lot this is
+#include "hal/mmu_ll.h"    // raw MMU entry read: is PSRAM behind the XTS-AES engine?
 
 #include "sx126x_hal.h"
 #include "tca9535.h"
@@ -171,6 +174,33 @@ void app_main(void)
                            : POLYCAST5_CPU_FLASH_WRITE_FREQ_MHZ; // v1.0- : 160 steady
     if (max_freq_mhz != POLYCAST5_CPU_MAX_FREQ_MHZ) {
         ESP_LOGE(TAG, "Chip rev v1.0- detected: CPU will run at 160 MHz steady (no DFS)");
+    }
+
+    // Encrypted PSRAM at 240 MHz corrupts a byte per cache line on the eFuse blk rev v0.3 lot, so cap those units at 160MHz
+    // Decided from the live MMU entry, not from build flags:
+    // locked builds encrypt PSRAM, dev builds map it plaintext
+    bool psram_encrypted = esp_psram_is_initialized(); // Pessimistic existance check
+    if (psram_encrypted) {
+        void *psram_probe = heap_caps_malloc(16, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (psram_probe != NULL) {
+            // mmu_ll_read_entry() strips the bit, so go to the registers
+            // The index/content pair is not atomic and flash mapping uses the same registers, so hold off interrupts
+            portMUX_TYPE mmu_mux = portMUX_INITIALIZER_UNLOCKED;
+            portENTER_CRITICAL(&mmu_mux);
+            REG_WRITE(SPI_MEM_MMU_ITEM_INDEX_REG(0), mmu_ll_get_entry_id(0, (uint32_t)psram_probe));
+            psram_encrypted = (REG_READ(SPI_MEM_MMU_ITEM_CONTENT_REG(0)) & SOC_MMU_SENSITIVE) != 0;
+            portEXIT_CRITICAL(&mmu_mux);
+            heap_caps_free(psram_probe);
+        } else {
+            ESP_LOGE(TAG, "PSRAM probe alloc failed; assuming encrypted PSRAM and capping the CPU");
+        }
+    }
+    uint32_t blk_rev = efuse_hal_blk_version(); // major * 100 + minor
+    if (max_freq_mhz > POLYCAST5_CPU_FLASH_WRITE_FREQ_MHZ && psram_encrypted &&
+            blk_rev < POLYCAST5_CPU_240_MIN_EFUSE_BLK_REV) {
+        max_freq_mhz = POLYCAST5_CPU_FLASH_WRITE_FREQ_MHZ;
+        ESP_LOGE(TAG, "OK: eFuse blk rev v%lu.%lu with encrypted PSRAM: CPU capped at %d MHz",
+                (unsigned long)(blk_rev / 100), (unsigned long)(blk_rev % 100), max_freq_mhz);
     }
     esp_pm_config_t pm_cfg = {
         .max_freq_mhz = max_freq_mhz,

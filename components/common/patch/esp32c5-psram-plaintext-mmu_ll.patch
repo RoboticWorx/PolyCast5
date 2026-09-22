@@ -1,36 +1,61 @@
 diff --git a/components/hal/esp32c5/include/hal/mmu_ll.h b/components/hal/esp32c5/include/hal/mmu_ll.h
-index 79df1a70..598c8cc6 100644
+index 79df1a70..95f55f4b 100644
 --- a/components/hal/esp32c5/include/hal/mmu_ll.h
 +++ b/components/hal/esp32c5/include/hal/mmu_ll.h
-@@ -216,8 +216,11 @@ __attribute__((always_inline)) static inline void mmu_ll_write_entry(uint32_t mm
+@@ -10,6 +10,10 @@
+ 
+ #include <stdint.h>
+ #include <stdbool.h>
++// PolyCast5 patch: mmu_ll_write_entry() branches on CONFIG_SECURE_FLASH_ENCRYPTION_MODE_RELEASE.
++// Nothing else here pulls sdkconfig.h in, and an undefined CONFIG_ symbol makes #if pick the
++// wrong branch silently, so include it explicitly.
++#include "sdkconfig.h"
+ #include "soc/spi_mem_reg.h"
+ #include "soc/ext_mem_defs.h"
+ #include "soc/soc_caps.h"
+@@ -216,10 +220,21 @@ __attribute__((always_inline)) static inline void mmu_ll_write_entry(uint32_t mm
  {
      uint32_t mmu_raw_value;
      if (mmu_ll_cache_encryption_enabled()) {
 -        // For PSRAM case, avoid encryption due to a bug in the hardware
--        if (!(target == MMU_TARGET_PSRAM0 && efuse_hal_chip_revision() <= 100)) {
-+        // PolyCast5 bench patch (2026-09-22): never route PSRAM through the XTS-AES engine, on any
-+        // chip revision. Upstream does this for v1.0 only (hardware bug); the eFuse blk rev v0.3 lot
-+        // of v1.2 silicon corrupts encrypted PSRAM at 240 MHz (one byte per 32 B line). Flash stays
-+        // encrypted; PSRAM contents are plaintext on the die. Revert: git checkout -- this file.
-+        if (target != MMU_TARGET_PSRAM0) {
++#if CONFIG_SECURE_FLASH_ENCRYPTION_MODE_RELEASE
++        // PolyCast5 patch: locked builds keep PSRAM encrypted, upstream behaviour. main.c caps the
++        // DFS ceiling at 160 MHz on the eFuse lots that corrupt encrypted PSRAM at 240 MHz.
+         if (!(target == MMU_TARGET_PSRAM0 && efuse_hal_chip_revision() <= 100)) {
              mmu_val |= SOC_MMU_SENSITIVE;
          }
++#else
++        // PolyCast5 patch: dev builds never route PSRAM through the XTS-AES engine, on any chip
++        // revision. Upstream does this for v1.0 only (hardware bug); the eFuse blk rev v0.3 lot of
++        // v1.2 silicon corrupts encrypted PSRAM at 240 MHz (one byte per 32 B line), so plaintext
++        // PSRAM is what buys 240 MHz there. Flash stays encrypted; PSRAM is plaintext on the die.
++        if (target != MMU_TARGET_PSRAM0) {
++            mmu_val |= SOC_MMU_SENSITIVE;
++        }
++#endif
      }
-@@ -227,13 +230,10 @@ __attribute__((always_inline)) static inline void mmu_ll_write_entry(uint32_t mm
+     mmu_val |= (target == MMU_TARGET_FLASH0) ? SOC_MMU_ACCESS_FLASH : SOC_MMU_ACCESS_SPIRAM;
+ 
+@@ -227,14 +242,22 @@ __attribute__((always_inline)) static inline void mmu_ll_write_entry(uint32_t mm
      REG_WRITE(SPI_MEM_MMU_ITEM_INDEX_REG(0), entry_id);
      REG_WRITE(SPI_MEM_MMU_ITEM_CONTENT_REG(0), mmu_raw_value);
  
--    // Anti-FI check to confirm the encryption status for PSRAM entry.
--    // This avoids a potential FI attacks to keep PSRAM unencrypted and
--    // hence read out plaintext in execute from PSRAM model.
--    if (mmu_ll_cache_encryption_enabled() && target == MMU_TARGET_PSRAM0 && efuse_hal_chip_revision() > 100) {
--        ESP_FAULT_ASSERT(REG_READ(SPI_MEM_MMU_ITEM_CONTENT_REG(0)) & SOC_MMU_SENSITIVE);
--    } else {
--        ESP_FAULT_ASSERT(!(mmu_ll_cache_encryption_enabled() && target == MMU_TARGET_PSRAM0 && efuse_hal_chip_revision() > 100));
-+    // Anti-FI check, inverted by the PolyCast5 bench patch above: a PSRAM entry must NOT carry
-+    // the sensitive bit, whatever the chip revision.
++#if CONFIG_SECURE_FLASH_ENCRYPTION_MODE_RELEASE
+     // Anti-FI check to confirm the encryption status for PSRAM entry.
+     // This avoids a potential FI attacks to keep PSRAM unencrypted and
+     // hence read out plaintext in execute from PSRAM model.
++    // PolyCast5 patch: verbatim upstream, so a locked build is bit-identical to stock IDF here.
+     if (mmu_ll_cache_encryption_enabled() && target == MMU_TARGET_PSRAM0 && efuse_hal_chip_revision() > 100) {
+         ESP_FAULT_ASSERT(REG_READ(SPI_MEM_MMU_ITEM_CONTENT_REG(0)) & SOC_MMU_SENSITIVE);
+     } else {
+         ESP_FAULT_ASSERT(!(mmu_ll_cache_encryption_enabled() && target == MMU_TARGET_PSRAM0 && efuse_hal_chip_revision() > 100));
+     }
++#else
++    // PolyCast5 patch: dev builds map PSRAM plaintext, so the entry must NOT carry the bit.
 +    if (target == MMU_TARGET_PSRAM0) {
 +        ESP_FAULT_ASSERT(!(REG_READ(SPI_MEM_MMU_ITEM_CONTENT_REG(0)) & SOC_MMU_SENSITIVE));
-     }
++    }
++#endif
  }
  
+ /**
