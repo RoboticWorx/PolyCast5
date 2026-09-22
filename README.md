@@ -132,8 +132,7 @@ idf.py build
 
 # Patches
 
-Changes to the ESP-IDF framework are required to use the deauthenticator app.
+Changes to the ESP-IDF framework are required to build the correct code for this device.
 
-If you would like this app to be functional, please see the following README:
-
-`https://github.com/RoboticWorx/PolyCast5/blob/main/components/wifi/patch/README.md`
+* [Mandatory patch for ESP32-C5s with an eFuse rev 0.3](https://github.com/RoboticWorx/PolyCast5/blob/main/components/common/patch/README.md).
+* [Patch to make the deauthenticator app function correctly](https://github.com/RoboticWorx/PolyCast5/blob/main/components/wifi/patch/README.md).
