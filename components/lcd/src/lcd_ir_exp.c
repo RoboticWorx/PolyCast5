@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <math.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -17,6 +16,10 @@
 #include "gpio_task.h"
 #include "lcd_utils.h"
 #include "ir_exp_task.h"
+#include "lcd_ir_exp_render.h"
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+#include "mirror.h"
+#endif
 
 #define TAG "LCD_IR_EXP"
 
@@ -37,6 +40,10 @@
 #define IRX_ROW_MED_F    95 // ink  98..108, and the 16 px box ends exactly on 111
 
 #define IRX_FRAME_MS 125 // 8 fps; the producer publishes at the same rate
+
+// Crosshair core and edge
+#define IRX_CROSS_FG lv_color_to_u16(lv_color_white())
+#define IRX_CROSS_BG lv_color_to_u16(lv_color_black())
 
 /* =============== Sensor orientation =============== */
 #define IRX_FLIP_H false
@@ -59,12 +66,6 @@ enum {
     IRX_MODE_VIEW = 0,
     IRX_MODE_DETAIL,
 };
-
-// Four source samples and their Q8 weights for one output pixel
-typedef struct {
-    int16_t idx[4];
-    int16_t w[4];
-} irx_tap_t;
 
 static bool irx_init = false;
 static lv_obj_t *irx_canvas = NULL;
@@ -95,6 +96,7 @@ static uint16_t *irx_palette = NULL; // 256 RGB565 entries
 static irx_tap_t *irx_tap_x = NULL;  // IRX_CANVAS_W entries
 static irx_tap_t *irx_tap_y = NULL;  // IRX_CANVAS_H entries
 static int16_t *irx_mid = NULL;      // MLX90642_ROWS x IRX_CANVAS_W intermediate
+static irx_scaler_t irx_scale;       // Taps and intermediate above, bundled for the render
 
 static uint8_t irx_pal_idx = 0;
 static int32_t irx_lo = 0;
@@ -187,156 +189,6 @@ static void irx_build_palette(uint8_t which)
     }
 }
 
-/* =============== Interpolation tables =============== */
-
-// Precompute, for every output coordinate, the four source samples it reads and their Catmull-Rom weights in Q8.
-// Built once at page entry so the per-frame inner loop is pure integer multiply-accumulate - what makes 8 fps
-// affordable without an FPU. Floats appear here and nowhere else in the render path.
-//
-// Mirroring an axis only reverses the source indices; the weight order stays, as the Catmull-Rom basis is
-// symmetric and idx[1]/idx[2] still bracket the output sample. The weight-sum correction below always lands on
-// w[1], a different physical tap once reversed, so a mirrored axis is accurate to 1 LSB (0.02 C) rather than
-// bit-identical - measured, and an order of magnitude under the sensor's own 0.21 C noise.
-static void irx_build_taps(irx_tap_t *taps, int dst_n, int src_n, bool flip)
-{
-    const float scale = (float)src_n / (float)dst_n;
-
-    for (int d = 0; d < dst_n; ++d) {
-        // Map output centre to source space, then split into an index and a fraction
-        const float sx = ((float)d + 0.5f) * scale - 0.5f;
-        const int i0 = (int)floorf(sx);
-        const float t = sx - (float)i0;
-
-        const float t2 = t * t;
-        const float t3 = t2 * t;
-        float w[4];
-        w[0] = -0.5f * t3 + t2 - 0.5f * t;
-        w[1] = 1.5f * t3 - 2.5f * t2 + 1.0f;
-        w[2] = -1.5f * t3 + 2.0f * t2 + 0.5f * t;
-        w[3] = 0.5f * t3 - 0.5f * t2;
-
-        int sum = 0;
-        for (int k = 0; k < 4; ++k) {
-            int si = i0 - 1 + k;
-            if (si < 0) si = 0; // Clamp at the edges rather than wrap
-            if (si > src_n - 1) si = src_n - 1;
-            if (flip) si = src_n - 1 - si; // Mirror this axis
-            taps[d].idx[k] = (int16_t)si;
-            taps[d].w[k] = (int16_t)lrintf(w[k] * 256.0f);
-            sum += taps[d].w[k];
-        }
-
-        // Round-off can leave the weights summing to 255 or 257, which would tint flat
-        // regions. Push the error into the dominant tap so the sum is exactly 256.
-        taps[d].w[1] = (int16_t)(taps[d].w[1] + (256 - sum));
-    }
-}
-
-/* =============== Render =============== */
-
-// Separable Catmull-Rom upscale straight into the RGB565 framebuffer. Pass 1 resamples each of the 24 source rows
-// to the full output width; pass 2 resamples down the columns and maps through the palette in the same loop, so no
-// full-size intermediate is ever materialised.
-//
-// Both passes clamp the result to the two samples it sits between: Catmull-Rom overshoots, which shows as a bright
-// halo beside a hot object, and bracketing removes it without softening genuine edges.
-static void irx_render(const int16_t *src)
-{
-    // Pass 1: horizontal, 32 -> IRX_CANVAS_W
-    for (int r = 0; r < MLX90642_ROWS; ++r) {
-        const int16_t *srow = src + r * MLX90642_COLS;
-        int16_t *drow = irx_mid + r * IRX_CANVAS_W;
-
-        for (int x = 0; x < IRX_CANVAS_W; ++x) {
-            const irx_tap_t *tp = &irx_tap_x[x];
-            const int32_t s1 = srow[tp->idx[1]];
-            const int32_t s2 = srow[tp->idx[2]];
-
-            int32_t v = ((int32_t)srow[tp->idx[0]] * tp->w[0] + s1 * tp->w[1] +
-                         s2 * tp->w[2] + (int32_t)srow[tp->idx[3]] * tp->w[3]) >> 8;
-
-            const int32_t lo = (s1 < s2) ? s1 : s2;
-            const int32_t hi = (s1 < s2) ? s2 : s1;
-            if (v < lo) v = lo;
-            else if (v > hi) v = hi;
-
-            drow[x] = (int16_t)v;
-        }
-    }
-
-    // Pass 2: vertical, 24 -> IRX_CANVAS_H, plus normalise and palette
-    const int32_t span = irx_hi - irx_lo;
-    const int32_t recip = (span > 0) ? ((255 << 16) / span) : 0;
-
-    for (int y = 0; y < IRX_CANVAS_H; ++y) {
-        const irx_tap_t *tp = &irx_tap_y[y];
-        const int16_t *r0 = irx_mid + tp->idx[0] * IRX_CANVAS_W;
-        const int16_t *r1 = irx_mid + tp->idx[1] * IRX_CANVAS_W;
-        const int16_t *r2 = irx_mid + tp->idx[2] * IRX_CANVAS_W;
-        const int16_t *r3 = irx_mid + tp->idx[3] * IRX_CANVAS_W;
-        uint16_t *out = irx_fb + y * irx_stride_px;
-
-        for (int x = 0; x < IRX_CANVAS_W; ++x) {
-            const int32_t s1 = r1[x];
-            const int32_t s2 = r2[x];
-
-            int32_t v = ((int32_t)r0[x] * tp->w[0] + s1 * tp->w[1] +
-                         s2 * tp->w[2] + (int32_t)r3[x] * tp->w[3]) >> 8;
-
-            const int32_t lo = (s1 < s2) ? s1 : s2;
-            const int32_t hi = (s1 < s2) ? s2 : s1;
-            if (v < lo) v = lo;
-            else if (v > hi) v = hi;
-
-            // Clamp into the displayed span BEFORE scaling. recip can reach (255 << 16) / IRX_MIN_SPAN, so an
-            // out-of-range sample would overflow the multiply - signed overflow, not a wrong colour. Bounding
-            // the difference first caps the product at 255 << 16 by construction.
-            int32_t d = v - irx_lo;
-            if (d < 0) d = 0;
-            else if (d > span) d = span;
-
-            int32_t n = (d * recip) >> 16;
-            if (n > 255) n = 255;
-
-            out[x] = irx_palette[n];
-        }
-    }
-}
-
-// Single pixel write, indexed by the draw buffer's stride rather than the canvas width: LVGL is free to pad rows.
-static inline void out_px(int y, int x, uint16_t col)
-{
-    irx_fb[y * irx_stride_px + x] = col;
-}
-
-// Centre reticle. A dark pixel either side of each white core arm keeps it legible over black, white and every
-// palette colour in between.
-static void irx_draw_crosshair(void)
-{
-    const int cx = IRX_CANVAS_W / 2;
-    const int cy = IRX_CANVAS_H / 2;
-    const uint16_t fg = lv_color_to_u16(lv_color_white());
-    const uint16_t bg = lv_color_to_u16(lv_color_black());
-
-    for (int d = 2; d <= 7; ++d) { // Leave a 2 px gap so the centre stays visible
-        for (int s = -1; s <= 1; ++s) {
-            const uint16_t col = (s == 0) ? fg : bg;
-
-            const int yy = cy + s;
-            if (yy >= 0 && yy < IRX_CANVAS_H) {
-                if (cx - d >= 0) out_px(yy, cx - d, col);
-                if (cx + d < IRX_CANVAS_W) out_px(yy, cx + d, col);
-            }
-
-            const int xx = cx + s;
-            if (xx >= 0 && xx < IRX_CANVAS_W) {
-                if (cy - d >= 0) out_px(cy - d, xx, col);
-                if (cy + d < IRX_CANVAS_H) out_px(cy + d, xx, col);
-            }
-        }
-    }
-}
-
 /* =============== Readout formatting =============== */
 
 // One decimal place with the unit appended. Takes hundredths of whichever unit it is printing, so Fahrenheit shares it.
@@ -420,8 +272,17 @@ static bool irx_alloc(void)
     }
 
     memset(irx_fb, 0, fb_bytes);
-    irx_build_taps(irx_tap_x, IRX_CANVAS_W, MLX90642_COLS, IRX_FLIP_H);
-    irx_build_taps(irx_tap_y, IRX_CANVAS_H, MLX90642_ROWS, IRX_FLIP_V);
+    irx_render_taps(irx_tap_x, IRX_CANVAS_W, MLX90642_COLS, IRX_FLIP_H);
+    irx_render_taps(irx_tap_y, IRX_CANVAS_H, MLX90642_ROWS, IRX_FLIP_V);
+    irx_scale = (irx_scaler_t){
+        .tap_x = irx_tap_x,
+        .tap_y = irx_tap_y,
+        .mid = irx_mid,
+        .src_w = MLX90642_COLS,
+        .src_h = MLX90642_ROWS,
+        .dst_w = IRX_CANVAS_W,
+        .dst_h = IRX_CANVAS_H,
+    };
     irx_build_palette(irx_pal_idx);
     return true;
 }
@@ -452,10 +313,108 @@ static void irx_set_status(const char *txt)
     irx_status_shown = true;
 }
 
-static void irx_timer_cb(lv_timer_t *t)
-{
-    (void)t;
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+/* =============== Screen Mirror =============== */
 
+// The viewer gets the raw frame and upscales it itself, bit-exact (lcd_ir_exp_render.c). Through the tile path,
+// sensor noise changes nearly every canvas tile every frame and drags the whole stream's quality down with it.
+
+static bool irx_have_frame = false; // The canvas holds a frame the mirror was given
+
+// Hand the mirror the frame the canvas was just drawn from. A copy; mirror_task sends the latest.
+static void irx_mirror_frame(const int16_t *frame)
+{
+    const mirror_thermal_frame_t f = {
+        .px = frame,
+        .cols = MLX90642_COLS,
+        .rows = MLX90642_ROWS,
+        .lo = irx_lo,
+        .hi = irx_hi,
+        .palette = irx_palette,
+        .flip_h = IRX_FLIP_H,
+        .flip_v = IRX_FLIP_V,
+        .crosshair = true,
+        .cross_fg = IRX_CROSS_FG,
+        .cross_bg = IRX_CROSS_BG,
+    };
+
+    mirror_thermal_frame(&f);
+    irx_have_frame = true;
+}
+
+// One object drawn after the canvas. If it overlaps, the tiles under it stay on the ordinary path so the viewer
+// sees it. Past the last slot, overlays merge into one box: coarser, never wrong.
+static void irx_mirror_hole(lv_obj_t *obj, const lv_area_t *canvas, mirror_rect_t *holes, size_t *n)
+{
+    if (obj == NULL || lv_obj_has_flag(obj, LV_OBJ_FLAG_HIDDEN)) {
+        return;
+    }
+
+    lv_area_t a;
+    lv_obj_get_coords(obj, &a);
+
+    const int32_t ext = lv_obj_calculate_ext_draw_size(obj, LV_PART_MAIN); // Shadow and outline paint outside
+    a.x1 = LV_MAX(a.x1 - ext, canvas->x1);
+    a.y1 = LV_MAX(a.y1 - ext, canvas->y1);
+    a.x2 = LV_MIN(a.x2 + ext, canvas->x2);
+    a.y2 = LV_MIN(a.y2 + ext, canvas->y2);
+    if (a.x1 > a.x2 || a.y1 > a.y2) {
+        return;
+    }
+
+    if (*n < MIRROR_THERMAL_MAX_HOLES) {
+        holes[*n] = (mirror_rect_t){ (int16_t)a.x1, (int16_t)a.y1, (int16_t)a.x2, (int16_t)a.y2 };
+        (*n)++;
+        return;
+    }
+
+    mirror_rect_t *h = &holes[MIRROR_THERMAL_MAX_HOLES - 1];
+    h->x1 = (int16_t)LV_MIN(h->x1, a.x1);
+    h->y1 = (int16_t)LV_MIN(h->y1, a.y1);
+    h->x2 = (int16_t)LV_MAX(h->x2, a.x2);
+    h->y2 = (int16_t)LV_MAX(h->y2, a.y2);
+}
+
+// Tell the mirror whether the canvas is up and what covers it. Every tick: overlays come and go on their own.
+static void irx_mirror_view(void)
+{
+    if (!irx_init || irx_canvas == NULL) {
+        return;
+    }
+
+    // Boxes are settled lazily, so a label whose text just changed still reports its old size
+    lv_obj_update_layout(irx_canvas);
+
+    lv_area_t ca;
+    lv_obj_get_coords(irx_canvas, &ca);
+
+    mirror_rect_t holes[MIRROR_THERMAL_MAX_HOLES];
+    size_t n = 0;
+
+    // Everything after the canvas among its siblings is drawn over it, then both display layers
+    lv_obj_t *scr = lv_obj_get_parent(irx_canvas);
+    const uint32_t count = lv_obj_get_child_count(scr);
+    for (uint32_t i = (uint32_t)lv_obj_get_index(irx_canvas) + 1; i < count; ++i) {
+        irx_mirror_hole(lv_obj_get_child(scr, (int32_t)i), &ca, holes, &n);
+    }
+
+    lv_obj_t *const layers[2] = { lv_layer_top(), lv_layer_sys() };
+    for (int l = 0; l < 2; ++l) {
+        const uint32_t lc = (layers[l] != NULL) ? lv_obj_get_child_count(layers[l]) : 0;
+        for (uint32_t i = 0; i < lc; ++i) {
+            irx_mirror_hole(lv_obj_get_child(layers[l], (int32_t)i), &ca, holes, &n);
+        }
+    }
+
+    const bool on = irx_have_frame && irx_mode == IRX_MODE_VIEW &&
+            !lv_obj_has_flag(irx_canvas, LV_OBJ_FLAG_HIDDEN);
+    const mirror_rect_t canvas = { (int16_t)ca.x1, (int16_t)ca.y1, (int16_t)ca.x2, (int16_t)ca.y2 };
+    mirror_thermal_view(on, &canvas, holes, n);
+}
+#endif // POLYCAST5_EN_SCREEN_MIRROR
+
+static void irx_image_tick(void)
+{
     // The sleep path calls lv_timer_handler() from its wait loop, so guard against firing after teardown freed the buffer.
     if (!irx_init || irx_canvas == NULL || irx_fb == NULL) {
         return;
@@ -540,9 +499,24 @@ static void irx_timer_cb(lv_timer_t *t)
         }
     }
 
-    irx_render(frame);
-    irx_draw_crosshair();
+    irx_render_frame(&irx_scale, frame, irx_lo, irx_hi, irx_palette, irx_fb, irx_stride_px);
+    irx_render_crosshair(irx_fb, irx_stride_px, IRX_CANVAS_W, IRX_CANVAS_H, IRX_CROSS_FG, IRX_CROSS_BG);
     lv_obj_invalidate(irx_canvas);
+
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+    irx_mirror_frame(frame);
+#endif
+}
+
+static void irx_timer_cb(lv_timer_t *t)
+{
+    (void)t;
+
+    irx_image_tick();
+
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+    irx_mirror_view();
+#endif
 }
 
 /* =============== UI construction =============== */
@@ -1029,6 +1003,13 @@ static void irx_session_stop(void)
 // its wait loop), delete the objects, free the buffers, and clear the entry gate so a re-entry rebuilds.
 static void irx_cleanup(void)
 {
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+    // First, and with the frame forgotten, so nothing below can turn the channel back on. The mirror then resends
+    // every tile it covered through the tile path.
+    irx_have_frame = false;
+    mirror_thermal_stop();
+#endif
+
     irx_session_stop();
 
     if (irx_timer != NULL) {
@@ -1173,6 +1154,9 @@ void lcd_gpio_ir_exp_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
             irx_hide_detail();
             irx_mode = IRX_MODE_VIEW;
             irx_last_seq = 0; // Force a full repaint of the image we hid
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+            irx_mirror_view();
+#endif
         }
         return;
     }
@@ -1208,4 +1192,8 @@ void lcd_gpio_ir_exp_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
         irx_cleanup();
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
+
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+    irx_mirror_view(); // A palette name or the detail view may now cover the canvas; a no-op after cleanup
+#endif
 }

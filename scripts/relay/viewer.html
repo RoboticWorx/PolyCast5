@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PolyCast5 Screen Mirror (dev)</title>
+<style>
+  body { font: 14px system-ui, sans-serif; background: #111; color: #eee; margin: 0; padding: 20px;
+         display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  canvas { width: 100%; max-width: 720px; aspect-ratio: 240/135; image-rendering: pixelated;
+           background: #000; border-radius: 8px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  input { font: inherit; padding: 6px 10px; border-radius: 6px; border: 1px solid #444;
+          background: #1c1c1c; color: #eee; width: 8em; text-transform: uppercase; }
+  button { font: inherit; padding: 10px 14px; border-radius: 8px; border: 0; background: #2a2a2a;
+           color: #eee; cursor: pointer; touch-action: none; user-select: none;
+           -webkit-tap-highlight-color: transparent; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .pad button { min-width: 56px; min-height: 56px; }
+  button:active { background: #0a4bff; }
+  .pad { display: grid; grid-template-columns: repeat(3, 56px); gap: 8px; justify-content: center; }
+  .pad .sp { visibility: hidden; }
+  #check { font: 700 28px ui-monospace, monospace; letter-spacing: .2em; color: #6ea0ff; }
+  #stats { font-family: ui-monospace, monospace; color: #888; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="row">
+  <input id="code" placeholder="CODE" maxlength="9" autocomplete="off" spellcheck="false">
+  <button id="go">Connect</button>
+  <span id="state">idle</span>
+  <span id="check"></span>
+</div>
+
+<canvas id="scr" width="240" height="135"></canvas>
+
+<div class="pad">
+  <span class="sp"></span><button data-b="2" disabled>&#9650;</button><span class="sp"></span>
+  <button data-b="4" disabled>&#9664;</button><button data-b="0" disabled>&#9679;</button><button data-b="5" disabled>&#9654;</button>
+  <span class="sp"></span><button data-b="3" disabled>&#9660;</button><span class="sp"></span>
+</div>
+
+<div class="row">
+  <button data-b="1" disabled>HOME</button>
+  <button id="shot" disabled>Screenshot</button>
+  <label><input type="checkbox" id="kbd" style="width:auto"> keyboard</label>
+</div>
+
+<div id="stats">--</div>
+
+<script src="decode.js"></script>
+<script>
+(() => {
+  'use strict';
+
+  const M = { FRAME: 0x01, STATUS: 0x03, BYE: 0x05, THERMAL: 0x06, BTN: 0x10, ACK: 0x11, TEXT: 0x12, KEYFRAME_REQ: 0x13, TEXTKEY: 0x15 };
+  const ACT = { UP: 0, DOWN: 1, TAP: 2 };
+  const TAP_MAX_MS = 250; // A press released sooner is sent as one TAP
+  const HOLD_REASSERT_MS = 400; // Inside the device's stuck-button watchdog
+  const RESYNC_MIN_MS = 2000; // Caps keyframe requests when every frame is rejected
+  const RESUME_KEY = 'pc5mirror.resume.';
+  const LAST_KEY = 'pc5mirror.lastcode';
+
+  const cv = document.getElementById('scr');
+  const ctx = cv.getContext('2d', { alpha: false });
+  let sink = MirrorDecode.canvasSink(ctx);
+  const $state = document.getElementById('state');
+  const $check = document.getElementById('check');
+  const $stats = document.getElementById('stats');
+
+  let ws = null, code = '', live = false, bye = null, lastResync = 0, resyncTimer = null;
+  let bytes = 0, frames = 0, lastTick = Date.now(), level = 0;
+
+  const setState = (s) => { $state.textContent = s; };
+  const sendBin = (u8) => { if (ws && ws.readyState === 1) ws.send(u8); };
+
+  // The relay's folding, so a token is stored under the code the relay knows it by
+  const normCode = (raw) => String(raw || '').toUpperCase().replace(/[^0-9A-Z]/g, '')
+    .replace(/O/g, '0').replace(/[IL]/g, '1').replace(/U/g, 'V');
+
+  // Storage can be blocked or throw on access. Without it a refreshed tab cannot rejoin
+  const loadResume = (c) => { try { return localStorage.getItem(RESUME_KEY + c); } catch (_) { return null; } };
+  const saveResume = (c, t) => { try { localStorage.setItem(RESUME_KEY + c, t); } catch (_) {} };
+  const dropResume = (c) => { try { localStorage.removeItem(RESUME_KEY + c); } catch (_) {} };
+  // Per tab, so only a refresh rejoins on its own; a new tab needs the code typed
+  const loadLast = () => { try { return normCode(sessionStorage.getItem(LAST_KEY)); } catch (_) { return ''; } };
+  const saveLast = (c) => { try { sessionStorage.setItem(LAST_KEY, c); } catch (_) {} };
+  const dropLast = () => { try { sessionStorage.removeItem(LAST_KEY); } catch (_) {} };
+
+  // Controls unlock only once the device has approved this viewer
+  function setEnabled(on) {
+    live = on;
+    document.querySelectorAll('[data-b], #shot').forEach((b) => { b.disabled = !on; });
+    if (!on) releaseAll();
+  }
+
+  // Deferred, not dropped: tiles after a rejected record stay stale until they change
+  function requestResync() {
+    const now = Date.now();
+    if (now - lastResync < RESYNC_MIN_MS) {
+      if (!resyncTimer) {
+        resyncTimer = setTimeout(() => { resyncTimer = null; requestResync(); },
+          RESYNC_MIN_MS - (now - lastResync));
+      }
+      return;
+    }
+    lastResync = now;
+    sendBin(new Uint8Array([M.KEYFRAME_REQ]));
+  }
+
+  function onBinary(buf) {
+    const u8 = new Uint8Array(buf);
+
+    if (u8[0] === M.STATUS && u8.length >= 2) {
+      setEnabled(u8[1] === 1);
+      setState(live ? 'live' : 'press SELECT on the device to allow this viewer');
+      return;
+    }
+    if (u8[0] === M.BYE) { bye = u8[1]; dropResume(code); setState('bye ' + bye); return; }
+
+    // The thermal page's raw frame, upscaled here exactly as the device draws it
+    if (u8[0] === M.THERMAL) {
+      const t = MirrorDecode.decodeThermal(buf);
+      if (!t) { requestResync(); return; }
+      if (!sink.thermal(t)) requestResync(); // No palette yet; a keyframe carries one
+      frames++;
+      sendBin(new Uint8Array([M.ACK, t.seq & 0xFF, t.seq >> 8]));
+      return;
+    }
+
+    const r = MirrorDecode.decodeFrame(buf, sink);
+    if (!r) {
+      // A rejected frame may have painted some tiles before failing; repaint all of them
+      if (u8[0] === M.FRAME) requestResync();
+      return;
+    }
+
+    level = r.level;
+
+    if (r.last) {
+      frames++;
+      sendBin(new Uint8Array([M.ACK, r.seq & 0xFF, r.seq >> 8]));
+    }
+  }
+
+  function connect(auto) {
+    // A second socket would be refused while the relay still holds this one as the viewer
+    if (ws && ws.readyState <= 1) return;
+
+    const c = normCode(document.getElementById('code').value);
+    if (!c) return;
+
+    saveLast(c);
+    const resume = loadResume(c);
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const sock = new WebSocket(`${proto}//${location.host}/v?code=${encodeURIComponent(c)}` +
+      (resume ? `&resume=${encodeURIComponent(resume)}` : ''));
+    let opened = false;
+
+    ws = sock;
+    code = c;
+    bye = null;
+    $check.textContent = '';
+    sock.binaryType = 'arraybuffer';
+
+    // A new session never sends THERMAL OFF, so an old sink repaints its stale thermal image
+    sink = MirrorDecode.canvasSink(ctx);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+
+    sock.onopen = () => { opened = true; setState('connected'); };
+
+    sock.onclose = (e) => {
+      if (ws !== sock) return;
+      clearTimeout(resyncTimer);
+      resyncTimer = null;
+      setEnabled(false);
+      $check.textContent = '';
+
+      // A refused upgrade hides its status: no device, slot taken, bad token and rate
+      // limit all look alike. The token is kept, or a transient refusal would lock us out.
+      // A refused auto-join is not tried again on the next load
+      if (!opened) {
+        if (auto) dropLast();
+        setState(resume ? 'refused (resume token kept)' : 'refused');
+        return;
+      }
+      if (e.reason === 'device_gone' || e.reason === 'timeout') dropResume(c);
+      setState((bye !== null ? `bye ${bye}, ` : '') + 'closed: ' + (e.reason || e.code));
+    };
+
+    sock.onmessage = (e) => {
+      if (ws !== sock) return;
+
+      if (typeof e.data === 'string') {
+        let m = {};
+        try { m = JSON.parse(e.data); } catch (_) { return; }
+
+        if (m.t === 'paired') {
+          // Until the device approves a viewer the relay issues a fresh token per attach
+          if (m.resume) saveResume(c, String(m.resume));
+          else dropResume(c);
+          $check.textContent = m.check ? String(m.check) : '';
+          setState('paired, waiting for the device');
+        } else if (m.t === 'bye') {
+          dropResume(c);
+          setState('bye: ' + m.reason);
+        }
+        return;
+      }
+
+      bytes += e.data.byteLength;
+      onBinary(e.data);
+    };
+  }
+
+  document.getElementById('go').addEventListener('click', () => connect(false));
+
+  // Only the browser knows how long a press lasted: a quick click is one TAP, and DOWN
+  // goes out only once a press outlives TAP_MAX_MS. Link delay then cannot turn a click
+  // into a hold
+  const pend = new Map(), holds = new Map();
+
+  function press(id) {
+    if (pend.has(id) || holds.has(id)) return;
+
+    pend.set(id, setTimeout(() => {
+      pend.delete(id);
+      sendBin(new Uint8Array([M.BTN, id, ACT.DOWN]));
+      // Re-assert inside the device's watchdog so a hold survives, and so a dropped link
+      // releases on its own instead of sticking the button down
+      holds.set(id, setInterval(() => sendBin(new Uint8Array([M.BTN, id, ACT.DOWN])), HOLD_REASSERT_MS));
+    }, TAP_MAX_MS));
+  }
+
+  // Idempotent: pointerup and lostpointercapture both land here for one release
+  function release(id) {
+    if (pend.has(id)) {
+      clearTimeout(pend.get(id));
+      pend.delete(id);
+      sendBin(new Uint8Array([M.BTN, id, ACT.TAP]));
+    } else if (holds.has(id)) {
+      clearInterval(holds.get(id));
+      holds.delete(id);
+      sendBin(new Uint8Array([M.BTN, id, ACT.UP]));
+    }
+  }
+
+  // Abandons a press not yet sent; one already held is released normally
+  function cancel(id) {
+    if (pend.has(id)) {
+      clearTimeout(pend.get(id));
+      pend.delete(id);
+    } else {
+      release(id);
+    }
+  }
+
+  function releaseAll() {
+    for (const id of [...pend.keys()]) cancel(id);
+    for (const id of [...holds.keys()]) release(id);
+  }
+
+  // Pointer events cover mouse, touch and pen with one code path
+  document.querySelectorAll('[data-b]').forEach((el) => {
+    const id = Number(el.dataset.b);
+
+    el.addEventListener('pointerdown', (e) => {
+      if (!live) return;
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      press(id);
+    });
+    el.addEventListener('pointerup', () => release(id));
+    el.addEventListener('pointercancel', () => cancel(id));
+    el.addEventListener('lostpointercapture', () => release(id));
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+  });
+
+  window.addEventListener('blur', releaseAll);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) releaseAll();
+    else if (live) sendBin(new Uint8Array([M.KEYFRAME_REQ]));
+  });
+
+  const NAV = { ArrowUp: 2, ArrowDown: 3, ArrowLeft: 4, ArrowRight: 5, Enter: 0, ' ': 0, Escape: 1, Backspace: 1 };
+
+  addEventListener('keydown', (e) => {
+    if (!live || e.target.tagName === 'INPUT') return;
+
+    if (document.getElementById('kbd').checked) {
+      if (e.key === 'Backspace') { e.preventDefault(); sendBin(new Uint8Array([M.TEXTKEY, 0])); return; }
+      if (e.key === 'Enter') { e.preventDefault(); sendBin(new Uint8Array([M.TEXTKEY, 1])); return; }
+      if (e.key === 'Escape') { e.preventDefault(); sendBin(new Uint8Array([M.TEXTKEY, 2])); return; }
+
+      if (e.key.length === 1) {
+        const c = e.key.charCodeAt(0);
+        if (c >= 0x20 && c <= 0x7E) {
+          e.preventDefault();
+          sendBin(new Uint8Array([M.TEXT, 1, c]));
+        }
+        return;
+      }
+      return;
+    }
+
+    const id = NAV[e.key];
+    if (id === undefined) return;
+    e.preventDefault(); // Before the repeat check, or a held arrow or Space scrolls the page
+    if (e.repeat) return; // The device makes its own auto-repeat
+    press(id);
+  });
+
+  // Release unconditionally, or a key pressed before focus moved would never end
+  addEventListener('keyup', (e) => {
+    const id = NAV[e.key];
+    if (id !== undefined) release(id);
+  });
+
+  document.getElementById('shot').addEventListener('click', () => {
+    sendBin(new Uint8Array([M.KEYFRAME_REQ]));
+    setTimeout(() => cv.toBlob((b) => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(b);
+      a.download = 'polycast5.png';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }, 'image/png'), 250);
+  });
+
+  setInterval(() => {
+    const now = Date.now(), dt = (now - lastTick) / 1000;
+    $stats.textContent = `${(bytes / 1024 / dt).toFixed(1)} KB/s   ${(frames / dt).toFixed(1)} fps   q${level}`;
+    bytes = 0; frames = 0; lastTick = now;
+  }, 1000);
+
+  // A refresh returns to the session: the tab's last code comes back and, with a token
+  // stored for it, is joined once. A refusal is left for the user to retry
+  const last = loadLast();
+  if (last) {
+    document.getElementById('code').value = last;
+    if (loadResume(last)) connect(true);
+  }
+})();
+</script>
+</body>
+</html>

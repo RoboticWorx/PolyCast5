@@ -1,4 +1,8 @@
+#include <stdio.h>
 #include <string.h>
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #include "lvgl.h" // Button matrix, label, LV_KEY_*, events, fonts
 
@@ -222,6 +226,62 @@ static void kb_nav(lcd_text_input_t *ti, uint32_t key)
     lv_obj_send_event(ti->kb, LV_EVENT_KEY, &key);
 }
 
+// Remote keyboard (Screen Mirror). Single producer (the mirror task), single consumer
+// (lcd_task, inside the tick), so a plain ring with a critical section is enough and no
+// LVGL call ever leaves the LCD task
+#define TI_REMOTE_Q_LEN 96
+
+// Control codes the queue carries inline alongside printable ASCII
+#define TI_REMOTE_BS  0x08 // Backspace
+#define TI_REMOTE_CR  0x0D // Enter, meaning submit
+#define TI_REMOTE_ESC 0x1B // Escape, meaning cancel
+
+static portMUX_TYPE s_remote_mux = portMUX_INITIALIZER_UNLOCKED;
+static char s_remote_q[TI_REMOTE_Q_LEN];
+static uint8_t s_remote_head = 0; // Next write
+static uint8_t s_remote_tail = 0; // Next read
+// Written by lcd_task, read by the mirror task. The pointed-to struct is always a
+// caller's static, so a stale pointer still refers to live storage
+static lcd_text_input_t *volatile s_active = NULL;
+
+static bool ti_remote_push(char c)
+{
+    bool pushed = false;
+
+    portENTER_CRITICAL(&s_remote_mux);
+    const uint8_t next = (uint8_t)((s_remote_head + 1) % TI_REMOTE_Q_LEN);
+    if (next != s_remote_tail) {
+        s_remote_q[s_remote_head] = c;
+        s_remote_head = next;
+        pushed = true;
+    }
+    portEXIT_CRITICAL(&s_remote_mux);
+
+    return pushed;
+}
+
+static bool ti_remote_pop(char *out)
+{
+    bool popped = false;
+
+    portENTER_CRITICAL(&s_remote_mux);
+    if (s_remote_tail != s_remote_head) {
+        *out = s_remote_q[s_remote_tail];
+        s_remote_tail = (uint8_t)((s_remote_tail + 1) % TI_REMOTE_Q_LEN);
+        popped = true;
+    }
+    portEXIT_CRITICAL(&s_remote_mux);
+
+    return popped;
+}
+
+static void ti_remote_flush(void)
+{
+    portENTER_CRITICAL(&s_remote_mux);
+    s_remote_tail = s_remote_head;
+    portEXIT_CRITICAL(&s_remote_mux);
+}
+
 /* ---- Public API ---- */
 
 void lcd_text_input_start(lcd_text_input_t *ti)
@@ -296,12 +356,37 @@ void lcd_text_input_start(lcd_text_input_t *ti)
     }
 
     ti->active = true;
+    s_active = ti;
+
+    ti_remote_flush(); // Drop anything typed before this screen opened
 }
 
 lcd_ti_status_t lcd_text_input_tick(lcd_text_input_t *ti, ui_btns_t *btns)
 {
     if (!ti->active) {
         return LCD_TI_PENDING;
+    }
+
+    // Remote keystrokes first, and the whole queue in one tick: the page dispatch only
+    // runs this every 200ms, so one character per tick would type at 5 chars a second
+    char rc;
+    while (ti_remote_pop(&rc)) {
+        if (rc == TI_REMOTE_BS) {
+            backspace(ti);
+        } else if (rc == TI_REMOTE_CR) {
+            // Same rule the on-grid OK key enforces
+            if (ti->len > 0 && (ti->allow_space_only || has_visible_char(ti->buf))) {
+                lcd_text_input_close(ti);
+                return LCD_TI_SUBMITTED;
+            }
+        } else if (rc == TI_REMOTE_ESC) {
+            if (!ti->lock_until_submit) {
+                lcd_text_input_close(ti);
+                return LCD_TI_CANCELLED;
+            }
+        } else {
+            insert_char(ti, rc);
+        }
     }
 
     if (btns->up_btn) {
@@ -353,6 +438,11 @@ lcd_ti_status_t lcd_text_input_tick(lcd_text_input_t *ti, ui_btns_t *btns)
 
 void lcd_text_input_close(lcd_text_input_t *ti)
 {
+    if (s_active == ti) {
+        s_active = NULL;
+        ti_remote_flush();
+    }
+
     if (ti->lbl_title) {
         lv_obj_delete(ti->lbl_title);
     }
@@ -379,4 +469,76 @@ void lcd_text_input_close(lcd_text_input_t *ti)
     ti->len = 0;
     ti->mode = 0;
     ti->active = false;
+}
+
+size_t lcd_text_input_remote_type(const char *ascii, size_t len)
+{
+    lcd_text_input_t *ti = s_active;
+
+    // Password and API-key screens are never remotely typeable
+    if (ascii == NULL || ti == NULL || !ti->active || ti->sensitive) {
+        return 0;
+    }
+
+    size_t accepted = 0;
+
+    for (size_t i = 0; i < len; i++) {
+        const char c = ascii[i];
+
+        // Printable ASCII only; the grid keyboard cannot produce anything else either
+        if (c < 0x20 || c > 0x7E) {
+            continue;
+        }
+
+        if (!ti_remote_push(c)) {
+            break; // Queue full; the rest is dropped rather than silently reordered
+        }
+
+        accepted++;
+    }
+
+    return accepted;
+}
+
+void lcd_text_input_remote_key(lcd_ti_remote_key_t key)
+{
+    lcd_text_input_t *ti = s_active;
+
+    if (ti == NULL || !ti->active || ti->sensitive) {
+        return;
+    }
+
+    switch (key) {
+        case LCD_TI_REMOTE_BACKSPACE:
+            (void)ti_remote_push(TI_REMOTE_BS);
+            break;
+        case LCD_TI_REMOTE_SUBMIT:
+            (void)ti_remote_push(TI_REMOTE_CR);
+            break;
+        case LCD_TI_REMOTE_CANCEL:
+            (void)ti_remote_push(TI_REMOTE_ESC);
+            break;
+        default:
+            break;
+    }
+}
+
+bool lcd_text_input_remote_state(bool *out_sensitive, char *out_buf, size_t out_size)
+{
+    lcd_text_input_t *ti = s_active;
+    const bool open = (ti != NULL) && ti->active;
+
+    if (out_sensitive) {
+        *out_sensitive = open && ti->sensitive;
+    }
+
+    if (out_buf && out_size) {
+        if (open && !ti->sensitive) {
+            snprintf(out_buf, out_size, "%s", ti->buf);
+        } else {
+            out_buf[0] = '\0';
+        }
+    }
+
+    return open;
 }

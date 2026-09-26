@@ -4,9 +4,12 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include <stdio.h>
+
 #include "esp_log.h"
 
 #include "lcd_utils.h"
+#include "lcd_mirror_page.h"
 #include "lcd_bluetooth.h"
 #include "lcd_hotkey.h"
 #include "lcd_gpio.h"
@@ -270,6 +273,52 @@ static void lcd_task(void *pvParameters)
             }
             
             dont_sleep_on_this_page = false; // Reset flag
+
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+            // Blank the stream on credential screens, and keep the device awake for a
+            // viewer who is watching rather than pressing, or waiting on approval. The
+            // session's own one-hour cap and the low-battery stop are what bound the drain
+            lcd_mirror_page_sync(ui_menu.page);
+
+            // A viewer asked for sleep. Raising the power press here routes it through
+            // the ordinary handler, which tears the session down on the way out. The home
+            // page ignores the press and sleeps on go_to_sleep, which the real button also sets
+            if (mirror_take_sleep_request()) {
+                ui_btns.pwr_btn = 1;
+                go_to_sleep = true;
+            }
+
+            const bool mirror_pending = (mirror_state == MIRROR_PENDING);
+
+            if (mirror_has_viewer() || mirror_pending) {
+                dont_sleep_on_this_page = true;
+            }
+
+            // Update the indicator only on a change: the icon is mirrored too, and
+            // rewriting it every pass would keep its tile permanently dirty
+            static int mirror_icon_shown = 0; // 0 hidden, 1 running, 2 viewer awaiting approval
+            const int mirror_icon_want = !mirror_is_active() ? 0 : (mirror_pending ? 2 : 1);
+
+            if (mirror_icon_want != mirror_icon_shown && ui_menu.lbl_mirror_icon) {
+                mirror_icon_shown = mirror_icon_want;
+
+                if (mirror_icon_want == 0) {
+                    lv_obj_add_flag(ui_menu.lbl_mirror_icon, LV_OBJ_FLAG_HIDDEN);
+                } else {
+                    lv_label_set_text(ui_menu.lbl_mirror_icon,
+                            (mirror_icon_want == 2) ? LV_SYMBOL_BELL : LV_SYMBOL_UPLOAD);
+                    lv_obj_remove_flag(ui_menu.lbl_mirror_icon, LV_OBJ_FLAG_HIDDEN);
+                }
+
+                // Approval happens on the mirror page, and the user may be anywhere
+                if (mirror_icon_want == 2) {
+                    xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics
+                    gpio_utils_spin_haptic(300);
+                    xSemaphoreGive(xHapticsMutex); // Release haptics
+                }
+            }
+#endif
+
             // All LCD pages
             switch (ui_menu.page) {
                 case BOOT_PAGE:
@@ -627,6 +676,18 @@ static void lcd_task(void *pvParameters)
                     lcd_gpio_ir_exp_page(&ui_btns, &ui_menu, &gpio_menu);
                     dont_sleep_on_this_page = true;
                     break;
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+                case WIFI_SCREEN_MIRROR_PAGE:
+                    lcd_wifi_screen_mirror_page(&ui_btns, &ui_menu, &wifi_menu);
+
+                    // Keep the pairing code up while a session runs. The inactivity timer
+                    // restarts when it ends, so the reason it ended stays readable
+                    if (mirror_is_active()) {
+                        dont_sleep_on_this_page = true;
+                        sleep_timer_last = xTaskGetTickCount();
+                    }
+                    break;
+#endif
                 default:
                     break;
             }
@@ -640,8 +701,14 @@ static void lcd_task(void *pvParameters)
 #else
         TickType_t home_sleep_timer_interval = pdMS_TO_TICKS((uint32_t)home_sleep_after_s * 1000U); // home_sleep_after_s is extern
         // If home and home_sleep_timer_interval has passed without intervention
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+        const bool mirror_holds_awake = mirror_has_viewer() || (mirror_state == MIRROR_PENDING);
+#else
+        const bool mirror_holds_awake = false;
+#endif
         if (((ui_menu.page == HOME_PAGE) || (ui_menu.page == BOOT_PAGE)) &&
-                ((xTaskGetTickCount() - sleep_timer_last >= home_sleep_timer_interval) || go_to_sleep)) {
+                (((xTaskGetTickCount() - sleep_timer_last >= home_sleep_timer_interval)
+                        && !mirror_holds_awake) || go_to_sleep)) {
             lcd_device_sleep();
 
             sleep_timer_last = xTaskGetTickCount();
@@ -662,6 +729,14 @@ static void lcd_task(void *pvParameters)
         }
         if (xAdcBatReadingQueue && xQueueReceive(xAdcBatReadingQueue, &battery_percentage, 0) == pdTRUE) {
             lcd_update_battery(&ui_menu, battery_percentage, is_charging);
+
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+            // Streaming is expensive; don't let a forgotten session flatten the pack
+            if (!is_charging && battery_percentage < 15 && mirror_is_active()) {
+                snprintf(mirror_error, sizeof(mirror_error), "Battery low"); // Ends in ERROR, not a bare "Stopped"
+                mirror_stop(MIRROR_BYE_LOW_BATT);
+            }
+#endif
         }
 
         // Check for connectivity -> update icon
@@ -683,6 +758,11 @@ static void lcd_task(void *pvParameters)
             }
         }
 
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+        // A credential page entered this pass has not flushed yet, so blanking here beats it
+        lcd_mirror_page_raise(ui_menu.page);
+#endif
+
         lv_timer_handler();
         vTaskDelay(pdMS_TO_TICKS(10));
     }
@@ -690,6 +770,10 @@ static void lcd_task(void *pvParameters)
 
 void lcd_task_create(void)
 {
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+    lcd_mirror_page_init(); // Hand the mirror its text sink before a session can start
+#endif
+
     if (xTaskCreatePinnedToCore(lcd_task, "lcd_task", 1024 * 8, NULL, POLYCAST5_PRIORITY_HIGH, NULL, 0) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start lcd_task");
     }

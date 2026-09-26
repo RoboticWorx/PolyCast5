@@ -7,6 +7,8 @@
 #include "esp_err.h"
 #include "driver/ledc.h"
 
+#include "polycast5_macros.h"
+
 #define LCD_BL_STATE_ON 0 // Active low
 #define LCD_BL_STATE_OFF 1 // Active low
 
@@ -14,6 +16,15 @@
 #define LCD_LEDC_FREQ_HZ 5000 // 5kHz PWM
 #define LCD_LEDC_CHANNEL LEDC_CHANNEL_0
 #define LCD_LEDC_TIMER LEDC_TIMER_0
+
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+// Remote (Screen Mirror) button injection, in ms. POLL_MS in gpio_task.c is 20
+#define GPIO_REMOTE_MIN_HOLD_MS 70 // >= 3 polls on the 10ms tick: guarantees one short press
+#define GPIO_REMOTE_TAP_HOLD_MS 80 // A single click from the web, and every queued one
+#define GPIO_REMOTE_HOLD_MAX_MS 1200 // Watchdog; the browser re-asserts every 400ms
+#define GPIO_REMOTE_GAP_MS 40 // Released between two presses of one pin: 2 polls
+#define GPIO_REMOTE_QUEUE_MAX 8 // Presses queued across all pins, at most 8; more are dropped
+#endif
 
 #define HAPTIC_MAX_MS 50
 #define HAPTIC_MIN_MS 10
@@ -79,6 +90,47 @@ int gpio_utils_read_input(uint8_t pin);
  * @return ESP_OK, or the I2C error (inputs is still written with the released default)
  */
 esp_err_t gpio_utils_read_inputs(uint8_t *inputs);
+
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+/**
+ * @brief Press or release a user button from a remote (Screen Mirror) session
+ *
+ *        The pin is merged into every gpio_utils_read_inputs() result, so gpio_task derives
+ *        the same short press, long press, auto-repeat, held-state globals and haptics as
+ *        a real press. A DOWN while that pin's press has had no UP only extends it. Any other
+ *        DOWN is queued as gpio_utils_remote_button_tap() is, so a DOWN after an UP never
+ *        merges into that press.
+ *
+ * @param [in] pin     A TCA9535_USER_BUTTON_*_PIN. POWER and the charge indicator are
+ *                     rejected: sleep polls POWER through this same overlay
+ * @param [in] down    true = press (drive the input low), false = release
+ * @param [in] hold_ms On a press, the watchdog, which a re-assert only ever extends
+ *                     (0 = GPIO_REMOTE_HOLD_MAX_MS; a queued press always gets that).
+ *                     On a release, the minimum hold owed from the press start, so a
+ *                     click shorter than the 20ms poll is not lost (0 = GPIO_REMOTE_MIN_HOLD_MS)
+ */
+void gpio_utils_remote_button_set(uint8_t pin, bool down, uint32_t hold_ms);
+
+/**
+ * @brief One complete click of a user button from a remote (Screen Mirror) session
+ *
+ *        Queued, up to GPIO_REMOTE_QUEUE_MAX across all pins, while that pin is held or in
+ *        its GPIO_REMOTE_GAP_MS release, or an earlier press is queued, or another pin's click
+ *        is still held or its release not yet polled. Never merged, so bunched clicks reach
+ *        gpio_task as separate presses, in arrival order, one release per poll. Another pin's
+ *        open hold (no UP yet) never delays it.
+ *
+ * @param [in] pin     As gpio_utils_remote_button_set()
+ * @param [in] hold_ms How long the click holds the pin (0 = GPIO_REMOTE_TAP_HOLD_MS).
+ *                     A queued click always holds GPIO_REMOTE_TAP_HOLD_MS
+ */
+void gpio_utils_remote_button_tap(uint8_t pin, uint32_t hold_ms);
+
+/**
+ * @brief Release every remotely held button and drop every queued one (session ended or link lost)
+ */
+void gpio_utils_remote_buttons_clear(void);
+#endif // POLYCAST5_EN_SCREEN_MIRROR
 
 /**
  * @brief Drive one pin on Port 1 (0…7)

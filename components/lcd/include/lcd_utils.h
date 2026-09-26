@@ -161,6 +161,7 @@ enum {
     WIFI_MANAGE_NETWORKS_PAGE,
     WIFI_NETWORK_INFO_PAGE,
     GPIO_IR_EXPANSION_PAGE,
+    WIFI_SCREEN_MIRROR_PAGE,
 };
 
 // Security features that show a one-time authorized/educational-use disclaimer before their first use
@@ -201,6 +202,7 @@ typedef struct ui_menu_t {
     lv_obj_t *lbl_hotkey_icon;
     lv_obj_t *lbl_wifi_icon;
     lv_obj_t *lbl_bluetooth_icon;
+    lv_obj_t *lbl_mirror_icon; // Screen Mirror is running, so the screen is leaving the device
 } ui_menu_t;
 
 typedef struct ui_btns_t {

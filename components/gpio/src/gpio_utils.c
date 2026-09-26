@@ -23,6 +23,7 @@
 
 #include "gpio_utils.h"
 #include "gpio_task.h"
+#include "gpio_remote.h"
 
 #define TAG "GPIO_UTILS"
 
@@ -319,6 +320,40 @@ esp_err_t gpio_utils_init(void)
     return ret;
 }
 
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+// Buttons a remote (Screen Mirror) session is pressing, merged into every input read so
+// gpio_task's state machine and haptics cannot tell them from physical presses.
+// Written by the mirror task, advanced by every input read, so all of it is under the lock.
+// Internal RAM: touched with interrupts off on every poll while a session drives a button
+static portMUX_TYPE s_remote_mux = portMUX_INITIALIZER_UNLOCKED;
+static gpio_remote_t s_remote = {
+    .queue_max = GPIO_REMOTE_QUEUE_MAX,
+    .click_ms = GPIO_REMOTE_TAP_HOLD_MS,
+    .hold_max_ms = GPIO_REMOTE_HOLD_MAX_MS,
+    .gap_ms = GPIO_REMOTE_GAP_MS,
+};
+
+// Read under s_remote_mux, so the scheduler never sees time run backwards. Wraps with the
+// tick count; the scheduler only ever compares elapsed times
+static uint32_t remote_now_ms(void)
+{
+    return (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
+}
+
+static bool remote_pin_ok(uint8_t pin)
+{
+    if (pin > 7) {
+        ESP_LOGE(TAG, "Invalid remote pin %d", pin);
+        return false;
+    }
+
+    // POWER and the charge indicator are never remotely drivable. POWER especially:
+    // lcd_device_sleep() spins on that pin through this same overlay, so a held remote
+    // press would stall it until the expiry, and sleeping ends the session anyway
+    return (pin != TCA9535_USER_BUTTON_POWER_PIN && pin != TCA9535_CHG_IND_PIN);
+}
+#endif
+
 // One register read answers every input: they are all port-0 bits
 // Preferred over gpio_utils_read_input() per pin, which takes xI2CBusMutex once per pin
 esp_err_t gpio_utils_read_inputs(uint8_t *inputs)
@@ -337,9 +372,55 @@ esp_err_t gpio_utils_read_inputs(uint8_t *inputs)
     }
 
     // 0xFF, never the raw byte, on failure
-    *inputs = (err == ESP_OK) ? raw : 0xFF;
+    uint8_t merged = (err == ESP_OK) ? raw : 0xFF;
+
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+    // Overlay remotely pressed buttons; one load when no session is driving any
+    if (s_remote.active != 0) {
+        portENTER_CRITICAL(&s_remote_mux);
+        merged = gpio_remote_apply(&s_remote, merged, remote_now_ms());
+        portEXIT_CRITICAL(&s_remote_mux);
+    }
+#endif
+
+    *inputs = merged;
     return err;
 }
+
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+void gpio_utils_remote_button_set(uint8_t pin, bool down, uint32_t hold_ms)
+{
+    if (!remote_pin_ok(pin)) {
+        return;
+    }
+
+    portENTER_CRITICAL(&s_remote_mux);
+    if (down) {
+        gpio_remote_down(&s_remote, pin, hold_ms ? hold_ms : GPIO_REMOTE_HOLD_MAX_MS, remote_now_ms());
+    } else {
+        gpio_remote_up(&s_remote, pin, hold_ms ? hold_ms : GPIO_REMOTE_MIN_HOLD_MS, remote_now_ms());
+    }
+    portEXIT_CRITICAL(&s_remote_mux);
+}
+
+void gpio_utils_remote_button_tap(uint8_t pin, uint32_t hold_ms)
+{
+    if (!remote_pin_ok(pin)) {
+        return;
+    }
+
+    portENTER_CRITICAL(&s_remote_mux);
+    gpio_remote_tap(&s_remote, pin, hold_ms ? hold_ms : GPIO_REMOTE_TAP_HOLD_MS, remote_now_ms());
+    portEXIT_CRITICAL(&s_remote_mux);
+}
+
+void gpio_utils_remote_buttons_clear(void)
+{
+    portENTER_CRITICAL(&s_remote_mux);
+    gpio_remote_clear(&s_remote);
+    portEXIT_CRITICAL(&s_remote_mux);
+}
+#endif // POLYCAST5_EN_SCREEN_MIRROR
 
 int gpio_utils_read_input(uint8_t pin)
 {

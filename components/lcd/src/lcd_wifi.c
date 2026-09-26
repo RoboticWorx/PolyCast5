@@ -53,7 +53,17 @@
 
 #define MAX_PASSWORD_LEN 32
 
-#define WIFI_MENU_START_SIZE 7 // First WIFI_MENU_START_SIZE default options
+// Built-in entries before the user's PolyPlugs. Screen Mirror is only offered when the
+// feature is compiled in: its page handler is behind the same macro, so an entry without
+// one would select a page nothing draws and nothing can leave
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+#define WIFI_MENU_START_SIZE 8
+#else
+#define WIFI_MENU_START_SIZE 7
+#endif
+
+_Static_assert(WIFI_MENU_START_SIZE <= WIFI_MENU_START_SIZE_MAX,
+        "Raise WIFI_MENU_START_SIZE_MAX in lcd_wifi.h");
 
 #define MQTT_READY_TXT "0 = OFF     1 = ON\n   255 = UPDATE" // 'UPDATE' refers to checking and performing an OTA firmware update if available
 #define MQTT_SENDING_TXT "Sending via\nMQTT broker..." 
@@ -73,7 +83,12 @@ extern esp_ip4_addr_t sta_gw;
 extern volatile bool gpio_select_btn_held;
 
 wifi_menu_t wifi_menu = {
-    .options = {"Connect to Network", "Monitor Packets", "AI Packet Analysis", "Deauthenticator", "ARP Spoofer", "Manage Networks", "Sync With PolyPlug"},
+    .options = {"Connect to Network", "Monitor Packets", "AI Packet Analysis", "Deauthenticator",
+            "ARP Spoofer", "Manage Networks", "Sync With PolyPlug",
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+            "Screen Mirror",
+#endif
+            },
     .size = WIFI_MENU_START_SIZE,
     .index = 0,
     .cont = NULL,
@@ -194,6 +209,11 @@ void lcd_wifi_setup_page(wifi_menu_t *menu)
     
     // Hide for now
     lv_obj_add_flag(menu->main_list, LV_OBJ_FLAG_HIDDEN);
+}
+
+bool lcd_wifi_plugs_full(const wifi_menu_t *menu)
+{
+    return (menu->size - WIFI_MENU_START_SIZE) >= WIFI_MAX_USER_PLUGS;
 }
 
 void lcd_wifi_update_menu(wifi_menu_t *menu)
@@ -2050,6 +2070,7 @@ void lcd_wifi_get_password(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t 
         ti.prefill = NULL;
         ti.lock_until_submit = false;
         ti.allow_space_only = true; // a Wi-Fi password may legitimately contain spaces
+        ti.sensitive = true; // Never mirrored, never remotely typeable
         ti.arrow_top = ui_menu->arrow_top;
         ti.arrow_bot = ui_menu->arrow_bot;
         ti.arrow_left = ui_menu->arrow_left;
@@ -3419,8 +3440,8 @@ esp_err_t lcd_wifi_menu_nvs_load(wifi_menu_t *menu)
             break;
         }
 
-        // Update menu struct
-        if (menu->size >= MAX_WIFI_OPTIONS) {
+        // Update menu struct. Same cap as the topic-key load, which resets size after this
+        if (lcd_wifi_plugs_full(menu)) {
             free(buf);
             break;
         }
@@ -3509,9 +3530,10 @@ esp_err_t lcd_wifi_topic_keys_nvs_load(wifi_menu_t *menu)
         return err;
     }
 
-    // Clamp count so user entries can't overrun the fixed arrays
-    if (count > MAX_WIFI_OPTIONS - WIFI_MENU_START_SIZE) {
-        count = MAX_WIFI_OPTIONS - WIFI_MENU_START_SIZE;
+    // Clamp to the same cap as the menu load: size is reset from this count below, so a
+    // mismatch would expose options that were never loaded or orphan ones that were
+    if (count > WIFI_MAX_USER_PLUGS) {
+        count = WIFI_MAX_USER_PLUGS;
     }
 
     // Zero out everything first

@@ -77,6 +77,7 @@ PolyCast5 is task-based: `main` brings up the hardware, then spawns one FreeRTOS
   * `gpio` - Runs `gpio_task`: polls the TCA9535 I2C GPIO expander for button events, drives the haptic motor and RGB LED, reads the battery ADC, and samples the LIS2DH12 accelerometer and MMC5603 magnetometer.
   * `infrared` - Runs `infrared_task`: captures and replays raw IR waveforms through the RMT peripheral (38 kHz carrier) and saves learned remotes to NVS. (e.g. TVs, air conditioners, etc.)
   * `lcd` - Runs `lcd_task`: drives the ST7789 display over SPI and renders every LVGL screen - menus, homescreen animations, games, tools, and settings.
+  * `mirror` - Runs `mirror_task`: captures the screen into a PSRAM shadow buffer from the LVGL flush, encodes only the tiles that changed, and streams them to a relay over a WebSocket so the device can be watched and driven from a browser anywhere.
   * `lora` - Runs `lora_task`: drives the SX1262 transceiver (via `sx126x`) for both the encrypted PolyPlug outlet protocol and [Meshtastic](https://meshtastic.org/) mesh messaging.
   * `lvgl` - The [LVGL](https://lvgl.io/) graphics library used to build the on-screen UI.
   * `sx126x` - Semtech's SX126x driver/HAL for the LoRa transceiver, used by `lora`.

@@ -1,0 +1,14 @@
+{
+  "name": "polycast5-mirror-relay",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Screen Mirror pairing relay for PolyCast5",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "local": "node dev-relay.js"
+  },
+  "devDependencies": {
+    "wrangler": "^4.36.0"
+  }
+}

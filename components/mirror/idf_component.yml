@@ -1,0 +1,8 @@
+## IDF Component Manager Manifest File
+dependencies:
+  ## Required IDF version
+  idf:
+    version: '>=6.0.0'
+  # WebSocket client for the outbound relay link. The device is always the client:
+  # the firmware has no AP+STA mode, so it cannot serve pages without dropping STA
+  espressif/esp_websocket_client: '^1.5.0'

@@ -5,7 +5,6 @@
   "idf.openOcdConfigs": [
     "board/esp32c5-builtin.cfg"
   ],
-  "idf.portWin": "COM3",
   "idf.toolsPathWin": "c:\\Espressif",
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32c5"
@@ -31,5 +30,6 @@
   "github.copilot.chat.commitMessageGeneration.instructions": [
     { "text": "Never add Co-authored-by lines to the commit message." }
   ],
-  "git.addAICoAuthor": "off"
+  "git.addAICoAuthor": "off",
+  "idf.port": "COM3"
 }

@@ -1,0 +1,27 @@
+name = "polycast5-mirror"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+# mirror.polycast5.com must exist as a DNS record in the same Cloudflare zone.
+# The Shopify storefront cannot host this: it serves pages only, not WebSockets.
+# routes = [{ pattern = "mirror.polycast5.com", custom_domain = true }]
+
+[[durable_objects.bindings]]
+name = "SESSION"
+class_name = "MirrorSession"
+
+# SQLite-backed: the only backend the Workers Free plan offers, and a class's backend
+# cannot be changed once deployed
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MirrorSession"]
+
+# Pairing attempts on /v per client IP (IPv6 per /64). Needs Wrangler 4.36+; period may
+# only be 10 or 60. namespace_id is any integer not used by another limiter in the account
+[[ratelimits]]
+name = "VIEW_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 10
+  period = 60

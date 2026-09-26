@@ -5,7 +5,11 @@
 
 #include "esp_err.h"
 
-#define MAX_WIFI_OPTIONS 22 // 7 built-in entries + 15 user PolyPlugs (see WIFI_MENU_START_SIZE)
+// The array size is fixed across builds so every TU agrees on wifi_menu_t, and the plug cap
+// is fixed so NVS written by one build loads whole in another
+#define WIFI_MAX_USER_PLUGS 15
+#define WIFI_MENU_START_SIZE_MAX 8 // Most built-in entries any build has (see WIFI_MENU_START_SIZE)
+#define MAX_WIFI_OPTIONS (WIFI_MENU_START_SIZE_MAX + WIFI_MAX_USER_PLUGS)
 #define MAX_WIFI_SUBOPTIONS 40 // WIFI_MAX_NETWORKS
 #define TOPIC_KEY_LEN 16
 
@@ -50,6 +54,15 @@ typedef struct {
 } wifi_menu_t;
 
 extern wifi_menu_t wifi_menu; 
+
+/**
+ * @brief Whether the menu already holds WIFI_MAX_USER_PLUGS user PolyPlugs
+ *
+ * @param [in] wifi_menu Wi-Fi menu structure
+ *
+ * @returns true if no more plugs can be added
+ */
+bool lcd_wifi_plugs_full(const wifi_menu_t *wifi_menu);
 
 /**
  * @brief Creates the central Wi-Fi page then hides it for quick access

@@ -50,6 +50,15 @@
 #include "lora_meshtastic_portal.h" // lora_meshtastic_portal_enabled_load_nvs
 #include "lora_meshtastic.h"        // g_meshtastic_mode, lora_meshtastic_listen_stop
 #include "ir_exp_task.h"            // ir_exp_task_park
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+#include "mirror.h"
+#include "mirror_proto.h" // MIRROR_BYE_*
+#endif
+
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+_Static_assert(MIRROR_SCR_W == HOR_RES && MIRROR_SCR_H == VER_RES,
+        "Screen Mirror geometry must track the panel");
+#endif
 
 #define DRAW_LINES 20
 #define FLUSH_CHUNK 2
@@ -117,6 +126,16 @@ typedef struct {
 
 static void st7789_flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_map)
 {
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+    // Screen Mirror taps here because every pixel the device draws reaches the panel
+    // through this one callback. Snapshotting before the bus lock keeps the copy out of
+    // xSPIBusMutex, which the SX126x shares. px_map stays valid for the whole callback:
+    // LV_USE_OS is LV_OS_NONE, so LVGL cannot reuse the draw buffer until this returns
+    if (mirror_is_active()) {
+        mirror_capture(area->x1, area->y1, area->x2, area->y2, (const uint16_t *)px_map);
+    }
+#endif
+
     xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
     
     uint16_t *color_ptr = (uint16_t *)px_map; // const const
@@ -211,6 +230,14 @@ static void lcd_backlight_set(bool on)
 
 void lcd_device_sleep(void)
 {
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+    // End the mirror before anything else. Sleep drops Wi-Fi, so the session is over
+    // regardless, and the spin loop below polls the POWER pin through the same overlay a
+    // remote press writes to: a button still held there would stall it until the watchdog
+    mirror_stop(MIRROR_BYE_SLEEP);
+    gpio_utils_remote_buttons_clear();
+#endif
+
     // Remember whether anything was running before we stop it
     bool anim_was_running = lcd_anim_is_running();
 
@@ -341,6 +368,9 @@ void lcd_device_sleep(void)
     
     go_to_sleep = false; // Clear sleep flag
     lcd_clear_pending_inputs = true; // Clear if action button pressed to wake/reset pwr_btn
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+    (void)mirror_take_sleep_request(); // A request that raced the sleep must not re-sleep on wake
+#endif
     
     // Require pin re-entry if sleeping from home page
     settings_menu.pin_menu.prompt_pin = true;
@@ -876,6 +906,17 @@ void lcd_init_selection_labels(ui_menu_t *ui_menu)
     ui_menu->lbl_wifi_icon = lv_label_create(ACTIVE_SCR); // Wi-Fi connected
     lcd_format_label(ui_menu->lbl_wifi_icon, LV_SYMBOL_WIFI, user_secondary_color,
             &lv_font_montserrat_18, LV_ALIGN_TOP_LEFT, 3, 0);
+
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+    // Screen Mirror indicator. Sits one row below the back arrow, clear of the stacked
+    // connectivity icons (which reach y = 60), rather than joining their layout cascade.
+    // The user must never be broadcasting their screen without something on every page
+    // saying so
+    ui_menu->lbl_mirror_icon = lv_label_create(ACTIVE_SCR);
+    lcd_format_label(ui_menu->lbl_mirror_icon, LV_SYMBOL_UPLOAD, user_secondary_color,
+            &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 20);
+    lv_obj_add_flag(ui_menu->lbl_mirror_icon, LV_OBJ_FLAG_HIDDEN);
+#endif
     
     // Hide all for now
     lv_obj_add_flag(ui_menu->btn_mid, LV_OBJ_FLAG_HIDDEN);
@@ -3292,6 +3333,26 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
                 // Show Wi-Fi menu
                 lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
             }
+#ifdef POLYCAST5_EN_SCREEN_MIRROR
+        } else if (ui_btns->select_btn == 1 && wifi_menu->index == 7) { // Screen Mirror
+            // Hide Wi-Fi menu
+            lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+            // Delete ping labels
+            lv_obj_delete(gateway_ping_lbl);
+            lv_obj_delete(dns_ping_lbl);
+
+            // Reset statics
+            do_once = false;
+            gateway_ping_lbl = dns_ping_lbl = NULL;
+
+            // SELECT on the mirror page stops the session, so don't let the press that
+            // opened it, or its auto-repeat, land there
+            lcd_clear_pending_inputs = true;
+
+            // Switch pages
+            ui_menu->page = WIFI_SCREEN_MIRROR_PAGE;
+#endif
         } else if (ui_btns->select_btn == 1 && wifi_menu->index == 5) { // Manage saved networks
             // Hide Wi-Fi menu
             lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -3311,7 +3372,7 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
             lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
 
             // Abort if we've reached the maximum number of plugs
-            if (wifi_menu->size >= MAX_WIFI_OPTIONS) {
+            if (lcd_wifi_plugs_full(wifi_menu)) {
                 lv_obj_t *lbl_full = lv_label_create(ACTIVE_SCR);
                 lcd_format_label(lbl_full, "Max plugs added!", user_secondary_color,
                         &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);

@@ -23,6 +23,8 @@ typedef struct {
     bool        lock_until_submit;/**< If true, BACK and POWER are disabled (only OK exits) */
     bool        allow_space_only; /**< false (names): value must have a non-space char; true
                                        (passwords): only emptiness is rejected. Default false. */
+    bool        sensitive;        /**< Wi-Fi passwords and API keys: the Screen Mirror blanks
+                                       the preview and refuses remote typing. Default false. */
     lv_obj_t   *arrow_top;        /**< Optional global nav arrows, hidden while the keyboard is up */
     lv_obj_t   *arrow_bot;
     lv_obj_t   *arrow_left;
@@ -57,5 +59,36 @@ lcd_ti_status_t lcd_text_input_tick(lcd_text_input_t *ti, ui_btns_t *btns);
  *        the entry for its own reasons.
  */
 void lcd_text_input_close(lcd_text_input_t *ti);
+
+typedef enum {
+    LCD_TI_REMOTE_BACKSPACE = 0,
+    LCD_TI_REMOTE_SUBMIT,
+    LCD_TI_REMOTE_CANCEL,
+} lcd_ti_remote_key_t;
+
+/**
+ * @brief Queue printable ASCII typed on a remote (Screen Mirror) keyboard
+ *
+ *        Dropped when no entry screen is open or the open one is `sensitive`. Applied on
+ *        the LCD task by the next lcd_text_input_tick(), so buffer bounds and the
+ *        lock_until_submit guard still hold and no LVGL call leaves that task.
+ *
+ * @return Characters accepted, which may be fewer than `len` if the queue filled
+ */
+size_t lcd_text_input_remote_type(const char *ascii, size_t len);
+
+/**
+ * @brief Queue a backspace, submit or cancel from a remote keyboard
+ */
+void lcd_text_input_remote_key(lcd_ti_remote_key_t key);
+
+/**
+ * @brief Whether an entry screen is open, so the mirror can raise the web keyboard
+ *
+ * @param [out] out_sensitive Set when the open screen refuses remote input; may be NULL
+ * @param [out] out_buf       Copy of the text so far, blanked when sensitive; may be NULL
+ * @param [in]  out_size      sizeof(out_buf)
+ */
+bool lcd_text_input_remote_state(bool *out_sensitive, char *out_buf, size_t out_size);
 
 #endif /* LCD_TEXT_INPUT_H */
