@@ -474,8 +474,11 @@ static void gpio_task(void *arg)
             xSemaphoreGive(xLEDCMutex); // Release LEDC
         }
         
+        // Backstop for a lost haptic OFF write
+        gpio_utils_haptic_watchdog();
+
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
-        
+
         //gpio_utils_cycle_rgb(); // Test RGB LED
     }
 }

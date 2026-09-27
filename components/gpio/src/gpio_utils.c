@@ -85,9 +85,18 @@ void gpio_utils_init_nvs(void)
 #endif
 }
 
+// Tick the current buzz should end at, or 0 when none is in flight
+static volatile TickType_t s_haptic_deadline_tick = 0;
+
 static void haptic_off_cb(TimerHandle_t xTimer)
 {
-    gpio_utils_write_output(TCA9535_HAPTIC_PIN, 0);
+    // Runs on the timer daemon, which blocks on xI2CBusMutex
+
+    // On failure leave the deadline set and let gpio_task's watchdog retry, so a
+    // stuck motor cannot depend on this one write succeeding
+    if (gpio_utils_write_output(TCA9535_HAPTIC_PIN, 0) == ESP_OK) {
+        s_haptic_deadline_tick = 0;
+    }
 }
 
 // Called every RGB_BLINK_PERIOD_MS to toggle the LED
@@ -174,7 +183,8 @@ static void init_ledc_pwm(void)
         .channel = LCD_LEDC_CHANNEL,
         .intr_type = LEDC_INTR_DISABLE, // No interrupts needed
         .timer_sel = LCD_LEDC_TIMER,
-        .duty = 100, // Start with 100% duty (ON)
+        // Full scale (brightness * ((1 << res) - 1)) / 100
+        .duty = (1 << LCD_LEDC_RESOLUTION) - 1,
         .hpoint = 0,
         .sleep_mode = LEDC_SLEEP_MODE_NO_ALIVE_NO_PD,
         .flags.output_invert = 1 // P-CH inversion
@@ -241,7 +251,7 @@ esp_err_t gpio_utils_init(void)
     gpio_config(&io_conf_out);
     
     // Default states
-    gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_ON); // LCD BL high
+    gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_ON); // Drives LOW: Q4 is a P-FET on 3V0
 
     // Port1 already holds the rest state from the preload above - haptic and all
     // three LEDs off, TSOP off, 3V3_EN asserted, both resets released - so no
@@ -618,6 +628,9 @@ void gpio_utils_spin_haptic(uint32_t ms)
     // Stop first so a pending expiry from a previous buzz can't fire OFF around the ON write
     xTimerStop(haptic_timer, portMAX_DELAY);
 
+    // Set before the ON write so the watchdog can never see the motor running without a deadline to judge it against
+    s_haptic_deadline_tick = xTaskGetTickCount() + ticks;
+
     gpio_utils_write_output(TCA9535_HAPTIC_PIN, 1); // Haptic ON
 
     // Arm the off-timer only after the ON write is committed, so OFF always follows ON
@@ -625,6 +638,29 @@ void gpio_utils_spin_haptic(uint32_t ms)
     xTimerChangePeriod(haptic_timer, ticks, portMAX_DELAY);
 
     // Haptic OFF when timer expires
+}
+
+void gpio_utils_haptic_watchdog(void)
+{
+    TickType_t deadline = s_haptic_deadline_tick;
+    if (deadline == 0) {
+        return; // No buzz in flight
+    }
+
+    // Signed compare so a deadline still in the future does not read as overdue
+    if ((int32_t)(xTaskGetTickCount() - deadline) < (int32_t)pdMS_TO_TICKS(HAPTIC_WATCHDOG_GRACE_MS)) {
+        return;
+    }
+
+    // Non-blocking: retry next poll instead
+    static TickType_t warned_for = 0;
+    if (gpio_utils_write_output_nb(TCA9535_HAPTIC_PIN, 0) == ESP_OK) {
+        s_haptic_deadline_tick = 0;
+        ESP_LOGW(TAG, "Haptic OFF was lost; motor forced off by the watchdog");
+    } else if (warned_for != deadline) {
+        warned_for = deadline; // Once per stuck buzz, not once per 20 ms poll
+        ESP_LOGW(TAG, "Haptic OFF failed; bus busy, retrying");
+    }
 }
 
 void gpio_utils_rgb_indicate(uint8_t rgb_data)
