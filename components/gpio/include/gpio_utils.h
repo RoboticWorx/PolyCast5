@@ -27,6 +27,10 @@
 #define HAPTIC_MAX_MS 50
 #define HAPTIC_MIN_MS 10
 
+// Slack past a buzz's intended end before gpio_task forces the motor off
+// Covers normal timer-daemon latency; anything beyond it means the OFF write was lost
+#define HAPTIC_WATCHDOG_GRACE_MS 100
+
 #define RGB_PERIOD_MAX_MS 50
 #define RGB_PERIOD_MIN_MS 0
 #define RGB_TOTAL_MAX_MS 500
@@ -205,6 +209,19 @@ uint8_t gpio_utils_volts_to_soc(float voltage);
  * @param [in] ms Time on in milliseconds
  */
 void gpio_utils_spin_haptic(uint32_t ms);
+
+/**
+ * @brief Force the haptic motor off if a buzz has outlived its deadline.
+ *
+ * Backstop for the one-shot OFF timer, whose callback runs on the timer daemon,
+ * blocks on the I2C bus and cannot retry. A lost OFF write leaves the motor
+ * running with nothing else to stop it: ~90 mA that sags VBAT until the battery
+ * cutoff drops 3V3_EN and the device powers off.
+ *
+ * Call from a polling loop. Non-blocking, cheap when idle (no I2C unless a buzz
+ * is actually overdue), and safe to call at any rate.
+ */
+void gpio_utils_haptic_watchdog(void);
 
 /** 
  * @brief Indicate HW state via the built-in RGB LED
