@@ -47,9 +47,6 @@
 // #define POLYCAST5_EN_PYRAMID_ANIM 1 // Enables pyramid-alien homescreen animation (56 frames)
 #define POLYCAST5_EN_WATER_ANIM 1 // Enables accelerometer-driven water-slosh homescreen animation (procedural, no assets)
 
-// Screen Mirror: live remote view and control over the web. Costs ~195 KB of PSRAM in .bss
-#define POLYCAST5_EN_SCREEN_MIRROR 1
-
 // Settings/testing
 //#define POLYCAST5_PERSIST_SELECTION_INDEX 1 // Persist selected menu option across NVS and home
 //#define POLYCAST5_CYCLE_RGB_ON_BOOT 1 // Cycle through the RGB LED to make sure it is working

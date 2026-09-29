@@ -3,8 +3,6 @@
 
 #include "gpio_remote.h"
 
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
-
 #define F_HELD 0x01 // Driven low
 #define F_OPEN 0x02 // The held press has had no UP yet
 #define F_GAP 0x04 // Forced released until gap_ms past start_ms
@@ -186,5 +184,3 @@ void gpio_remote_clear(gpio_remote_t *r)
     r->queued = 0;
     r->active = 0;
 }
-
-#endif // POLYCAST5_EN_SCREEN_MIRROR

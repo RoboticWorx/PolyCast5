@@ -12,62 +12,7 @@
 #include "lcd_text_input.h"
 #include "lcd_mirror_page.h"
 
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
-
 #include "mirror.h"
-
-// Credential screens are never streamed. The mirror captures a flat placeholder for these
-// instead of the real pixels, so a relayed session cannot capture a PIN, a password, a key
-// or the saved logins behind the autotype scripts. Every modal loop that draws a secret
-// runs inside one of these pages, so redaction is already up before its first flush
-static bool page_is_sensitive(int page)
-{
-    switch (page) {
-        case UNLOCK_PAGE:
-        case SETTINGS_PIN_PAGE: // Includes the "Your PIN is" confirmation
-        case SETTINGS_PIN_LOCKOUT_PAGE:
-        case WIFI_PASSWORD_PAGE:
-        case WIFI_NETWORK_INFO_PAGE: // Saved network password
-        case ESPNOW_RX_MAC_PAGE: // Freshly generated LMK
-        case BLUETOOTH_PAIRING_PAGE: // Static BLE passkey
-        case BLUETOOTH_PAIR_NEW_PAGE:
-        case BLUETOOTH_KEYBOARD_PAGE:
-        case BLUETOOTH_KEYBOARD_SUB_PAGE:
-        // Config portal passwords. Each page draws its password before it starts the
-        // portal, so the STA link, and the session with it, is still up at that flush
-        case BLUETOOTH_SCRIPT_ADD_PAGE:
-        case BLUETOOTH_AI_CONFIG_PAGE:
-        case WIFI_AI_CONFIG_PAGE:
-        case LORA_MESHTASTIC_PAGE:
-        case TOOLS_BTC_ADDR_SETUP_PAGE:
-            return true;
-        default:
-            return false;
-    }
-}
-
-void lcd_mirror_page_sync(int page)
-{
-    if (!mirror_is_active()) {
-        return;
-    }
-
-    if (page_is_sensitive(page)) {
-        mirror_set_redacted(true);
-    } else if (mirror_is_redacted()) {
-        mirror_set_redacted(false);
-
-        // The shadow holds only the placeholder, so repaint the real screen into it
-        lv_obj_invalidate(ACTIVE_SCR);
-    }
-}
-
-void lcd_mirror_page_raise(int page)
-{
-    if (mirror_is_active() && page_is_sensitive(page)) {
-        mirror_set_redacted(true);
-    }
-}
 
 // The sink takes a plain int so the mirror component never has to see lcd's enum, which
 // is what keeps the two components from requiring each other
@@ -282,5 +227,3 @@ void lcd_mirror_page_teardown(void)
         }
     }
 }
-
-#endif // POLYCAST5_EN_SCREEN_MIRROR

@@ -6,8 +6,6 @@
 
 #include "polycast5_macros.h"
 
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
-
 #include "mirror.h"
 #include "mirror_priv.h"
 #include "mirror_proto.h"
@@ -246,8 +244,8 @@ size_t mirror_thermal_encode(bool keyframe, uint16_t seq, uint8_t *out, size_t c
 
     const thermal_state_t *t = &s_snap;
 
-    // The canvas has to be on screen, inside it, and not behind a redaction
-    const bool on = t->view_on && t->have_frame && !mirror_is_redacted() &&
+    // The canvas has to be on screen and inside it
+    const bool on = t->view_on && t->have_frame &&
             t->cols > 0 && t->rows > 0 && t->canvas.x1 >= 0 && t->canvas.y1 >= 0 &&
             t->canvas.x2 < MIRROR_SCR_W && t->canvas.y2 < MIRROR_SCR_H &&
             t->canvas.x1 <= t->canvas.x2 && t->canvas.y1 <= t->canvas.y2;
@@ -371,5 +369,3 @@ void mirror_thermal_reset(void)
 
     mirror_encode_set_thermal(NULL, NULL);
 }
-
-#endif // POLYCAST5_EN_SCREEN_MIRROR

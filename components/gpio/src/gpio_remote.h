@@ -3,10 +3,6 @@
 
 #include <stdint.h>
 
-#include "polycast5_macros.h"
-
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
-
 // Remote (Screen Mirror) button scheduler for the eight port-0 pins. Pure logic with the time
 // passed in, so the host tests drive it directly; gpio_utils.c owns the lock and the clock.
 // Pin numbers are trusted: the caller has already rejected anything above 7
@@ -64,7 +60,5 @@ uint8_t gpio_remote_apply(gpio_remote_t *r, uint8_t inputs, uint32_t now_ms);
  * @brief Release every pin and drop the queue. The configuration is kept
  */
 void gpio_remote_clear(gpio_remote_t *r);
-
-#endif // POLYCAST5_EN_SCREEN_MIRROR
 
 #endif // GPIO_REMOTE_H

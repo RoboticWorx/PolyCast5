@@ -4,10 +4,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "polycast5_macros.h"
-
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
-
 // Screen Mirror quality controller and ack round-trip ring. Pure logic with the time passed
 // in, so the host tests drive it directly; mirror_task.c owns the locks and the clock.
 // Levels are plain numbers, 0 (exact) to MIRROR_QC_WORST, as mirror_quality_t counts them
@@ -162,7 +158,5 @@ uint8_t mirror_quality_up_after(const mirror_quality_ctl_t *q);
  * @return The level to encode at; q->why says why when it changed
  */
 uint8_t mirror_quality_window(mirror_quality_ctl_t *q, const mirror_window_t *w, uint8_t pinned);
-
-#endif // POLYCAST5_EN_SCREEN_MIRROR
 
 #endif // MIRROR_QUALITY_H

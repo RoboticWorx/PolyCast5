@@ -234,23 +234,6 @@ static void verify_exact(const uint16_t *s, mirror_quality_t q, const char *what
     }
 }
 
-/* Every decoded pixel must be the redaction placeholder and nothing else. */
-static void verify_all_placeholder(const char *what)
-{
-    int leaked = 0, first = -1;
-
-    for (int i = 0; i < MIRROR_SCR_W * MIRROR_SCR_H; i++)
-        if (canvas[i] != MIRROR_REDACT_COLOR) { if (first < 0) first = i; leaked++; }
-
-    if (leaked) {
-        printf("  !! %s: %d px are not placeholder (first at %d,%d: %04X)\n", what, leaked,
-               first % MIRROR_SCR_W, first / MIRROR_SCR_W, canvas[first]);
-        failures++;
-    } else {
-        printf("  ok  %s\n", what);
-    }
-}
-
 static void reset_all(void)
 {
     memset(canvas, 0, sizeof(canvas));
@@ -363,58 +346,6 @@ int main(void)
     const size_t idle = send_frame(MIRROR_Q_EXACT, false);
     if (idle != 0) { printf("  !! idle frame cost %zu B, expected 0\n", idle); failures++; }
     else printf("  ok  repaint with identical pixels emits nothing\n");
-
-    printf("\n=== redaction (capture-time) ===\n");
-
-    /* (a) redaction on first, then a secret is drawn: the capture must store the
-       placeholder, so the secret never reaches the shadow or the wire. */
-    reset_all();
-    memset(canvas, 0, sizeof(canvas));
-    mirror_set_redacted(true);
-    scr_menu(truth, 0); /* a "secret" screen painted while redacted */
-    push_screen(truth);
-    send_frame(MIRROR_Q_EXACT, false);
-    verify_all_placeholder("(a) a capture while redacted stores only placeholder");
-    mirror_set_redacted(false);
-
-    /* (b) a secret is already showing, then redaction turns on: the fill in
-       mirror_set_redacted blanks the shadow, so the very next frame is placeholder. */
-    reset_all();
-    scr_menu(truth, 0);
-    push_screen(truth);
-    send_frame(MIRROR_Q_EXACT, true); /* secret is now on the viewer */
-    memset(canvas, 0, sizeof(canvas));
-    mirror_set_redacted(true); /* no capture between here and the send */
-    send_frame(MIRROR_Q_EXACT, false);
-    verify_all_placeholder("(b) redacting after a secret sends only placeholder");
-    mirror_set_redacted(false);
-
-    /* (c) lifting redaction forces a keyframe; the real pixels captured after go out. */
-    reset_all();
-    mirror_set_redacted(true);
-    send_frame(MIRROR_Q_EXACT, false); /* placeholder on the viewer */
-    mirror_set_redacted(false); /* forces a keyframe; the LCD side would invalidate here */
-    scr_menu(truth, 0);
-    push_screen(truth);
-    memset(canvas, 0, sizeof(canvas));
-    send_frame(MIRROR_Q_EXACT, false);
-    verify_exact(truth, MIRROR_Q_EXACT, "(c) real pixels return after redaction lifts");
-
-    /* (d) a session ending mid-redaction must leave no secret in the shadow. */
-    reset_all();
-    scr_menu(truth, 0);
-    push_screen(truth);
-    send_frame(MIRROR_Q_EXACT, true);
-    mirror_set_redacted(true);
-    {
-        const uint16_t *shadow = mirror_shadow();
-        int secret = 0;
-        for (int i = 0; i < MIRROR_SCR_W * MIRROR_SCR_H; i++)
-            if (shadow[i] != MIRROR_REDACT_COLOR) secret++;
-        if (secret) { printf("  !! (d) %d secret px remain in the shadow\n", secret); failures++; }
-        else printf("  ok  (d) shadow holds no secret while redacted\n");
-    }
-    mirror_set_redacted(false);
 
     printf("\n%s (%d failure%s)\n", failures ? "FAILED" : "ALL PASS", failures,
            failures == 1 ? "" : "s");

@@ -87,22 +87,6 @@ void mirror_capture(int16_t x1, int16_t y1, int16_t x2, int16_t y2, const uint16
 void mirror_force_keyframe(void);
 
 /**
- * @brief Blank the stream while a credential screen is up
- *
- *        Set by the LCD task on page transitions. Redaction is done at capture time:
- *        entering fills the whole shadow with the placeholder and forces a keyframe, and
- *        every capture while redacted stores the placeholder, so a password or PIN never
- *        reaches the shadow. Leaving forces a keyframe; the LCD side then invalidates the
- *        screen so the real pixels are recaptured.
- */
-void mirror_set_redacted(bool redacted);
-
-/**
- * @brief Whether the stream is currently redacted
- */
-bool mirror_is_redacted(void);
-
-/**
  * @brief Start a mirror session: connect to the relay and ask for a pairing code
  *
  *        Requires an associated Wi-Fi STA. Safe to call when already running.

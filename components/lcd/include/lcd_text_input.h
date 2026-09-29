@@ -23,8 +23,8 @@ typedef struct {
     bool        lock_until_submit;/**< If true, BACK and POWER are disabled (only OK exits) */
     bool        allow_space_only; /**< false (names): value must have a non-space char; true
                                        (passwords): only emptiness is rejected. Default false. */
-    bool        sensitive;        /**< Wi-Fi passwords and API keys: the Screen Mirror blanks
-                                       the preview and refuses remote typing. Default false. */
+    bool        sensitive;        /**< The Screen Mirror blanks the preview and refuses remote
+                                       typing. No entry sets it today. Default false. */
     lv_obj_t   *arrow_top;        /**< Optional global nav arrows, hidden while the keyboard is up */
     lv_obj_t   *arrow_bot;
     lv_obj_t   *arrow_left;

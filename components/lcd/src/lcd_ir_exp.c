@@ -17,9 +17,7 @@
 #include "lcd_utils.h"
 #include "ir_exp_task.h"
 #include "lcd_ir_exp_render.h"
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
 #include "mirror.h"
-#endif
 
 #define TAG "LCD_IR_EXP"
 
@@ -313,7 +311,6 @@ static void irx_set_status(const char *txt)
     irx_status_shown = true;
 }
 
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
 /* =============== Screen Mirror =============== */
 
 // The viewer gets the raw frame and upscales it itself, bit-exact (lcd_ir_exp_render.c). Through the tile path,
@@ -411,7 +408,6 @@ static void irx_mirror_view(void)
     const mirror_rect_t canvas = { (int16_t)ca.x1, (int16_t)ca.y1, (int16_t)ca.x2, (int16_t)ca.y2 };
     mirror_thermal_view(on, &canvas, holes, n);
 }
-#endif // POLYCAST5_EN_SCREEN_MIRROR
 
 static void irx_image_tick(void)
 {
@@ -503,9 +499,7 @@ static void irx_image_tick(void)
     irx_render_crosshair(irx_fb, irx_stride_px, IRX_CANVAS_W, IRX_CANVAS_H, IRX_CROSS_FG, IRX_CROSS_BG);
     lv_obj_invalidate(irx_canvas);
 
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
     irx_mirror_frame(frame);
-#endif
 }
 
 static void irx_timer_cb(lv_timer_t *t)
@@ -514,9 +508,7 @@ static void irx_timer_cb(lv_timer_t *t)
 
     irx_image_tick();
 
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
     irx_mirror_view();
-#endif
 }
 
 /* =============== UI construction =============== */
@@ -1003,12 +995,10 @@ static void irx_session_stop(void)
 // its wait loop), delete the objects, free the buffers, and clear the entry gate so a re-entry rebuilds.
 static void irx_cleanup(void)
 {
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
     // First, and with the frame forgotten, so nothing below can turn the channel back on. The mirror then resends
     // every tile it covered through the tile path.
     irx_have_frame = false;
     mirror_thermal_stop();
-#endif
 
     irx_session_stop();
 
@@ -1154,9 +1144,7 @@ void lcd_gpio_ir_exp_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
             irx_hide_detail();
             irx_mode = IRX_MODE_VIEW;
             irx_last_seq = 0; // Force a full repaint of the image we hid
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
             irx_mirror_view();
-#endif
         }
         return;
     }
@@ -1193,7 +1181,5 @@ void lcd_gpio_ir_exp_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
 
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
     irx_mirror_view(); // A palette name or the detail view may now cover the canvas; a no-op after cleanup
-#endif
 }

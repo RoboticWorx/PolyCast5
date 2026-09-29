@@ -81,8 +81,6 @@ for t in TARGETS:
         cmd = re.sub(re.escape(via), lambda m: src, cmd, flags=re.IGNORECASE)
     cmd = re.sub(r'\s-o\s+\S+', ' ', cmd)
     cmd = re.sub(r'\s-c\s+', ' -fsyntax-only ', cmd)
-    # The feature ships switched off, which would compile every guarded source to nothing
-    cmd = cmd.replace(' -fsyntax-only ', ' -DPOLYCAST5_EN_SCREEN_MIRROR=1 -fsyntax-only ', 1)
 
     bat = os.path.join(SP, '_sc.bat')
     io.open(bat, 'w', encoding='utf-8', newline='\r\n').write(

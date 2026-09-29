@@ -2,10 +2,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "polycast5_macros.h"
-
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
-
 #include "mirror_quality.h"
 
 #define RTT_EMPTY 0
@@ -474,5 +470,3 @@ uint8_t mirror_quality_window(mirror_quality_ctl_t *q, const mirror_window_t *w,
 
     return q->level;
 }
-
-#endif // POLYCAST5_EN_SCREEN_MIRROR

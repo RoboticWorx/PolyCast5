@@ -274,12 +274,6 @@ static void lcd_task(void *pvParameters)
             
             dont_sleep_on_this_page = false; // Reset flag
 
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
-            // Blank the stream on credential screens, and keep the device awake for a
-            // viewer who is watching rather than pressing, or waiting on approval. The
-            // session's own one-hour cap and the low-battery stop are what bound the drain
-            lcd_mirror_page_sync(ui_menu.page);
-
             // A viewer asked for sleep. Raising the power press here routes it through
             // the ordinary handler, which tears the session down on the way out. The home
             // page ignores the press and sleeps on go_to_sleep, which the real button also sets
@@ -290,6 +284,9 @@ static void lcd_task(void *pvParameters)
 
             const bool mirror_pending = (mirror_state == MIRROR_PENDING);
 
+            // Keep the device awake for a viewer who is watching rather than pressing, or
+            // waiting on approval. The session's one-hour cap and the low-battery stop
+            // bound the drain
             if (mirror_has_viewer() || mirror_pending) {
                 dont_sleep_on_this_page = true;
             }
@@ -317,7 +314,6 @@ static void lcd_task(void *pvParameters)
                     xSemaphoreGive(xHapticsMutex); // Release haptics
                 }
             }
-#endif
 
             // All LCD pages
             switch (ui_menu.page) {
@@ -676,7 +672,6 @@ static void lcd_task(void *pvParameters)
                     lcd_gpio_ir_exp_page(&ui_btns, &ui_menu, &gpio_menu);
                     dont_sleep_on_this_page = true;
                     break;
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
                 case WIFI_SCREEN_MIRROR_PAGE:
                     lcd_wifi_screen_mirror_page(&ui_btns, &ui_menu, &wifi_menu);
 
@@ -687,7 +682,6 @@ static void lcd_task(void *pvParameters)
                         sleep_timer_last = xTaskGetTickCount();
                     }
                     break;
-#endif
                 default:
                     break;
             }
@@ -701,11 +695,7 @@ static void lcd_task(void *pvParameters)
 #else
         TickType_t home_sleep_timer_interval = pdMS_TO_TICKS((uint32_t)home_sleep_after_s * 1000U); // home_sleep_after_s is extern
         // If home and home_sleep_timer_interval has passed without intervention
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
         const bool mirror_holds_awake = mirror_has_viewer() || (mirror_state == MIRROR_PENDING);
-#else
-        const bool mirror_holds_awake = false;
-#endif
         if (((ui_menu.page == HOME_PAGE) || (ui_menu.page == BOOT_PAGE)) &&
                 (((xTaskGetTickCount() - sleep_timer_last >= home_sleep_timer_interval)
                         && !mirror_holds_awake) || go_to_sleep)) {
@@ -730,13 +720,11 @@ static void lcd_task(void *pvParameters)
         if (xAdcBatReadingQueue && xQueueReceive(xAdcBatReadingQueue, &battery_percentage, 0) == pdTRUE) {
             lcd_update_battery(&ui_menu, battery_percentage, is_charging);
 
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
             // Streaming is expensive; don't let a forgotten session flatten the pack
             if (!is_charging && battery_percentage < 15 && mirror_is_active()) {
                 snprintf(mirror_error, sizeof(mirror_error), "Battery low"); // Ends in ERROR, not a bare "Stopped"
                 mirror_stop(MIRROR_BYE_LOW_BATT);
             }
-#endif
         }
 
         // Check for connectivity -> update icon
@@ -758,11 +746,6 @@ static void lcd_task(void *pvParameters)
             }
         }
 
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
-        // A credential page entered this pass has not flushed yet, so blanking here beats it
-        lcd_mirror_page_raise(ui_menu.page);
-#endif
-
         lv_timer_handler();
         vTaskDelay(pdMS_TO_TICKS(10));
     }
@@ -770,9 +753,7 @@ static void lcd_task(void *pvParameters)
 
 void lcd_task_create(void)
 {
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
     lcd_mirror_page_init(); // Hand the mirror its text sink before a session can start
-#endif
 
     if (xTaskCreatePinnedToCore(lcd_task, "lcd_task", 1024 * 8, NULL, POLYCAST5_PRIORITY_HIGH, NULL, 0) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start lcd_task");

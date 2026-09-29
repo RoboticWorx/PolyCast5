@@ -15,7 +15,6 @@
 
 #include "polycast5_macros.h"
 
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
 #include "polycast5_gpios.h" // TCA9535_USER_BUTTON_*_PIN
 
 #include "gpio_utils.h" // Remote button injection
@@ -1125,5 +1124,3 @@ void mirror_stop(uint8_t reason)
 
     gpio_utils_remote_buttons_clear();
 }
-
-#endif // POLYCAST5_EN_SCREEN_MIRROR

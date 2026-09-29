@@ -5,8 +5,6 @@
 
 #include "polycast5_macros.h"
 
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
-
 #include "mirror.h"
 #include "mirror_priv.h"
 #include "mirror_proto.h"
@@ -21,10 +19,6 @@ POLYCAST5_USE_PSRAM_BSS static uint8_t s_arena[MIRROR_ARENA_BYTES];
 static uint32_t s_rec_off[MIRROR_TILE_CNT + 1]; // Byte offset of each record, plus the end
 static uint16_t s_rec_tile[MIRROR_TILE_CNT]; // Tile index per record, to restore a failed send
 static uint16_t s_rec_count = 0;
-
-// One redaction snapshot per frame: mirror_encode_frame reads it, mirror_encode_build_msg
-// stamps the header from it, so every message of a frame agrees on the flag
-static bool s_redacted_snap = false;
 
 // Tiles whose canvas part the viewer paints from the thermal channel
 static bool s_th_on = false;
@@ -242,10 +236,6 @@ uint16_t mirror_encode_frame(mirror_quality_t q)
     const uint16_t mask = quantize_mask(q);
     const bool half = (q == MIRROR_Q_444_HALF);
 
-    // Redaction is applied at capture time, so the shadow already holds the placeholder.
-    // Snapshot the flag once here and stamp every message of this frame from it
-    s_redacted_snap = mirror_is_redacted();
-
     const uint16_t *shadow = mirror_shadow();
     uint16_t *ref = mirror_ref();
 
@@ -411,9 +401,6 @@ size_t mirror_encode_build_msg(uint16_t index, uint16_t seq, bool keyframe,
     if (index == msgs - 1) {
         flags |= MIRROR_FLAG_LAST_MSG;
     }
-    if (s_redacted_snap) {
-        flags |= MIRROR_FLAG_REDACTED;
-    }
 
     out[0] = MIRROR_MSG_FRAME;
     out[1] = flags;
@@ -466,5 +453,3 @@ void mirror_encode_restore_msg(uint16_t index)
         mirror_dirty_restore(tile);
     }
 }
-
-#endif // POLYCAST5_EN_SCREEN_MIRROR

@@ -572,25 +572,6 @@ static void test_session(const char *path)
     if (step_th_bytes < (size_t)MIRROR_THERMAL_HDR_BYTES + 512) bad("reopening did not resend the palette");
     checkpoint("back from detail", true, false, MIRROR_Q_EXACT);
 
-    /* Redaction: the channel closes and nothing but placeholder remains */
-    mirror_set_redacted(true);
-    device_step(MIRROR_Q_EXACT, false);
-    for (int i = 0; i < W * H; i++) truth[i] = MIRROR_REDACT_COLOR;
-    checkpoint("redacted", false, false, MIRROR_Q_EXACT);
-    {
-        sense(30);
-        render_and_publish(); /* even a new frame must not reopen it */
-        device_step(MIRROR_Q_EXACT, false);
-        if (step_th_bytes != 0) bad("a THERMAL message went out while redacted");
-        else ok("nothing thermal goes out while redacted");
-        checkpoint("redacted, new frame", false, false, MIRROR_Q_EXACT);
-    }
-    mirror_set_redacted(false);
-    compose(false, 2);
-    push_screen(truth); /* the LCD invalidates on lift */
-    device_step(MIRROR_Q_EXACT, false);
-    checkpoint("redaction lifted", true, false, MIRROR_Q_EXACT);
-
     /* Leaving the page. irx_cleanup stops the channel and then blocks up to 3.5 s parking
        the sensors with no flush, so only the stop itself can put the canvas back */
     mirror_thermal_stop();

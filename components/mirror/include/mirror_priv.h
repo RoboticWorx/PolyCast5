@@ -8,10 +8,6 @@
 
 // Shared between the capture and encode translation units only
 
-// Colour the shadow and the stream hold instead of the real pixels while a credential
-// screen is up. Filled at capture time, so a secret never reaches the shadow
-#define MIRROR_REDACT_COLOR 0x2104 // Dark grey in RGB565
-
 // What the tile stream carries under the canvas while the viewer paints thermal frames
 // there. Constant, so the sensor noise LVGL flushes never reaches the diff
 #define MIRROR_THERMAL_FILL 0x0000
@@ -127,8 +123,7 @@ void mirror_encode_set_thermal(const uint32_t *tiles, const mirror_rect_t *canva
  * @brief Build the MIRROR_MSG_THERMAL message the viewer is owed, if any
  *
  *        mirror_task only. Latest wins: frames published since the last call are dropped.
- *        While redacted the only message is the one ending the channel. Nothing is
- *        adopted until mirror_thermal_commit()
+ *        Nothing is adopted until mirror_thermal_commit()
  *
  * @param [in]  keyframe The viewer is being repainted: resend it all, palette included
  * @param [in]  seq      Sequence number to stamp, shared with FRAME

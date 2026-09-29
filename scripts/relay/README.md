@@ -187,10 +187,9 @@ device, never hearing `locked`, sends that browser nothing but STATUS PENDING.
 ## What the relay operator can see
 
 Everything: the screen, and every character typed into a text box. The transport is TLS so
-nobody else can, but this is not end to end. The firmware refuses to mirror or accept
-remote typing on PIN, Wi-Fi-password and saved-login screens, which is the control that
-actually matters — but the honest summary is still "don't mirror something you would not
-show the person running the relay."
+nobody else can, but this is not end to end. The firmware blanks nothing: PIN, password,
+key and saved-login screens are streamed and remotely typeable like every other screen, so
+the summary is "don't mirror something you would not show the person running the relay."
 
 If end-to-end is wanted later, the right shape is a key in the URL **fragment** (`#k=...`)
 carried by the QR code on the device, since a fragment is never sent to the server. Do not

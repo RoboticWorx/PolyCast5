@@ -19,10 +19,8 @@ mkdir -p "$OUT"
 fails=0
 
 build() {
-  # Project headers are the real ones, never copies; only ESP-IDF headers are stubbed.
-  # The feature ships switched off in polycast5_macros.h, and these tests exercise it
+  # Project headers are the real ones, never copies; only ESP-IDF headers are stubbed
   "$GCC" -std=c11 -O2 -Wall -Wextra -Wno-unused-parameter \
-    -DPOLYCAST5_EN_SCREEN_MIRROR=1 \
     -I"$HERE/stub" -I"$MIRROR/include" -I"$REPO/components/common/include" \
     "$HERE/$1.c" "$MIRROR/src/mirror_capture.c" "$MIRROR/src/mirror_encode.c" \
     -o "$OUT/$1.exe" || { echo "!! $1 failed to compile"; return 1; }
@@ -50,7 +48,7 @@ echo "### browser decoder vs. the real firmware encoder"
 
 echo
 echo "### thermal channel: device render vs browser port, then a scripted session"
-"$GCC" -std=c11 -O2 -Wall -Wextra -Wno-unused-parameter -DPOLYCAST5_EN_SCREEN_MIRROR=1 \
+"$GCC" -std=c11 -O2 -Wall -Wextra -Wno-unused-parameter \
   -I"$HERE/stub" -I"$MIRROR/include" -I"$REPO/components/common/include" \
   -I"$REPO/components/lcd/src" \
   "$HERE/test_thermal.c" "$MIRROR/src/mirror_capture.c" "$MIRROR/src/mirror_encode.c" \
@@ -62,7 +60,7 @@ echo "### thermal channel: device render vs browser port, then a scripted sessio
 
 echo
 echo "### remote button scheduler"
-"$GCC" -std=c11 -O2 -Wall -Wextra -Wno-unused-parameter -DPOLYCAST5_EN_SCREEN_MIRROR=1 \
+"$GCC" -std=c11 -O2 -Wall -Wextra -Wno-unused-parameter \
   -I"$HERE/stub" -I"$REPO/components/gpio/src" -I"$REPO/components/common/include" \
   "$HERE/test_remote_buttons.c" "$REPO/components/gpio/src/gpio_remote.c" \
   -o "$OUT/test_remote_buttons.exe" \
@@ -71,7 +69,7 @@ echo "### remote button scheduler"
 
 echo
 echo "### quality controller and ack round trips, on a simulated link"
-"$GCC" -std=c11 -O2 -Wall -Wextra -Wno-unused-parameter -DPOLYCAST5_EN_SCREEN_MIRROR=1 \
+"$GCC" -std=c11 -O2 -Wall -Wextra -Wno-unused-parameter \
   -I"$MIRROR/src" -I"$REPO/components/common/include" \
   "$HERE/test_quality.c" "$MIRROR/src/mirror_quality.c" \
   -o "$OUT/test_quality.exe" \

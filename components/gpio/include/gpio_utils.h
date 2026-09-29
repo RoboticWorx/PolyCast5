@@ -17,14 +17,12 @@
 #define LCD_LEDC_CHANNEL LEDC_CHANNEL_0
 #define LCD_LEDC_TIMER LEDC_TIMER_0
 
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
 // Remote (Screen Mirror) button injection, in ms. POLL_MS in gpio_task.c is 20
 #define GPIO_REMOTE_MIN_HOLD_MS 70 // >= 3 polls on the 10ms tick: guarantees one short press
 #define GPIO_REMOTE_TAP_HOLD_MS 80 // A single click from the web, and every queued one
 #define GPIO_REMOTE_HOLD_MAX_MS 1200 // Watchdog; the browser re-asserts every 400ms
 #define GPIO_REMOTE_GAP_MS 40 // Released between two presses of one pin: 2 polls
 #define GPIO_REMOTE_QUEUE_MAX 8 // Presses queued across all pins, at most 8; more are dropped
-#endif
 
 #define HAPTIC_MAX_MS 50
 #define HAPTIC_MIN_MS 10
@@ -91,7 +89,6 @@ int gpio_utils_read_input(uint8_t pin);
  */
 esp_err_t gpio_utils_read_inputs(uint8_t *inputs);
 
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
 /**
  * @brief Press or release a user button from a remote (Screen Mirror) session
  *
@@ -130,7 +127,6 @@ void gpio_utils_remote_button_tap(uint8_t pin, uint32_t hold_ms);
  * @brief Release every remotely held button and drop every queued one (session ended or link lost)
  */
 void gpio_utils_remote_buttons_clear(void);
-#endif // POLYCAST5_EN_SCREEN_MIRROR
 
 /**
  * @brief Drive one pin on Port 1 (0…7)

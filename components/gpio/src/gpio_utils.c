@@ -320,7 +320,6 @@ esp_err_t gpio_utils_init(void)
     return ret;
 }
 
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
 // Buttons a remote (Screen Mirror) session is pressing, merged into every input read so
 // gpio_task's state machine and haptics cannot tell them from physical presses.
 // Written by the mirror task, advanced by every input read, so all of it is under the lock.
@@ -352,7 +351,6 @@ static bool remote_pin_ok(uint8_t pin)
     // press would stall it until the expiry, and sleeping ends the session anyway
     return (pin != TCA9535_USER_BUTTON_POWER_PIN && pin != TCA9535_CHG_IND_PIN);
 }
-#endif
 
 // One register read answers every input: they are all port-0 bits
 // Preferred over gpio_utils_read_input() per pin, which takes xI2CBusMutex once per pin
@@ -374,20 +372,17 @@ esp_err_t gpio_utils_read_inputs(uint8_t *inputs)
     // 0xFF, never the raw byte, on failure
     uint8_t merged = (err == ESP_OK) ? raw : 0xFF;
 
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
     // Overlay remotely pressed buttons; one load when no session is driving any
     if (s_remote.active != 0) {
         portENTER_CRITICAL(&s_remote_mux);
         merged = gpio_remote_apply(&s_remote, merged, remote_now_ms());
         portEXIT_CRITICAL(&s_remote_mux);
     }
-#endif
 
     *inputs = merged;
     return err;
 }
 
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
 void gpio_utils_remote_button_set(uint8_t pin, bool down, uint32_t hold_ms)
 {
     if (!remote_pin_ok(pin)) {
@@ -420,7 +415,6 @@ void gpio_utils_remote_buttons_clear(void)
     gpio_remote_clear(&s_remote);
     portEXIT_CRITICAL(&s_remote_mux);
 }
-#endif // POLYCAST5_EN_SCREEN_MIRROR
 
 int gpio_utils_read_input(uint8_t pin)
 {

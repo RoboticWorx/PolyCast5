@@ -5,11 +5,11 @@
 
 #include "esp_err.h"
 
-// The array size is fixed across builds so every TU agrees on wifi_menu_t, and the plug cap
-// is fixed so NVS written by one build loads whole in another
+// Built-in entries come first and the user's PolyPlugs after them. NVS stores plugs by their
+// position among the plugs, never by menu index, so adding a built-in entry moves no plug
+#define WIFI_MENU_START_SIZE 8
 #define WIFI_MAX_USER_PLUGS 15
-#define WIFI_MENU_START_SIZE_MAX 8 // Most built-in entries any build has (see WIFI_MENU_START_SIZE)
-#define MAX_WIFI_OPTIONS (WIFI_MENU_START_SIZE_MAX + WIFI_MAX_USER_PLUGS)
+#define MAX_WIFI_OPTIONS (WIFI_MENU_START_SIZE + WIFI_MAX_USER_PLUGS)
 #define MAX_WIFI_SUBOPTIONS 40 // WIFI_MAX_NETWORKS
 #define TOPIC_KEY_LEN 16
 

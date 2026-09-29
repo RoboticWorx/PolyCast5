@@ -5,8 +5,6 @@
 
 #include "polycast5_macros.h"
 
-#ifdef POLYCAST5_EN_SCREEN_MIRROR
-
 #include "mirror.h"
 #include "mirror_priv.h"
 
@@ -32,8 +30,6 @@ static volatile uint8_t s_gen[MIRROR_TILE_CNT];
 
 static portMUX_TYPE s_dirty_mux = portMUX_INITIALIZER_UNLOCKED;
 
-static volatile bool s_redacted = false;
-
 const uint16_t *mirror_shadow(void)
 {
     return s_shadow;
@@ -55,19 +51,7 @@ void mirror_capture(int16_t x1, int16_t y1, int16_t x2, int16_t y2, const uint16
     const int16_t w = x2 - x1 + 1;
     const int16_t h = y2 - y1 + 1;
 
-    if (s_redacted) {
-        // The real pixels must never reach the shadow, so store the placeholder instead of
-        // what LVGL flushed. The tiles are still marked dirty below, so the blank streams
-        uint16_t *dst = &s_shadow[(uint32_t)y1 * MIRROR_SCR_W + x1];
-
-        for (int16_t y = 0; y < h; y++) {
-            for (int16_t x = 0; x < w; x++) {
-                dst[x] = MIRROR_REDACT_COLOR;
-            }
-
-            dst += MIRROR_SCR_W;
-        }
-    } else if (w == MIRROR_SCR_W) {
+    if (w == MIRROR_SCR_W) {
         // LVGL's partial render is full-width far more often than not, and then the
         // whole band is one contiguous run in both source and destination
         memcpy(&s_shadow[(uint32_t)y1 * MIRROR_SCR_W], px,
@@ -199,39 +183,3 @@ uint8_t mirror_tile_gen(uint16_t tile)
 {
     return (tile < MIRROR_TILE_CNT) ? s_gen[tile] : 0;
 }
-
-void mirror_set_redacted(bool redacted)
-{
-    if (s_redacted == redacted) {
-        return;
-    }
-
-    s_redacted = redacted;
-
-    if (redacted) {
-        // Blank the whole shadow now, so a secret never sits in it even for one frame. The
-        // capture hook keeps it placeholder until redaction lifts
-        for (uint32_t i = 0; i < MIRROR_SCR_W * MIRROR_SCR_H; i++) {
-            s_shadow[i] = MIRROR_REDACT_COLOR;
-        }
-
-        // Dirty every tile and bump its generation, so an encode that lcd_task preempts
-        // across this fill sees the gen move and discards a half-old tile
-        portENTER_CRITICAL(&s_dirty_mux);
-        for (uint16_t t = 0; t < MIRROR_TILE_CNT; t++) {
-            s_dirty[t >> 5] |= (1u << (t & 31));
-            s_gen[t]++;
-        }
-        portEXIT_CRITICAL(&s_dirty_mux);
-    }
-
-    // Both edges need a full repaint: entering hides the real pixels, leaving restores them
-    mirror_force_keyframe();
-}
-
-bool mirror_is_redacted(void)
-{
-    return s_redacted;
-}
-
-#endif // POLYCAST5_EN_SCREEN_MIRROR

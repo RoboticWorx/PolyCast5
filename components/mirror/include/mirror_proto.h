@@ -36,7 +36,7 @@
 #define MIRROR_FLAG_KEYFRAME   0x01
 #define MIRROR_FLAG_HALF_SCALE 0x02
 #define MIRROR_FLAG_LAST_MSG   0x04 // Last message of this frame; the viewer ACKs on it
-#define MIRROR_FLAG_REDACTED   0x08 // A credential screen is up; pixels are a placeholder
+// 0x08 reserved: was REDACTED, never set now
 #define MIRROR_FLAG_LEVEL_SHIFT 4   // Quality level in the high nibble
 
 // Tile encodings
