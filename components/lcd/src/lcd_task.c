@@ -306,13 +306,6 @@ static void lcd_task(void *pvParameters)
                             (mirror_icon_want == 2) ? LV_SYMBOL_BELL : LV_SYMBOL_UPLOAD);
                     lv_obj_remove_flag(ui_menu.lbl_mirror_icon, LV_OBJ_FLAG_HIDDEN);
                 }
-
-                // Approval happens on the mirror page, and the user may be anywhere
-                if (mirror_icon_want == 2) {
-                    xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics
-                    gpio_utils_spin_haptic(300);
-                    xSemaphoreGive(xHapticsMutex); // Release haptics
-                }
             }
 
             // All LCD pages
