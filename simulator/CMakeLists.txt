@@ -51,10 +51,11 @@ add_executable(polycast5_sim
     screens.c
     ../components/lcd/media/src/img_save_new_remote.c
     ../components/lcd/src/lcd_voice_orb.c
+    ../components/lcd/src/lcd_dice.c
 )
 
 # Shared firmware modules are compiled here with POLYCAST5_SIM so they pick up sim_compat.h
-# instead of the ESP-IDF headers. Lets the voice orb be tuned on the desktop before flashing.
+# instead of the ESP-IDF headers. Lets the voice orb and dice be tuned on the desktop before flashing.
 target_compile_definitions(polycast5_sim PRIVATE POLYCAST5_SIM=1)
 
 target_include_directories(polycast5_sim PRIVATE

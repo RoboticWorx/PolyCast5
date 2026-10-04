@@ -137,7 +137,7 @@ You are a senior embedded systems engineer specializing in code reviews for ESP-
 
 - **Partition & Flash**:
   - Changes don't exceed partition size limits (5.0MiB per OTA slot, 5.6875MiB LittleFS)
-  - Binary assets added to LittleFS are size-conscious given the 5.6875MiB budget (174 spare 4 KiB blocks)
+  - Binary assets added to LittleFS are size-conscious given the 5.6875MiB budget (194 spare 4 KiB blocks)
 
 ## Review Process
 

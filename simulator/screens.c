@@ -18,6 +18,7 @@
 #include "screens.h"
 #include "lvgl.h"
 #include "lcd_voice_orb.h"
+#include "lcd_dice.h"
 #include "sim_compat.h"
 
 #define DEFAULT_BATTERY_LV "92%"
@@ -2653,4 +2654,190 @@ void screen_tetris(void)
     lv_obj_t *lbl_bat_icon = lv_label_create(scr);
     format_label(lbl_bat_icon, LV_SYMBOL_BATTERY_FULL, secondary,
                  &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
+}
+
+/* ─── Dice Roller page ───────────────────────────────────────────
+ * Runs the firmware's procedural dice (lcd_dice.c) in the same layout as
+ * lcd_tools_dice_page.  The device rolls on Select and edits Dice/Sides with
+ * Up/Down; the simulator has neither, so Down rolls and Up steps through a
+ * few dice/sides presets.  A timer stands in for the firmware's frame loop. */
+
+/* Up cycles through these: { dice, sides } */
+static const uint8_t dice_presets[][2] = {
+    {1, 6}, {2, 6}, {3, 6}, {1, 20}, {5, 12}, {9, 6}, {30, 6}, {1, 100}, {255, 255},
+};
+#define DICE_PRESET_N ((int)(sizeof(dice_presets) / sizeof(dice_presets[0])))
+
+static lv_timer_t *dice_timer      = NULL; /* Steps the roll; paused while the dice rest */
+static lv_obj_t   *dice_lbl_count  = NULL;
+static lv_obj_t   *dice_lbl_sides  = NULL;
+static lv_obj_t   *dice_lbl_result = NULL; /* Total, or the roll prompt */
+static int         dice_preset     = 0;
+static uint16_t    dice_total      = 0;    /* Shown once the dice land */
+static uint8_t     dice_rolls[255];        /* This roll's results, one per die */
+
+/* Same box as the firmware's dice_box_create(): caption left, value right. */
+static lv_obj_t *dice_box_create(lv_obj_t *scr, const char *caption, int32_t y,
+                                 bool selected, lv_obj_t **lbl_value)
+{
+    lv_color_t primary   = USER_PRIMARY_COLOR;
+    lv_color_t secondary = USER_SECONDARY_COLOR;
+    lv_color_t text      = selected ? primary : secondary;
+
+    lv_obj_t *box = lv_obj_create(scr);
+    lv_obj_remove_style_all(box);
+    lv_obj_set_pos(box, 129, y);
+    lv_obj_set_size(box, 96, 32);
+    lv_obj_set_style_radius(box, 8, 0);
+    lv_obj_set_style_border_width(box, 2, 0);
+    lv_obj_set_style_border_color(box, secondary, 0);
+    lv_obj_set_style_bg_color(box, secondary, 0);
+    lv_obj_set_style_bg_opa(box, selected ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+    lv_obj_set_style_pad_hor(box, 6, 0);
+
+    lv_obj_t *lbl_caption = lv_label_create(box);
+    format_label(lbl_caption, caption, text, &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 0, 0);
+
+    *lbl_value = lv_label_create(box);
+    format_label(*lbl_value, "", text, &lv_font_montserrat_20, LV_ALIGN_RIGHT_MID, 0, 0);
+
+    return box;
+}
+
+/* Mirrors dice_result_show(): 0 = not rolled yet, so prompt instead. */
+static void dice_show_result(uint16_t total)
+{
+    if (total == 0) {
+        lv_obj_set_style_text_font(dice_lbl_result, &lv_font_montserrat_14, 0);
+        lv_label_set_text(dice_lbl_result, "Press select\nto roll");
+    } else {
+        /* Five digits at 24 px can outgrow the column and wrap; 22 px always fits */
+        lv_obj_set_style_text_font(dice_lbl_result,
+                                   total >= 10000 ? &lv_font_montserrat_22 : &lv_font_montserrat_24, 0);
+        lv_label_set_text_fmt(dice_lbl_result, "= %u", (unsigned)total);
+    }
+}
+
+/* Show the current preset's values and lay out its dice, each showing its side count. */
+static void dice_apply_preset(void)
+{
+    uint8_t count = dice_presets[dice_preset][0];
+    uint8_t sides = dice_presets[dice_preset][1];
+
+    lv_label_set_text_fmt(dice_lbl_count, "%u", (unsigned)count);
+    lv_label_set_text_fmt(dice_lbl_sides, "%u", (unsigned)sides);
+    lcd_dice_reset(count, sides);
+    dice_show_result(0);
+}
+
+/* Stands in for the firmware's blocking frame loop: one roll step per tick. */
+static void dice_timer_cb(lv_timer_t *t)
+{
+    if (!lcd_dice_roll_step(lv_tick_get())) {
+        lv_timer_pause(t);
+        dice_show_result(dice_total); /* The total appears once the dice land */
+    }
+}
+
+/* Down: roll (ignored while the dice are still moving). */
+static void dice_on_down(void)
+{
+    if (!dice_timer || !lcd_dice_is_available()) return;
+    if (!lv_timer_get_paused(dice_timer)) return;
+
+    uint8_t count = dice_presets[dice_preset][0];
+    uint8_t sides = dice_presets[dice_preset][1];
+
+    /* Results first, as on the device; the animation lands each die on its own */
+    dice_total = 0;
+    for (int i = 0; i < count; i++) {
+        dice_rolls[i] = (uint8_t)(rand() % sides + 1);
+        dice_total += dice_rolls[i];
+    }
+
+    lv_label_set_text(dice_lbl_result, "");
+    lcd_dice_roll_start(dice_rolls, (uint32_t)rand(), lv_tick_get());
+    lv_timer_resume(dice_timer);
+}
+
+/* Up: next dice/sides preset. */
+static void dice_on_up(void)
+{
+    if (dice_timer) lv_timer_pause(dice_timer);
+    dice_preset = (dice_preset + 1) % DICE_PRESET_N;
+    dice_apply_preset();
+}
+
+static void dice_cleanup(void)
+{
+    if (dice_timer) {
+        lv_timer_delete(dice_timer);
+        dice_timer = NULL;
+    }
+    /* Frees the dice canvas and framebuffer before lv_obj_clean() takes the screen. */
+    lcd_dice_deinit();
+    dice_lbl_count = dice_lbl_sides = dice_lbl_result = NULL;
+}
+
+void screen_dice(void)
+{
+    lv_color_t primary   = USER_PRIMARY_COLOR;
+    lv_color_t secondary = USER_SECONDARY_COLOR;
+
+    lv_obj_t *scr = lv_scr_act();
+    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_style_bg_color(scr, primary, 0);
+    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
+
+    /* ── Persistent UI (all four arrows + battery), as on the device ── */
+    lv_obj_t *arrow_top = lv_label_create(scr);
+    format_label(arrow_top, LV_SYMBOL_UP, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+
+    lv_obj_t *arrow_left = lv_label_create(scr);
+    format_label(arrow_left, LV_SYMBOL_LEFT, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 4, 0);
+
+    lv_obj_t *arrow_right = lv_label_create(scr);
+    format_label(arrow_right, LV_SYMBOL_RIGHT, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_RIGHT_MID, -4, 0);
+
+    lv_obj_t *arrow_bot = lv_label_create(scr);
+    format_label(arrow_bot, LV_SYMBOL_DOWN, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+    lv_obj_t *lbl_bat_txt = lv_label_create(scr);
+    format_label(lbl_bat_txt, DEFAULT_BATTERY_LV, secondary,
+                 &lv_font_montserrat_14, LV_ALIGN_TOP_RIGHT, -28, 0);
+
+    lv_obj_t *lbl_bat_icon = lv_label_create(scr);
+    format_label(lbl_bat_icon, LV_SYMBOL_BATTERY_FULL, secondary,
+                 &lv_font_montserrat_18, LV_ALIGN_TOP_RIGHT, -2, -3);
+
+    /* ── Dice arena: the real firmware module, so this is what the device draws ── */
+    user_primary_color   = primary;
+    user_secondary_color = secondary;
+    if (!lcd_dice_init(scr, 15, 16, 110, 102)) {
+        fprintf(stderr, "dice init failed\n");
+    }
+
+    /* ── Dice / Sides boxes and the total ── */
+    dice_box_create(scr, "Dice", 16, true, &dice_lbl_count);
+    dice_box_create(scr, "Sides", 52, false, &dice_lbl_sides);
+
+    dice_lbl_result = lv_label_create(scr);
+    lv_obj_set_width(dice_lbl_result, 96);
+    lv_obj_set_style_text_align(dice_lbl_result, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(dice_lbl_result, secondary, 0);
+    lv_obj_align(dice_lbl_result, LV_ALIGN_CENTER, 57, 36);
+
+    dice_preset = 0;
+    dice_apply_preset();
+
+    /* Created idle: Down resumes it for a roll, the last step pauses it */
+    dice_timer = lv_timer_create(dice_timer_cb, 16, NULL);
+    lv_timer_pause(dice_timer);
+
+    screen_set_nav_handlers(dice_on_up, dice_on_down);
+    screen_set_cleanup(dice_cleanup);
 }

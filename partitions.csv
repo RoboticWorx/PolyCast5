@@ -1,7 +1,7 @@
 # Partition table at 0x10000: 56 KiB bootloader budget (FE ~34 KiB, FE+SBv2 ~48 KiB).
 # Sizes:      4 KiB NVS keys,  236 KiB NVS,  5.0 MiB OTA slots,  5.6875 MiB LittleFS.
 # Converted: ~4 KB NVS keys,  ~242 KB NVS,  ~5.24 MB OTA slots,  ~5.96 MB LittleFS
-# LittleFS: 10 full frames of margin (174 blocks = 712704 B)
+# LittleFS: 12 full frames of margin (194 blocks = 794624 B)
 
 # Name,   Type, SubType,  Offset,   Size,     Flags
 nvs_keys, data, nvs_keys, 0x011000, 0x001000, encrypted

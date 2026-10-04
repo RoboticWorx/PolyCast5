@@ -156,20 +156,6 @@
 
 // ------------------------- //
 
-/* IMAGES START */
-
-// Tools dice
-#define IMG_DICE_1 "A:/img/dice_1.bin"
-#define IMG_DICE_2 "A:/img/dice_2.bin"
-#define IMG_DICE_3 "A:/img/dice_3.bin"
-#define IMG_DICE_4 "A:/img/dice_4.bin"
-#define IMG_DICE_5 "A:/img/dice_5.bin"
-#define IMG_DICE_6 "A:/img/dice_6.bin"
-
-/* IMAGES END */
-
-// ------------------------- //
-
 /* QRS START */
 
 // ONLY BOOT QR: Others are now generated dynamically

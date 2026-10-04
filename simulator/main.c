@@ -46,6 +46,7 @@ static const screen_entry_t screens[] = {
     { "Infrared Add Sig",  screen_infrared_add_signal},
     { "LoRa",              screen_lora               },
     { "Tools",             screen_tools              },
+    { "Dice Roller",       screen_dice               },
     { "Tetris",            screen_tetris             },
     { "Wi-Fi Beacon",      screen_wifi_beacon        },
     { "Wi-Fi Data",        screen_wifi_data          },

@@ -113,6 +113,12 @@ void screen_ota_update(void);
  */
 void screen_tetris(void);
 
+/**
+ * Render the Dice Roller page with the firmware's procedural dice.
+ * Down rolls; Up steps through dice/sides presets (1d6 up to 255d255).
+ */
+void screen_dice(void);
+
 /* ─── Menu navigation (Up/Down arrows) ───────────────────────── */
 
 #define MENU_MAX_BTNS 16

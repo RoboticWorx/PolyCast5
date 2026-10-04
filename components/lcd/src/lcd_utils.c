@@ -506,14 +506,6 @@ void lcd_lvgl_init(void)
     // Pre-load animations for quick access (but longer boot time)
     lcd_anim_warm_all();
     
-    // Pre-load images too
-    warm_img(IMG_DICE_1);
-    warm_img(IMG_DICE_2);
-    warm_img(IMG_DICE_3);
-    warm_img(IMG_DICE_4);
-    warm_img(IMG_DICE_5);
-    warm_img(IMG_DICE_6);
-    
     // And QRs
     warm_img(QR_PC5_BOOT);
     // Other QRs are generated dynamically
