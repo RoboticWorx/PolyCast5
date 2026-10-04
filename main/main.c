@@ -259,24 +259,28 @@ void app_main(void)
     xSPIBusMutex = xSemaphoreCreateMutex();
     configASSERT(xSPIBusMutex);
 
+    // With POLYCAST5_EN_BOOT_SCREEN, lcd_init_driver raises the backlight once the splash is drawn
+    xLEDCMutex = xSemaphoreCreateMutex();
+    configASSERT(xLEDCMutex);
+
     // Initialize various
     lcd_init_driver();
     lcd_lvgl_init();
+
+    // The boot splash (if enabled) is drawing on this bus, and SX_NSS dips low while the HAL takes it over
+    xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
     spi_sx126x_init();
+    sx126x_hal_init(spi_sx126x);
+    xSemaphoreGive(xSPIBusMutex); // Release SPI bus
 
     // Create remaining mutexes
     xHapticsMutex = xSemaphoreCreateMutex();
     configASSERT(xHapticsMutex);
     xRgbLedMutex = xSemaphoreCreateMutex();
     configASSERT(xRgbLedMutex);
-    xLEDCMutex = xSemaphoreCreateMutex();
-    configASSERT(xLEDCMutex);
     
     xPowerButtonSemaphore = xSemaphoreCreateBinary();
     configASSERT(xPowerButtonSemaphore);
-    
-    // Initialize the SX126x HAL with the SPI handle
-    sx126x_hal_init(spi_sx126x);
 
     // Initialize the sx126x_t structure
     sx126x.context = NULL; // Not used

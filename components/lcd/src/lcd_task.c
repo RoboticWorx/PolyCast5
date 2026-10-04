@@ -17,7 +17,9 @@
 #include "wifi_task.h"
 #include "bluetooth_task.h"
 
+#ifndef POLYCAST5_EN_BOOT_SCREEN
 extern int8_t lcd_ledc_brightness;
+#endif
 
 static const char *TAG = "LCD_TASK";
 
@@ -103,6 +105,9 @@ static void lcd_task(void *pvParameters)
     
     lcd_init_selection_labels(&ui_menu);
 
+#ifdef POLYCAST5_EN_BOOT_SCREEN
+    // Brightness was restored by lcd_init_driver, behind the boot splash
+#else
     // Set brightness at boot
     xSemaphoreTake(xLEDCMutex, portMAX_DELAY); // Lock LEDC
     lcd_settings_lcd_ledc_nvs_load();
@@ -110,8 +115,8 @@ static void lcd_task(void *pvParameters)
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CHANNEL, duty);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CHANNEL);
     xSemaphoreGive(xLEDCMutex); // Release LEDC
-    
-    
+#endif
+
     /* Load all user settings */
     lcd_hotkey_nvs_load(&hotkey_cmd);
     

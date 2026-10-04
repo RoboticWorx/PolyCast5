@@ -33,6 +33,7 @@
 #include "misc/lv_text.h"
 
 #include "lcd_asset_macros.h"
+#include "lcd_boot_splash.h" // lcd_boot_splash_show, lcd_boot_splash_stop
 #include "lcd_bluetooth.h"
 #include "lcd_gpio.h"
 #include "lcd_utils.h"
@@ -117,6 +118,10 @@ typedef struct {
 
 static void st7789_flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_map)
 {
+#ifdef POLYCAST5_EN_BOOT_SCREEN
+    lcd_boot_splash_stop(); // First LVGL frame replaces the boot splash: ends its animation task
+#endif
+
     xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
     
     uint16_t *color_ptr = (uint16_t *)px_map; // const const
@@ -153,6 +158,10 @@ static void st7789_flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_
 
 static void lcd_panel_sleep(void)
 {
+#ifdef POLYCAST5_EN_BOOT_SCREEN
+    lcd_boot_splash_stop(); // Sleep can come before the first frame: end the splash task first
+#endif
+
     xSemaphoreTake(xSPIBusMutex, portMAX_DELAY); // Lock SPI bus
     
     // Display off, sleep in
@@ -412,6 +421,19 @@ void lcd_init_driver(void)
     // Restore portrait offsets
     tft._offsetx = 40;
     tft._offsety = 53; // 52 if 270 | 53 if 90
+
+#ifdef POLYCAST5_EN_BOOT_SCREEN
+    // Boot splash (lcd_boot_splash.c): paints GRAM and starts its animation task
+    // Backlight stays dark until GRAM holds the splash instead of power-up noise
+    lcd_boot_splash_show(&tft);
+
+    // GRAM reaches the glass on the next 60 Hz scan, then the liquid crystal settles
+    vTaskDelay(pdMS_TO_TICKS(50));
+
+    // Backlight on at the saved brightness (lcd_task does it when the boot screen is off)
+    lcd_settings_lcd_ledc_nvs_load();
+    lcd_backlight_set(true);
+#endif
 }
 
 static void lv_tick_cb(void *arg)

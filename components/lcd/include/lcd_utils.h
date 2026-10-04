@@ -228,7 +228,10 @@ void lcd_device_deep_sleep(void);
 #endif
 
 /** 
- * @brief Initialise SPI bus + ST7789 panel (blocking)
+ * @brief Initialise SPI bus + ST7789 panel (blocking). With POLYCAST5_EN_BOOT_SCREEN, also
+ *        paint the boot splash, start its task and raise the saved brightness
+ *
+ * Needs NVS, xSPIBusMutex and xLEDCMutex to exist first.
  */
 void lcd_init_driver(void);
 

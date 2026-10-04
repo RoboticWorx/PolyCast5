@@ -16,8 +16,10 @@
  *                                tasks are created. Everything else, then
  *                                prints the combined report for both phases.
  *
- * Both phases assume they are the only bus users and that no task has claimed
- * the peripherals yet. Results are buffered across the two phases and printed
+ * Both phases assume no task has claimed the peripherals yet. The early phase is
+ * the only bus user; with POLYCAST5_EN_BOOT_SCREEN the late phase shares SPI2
+ * with the boot splash task, so SPI2 access there must take xSPIBusMutex (the
+ * sx126x HAL does). Results are buffered across the two phases and printed
  * once at the end of the late phase, so a halt in between loses the report.
  *
  * Checks that are intrusive (drive expander nets, spin the haptic, transmit)

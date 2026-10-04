@@ -28,8 +28,10 @@ void verify_hardware_run_early(void);
  * production fixture.
  *
  * Must be called from app_main after all buses/HALs are initialized but
- * BEFORE the application tasks are created: the probes assume they are the
- * only bus users and that no task has claimed the peripherals yet.
+ * BEFORE the application tasks are created: the probes assume no task has
+ * claimed the peripherals yet. With POLYCAST5_EN_BOOT_SCREEN the boot splash
+ * task is already drawing on SPI2, so any SPI2 access here must take
+ * xSPIBusMutex.
  */
 void verify_hardware_run(void);
 

@@ -183,8 +183,13 @@ static void init_ledc_pwm(void)
         .channel = LCD_LEDC_CHANNEL,
         .intr_type = LEDC_INTR_DISABLE, // No interrupts needed
         .timer_sel = LCD_LEDC_TIMER,
+#ifdef POLYCAST5_EN_BOOT_SCREEN
+        // Dark until the boot splash is in GRAM: lcd_init_driver() then sets the saved brightness
+        .duty = 0,
+#else
         // Full scale (brightness * ((1 << res) - 1)) / 100
         .duty = (1 << LCD_LEDC_RESOLUTION) - 1,
+#endif
         .hpoint = 0,
         .sleep_mode = LEDC_SLEEP_MODE_NO_ALIVE_NO_PD,
         .flags.output_invert = 1 // P-CH inversion
@@ -248,10 +253,16 @@ esp_err_t gpio_utils_init(void)
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE
     };
+#ifdef POLYCAST5_EN_BOOT_SCREEN
+    // Default states, latched before the output is enabled so the pad comes up already HIGH
+    gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_OFF); // Drives HIGH: Q4 is a P-FET on 3V0, GRAM still holds power-up noise
+    gpio_config(&io_conf_out);
+#else
     gpio_config(&io_conf_out);
     
     // Default states
     gpio_set_level(ST7789_LEDA_PIN, LCD_BL_STATE_ON); // Drives LOW: Q4 is a P-FET on 3V0
+#endif
 
     // Port1 already holds the rest state from the preload above - haptic and all
     // three LEDs off, TSOP off, 3V3_EN asserted, both resets released - so no
