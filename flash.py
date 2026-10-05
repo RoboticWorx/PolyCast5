@@ -28,6 +28,9 @@ That's it. The script figures out everything else:
     filenames plus a matching flash_args), so the committed release binaries -
     the ones the web Firmware Updater serves - always match the pushed source.
     Skipped on --dry-run; unchanged files aren't rewritten.
+  * Writes bin/manifest.json, the OTA manifest, with "version" read from the
+    built app image's descriptor and "size" from PolyCast5.bin, so the
+    published manifest can't drift from the binary. Also skipped on --dry-run.
   * Distills every build's linker map into bin/size_report.txt - an
     idf.py-size-style breakdown (SRAM/flash/PSRAM usage, image-vs-partition
     budgets, per-component sizes) committed alongside the binaries, so
@@ -119,7 +122,7 @@ Exit code: 0 on success (or nothing-to-do), non-zero on any failure.
 ----------------------------------------------------------------------------
 Trace map (top to bottom): the flow lives in main(), which runs nine numbered
 steps: 1) build, 2) load build outputs, 3) build a per-partition "plan",
-4) mirror the images into bin/ + write the size report, 5) connect + preflight
+4) mirror the images into bin/ + write the OTA manifest and size report, 5) connect + preflight
 the chip, 6) decide what changed, 7) print the plan, 8) flash, 9) save state.
 Everything above main() is a helper those steps call.
 ----------------------------------------------------------------------------
@@ -410,6 +413,68 @@ def export_release_bins(plan: list[dict], write_flash_args: list[str]) -> None:
             print(gray("bin/ release binaries already match this build."))
     except OSError as e:
         print(yellow(f"Note: couldn't update bin/ release binaries ({e})."))
+
+
+# ===========================================================================
+# OTA manifest (bin/manifest.json). Devices offer an update whenever the
+# manifest's "version" differs from their running image's version, string for
+# string, so the version is read out of the built app image, never typed.
+# ===========================================================================
+OTA_MANIFEST     = BIN_DIR / "manifest.json"
+# Used when bin/manifest.json doesn't exist yet; an existing file's url/info are kept.
+OTA_DEFAULT_URL  = "https://github.com/RoboticWorx/PolyCast5-OTA/releases/download/latest/PolyCast5.bin"
+OTA_DEFAULT_INFO = "https://github.com/RoboticWorx/PolyCast5-OTA/releases/tag/latest"
+# esp_app_desc_t follows the image header (24 B) + first segment header (8 B).
+APP_DESC_OFFSET  = 0x20
+APP_DESC_MAGIC   = 0xABCD5432
+
+
+def read_app_version(path: Path) -> str | None:
+    """Return esp_app_desc_t.version from an app image, or None if it has none."""
+    with path.open("rb") as f:
+        f.seek(APP_DESC_OFFSET)
+        desc = f.read(48)  # magic, secure_version, reserv1[2], version[32]
+    if len(desc) < 48 or int.from_bytes(desc[0:4], "little") != APP_DESC_MAGIC:
+        return None
+    return desc[16:48].split(b"\0", 1)[0].decode("utf-8", "replace") or None
+
+
+def write_ota_manifest(plan: list[dict]) -> None:
+    """Write bin/manifest.json (version + size) for the app image in the plan.
+
+    Non-fatal, same contract as export_release_bins()."""
+    try:
+        app = next((p for p in plan if p["is_app"]), None)
+        version = read_app_version(app["path"]) if app else None
+        if not version:
+            print(yellow("Note: no app descriptor in this build; bin/manifest.json not updated."))
+            return
+        # export_release_bins() swallows copy errors; only describe the image actually in bin/
+        exported = BIN_DIR / Path(app["rel"]).name
+        if not exported.exists() or sha256_file(exported) != app["sha"]:
+            print(yellow(f"Note: bin/{exported.name} doesn't match this build; bin/manifest.json not updated."))
+            return
+        url, info = OTA_DEFAULT_URL, OTA_DEFAULT_INFO
+        try:
+            old = json.loads(OTA_MANIFEST.read_text(encoding="utf-8"))
+            url, info = old.get("url", url), old.get("info", info)
+        except (OSError, ValueError, AttributeError):
+            pass  # missing or hand-mangled: fall back to the defaults
+        manifest = {"version": version, "url": url, "size": app["size"], "info": info}
+        text = json.dumps(manifest, indent=2) + "\n"
+        try:
+            # read_bytes for the same CRLF reason as the size report
+            if OTA_MANIFEST.read_bytes().decode("utf-8") == text:
+                print(gray(f"OTA manifest unchanged (v{version})."))
+                return
+        except (OSError, ValueError):
+            pass
+        BIN_DIR.mkdir(exist_ok=True)
+        with OTA_MANIFEST.open("w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+        print(cyan(f"OTA manifest: v{version}, {app['size']} B -> bin/{OTA_MANIFEST.name}"))
+    except Exception as e:
+        print(yellow(f"Note: couldn't write bin/manifest.json ({e})."))
 
 
 # ===========================================================================
@@ -1107,11 +1172,13 @@ def main() -> int:
     # -- 4. Mirror the built images into bin/ + refresh the size report -------
     # bin/ holds the committed release binaries (served by the web Firmware
     # Updater), so refreshing it on every build means pushed source always
-    # ships matching binaries; the size report rides along so every commit
+    # ships matching binaries, plus the OTA manifest that describes them; the
+    # size report rides along so every commit
     # also carries its size analysis. Dry-run changes nothing, on-chip or in
     # the repo.
     if not args.dry_run:
         export_release_bins(plan, write_flash_args)
+        write_ota_manifest(plan)
         generate_size_report(plan, parts)
 
     # -- 5. Port + device preflight (identity + on-chip FE state) -------------

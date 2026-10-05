@@ -22,7 +22,9 @@ endif()
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 # Set the embedded firmware version and app name
-set(PROJECT_VER "0.1.0")
+# PROJECT_VER is the version System Info shows and OTA compares. The OTA manifest's
+# "version" must equal it exactly; flash.py writes bin/manifest.json from the built image
+set(PROJECT_VER "1.0.0")
 project(PolyCast5)
 
 # Wire the custom lwIP IPv4-input hook used by the Wi-Fi ARP feature

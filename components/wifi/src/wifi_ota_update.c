@@ -26,9 +26,10 @@
 
 #define TAG "WIFI_OTA_UPDATE"
 
-#define NVS_OTA_VERSION_NS "ota"
-#define NVS_OTA_VERSION_KEY "version"
-#define NVS_OTA_PENDING_KEY "pending"
+// Pre-1.0.0 builds kept the firmware version here instead of reading the app descriptor
+#define NVS_OTA_LEGACY_NS "ota"
+#define NVS_OTA_LEGACY_VERSION_KEY "version"
+#define NVS_OTA_LEGACY_PENDING_KEY "pending"
 
 //#define OTA_CHECK_PROJ_DESC 1 // Enables project_description.json version check (redundant)
 
@@ -41,7 +42,6 @@ static TaskHandle_t ota_task_handle = NULL;
 static TaskHandle_t ota_check_task_handle = NULL; // Only one check at a time
 POLYCAST5_USE_PSRAM_BSS static char manifest_url_buf[512]; // Manifest URL buffer
 
-static char pending_manifest_ver[64];
 static int manifest_size_bytes = -1;
 
 // C5 errata guard for encrypted flash writes: cap DFS to 160 MHz while writing and
@@ -127,7 +127,6 @@ static void ota_task(void *_)
     err = esp_https_ota_begin(&ota_cfg, &h);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "ota_begin error: %s", esp_err_to_name(err));
-        pending_manifest_ver[0] = '\0'; // Clear pending version
         goto out;
     }
 
@@ -208,7 +207,6 @@ static void ota_task(void *_)
         ESP_LOGE(TAG, "ota_perform error: %s", esp_err_to_name(err));
         
         // Abort
-        pending_manifest_ver[0] = '\0'; // Clear pending version
         esp_https_ota_abort(h);
         goto out;
     }
@@ -220,20 +218,6 @@ static void ota_task(void *_)
         ESP_LOGI(TAG, "OTA OK, rebooting...");
 #endif
 
-        // Stage the new version as PENDING. wifi_task promotes it to the canonical
-        // version key only after the new image boots healthily (rollback would otherwise
-        // leave NVS pointing at a version we're no longer running -- BUG-018).
-        if (pending_manifest_ver[0]) {
-            err = wifi_ota_update_set_nvs_pending_version(pending_manifest_ver);
-            if (err != ESP_OK) {
-                ESP_LOGE(TAG, "wifi_ota_update_set_nvs_pending_version failed: %s", esp_err_to_name(err));
-            } else {
-#ifdef POLYCAST5_DEBUG
-                ESP_LOGI(TAG, "Staged pending FW version in NVS: %s", pending_manifest_ver);
-#endif
-            }
-        }
-        
         int done = -1;
         // Send OTA success to LCD
         xQueueSend(xWifiOtaPctQueue, &done, portMAX_DELAY);
@@ -242,7 +226,6 @@ static void ota_task(void *_)
         esp_restart(); // Restart
     } else {
         ESP_LOGE(TAG, "ota_finish error: %s", esp_err_to_name(err));
-        pending_manifest_ver[0] = '\0'; // Clear pending version
     }
     
     // Abort process
@@ -359,12 +342,8 @@ static void ota_check_task(void *_)
         goto done;
     }
 
-    // Read the current app's version
-    char current_ver[64] = {0};
-    esp_err_t err = wifi_ota_update_get_nvs_version(current_ver, sizeof(current_ver));
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "wifi_ota_update_get_nvs_version failed: %s", esp_err_to_name(err));
-    }
+    // Read the running image's version (follows OTA, USB reflash, and rollback alike)
+    const char *current_ver = esp_app_get_description()->version;
     const char *new_ver = jver->valuestring;
     strlcpy(ota_update_url, jurl->valuestring, sizeof(ota_update_url));
 
@@ -381,9 +360,6 @@ static void ota_check_task(void *_)
         ESP_LOGI(TAG, "New version found -> Considering OTA from %s", ota_update_url);
 #endif
 
-        // Save the pending version to global buffer
-        strlcpy(pending_manifest_ver, new_ver, sizeof(pending_manifest_ver));
-        
         // OTA update is available
         xEventGroupSetBits(xWifiEventGroup, WIFI_OTA_AVAILABLE_BIT);
     } else {
@@ -393,7 +369,6 @@ static void ota_check_task(void *_)
         // No OTA available
         xEventGroupClearBits(xWifiEventGroup, WIFI_OTA_AVAILABLE_BIT);
 
-        pending_manifest_ver[0] = '\0'; // Clear pending version
         ota_update_url[0] = '\0';
         ota_update_info[0] = '\0';
     }
@@ -498,103 +473,25 @@ void wifi_ota_update_mark_app_valid(void)
 #endif
 }
 
-esp_err_t wifi_ota_update_set_nvs_version(const char *val)
+void wifi_ota_update_erase_legacy_version(void)
 {
     nvs_handle_t h;
-    esp_err_t err;
-    
-    // Open NVS
-    err = nvs_open(NVS_OTA_VERSION_NS, NVS_READWRITE, &h);
-    if (err != ESP_OK) {
-        return err;
+
+    // Namespace only exists on units that ran an older build; a read-only open won't create it
+    if (nvs_open(NVS_OTA_LEGACY_NS, NVS_READONLY, &h) != ESP_OK) {
+        return;
     }
-    
-    // Set the version string
-    err = nvs_set_str(h, NVS_OTA_VERSION_KEY, val);
-    
-    // Persist changes if success
-    if (err == ESP_OK) {
-        err = nvs_commit(h);
-    }
-    
-    // Close and return
     nvs_close(h);
-    return err;
-}
 
-esp_err_t wifi_ota_update_get_nvs_version(char *out, size_t out_sz)
-{
-    nvs_handle_t h;
-    esp_err_t err;
-
-    // Open NVS
-    err = nvs_open(NVS_OTA_VERSION_NS, NVS_READONLY, &h);
-    if (err != ESP_OK) {
-        return err;
+    if (nvs_open(NVS_OTA_LEGACY_NS, NVS_READWRITE, &h) != ESP_OK) {
+        return;
     }
 
-    size_t len = out_sz; // Must include room for '\0'
-
-    // Get the saved version string
-    err = nvs_get_str(h, NVS_OTA_VERSION_KEY, out, &len);
-
-    // Close and return
+    // An older build would otherwise promote a stale pending key after a downgrade
+    // and report a version it isn't running. ESP_ERR_NVS_NOT_FOUND once cleared
+    nvs_erase_key(h, NVS_OTA_LEGACY_VERSION_KEY);
+    nvs_erase_key(h, NVS_OTA_LEGACY_PENDING_KEY);
+    nvs_commit(h);
     nvs_close(h);
-    return err;
-}
-
-esp_err_t wifi_ota_update_set_nvs_pending_version(const char *val)
-{
-    nvs_handle_t h;
-    esp_err_t err;
-
-    err = nvs_open(NVS_OTA_VERSION_NS, NVS_READWRITE, &h);
-    if (err != ESP_OK) {
-        return err;
-    }
-
-    err = nvs_set_str(h, NVS_OTA_PENDING_KEY, val);
-    if (err == ESP_OK) {
-        err = nvs_commit(h);
-    }
-
-    nvs_close(h);
-    return err;
-}
-
-esp_err_t wifi_ota_update_get_nvs_pending_version(char *out, size_t out_sz)
-{
-    nvs_handle_t h;
-    esp_err_t err;
-
-    err = nvs_open(NVS_OTA_VERSION_NS, NVS_READONLY, &h);
-    if (err != ESP_OK) {
-        return err;
-    }
-
-    size_t len = out_sz;
-    err = nvs_get_str(h, NVS_OTA_PENDING_KEY, out, &len);
-
-    nvs_close(h);
-    return err;
-}
-
-esp_err_t wifi_ota_update_erase_nvs_pending_version(void)
-{
-    nvs_handle_t h;
-    esp_err_t err;
-
-    err = nvs_open(NVS_OTA_VERSION_NS, NVS_READWRITE, &h);
-    if (err != ESP_OK) {
-        return err;
-    }
-
-    err = nvs_erase_key(h, NVS_OTA_PENDING_KEY);
-    if (err == ESP_OK) {
-        err = nvs_commit(h);
-    }
-
-    nvs_close(h);
-    return err;
 }
 

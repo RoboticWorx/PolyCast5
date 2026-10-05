@@ -18,6 +18,7 @@
 #include "esp_heap_caps.h"
 #include "esp_system.h"
 #include "esp_idf_version.h"
+#include "esp_app_desc.h"
 
 #include "core/lv_obj_scroll.h"
 #include "font/lv_symbol_def.h"
@@ -1731,12 +1732,8 @@ static void system_build_info(char *buf, size_t n)
 
     const char *idf = esp_get_idf_version();
     
-    // Get this firmware version
-    char pc5_fw_version[64] = "unknown";
-    esp_err_t err = wifi_ota_update_get_nvs_version(pc5_fw_version, sizeof(pc5_fw_version));
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "wifi_ota_update_get_nvs_version failed: %s", esp_err_to_name(err));
-    }
+    // Get this firmware version (from the running image, so it's right after any flash method)
+    const char *pc5_fw_version = esp_app_get_description()->version;
 
     // Format chip revision and cores
     unsigned rev = (unsigned)ci.revision;
@@ -1753,7 +1750,7 @@ static void system_build_info(char *buf, size_t n)
     const esp_partition_t *nvs_part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS, NULL);
     char nvs_line[96] = "NVS: (not found)\n\n";
     if (nvs_part) {
-        err = nvs_get_stats(nvs_part->label, &st);
+        esp_err_t err = nvs_get_stats(nvs_part->label, &st);
         if (err == ESP_OK) {
             size_t used_est_bytes = st.used_entries * 32;
             size_t free_est_bytes = st.free_entries * 32;
