@@ -313,7 +313,7 @@ esp_err_t wifi_autoconnect_pick_known_network(wifi_login_t *out)
         .scan_type = WIFI_SCAN_TYPE_ACTIVE,
         .scan_time = {
             .active = {
-                .min = 50, // At least 50ms each channel
+                .min = 20, // At least 20ms each channel
                 .max = 120 // At most 120ms each channel
             },
             .passive = 50, // 50ms for passive scan

@@ -254,6 +254,7 @@ static void display_mac_and_lmk(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
     lcd_format_label(lbl_lmk, lmk_str, user_secondary_color,
             &lv_font_montserrat_18, LV_ALIGN_BOTTOM_LEFT, 5, -2);    
 
+    gpio_screen_changed(); // Taps and holds from before this prompt don't count
     while (1) {
         lv_timer_handler();
         
@@ -299,6 +300,7 @@ static bool prompt_yn_encryption(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
     lcd_format_label(lbl_enc_no, "NO", user_secondary_color,
             &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
                     
+    gpio_screen_changed(); // Taps and holds from before this prompt don't count
     while (1) {
         lv_timer_handler();
         
@@ -592,6 +594,7 @@ static void prompt_upload_qr(ui_menu_t *ui_menu)
         ESP_LOGE(TAG, "prompt_upload_qr lcd_draw_qr failed: %d", n);
     }
     
+    gpio_screen_changed(); // Taps and holds from before this prompt don't count
     while (1) {
         lv_timer_handler();
         
@@ -854,6 +857,7 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
     lcd_format_label(lbl_del, "DELETE", user_secondary_color,
             &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
 
+    gpio_screen_changed(); // Taps and holds from before this prompt don't count
     while (1) {
         lv_timer_handler();
         
@@ -981,6 +985,8 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
 {
     #define BUF_SIZE 4
     
+    static uint32_t select_hold = 0; // SELECT hold-to-repeat (+3)
+    
     if (xSemaphoreTake(xEspCmdTxSuccessSemaphore, 0) == pdTRUE) { // If transmission successful
         lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT LV_SYMBOL_OK);
     } else if (xSemaphoreTake(xEspCmdTxFailedSemaphore, 0) == pdTRUE) { // If transmission failed
@@ -990,6 +996,9 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
     if (xSemaphoreTake(xEspCmdRxStatusSemaphore, 0) == pdTRUE) { // If data received
         lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, RX_TXT LV_SYMBOL_OK);
     }
+    
+    // Holding SELECT keeps stepping the command by 3
+    lcd_select_hold_repeat(ui_btns, &select_hold);
     
     // Send command
     if (ui_btns->right_btn == 1) {

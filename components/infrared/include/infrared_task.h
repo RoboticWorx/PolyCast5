@@ -7,6 +7,7 @@ extern SemaphoreHandle_t xInfraredRxEventSemaphore;
 extern SemaphoreHandle_t xInfraredStartRxSemaphore;
 extern SemaphoreHandle_t xInfraredDisableSemaphore;
 extern SemaphoreHandle_t xInfraredSignalSavedSemaphore;
+extern SemaphoreHandle_t xInfraredSignalTooLongSemaphore; // Learned signal filled the RX buffer: not saved
 
 extern SemaphoreHandle_t xInfraredDataMutex;
 

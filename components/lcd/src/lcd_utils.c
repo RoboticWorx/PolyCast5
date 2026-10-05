@@ -88,6 +88,8 @@
 
 extern volatile bool gpio_left_to_exit; // gpio_task.c
 extern volatile bool gpio_waiting_for_left; // gpio_task.c
+
+bool lcd_hold_activity = false;
 extern int8_t lcd_ledc_brightness; // gpio_task.c
 
 extern bool monitoring_packets;
@@ -276,6 +278,8 @@ void lcd_device_sleep(void)
         uint8_t tca_int_clear;
         TCA9535ReadSingleRegister(TCA9535_INPUT_REG0, &tca_int_clear);
 
+        gpio_screen_changed(); // Taps and holds from before sleep don't act after waking
+
 #ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Entering light sleep: esp_light_sleep_start");
 #endif
@@ -312,6 +316,7 @@ void lcd_device_sleep(void)
         // Only a real user wake (ext1 on the TCA9535 INT) resumes the UI
         if (wake_causes & (1UL << ESP_SLEEP_WAKEUP_EXT1)) {
             woke_by_button = true;
+            gpio_woke_by_button(); // Only the wake press is dropped; later presses count
         } else {
             lcd_backlight_set(false); // Not the user: keep the screen fully dark
 
@@ -349,7 +354,7 @@ void lcd_device_sleep(void)
     xQueueReset(xPowerButtonSemaphore); // Clear xPowerButtonSemaphore
     
     go_to_sleep = false; // Clear sleep flag
-    lcd_clear_pending_inputs = true; // Clear if action button pressed to wake/reset pwr_btn
+    ui_btns.pwr_btn = 0; // The press that put the device to sleep
     
     // Require pin re-entry if sleeping from home page
     settings_menu.pin_menu.prompt_pin = true;
@@ -505,7 +510,7 @@ void lcd_lvgl_init(void)
     
     // Pre-load animations for quick access (but longer boot time)
     lcd_anim_warm_all();
-    
+
     // And QRs
     warm_img(QR_PC5_BOOT);
     // Other QRs are generated dynamically
@@ -919,6 +924,70 @@ void lcd_clear_user_in()
     ui_btns.select_btn = 0;
     ui_btns.home_btn = 0;
     ui_btns.pwr_btn = 0;
+
+    // And what was pressed while a blocking screen was up: queued taps, presses still down (a prompt
+    // that returned to this page)
+    gpio_screen_changed();
+}
+
+bool lcd_take_long_press(gpio_btn_t btn, bool *short_btn)
+{
+    bool own_short = false;
+    if (!gpio_take_long_press(btn, &own_short)) {
+        return false;
+    }
+
+    // Its hold may have queued this short this tick; a newer press's tap stays
+    if (own_short) {
+        *short_btn = false;
+    }
+    lcd_hold_activity = true;
+
+    return true;
+}
+
+void lcd_arm_confirm_page(ui_btns_t *ui_btns)
+{
+    gpio_screen_changed();
+    ui_btns->up_btn = ui_btns->down_btn = ui_btns->left_btn = 0;
+    ui_btns->right_btn = ui_btns->select_btn = ui_btns->home_btn = 0;
+}
+
+void lcd_arrows_hide(ui_menu_t *ui_menu, bool was_hidden[4])
+{
+    lv_obj_t *arrows[4] = {ui_menu->arrow_top, ui_menu->arrow_bot, ui_menu->arrow_left, ui_menu->arrow_right};
+    for (size_t i = 0; i < 4; ++i) {
+        was_hidden[i] = lv_obj_has_flag(arrows[i], LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(arrows[i], LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void lcd_arrows_restore(ui_menu_t *ui_menu, const bool was_hidden[4])
+{
+    lv_obj_t *arrows[4] = {ui_menu->arrow_top, ui_menu->arrow_bot, ui_menu->arrow_left, ui_menu->arrow_right};
+    for (size_t i = 0; i < 4; ++i) {
+        if (!was_hidden[i]) {
+            lv_obj_remove_flag(arrows[i], LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+}
+
+void lcd_select_hold_repeat(ui_btns_t *ui_btns, uint32_t *hold)
+{
+    // Same physical press, still down: another step
+    if (*hold != 0 && *hold == gpio_press_seq(GPIO_BTN_SELECT) && gpio_select_btn_held) {
+        ui_btns->select_btn = true;
+        lcd_hold_activity = true;
+        return;
+    }
+    *hold = 0;
+
+    // Only this press's own long press starts a hold: an earlier press's was served by its release
+    if (gpio_select_btn_held && gpio_take_held_long_press(GPIO_BTN_SELECT)) {
+        *hold = gpio_press_seq(GPIO_BTN_SELECT);
+        ui_btns->select_btn = true; // First step
+        lcd_hold_activity = true;
+    }
 }
 
 void lcd_update_battery(ui_menu_t *ui_menu, uint8_t battery_percentage, bool charging)
@@ -1746,6 +1815,11 @@ uint8_t lcd_wait_for_bit_better(EventGroupHandle_t event_group, EventBits_t bit,
     xSemaphoreGive(xGpioLeftBtnMutex); // Release left button mutex
     lcd_clear_pending_inputs = true;
 
+    // A LEFT held to exit keeps repeating: end it so it doesn't act on what comes next
+    if (status == LCD_WAIT_FOR_BIT_BETTER_EXIT) {
+        gpio_end_hold(GPIO_BTN_LEFT);
+    }
+
     // Got bit
     return status;
 }
@@ -1847,8 +1921,97 @@ static bool lora_hotkey_blocked_by_meshtastic(void)
     return true; // Meshtastic enabled, deny
 }
 
+// Fire hotkey idx: send its LoRa / ESP-NOW / IR command, or go to its page. False if nothing is bound
+static bool home_fire_hotkey(ui_menu_t *ui_menu, uint8_t idx)
+{
+    /* Check for commands */
+    if (hotkey_cmd.has_lora[idx]) { // LoRa cmd; shows a notice and skips if Meshtastic owns the radio
+        if (!lora_hotkey_blocked_by_meshtastic()) {
+            // RGB indicator
+            uint8_t rgb_state = RGB_BLINK_TEAL;
+            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+            
+            // Send the command
+            lora_send_req_t lora_req = { .cmd = hotkey_cmd.lora_cmd[idx], .ui_origin = false };
+            xQueueOverwrite(xLoraSendEncQueue, &lora_req); // Never block the UI; latest command wins
+        }
+    } else if (hotkey_cmd.has_espnow[idx]) { // Else ESP-NOW
+        // RGB indicator
+        uint8_t rgb_state = RGB_BLINK_TEAL;
+        xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+        
+        // Send the command
+        xQueueSend(xEspSendCmdQueue, &hotkey_cmd.espnow_cmd[idx], portMAX_DELAY);
+    } else if (hotkey_cmd.has_ir[idx]) { // Else Infrared
+        const ir_cmd_t *ir_hk = &hotkey_cmd.ir_cmd[idx];
+        size_t sig_idx = (size_t)ir_hk->index - IR_NUM_BASE_OPTIONS;
+        
+        // A remote/signal deleted since binding (or by older firmware) must never become ir_current_remote
+        xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
+        bool in_range = ir_hk->current_remote < num_remotes && ir_hk->index >= IR_NUM_BASE_OPTIONS &&
+                sig_idx < remotes[ir_hk->current_remote].num_signals;
+        bool ir_ok = in_range && remotes[ir_hk->current_remote].signals[sig_idx];
+        if (ir_ok) {
+            ir_current_remote = ir_hk->current_remote; // Update current remote
+        }
+        xSemaphoreGive(xInfraredDataMutex); // Release IR
+
+        // Dead target: nothing sent, no blink. Out of range, it is unbound so a remote or signal added
+        // there later can't revive it
+        if (!ir_ok) {
+#ifdef POLYCAST5_DEBUG
+            ESP_LOGW(TAG, "IR hotkey %d stale: remote %zu, index %d", idx, ir_hk->current_remote, ir_hk->index);
+#endif
+            if (!in_range) {
+                hotkey_cmd.has_ir[idx] = false;
+                memset(&hotkey_cmd.ir_cmd[idx], 0, sizeof(hotkey_cmd.ir_cmd[idx]));
+                lcd_hotkey_nvs_save(&hotkey_cmd);
+            }
+            return true;
+        }
+        
+        // RGB indicator
+        uint8_t rgb_state = RGB_BLINK_PURPLE;
+        xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+        
+        // Send the command
+        xQueueSend(xInfraredSignalToTxQueue, &ir_hk->index, portMAX_DELAY);
+    } else if (hotkey_cmd.is_page[idx]) { // Else a menu page
+        // Update the page
+        ui_menu->page = hotkey_cmd.selected_page[idx];
+
+        // Go to it
+        go_to_page_from_hotkey(ui_menu);
+    } else {
+        return false; // Nothing bound
+    }
+    
+    return true;
+}
+
 void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
+    // Hotkeys wait for the PIN
+    bool hotkeys_on = !settings_menu->pin_menu.pin_set || !settings_menu->pin_menu.prompt_pin;
+
+    // Long presses go first: the same hold may have queued its short this tick. One with no
+    // hotkey bound, or behind the PIN, acts once as its short press
+    const struct { gpio_btn_t btn; uint8_t idx; bool *short_btn; } longs[] = {
+        { GPIO_BTN_HOME,   HOTKEY_LONG_HOME_IDX,   &ui_btns->home_btn },
+        { GPIO_BTN_LEFT,   HOTKEY_LONG_LEFT_IDX,   &ui_btns->left_btn },
+        { GPIO_BTN_RIGHT,  HOTKEY_LONG_RIGHT_IDX,  &ui_btns->right_btn },
+        { GPIO_BTN_SELECT, HOTKEY_LONG_SELECT_IDX, &ui_btns->select_btn },
+    };
+    for (size_t i = 0; i < sizeof(longs) / sizeof(longs[0]); ++i) {
+        if (lcd_take_long_press(longs[i].btn, longs[i].short_btn)) {
+            if (hotkeys_on && home_fire_hotkey(ui_menu, longs[i].idx)) {
+                return;
+            }
+            *longs[i].short_btn = true;
+            break; // One per tick
+        }
+    }
+
     if (ui_btns->up_btn == 1) {
         lcd_anim_transition_animation(true);
     } else if (ui_btns->down_btn == 1) {
@@ -1944,268 +2107,10 @@ void lcd_home_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *sett
     
             ui_menu->page = UNLOCK_PAGE;
         }        
-    }
-
-    // Don't allow hotkeys if pin is set and must be entered
-    if (settings_menu->pin_menu.pin_set && settings_menu->pin_menu.prompt_pin) {
-        return;
-    }
-    
-    /* HOTKEYS */
- 
-    // Long press home
-    else if (xHomeButtonLongSemaphore && xSemaphoreTake(xHomeButtonLongSemaphore, 0) == pdTRUE) {
-        /* Check for commands */
-        if (hotkey_cmd.has_lora[HOTKEY_LONG_HOME_IDX] && !lora_hotkey_blocked_by_meshtastic()) { // LoRa cmd; shows a notice and skips if Meshtastic owns the radio
-            // RGB indicator
-            uint8_t rgb_state = RGB_BLINK_TEAL;
-            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-            
-            // Send the command
-            lora_send_req_t lora_req = { .cmd = hotkey_cmd.lora_cmd[HOTKEY_LONG_HOME_IDX], .ui_origin = false };
-            xQueueOverwrite(xLoraSendEncQueue, &lora_req); // Never block the UI; latest command wins
-        } else if (hotkey_cmd.has_espnow[HOTKEY_LONG_HOME_IDX]) { // Else ESP-NOW
-            // RGB indicator
-            uint8_t rgb_state = RGB_BLINK_TEAL;
-            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-            
-            // Send the command
-            xQueueSend(xEspSendCmdQueue, &hotkey_cmd.espnow_cmd[HOTKEY_LONG_HOME_IDX], portMAX_DELAY);
-        } else if (hotkey_cmd.has_ir[HOTKEY_LONG_HOME_IDX]) { // Else Infrared
-            // RGB indicator
-            uint8_t rgb_state = RGB_BLINK_PURPLE;
-            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-            
-            // Update current remote
-            xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
-            ir_current_remote = hotkey_cmd.ir_cmd[HOTKEY_LONG_HOME_IDX].current_remote;
-            xSemaphoreGive(xInfraredDataMutex); // Release IR
-            
-            // Send the command
-            xQueueSend(xInfraredSignalToTxQueue, &hotkey_cmd.ir_cmd[HOTKEY_LONG_HOME_IDX].index, portMAX_DELAY);
-        } else if (hotkey_cmd.is_page[HOTKEY_LONG_HOME_IDX]) { // Else a menu page
-            // Update the page
-            ui_menu->page = hotkey_cmd.selected_page[HOTKEY_LONG_HOME_IDX];
-
-            // Go to it
-            go_to_page_from_hotkey(ui_menu);
-        } else {
-#ifdef POLYCAST5_DEBUG
-            ESP_LOGW(TAG, "Long home hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_HOME_IDX,
-                    hotkey_cmd.has_lora[HOTKEY_LONG_HOME_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_HOME_IDX]);
-#endif
-        }
-    }
-    // Long press left
-    else if (xLeftButtonLongSemaphore && xSemaphoreTake(xLeftButtonLongSemaphore, 0) == pdTRUE) {
-        /* Check for commands */
-        if (hotkey_cmd.has_lora[HOTKEY_LONG_LEFT_IDX] && !lora_hotkey_blocked_by_meshtastic()) { // LoRa cmd; shows a notice and skips if Meshtastic owns the radio
-            // RGB indicator
-            uint8_t rgb_state = RGB_BLINK_TEAL;
-            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-            
-            // Send the command
-            lora_send_req_t lora_req = { .cmd = hotkey_cmd.lora_cmd[HOTKEY_LONG_LEFT_IDX], .ui_origin = false };
-            xQueueOverwrite(xLoraSendEncQueue, &lora_req); // Never block the UI; latest command wins
-        } else if (hotkey_cmd.has_espnow[HOTKEY_LONG_LEFT_IDX]) { // Else ESP-NOW
-            // RGB indicator
-            uint8_t rgb_state = RGB_BLINK_TEAL;
-            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-            
-            // Send the command
-            xQueueSend(xEspSendCmdQueue, &hotkey_cmd.espnow_cmd[HOTKEY_LONG_LEFT_IDX], portMAX_DELAY);
-        } else if (hotkey_cmd.has_ir[HOTKEY_LONG_LEFT_IDX]) { // Else Infrared
-            // RGB indicator
-            uint8_t rgb_state = RGB_BLINK_PURPLE;
-            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-            
-            // Update current remote
-            xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
-            ir_current_remote = hotkey_cmd.ir_cmd[HOTKEY_LONG_LEFT_IDX].current_remote;
-            xSemaphoreGive(xInfraredDataMutex); // Release IR
-            
-            // Send the command
-            xQueueSend(xInfraredSignalToTxQueue, &hotkey_cmd.ir_cmd[HOTKEY_LONG_LEFT_IDX].index, portMAX_DELAY);
-        } else if (hotkey_cmd.is_page[HOTKEY_LONG_LEFT_IDX]) { // Else a menu page
-            // Update the page
-            ui_menu->page = hotkey_cmd.selected_page[HOTKEY_LONG_LEFT_IDX];
-
-            // Go to it
-            go_to_page_from_hotkey(ui_menu);
-        } else {
-#ifdef POLYCAST5_DEBUG
-            ESP_LOGW(TAG, "Long left hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_LEFT_IDX,
-                    hotkey_cmd.has_lora[HOTKEY_LONG_LEFT_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_LEFT_IDX]);
-#endif
-        }
-    }
-    // Long press right
-    else if (xRightButtonLongSemaphore && xSemaphoreTake(xRightButtonLongSemaphore, 0) == pdTRUE) {
-        /* Check for commands */
-        if (hotkey_cmd.has_lora[HOTKEY_LONG_RIGHT_IDX] && !lora_hotkey_blocked_by_meshtastic()) { // LoRa cmd; shows a notice and skips if Meshtastic owns the radio
-            // RGB indicator
-            uint8_t rgb_state = RGB_BLINK_TEAL;
-            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-            
-            // Send the command
-            lora_send_req_t lora_req = { .cmd = hotkey_cmd.lora_cmd[HOTKEY_LONG_RIGHT_IDX], .ui_origin = false };
-            xQueueOverwrite(xLoraSendEncQueue, &lora_req); // Never block the UI; latest command wins
-        } else if (hotkey_cmd.has_espnow[HOTKEY_LONG_RIGHT_IDX]) { // Else ESP-NOW
-            // RGB indicator
-            uint8_t rgb_state = RGB_BLINK_TEAL;
-            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-            
-            // Send the command
-            xQueueSend(xEspSendCmdQueue, &hotkey_cmd.espnow_cmd[HOTKEY_LONG_RIGHT_IDX], portMAX_DELAY);
-        } else if (hotkey_cmd.has_ir[HOTKEY_LONG_RIGHT_IDX]) { // Else Infrared
-            // RGB indicator
-            uint8_t rgb_state = RGB_BLINK_PURPLE;
-            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-            
-            // Update current remote
-            xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
-            ir_current_remote = hotkey_cmd.ir_cmd[HOTKEY_LONG_RIGHT_IDX].current_remote;
-            xSemaphoreGive(xInfraredDataMutex); // Release IR
-            
-            // Send the command
-            xQueueSend(xInfraredSignalToTxQueue, &hotkey_cmd.ir_cmd[HOTKEY_LONG_RIGHT_IDX].index, portMAX_DELAY);
-        } else if (hotkey_cmd.is_page[HOTKEY_LONG_RIGHT_IDX]) { // Else a menu page
-            // Update the page
-            ui_menu->page = hotkey_cmd.selected_page[HOTKEY_LONG_RIGHT_IDX];
-
-            // Go to it
-            go_to_page_from_hotkey(ui_menu);
-        } else {
-#ifdef POLYCAST5_DEBUG
-            ESP_LOGW(TAG, "Long right hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_RIGHT_IDX,
-                    hotkey_cmd.has_lora[HOTKEY_LONG_RIGHT_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_RIGHT_IDX]);
-#endif
-        }
-    }
-    // Long press select
-    else if (xSelectButtonLongSemaphore && xSemaphoreTake(xSelectButtonLongSemaphore, 0) == pdTRUE) {
-        /* Check for commands */
-        if (hotkey_cmd.has_lora[HOTKEY_LONG_SELECT_IDX] && !lora_hotkey_blocked_by_meshtastic()) { // LoRa cmd; shows a notice and skips if Meshtastic owns the radio
-            // RGB indicator
-            uint8_t rgb_state = RGB_BLINK_TEAL;
-            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-            
-            // Send the command
-            lora_send_req_t lora_req = { .cmd = hotkey_cmd.lora_cmd[HOTKEY_LONG_SELECT_IDX], .ui_origin = false };
-            xQueueOverwrite(xLoraSendEncQueue, &lora_req); // Never block the UI; latest command wins
-        } else if (hotkey_cmd.has_espnow[HOTKEY_LONG_SELECT_IDX]) { // Else ESP-NOW
-            // RGB indicator
-            uint8_t rgb_state = RGB_BLINK_TEAL;
-            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-            
-            // Send the command
-            xQueueSend(xEspSendCmdQueue, &hotkey_cmd.espnow_cmd[HOTKEY_LONG_SELECT_IDX], portMAX_DELAY);
-        } else if (hotkey_cmd.has_ir[HOTKEY_LONG_SELECT_IDX]) { // Else Infrared
-            // RGB indicator
-            uint8_t rgb_state = RGB_BLINK_PURPLE;
-            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-            
-            // Update current remote
-            xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
-            ir_current_remote = hotkey_cmd.ir_cmd[HOTKEY_LONG_SELECT_IDX].current_remote;
-            xSemaphoreGive(xInfraredDataMutex); // Release IR
-            
-            // Send the command
-            xQueueSend(xInfraredSignalToTxQueue, &hotkey_cmd.ir_cmd[HOTKEY_LONG_SELECT_IDX].index, portMAX_DELAY);
-        } else if (hotkey_cmd.is_page[HOTKEY_LONG_SELECT_IDX]) { // Else a menu page
-            // Update the page
-            ui_menu->page = hotkey_cmd.selected_page[HOTKEY_LONG_SELECT_IDX];
-
-            // Go to it
-            go_to_page_from_hotkey(ui_menu);
-        } else {
-#ifdef POLYCAST5_DEBUG
-            ESP_LOGW(TAG, "Long select hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_LONG_SELECT_IDX,
-                    hotkey_cmd.has_lora[HOTKEY_LONG_SELECT_IDX], hotkey_cmd.has_espnow[HOTKEY_LONG_SELECT_IDX]);
-#endif
-        }
-    } else if (ui_btns->home_btn == 1) { // Short press home
-        /* Check for commands */
-        if (hotkey_cmd.has_lora[HOTKEY_SHORT_HOME_IDX] && !lora_hotkey_blocked_by_meshtastic()) { // LoRa cmd; shows a notice and skips if Meshtastic owns the radio
-            // RGB indicator
-            uint8_t rgb_state = RGB_BLINK_TEAL;
-            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-            
-            // Send the command
-            lora_send_req_t lora_req = { .cmd = hotkey_cmd.lora_cmd[HOTKEY_SHORT_HOME_IDX], .ui_origin = false };
-            xQueueOverwrite(xLoraSendEncQueue, &lora_req); // Never block the UI; latest command wins
-        } else if (hotkey_cmd.has_espnow[HOTKEY_SHORT_HOME_IDX]) { // Else ESP-NOW
-            // RGB indicator
-            uint8_t rgb_state = RGB_BLINK_TEAL;
-            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-            
-            // Send the command
-            xQueueSend(xEspSendCmdQueue, &hotkey_cmd.espnow_cmd[HOTKEY_SHORT_HOME_IDX], portMAX_DELAY);
-        } else if (hotkey_cmd.has_ir[HOTKEY_SHORT_HOME_IDX]) { // Else Infrared
-            // RGB indicator
-            uint8_t rgb_state = RGB_BLINK_PURPLE;
-            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-                
-            // Update current remote
-            xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
-            ir_current_remote = hotkey_cmd.ir_cmd[HOTKEY_SHORT_HOME_IDX].current_remote;
-            xSemaphoreGive(xInfraredDataMutex); // Release IR
-            
-            // Send the command
-            xQueueSend(xInfraredSignalToTxQueue, &hotkey_cmd.ir_cmd[HOTKEY_SHORT_HOME_IDX].index, portMAX_DELAY);
-        } else if (hotkey_cmd.is_page[HOTKEY_SHORT_HOME_IDX]) { // Else a menu page
-            // Update the page
-            ui_menu->page = hotkey_cmd.selected_page[HOTKEY_SHORT_HOME_IDX];
-
-            // Go to it
-            go_to_page_from_hotkey(ui_menu);
-        } else {
-#ifdef POLYCAST5_DEBUG
-            ESP_LOGW(TAG, "Short home hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_SHORT_HOME_IDX,
-                    hotkey_cmd.has_lora[HOTKEY_SHORT_HOME_IDX], hotkey_cmd.has_espnow[HOTKEY_SHORT_HOME_IDX]);
-#endif
-        }
-    } else if (ui_btns->right_btn == 1) { // Short press right
-        /* Check for commands */
-        if (hotkey_cmd.has_lora[HOTKEY_SHORT_RIGHT_IDX] && !lora_hotkey_blocked_by_meshtastic()) { // LoRa cmd; shows a notice and skips if Meshtastic owns the radio
-            // RGB indicator
-            uint8_t rgb_state = RGB_BLINK_TEAL;
-            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-            
-            // Send the command
-            lora_send_req_t lora_req = { .cmd = hotkey_cmd.lora_cmd[HOTKEY_SHORT_RIGHT_IDX], .ui_origin = false };
-            xQueueOverwrite(xLoraSendEncQueue, &lora_req); // Never block the UI; latest command wins
-        } else if (hotkey_cmd.has_espnow[HOTKEY_SHORT_RIGHT_IDX]) { // Else ESP-NOW
-            // RGB indicator
-            uint8_t rgb_state = RGB_BLINK_TEAL;
-            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-            
-            // Send the command
-            xQueueSend(xEspSendCmdQueue, &hotkey_cmd.espnow_cmd[HOTKEY_SHORT_RIGHT_IDX], portMAX_DELAY);
-        } else if (hotkey_cmd.has_ir[HOTKEY_SHORT_RIGHT_IDX]) { // Else Infrared
-            // RGB indicator
-            uint8_t rgb_state = RGB_BLINK_PURPLE;
-            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-                    
-            // Update current remote
-            xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
-            ir_current_remote = hotkey_cmd.ir_cmd[HOTKEY_SHORT_RIGHT_IDX].current_remote;
-            xSemaphoreGive(xInfraredDataMutex); // Release IR
-            
-            // Send the command
-            xQueueSend(xInfraredSignalToTxQueue, &hotkey_cmd.ir_cmd[HOTKEY_SHORT_RIGHT_IDX].index, portMAX_DELAY);
-        } else if (hotkey_cmd.is_page[HOTKEY_SHORT_RIGHT_IDX]) { // Else a menu page
-            // Update the page
-            ui_menu->page = hotkey_cmd.selected_page[HOTKEY_SHORT_RIGHT_IDX];
-
-            // Go to it
-            go_to_page_from_hotkey(ui_menu);
-        } else {
-#ifdef POLYCAST5_DEBUG
-            ESP_LOGW(TAG, "Short right hotkey DNE, index='%d' has_lora='%d' has_espnow='%d'", HOTKEY_SHORT_RIGHT_IDX,
-                    hotkey_cmd.has_lora[HOTKEY_SHORT_RIGHT_IDX], hotkey_cmd.has_espnow[HOTKEY_SHORT_RIGHT_IDX]);
-#endif
-        }
+    } else if (hotkeys_on && ui_btns->home_btn == 1) { // Short press home hotkey
+        home_fire_hotkey(ui_menu, HOTKEY_SHORT_HOME_IDX);
+    } else if (hotkeys_on && ui_btns->right_btn == 1) { // Short press right hotkey
+        home_fire_hotkey(ui_menu, HOTKEY_SHORT_RIGHT_IDX);
     }
 }
 
@@ -2282,7 +2187,7 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
             // Go back
             ui_menu->page = HOME_PAGE;
         }
-    } else if (ui_btns->select_btn == 1) { // Check against actual
+    } else if (ui_btns->select_btn == 1 && num_filled > 0) { // Check against actual; an empty submit is no attempt
         input_pin[num_filled] = '\0'; // Ensure termination
             
 #ifdef POLYCAST5_DEBUG
@@ -2350,7 +2255,12 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
             // RGB indicator
             uint8_t rgb_state = RGB_BLINK_RED;
             xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-            
+
+            // Clear input: the retry starts empty
+            num_filled = 0;
+            memset(input_pin, 0, sizeof(input_pin));
+            lcd_settings_rebuild_pin_boxes(settings_menu->pin_menu.pin_container, unlock_labels, input_pin, &num_boxes, num_filled);
+
             // Outline red
             for (int i = 0; i < num_boxes; ++i) {
                 lv_obj_set_style_border_color(lv_obj_get_parent(unlock_labels[i]), lv_palette_main(LV_PALETTE_RED), 0);
@@ -2418,6 +2328,14 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
         lcd_settings_rebuild_pin_boxes(settings_menu->pin_menu.pin_container, unlock_labels, input_pin, &num_boxes, num_filled);
         
         lcd_transition_back(false, ui_menu); // True = home, false = sleep
+    }
+
+    // Left the page (home, unlocked, lockout, sleep; container hidden): the next entry starts empty.
+    // Keep this last: the function has no early return
+    if (ui_menu->page != UNLOCK_PAGE) {
+        num_filled = 0;
+        memset(input_pin, 0, sizeof(input_pin));
+        lcd_settings_rebuild_pin_boxes(settings_menu->pin_menu.pin_container, unlock_labels, input_pin, &num_boxes, num_filled);
     }
 }
 
@@ -2606,6 +2524,7 @@ void lcd_transition_back(bool home, ui_menu_t *ui_menu)
 void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_menu) 
 {    
     static bool initalized = false;
+    static uint32_t select_hold = 0; // SELECT hold-to-repeat
     
     // Do once
     if (!initalized) {
@@ -2615,6 +2534,13 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
         lv_obj_remove_flag(ir_menu->main_list, LV_OBJ_FLAG_HIDDEN);    
         
         initalized = true;
+    }
+    
+    // Holding SELECT on a signal resends it every tick until release, like a real remote
+    if (ir_menu->index >= 3) {
+        lcd_select_hold_repeat(ui_btns, &select_hold);
+    } else {
+        select_hold = 0;
     }
     
     // Edit selected
@@ -2679,12 +2605,13 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
             lcd_hotkey_nvs_save(&hotkey_cmd);
         }
         
-        // Transmit signal at index
-        xQueueSend(xInfraredSignalToTxQueue, &ir_menu->index, portMAX_DELAY);
-        
-        // RGB indicator
-        uint8_t rgb_state = RGB_BLINK_PURPLE;
-        xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+        // Transmit signal at index. A held SELECT re-sends every tick and a long signal replays for up
+        // to ~0.5 s, so a hold step is skipped while one is already queued; a tap always goes out
+        if (xQueueSend(xInfraredSignalToTxQueue, &ir_menu->index, select_hold ? 0 : portMAX_DELAY) == pdTRUE) {
+            // RGB indicator
+            uint8_t rgb_state = RGB_BLINK_PURPLE;
+            xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
+        }
     } else if (ui_btns->down_btn == 1) { // Back selected
         xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
         
@@ -3141,7 +3068,30 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
         if (((last_wifi_event_bits & WIFI_CONNECTED_BIT) && !(wifi_event_bits & WIFI_CONNECTED_BIT))
                 || (wifi_event_bits & WIFI_CONNECTING_FAILED_BIT)) {
             lv_obj_t *lbl = lv_obj_get_child(wifi_menu->btns[0], 0);
-            lv_label_set_text(lbl, "Connect to Network");
+
+            // The user saw "Connecting...": say it failed instead of quietly reverting
+            if ((wifi_event_bits & WIFI_CONNECTING_FAILED_BIT) && strcmp(lv_label_get_text(lbl), "Connecting...") == 0) {
+                lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+                bool arrows_hidden[4];
+                lcd_arrows_hide(ui_menu, arrows_hidden);
+
+                lv_obj_t *lbl_failed = lv_label_create(ACTIVE_SCR);
+                lv_obj_set_style_text_align(lbl_failed, LV_TEXT_ALIGN_CENTER, 0);
+                lcd_format_label(lbl_failed, "Connection failed!\nCheck the signal\nor password.", user_secondary_color,
+                        &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+                lv_timer_handler();
+                vTaskDelay(pdMS_TO_TICKS(2000));
+                lv_obj_delete(lbl_failed);
+                lcd_clear_pending_inputs = true;
+
+                lcd_arrows_restore(ui_menu, arrows_hidden);
+                lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+            }
+            // A failure left from before a later connect must not relabel a connected device
+            if (!(wifi_event_bits & WIFI_CONNECTED_BIT)) {
+                lv_label_set_text(lbl, "Connect to Network");
+            }
 
             xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTING_FAILED_BIT); // Reset for next time
         }
@@ -3696,7 +3646,9 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
                 ESP_LOGE(TAG, "Waiting for left btn press: no OTA available");
 #endif
                 // Wait for left button to be pressed
+                gpio_screen_changed(); // Taps and holds from before this prompt don't count
                 xSemaphoreTake(xLeftButtonSemaphore, portMAX_DELAY);
+                gpio_end_hold(GPIO_BTN_LEFT); // A held LEFT's next repeat would leave Settings too
                 lcd_clear_pending_inputs = true; // Clear any button presses during wait
             }
         } else {
@@ -3711,7 +3663,9 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
             ESP_LOGE(TAG, "Waiting for left btn press: failed to connect to Wi-Fi");
 #endif
             // Wait for left button to be pressed
+            gpio_screen_changed(); // Taps and holds from before this prompt don't count
             xSemaphoreTake(xLeftButtonSemaphore, portMAX_DELAY);
+            gpio_end_hold(GPIO_BTN_LEFT); // A held LEFT's next repeat would leave Settings too
             lcd_clear_pending_inputs = true; // Clear any button presses during wait
         }
 

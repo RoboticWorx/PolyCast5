@@ -370,14 +370,18 @@ static void ai_task(void *pvParameters)
                 ESP_LOGI(TAG, "Raw frames sniff resolved with response. Grok analysis of raw frames: %s", ai_response);
 #endif
                 char *ai_script_ptr = ai_response;
-                xQueueSend(xWifiAiRawSniffQueue, &ai_script_ptr, portMAX_DELAY);
+                xQueueOverwrite(xWifiAiRawSniffQueue, &ai_script_ptr); // Depth 1: replaces an unread result instead of blocking
             }
         } else {
             ESP_LOGE(TAG, "AI request failed: %s", esp_err_to_name(err));
 
+            if (cmd.type == AI_CMD_RAW_FRAMES) {
+                // NULL result = failed. The packet page reads its own queue: a late keyboard result can't fake or mask it
+                char *ai_script_ptr = NULL;
+                xQueueOverwrite(xWifiAiRawSniffQueue, &ai_script_ptr);
             // Explicitly release the AI keyboard from its "thinking" state, or the UI hangs forever
             // STT failures above already raised a bit, so check none raised before
-            if (!(xEventGroupGetBits(xAiEventGroup) &
+            } else if (!(xEventGroupGetBits(xAiEventGroup) &
                     (AI_RATE_LIMITED_BIT | AI_THINKING_FAILED_BIT | AI_DONE_THINKING_BIT))) {
                 if (err == ESP_ERR_NOT_FOUND &&
                         (cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD || cmd.type == AI_CMD_CUSTOM)) {

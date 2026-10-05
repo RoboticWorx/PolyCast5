@@ -422,3 +422,65 @@ void lcd_hotkey_nvs_load(hotkey_cmd_t *dst)
     nvs_close(h);
 }
 
+// Unbind IR hotkey i
+static void hotkey_ir_clear(int i)
+{
+    hotkey_cmd.has_ir[i] = false;
+    memset(&hotkey_cmd.ir_cmd[i], 0, sizeof(hotkey_cmd.ir_cmd[i]));
+}
+
+void lcd_hotkey_ir_signal_deleted(size_t remote_idx, int sig_menu_idx)
+{
+    bool changed = false;
+
+    for (int i = 0; i < MAX_HOTKEY_OPTIONS; i++) {
+        ir_cmd_t *cmd = &hotkey_cmd.ir_cmd[i];
+        if (!hotkey_cmd.has_ir[i] || cmd->current_remote != remote_idx || cmd->index < sig_menu_idx) {
+            continue;
+        }
+
+        if (cmd->index == sig_menu_idx) { // Its signal is gone
+            hotkey_ir_clear(i);
+        } else { // A later signal, now one lower
+            cmd->index--;
+        }
+        changed = true;
+    }
+
+    // Persist to NVS
+    if (changed) {
+        lcd_hotkey_nvs_save(&hotkey_cmd);
+    }
+}
+
+void lcd_hotkey_ir_remote_deleted(size_t remote_idx, bool shifted, size_t remotes_left)
+{
+    bool changed = false;
+
+    for (int i = 0; i < MAX_HOTKEY_OPTIONS; i++) {
+        ir_cmd_t *cmd = &hotkey_cmd.ir_cmd[i];
+        if (!hotkey_cmd.has_ir[i]) {
+            continue;
+        }
+
+        if (cmd->current_remote == remote_idx) { // Its remote is gone (or reset empty)
+            hotkey_ir_clear(i);
+            changed = true;
+        } else if (shifted && cmd->current_remote > remote_idx) { // A later remote, now one lower
+            cmd->current_remote--;
+            changed = true;
+        }
+
+        // Past the list: left by older firmware's deletes
+        if (hotkey_cmd.has_ir[i] && cmd->current_remote >= remotes_left) {
+            hotkey_ir_clear(i);
+            changed = true;
+        }
+    }
+
+    // Persist to NVS
+    if (changed) {
+        lcd_hotkey_nvs_save(&hotkey_cmd);
+    }
+}
+

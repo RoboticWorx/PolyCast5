@@ -48,6 +48,7 @@ static deauth_target_t deauth_target = {0};
 static arp_spoof_target_t arp_spoof_target = {0};
 static ndp_spoof_target_t ndp_spoof_target = {0};
 static wifi_login_t selected_network = {0};
+static wifi_login_t pending_retry_network = {0}; // User-chosen network to retry once after a failed connect
 static wifi_sniff_t sniff_network = {0};
 
 static wifi_mqtt_t wifi_mqtt = {0};
@@ -285,12 +286,19 @@ static void wifi_task(void *param)
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "wifi_utils_radio_start failed: %s", esp_err_to_name(err));
                     xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_CONNECTING_BIT);
+                    xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTING_FAILED_BIT); // Gave up: LCD leaves "Connecting..."
                     continue;
                 }
                 err = wifi_utils_connect();
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "wifi_utils_connect failed: %s", esp_err_to_name(err));
                     xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_CONNECTING_BIT);
+                }
+
+                // First attempt failed and queued a retry: retry this network, not another saved one
+                // It is only saved once it connects, so the known-network pick can't find it
+                if (wifi_reconnect_with_scan) {
+                    pending_retry_network = selected_network;
                 }
             }
         }
@@ -397,16 +405,22 @@ static void wifi_task(void *param)
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Reconnecting to known network...");
 #endif
-                // Use cached known network or scan if failed attempt
-                esp_err_t err = wifi_autoconnect_pick_known_network(&selected_network);
-                if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "WIFI_RECONNECT_BIT: wifi_autoconnect_pick_known_network failed: %s. Falling back.", esp_err_to_name(err));
-                    selected_network = wifi_utils_get_prev();
+                if (pending_retry_network.ssid[0] != '\0') {
+                    // A user-chosen connect failed once: retry that network
+                    selected_network = pending_retry_network;
+                    memset(&pending_retry_network, 0, sizeof(pending_retry_network)); // Consume
+                } else {
+                    // Use cached known network or scan if failed attempt
+                    err = wifi_autoconnect_pick_known_network(&selected_network);
+                    if (err != ESP_OK) {
+                        ESP_LOGE(TAG, "WIFI_RECONNECT_BIT: wifi_autoconnect_pick_known_network failed: %s. Falling back.", esp_err_to_name(err));
+                        selected_network = wifi_utils_get_prev();
 
-                    // Don't fall back to a network that's no longer saved (e.g. one that was
-                    // forgotten but still lingers in esp_wifi's flash STA config)
-                    if (selected_network.ssid[0] != '\0' && !wifi_autoconnect_is_known(selected_network.ssid)) {
-                        selected_network.ssid[0] = '\0';
+                        // Don't fall back to a network that's no longer saved (e.g. one that was
+                        // forgotten but still lingers in esp_wifi's flash STA config)
+                        if (selected_network.ssid[0] != '\0' && !wifi_autoconnect_is_known(selected_network.ssid)) {
+                            selected_network.ssid[0] = '\0';
+                        }
                     }
                 }
 
@@ -417,6 +431,7 @@ static void wifi_task(void *param)
 #endif
                     wifi_reconnect_with_scan = false;
                     xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_CONNECTING_BIT);
+                    xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTING_FAILED_BIT); // Gave up: LCD leaves "Connecting..."
                 } else {
                     xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // Tell LCD we're trying
 

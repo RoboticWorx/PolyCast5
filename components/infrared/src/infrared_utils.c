@@ -37,14 +37,9 @@ static rmt_encoder_handle_t tx_encoder = NULL;
 // When IR signal received
 static bool IRAM_ATTR infrared_rx_callback(rmt_channel_handle_t channel, const rmt_rx_done_event_data_t *edata, void *user_data)
 {
-    // Get len
+    // Get len. The driver clamps it to the buffer: MAX_PULSES means cut off (rejected in infrared_task)
     size_t len = edata->num_symbols;
-    
-    // Cap signal
-    if (len > MAX_PULSES) {
-        len = MAX_PULSES;
-    }
-    
+
     // Make sure an actual signal (not random IR)
     if (len < MIN_VALID_PULSES) {
         restart_rx_pending = true;
@@ -52,10 +47,7 @@ static bool IRAM_ATTR infrared_rx_callback(rmt_channel_handle_t channel, const r
         return (xHigherPriorityTaskWoken == pdTRUE);
     }
     
-    // Copy received signal into ir_signal
-    memcpy(ir_signal, edata->received_symbols, len * sizeof(rmt_symbol_word_t));
-    
-    // Copy length
+    // Symbols are already in ir_signal (the rmt_receive buffer)
     ir_signal_length = len;
 
     /*#ifdef POLYCAST5_DEBUG
@@ -343,8 +335,9 @@ void infrared_utils_load_remotes_nvs(void)
                 
                 // If good malloc
                 if (sig) {
-                    // Get signal
-                    if (nvs_get_blob(h, key, sig, &blob_size) == ESP_OK) {
+                    // Get signal; its length must fit the blob, TX trusts it
+                    if (nvs_get_blob(h, key, sig, &blob_size) == ESP_OK && sig->length > 0 &&
+                            sig->length <= (blob_size - sizeof(ir_signal_t)) / sizeof(rmt_symbol_word_t)) {
                         remotes[r].signals[s] = sig;
                     } else { // Else free bad
                         free(sig);
@@ -621,6 +614,9 @@ void infrared_utils_delete_remote_nvs(size_t remote_idx)
             remotes[k] = remotes[k + 1];
         }
         num_remotes--;
+
+        // The vacated last slot still holds freed or aliased pointers
+        memset(&remotes[num_remotes], 0, sizeof(remotes[num_remotes]));
     }
 
     // Resave to NVS

@@ -1884,7 +1884,7 @@ void lcd_tools_how_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
         ui_menu->page = TOOLS_SRS_PAGE;
     }
     // Reset notebook
-    else if (xSemaphoreTake(xSelectButtonLongSemaphore, 0) == pdTRUE) {
+    else if (lcd_take_long_press(GPIO_BTN_SELECT, &ui_btns->select_btn)) {
         // Clear SRS NVS
         lcd_ns_nvs_clear(SRS_NS);
         
@@ -2006,6 +2006,7 @@ void lcd_tools_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *to
             lv_timer_handler();
             
             // Wait for user confirmation
+            gpio_screen_changed(); // Taps and holds from before this prompt don't count
             while (xSemaphoreTake(xSelectButtonSemaphore, pdMS_TO_TICKS(10)) != pdPASS) {
                 lv_timer_handler();
                 vTaskDelay(pdMS_TO_TICKS(10));

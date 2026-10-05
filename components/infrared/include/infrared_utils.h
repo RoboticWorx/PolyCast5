@@ -12,7 +12,7 @@
 // Configuration macros
 #define RMT_RESOLUTION_HZ 1000000 // 1us resolution
 
-#define MAX_PULSES 128
+#define MAX_PULSES 512 // RX buffer; a capture that fills it was cut off by the driver and is rejected
 #define PULSE_BLOCK 96
 #define MIN_VALID_PULSES 10
 

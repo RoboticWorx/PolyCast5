@@ -394,7 +394,7 @@ void lcd_gpio_scanner_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *
     }
 }
 
-// Safe log append
+// Log append: drops whole lines from the front so the newest text always fits
 static void term_log_append(char *dst, size_t cap, const char *line)
 {
     // Exit early if bad
@@ -402,21 +402,59 @@ static void term_log_append(char *dst, size_t cap, const char *line)
         return;
     }
     
-    strlcat(dst, line, cap);
+    size_t add = strlen(line);
+
+    // Longer than the whole log: keep its tail
+    if (add >= cap) {
+        line += add - (cap - 1);
+        add = cap - 1;
+    }
+
+    // First line start that leaves room; no newline left drops everything
+    size_t len = strlen(dst);
+    size_t drop = 0;
+    while (len - drop + add >= cap) {
+        const char *nl = memchr(dst + drop, '\n', len - drop);
+        drop = nl ? (size_t)(nl - dst) + 1 : len;
+    }
+
+    // Shift the kept lines to the front
+    if (drop > 0) {
+        memmove(dst, dst + drop, len - drop);
+        len -= drop;
+    }
+
+    memcpy(dst + len, line, add + 1); // Includes NUL
+}
+
+// Show the log without its final newline, which LVGL would draw as an empty bottom row
+static void term_log_show(lv_obj_t *lbl, char *log)
+{
+    size_t len = strlen(log);
+    if (len > 0 && log[len - 1] == '\n') {
+        log[len - 1] = '\0';
+        lv_label_set_text(lbl, log); // Copies
+        log[len - 1] = '\n';
+    } else {
+        lv_label_set_text(lbl, log);
+    }
 }
 
 void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *gpio_menu)
 {
     #define TERMINAL_SLAVE_ADDR 0x2A // Assumed external slave address
     #define TERMINAL_MAX_CMD 255 // Max command value (uint8_t)
+    #define TERMINAL_FOOTER_H 22 // Command strip in the bottom padding: 1 divider + 2 pad + 16 line + 3 pad
+    #define TERMINAL_LOG_GAP 6 // Space between the last log line and the command strip's divider
  
     // Statics
     static bool init = false;
     static lv_obj_t *cont = NULL;
     static lv_obj_t *title_lbl = NULL;
     static lv_obj_t *log_lbl = NULL;
+    static lv_obj_t *cmd_lbl = NULL; // Fixed: the command SELECT sends
     static uint8_t current_cmd = 0; // Current command number (0-255)
-    POLYCAST5_USE_PSRAM_BSS static char log_buffer[2048] = {0}; // Buffer for terminal log (append-only)
+    POLYCAST5_USE_PSRAM_BSS static char log_buffer[2048] = {0}; // Buffer for terminal log (oldest lines dropped when full)
  
      // Do once
     if (!init) {
@@ -438,6 +476,7 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
         lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_AUTO);
         lv_obj_set_scroll_dir(cont, LV_DIR_VER);
         lv_obj_set_style_pad_all(cont, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Padding for content
+        lv_obj_set_style_pad_bottom(cont, TERMINAL_FOOTER_H + TERMINAL_LOG_GAP, LV_PART_MAIN | LV_STATE_DEFAULT); // Log ends a gap above the command strip
 
         // Title label
         title_lbl = lv_label_create(cont);
@@ -456,6 +495,22 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
         
         lv_label_set_text(log_lbl, "Use up/down to adjust.\nPress select to send.");
 
+        // Command label: floating, so it stays put while the log scrolls under it
+        cmd_lbl = lv_label_create(cont);
+        lv_obj_add_flag(cmd_lbl, LV_OBJ_FLAG_FLOATING);
+        lv_obj_set_size(cmd_lbl, lv_pct(100), TERMINAL_FOOTER_H);
+        lv_obj_set_style_bg_color(cmd_lbl, user_primary_color, 0);
+        lv_obj_set_style_bg_opa(cmd_lbl, LV_OPA_COVER, 0); // Hides log text scrolling underneath
+        lv_obj_set_style_border_side(cmd_lbl, LV_BORDER_SIDE_TOP, 0);
+        lv_obj_set_style_border_width(cmd_lbl, 1, 0);
+        lv_obj_set_style_border_color(cmd_lbl, user_secondary_color, 0);
+        lv_obj_set_style_pad_top(cmd_lbl, 2, 0);
+        lv_obj_set_style_text_font(cmd_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(cmd_lbl, user_secondary_color, 0);
+        lv_obj_set_style_text_align(cmd_lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(cmd_lbl, LV_ALIGN_BOTTOM_MID, 0, TERMINAL_FOOTER_H + TERMINAL_LOG_GAP); // Sits on the bottom border, below the gap
+        lv_label_set_text_fmt(cmd_lbl, "Command: %u (0x%02X)", current_cmd, current_cmd);
+
         lv_timer_handler();
  
         init = true;
@@ -467,24 +522,13 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
         current_cmd = (current_cmd < TERMINAL_MAX_CMD) ? current_cmd + 1 : 0;
         
         // Show updated
-        char msg[64];
-        snprintf(msg, sizeof(msg), "Command: %d\n", current_cmd);
-        term_log_append(log_buffer, sizeof(log_buffer), msg);
-
-        lv_label_set_text(log_lbl, log_buffer);
-        lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
+        lv_label_set_text_fmt(cmd_lbl, "Command: %u (0x%02X)", current_cmd, current_cmd);
     } else if (ui_btns->down_btn == 1) {
         // Decrement cmd with wrap
         current_cmd = (current_cmd > 0) ? current_cmd - 1 : TERMINAL_MAX_CMD;
         
         // Show updated
-        char msg[64];
-        snprintf(msg, sizeof(msg), "Command: %d\n", current_cmd);
-        term_log_append(log_buffer, sizeof(log_buffer), msg);
-        
-        lv_label_set_text(log_lbl, log_buffer);
-
-        lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
+        lv_label_set_text_fmt(cmd_lbl, "Command: %u (0x%02X)", current_cmd, current_cmd);
     } else if (ui_btns->select_btn == 1) {
         #define TERMINAL_MAX_RESPONSE_LEN 126 // Match slave
         #define TERMINAL_FIXED_LEN (1 + TERMINAL_MAX_RESPONSE_LEN) // Fixed read size
@@ -504,10 +548,10 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
             i2c_master_dev_handle_t term_dev = NULL;
             ret = i2c_master_bus_add_device(i2c_bus_handle, &dev_cfg, &term_dev);
             if (ret != ESP_OK) {
-                snprintf(msg, sizeof(msg), "Add device failed: %s\n\n", esp_err_to_name(ret));
+                snprintf(msg, sizeof(msg), "Add device failed: %s\n", esp_err_to_name(ret));
                 term_log_append(log_buffer, sizeof(log_buffer), msg);
                 xSemaphoreGive(xI2CBusMutex);
-                lv_label_set_text(log_lbl, log_buffer);
+                term_log_show(log_lbl, log_buffer);
                 lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
                 return;
             }
@@ -521,13 +565,13 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
             term_log_append(log_buffer, sizeof(log_buffer), msg);
 
             if (ret != ESP_OK) {
-                snprintf(msg, sizeof(msg), "Write failed: %s\n\n", esp_err_to_name(ret));
+                snprintf(msg, sizeof(msg), "Write failed: %s\n", esp_err_to_name(ret));
                 term_log_append(log_buffer, sizeof(log_buffer), msg);
 
                 // Early exit on write error
                 i2c_master_bus_rm_device(term_dev);
                 xSemaphoreGive(xI2CBusMutex); // Release I2C bus
-                lv_label_set_text(log_lbl, log_buffer);
+                term_log_show(log_lbl, log_buffer);
                 lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
                 return;
             }
@@ -546,17 +590,17 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
 
                 // len == 0 -> empty
                 if (response_len == 0) {
-                    snprintf(msg, sizeof(msg), "Empty response.\n\n");
+                    snprintf(msg, sizeof(msg), "Empty response.\n");
                 } else if (response_len > TERMINAL_MAX_RESPONSE_LEN) { // Response too big
-                    snprintf(msg, sizeof(msg), "Invalid response length: %u\n\n", response_len);
+                    snprintf(msg, sizeof(msg), "Invalid response length: %u\n", response_len);
                 } else { // Else valid response
                     char response_str[TERMINAL_MAX_RESPONSE_LEN + 1] = {0};
                     memcpy(response_str, &response_buf[1], response_len); // Copy exactly len bytes
                     response_str[response_len] = '\0'; // NUL-terminate
-                    snprintf(msg, sizeof(msg), "Response: %s\n\n", response_str);
+                    snprintf(msg, sizeof(msg), "Response: %s\n", response_str);
                 }
             } else {
-                snprintf(msg, sizeof(msg), "Read failed: %s\n\n", esp_err_to_name(ret));
+                snprintf(msg, sizeof(msg), "Read failed: %s\n", esp_err_to_name(ret));
             }
 
             // Append to log
@@ -567,20 +611,20 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
             xSemaphoreGive(xI2CBusMutex); // Release I2C bus
 
             // Show and scroll to bottom
-            lv_label_set_text(log_lbl, log_buffer);
+            term_log_show(log_lbl, log_buffer);
             lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
         } else {
             // Mutex timeout - append error
-            term_log_append(log_buffer, sizeof(log_buffer), "\nI2C bus busy - timed out.\n\n");
+            term_log_append(log_buffer, sizeof(log_buffer), "\nI2C bus busy - timed out.\n");
 
             // Show and scroll to bottom
-            lv_label_set_text(log_lbl, log_buffer);
+            term_log_show(log_lbl, log_buffer);
             lv_obj_scroll_to_y(cont, LV_COORD_MAX, LV_ANIM_ON);
         }
     } else if (ui_btns->left_btn == 1) { // Exit
         // Clean up
         lv_obj_delete(cont); // Deletes children
-        cont = title_lbl = log_lbl = NULL;
+        cont = title_lbl = log_lbl = cmd_lbl = NULL;
         init = false;
         memset(log_buffer, 0, sizeof(log_buffer)); // Clear log for next entry
         current_cmd = 0;
@@ -593,7 +637,7 @@ void lcd_gpio_terminal_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t 
     } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off
         // Clean up
         lv_obj_delete(cont); // Deletes children
-        cont = title_lbl = log_lbl = NULL;
+        cont = title_lbl = log_lbl = cmd_lbl = NULL;
         init = false;
         memset(log_buffer, 0, sizeof(log_buffer)); // Clear log for next entry
         current_cmd = 0;

@@ -85,4 +85,21 @@ void lcd_hotkey_nvs_load(hotkey_cmd_t *hotkey_cmd);
  */
 void lcd_hotkey_nvs_save(const hotkey_cmd_t *hotkey_cmd);
 
+/**
+ * @brief After an IR signal delete: clear hotkeys on that signal, shift later ones down, save if changed
+ *
+ * @param [in] remote_idx Remote the signal was on
+ * @param [in] sig_menu_idx IR menu index of the deleted signal (signal + IR_NUM_BASE_OPTIONS)
+ */
+void lcd_hotkey_ir_signal_deleted(size_t remote_idx, int sig_menu_idx);
+
+/**
+ * @brief After an IR remote delete: clear its hotkeys and any past the list, shift later ones down, save if changed
+ *
+ * @param [in] remote_idx Deleted remote
+ * @param [in] shifted False if the only remote was reset in place instead of removed
+ * @param [in] remotes_left num_remotes after the delete
+ */
+void lcd_hotkey_ir_remote_deleted(size_t remote_idx, bool shifted, size_t remotes_left);
+
 #endif // LCD_HOTKEY_H

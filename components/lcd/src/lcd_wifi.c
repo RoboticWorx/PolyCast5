@@ -51,7 +51,7 @@
 #define WIFI_TOPIC_KEY_COUNT "count" // u8: number of topics
 #define WIFI_TOPIC_KEY_FMT "topic_%02d" // e.g. "topic_00", "topic_01", ...
 
-#define MAX_PASSWORD_LEN 32
+#define MAX_PASSWORD_LEN 63 // WPA passphrase max; 64 (hex PSK) would not fit esp_wifi's sta.password[64] with its NUL
 
 #define WIFI_MENU_START_SIZE 7 // First WIFI_MENU_START_SIZE default options
 
@@ -603,6 +603,38 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
 
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     } else if (ui_btns->select_btn == 1 && wifi_menu->scan_menu.index == 0 && !scanning && !monitoring_packets) { // If connecting to last known
+        // Nothing saved yet: say so and stay here instead of silently going back
+        if (wifi_autoconnect_get_known_count() == 0) {
+            lv_obj_add_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+            if (lbl_option) {
+                lv_obj_add_flag(lbl_option, LV_OBJ_FLAG_HIDDEN);
+            }
+            bool arrows_hidden[4];
+            lcd_arrows_hide(ui_menu, arrows_hidden);
+
+            lv_obj_t *lbl_none = lv_label_create(ACTIVE_SCR);
+            lv_obj_set_style_text_align(lbl_none, LV_TEXT_ALIGN_CENTER, 0);
+            lcd_format_label(lbl_none, "No saved network yet.\nScan and pick one.", user_secondary_color,
+                    &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+            lv_timer_handler();
+            vTaskDelay(pdMS_TO_TICKS(1500));
+            lv_obj_delete(lbl_none);
+            lcd_clear_pending_inputs = true;
+
+            lcd_arrows_restore(ui_menu, arrows_hidden);
+            lv_obj_remove_flag(wifi_menu->scan_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+            if (lbl_option) {
+                lv_obj_remove_flag(lbl_option, LV_OBJ_FLAG_HIDDEN);
+            }
+            return;
+        }
+
+        // Show the attempt now: if no saved network is in range it gives up without one, and the
+        // Wi-Fi page only reports a failure after "Connecting..."
+        if (!(xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT)) {
+            lv_label_set_text(lv_obj_get_child(wifi_menu->btns[0], 0), "Connecting...");
+        }
+
         if (lbl_option) { // Delete if exists
             lv_obj_delete(lbl_option);
             lbl_option = NULL;
@@ -987,6 +1019,7 @@ void lcd_wifi_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *w
     static lv_obj_t *lbl_sec_ins = NULL;
     static lv_obj_t *lbl_send = NULL;
     static lv_obj_t *lbl_stats = NULL;
+    static uint32_t select_hold = 0; // SELECT hold-to-repeat (-3 s)
 
     if (init) {
         // Default duration for deauth target
@@ -1066,6 +1099,9 @@ void lcd_wifi_deauth_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *w
             lv_label_set_text_fmt(lbl_stats, "%" PRIu32 " sent", deauth_stats.frames_sent);
         }
     }
+
+    // Holding SELECT keeps stepping the duration down by 3 s
+    lcd_select_hold_repeat(ui_btns, &select_hold);
 
     // User input
     if (ui_btns->right_btn == 1) { // Send deauth frames
@@ -1527,6 +1563,7 @@ void lcd_wifi_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {
     #define WIFI_AI_PKT_CONN_FAILED_TXT "Connection failed!\nPlease connect to your\nWi-Fi network at least\nonce in the 'Wi-Fi'\nmenu and make sure\nyou are in range."
+    #define WIFI_AI_PKT_AI_FAILED_TXT "Analysis failed!\nCheck your API key,\ncredits and internet.\n\nHold SELECT to retry."
     #define WIFI_AI_PKT_CAPTURE_TXT "Captured %u/%u pkts"
     #define WIFI_AI_PKT_HOLD_TXT "  Hold select to\ncapture on Ch. %u"
 
@@ -1609,7 +1646,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 
 		// Default state
         state = AI_PKT_IDLE;
-        last_select = false;
+        last_select = gpio_select_btn_held; // Still down from the press that opened the page: not a new press
         last_frames_shown = 0;
         reconnect_sent = false;
         disconnect_tick = reconnect_start_tick = 0;
@@ -1797,17 +1834,35 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 
     // When response received (non-blocking)
     if ((xQueueReceive(xWifiAiRawSniffQueue, &raw_frames_ai_response, 0) == pdTRUE) && (state == AI_PKT_ANALYSIS_WAITING)) {
-        // Snapshot into portal's s_result before AI task can memset ai_response on a subsequent command
-        ai_analysis_portal_set_result(raw_frames_ai_response);
-
-        state = AI_PKT_ANALYSIS_COMPLETE;
-
 		// Stop loading animation
 		lcd_anim_loading_stop();
 
         lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
-        lv_label_set_text(lbl_ins, "Analysis complete!\n\nPress RIGHT to\nsee the results.");
-        lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Show right arrow
+
+        if (raw_frames_ai_response) {
+            // Snapshot into portal's s_result before AI task can memset ai_response on a subsequent command
+            ai_analysis_portal_set_result(raw_frames_ai_response);
+
+            state = AI_PKT_ANALYSIS_COMPLETE;
+
+            lv_label_set_text(lbl_ins, "Analysis complete!\n\nPress RIGHT to\nsee the results.");
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN); // Show right arrow
+        } else { // NULL = AI request failed
+            lv_label_set_text(lbl_ins, WIFI_AI_PKT_AI_FAILED_TXT);
+
+            // Idle cues back: RIGHT = config, UP/DOWN = channel. The gear icon stays hidden, it would
+            // overlap the centred error text
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+            // Back to the page-entry Wi-Fi state so a retry can sniff. An exit this tick handles Wi-Fi itself
+            if (!(ui_btns->left_btn || ui_btns->right_btn || ui_btns->home_btn || ui_btns->pwr_btn)) {
+                xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+            }
+
+            state = AI_PKT_IDLE;
+        }
         lv_timer_handler(); // Update immediately
     }
 
@@ -2955,6 +3010,7 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
     lcd_format_label(lbl_del, "DELETE", user_secondary_color,
             &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
                     
+    gpio_screen_changed(); // Taps and holds from before this prompt don't count
     while (1) {
         lv_timer_handler();
         
@@ -3092,6 +3148,7 @@ void lcd_wifi_send_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
     // Define statics
     static bool three_dots = false;
     static bool mqtt_connected = false;
+    static uint32_t select_hold = 0; // SELECT hold-to-repeat (+3)
     
     // Update labels on status
     static EventBits_t last_wifi_event_bits = {0};
@@ -3120,6 +3177,9 @@ void lcd_wifi_send_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
         
         last_wifi_event_bits = wifi_event_bits;
     }
+    
+    // Holding SELECT keeps stepping the command by 3
+    lcd_select_hold_repeat(ui_btns, &select_hold);
     
     // Send via MQTT
     if (ui_btns->right_btn == 1) {
@@ -3849,6 +3909,7 @@ void lcd_wifi_network_info_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_men
 
     // Init once
     if (!init) {
+        lcd_arm_confirm_page(ui_btns); // RIGHT confirms: only a press made on this page counts
         // Right = forget, Left = back; hide the vertical arrows
         lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -3883,6 +3944,21 @@ void lcd_wifi_network_info_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_men
         lv_obj_set_style_text_align(info_lbl_prompt, LV_TEXT_ALIGN_CENTER, 0);
         lcd_format_label(info_lbl_prompt, "Press RIGHT to forget", user_secondary_color,
                 &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -10);
+
+        // A long password (up to 63 chars) can run into the prompt: drop it to 12 pt, and if a two-line
+        // SSID still leaves too little room, roll it on one line
+        lv_obj_update_layout(info_lbl_prompt);
+        if (lv_obj_get_y2(info_lbl_pw) >= lv_obj_get_y(info_lbl_prompt)) {
+            lv_obj_set_style_text_font(info_lbl_pw, &lv_font_montserrat_12, 0);
+            lv_obj_align_to(info_lbl_pw, info_lbl_ssid, LV_ALIGN_OUT_BOTTOM_MID, 0, 4);
+
+            lv_obj_update_layout(info_lbl_pw);
+            if (lv_obj_get_y2(info_lbl_pw) >= lv_obj_get_y(info_lbl_prompt)) {
+                lv_obj_set_style_text_font(info_lbl_pw, &lv_font_montserrat_16, 0);
+                lv_label_set_long_mode(info_lbl_pw, LV_LABEL_LONG_SCROLL_CIRCULAR);
+                lv_obj_align_to(info_lbl_pw, info_lbl_ssid, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+            }
+        }
 
         init = true;
     }

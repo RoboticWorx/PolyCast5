@@ -926,6 +926,7 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
     lcd_format_label(lbl_del, "DELETE", user_secondary_color,
                  &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
                     
+    gpio_screen_changed(); // Taps and holds from before this prompt don't count
     while (1) {
         lv_timer_handler(); // Show
         
@@ -1082,6 +1083,15 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, lora_menu_t *lora_menu)
 
 void lcd_lora_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *lora_menu, lora_plan_menu_t *lora_plan_menu) 
 {    
+    static uint32_t select_hold = 0; // SELECT hold-to-repeat on Send
+
+    // Holding SELECT on Send resends every tick until release
+    if (lora_menu->submenu.index == 0) {
+        lcd_select_hold_repeat(ui_btns, &select_hold);
+    } else {
+        select_hold = 0;
+    }
+
     // If the receiver reported an outcome for a command sent from this PolyPlug.
     // Peek first: one belonging to another page stays queued for that page.
     lora_receipt_t receipt;
@@ -1465,6 +1475,7 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
     static uint8_t cmd_to_send = 1; // Set default
     static bool tx_success = false;
     static bool init = false;
+    static uint32_t select_hold = 0; // SELECT hold-to-repeat (+3)
     
     static lv_obj_t *qr_canvas = NULL;
     static uint8_t *qr_buf = NULL; // Canvas backing buffer
@@ -1584,6 +1595,9 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
     }
     
     /* User input */
+    // Holding SELECT keeps stepping the command by 3
+    lcd_select_hold_repeat(ui_btns, &select_hold);
+    
     // Increment command
     if (ui_btns->up_btn == 1) {
         // Reset receipts
@@ -1699,6 +1713,7 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
         }
         
         // Show until back selected
+        gpio_screen_changed(); // Taps and holds from before this prompt don't count
         while (xSemaphoreTake(xLeftButtonSemaphore, 0) != pdTRUE) {
             lv_timer_handler();
             vTaskDelay(pdMS_TO_TICKS(10));
@@ -2197,6 +2212,17 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
         init = true;
     }
     
+    // Holding RIGHT/LEFT walks the cursor and the hold ends on the last/first digit, so sending the
+    // plan or discarding the times takes a tap: an auto-repeat there is ignored
+    if (ui_btns->right_btn == 1 && selected_digit == 11 && gpio_short_was_repeat(GPIO_BTN_RIGHT)) {
+        ui_btns->right_btn = 0;
+        gpio_end_hold(GPIO_BTN_RIGHT);
+    }
+    if (ui_btns->left_btn == 1 && selected_digit == 0 && gpio_short_was_repeat(GPIO_BTN_LEFT)) {
+        ui_btns->left_btn = 0;
+        gpio_end_hold(GPIO_BTN_LEFT);
+    }
+
     // Confirm
     if (ui_btns->right_btn == 1 && selected_digit == 11) {
 #ifdef POLYCAST5_DEBUG
@@ -2276,6 +2302,9 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
     } else if (ui_btns->right_btn == 1) { // Digit right
         // Increment with wrap
         selected_digit = (selected_digit + 1) % PLAN_TIME_DIGITS;
+        if (selected_digit == 11 && gpio_short_was_repeat(GPIO_BTN_RIGHT)) {
+            gpio_end_hold(GPIO_BTN_RIGHT); // No queued repeat may confirm
+        }
         
         // Set cursor X position
         lv_obj_set_x(lbl_selected_icon, cursor_x_offsets[selected_digit]);
@@ -2285,6 +2314,9 @@ void lcd_lora_plan_times_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
     } else if (ui_btns->left_btn == 1) { // Digit left
         // Decrement with wrap
         selected_digit = (selected_digit + PLAN_TIME_DIGITS - 1) % PLAN_TIME_DIGITS;
+        if (selected_digit == 0 && gpio_short_was_repeat(GPIO_BTN_LEFT)) {
+            gpio_end_hold(GPIO_BTN_LEFT); // No queued repeat may go back
+        }
         
         // Set cursor X position
         lv_obj_set_x(lbl_selected_icon, cursor_x_offsets[selected_digit]);

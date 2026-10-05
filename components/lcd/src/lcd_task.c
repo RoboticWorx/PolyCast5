@@ -263,7 +263,7 @@ static void lcd_task(void *pvParameters)
                 
                 go_to_sleep = true;
             } else {
-                // ui_btns.pwr_btn cleared with lcd_clear_pending_inputs after waking
+                // ui_btns.pwr_btn cleared by lcd_device_sleep after waking
                 
                 go_to_sleep = false;
             }
@@ -275,6 +275,7 @@ static void lcd_task(void *pvParameters)
             }
             
             dont_sleep_on_this_page = false; // Reset flag
+            int page_before = ui_menu.page;
             // All LCD pages
             switch (ui_menu.page) {
                 case BOOT_PAGE:
@@ -634,6 +635,18 @@ static void lcd_task(void *pvParameters)
                     break;
                 default:
                     break;
+            }
+
+            // Holds don't carry into the next page; quick taps do (a level deeper)
+            if (ui_menu.page != page_before) {
+                gpio_swallow_holds(ui_menu.page == HOME_PAGE);
+            }
+            gpio_lcd_pass_done(); // An untaken long press now ages toward being dropped
+
+            // A consumed hold gives no short, so count it as input here
+            if (lcd_hold_activity) {
+                lcd_hold_activity = false;
+                sleep_timer_last = xTaskGetTickCount();
             }
         }
         

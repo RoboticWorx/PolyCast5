@@ -1,7 +1,20 @@
 #ifndef GPIO_TASK_H
 #define GPIO_TASK_H
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #include "freertos/idf_additions.h"
+
+// Buttons, in gpio_task's polling order
+typedef enum {
+    GPIO_BTN_SELECT = 0,
+    GPIO_BTN_HOME,
+    GPIO_BTN_UP,
+    GPIO_BTN_DOWN,
+    GPIO_BTN_LEFT,
+    GPIO_BTN_RIGHT,
+} gpio_btn_t;
 
 // Mutex
 extern SemaphoreHandle_t xSPIBusMutex;
@@ -48,6 +61,105 @@ extern QueueHandle_t xMagReadingsQueue;
 
 // Latest raw measured battery voltage (volts), updated by adc_task
 extern volatile float gpio_battery_voltage;
+
+// True while the physical button is down, sampled every poll
+extern volatile bool gpio_select_btn_held;
+extern volatile bool gpio_up_btn_held;
+extern volatile bool gpio_down_btn_held;
+extern volatile bool gpio_left_btn_held;
+extern volatile bool gpio_right_btn_held;
+
+/**
+ * @brief  Take a button's waiting long press and end the press that gave it: no more
+ *         auto-repeats or release short follow, and a short it already queued is dropped.
+ *
+ * @param [in] btn Button
+ * @param [out] own_short Optional: set true if the last short given came from that same press
+ *                        (it was dropped; a copy already taken this tick is the caller's to drop)
+ *
+ * @returns True if a long press was taken
+ */
+bool gpio_take_long_press(gpio_btn_t btn, bool *own_short);
+
+/**
+ * @brief  End a button's current press: no more long press, auto-repeats or release short,
+ *         and a queued repeat is dropped.
+ *
+ * @param [in] btn Button
+ */
+void gpio_end_hold(gpio_btn_t btn);
+
+/**
+ * @brief  For hold-to-repeat: take the waiting long press only if it came from the press still
+ *         held (then as gpio_take_long_press). One from an earlier press is dropped.
+ *
+ * @param [in] btn Button
+ *
+ * @returns True if a long press was taken
+ */
+bool gpio_take_held_long_press(gpio_btn_t btn);
+
+/**
+ * @brief  Whether the button's last short press was an auto-repeat rather than a release.
+ *
+ * @param [in] btn Button
+ *
+ * @returns True for an auto-repeat
+ */
+bool gpio_short_was_repeat(gpio_btn_t btn);
+
+/**
+ * @brief  lcd_task finished a page pass. A long press left untaken across two passes is dropped
+ *         at the button's next press.
+ */
+void gpio_lcd_pass_done(void);
+
+/**
+ * @brief  Number of the button's current (or last) physical press; changes on every new press.
+ *
+ * @param [in] btn Button
+ *
+ * @returns Press number, 0 before the first press
+ */
+uint32_t gpio_press_seq(gpio_btn_t btn);
+
+/**
+ * @brief  Drop every queued short press (they count taps).
+ */
+void gpio_flush_shorts(void);
+
+/**
+ * @brief  Drop one button's queued short presses.
+ *
+ * @param [in] btn Button
+ */
+void gpio_flush_short(gpio_btn_t btn);
+
+
+/**
+ * @brief  On a page change: end presses held past the long-press point or down when another
+ *         button's event fired, drop waiting long presses, and drop or ignore HOME taps (and RIGHT
+ *         when landing on the homescreen) for SCREEN_SETTLE_MS: a second press would fire a
+ *         homescreen hotkey. Other taps carry over, so quick taps go a level deeper. Raw held flags
+ *         are untouched.
+ *
+ * @param [in] to_home The new page is the homescreen
+ */
+void gpio_swallow_holds(bool to_home);
+
+/**
+ * @brief  A blocking prompt or destructive confirm page is up: drop queued taps and waiting long
+ *         presses and end every press still down, so nothing aimed elsewhere confirms it. Raw held
+ *         flags are untouched.
+ */
+void gpio_screen_changed(void);
+
+/**
+ * @brief  A button just woke the device from light sleep: a press found down at gpio_task's next
+ *         good read is the one that woke it and gives no events. Later presses count. Call before
+ *         lcd_task next blocks, so gpio_task can't read in between.
+ */
+void gpio_woke_by_button(void);
 
 /**
  * @brief  Create the GPIO task.

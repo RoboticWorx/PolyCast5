@@ -106,12 +106,6 @@ static uint32_t irx_last_seq = 0;
 static uint8_t irx_mode = IRX_MODE_VIEW;
 static TickType_t irx_pal_show_until = 0; // Hold the palette name on screen after a change
 
-// Raw held button state, declared in gpio_task.c
-extern volatile bool gpio_select_btn_held;
-
-// Set when the long semaphore is served, cleared only once the button is physically up.
-static bool irx_sel_held = false;
-
 // Defined with the rest of the detail view below; the page timer above needs the declaration
 static void irx_detail_tick(void);
 
@@ -1119,16 +1113,12 @@ void lcd_gpio_ir_exp_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
         irx_timer = lv_timer_create(irx_timer_cb, IRX_FRAME_MS, NULL);
         irx_init = true;
 
-        // The SELECT press that opened this page may still be down, and the menu behind may already have armed
-        // the long semaphore. Drop both, or the first pass latches a hold nothing releases and eats a real press.
+        // The menu behind may already have armed the long semaphore with the press that opened this page
         if (xSelectButtonLongSemaphore != NULL) {
             xQueueReset(xSelectButtonLongSemaphore);
         }
-        irx_sel_held = false;
 
-        // Same reason as the failure path above, and it matters most on the hotkey route: a long-press that jumps
-        // straight here leaves the button down, gpio_task starts auto-repeating shorts 100 ms later, and the first
-        // to arrive after the bring-up would run the exit branch and close the page the hotkey just opened.
+        // Same reason as the failure path above: presses made during the bring-up are still latched
         lcd_clear_pending_inputs = true;
 
 #ifdef POLYCAST5_DEBUG
@@ -1152,17 +1142,6 @@ void lcd_gpio_ir_exp_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
         return;
     }
 
-    // SELECT hold bookkeeping, before the mode dispatch because more than one mode acts on select_btn. Once a
-    // hold has been served, gpio_task's auto-repeat hands out short presses every 100 ms while the button is down;
-    // those are swallowed here so the hold does not also trigger the short press. The latch clears on release.
-    if (irx_sel_held) {
-        if (gpio_select_btn_held) {
-            ui_btns->select_btn = 0;
-        } else {
-            irx_sel_held = false;
-        }
-    }
-
     // Detail view: LEFT or RIGHT returns to the image, HOME/POWER leaves the page
     if (irx_mode == IRX_MODE_DETAIL) {
         if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
@@ -1177,12 +1156,9 @@ void lcd_gpio_ir_exp_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
         return;
     }
 
-    // Live view. The hold is still consumed even though nothing acts on it any more: leaving it signalled would
-    // hand the hold to whatever page comes next, and without the latch gpio_task auto-repeat shorts fall through
-    // to the freeze toggle and flicker HOLD for as long as the button is held.
-    if (xSelectButtonLongSemaphore != NULL
-            && xSemaphoreTake(xSelectButtonLongSemaphore, 0) == pdTRUE) {
-        irx_sel_held = true; // Swallow the auto-repeat shorts until the button comes up
+    // Live view. A SELECT hold is consumed and does nothing; otherwise its release short would toggle freeze
+    if (lcd_take_long_press(GPIO_BTN_SELECT, &ui_btns->select_btn)) {
+        // Hold swallowed
     } else if (ui_btns->up_btn == 1) {
         irx_pal_idx = (uint8_t)((irx_pal_idx + IRX_PAL_COUNT - 1) % IRX_PAL_COUNT);
         irx_build_palette(irx_pal_idx);

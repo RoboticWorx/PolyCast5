@@ -20,6 +20,7 @@
 #include "lcd_gpio.h"
 
 #include "gpio_utils.h"
+#include "gpio_task.h" // gpio_btn_t
 
 #include "wifi_task.h" // icon_state_t
 
@@ -360,6 +361,52 @@ void lcd_init_images();
  * @brief Clear all user inputs
  */
 void lcd_clear_user_in();
+
+// Set when a long press or hold-repeat step was consumed; lcd_task counts it as input for the sleep timer
+extern bool lcd_hold_activity;
+
+/**
+ * @brief Take a button's long press and end its hold (no repeats or release short follow)
+ *
+ * @param [in] btn Button
+ * @param [out] short_btn That button's ui_btns flag, cleared: the hold may have queued it this tick
+ *
+ * @returns True if a long press was taken
+ */
+bool lcd_take_long_press(gpio_btn_t btn, bool *short_btn);
+
+/**
+ * @brief Call on a destructive confirm page's first pass: taps carried in from the page before
+ *        (and any already copied into ui_btns this pass) don't count, nor presses still down
+ *
+ * @param [in,out] ui_btns UI buttons; the short-press flags are cleared, pwr_btn is kept
+ */
+void lcd_arm_confirm_page(ui_btns_t *ui_btns);
+
+/**
+ * @brief Hide the four arrows for a notice that clears itself, remembering which were showing
+ *
+ * @param [in] ui_menu UI menu
+ * @param [out] was_hidden Each arrow's hidden state before: top, bottom, left, right
+ */
+void lcd_arrows_hide(ui_menu_t *ui_menu, bool was_hidden[4]);
+
+/**
+ * @brief Show again the arrows lcd_arrows_hide() hid
+ *
+ * @param [in] ui_menu UI menu
+ * @param [in] was_hidden States lcd_arrows_hide() saved
+ */
+void lcd_arrows_restore(ui_menu_t *ui_menu, const bool was_hidden[4]);
+
+/**
+ * @brief Opt-in SELECT hold-to-repeat: once a SELECT hold passes the long-press point, select_btn
+ *        is set on every tick until release (SELECT itself never auto-repeats)
+ *
+ * @param [in,out] ui_btns UI buttons
+ * @param [in,out] hold Caller-owned static, 0 when idle
+ */
+void lcd_select_hold_repeat(ui_btns_t *ui_btns, uint32_t *hold);
 
 /**
  * @brief Updates battery label and icon

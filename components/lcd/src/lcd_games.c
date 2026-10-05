@@ -311,6 +311,8 @@ POLYCAST5_USE_PSRAM_BSS static tetris_piece_t tetris_current_piece;
 POLYCAST5_USE_PSRAM_BSS static tetris_piece_t tetris_next_piece;
 POLYCAST5_USE_PSRAM_BSS static uint32_t tetris_score;
 POLYCAST5_USE_PSRAM_BSS static bool tetris_game_over;
+POLYCAST5_USE_PSRAM_BSS static bool tetris_game_over_handled; // High score + game over screen done once
+POLYCAST5_USE_PSRAM_BSS static TickType_t tetris_game_over_tick; // When the game over screen appeared
 POLYCAST5_USE_PSRAM_BSS static TickType_t tetris_last_fall_time;
 
 // LVGL elements
@@ -591,6 +593,7 @@ void lcd_games_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t 
         memset(tetris_board, 0, sizeof(tetris_board));
         tetris_score = 0;
         tetris_game_over = false;
+        tetris_game_over_handled = false;
         tetris_next_piece.type = esp_random() % 7;
         spawn_piece();
         tetris_last_fall_time = xTaskGetTickCount();
@@ -636,22 +639,34 @@ void lcd_games_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t 
 
     // Handle game over
     if (tetris_game_over) {
-        // Clear the board visually
-        lv_canvas_fill_bg(tetris_canvas, user_primary_color, LV_OPA_COVER);
-        lv_obj_invalidate(tetris_canvas);
+        // One-time: high score check + game over screen
+        if (!tetris_game_over_handled) {
+            // Clear the board visually
+            lv_canvas_fill_bg(tetris_canvas, user_primary_color, LV_OPA_COVER);
+            lv_obj_invalidate(tetris_canvas);
 
-        // Get old high score and compare to current
-        uint32_t high_score = tetris_high_score_nvs_load();
-        if (tetris_score > high_score) {
-            // If new high score, save
-            high_score = tetris_score;
-            tetris_high_score_nvs_save(high_score);
+            // Get old high score and compare to current
+            uint32_t high_score = tetris_high_score_nvs_load();
+            if (tetris_score > high_score) {
+                // If new high score, save
+                high_score = tetris_score;
+                tetris_high_score_nvs_save(high_score);
+            }
+
+            char buf[41];
+            snprintf(buf, sizeof(buf), "Game Over!\nScore: %" PRIu32 "\nHigh Score: %" PRIu32, tetris_score, high_score);
+            lv_label_set_text(tetris_game_over_label, buf);
+            lv_obj_remove_flag(tetris_game_over_label, LV_OBJ_FLAG_HIDDEN);
+
+            tetris_game_over_handled = true;
+            tetris_game_over_tick = xTaskGetTickCount();
+            gpio_screen_changed(); // Play taps and holds don't dismiss the score screen
         }
 
-        char buf[41];
-        snprintf(buf, sizeof(buf), "Game Over!\nScore: %" PRIu32 "\nHigh Score: %" PRIu32, tetris_score, high_score);
-        lv_label_set_text(tetris_game_over_label, buf);
-        lv_obj_remove_flag(tetris_game_over_label, LV_OBJ_FLAG_HIDDEN);
+        // Brief grace so a tap from the final moments of play is not consumed
+        if (xTaskGetTickCount() - tetris_game_over_tick < pdMS_TO_TICKS(600)) {
+            return;
+        }
 
         // Any button to exit
         if (ui_btns->up_btn || ui_btns->down_btn || ui_btns->left_btn || ui_btns->right_btn || ui_btns->select_btn || ui_btns->home_btn) {
@@ -1605,6 +1620,7 @@ void lcd_games_trex_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *g
 
             trex_game_over_handled = true;
             trex_game_over_tick = xTaskGetTickCount();
+            gpio_screen_changed(); // Play taps and holds don't dismiss the score screen
         }
 
         // Brief grace so a button still held from the crash is not consumed
@@ -2420,6 +2436,7 @@ void lcd_games_flappy_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t 
 
             flappy_game_over_handled = true;
             flappy_game_over_tick = xTaskGetTickCount();
+            gpio_screen_changed(); // Play taps and holds don't dismiss the score screen
         }
 
         // Brief grace so a button still held from the crash is not consumed

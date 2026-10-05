@@ -1557,9 +1557,9 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
             }
         }
 
-        // Default states
-        last_select = false;
-        
+        // Default states. A SELECT still down from the press that opened the page is not a new press
+        last_select = gpio_select_btn_held;
+
         do_once = true;
     }
 
@@ -1890,8 +1890,15 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
         do_once = true;
     }
 
-    // Up button pressed
-    if (ui_btns->up_btn == 1) {
+    // Long right -> go to index 2 (first user index). Checked first: the hold may have queued a +5 this tick
+    if (lcd_take_long_press(GPIO_BTN_RIGHT, &ui_btns->right_btn)) {
+        // Update selection
+        bluetooth_menu->bluetooth_keyboard_menu.index = 2;
+        update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
+
+        // Save to NVS
+        lcd_bluetooth_script_selected_set(bluetooth_menu->bluetooth_keyboard_menu.index);
+    } else if (ui_btns->up_btn == 1) { // Up button pressed
         // Update selection
         bluetooth_menu->bluetooth_keyboard_menu.index--;
         update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
@@ -1908,15 +1915,6 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
     } else if (ui_btns->right_btn == 1) { // Right button pressed (+5)
         // Update selection
         bluetooth_menu->bluetooth_keyboard_menu.index = bluetooth_menu->bluetooth_keyboard_menu.index + 5;
-        update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
-
-        // Save to NVS
-        lcd_bluetooth_script_selected_set(bluetooth_menu->bluetooth_keyboard_menu.index);
-    }
-    // Long right -> go to index 2 (first user index)
-    else if (xSemaphoreTake(xRightButtonLongSemaphore, 0) == pdTRUE) {
-        // Update selection
-        bluetooth_menu->bluetooth_keyboard_menu.index = 2;
         update_keyboard_menu(&bluetooth_menu->bluetooth_keyboard_menu);
 
         // Save to NVS
@@ -2224,6 +2222,7 @@ static void prompt_rename_or_del(ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth
     lcd_format_label(lbl_del, "DELETE", user_secondary_color,
             &lv_font_montserrat_18, LV_ALIGN_BOTTOM_MID, 0, -13);
     
+    gpio_screen_changed(); // Taps and holds from before this prompt don't count
     while (1) {
         lv_timer_handler();
         
@@ -2705,6 +2704,7 @@ void lcd_bluetooth_forget_all_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluet
     
     // Only execute once
     if (!do_once) {
+        lcd_arm_confirm_page(ui_btns); // RIGHT confirms: only a press made on this page counts
         lbl_ins = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_ins, "Press RIGHT to\nforget all devices.", user_secondary_color,
                 &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 10);

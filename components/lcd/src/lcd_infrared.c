@@ -119,8 +119,16 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
             lbl_title = lbl_name = lbl_back = lbl_edit = lbl_select = NULL;
         } else if (edit_idx == 2) { // Delete remote
             xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
-            infrared_utils_delete_remote_nvs(ir_current_remote);
+            size_t del_remote = ir_current_remote;
+            size_t remotes_before = num_remotes;
+            infrared_utils_delete_remote_nvs(del_remote);
+            size_t remotes_left = num_remotes;
             xSemaphoreGive(xInfraredDataMutex); // Release IR
+
+            // Hotkeys follow the shift; its own are cleared
+            if (del_remote < remotes_before) {
+                lcd_hotkey_ir_remote_deleted(del_remote, remotes_left < remotes_before, remotes_left);
+            }
 
             // Reset
             lv_obj_delete(lbl_title);
@@ -149,9 +157,18 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
             // Back to main page
             ui_menu->page = INFRARED_PAGE;
         } else if (edit_idx > 2) { // Delete signal
-            int to_delete = edit_idx;
-            int q = -to_delete;
-            xQueueSend(xInfraredSignalToTxQueue, &q, portMAX_DELAY);
+            // Here rather than in infrared_task, so the hotkey fix-up below sees it done
+            xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
+            size_t del_remote = ir_current_remote;
+            size_t signals_before = remotes[del_remote].num_signals;
+            infrared_utils_delete_signal_from_remote_nvs(del_remote, (size_t)edit_idx - IR_NUM_BASE_OPTIONS);
+            bool deleted = remotes[del_remote].num_signals < signals_before;
+            xSemaphoreGive(xInfraredDataMutex); // Release IR
+
+            // Hotkeys follow the shift; its own are cleared
+            if (deleted) {
+                lcd_hotkey_ir_signal_deleted(del_remote, edit_idx);
+            }
 
             // Back to main
             ui_menu->page = INFRARED_PAGE;
@@ -678,6 +695,9 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *ir_menu)
     lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
     
+    // Drop a too-long result left by a cancelled attempt
+    xSemaphoreTake(xInfraredSignalTooLongSemaphore, 0);
+
     // Restart infrared RX
     xSemaphoreGive(xInfraredStartRxSemaphore);
     
@@ -699,6 +719,7 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *ir_menu)
     lv_timer_handler(); // Show
     
     // Wait until signal received and saved    
+    gpio_screen_changed(); // Taps and holds from before this prompt don't count
     while (1) {
         // Signal received and saved successfully
         if (xSemaphoreTake(xInfraredSignalSavedSemaphore, 0) == pdTRUE) {
@@ -733,10 +754,39 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *ir_menu)
             break;
         }
         
+        // Signal filled the RX buffer: cut off, not saved
+        if (xSemaphoreTake(xInfraredSignalTooLongSemaphore, 0) == pdTRUE) {
+            lv_obj_delete(img_save_remote); // Delete img
+
+            // Notice text
+            lv_obj_center(lbl_ins);
+            lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_20, 0);
+            lv_label_set_text(lbl_ins, "Signal too long!");
+            lv_timer_handler(); // Show
+
+            // Wait then clear
+            vTaskDelay(pdMS_TO_TICKS(1500));
+            lv_obj_delete(lbl_ins);
+            lv_obj_delete(lbl_sig_len);
+
+            // Show arrows
+            lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+            lcd_clear_pending_inputs = true; // Clear any false inputs
+
+            // Go back
+            ui_menu->page = INFRARED_PAGE;
+
+            break;
+        }
+
         // User hit cancel
         if (xSemaphoreTake(xLeftButtonSemaphore, 0)) {
             xSemaphoreGive(xInfraredDisableSemaphore); // Disable IR
-            
+            gpio_end_hold(GPIO_BTN_LEFT); // A held LEFT's next repeats would scroll the IR list
+
             // Delete objects
             lv_obj_delete(lbl_ins);
             lv_obj_delete(lbl_sig_len);

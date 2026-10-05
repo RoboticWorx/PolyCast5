@@ -250,6 +250,7 @@ bool srs_sync_time_over_wifi(void)
         lv_timer_handler();
         
         // Wait for left button press
+        gpio_screen_changed(); // Taps and holds from before this prompt don't count
         while (xSemaphoreTake(xLeftButtonSemaphore, 0) != pdPASS) {
             lv_timer_handler();
             vTaskDelay(pdMS_TO_TICKS(10));

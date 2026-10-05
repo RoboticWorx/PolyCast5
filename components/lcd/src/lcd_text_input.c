@@ -222,6 +222,13 @@ static void kb_nav(lcd_text_input_t *ti, uint32_t key)
     lv_obj_send_event(ti->kb, LV_EVENT_KEY, &key);
 }
 
+// Text of the highlighted key, NULL if none
+static const char *kb_selected_text(const lcd_text_input_t *ti)
+{
+    uint32_t id = lv_buttonmatrix_get_selected_button(ti->kb);
+    return (id == LV_BUTTONMATRIX_BUTTON_NONE) ? NULL : lv_buttonmatrix_get_button_text(ti->kb, id);
+}
+
 /* ---- Public API ---- */
 
 void lcd_text_input_start(lcd_text_input_t *ti)
@@ -236,6 +243,7 @@ void lcd_text_input_start(lcd_text_input_t *ti)
         ti->len = (int)strlen(ti->buf);
     }
     ti->mode = 0; // Always open on the uppercase set
+    ti->select_hold = 0;
 
     // Title
     ti->lbl_title = lv_label_create(ACTIVE_SCR);
@@ -304,6 +312,14 @@ lcd_ti_status_t lcd_text_input_tick(lcd_text_input_t *ti, ui_btns_t *btns)
         return LCD_TI_PENDING;
     }
 
+    // Holding SELECT on DEL or a character repeats it every tick; OK, EXIT and the mode key act once
+    const char *held_key = kb_selected_text(ti);
+    if (held_key && strcmp(held_key, K_OK) != 0 && strcmp(held_key, K_EXIT) != 0 && !key_is_mode(held_key)) {
+        lcd_select_hold_repeat(btns, &ti->select_hold);
+    } else {
+        ti->select_hold = 0;
+    }
+
     if (btns->up_btn) {
         kb_nav(ti, LV_KEY_UP);
     } else if (btns->down_btn) {
@@ -315,10 +331,7 @@ lcd_ti_status_t lcd_text_input_tick(lcd_text_input_t *ti, ui_btns_t *btns)
     } else if (btns->home_btn) {
         kb_cycle_mode(ti); // Shortcut for the on-grid mode key
     } else if (btns->select_btn) {
-        uint32_t id = lv_buttonmatrix_get_selected_button(ti->kb);
-        const char *t = (id == LV_BUTTONMATRIX_BUTTON_NONE)
-                            ? NULL
-                            : lv_buttonmatrix_get_button_text(ti->kb, id);
+        const char *t = kb_selected_text(ti);
         if (t) {
             if (strcmp(t, K_OK) == 0) {
                 // Refuse to submit a value with no visible character

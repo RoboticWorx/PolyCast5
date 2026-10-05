@@ -103,7 +103,15 @@ esp_err_t wifi_utils_scan(wifi_scan_t *wifi_scan)
         .ssid = NULL,
         .bssid = NULL,
         .channel = 0, // 0 = scan all channels
-        .show_hidden = true
+        .show_hidden = true,
+        .scan_type = WIFI_SCAN_TYPE_ACTIVE,
+        .scan_time = {
+            .active = {
+                .min = 20, // At least 20ms each channel
+                .max = 120 // At most 120ms each channel
+            },
+            .passive = 50, // 50ms for passive scan
+        },
     };
 
     // Start scan (true = block until scan done)
@@ -784,8 +792,8 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 
         // Notify we connected
         xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTED_BIT);
-        xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // No longer trying to connect
-        
+        xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTING_BIT | WIFI_CONNECTING_FAILED_BIT); // No longer trying; an earlier give-up is stale
+
         // Connected icon
         xEventGroupSetBits(xConnectionIconEventGroup, ICON_BIT_WIFI_CONNECTED);
         

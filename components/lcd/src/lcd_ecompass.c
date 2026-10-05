@@ -490,6 +490,7 @@ static void prompt_accel_espnow_qr(ui_menu_t *ui_menu, espnow_menu_t *espnow_men
         ESP_LOGE(TAG, "prompt_accel_espnow_qr lcd_draw_qr failed: %d", n);
     }
     
+    gpio_screen_changed(); // Taps and holds from before this prompt don't count
     while (1) {
         lv_timer_handler();
         

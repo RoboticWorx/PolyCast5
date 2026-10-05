@@ -21,12 +21,17 @@ SemaphoreHandle_t xInfraredRxEventSemaphore;
 SemaphoreHandle_t xInfraredStartRxSemaphore;
 SemaphoreHandle_t xInfraredDisableSemaphore;
 SemaphoreHandle_t xInfraredSignalSavedSemaphore;
+SemaphoreHandle_t xInfraredSignalTooLongSemaphore;
 
 SemaphoreHandle_t xInfraredDataMutex;
 
 QueueHandle_t xInfraredSignalToTxQueue;
 
-rmt_symbol_word_t ir_signal[MAX_PULSES]; // The active signal itself
+#ifdef CONFIG_RMT_RX_ISR_CACHE_SAFE
+rmt_symbol_word_t ir_signal[MAX_PULSES]; // RX buffer; the cache-safe RX ISR writes it, so internal
+#else
+POLYCAST5_USE_PSRAM_BSS rmt_symbol_word_t ir_signal[MAX_PULSES]; // RX buffer; the RX ISR never runs with cache off
+#endif
 
 ir_remote_t remotes[MAX_REMOTES]; // Remotes array
 size_t num_remotes = 1; // 1 default
@@ -44,12 +49,15 @@ static void infrared_task(void *pvParameters) {
     configASSERT(xInfraredStartRxSemaphore);
     xInfraredSignalSavedSemaphore = xSemaphoreCreateBinary();
     configASSERT(xInfraredSignalSavedSemaphore);
+    xInfraredSignalTooLongSemaphore = xSemaphoreCreateBinary();
+    configASSERT(xInfraredSignalTooLongSemaphore);
     xInfraredRxEventSemaphore = xSemaphoreCreateBinary();
     configASSERT(xInfraredRxEventSemaphore);
     
     // Other
     xInfraredDataMutex = xSemaphoreCreateMutex();
     configASSERT(xInfraredDataMutex);
+    xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Held until remotes are loaded: lcd_task reads them
     
     xInfraredSignalToTxQueue = xQueueCreate(1, sizeof(int));
     configASSERT(xInfraredSignalToTxQueue);
@@ -68,6 +76,7 @@ static void infrared_task(void *pvParameters) {
     
     // Load remotes and signals from NVS (includes names)
     infrared_utils_load_remotes_nvs();
+    xSemaphoreGive(xInfraredDataMutex); // Release IR
     
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Loaded %zu remotes from NVS", num_remotes);
@@ -102,6 +111,19 @@ static void infrared_task(void *pvParameters) {
 #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Received IR signal (%zu pulses)", ir_signal_length);
 #endif
+            // Filled the buffer: the driver dropped the rest, so don't save a cut-off signal
+            if (ir_signal_length >= MAX_PULSES) {
+                ESP_LOGW(TAG, "IR signal longer than %d pulses, not saved", MAX_PULSES - 1);
+                xSemaphoreGive(xInfraredDataMutex); // Release IR
+
+                // Disable until next attempt
+                infrared_utils_disable_rx();
+                gpio_utils_en_tsop_receiver(false);
+
+                xSemaphoreGive(xInfraredSignalTooLongSemaphore); // Notify LCD
+                continue;
+            }
+
             // Check if space available
             if (!infrared_utils_ensure_capacity()) {
                 ESP_LOGW(TAG, "Max signals reached, dropping new signal");
@@ -184,44 +206,31 @@ static void infrared_task(void *pvParameters) {
         // Transmit a specific signal (index ir_menu_sig_idx)
         if (xQueueReceive(xInfraredSignalToTxQueue, &ir_menu_sig_idx, 0) == pdTRUE) {
             xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
-            
-            // Negative means delete index ir_menu_sig_idx
-            if (ir_menu_sig_idx < 0) {
-                ir_menu_sig_idx = -ir_menu_sig_idx; // Make positive
-                if (ir_menu_sig_idx < IR_NUM_BASE_OPTIONS) {
-                    ESP_LOGE(TAG, "Invalid delete index %d", ir_menu_sig_idx);
-                    xSemaphoreGive(xInfraredDataMutex);
-                    continue;
-                }
-                size_t sig_idx = (size_t) ir_menu_sig_idx - IR_NUM_BASE_OPTIONS; // Offset for 0-based
 
-                infrared_utils_delete_signal_from_remote_nvs(ir_current_remote, sig_idx);
-            } else { // Else send the signal at that index
-                if (ir_menu_sig_idx < IR_NUM_BASE_OPTIONS) {
-                    ESP_LOGE(TAG, "Invalid TX index %d", ir_menu_sig_idx);
-                    xSemaphoreGive(xInfraredDataMutex);
-                    continue;
-                }
-                size_t sig_idx = (size_t) ir_menu_sig_idx - IR_NUM_BASE_OPTIONS; // Offset for 0-based
+            if (ir_menu_sig_idx < IR_NUM_BASE_OPTIONS) {
+                ESP_LOGE(TAG, "Invalid TX index %d", ir_menu_sig_idx);
+                xSemaphoreGive(xInfraredDataMutex);
+                continue;
+            }
+            size_t sig_idx = (size_t) ir_menu_sig_idx - IR_NUM_BASE_OPTIONS; // Offset for 0-based
 
-                // Bounds check
-                if (sig_idx >= remotes[ir_current_remote].num_signals ||
-                        !remotes[ir_current_remote].signals[sig_idx]) {
-                    ESP_LOGE(TAG, "Signal index %zu out of range for remote %zu", sig_idx, ir_current_remote);
-                    xSemaphoreGive(xInfraredDataMutex);
-                    continue;
-                }
+            // Bounds check
+            if (ir_current_remote >= num_remotes || sig_idx >= remotes[ir_current_remote].num_signals ||
+                    !remotes[ir_current_remote].signals[sig_idx]) {
+                ESP_LOGE(TAG, "Signal index %zu out of range for remote %zu", sig_idx, ir_current_remote);
+                xSemaphoreGive(xInfraredDataMutex);
+                continue;
+            }
 
-                // Get signal from current remote
-                ir_signal_t *sig = remotes[ir_current_remote].signals[sig_idx];
+            // Get signal from current remote
+            ir_signal_t *sig = remotes[ir_current_remote].signals[sig_idx];
 
 #ifdef POLYCAST5_DEBUG
-                ESP_LOGI(TAG, "Replaying signal %zu for remote %zu (%zu pulses)", sig_idx, ir_current_remote, sig->length);
+            ESP_LOGI(TAG, "Replaying signal %zu for remote %zu (%zu pulses)", sig_idx, ir_current_remote, sig->length);
 #endif
-                // Send
-                infrared_utils_transmit_ir(sig->pulses, sig->length);
-            }
-            
+            // Send
+            infrared_utils_transmit_ir(sig->pulses, sig->length);
+
             xSemaphoreGive(xInfraredDataMutex); // Release IR
         }
         

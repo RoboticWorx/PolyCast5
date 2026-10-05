@@ -36,6 +36,7 @@ typedef struct {
     lv_obj_t   *kb;               /**< Grid keyboard (button matrix) */
     int         len;              /**< Current text length in `buf` */
     int         mode;            /**< Active character set: 0 = ABC, 1 = abc, 2 = 12# */
+    uint32_t    select_hold;      /**< SELECT hold-to-repeat state (lcd_select_hold_repeat) */
     bool        active;           /**< True between start and a terminal tick */
 } lcd_text_input_t;
 

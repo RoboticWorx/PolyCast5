@@ -81,6 +81,9 @@
 #define SLEEP_TIMER_MIN_S 5 // 5 sec
 #define SLEEP_TIMER_MAX_S 120 // 2 min
 
+#define LCD_LEDC_MIN 10 // % (0 is backlight off)
+#define LCD_LEDC_MAX 100 // %
+
 // Order matters: SETTINGS_*_IDX in lcd_settings.h must match this list
 settings_menu_t settings_menu = {
     .options = {"Check for Updates", SETTINGS_SET_LOCK_TXT, "Change Colors", "LCD Brightness", "Adjust Haptics",
@@ -451,6 +454,7 @@ static void confirm_entered_pin(ui_menu_t *ui_menu, settings_menu_t *settings_me
             &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
    
     // Wait for user to confirm
+    gpio_screen_changed(); // Taps and holds from before this prompt don't count
     while (1) {
         lv_timer_handler();
         
@@ -487,6 +491,7 @@ void lcd_settings_ota_confirm_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
     static lv_obj_t *instr_lbl = NULL;
     
     if (!init) {
+        lcd_arm_confirm_page(ui_btns); // RIGHT confirms: only a press made on this page counts
         // Create a scrollable container for the instructions
         cont = lv_obj_create(ACTIVE_SCR);
         lv_obj_set_size(cont, 210, 106);
@@ -1204,7 +1209,8 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
     
     static bool init = false;
     static int selected = 0;
-    
+    static uint32_t select_hold = 0; // SELECT hold-to-repeat on the slider
+
     static lv_obj_t *cont, *slider, *lbl_spin, *pointer, *sw_row[6], *sw_arr[6];
     
     static lv_style_t row_style;
@@ -1291,6 +1297,13 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
                  &lv_font_montserrat_16, LV_ALIGN_TOP_LEFT, 23, 28);
 
         init = true;
+    }
+
+    // Holding SELECT on the slider keeps stepping it; the switches toggle once per press
+    if (selected == 0) {
+        lcd_select_hold_repeat(ui_btns, &select_hold);
+    } else {
+        select_hold = 0;
     }
 
     // Scroll down
@@ -2093,10 +2106,7 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
     #define ADJ_LCD_INS_TXT "LCD brightness:"
     #define ADJ_LCD_TXT "%d%%"
     #define ADJ_LCD_SAVINGS_TXT "+%d%% battery life"
-    
-    #define LCD_LEDC_MAX 100
-    #define LCD_LEDC_MIN 0
-    
+
     // Statics
     static bool init = false;
     
@@ -2132,7 +2142,7 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
         slider = lv_slider_create(ACTIVE_SCR);
         lv_obj_set_size(slider, 10, 100);
         lv_obj_align(slider, LV_ALIGN_CENTER, 65, 0);
-        lv_slider_set_range(slider, LCD_LEDC_MIN, LCD_LEDC_MAX);
+        lv_slider_set_range(slider, 0, LCD_LEDC_MAX); // Bar matches the shown percent
         lv_slider_set_value(slider, lcd_ledc_brightness, LV_ANIM_OFF);
         xSemaphoreGive(xLEDCMutex); // Release LEDC
         
@@ -2143,10 +2153,10 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
     if (ui_btns->up_btn == 1) {
         xSemaphoreTake(xLEDCMutex, portMAX_DELAY); // Lock LEDC
         lcd_ledc_brightness += 5;
-        
-        // Wrap
+
+        // Clamp: wrapping would drop to the dimmest setting
         if (lcd_ledc_brightness > LCD_LEDC_MAX) {
-            lcd_ledc_brightness = LCD_LEDC_MIN;
+            lcd_ledc_brightness = LCD_LEDC_MAX;
         }
         
         // Create text
@@ -2168,10 +2178,10 @@ void lcd_settings_adjust_lcd_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
     } else if (ui_btns->down_btn == 1) { // Decrease brightness
         xSemaphoreTake(xLEDCMutex, portMAX_DELAY); // Lock LEDC
         lcd_ledc_brightness -= 5;
-        
-        // Wrap
+
+        // Clamp: never reach backlight off
         if (lcd_ledc_brightness < LCD_LEDC_MIN) {
-            lcd_ledc_brightness = LCD_LEDC_MAX;
+            lcd_ledc_brightness = LCD_LEDC_MIN;
         }
         
         // Create text
@@ -2344,6 +2354,7 @@ void lcd_settings_adjust_lora_sf_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
         lv_timer_handler();
 
         // Wait for OK or back to be pressed
+        gpio_screen_changed(); // Taps and holds from before this prompt don't count
         while(1) {
             // OK
             if (xSemaphoreTake(xRightButtonSemaphore, 0) == pdTRUE) {
@@ -2530,6 +2541,7 @@ void lcd_settings_change_lora_region_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu
         lv_timer_handler();
 
         // Wait for OK, Back, or Home/Power (Home/Power exit without saving)
+        gpio_screen_changed(); // Taps and holds from before this prompt don't count
         while(1) {
             // OK
             if (xSemaphoreTake(xRightButtonSemaphore, 0) == pdTRUE) {
@@ -2793,6 +2805,7 @@ void lcd_settings_factory_rst_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
     
     // Only execute once
     if (!do_once) {
+        lcd_arm_confirm_page(ui_btns); // RIGHT confirms: only a press made on this page counts
         lbl_ins = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_ins, "Press RIGHT to factory reset.", user_secondary_color,
                 &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 18);
@@ -2920,19 +2933,20 @@ void lcd_settings_pin_nvs_save(const settings_menu_t *menu)
         return;
     }
 
-    // Save pin_set as a u8
-    err = nvs_set_u8(h, SETTINGS_PIN_SET_KEY, menu->pin_menu.pin_set ? 1 : 0);
-    
+    // Save unlock_pin as a string. First: each write hits flash on its own, so a cut after it never
+    // leaves the flag set over a missing PIN
+    err = nvs_set_str(h, SETTINGS_PIN_KEY, menu->pin_menu.unlock_pin);
+
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "lcd_settings_pin_nvs_save NVS set u8 error");
+        ESP_LOGE(TAG, "lcd_settings_pin_nvs_save NVS set str error");
         goto out;
     }
 
-    // Save unlock_pin as a string
-    err = nvs_set_str(h, SETTINGS_PIN_KEY, menu->pin_menu.unlock_pin);
-    
+    // Save pin_set as a u8
+    err = nvs_set_u8(h, SETTINGS_PIN_SET_KEY, menu->pin_menu.pin_set ? 1 : 0);
+
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "lcd_settings_pin_nvs_save NVS set str error");
+        ESP_LOGE(TAG, "lcd_settings_pin_nvs_save NVS set u8 error");
         goto out;
     }
 
@@ -3008,6 +3022,11 @@ void lcd_settings_pin_nvs_load(settings_menu_t *menu)
     }
 
     out:
+    // No PIN stored (cut save, read error): no lock. Empty submits never unlock
+    if (menu->pin_menu.unlock_pin[0] == '\0') {
+        menu->pin_menu.pin_set = false;
+    }
+
     nvs_close(h);
 }
 
@@ -3339,7 +3358,7 @@ void lcd_settings_lcd_ledc_nvs_save(void)
         return;
     }
 
-    // Save the brightness (0-100)
+    // Save the brightness (10-100)
     err = nvs_set_i8(h, SETTINGS_LCD_LEDC_KEY, lcd_ledc_brightness);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "lcd_settings_lcd_ledc_nvs_save: brightness set failed");
@@ -3373,6 +3392,12 @@ void lcd_settings_lcd_ledc_nvs_load(void)
     int8_t loaded;
     err = nvs_get_i8(h, SETTINGS_LCD_LEDC_KEY, &loaded);
     if (err == ESP_OK) {
+        // Clamp: a 0 saved by older firmware would boot with the backlight off
+        if (loaded < LCD_LEDC_MIN) {
+            loaded = LCD_LEDC_MIN;
+        } else if (loaded > LCD_LEDC_MAX) {
+            loaded = LCD_LEDC_MAX;
+        }
         lcd_ledc_brightness = loaded;
 #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Loaded LCD brightness: %d%%", lcd_ledc_brightness);

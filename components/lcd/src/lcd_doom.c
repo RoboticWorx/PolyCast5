@@ -95,6 +95,12 @@ extern volatile bool gpio_right_btn_held;
 
 #define DOOM_MOVE_SPEED 0.085f
 #define DOOM_ROT_SPEED  0.060f
+
+// doom_dir_ignored bits
+#define DOOM_DIR_LEFT  0x01
+#define DOOM_DIR_RIGHT 0x02
+#define DOOM_DIR_UP    0x04
+#define DOOM_DIR_DOWN  0x08
 #define DOOM_WALL_MARGIN 0.18f
 #define DOOM_PERP_MIN 0.05f
 
@@ -159,6 +165,7 @@ POLYCAST5_USE_PSRAM_BSS static uint16_t doom_muzzle_ms;
 POLYCAST5_USE_PSRAM_BSS static uint16_t doom_hurt_ms;   // >0 = HUD flashes red (just took damage)
 POLYCAST5_USE_PSRAM_BSS static bool doom_moved;
 POLYCAST5_USE_PSRAM_BSS static bool doom_prev_select;
+POLYCAST5_USE_PSRAM_BSS static uint8_t doom_dir_ignored; // DOOM_DIR_* still held from the entering press
 POLYCAST5_USE_PSRAM_BSS static TickType_t doom_fire_last;
 
 POLYCAST5_USE_PSRAM_BSS static bool doom_init;
@@ -881,6 +888,10 @@ static void doom_reset_run(void)
     doom_prev_select = gpio_select_btn_held;
     doom_fire_last = 0;
 
+    // Same for directions, e.g. a long-press hotkey that opened the game: each waits for its release
+    doom_dir_ignored = (gpio_left_btn_held ? DOOM_DIR_LEFT : 0) | (gpio_right_btn_held ? DOOM_DIR_RIGHT : 0) |
+            (gpio_up_btn_held ? DOOM_DIR_UP : 0) | (gpio_down_btn_held ? DOOM_DIR_DOWN : 0);
+
     // Clear the per-run flags so the tick loop resumes and the HUD repaints
     doom_game_over = false;
     doom_game_won = false;
@@ -990,6 +1001,27 @@ static void doom_fire(void)
     }
 }
 
+// Play reads the raw held flags, so its taps are never used: drop them before they queue up behind
+// HOME or carry into the game-over screen
+static void doom_drop_play_taps(void)
+{
+    gpio_flush_short(GPIO_BTN_SELECT);
+    gpio_flush_short(GPIO_BTN_UP);
+    gpio_flush_short(GPIO_BTN_DOWN);
+    gpio_flush_short(GPIO_BTN_LEFT);
+    gpio_flush_short(GPIO_BTN_RIGHT);
+}
+
+// Held direction, ignored until first released if it was already down when the run started
+static bool doom_dir_held(bool held, uint8_t dir)
+{
+    if (!held) {
+        doom_dir_ignored &= (uint8_t)~dir;
+        return false;
+    }
+    return !(doom_dir_ignored & dir);
+}
+
 // Sample the held buttons each tick: left/right turn, up/down move (with
 // collision), and select fires once per press (rising edge).
 static void doom_input(void)
@@ -998,13 +1030,13 @@ static void doom_input(void)
 
     // Facing +X on a y-down map: turning left must rotate dir toward -Y, which
     // is a negative angle (doom_rotate(+a) rotates toward +Y = the player's right)
-    if (gpio_left_btn_held)  doom_rotate(-DOOM_ROT_SPEED);
-    if (gpio_right_btn_held) doom_rotate(DOOM_ROT_SPEED);
+    if (doom_dir_held(gpio_left_btn_held, DOOM_DIR_LEFT))   doom_rotate(-DOOM_ROT_SPEED);
+    if (doom_dir_held(gpio_right_btn_held, DOOM_DIR_RIGHT)) doom_rotate(DOOM_ROT_SPEED);
 
     // Move forward/back along the facing direction (with wall collision)
     float mv = 0.0f;
-    if (gpio_up_btn_held)   mv += DOOM_MOVE_SPEED;
-    if (gpio_down_btn_held) mv -= DOOM_MOVE_SPEED;
+    if (doom_dir_held(gpio_up_btn_held, DOOM_DIR_UP))     mv += DOOM_MOVE_SPEED;
+    if (doom_dir_held(gpio_down_btn_held, DOOM_DIR_DOWN)) mv -= DOOM_MOVE_SPEED;
     if (mv != 0.0f) {
         doom_try_move(doom_dirX * mv, doom_dirY * mv);
         doom_moved = true;
@@ -1541,10 +1573,12 @@ void lcd_games_doom_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *g
             lv_obj_remove_flag(doom_overlay_label, LV_OBJ_FLAG_HIDDEN);
             doom_state_handled = true;
             doom_over_tick = xTaskGetTickCount();
+            gpio_screen_changed(); // Play taps and held directions don't continue the run
         }
 
         // Grace so a button still held from the final moment is not consumed
         if (xTaskGetTickCount() - doom_over_tick < pdMS_TO_TICKS(600)) {
+            doom_drop_play_taps(); // Only a press after the grace continues
             return;
         }
 
@@ -1567,6 +1601,7 @@ void lcd_games_doom_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t *g
 
     // Active play: movement/fire are sampled in the timer from raw held-state.
     // The 200ms poll only handles leaving the game.
+    doom_drop_play_taps();
     if (ui_btns->home_btn) {
         doom_exit_to_menu(ui_menu, games_menu);
     } else if (ui_btns->pwr_btn) {
