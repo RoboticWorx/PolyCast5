@@ -369,6 +369,7 @@ static void battery_power_latch_update(float vbat)
 static void adc_task(void *arg)
 {
     static uint8_t last_percentage = 100;
+    static bool rise_pending = false; // Last reading was a held-back last_percentage + 1
     
     // Get battery charge on start
     gpio_utils_init_battery_adc();
@@ -422,10 +423,12 @@ static void adc_task(void *arg)
             ESP_LOGI(TAG, "Battery percentage: %u%%", percentage);
 #endif
             
-            // If fluctuating by one, ignore
-            if (percentage == last_percentage + 1) {
+            // Hold back a +1 as jitter, but take a second 100 in a row: 99 can't rise by 2
+            if (percentage == last_percentage + 1 && !(percentage == 100 && rise_pending)) {
+                rise_pending = true;
                 percentage = last_percentage;
             } else {
+                rise_pending = false;
                 last_percentage = percentage;
             }
             

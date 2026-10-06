@@ -2132,6 +2132,33 @@ static void go_to_pin_lockout_page(settings_menu_t *settings_menu, ui_menu_t *ui
     ui_menu->page = SETTINGS_PIN_LOCKOUT_PAGE;
 }
 
+// Lockout for a wrong-attempt count; 11 and beyond stays permanent
+static uint32_t pin_lockout_for_attempts(uint32_t attempts)
+{
+    if (attempts < 4) {
+        return 0;
+    }
+    
+    switch (attempts) {
+        case 4:
+            return 60; // 1 minute
+        case 5:
+            return 300; // 5 minutes
+        case 6:
+            return 900; // 15 minutes
+        case 7:
+            return 3600; // 1 hour
+        case 8:
+            return 10800; // 3 hours
+        case 9:
+            return 28800; // 8 hours
+        case 10:
+            return 86400; // 1 day
+        default:
+            return 86411; // Forever (> 86400)
+    }
+}
+
 void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
     // Statics
@@ -2199,6 +2226,15 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
         ESP_LOGI(TAG, "Need pin: %s", settings_menu->pin_menu.unlock_pin);
 #endif
         
+        // Count the attempt before checking it, so a reset can't take a guess back.
+        // Lockout first: a reset between the two writes repeats a tier instead of skipping it
+        pin_lockout_seconds = pin_lockout_for_attempts(pin_attempts + 1);
+        if (pin_lockout_seconds > 0) {
+            lcd_settings_pin_lockout_s_nvs_save(); // Saves pin_lockout_seconds global
+        }
+        pin_attempts++;
+        lcd_settings_pin_attempts_nvs_save(); // Saves pin_attempts global
+        
         // If PIN is correct
         if (strcmp(input_pin, settings_menu->pin_menu.unlock_pin) == 0) {
 #ifdef POLYCAST5_DEBUG
@@ -2210,7 +2246,11 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
             lv_obj_add_flag(settings_menu->pin_menu.lbl_back, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(settings_menu->pin_menu.lbl_attempts, LV_OBJ_FLAG_HIDDEN);
             
-            // Reset
+            // Reset: lockout first, so a reset between the writes can't lock out a correct PIN
+            if (pin_lockout_seconds > 0) {
+                pin_lockout_seconds = 0;
+                lcd_settings_pin_lockout_s_nvs_save(); // Saves pin_lockout_seconds global
+            }
             num_filled = num_boxes = 0;
             pin_attempts = 0;
             lcd_settings_pin_attempts_nvs_save(); // Saves pin_attempts global
@@ -2266,9 +2306,6 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
                 lv_obj_set_style_border_color(lv_obj_get_parent(unlock_labels[i]), lv_palette_main(LV_PALETTE_RED), 0);
             }
             
-            pin_attempts++;
-            lcd_settings_pin_attempts_nvs_save(); // Saves pin_attempts global
-            
             // Build and set attempts string
             char buf[18];
             snprintf(buf, sizeof(buf), "WRONG: %" PRIu32, pin_attempts);
@@ -2277,42 +2314,9 @@ void lcd_unlock_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *se
             // Show attempts
             lv_obj_remove_flag(settings_menu->pin_menu.lbl_attempts, LV_OBJ_FLAG_HIDDEN);
 
-            // Lockout on certain number of pin attempts to protect user data
-            switch (pin_attempts) {
-                case 4:
-                    pin_lockout_seconds = 60; // 1 minute
-                    go_to_pin_lockout_page(settings_menu, ui_menu);
-                    break;
-                case 5:
-                    pin_lockout_seconds = 300; // 5 minutes
-                    go_to_pin_lockout_page(settings_menu, ui_menu);
-                    break;
-                case 6:
-                    pin_lockout_seconds = 900; // 15 minutes
-                    go_to_pin_lockout_page(settings_menu, ui_menu);
-                    break;
-                case 7:
-                    pin_lockout_seconds = 3600; // 1 hour
-                    go_to_pin_lockout_page(settings_menu, ui_menu);
-                    break;
-                case 8:
-                    pin_lockout_seconds = 10800; // 3 hours
-                    go_to_pin_lockout_page(settings_menu, ui_menu);
-                    break;
-                case 9:
-                    pin_lockout_seconds = 28800; // 8 hours
-                    go_to_pin_lockout_page(settings_menu, ui_menu);
-                    break;
-                case 10:
-                    pin_lockout_seconds = 86400; // 1 day
-                    go_to_pin_lockout_page(settings_menu, ui_menu);
-                    break;
-                case 11:
-                    pin_lockout_seconds = 86411; // Forever (> 86400)
-                    go_to_pin_lockout_page(settings_menu, ui_menu);
-                    break;
-                default:
-                    break;
+            // Lockout on certain number of pin attempts to protect user data (saved before the check)
+            if (pin_lockout_seconds > 0) {
+                go_to_pin_lockout_page(settings_menu, ui_menu);
             }
         }
     } else if (ui_btns->pwr_btn == 1) { // Power off

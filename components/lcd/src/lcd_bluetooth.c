@@ -49,6 +49,9 @@ extern volatile bool mic_recording; // ai_task.c
 
 static uint8_t current_category = 0;
 
+// Keyboard page init flag, file scope so the sub page's Home/Power exit (which deinits BT) can force a re-init
+static bool keyboard_page_init = false;
+
 
 POLYCAST5_USE_PSRAM_BSS static char script_labels[BT_MAX_KEYBOARD_SCRIPTS][BT_SCRIPT_LABEL_MAX_LEN + 1];
 
@@ -198,9 +201,9 @@ static void keyboard_submenu_refresh_from_nvs(bluetooth_keyboard_menu_t *km, uin
             // Read label from NVS (namespace/keys match the portal)
             size_t len = sizeof(script_labels[s]);
             err = bluetooth_portal_script_label_get_nvs((uint16_t)i, script_labels[s], len);
-            if (err != ESP_OK) {
-                // On error, show a placeholder rather than leaving a blank
-                snprintf(script_labels[s], sizeof(script_labels[s]), "Script %u", (unsigned)i);
+            if (err != ESP_OK || script_labels[s][0] == '\0') {
+                // Unnamed (or unreadable): placeholder numbered by row, never anything from the payload
+                snprintf(script_labels[s], sizeof(script_labels[s]), "Script %d", s + 1);
             }
 
             km->options[s] = script_labels[s];
@@ -1862,11 +1865,8 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 
 void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
 {
-    // Statics
-    static bool do_once = false;
-    
     // Only execute once
-    if (!do_once) {
+    if (!keyboard_page_init) {
         // If picking this page as a hotkey
         if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
             lcd_hotkey_save_page_as_hotkey(ui_menu); // Save as a hotkey
@@ -1887,7 +1887,7 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
         uint16_t cmd = BLUETOOTH_CMD_INIT;
         xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
         
-        do_once = true;
+        keyboard_page_init = true;
     }
 
     // Long right -> go to index 2 (first user index). Checked first: the hold may have queued a +5 this tick
@@ -1934,7 +1934,7 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
         lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         
         // Reset static
-        do_once = false;
+        keyboard_page_init = false;
         
         // Switch pages
         ui_menu->page = BLUETOOTH_PAGE;
@@ -1950,7 +1950,7 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
         lv_obj_add_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
         
         // Reset static
-        do_once = false;
+        keyboard_page_init = false;
         
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     } else if (ui_btns->select_btn == 1) { // Option selected
@@ -1964,7 +1964,7 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
             lv_obj_add_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
             
             // Reset static
-            do_once = false;
+            keyboard_page_init = false;
             
             // Switch pages
             ui_menu->page = BLUETOOTH_SCRIPT_ADD_PAGE;
@@ -2048,8 +2048,9 @@ void lcd_bluetooth_keyboard_sub_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blu
         // Clean up
         lv_obj_clean(submenu->main_list);
         
-        // Reset init
+        // Reset init, and the keyboard page's so its next entry re-sends BLUETOOTH_CMD_INIT
         init = false;
+        keyboard_page_init = false;
         
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu);  // True = home, false = sleep
     }

@@ -314,7 +314,7 @@ void lcd_gpio_scanner_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *
         lv_obj_set_style_text_font(status_lbl, &lv_font_montserrat_14, 0);
         lv_obj_set_style_text_color(status_lbl, user_secondary_color, 0);
         lv_obj_align_to(status_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
-        lv_label_set_text(status_lbl, "Press SELECT to scan.\nNote: 0x20 and 0x19 are internal.");
+        lv_label_set_text(status_lbl, "Press SELECT to scan.\nNote: 0x20, 0x19, and 0x30 are internal.");
 
         // Addresses label: hidden initially
         addrs_lbl = lv_label_create(cont);

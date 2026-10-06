@@ -11,6 +11,8 @@
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "esp_log.h"
+#include "esp_attr.h"
+#include "esp_random.h"
 #include "cJSON.h"
 
 #include "bluetooth_portal.h"
@@ -48,6 +50,72 @@ extern char bt_wifi_portal_pass[]; // bluetooth_task.c
 static httpd_handle_t bt_server = NULL;
 static esp_netif_t *bt_ap_netif = NULL;
 static char s_ip[16] = "192.168.4.1";
+
+// Per-slot script identity for this server instance. Every slot shift carries it along, so a page's Save/Delete finds
+// its script wherever it moved and can never land on another one. Seeded randomly so a tab from an earlier session never matches
+POLYCAST5_USE_PSRAM_BSS static uint32_t s_slot_ids[BT_MAX_KEYBOARD_SCRIPTS];
+static uint32_t s_slot_id_seed = 0;
+static uint32_t s_next_slot_id = 0;
+static bool s_slot_ids_seeded = false;
+
+// Give every stored script a fresh id (server start, import)
+static void slot_ids_reset(void)
+{
+    uint16_t count = bluetooth_portal_script_count_get_nvs();
+
+    s_slot_id_seed = esp_random();
+    s_next_slot_id = s_slot_id_seed;
+    for (uint16_t i = 0; i < count; ++i) {
+        s_slot_ids[i] = s_next_slot_id++;
+    }
+}
+
+// Slot idx was deleted and the later slots shifted down one (count_before = script count before the delete)
+static void slot_ids_remove(uint16_t idx, uint16_t count_before)
+{
+    for (uint16_t i = idx; i + 1 < count_before; ++i) {
+        s_slot_ids[i] = s_slot_ids[i + 1];
+    }
+
+    // The vacated tail gets its own id, so a tail left visible by a failed count write stays addressable
+    if (count_before > 0) {
+        s_slot_ids[count_before - 1] = s_next_slot_id++;
+    }
+}
+
+// Global slot holding the script with the given id (exactly the 8 lowercase hex chars GET hands out). On a miss, *out_why
+// is the 409 reason: "deleted" if the id was issued since the last reset (its script is gone), else "unknown" (an id from
+// before a reboot or import, or malformed)
+static bool slot_find_by_id(const char *id_hex, uint16_t count, uint16_t *out_global, const char **out_why)
+{
+    *out_why = "unknown";
+
+    if (id_hex == NULL || strlen(id_hex) != 8) {
+        return false;
+    }
+    for (int k = 0; k < 8; ++k) {
+        char c = id_hex[k];
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
+            return false;
+        }
+    }
+
+    uint32_t id = (uint32_t)strtoul(id_hex, NULL, 16);
+
+    for (uint16_t i = 0; i < count; ++i) {
+        if (s_slot_ids[i] == id) {
+            *out_global = i;
+            return true;
+        }
+    }
+
+    // Issued ids are [seed, next) modulo 2^32
+    if ((uint32_t)(id - s_slot_id_seed) < (uint32_t)(s_next_slot_id - s_slot_id_seed)) {
+        *out_why = "deleted";
+    }
+
+    return false;
+}
 
 /* =============== NVS =============== */
 
@@ -530,6 +598,7 @@ esp_err_t bluetooth_portal_category_delete_nvs(uint8_t idx)
 
             if (shift_ok) {
                 // Shift succeeded - safe to clear tail and decrement count
+                slot_ids_remove((uint16_t)s, sc);
                 sc--;
 
                 if (bluetooth_script_label_set_nvs(sc, "") != ESP_OK ||
@@ -674,9 +743,7 @@ static esp_err_t scripts_list_get(httpd_req_t *req)
 }
 
 // Map (category, local_index) -> global script index in NVS
-// If create==true and local_index == current number of scripts in that category:
-// return the next free global index (append)
-static bool resolve_global_index_for_local(uint8_t cat, uint16_t local_index, bool create, uint16_t *out_global)
+static bool resolve_global_index_for_local(uint8_t cat, uint16_t local_index, uint16_t *out_global)
 {
     // Get total script count
     uint16_t total = bluetooth_portal_script_count_get_nvs();
@@ -697,21 +764,91 @@ static bool resolve_global_index_for_local(uint8_t cat, uint16_t local_index, bo
         }
     }
     
-    // If not found and caller wants to create at the tail of this category,
-    // allow appending a brand-new script at the end of the global list
-    // when local_index == number of scripts in this category.
-    // Reject if at capacity: total < BT_MAX_KEYBOARD_SCRIPTS allows append at the last
-    // valid index (bumping count to BT_MAX_KEYBOARD_SCRIPTS); total == max is full
-    if (create && local_index == seen && total < BT_MAX_KEYBOARD_SCRIPTS) {
-        *out_global = total; // append at tail (new global index)
-        return true;
-    }
-    
-    // Otherwise, no mapping
+    // No mapping
     return false;
 }
 
-// GET /api/script?index=N[&cat=C]  -> {"index":GLOBAL,"name":"...","body":"...","cat":C}
+// Rank of a global slot within its category (its local index)
+static uint16_t local_index_for_global(uint8_t cat, uint16_t global_idx)
+{
+    uint16_t local = 0;
+    for (uint16_t i = 0; i < global_idx; ++i) {
+        uint8_t c = 0;
+        (void)bluetooth_portal_script_cat_idx_get_nvs(i, &c);
+
+        if (c == cat) {
+            local++;
+        }
+    }
+
+    return local;
+}
+
+// FNV-1a fingerprint of a script's label + body as 8 hex chars. GET hands it to the page with the slot id and edit/delete
+// echo both back, so a script changed in another tab since it was loaded is refused instead of overwritten
+static void script_tag_fmt(const char *label, const char *body, char out[9])
+{
+    uint32_t h = 2166136261u;
+
+    // Label including its NUL so the label/body boundary can't alias
+    const char *p = label;
+    do {
+        h = (h ^ (uint8_t)*p) * 16777619u;
+    } while (*p++ != '\0');
+
+    for (p = body; *p != '\0'; ++p) {
+        h = (h ^ (uint8_t)*p) * 16777619u;
+    }
+
+    snprintf(out, 9, "%08lx", (unsigned long)h);
+}
+
+// Current tag of a slot, read the same way script_one_get reads it (body_buf: MAX_HTTP_BODY_TXT + 1 bytes of scratch)
+static void script_slot_tag(uint16_t idx, char *body_buf, char out[9])
+{
+    char label[BT_SCRIPT_LABEL_MAX_LEN + 1] = {0};
+    size_t blen = 0;
+
+    body_buf[0] = '\0';
+    bluetooth_portal_script_label_get_nvs(idx, label, sizeof(label));
+    bluetooth_portal_script_body_get_nvs(idx, body_buf, MAX_HTTP_BODY_TXT + 1, &blen);
+
+    script_tag_fmt(label, body_buf, out);
+}
+
+// 409: the script the page loaded was "deleted", its id is "unknown" (see slot_find_by_id), or it was changed/moved since ("stale")
+static esp_err_t script_stale(httpd_req_t *req, const char *why)
+{
+    char json[48];
+    snprintf(json, sizeof(json), "{\"ok\":false,\"error\":\"%s\"}", why);
+
+    httpd_resp_set_status(req, "409 Conflict");
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, json);
+}
+
+// 500 for a failed slot write. An edit may be half-applied (body written, label not), so hand back the slot's current tag:
+// the page rebinds to it and its retry still lands instead of getting 409
+static esp_err_t script_write_failed(httpd_req_t *req, bool is_edit, uint16_t global_idx)
+{
+    char json[64] = "{\"ok\":false,\"error\":\"nvs\"}";
+
+    if (is_edit) {
+        char *scratch = (char *)malloc(MAX_HTTP_BODY_TXT + 1);
+        if (scratch != NULL) {
+            char tag[9];
+            script_slot_tag(global_idx, scratch, tag);
+            free(scratch);
+            snprintf(json, sizeof(json), "{\"ok\":false,\"error\":\"nvs\",\"tag\":\"%s\"}", tag);
+        }
+    }
+
+    httpd_resp_set_status(req, "500 Internal Server Error");
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, json);
+}
+
+// GET /api/script?index=N[&cat=C]  -> {"index":GLOBAL,"name":"...","body":"...","cat":C,"id":"...","tag":"..."}
 // If &cat=C is present, 'index' is LOCAL within that category and we resolve it to a GLOBAL index.
 static esp_err_t script_one_get(httpd_req_t *req)
 {
@@ -738,8 +875,8 @@ static esp_err_t script_one_get(httpd_req_t *req)
         uint16_t local_idx = (uint16_t)atoi(idx_str);
         uint8_t cat = (uint8_t)atoi(cat_str);
 
-        // Resolve (no create)
-        if (!resolve_global_index_for_local(cat, local_idx, false, &global_idx)) {
+        // Resolve
+        if (!resolve_global_index_for_local(cat, local_idx, &global_idx)) {
             return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "not found");
         }
     } else {
@@ -781,6 +918,14 @@ static esp_err_t script_one_get(httpd_req_t *req)
     cJSON_AddStringToObject(root, "name",  (name[0] ? name : ""));
     cJSON_AddStringToObject(root, "body",  (body[0] ? body : ""));
     cJSON_AddNumberToObject(root, "cat",   (int)cat);
+
+    // Id + tag the page echoes back on edit/delete
+    char id[9];
+    char tag[9];
+    snprintf(id, sizeof(id), "%08lx", (unsigned long)s_slot_ids[global_idx]);
+    script_tag_fmt(name, body, tag);
+    cJSON_AddStringToObject(root, "id",    id);
+    cJSON_AddStringToObject(root, "tag",   tag);
 
     // Serialize
     char *txt = cJSON_PrintUnformatted(root);
@@ -825,33 +970,11 @@ static void trim_ascii(char *s)
     }
 }
 
-// Derive label from first nonblank line of body
-static void label_from_body(const char *body_in, char *out, size_t outlen)
-{
-    // Make sure valid
-    if (!body_in || !out || outlen == 0) {
-        return;
-    }
-
-    size_t i = 0, n = 0;
-
-    // Skip blanks
-    while (body_in[i] && (unsigned char)body_in[i] <= ' ') {
-        i++;
-    }
-
-    while (body_in[i] && body_in[i] != '\n' && body_in[i] != '\r' && n + 1 < outlen) {
-        out[n++] = body_in[i++];
-    }
-    out[n] = '\0'; // NUL-terminate
-
-    trim_ascii(out);
-}
-
 // POST /api/script
-// Body: {"index":N,"name":"...","body":"...","cat":C}
-// If "cat" is provided, 'index' is LOCAL within that category.
-// We resolve to a GLOBAL index (existing slot or append at end).
+// New:  {"new":true,"cat":C,"name":"...","body":"..."} appends at the global tail
+// Edit: {"id":"...","tag":"...","from_cat":F,"cat":C,"name":"...","body":"..."} rewrites the script with that id wherever it now is; a changed cat moves it
+// id + tag come from the GET that loaded the script and F is the category the page shows it in; a script since deleted, changed or moved elsewhere gets 409
+// Responds {"ok":true,"index":GLOBAL,"local":L,"cat":C,"name":"...","id":"...","tag":"..."} so the page stays bound to the saved script
 static esp_err_t script_one_post(httpd_req_t *req)
 {
     // Reject overly large bodies
@@ -888,28 +1011,24 @@ static esp_err_t script_one_post(httpd_req_t *req)
     }
 
     // Extract fields
-    cJSON *jidx = cJSON_GetObjectItemCaseSensitive(j, "index");
+    cJSON *jnew = cJSON_GetObjectItemCaseSensitive(j, "new");
+    cJSON *jid = cJSON_GetObjectItemCaseSensitive(j, "id");
+    cJSON *jtag = cJSON_GetObjectItemCaseSensitive(j, "tag");
+    cJSON *jfrom = cJSON_GetObjectItemCaseSensitive(j, "from_cat");
     cJSON *jname = cJSON_GetObjectItemCaseSensitive(j, "name");
     cJSON *jbody = cJSON_GetObjectItemCaseSensitive(j, "body");
-    cJSON *jcat = cJSON_GetObjectItemCaseSensitive(j, "cat"); // Optional
+    cJSON *jcat = cJSON_GetObjectItemCaseSensitive(j, "cat");
 
-    // Validate required fields
-    if (!cJSON_IsNumber(jidx) || !cJSON_IsString(jname) || !cJSON_IsString(jbody)) {
+    // Validate required fields: a new script needs "new":true, an edit the id + tag it was loaded with and its category
+    bool is_new = cJSON_IsTrue(jnew);
+    if (!cJSON_IsNumber(jcat) || !cJSON_IsString(jname) || !cJSON_IsString(jbody) ||
+            (!is_new && (!cJSON_IsString(jid) || !cJSON_IsString(jtag) || !cJSON_IsNumber(jfrom)))) {
         cJSON_Delete(j);
         free(buf);
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing index/name/body");
-    }
-
-    // Validate index range
-    // Valid indices are 0..BT_MAX_KEYBOARD_SCRIPTS-1; appending at the last index bumps count to BT_MAX_KEYBOARD_SCRIPTS (the ceiling)
-    if (jidx->valueint < 0 || jidx->valueint >= BT_MAX_KEYBOARD_SCRIPTS) {
-        cJSON_Delete(j);
-        free(buf);
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "index out of range");
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing cat/name/body or id/tag/from_cat");
     }
 
     // Pull values
-    uint16_t idx_local_or_global = (uint16_t)jidx->valueint;
     const char *name_in = jname->valuestring;
     const char *body_in = jbody->valuestring;
 
@@ -921,66 +1040,77 @@ static esp_err_t script_one_post(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "body too large");
     }
 
-    // Parse/Default category
-    uint8_t cat = 0;
-    bool has_cat = false;
-    if (cJSON_IsNumber(jcat)) {
-        if (jcat->valueint < 0 || jcat->valueint >= BT_MAX_CATEGORIES) {
-            cJSON_Delete(j);
-            free(buf);
-            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "cat out of range");
-        }
-        cat = (uint8_t)jcat->valueint;
-        has_cat = true;
-    }
+    // Resolve the GLOBAL slot
+    uint16_t total = bluetooth_portal_script_count_get_nvs();
+    uint16_t global_idx = total;
 
-    // Resolve to GLOBAL index
-    uint16_t global_idx = idx_local_or_global;
-    if (has_cat) {
-        // Resolve local -> global (allow create if local==tail)
-        if (!resolve_global_index_for_local(cat, idx_local_or_global, true, &global_idx)) {
+    if (is_new) {
+        // Append at the global tail
+        if (total >= BT_MAX_KEYBOARD_SCRIPTS) {
             cJSON_Delete(j);
             free(buf);
-            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad index/cat");
+            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "max scripts reached");
         }
     } else {
-        // Treat as global (edit or append at tail)
-        uint16_t total = bluetooth_portal_script_count_get_nvs();
-
-        // If index past tail, reject
-        if (global_idx > total) {
+        // Find the loaded script wherever it moved
+        const char *why = NULL;
+        if (!slot_find_by_id(jid->valuestring, total, &global_idx, &why)) {
             cJSON_Delete(j);
             free(buf);
-            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad index");
+            return script_stale(req, why);
+        }
+
+        // Its content must still be what the page loaded
+        char *cur_body = (char *)malloc(MAX_HTTP_BODY_TXT + 1);
+        if (cur_body == NULL) {
+            cJSON_Delete(j);
+            free(buf);
+            return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+        }
+
+        char cur_tag[9];
+        script_slot_tag(global_idx, cur_body, cur_tag);
+        free(cur_body);
+
+        // ...and still in the category the page shows it in (another tab may have moved it or deleted a category)
+        uint8_t cur_cat = 0;
+        (void)bluetooth_portal_script_cat_idx_get_nvs(global_idx, &cur_cat);
+
+        if ((strcmp(cur_tag, jtag->valuestring) != 0) || (jfrom->valueint != cur_cat)) {
+            cJSON_Delete(j);
+            free(buf);
+            return script_stale(req, "stale");
         }
     }
 
-    // Build label from name/body
+    // Category must exist, or the script is unreachable from the device menu
+    if (jcat->valueint < 0 || jcat->valueint >= bluetooth_portal_category_count_get_nvs()) {
+        cJSON_Delete(j);
+        free(buf);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "cat out of range");
+    }
+    uint8_t cat = (uint8_t)jcat->valueint;
+
+    // Label from Name only, never from the body: a credential's first line is the secret, and labels are shown on screen and sent to the AI.
+    // Blank stays blank: the device shows a "Script N" placeholder and AI lookups skip unnamed scripts
     char label[BT_SCRIPT_LABEL_MAX_LEN + 1];
-    if (name_in[0] != '\0') {
-        strncpy(label, name_in, BT_SCRIPT_LABEL_MAX_LEN);
-        label[BT_SCRIPT_LABEL_MAX_LEN] = '\0';
-        trim_ascii(label);
-    } else {
-        label_from_body(body_in, label, sizeof(label));
-        if (label[0] == '\0') {
-            snprintf(label, sizeof(label), "Script %02d", (int)global_idx);
-        }
-    }
+    strncpy(label, name_in, BT_SCRIPT_LABEL_MAX_LEN);
+    label[BT_SCRIPT_LABEL_MAX_LEN] = '\0';
+    trim_ascii(label);
 
     // Persist the slot BEFORE bumping the count so a failed write (e.g. NVS full) never leaves a counted-but-empty slot
     // On append this writes index == count, currently beyond the count and therefore invisible; the count bump below reveals it only after every write succeeds
 
-    // Persist label
-    esp_err_t err = bluetooth_script_label_set_nvs(global_idx, label);
+    // Persist body first: it is the write likely to fail (NVS full), and failing before the label leaves an edited script unchanged so a retry still matches its tag
+    esp_err_t err = bluetooth_script_body_set_nvs(global_idx, body_in);
 
-    // Persist body
+    // Persist label
     if (err == ESP_OK) {
-        err = bluetooth_script_body_set_nvs(global_idx, body_in);
+        err = bluetooth_script_label_set_nvs(global_idx, label);
     }
 
-    // Persist category only if supplied (keep old if not)
-    if (err == ESP_OK && has_cat) {
+    // Persist category (category membership is only this key, so a changed cat moves the script)
+    if (err == ESP_OK) {
         err = bluetooth_portal_script_cat_idx_set_nvs(global_idx, cat);
     }
 
@@ -988,7 +1118,7 @@ static esp_err_t script_one_post(httpd_req_t *req)
     if (err != ESP_OK) {
         cJSON_Delete(j);
         free(buf);
-        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "nvs");
+        return script_write_failed(req, !is_new, global_idx);
     }
 
     // All slot writes succeeded. If appending, reveal the new tail by bumping the count LAST
@@ -1001,28 +1131,46 @@ static esp_err_t script_one_post(httpd_req_t *req)
             free(buf);
             return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "nvs-count");
         }
+
+        // New script, new identity
+        s_slot_ids[global_idx] = s_next_slot_id++;
     }
 
-    // Respond with GLOBAL index
-    char okjson[48];
-    int n = snprintf(okjson, sizeof(okjson), "{\"ok\":true,\"index\":%d}", (int)global_idx);
-    if ((n < 0) || (n >= (int)sizeof(okjson))) {
-        strcpy(okjson, "{\"ok\":true}");
-    }
-
-    // Send response
-    httpd_resp_set_type(req, "application/json");
-    err = httpd_resp_sendstr(req, okjson);
+    // New id/tag before body_in (owned by j) is freed
+    char id[9];
+    char tag[9];
+    snprintf(id, sizeof(id), "%08lx", (unsigned long)s_slot_ids[global_idx]);
+    script_tag_fmt(label, body_in, tag);
 
     // Cleanup
     cJSON_Delete(j);
     free(buf);
+
+    // Respond with where the script now lives + its new tag so the page stays bound to it
+    char *txt = NULL;
+    cJSON *resp = cJSON_CreateObject();
+    if (resp != NULL) {
+        cJSON_AddBoolToObject(resp, "ok", true);
+        cJSON_AddNumberToObject(resp, "index", (int)global_idx);
+        cJSON_AddNumberToObject(resp, "local", (int)local_index_for_global(cat, global_idx));
+        cJSON_AddNumberToObject(resp, "cat", (int)cat);
+        cJSON_AddStringToObject(resp, "name", label);
+        cJSON_AddStringToObject(resp, "id", id);
+        cJSON_AddStringToObject(resp, "tag", tag);
+        txt = cJSON_PrintUnformatted(resp);
+        cJSON_Delete(resp);
+    }
+
+    // Saved either way; without the tag the page drops back to new-script mode
+    httpd_resp_set_type(req, "application/json");
+    err = httpd_resp_sendstr(req, (txt != NULL) ? txt : "{\"ok\":true}");
+    free(txt);
     return err;
 }
 
-// DELETE /api/script?index=N[&cat=C]
-// If &cat=C is present, 'index' is LOCAL to that category.
-// We delete the corresponding GLOBAL slot and shift tail (label/body/cat).
+// DELETE /api/script?id=I&tag=T&cat=C
+// I and T come from the GET that loaded the script and C is the category the page shows it in; a script since deleted, changed or moved elsewhere gets 409.
+// We delete its GLOBAL slot and shift tail (label/body/cat).
 static esp_err_t script_one_delete(httpd_req_t *req)
 {
     // Read query
@@ -1031,40 +1179,38 @@ static esp_err_t script_one_delete(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing query");
     }
 
-    // Parse index
-    char idx_str[8] = {0};
-    if (httpd_query_key_value(qstr, "index", idx_str, sizeof(idx_str)) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing index");
-    }
-
-    // Parse optional category
+    // Parse id + tag + cat
+    char id_str[16] = {0};
+    char tag_str[16] = {0};
     char cat_str[8] = {0};
-    bool has_cat = (httpd_query_key_value(qstr, "cat", cat_str, sizeof(cat_str)) == ESP_OK);
+    if ((httpd_query_key_value(qstr, "id", id_str, sizeof(id_str)) != ESP_OK) ||
+            (httpd_query_key_value(qstr, "tag", tag_str, sizeof(tag_str)) != ESP_OK) ||
+            (httpd_query_key_value(qstr, "cat", cat_str, sizeof(cat_str)) != ESP_OK)) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing id/tag/cat");
+    }
 
-    // Resolve to GLOBAL index
+    // Find the loaded script wherever it moved
     uint16_t global_idx = 0;
-    if (has_cat) {
-        uint16_t local_idx = (uint16_t)atoi(idx_str);
-        uint8_t cat = (uint8_t)atoi(cat_str);
-
-        // Resolve local -> global (no create on delete)
-        if (!resolve_global_index_for_local(cat, local_idx, false, &global_idx)) {
-            return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "not found");
-        }
-    } else {
-        global_idx = (uint16_t)atoi(idx_str);
-    }
-
-    // Validate range
     uint16_t count = bluetooth_portal_script_count_get_nvs();
-    if (global_idx >= count) {
-        return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "not found");
+    const char *why = NULL;
+    if (!slot_find_by_id(id_str, count, &global_idx, &why)) {
+        return script_stale(req, why);
     }
 
-    // Allocate scratch for body shift
+    // Allocate scratch for the tag check + body shift
     char *next_body = (char *)malloc(MAX_HTTP_BODY_TXT + 1);
     if (next_body == NULL) {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+    }
+
+    // Refuse if the slot no longer holds the loaded script, or it moved category
+    char cur_tag[9];
+    uint8_t cur_cat = 0;
+    script_slot_tag(global_idx, next_body, cur_tag);
+    (void)bluetooth_portal_script_cat_idx_get_nvs(global_idx, &cur_cat);
+    if ((strcmp(cur_tag, tag_str) != 0) || (atoi(cat_str) != cur_cat)) {
+        free(next_body);
+        return script_stale(req, "stale");
     }
 
     // Shift down [global_idx+1 .. count-1] into [global_idx .. count-2]
@@ -1095,6 +1241,7 @@ static esp_err_t script_one_delete(httpd_req_t *req)
 
     // Decrement count
     bluetooth_script_count_set_nvs(count - 1);
+    slot_ids_remove(global_idx, count);
 
     // Free scratch
     free(next_body);
@@ -1647,14 +1794,13 @@ static esp_err_t import_post(httpd_req_t *req)
     for (int i = 0; i < script_n; ++i) {
         cJSON *s = cJSON_GetArrayItem(scr, i);
 
-        // Label (truncate to 32; default if missing)
-        char label[BT_SCRIPT_LABEL_MAX_LEN + 1];
+        // Label (truncate to 32; blank if missing)
+        char label[BT_SCRIPT_LABEL_MAX_LEN + 1] = {0};
         cJSON *jl = cJSON_IsObject(s) ? cJSON_GetObjectItemCaseSensitive(s, "label") : NULL;
         if (cJSON_IsString(jl) && (jl->valuestring != NULL)) {
             strncpy(label, jl->valuestring, BT_SCRIPT_LABEL_MAX_LEN);
             label[BT_SCRIPT_LABEL_MAX_LEN] = '\0';
-        } else {
-            snprintf(label, sizeof(label), "Script %02d", i);
+            trim_ascii(label);
         }
 
         // Category (clamp out-of-range to 0)
@@ -1686,6 +1832,9 @@ static esp_err_t import_post(httpd_req_t *req)
     // Count last: only fully-written slots become visible
     esp_err_t count_err = bluetooth_script_count_set_nvs((uint16_t)scripts_written);
 
+    // Every slot was rewritten: fresh ids, so pages bound before the import get 409
+    slot_ids_reset();
+
     cJSON_Delete(root);
     free(buf);
 
@@ -1709,6 +1858,13 @@ static esp_err_t import_post(httpd_req_t *req)
 // Start the embedded HTTP server and register endpoints
 static httpd_handle_t start_http(void)
 {
+    // Script ids last the whole boot: only this server and import touch the store, so a tab left open
+    // across a portal exit and re-entry stays valid
+    if (!s_slot_ids_seeded) {
+        slot_ids_reset();
+        s_slot_ids_seeded = true;
+    }
+
     // C0nfigure default
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
     cfg.max_uri_handlers = 16;

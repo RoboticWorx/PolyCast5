@@ -454,9 +454,17 @@ bool wifi_ota_update_in_progress(void)
 void wifi_ota_update_mark_app_valid(void)
 {
 #ifdef CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
+    // Only commit if this image is the one on trial. Marking valid flips the active otadata
+    // entry, not the running slot: after the bootloader rejects an update and falls back
+    // here, that entry is the rejected image, which would then be retried on every boot
+    esp_ota_img_states_t state;
+    if (esp_ota_get_state_partition(esp_ota_get_running_partition(), &state) != ESP_OK || state != ESP_OTA_IMG_PENDING_VERIFY) {
+        return;
+    }
+
     // Marking valid writes the (encrypted) otadata partition, so drop to 160 for
     // the write (C5 errata), then restore
-    
+
     // If the cap fails, skip it -- risking a rollback is safer than corrupting otadata at 240 MHz
     if (!ota_flash_write_freq_guard(true)) {
         ESP_LOGE(TAG, "Could not cap CPU; skipping mark-app-valid");

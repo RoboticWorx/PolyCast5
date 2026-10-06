@@ -34,6 +34,12 @@ static rmt_channel_handle_t rx_channel = NULL;
 static rmt_channel_handle_t tx_channel = NULL;
 static rmt_encoder_handle_t tx_encoder = NULL;
 
+#ifdef CONFIG_RMT_TX_ISR_CACHE_SAFE
+static rmt_symbol_word_t tx_signal[MAX_PULSES]; // Level-flipped TX copy; the cache-safe TX ISR reads it, so internal
+#else
+POLYCAST5_USE_PSRAM_BSS static rmt_symbol_word_t tx_signal[MAX_PULSES]; // Level-flipped TX copy
+#endif
+
 // When IR signal received
 static bool IRAM_ATTR infrared_rx_callback(rmt_channel_handle_t channel, const rmt_rx_done_event_data_t *edata, void *user_data)
 {
@@ -111,11 +117,10 @@ void infrared_utils_init_tx(void)
         return;
     }
 
-    // TX signal configuration
+    // TX signal configuration: carrier on HIGH levels (marks, once flipped at TX)
     rmt_carrier_config_t carrier_config = {
         .frequency_hz = 38000,
         .duty_cycle = 0.33,
-        .flags.polarity_active_low = true,
     };
     ESP_ERROR_CHECK(rmt_apply_carrier(tx_channel, &carrier_config));
 
@@ -177,11 +182,18 @@ void infrared_utils_transmit_ir(rmt_symbol_word_t *signal, size_t length)
         ESP_LOGE(TAG, "TX channel or encoder not initialized");
         return;
     }
-    
+
+    // Learned marks are level 0 (TSOP is active-low) but the LED driver is active-high: flip so gaps are dark
+    for (size_t i = 0; i < length; i++) {
+        tx_signal[i] = signal[i];
+        tx_signal[i].level0 = !signal[i].level0;
+        tx_signal[i].level1 = !signal[i].level1;
+    }
+
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "TX symbol: level0=%d, duration0=%d, level1=%d, duration1=%d",
-            signal[length - 1].level0, signal[length - 1].duration0,
-            signal[length - 1].level1, signal[length - 1].duration1);
+            tx_signal[length - 1].level0, tx_signal[length - 1].duration0,
+            tx_signal[length - 1].level1, tx_signal[length - 1].duration1);
 #endif
 
     // Make sure not to pick up our own transmission
@@ -189,7 +201,7 @@ void infrared_utils_transmit_ir(rmt_symbol_word_t *signal, size_t length)
 
     // TX once
     rmt_transmit_config_t tx_config = {.loop_count = 1};
-    esp_err_t ret = rmt_transmit(tx_channel, tx_encoder, signal,
+    esp_err_t ret = rmt_transmit(tx_channel, tx_encoder, tx_signal,
             length * sizeof(rmt_symbol_word_t), &tx_config);
     
     // Allow time for transmisison to finish

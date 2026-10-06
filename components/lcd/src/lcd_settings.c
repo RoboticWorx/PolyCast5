@@ -2753,6 +2753,10 @@ void lcd_settings_pin_lockout_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
         lv_obj_remove_flag(ui_menu->arrow_left, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
 
+        // A boot into the lockout skips the home-page PIN entry: mask input and show the count
+        pin_signing_in = true;
+        lv_label_set_text_fmt(settings_menu->pin_menu.lbl_attempts, "WRONG: %" PRIu32, pin_attempts);
+
         // Show pin prompt
         lv_obj_remove_flag(settings_menu->pin_menu.pin_container, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(settings_menu->pin_menu.lbl_ins, LV_OBJ_FLAG_HIDDEN);
