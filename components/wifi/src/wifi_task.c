@@ -34,6 +34,11 @@
 
 #define TAG "WIFI_TASK"
 
+// Requests the event block acts on; taken and cleared together each pass
+#define WIFI_REQUEST_BITS (WIFI_RECONNECT_BIT | WIFI_DISCONNECT_BIT | WIFI_SCAN_NETWORKS_BIT | WIFI_SCAN_DEAUTH_BIT | WIFI_GET_DATE_TIME_BIT)
+// Requests that end with the radio stopped; a later reconnect request supersedes them
+#define WIFI_RADIO_OFF_REQUEST_BITS (WIFI_DISCONNECT_BIT | WIFI_SCAN_NETWORKS_BIT | WIFI_SCAN_DEAUTH_BIT)
+
 extern volatile bool wifi_reconnect_with_scan; // wifi_utils.c
 
 char btc_wifi_portal_pass[64];
@@ -81,7 +86,6 @@ EventGroupHandle_t xWiFiPortalEventGroup;
 QueueHandle_t xWifiOtaPctQueue;
 
 static EventBits_t last_portal_bits = 0;
-static EventBits_t last_wifi_event_bits = 0;
 
 static TaskHandle_t wifi_time_task_handle = NULL;
 
@@ -334,20 +338,25 @@ static void wifi_task(void *param)
             }
         }
 
-        // Check for Wi-Fi events
-        EventBits_t wifi_event_bits = xEventGroupGetBits(xWifiEventGroup);
-        if ((wifi_event_bits != last_wifi_event_bits) || wifi_reconnect_with_scan) { // Only act on changes
+        // Check for Wi-Fi requests: taken and cleared atomically, so none can stick or go unseen
+        EventBits_t wifi_req_bits = xEventGroupClearBits(xWifiEventGroup, WIFI_REQUEST_BITS);
+
+        // A pending disconnect wins: wifi_task_request_reconnect() clears it, so it is newer than any UI reconnect
+        if (wifi_req_bits & WIFI_DISCONNECT_BIT) {
+            wifi_req_bits &= ~WIFI_RECONNECT_BIT;
+        }
+
+        if (wifi_req_bits || wifi_reconnect_with_scan) {
             esp_err_t err;
 
 #ifdef POLYCAST5_DEBUG
-            ESP_LOGI(TAG, "Received Wi-Fi event: %u", (unsigned int)wifi_event_bits);
+            ESP_LOGI(TAG, "Received Wi-Fi requests: %u", (unsigned int)wifi_req_bits);
             if (wifi_reconnect_with_scan) {
                 ESP_LOGI(TAG, "wifi_reconnect_with_scan flag is set");
             }
 #endif
-            // If Wi-Fi reconnect bit transitioned 0 -> 1
-            if (((wifi_event_bits & WIFI_RECONNECT_BIT) && !(last_wifi_event_bits & WIFI_RECONNECT_BIT))
-                    || wifi_reconnect_with_scan) {
+            // If Wi-Fi reconnect requested (or a failed connect queued its retry)
+            if ((wifi_req_bits & WIFI_RECONNECT_BIT) || wifi_reconnect_with_scan) {
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Reconnecting to known network...");
 #endif
@@ -391,10 +400,13 @@ static void wifi_task(void *param)
                         ESP_LOGE(TAG, "WIFI_RECONNECT_BIT: wifi_utils_connect failed: %s", esp_err_to_name(err));
                     }
                 }
-                xEventGroupClearBits(xWifiEventGroup, WIFI_RECONNECT_BIT); // Reset for next time
+                // A reconnect requested during this attempt is satisfied by it, and is newer than radio-off requests taken this pass
+                if (xEventGroupClearBits(xWifiEventGroup, WIFI_RECONNECT_BIT) & WIFI_RECONNECT_BIT) {
+                    wifi_req_bits &= ~WIFI_RADIO_OFF_REQUEST_BITS;
+                }
             }
-            // If Wi-Fi disconnect bit transitioned 0 -> 1
-            if ((wifi_event_bits & WIFI_DISCONNECT_BIT) && !(last_wifi_event_bits & WIFI_DISCONNECT_BIT)) {
+            // If Wi-Fi disconnect requested
+            if (wifi_req_bits & WIFI_DISCONNECT_BIT) {
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Disconnecting Wi-Fi...");
 #endif
@@ -402,10 +414,9 @@ static void wifi_task(void *param)
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "WIFI_DISCONNECT_BIT: wifi_utils_radio_stop failed: %s", esp_err_to_name(err));
                 }
-                xEventGroupClearBits(xWifiEventGroup, WIFI_DISCONNECT_BIT); // Reset for next time
             }
-            // If Wi-Fi scan networks bit transitioned 0 -> 1
-            if ((wifi_event_bits & WIFI_SCAN_NETWORKS_BIT) && !(last_wifi_event_bits & WIFI_SCAN_NETWORKS_BIT)) {
+            // If Wi-Fi scan networks requested
+            if (wifi_req_bits & WIFI_SCAN_NETWORKS_BIT) {
                 err = esp_wifi_start();
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "WIFI_SCAN_NETWORKS_BIT: esp_wifi_start failed: %s", esp_err_to_name(err));
@@ -414,14 +425,14 @@ static void wifi_task(void *param)
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "WIFI_SCAN_NETWORKS_BIT: wifi_utils_scan failed: %s", esp_err_to_name(err));
                 }
+                xEventGroupClearBits(xWifiEventGroup, WIFI_SCAN_NETWORKS_BIT); // A scan requested during this one shares its results
                 err = wifi_utils_radio_stop();
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "WIFI_SCAN_NETWORKS_BIT: wifi_utils_radio_stop failed: %s", esp_err_to_name(err));
                 }
-                xEventGroupClearBits(xWifiEventGroup, WIFI_SCAN_NETWORKS_BIT); // Reset for next time
             }
-            // If Wi-Fi scan networks for deauth bit transitioned 0 -> 1
-            if ((wifi_event_bits & WIFI_SCAN_DEAUTH_BIT) && !(last_wifi_event_bits & WIFI_SCAN_DEAUTH_BIT)) {
+            // If Wi-Fi scan networks for deauth requested
+            if (wifi_req_bits & WIFI_SCAN_DEAUTH_BIT) {
                 err = esp_wifi_start();
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "WIFI_SCAN_DEAUTH_BIT: esp_wifi_start failed: %s", esp_err_to_name(err));
@@ -430,14 +441,14 @@ static void wifi_task(void *param)
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "WIFI_SCAN_DEAUTH_BIT: wifi_deauth_scan failed: %s", esp_err_to_name(err));
                 }
+                xEventGroupClearBits(xWifiEventGroup, WIFI_SCAN_DEAUTH_BIT); // A scan requested during this one shares its results
                 err = wifi_utils_radio_stop();
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "WIFI_SCAN_DEAUTH_BIT: wifi_utils_radio_stop failed: %s", esp_err_to_name(err));
                 }
-                xEventGroupClearBits(xWifiEventGroup, WIFI_SCAN_DEAUTH_BIT); // Reset for next time
             }
-            // If Wi-Fi get date and time bit transitioned 0 -> 1
-            if ((wifi_event_bits & WIFI_GET_DATE_TIME_BIT) && !(last_wifi_event_bits & WIFI_GET_DATE_TIME_BIT)) {
+            // If Wi-Fi get date and time requested
+            if (wifi_req_bits & WIFI_GET_DATE_TIME_BIT) {
                 // Run time sync in a dedicated task (TLS/HTTP client + JSON parsing stack can be deep)
                 if (wifi_time_task_handle == NULL) {
                     if (xTaskCreate(wifi_time_task, "wifi_time_task", 1024 * 6, NULL,
@@ -446,10 +457,7 @@ static void wifi_task(void *param)
                         wifi_time_task_handle = NULL;
                     }
                 }
-                xEventGroupClearBits(xWifiEventGroup, WIFI_GET_DATE_TIME_BIT); // Reset for next time
             }
-
-            last_wifi_event_bits = wifi_event_bits;
         }
 
         // Check for web portal events
@@ -573,6 +581,13 @@ static void wifi_task(void *param)
 
         vTaskDelay(pdMS_TO_TICKS(10));
     }
+}
+
+void wifi_task_request_reconnect(void)
+{
+    // Drop pending radio-off requests first: wifi_task reads a disconnect still pending as the newer request
+    xEventGroupClearBits(xWifiEventGroup, WIFI_RADIO_OFF_REQUEST_BITS);
+    xEventGroupSetBits(xWifiEventGroup, WIFI_RECONNECT_BIT);
 }
 
 void wifi_task_create(void)

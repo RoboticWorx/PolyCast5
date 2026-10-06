@@ -1291,7 +1291,7 @@ void lcd_tools_claude_usage_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_m
             lv_timer_handler();
 
             // Trigger reconnect via wifi_task
-            xEventGroupSetBits(xWifiEventGroup, WIFI_RECONNECT_BIT);
+            wifi_task_request_reconnect();
 
             // Block until connected, timeout, or LEFT pressed
             uint8_t status = lcd_wait_for_bit_better(xWifiEventGroup,

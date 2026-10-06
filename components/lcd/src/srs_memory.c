@@ -169,7 +169,7 @@ bool srs_sync_time_over_wifi(void)
     }
 
     /* If not synced */
-    xEventGroupSetBits(xWifiEventGroup, WIFI_RECONNECT_BIT); // Reconnect to previous Wi-Fi network
+    wifi_task_request_reconnect(); // Reconnect to previous Wi-Fi network
 
     // Wait up to WIFI_CONN_TIMEOUT_MS for connection
     TickType_t start = xTaskGetTickCount();

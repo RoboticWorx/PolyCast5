@@ -3603,7 +3603,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
         xEventGroupSetBits(xWifiEventGroup, WIFI_CHECK_OTA_ON_CONN_BIT);
 
         // Connect to previous Wi-Fi network
-        xEventGroupSetBits(xWifiEventGroup, WIFI_RECONNECT_BIT);
+        wifi_task_request_reconnect();
 
         // Wait up to WIFI_CONN_TIMEOUT_MS for Wi-Fi to connect
         uint8_t status = lcd_wait_for_bit_better(xWifiEventGroup, WIFI_CONNECTED_BIT, WIFI_CONN_TIMEOUT_MS);

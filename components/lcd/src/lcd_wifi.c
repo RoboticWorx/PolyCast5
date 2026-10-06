@@ -643,7 +643,7 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
         // Check for OTA on connect
         xEventGroupSetBits(xWifiEventGroup, WIFI_CHECK_OTA_ON_CONN_BIT);
 #endif
-        xEventGroupSetBits(xWifiEventGroup, WIFI_RECONNECT_BIT); // Reconnect to previous Wi-Fi network
+        wifi_task_request_reconnect(); // Reconnect to previous Wi-Fi network
         
         // Reset
         monitoring_packets = false;
@@ -1749,7 +1749,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
             if ((xTaskGetTickCount() - disconnect_tick) < pdMS_TO_TICKS(2000)) {
                 // Do nothing for a bit (non-blocking delay)
             } else {
-                xEventGroupSetBits(xWifiEventGroup, WIFI_RECONNECT_BIT); // Reconnect to previous Wi-Fi network
+                wifi_task_request_reconnect(); // Reconnect to previous Wi-Fi network
 
                 reconnect_start_tick = xTaskGetTickCount();
                 reconnect_sent = true;

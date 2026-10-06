@@ -37,7 +37,7 @@ extern EventGroupHandle_t xWiFiPortalEventGroup;
 #define WIFI_CONNECTED_BIT         (1U << 3)
 #define WIFI_CONNECTING_FAILED_BIT (1U << 4) // For LCD "Connecting..."
 #define WIFI_DISCONNECT_BIT        (1U << 5)
-#define WIFI_RECONNECT_BIT         (1U << 6)
+#define WIFI_RECONNECT_BIT         (1U << 6) // UI sets via wifi_task_request_reconnect(); raw sets lose to a pending disconnect
 #define WIFI_MQTT_CONNECTED_BIT    (1U << 7)
 #define WIFI_MQTT_SUCCESS_BIT      (1U << 8)
 #define WIFI_CHECK_OTA_ON_CONN_BIT (1U << 9)
@@ -79,6 +79,11 @@ extern QueueHandle_t xWifiOtaPctQueue;
  * @brief Create the Wi-Fi task
  */
 void wifi_task_create(void);
+
+/**
+ * @brief Request a reconnect to the last known network for a user action, cancelling any pending disconnect or scan
+ */
+void wifi_task_request_reconnect(void);
 
 
 #endif // WIFI_TASK_H
