@@ -24,6 +24,11 @@ That's it. The script figures out everything else:
   * Handles the very first flash of a brand-new board with --first: a virgin
     chip has no encryption key burned yet, so everything goes on as plaintext
     and the bootloader encrypts the flash itself on the first boot.
+  * Reads the board's hardware-revision eFuse (BLOCK_USR_DATA bytes 0-1) on
+    every run that connects to the board (not --dry-run, --monitoronly or
+    --list-ports), and burns POLYCAST5_HW_VERSION from polycast5_macros.h into
+    a blank one, without asking. The block takes ONE write ever, so a board that
+    already has a revision keeps it. For a new board revision, bump that macro.
   * Mirrors the freshly built images into the repo's bin/ folder (flat
     filenames plus a matching flash_args), so the committed release binaries -
     the ones the web Firmware Updater serves - always match the pushed source.
@@ -123,7 +128,7 @@ Exit code: 0 on success (or nothing-to-do), non-zero on any failure.
 Trace map (top to bottom): the flow lives in main(), which runs nine numbered
 steps: 1) build, 2) load build outputs, 3) build a per-partition "plan",
 4) mirror the images into bin/ + write the OTA manifest and size report, 5) connect + preflight
-the chip, 6) decide what changed, 7) print the plan, 8) flash, 9) save state.
+the chip (and its hardware-revision eFuse), 6) decide what changed, 7) print the plan, 8) flash, 9) save state.
 Everything above main() is a helper those steps call.
 ----------------------------------------------------------------------------
 """
@@ -922,6 +927,96 @@ def read_chip_fe(port: str, chip: str, after: str = "hard-reset") -> bool | None
 
 
 # ===========================================================================
+# Hardware revision eFuse. Bytes 0-1 of BLOCK_USR_DATA hold the board revision
+# (u16, little-endian), which the firmware reads in gpio_get_hw_version(). The
+# block is Reed-Solomon coded, so it takes exactly ONE write: the first burn is
+# permanent and nothing can be added to the block afterwards. A blank block is
+# a board from before the burn, which the firmware reports as
+# POLYCAST5_HW_VERSION_BLANK.
+# ===========================================================================
+MACROS_H        = ROOT / "components" / "common" / "include" / "polycast5_macros.h"
+HW_REV_BLOCK    = "BLOCK_USR_DATA"                 # eFuse BLK3, 32 bytes
+HW_REV_FILE     = BUILD_DIR / "hw_rev_efuse.bin"   # the 32-byte image burn-block-data writes
+
+
+def macro_int(name: str) -> int:
+    """Return an integer #define from polycast5_macros.h (dies if it's missing)."""
+    try:
+        text = MACROS_H.read_text(encoding="utf-8", errors="replace")
+    except OSError as e:
+        die(f"couldn't read {MACROS_H.name} ({e}).")
+    # Anchored to the line start, so a commented-out define doesn't count, and
+    # [ \t]+ after the name keeps POLYCAST5_HW_VERSION from matching *_BLANK.
+    m = re.search(rf"^[ \t]*#define[ \t]+{name}[ \t]+(\d+)\b", text, re.M)
+    if not m:
+        die(f"{name} is not defined in {MACROS_H.name}.")
+    return int(m.group(1))
+
+
+def espefuse_cmd(port: str, chip: str, before: str, after: str, *args: str) -> list[str]:
+    # Same shape as esptool_cmd(), for `python -m espefuse ...` (no --connect-attempts there).
+    return [sys.executable, "-m", "espefuse", "--chip", chip, "-p", port,
+            "--before", before, "--after", after, *args]
+
+
+def read_hw_rev_block(port: str, chip: str, before: str, after: str) -> bytes | None:
+    """Return the 32 bytes of BLOCK_USR_DATA, or None if they couldn't be read."""
+    proc = run(espefuse_cmd(port, chip, before, after, "dump"), capture=True, fatal=False)
+    if proc is None:
+        return None
+    out = proc.stdout or ""
+    die_if_locked_device(out)
+    if proc.returncode != 0:
+        return None
+    # "BLOCK_USR_DATA  (BLOCK3          ) [3 ] dump: 0000000e 00000000 ..." - eight
+    # 32-bit words, each printed little-endian (bytes 01 02 03 04 show as 04030201).
+    m = re.search(r"^BLOCK_USR_DATA\b[^\n]*?dump:\s*((?:[0-9a-fA-F]{8}[ \t]+){7}[0-9a-fA-F]{8})",
+                  out, re.M)
+    if not m:
+        return None
+    return b"".join(int(w, 16).to_bytes(4, "little") for w in m.group(1).split())
+
+
+def check_hw_revision(port: str, chip: str, before: str, after: str) -> None:
+    """Report the board's hardware-revision eFuse, and burn POLYCAST5_HW_VERSION
+    into it, without asking, if it's blank.
+
+    Never burns a block that already holds anything: espefuse alone can't be
+    trusted with that, since it reports success for a value whose bits are a
+    subset of what's already burned (14 = 0b1110 over 15 = 0b1111) while the
+    chip keeps the old value. Non-fatal unless a burn fails to read back."""
+    want = macro_int("POLYCAST5_HW_VERSION")
+    if not 1 <= want <= 0xFFFF:
+        die(f"POLYCAST5_HW_VERSION must be 1-65535 (it's {want}).")
+
+    block = read_hw_rev_block(port, chip, before, after)
+    if block is None:
+        print(yellow("Couldn't read the hardware-revision eFuse; skipping it this run."))
+        return
+
+    # Already written: report it. A different revision is normal (an older board)
+    if any(block):
+        have = int.from_bytes(block[0:2], "little")
+        note = "" if have == want else f"  (blank boards get v{want}; this one keeps its burn)"
+        print(green(f"Hardware revision: v{have} (eFuse).") + gray(note))
+        return
+
+    print(yellow(f"Hardware-revision eFuse is blank: burning POLYCAST5_HW_VERSION = v{want} (permanent)."))
+    HW_REV_FILE.write_bytes(want.to_bytes(2, "little") + bytes(30))  # burn-block-data takes the whole block
+    run(espefuse_cmd(port, chip, before, after, "--do-not-confirm",
+                     "burn-block-data", HW_REV_BLOCK, str(HW_REV_FILE)), fatal=False)
+
+    # The exit code isn't proof (see above): read it back
+    burned = read_hw_rev_block(port, chip, before, after)
+    if burned != HW_REV_FILE.read_bytes():
+        die("the hardware-revision eFuse didn't read back as burned.",
+            f"Read back: {burned.hex() if burned else 'nothing (read failed)'}",
+            f"Check it with:  python -m espefuse --chip {chip} -p {port} dump",
+            "Nothing was flashed.")
+    print(green(f"Hardware revision: v{want} burned into eFuse."))
+
+
+# ===========================================================================
 # Change-tracking state (build/flash_state.json).
 # ===========================================================================
 def load_state() -> dict | None:
@@ -1186,6 +1281,8 @@ def main() -> int:
         # Dry-run never touches hardware: don't auto-detect or connect.
         port = args.port or "(auto-detect at flash time)"
         mac = None
+        print(gray(f"[dry-run] would read the hardware-revision eFuse and burn "
+                   f"v{macro_int('POLYCAST5_HW_VERSION')} if it's blank."))
     else:
         port = args.port or autodetect_port()
         print(cyan("Connecting to device..."))
@@ -1246,6 +1343,11 @@ def main() -> int:
                     "Rebuild with CONFIG_SECURE_FLASH_ENC_ENABLED=y to match the board.")
         else:
             print(green(f"Chip flash-encryption: {'ON' if chip_fe else 'OFF'} (matches build)."))
+
+        # Before any write: on --first the last flash step boots the one-way
+        # encryption pass, and an espefuse reset after it would interrupt it.
+        # probe_after keeps a --first chip in download mode here too.
+        check_hw_revision(port, chip, before, probe_after)
 
     # -- 6. Decide what changed -----------------------------------------------
     # `reason` is set when we should flash EVERYTHING (skips per-file hashing).

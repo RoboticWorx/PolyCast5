@@ -162,6 +162,14 @@ void gpio_screen_changed(void);
 void gpio_woke_by_button(void);
 
 /**
+ * @brief  Board hardware revision, for firmware paths that differ between boards. Read from eFuse
+ *         BLOCK_USR_DATA bytes 0-1, burned once by flash.py.
+ *
+ * @returns Hardware revision (POLYCAST5_HW_VERSION_BLANK if the eFuse is blank)
+ */
+uint16_t gpio_get_hw_version(void);
+
+/**
  * @brief  Create the GPIO task.
  *         Internally it calls gpio_utils_init(), then
  *         polls P0.0–P0.7 and mirrors each bit to P1.0–P1.7.

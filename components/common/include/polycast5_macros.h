@@ -47,6 +47,10 @@
 // #define POLYCAST5_EN_PYRAMID_ANIM 1 // Enables pyramid-alien homescreen animation (56 frames)
 #define POLYCAST5_EN_WATER_ANIM 1 // Enables accelerometer-driven water-slosh homescreen animation (procedural, no assets)
 
+// Hardware revision: eFuse BLOCK_USR_DATA bytes 0-1 (u16), read by gpio_get_hw_version(). The block takes ONE write, ever
+#define POLYCAST5_HW_VERSION 14 // flash.py burns this into every blank eFuse it flashes. Bump for a new board revision
+#define POLYCAST5_HW_VERSION_BLANK 14 // Reported for a blank eFuse (boards from before the burn). Never change
+
 // Boot screen
 #define POLYCAST5_EN_BOOT_SCREEN 1 // Animated boot splash until the UI draws (lcd_boot_splash.c). Off: backlight on at full from gpio_utils_init over power-up noise, brightness restored in lcd_task
 

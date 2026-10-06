@@ -9,6 +9,8 @@
 
 #include "hal/adc_hal.h"
 #include "esp_log.h"
+#include "esp_efuse.h"
+#include "esp_efuse_table.h"
 
 #include "lis2dh12.h"
 #include "mmc5603.h"
@@ -330,6 +332,13 @@ void gpio_screen_changed(void)
 void gpio_woke_by_button(void)
 {
     wake_read_pending = true;
+}
+
+uint16_t gpio_get_hw_version(void)
+{
+    uint16_t ver = 0; // Stays 0 while the eFuse is blank
+    esp_efuse_read_field_blob(ESP_EFUSE_USER_DATA, &ver, 16);
+    return ver ? ver : POLYCAST5_HW_VERSION_BLANK;
 }
 
 // Release or re-assert the 3V3_EN power latch based on measured battery voltage
@@ -742,6 +751,10 @@ static void gpio_task(void *arg)
 
 void gpio_task_create(void)
 {
+#ifdef POLYCAST5_DEBUG
+    ESP_LOGI(TAG, "Hardware version: v%u", gpio_get_hw_version());
+#endif
+
     if (xTaskCreate(gpio_task, "gpio_task", 1024 * 2, NULL, POLYCAST5_PRIORITY_MEDIUM, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start gpio_task");
     }
