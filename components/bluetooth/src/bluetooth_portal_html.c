@@ -457,6 +457,7 @@ const char *BLUETOOTH_WEB_PORTAL_HTML =
 "      // -------------------------------\n"
 "      var categoryCount = 0;\n"
 "      var categoryScriptCounts = [];\n"
+"      var categoryDeleteBusy = false;\n"
 
 "      // Script the editor is bound to: null = new script, else {id, tag, cat, local} from its last load/save.\n"
 "      // Save/Delete act on exactly that script (the device finds it by id even if it moved) and refuse (409) if it was changed or deleted since.\n"
@@ -1003,14 +1004,36 @@ const char *BLUETOOTH_WEB_PORTAL_HTML =
 "      }\n"
 
 "      async function deleteCategory() {\n"
+"        if (categoryDeleteBusy) return;\n"
 "        const categoryStatusText = getElementByIdSafe('category_status_text');\n"
 
 "        const categoryIndexInput = getElementByIdSafe('category_index_input');\n"
 "        const categoryNameInput = getElementByIdSafe('category_name_input');\n"
 
-"        const categoryIndex = parseIntegerOrDefault(categoryIndexInput ? categoryIndexInput.value : '0', 0);\n"
+"        const categoryIndex = parseIntegerOrDefault(categoryIndexInput ? categoryIndexInput.value : '', -1);\n"
 
+"        categoryDeleteBusy = true;\n"
 "        try {\n"
+"          // Name and script count come from the device, not the edit boxes, so the confirm names what is actually deleted\n"
+"          const listResponse = await fetch('/api/categories');\n"
+"          if (!listResponse.ok) {\n"
+"            setTextIfExists(categoryStatusText, 'Error');\n"
+"            return;\n"
+"          }\n"
+"          const list = await listResponse.json();\n"
+"          if (categoryIndex < 0 || categoryIndex >= (list.count || 0)) {\n"
+"            setTextIfExists(categoryStatusText, 'Not found');\n"
+"            refreshCategoryLists();\n"
+"            return;\n"
+"          }\n"
+
+"          const categoryName = (list.names && list.names[categoryIndex]) || '(unnamed)';\n"
+"          const scriptCount = (list.script_counts && list.script_counts[categoryIndex]) || 0;\n"
+"          const confirmText = (scriptCount > 0)\n"
+"            ? 'Deleting category \"' + categoryName + '\" will also DELETE its ' + scriptCount + (scriptCount === 1 ? ' script' : ' scripts') + '. This cannot be undone. Continue?'\n"
+"            : 'Delete category \"' + categoryName + '\"? It has no scripts. Continue?';\n"
+"          if (!confirm(confirmText)) return;\n"
+
 "          const response = await fetch(`/api/category?index=${categoryIndex}`, { method: 'DELETE' });\n"
 
 "          if (response.ok) {\n"
@@ -1023,6 +1046,8 @@ const char *BLUETOOTH_WEB_PORTAL_HTML =
 "          }\n"
 "        } catch (error) {\n"
 "          console.error(error);\n"
+"        } finally {\n"
+"          categoryDeleteBusy = false;\n"
 "        }\n"
 "      }\n"
 

@@ -1819,7 +1819,7 @@ void lcd_tools_how_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
     static lv_obj_t *instr_lbl = NULL;
     
     if (!init) {
-        // Reset long select semaphore to avoid false notebook reset
+        // Reset long select semaphore to avoid a false forget prompt
         xQueueReset(xSelectButtonLongSemaphore);
         
         // Create a scrollable container for the instructions
@@ -1883,13 +1883,11 @@ void lcd_tools_how_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
         // Switch pages
         ui_menu->page = TOOLS_SRS_PAGE;
     }
-    // Reset notebook
+    // Ask before forgetting notebooks (the hold ended here, so it can't confirm)
     else if (lcd_take_long_press(GPIO_BTN_SELECT, &ui_btns->select_btn)) {
-        // Clear SRS NVS
-        lcd_ns_nvs_clear(SRS_NS);
-        
-        // Hide right arrow
-        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+        // Hide top and bottom arrows
+        lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
 
         // Delete objects
         lv_obj_delete(cont); // Deletes children
@@ -1899,11 +1897,8 @@ void lcd_tools_how_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
         title_lbl = instr_lbl = NULL;
         init = false;
             
-        // Show tools menu
-        lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
-        
-        // Switch back
-        ui_menu->page = TOOLS_PAGE;
+        // Switch pages
+        ui_menu->page = TOOLS_SRS_FORGET_PAGE;
     } else if (ui_btns->left_btn) { // Go back
         // Hide right arrow
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -1929,6 +1924,96 @@ void lcd_tools_how_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
         cont = NULL;
         title_lbl = instr_lbl = NULL;
         init = false;
+        
+        lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
+}
+
+void lcd_tools_srs_forget_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *tools_menu)
+{
+    // Statics
+    static bool do_once = false;
+
+    static lv_obj_t *lbl_ins = NULL;
+    static lv_obj_t *lbl_note = NULL;
+
+    // Only execute once
+    if (!do_once) {
+        lcd_arm_confirm_page(ui_btns); // RIGHT confirms: only a press made on this page counts
+        lbl_ins = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_ins, "Press RIGHT to forget\nall notebooks.", user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_TOP_MID, 0, 10);
+
+        lbl_note = lv_label_create(ACTIVE_SCR);
+        lcd_format_label(lbl_note, "NOTE: This erases every\npage and review date!", user_secondary_color,
+                &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -10);
+        do_once = true;
+    }
+
+    // Forget notebooks
+    if (ui_btns->right_btn == 1) {
+        // Delete objects
+        lv_obj_delete(lbl_ins);
+        lv_obj_delete(lbl_note);
+
+        // Reset statics
+        lbl_ins = lbl_note = NULL;
+        do_once = false;
+
+        // Erasing up to SRS_MAX_ENTRIES keys takes a moment
+        bool arrows_hidden[4];
+        lcd_arrows_hide(ui_menu, arrows_hidden);
+        lv_obj_t *lbl_result = lv_label_create(ACTIVE_SCR);
+        lv_obj_set_style_text_align(lbl_result, LV_TEXT_ALIGN_CENTER, 0);
+        lcd_format_label(lbl_result, "Forgetting...", user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+        lv_refr_now(NULL); // Render now (lv_timer_handler only refreshes every 33 ms)
+
+        // Wipe and show the real result
+        bool forgotten = (srs_forget_all() == ESP_OK);
+        lcd_format_label(lbl_result, forgotten ? "Notebooks forgotten." : "Couldn't forget\nnotebooks!",
+                user_secondary_color, &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+        lv_refr_now(NULL); // Render now (lv_timer_handler only refreshes every 33 ms)
+        vTaskDelay(pdMS_TO_TICKS(1500));
+        lv_obj_delete(lbl_result);
+        lcd_clear_pending_inputs = true; // Taps made during the notice don't count
+        lcd_arrows_restore(ui_menu, arrows_hidden);
+
+        // Show top and bottom arrows
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+        // Hide right arrow
+        lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
+
+        // Show tools menu
+        lv_obj_remove_flag(tools_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        // Switch pages
+        ui_menu->page = TOOLS_PAGE;
+    } else if (ui_btns->left_btn == 1) { // Back to the intro
+        // Delete objects
+        lv_obj_delete(lbl_ins);
+        lv_obj_delete(lbl_note);
+
+        // Reset statics
+        lbl_ins = lbl_note = NULL;
+        do_once = false;
+
+        // Show top and bottom arrows (right stays: the intro's skip)
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+        // Switch pages
+        ui_menu->page = TOOLS_HOW_SRS_PAGE;
+    } else if (ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) { // Home or power off selected
+        // Delete objects
+        lv_obj_delete(lbl_ins);
+        lv_obj_delete(lbl_note);
+
+        // Reset statics
+        lbl_ins = lbl_note = NULL;
+        do_once = false;
         
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }

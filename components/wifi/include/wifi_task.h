@@ -45,9 +45,10 @@ extern EventGroupHandle_t xWiFiPortalEventGroup;
 #define WIFI_GET_DATE_TIME_BIT     (1U << 11)
 #define WIFI_GOT_DATE_TIME_BIT     (1U << 12)
 #define WIFI_STOP_DEAUTH_BIT       (1U << 13)
-#define WIFI_DATE_TIME_FAILED_BIT  (1U << 14) // SNTP sync gave up (pairs with WIFI_GOT_DATE_TIME_BIT)
+#define WIFI_DATE_TIME_FAILED_BIT  (1U << 14) // SNTP sync or time-zone lookup gave up (pairs with WIFI_GOT_DATE_TIME_BIT)
 #define WIFI_STOP_ARP_SPOOF_BIT    (1U << 15)
 #define WIFI_STOP_NDP_SPOOF_BIT    (1U << 16)
+#define WIFI_SAVE_LIST_FULL_BIT    (1U << 17) // Joined network not saved (list full); the Wi-Fi page shows a notice
 extern EventGroupHandle_t xWifiEventGroup;
 
 extern QueueHandle_t xWifiScanQueue;
@@ -71,6 +72,7 @@ extern SemaphoreHandle_t xWifiCycleSemaphore;
 extern SemaphoreHandle_t xWifiPingSemaphore;
 
 extern SemaphoreHandle_t xWifiRawFramesMutex;
+extern SemaphoreHandle_t xWifiDataMutex;
 
 // OTA
 extern QueueHandle_t xWifiOtaPctQueue;

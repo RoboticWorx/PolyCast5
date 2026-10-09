@@ -303,6 +303,15 @@ void lcd_text_input_start(lcd_text_input_t *ti)
         }
     }
 
+    // The title overlaps the status-bar battery, so hide that too until close
+    lv_obj_t *battery[2] = { ti->battery_txt, ti->battery_icon };
+    for (int i = 0; i < 2; i++) {
+        if (battery[i]) {
+            ti->battery_was_hidden[i] = lv_obj_has_flag(battery[i], LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(battery[i], LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
     ti->active = true;
 }
 
@@ -385,6 +394,14 @@ void lcd_text_input_close(lcd_text_input_t *ti)
     for (int i = 0; i < 4; i++) {
         if (arrows[i] && !ti->arrow_was_hidden[i]) {
             lv_obj_remove_flag(arrows[i], LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    // Bring the battery back
+    lv_obj_t *battery[2] = { ti->battery_txt, ti->battery_icon };
+    for (int i = 0; i < 2; i++) {
+        if (battery[i] && !ti->battery_was_hidden[i]) {
+            lv_obj_remove_flag(battery[i], LV_OBJ_FLAG_HIDDEN);
         }
     }
 

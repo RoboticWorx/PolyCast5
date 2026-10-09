@@ -734,6 +734,8 @@ void lcd_lora_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_me
         ti.arrow_bot = ui_menu->arrow_bot;
         ti.arrow_left = ui_menu->arrow_left;
         ti.arrow_right = ui_menu->arrow_right;
+        ti.battery_txt = ui_menu->lbl_battery_txt;
+        ti.battery_icon = ui_menu->lbl_battery_icon;
         lcd_text_input_start(&ti);
     }
 
@@ -1470,9 +1472,11 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
     #define GPIO_TX_TXT "Transmit: "
     #define GPIO_RX_TXT "Received: "
     #define GPIO_BUF_SIZE 4
+    #define LORA_GPIO_CMD_MIN 1  // 0 is the receiver's idle state
+    #define LORA_GPIO_CMD_MAX 31 // 5-bit bus
     
     // Create statics
-    static uint8_t cmd_to_send = 1; // Set default
+    static uint8_t cmd_to_send = LORA_GPIO_CMD_MIN; // Set default
     static bool tx_success = false;
     static bool init = false;
     static uint32_t select_hold = 0; // SELECT hold-to-repeat (+3)
@@ -1494,7 +1498,7 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
     // Do once
     if (!init) {
         tx_success = false;
-        cmd_to_send = 1;
+        cmd_to_send = LORA_GPIO_CMD_MIN;
         
         // Create labels
         lbl_send_tx = lv_label_create(ACTIVE_SCR);
@@ -1604,7 +1608,7 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
         lv_label_set_text(lbl_send_tx, GPIO_TX_TXT);
         lv_label_set_text(lbl_send_rx, GPIO_RX_TXT);
         
-        cmd_to_send++;
+        cmd_to_send = (cmd_to_send >= LORA_GPIO_CMD_MAX) ? LORA_GPIO_CMD_MIN : cmd_to_send + 1;
         
         char buf[GPIO_BUF_SIZE];
         snprintf(buf, sizeof(buf), "%u", cmd_to_send);
@@ -1614,7 +1618,7 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
         lv_label_set_text(lbl_send_tx, GPIO_TX_TXT);
         lv_label_set_text(lbl_send_rx, GPIO_RX_TXT);
         
-        cmd_to_send--;
+        cmd_to_send = (cmd_to_send <= LORA_GPIO_CMD_MIN) ? LORA_GPIO_CMD_MAX : cmd_to_send - 1;
         
         char buf[GPIO_BUF_SIZE];
         snprintf(buf, sizeof(buf), "%u", cmd_to_send);
@@ -1624,7 +1628,9 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
         lv_label_set_text(lbl_send_tx, GPIO_TX_TXT);
         lv_label_set_text(lbl_send_rx, GPIO_RX_TXT);
         
-        cmd_to_send += 3;
+        // Wrap within 1..31
+        cmd_to_send = (uint8_t)((cmd_to_send - LORA_GPIO_CMD_MIN + 3) %
+                (LORA_GPIO_CMD_MAX - LORA_GPIO_CMD_MIN + 1) + LORA_GPIO_CMD_MIN);
         
         char buf[GPIO_BUF_SIZE];
         snprintf(buf, sizeof(buf), "%u", cmd_to_send);
@@ -1637,11 +1643,13 @@ void lcd_lora_gpio_subpage(ui_btns_t *ui_btns, ui_menu_t *ui_menu, lora_menu_t *
         // Send the data to lora_task
         if (lora_menu->keys[lora_menu->index] == NULL) { // No key saved (interrupted pairing); don't send
             ESP_LOGE(TAG, "Missing LoRa key for index %d; skipping send", lora_menu->index);
+        } else if (cmd_to_send < LORA_GPIO_CMD_MIN || cmd_to_send > LORA_GPIO_CMD_MAX) { // Bus carries 1..31 only
+            ESP_LOGE(TAG, "GPIO value %u out of range; skipping send", cmd_to_send);
         } else {
             lora_pcp_cmd_t lora_cmd = {0}; // Zero out
             lora_cmd.index = lora_menu->submenu.index;
             memcpy(lora_cmd.key, lora_menu->keys[lora_menu->index], LORA_PCP_ENC_KEY_LEN);
-            snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "gpio %d", cmd_to_send);
+            snprintf(lora_cmd.instr, sizeof(lora_cmd.instr), "gpio %u", cmd_to_send);
 
             lora_send_ui_cmd(&lora_cmd, lora_menu->index); // Send the command
 

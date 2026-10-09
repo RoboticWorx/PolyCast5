@@ -558,6 +558,9 @@ void lcd_settings_ota_confirm_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
         lv_obj_remove_flag(settings_menu->main_list, LV_OBJ_FLAG_HIDDEN);
         lv_timer_handler();
 
+        // Dismissed: the next check starts fresh
+        xEventGroupClearBits(xWifiEventGroup, WIFI_CHECK_OTA_ON_CONN_BIT | WIFI_OTA_AVAILABLE_BIT);
+
         // Disconnect Wi-Fi
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
@@ -585,6 +588,9 @@ void lcd_settings_ota_confirm_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, setti
         cont = NULL;
         title_lbl = instr_lbl = NULL;
         init = false;
+
+        // Dismissed: the next check starts fresh
+        xEventGroupClearBits(xWifiEventGroup, WIFI_CHECK_OTA_ON_CONN_BIT | WIFI_OTA_AVAILABLE_BIT);
         
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
     }
@@ -1204,6 +1210,17 @@ void lcd_settings_colors_sel_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settin
     }
 }
 
+// Scroll to an absolute y from the live position; unbounded, unlike lv_obj_scroll_to_y
+static void scroll_to_y_unbounded(lv_obj_t *cont, int32_t y)
+{
+    int32_t dy = lv_obj_get_scroll_y(cont) - y;
+    if (dy != 0) {
+        lv_obj_scroll_by(cont, 0, dy, LV_ANIM_ON); // Replaces a running scroll, so presses mid-animation still land
+    } else {
+        lv_anim_delete(cont, NULL); // Already there: stop a scroll still heading elsewhere
+    }
+}
+
 void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *settings_menu)
 {
     #define ADJ_HAPTIC_Y_OFFSET 38
@@ -1309,22 +1326,23 @@ void lcd_settings_adjust_haptics_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
 
     // Scroll down
     if (ui_btns->down_btn == 1) {
-        // Decrement with wrap
+        // Increment with wrap
         selected = (selected + 1) % 7;
         
-        lv_obj_scroll_by(cont, 0, -ADJ_HAPTIC_Y_OFFSET, LV_ANIM_ON); 
+        // Absolute row, so a wrap or a press mid-animation lands under the pointer; rows 5-6 sit past the content end
+        scroll_to_y_unbounded(cont, selected * ADJ_HAPTIC_Y_OFFSET);
     } else if (ui_btns->up_btn == 1) { // Scroll up
-        // Increment with wrap
+        // Decrement with wrap
         selected = (selected + 6) % 7;
         
-        lv_obj_scroll_by(cont, 0, ADJ_HAPTIC_Y_OFFSET, LV_ANIM_ON);
+        scroll_to_y_unbounded(cont, selected * ADJ_HAPTIC_Y_OFFSET);
     } else if (ui_btns->select_btn == 1) { // Toggle/iterate
         xSemaphoreTake(xHapticsMutex, portMAX_DELAY); // Lock haptics        
         // Iterate slider
         if (selected == 0) {
-            // Increment slider with wrap
-            haptic_len_ms = (haptic_len_ms + 1) % (HAPTIC_MAX_MS + 1);
-            if (haptic_len_ms < HAPTIC_MIN_MS) {
+            // Increment slider by one tick with wrap
+            haptic_len_ms += TIMING_STEP_MS;
+            if (haptic_len_ms > HAPTIC_MAX_MS) {
                 haptic_len_ms = HAPTIC_MIN_MS;
             }
             
@@ -1538,13 +1556,11 @@ void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
         xSemaphoreTake(xRgbLedMutex, portMAX_DELAY); // Lock RGB LED
         // On first option
         if (every_selected) {
-            rbg_blink_period_ms += 5;
+            rbg_blink_period_ms += TIMING_STEP_MS;
         
             // Wrap
             if (rbg_blink_period_ms > RGB_PERIOD_MAX_MS) {
                 rbg_blink_period_ms = RGB_PERIOD_MIN_MS;
-            } else if (rbg_blink_period_ms > 0 && rbg_blink_period_ms < 10) { // Skip 5
-                rbg_blink_period_ms = 10;
             }
             
             // Update text
@@ -1552,7 +1568,7 @@ void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
             lv_label_set_text_fmt(lbl_every, RGB_BLINK_EVERY_TXT, (unsigned)(rbg_blink_period_ms * 2));
             lv_slider_set_value(slider_every, rbg_blink_period_ms, LV_ANIM_OFF);
         } else { // Second option (for duration)
-            rgb_blink_total_ms += 10;
+            rgb_blink_total_ms += TIMING_STEP_MS;
         
             // Wrap
             if (rgb_blink_total_ms > RGB_TOTAL_MAX_MS) {
@@ -1571,13 +1587,11 @@ void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
         xSemaphoreTake(xRgbLedMutex, portMAX_DELAY); // Lock RGB LED
         // On first option
         if (every_selected) {
-            rbg_blink_period_ms -= 5;
+            rbg_blink_period_ms -= TIMING_STEP_MS;
             
             // Wrap
             if (rbg_blink_period_ms < RGB_PERIOD_MIN_MS) {
                 rbg_blink_period_ms = RGB_PERIOD_MAX_MS;
-            } else if (rbg_blink_period_ms > 0 && rbg_blink_period_ms < 10) { // Skip 5
-                rbg_blink_period_ms = 0;
             }
             
             // Update text
@@ -1585,7 +1599,7 @@ void lcd_settings_adjust_rgb_led_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, se
             lv_label_set_text_fmt(lbl_every, RGB_BLINK_EVERY_TXT, (unsigned)(rbg_blink_period_ms * 2));
             lv_slider_set_value(slider_every, rbg_blink_period_ms, LV_ANIM_OFF);
         } else { // Second option (for duration)
-            rgb_blink_total_ms -= 10;
+            rgb_blink_total_ms -= TIMING_STEP_MS;
         
             // Wrap
             if (rgb_blink_total_ms  < RGB_TOTAL_MIN_MS) {
@@ -1728,22 +1742,21 @@ static void system_build_info(char *buf, size_t n)
     system_fmt_mac(mac_bt_str,  sizeof(mac_bt_str),  mac_bt);
 
     // Stack watermark (this task)
-    UBaseType_t watermark = uxTaskGetStackHighWaterMark(NULL); // Minimum free stack your task has had since it started
+    UBaseType_t watermark = uxTaskGetStackHighWaterMark(NULL); // Minimum free stack (bytes on IDF) this task has had since it started
 
     const char *idf = esp_get_idf_version();
     
     // Get this firmware version (from the running image, so it's right after any flash method)
     const char *pc5_fw_version = esp_app_get_description()->version;
 
-    // Format chip revision and cores
+    // Format chip revision (major * 100 + minor) and cores
     unsigned rev = (unsigned)ci.revision;
-    unsigned rev_major = rev / 100; // X
-    unsigned rev_minor = (rev / 10) % 10; // Y
-    unsigned rev_sub = rev % 10; // Z
+    unsigned rev_major = rev / 100;
+    unsigned rev_minor = rev % 100;
     
     char chip_line[96];
-    snprintf(chip_line, sizeof(chip_line), "Chip: %s\n%u core(s), rev %u.%u.%u",
-            system_chip_model_to_str(ci.model), (unsigned)ci.cores, rev_major, rev_minor, rev_sub);
+    snprintf(chip_line, sizeof(chip_line), "Chip: %s\n%u core(s), rev v%u.%u",
+            system_chip_model_to_str(ci.model), (unsigned)ci.cores, rev_major, rev_minor);
 
     // NVS stats
     nvs_stats_t st = {0};
@@ -1814,7 +1827,7 @@ static void system_build_info(char *buf, size_t n)
         "(Max block: %.1f KB)\n\n"
         
         "Stack high-water mark:\n"
-        "%u words\n\n"
+        "%u bytes\n\n"
         
         "WiFi:\n"
         "STA: %s\n"
@@ -3217,7 +3230,7 @@ void lcd_settings_haptics_nvs_load(void)
     // Load slider length
     uint8_t len;
     if (nvs_get_u8(h, SETTINGS_HAPTIC_DUR_KEY, &len) == ESP_OK) {
-        haptic_len_ms = len;
+        haptic_len_ms = (uint8_t)gpio_utils_snap_ms(len, HAPTIC_MIN_MS, HAPTIC_MAX_MS); // Onto the tick grid
     }
 
     // Load haptic btn states
@@ -3330,7 +3343,7 @@ void lcd_settings_rgb_led_nvs_load(void)
     // Load the RGB LED period
     int16_t len;
     if (nvs_get_i16(h, SETTINGS_RGB_LED_PERIOD_KEY, &len) == ESP_OK) {
-        rbg_blink_period_ms = len;
+        rbg_blink_period_ms = (int16_t)gpio_utils_snap_ms(len, RGB_PERIOD_MIN_MS, RGB_PERIOD_MAX_MS); // Onto the tick grid
 #ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Loaded RGB LED period: %d ms", rbg_blink_period_ms);
 #endif
@@ -3338,7 +3351,7 @@ void lcd_settings_rgb_led_nvs_load(void)
     
     // Load the RGB LED total duration
     if (nvs_get_i16(h, SETTINGS_RGB_LED_TOTAL_KEY, &len) == ESP_OK) {
-        rgb_blink_total_ms = len;
+        rgb_blink_total_ms = (int16_t)gpio_utils_snap_ms(len, RGB_TOTAL_MIN_MS, RGB_TOTAL_MAX_MS); // Onto the tick grid
 #ifdef POLYCAST5_DEBUG
             ESP_LOGI(TAG, "Loaded RGB LED total duration: %d ms", rgb_blink_total_ms);
 #endif

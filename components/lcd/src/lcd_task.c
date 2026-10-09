@@ -450,6 +450,9 @@ static void lcd_task(void *pvParameters)
                 case TOOLS_HOW_SRS_PAGE:
                     lcd_tools_how_srs_page(&ui_btns, &ui_menu, &tools_menu);
                     break;
+                case TOOLS_SRS_FORGET_PAGE:
+                    lcd_tools_srs_forget_page(&ui_btns, &ui_menu, &tools_menu);
+                    break;
                 case TOOLS_BTC_ADDR_PAGE:
                     lcd_tools_btc_addr_page(&ui_btns, &ui_menu, &tools_menu);
                     break;
@@ -640,6 +643,11 @@ static void lcd_task(void *pvParameters)
             // Holds don't carry into the next page; quick taps do (a level deeper)
             if (ui_menu.page != page_before) {
                 gpio_swallow_holds(ui_menu.page == HOME_PAGE);
+
+                // Home cancels a pending hotkey pick; the eye hides below before home's first tick
+                if (ui_menu.page == HOME_PAGE && xConnectionIconEventGroup) {
+                    xEventGroupClearBits(xConnectionIconEventGroup, ICON_BIT_HOTKEY_ACTIVE);
+                }
             }
             gpio_lcd_pass_done(); // An untaken long press now ages toward being dropped
 

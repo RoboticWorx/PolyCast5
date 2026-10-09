@@ -20,12 +20,12 @@ extern size_t ir_signal_length;
 SemaphoreHandle_t xInfraredRxEventSemaphore;
 SemaphoreHandle_t xInfraredStartRxSemaphore;
 SemaphoreHandle_t xInfraredDisableSemaphore;
-SemaphoreHandle_t xInfraredSignalSavedSemaphore;
 SemaphoreHandle_t xInfraredSignalTooLongSemaphore;
 
 SemaphoreHandle_t xInfraredDataMutex;
 
 QueueHandle_t xInfraredSignalToTxQueue;
+QueueHandle_t xInfraredSignalSavedQueue;
 
 #ifdef CONFIG_RMT_RX_ISR_CACHE_SAFE
 rmt_symbol_word_t ir_signal[MAX_PULSES]; // RX buffer; the cache-safe RX ISR writes it, so internal
@@ -47,8 +47,6 @@ static void infrared_task(void *pvParameters) {
     configASSERT(xInfraredDisableSemaphore);
     xInfraredStartRxSemaphore = xSemaphoreCreateBinary();
     configASSERT(xInfraredStartRxSemaphore);
-    xInfraredSignalSavedSemaphore = xSemaphoreCreateBinary();
-    configASSERT(xInfraredSignalSavedSemaphore);
     xInfraredSignalTooLongSemaphore = xSemaphoreCreateBinary();
     configASSERT(xInfraredSignalTooLongSemaphore);
     xInfraredRxEventSemaphore = xSemaphoreCreateBinary();
@@ -61,6 +59,8 @@ static void infrared_task(void *pvParameters) {
     
     xInfraredSignalToTxQueue = xQueueCreate(1, sizeof(int));
     configASSERT(xInfraredSignalToTxQueue);
+    xInfraredSignalSavedQueue = xQueueCreate(1, sizeof(esp_err_t));
+    configASSERT(xInfraredSignalSavedQueue);
         
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Initializing IR system...");
@@ -188,15 +188,27 @@ static void infrared_task(void *pvParameters) {
             remotes[ir_current_remote].num_signals++; // Now one more signal
             
             // Save the signal blob and update num_signals in NVS
-            infrared_utils_save_signal_to_remote_nvs(ir_current_remote, ns, sig, ""); // Empty name for now
-            infrared_utils_save_remote_nsig_nvs(ir_current_remote);
+            esp_err_t err = infrared_utils_save_signal_to_remote_nvs(ir_current_remote, ns, sig, ""); // Empty name for now
+            if (err == ESP_OK) {
+                err = infrared_utils_save_remote_nsig_nvs(ir_current_remote);
+            }
             
 #ifdef POLYCAST5_DEBUG
-            ESP_LOGI(TAG, "Saved signal index %zu for remote %zu (%zu pulses)", ns, ir_current_remote, sig->length);
+            if (err == ESP_OK) {
+                ESP_LOGI(TAG, "Saved signal index %zu for remote %zu (%zu pulses)", ns, ir_current_remote, sig->length);
+            }
 #endif
+            // NVS refused it: undo it there and in RAM (the stored count is still the old one)
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Signal not saved: %s", esp_err_to_name(err));
+                infrared_utils_erase_signal_nvs(ir_current_remote, ns);
+                remotes[ir_current_remote].num_signals--;
+                free(remotes[ir_current_remote].signal_names[ns]);
+                free(sig);
+            }
             xSemaphoreGive(xInfraredDataMutex); // Release IR
             
-            xSemaphoreGive(xInfraredSignalSavedSemaphore); // Notify LCD we got and saved a valid signal
+            xQueueOverwrite(xInfraredSignalSavedQueue, &err); // Notify LCD of the save result
 
             // Disable until next signal
             infrared_utils_disable_rx();

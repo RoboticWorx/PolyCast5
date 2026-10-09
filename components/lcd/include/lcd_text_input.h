@@ -27,9 +27,12 @@ typedef struct {
     lv_obj_t   *arrow_bot;
     lv_obj_t   *arrow_left;
     lv_obj_t   *arrow_right;
+    lv_obj_t   *battery_txt;      /**< Optional status-bar battery labels, hidden while the keyboard is up (the title overlaps them) */
+    lv_obj_t   *battery_icon;
 
     /* ---- Internal state (do not touch) ---- */
     bool        arrow_was_hidden[4]; /**< Prior visibility of {top,bot,left,right}, restored on close */
+    bool        battery_was_hidden[2]; /**< Prior visibility of {battery_txt,battery_icon}, restored on close */
     lv_obj_t   *lbl_title;
     lv_obj_t   *lbl_hint;
     lv_obj_t   *lbl_text;         /**< Typed-text preview (uses the tail-window helper) */

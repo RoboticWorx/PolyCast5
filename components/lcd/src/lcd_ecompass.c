@@ -30,7 +30,7 @@
 #define HEADING_ARC_EXT 2  // How far the ring's outer edge sits beyond the circle rim (px)
 #define ARC_TOP_DEG     270 // 12 o'clock in LVGL arc/scale angles (0 = right, increasing clockwise)
 
-#define DIAL_TICK_CNT    12 // Rim tick marks, one every 30deg (matches the 12 calibration sectors)
+#define DIAL_TICK_CNT    12 // Rim tick marks, one every 30deg
 #define DIAL_MAJOR_EVERY 3  // Every 3rd tick is a long "cardinal" mark -> 4 of them, at 12/3/6/9 o'clock
 #define DIAL_TICK_MINOR  6  // Minor tick length, measured inward from the rim (px)
 #define DIAL_TICK_MAJOR  8  // Cardinal tick length (px)
@@ -39,27 +39,31 @@
 #define BULLSEYE_RINGS   3  // Faint concentric tilt-scale rings inside the bubble (indicator dist = tilt)
 
 // Magnetometer hard-/soft-iron calibration persistence (NVS)
-// Stores the four X/Y min/max bounds so the compass works on every boot without a fresh calibration turn
-#define ECOMPASS_NVS_NS  "ecompass"
-#define ECOMPASS_NVS_KEY "minmax"
+// Stores the fitted 3-axis centre + soft-iron correction so the compass works on every boot without recalibrating
+#define ECOMPASS_NVS_NS      "ecompass"
+#define ECOMPASS_NVS_KEY     "cal3d"
+#define ECOMPASS_NVS_KEY_OLD "minmax" // Old flat X/Y-only calibration: never read, erased on save
 
+// Plausible calibration: Earth's field is ~22-67 uT anywhere, with headroom for soft iron
+#define ECOMPASS_R_MIN   12.0f   // Min radius along each ellipsoid axis (uT)
+#define ECOMPASS_R_MAX   150.0f  // Max radius along each ellipsoid axis (uT)
+#define ECOMPASS_R_RATIO 0.6f    // Smallest / largest radius; lower = partial coverage or a distorted fit
+#define ECOMPASS_C_MAX   3000.0f // Max |centre| per axis (uT), the sensor's +-30 G full scale
+
+// Calibration (also the NVS blob): w * (m - c) maps a reading m onto the unit sphere
 typedef struct {
-    float x_min, x_max, y_min, y_max;
-} ecompass_blob_t;
+    float c[3];    // Hard-iron centre per axis (uT)
+    float w[3][3]; // Soft-iron correction, symmetric (1/uT); diagonal 1/radius when the axes aren't coupled
+} ecompass_cal_t;
 
 // Static ARGB8888 arrow image, re-rasterised on each page entry to track the accent colour
 POLYCAST5_USE_PSRAM_BSS static uint8_t arrow_px[ARROW_SIZE * ARROW_SIZE * 4] __attribute__((aligned(4)));
 static lv_image_dsc_t arrow_dsc;
 
-// Hard-/soft-iron compass calibration state: Min/max of the X/Y field: centre = midpoint, radius = half-span
-static float mag_cal_x_min = 1e9f, mag_cal_x_max = -1e9f;
-static float mag_cal_y_min = 1e9f, mag_cal_y_max = -1e9f;
+// Compass calibration in use (all zero = none)
+static ecompass_cal_t mag_cal;
 static bool ecompass_loaded = false; // NVS calibration loaded this boot?
 static bool cal_complete = false;  // Do we have a usable calibration (from NVS or the cal page)?
-
-// Centre of the calibration ellipse (hard-iron offset), used by both the compass and cal pages
-static inline float ecompass_center_x(void) { return (mag_cal_x_min + mag_cal_x_max) * 0.5f; }
-static inline float ecompass_center_y(void) { return (mag_cal_y_min + mag_cal_y_max) * 0.5f; }
 
 // Arrow outline as offsets from the image centre, tip pointing up
 static const float arrow_pts[4][2] = {
@@ -279,7 +283,7 @@ static void accel_build_bubble(ui_menu_t *ui_menu, lv_obj_t *cont, lv_obj_t **ou
         *out_arc = arc;
     }
 
-    // Tick dial: 12 marks at 30deg (the same wedges the calibration walks through), every 3rd one a longer cardinal
+    // Tick dial: 12 marks at 30deg, every 3rd one a longer cardinal
     lv_obj_t *dial = lv_scale_create(cont); // Sibling of level_bg, shares its box -> shares its center
     lv_obj_set_size(dial, LEVEL_D, LEVEL_D);
     lv_obj_align(dial, LV_ALIGN_LEFT_MID, X_OFFSET, 0);
@@ -327,10 +331,21 @@ static void accel_build_bubble(ui_menu_t *ui_menu, lv_obj_t *cont, lv_obj_t **ou
     *out_val_lbl = val_lbl;
 }
 
+// Board-frame unit "up" vector (the accel reading at rest) rebuilt from pitch/roll
+static void accel_up_vector(const accel_deg_t *a, float up[3])
+{
+    float p = a->pitch * DEG2RAD;
+    float r = a->roll  * DEG2RAD;
+    up[0] = -sinf(p);          // Board +X component
+    up[1] = cosf(p) * sinf(r); // Board +Y component
+    up[2] = cosf(p) * cosf(r); // Board +Z component
+}
+
 // Update the X/Y/Z readout from a reading and ease the indicator toward the tilt
+// up is the reading's accel_up_vector(), used by the upright modes
 // indicator_d is the indicator's diameter in px; travel is clamped to it so a larger indicator still stays inside the circle.
 // heading is the last compass Z, drawn so an accel-only frame never drops the readout to two lines (mag block rewrites Z when fresh)
-static void accel_apply_reading(const accel_deg_t *a, lv_obj_t *ball, float indicator_d, lv_obj_t *val_lbl, float heading, float *out_x, float *out_y)
+static void accel_apply_reading(const accel_deg_t *a, const float up[3], lv_obj_t *ball, float indicator_d, lv_obj_t *val_lbl, float heading, float *out_x, float *out_y)
 {
     const float max_travel = (LEVEL_D / 2.0f) - (indicator_d / 2.0f) - 2.0f;
 
@@ -343,12 +358,10 @@ static void accel_apply_reading(const accel_deg_t *a, lv_obj_t *ball, float indi
         read_y = -a->pitch;
     } else {
         // Holding/Remote are used with the screen vertical, where atan2 pitch/roll gimbal-lock
-        // Reconstruct the corrected gravity unit vector and recentre
-        float p = a->pitch * DEG2RAD;
-        float r = a->roll  * DEG2RAD;
-        float gx = -sinf(p);          // Board +X gravity component
-        float gy = cosf(p) * sinf(r); // Board +Y gravity component
-        float gz = cosf(p) * cosf(r); // Board +Z gravity component
+        // Recentre on the corrected gravity unit vector instead
+        float gx = up[0]; // Board +X gravity component
+        float gy = up[1]; // Board +Y gravity component
+        float gz = up[2]; // Board +Z gravity component
         const float scale = max_travel / sinf(MAX_TILT_DEG * DEG2RAD);
 
         if (accel_mode == MODE_HOLDING) {
@@ -393,7 +406,144 @@ static void accel_apply_reading(const accel_deg_t *a, lv_obj_t *ball, float indi
     if (out_y) *out_y = read_y;
 }
 
-static void ecompass_nvs_save(float x_min, float x_max, float y_min, float y_max)
+// Tilt-compensated heading (deg, [0,360)) of the current mode's forward direction from a magnetometer sample
+// up is the board-frame unit up vector, or NULL to assume the mode's nominal pose. False when no heading is possible.
+static bool ecompass_heading(const mmc5603_reading_t *m, const float *up, float *deg)
+{
+    static const float nominal_up[MODE_COUNT][3] = {
+        { 0.0f, 0.0f, 1.0f }, // Flat: screen up
+        { 1.0f, 0.0f, 0.0f }, // Holding: board +X up
+        { 0.0f, 1.0f, 0.0f }, // Remote: board +Y up
+    };
+
+    if (!(mag_cal.w[0][0] > 0.0f && mag_cal.w[1][1] > 0.0f && mag_cal.w[2][2] > 0.0f)) {
+        return false; // Always calibrated here; guards a bad state
+    }
+    if (!up) {
+        up = nominal_up[accel_mode];
+    }
+
+    // Hard-iron: subtract the centre. Soft-iron: map the ellipsoid back onto the unit sphere.
+    const float d[3] = { m->x - mag_cal.c[0], m->y - mag_cal.c[1], m->z - mag_cal.c[2] };
+    float v[3];
+    for (int i = 0; i < 3; i++) {
+        v[i] = mag_cal.w[i][0] * d[0] + mag_cal.w[i][1] * d[1] + mag_cal.w[i][2] * d[2];
+    }
+
+#ifdef POLYCAST5_DEBUG_MAGNETO
+    // v z < 0 lying flat screen-up (northern hemisphere) confirms the mag Z axis matches the accel frame
+    static TickType_t last_cal_log = 0;
+    if (xTaskGetTickCount() - last_cal_log >= pdMS_TO_TICKS(500)) {
+        last_cal_log = xTaskGetTickCount();
+        ESP_LOGI(TAG, "ecompass centre=(%.1f, %.1f, %.1f) w diag=(%.4f, %.4f, %.4f) v=(%.2f, %.2f, %.2f) up=(%.2f, %.2f, %.2f)",
+                 (double)mag_cal.c[0], (double)mag_cal.c[1], (double)mag_cal.c[2],
+                 (double)mag_cal.w[0][0], (double)mag_cal.w[1][1], (double)mag_cal.w[2][2],
+                 (double)v[0], (double)v[1], (double)v[2],
+                 (double)up[0], (double)up[1], (double)up[2]);
+    }
+#endif
+
+    // East = field x up, north = up x east: both horizontal and equal length, so tilt drops out
+    const float e[3] = { v[1] * up[2] - v[2] * up[1], v[2] * up[0] - v[0] * up[2], v[0] * up[1] - v[1] * up[0] };
+    const float n[3] = { up[1] * e[2] - up[2] * e[1], up[2] * e[0] - up[0] * e[2], up[0] * e[1] - up[1] * e[0] };
+
+    // Forward = the mode's screen left-right axis x up, which stays level as the device tips toward/away
+    // Flat/Holding: left-right is board +Y (forward +X lying flat, -Z upright). Remote: board -X (forward -Z upright).
+    float f[3];
+    if (accel_mode == MODE_REMOTE) {
+        f[0] = 0.0f;  f[1] = up[2]; f[2] = -up[1];
+    } else {
+        f[0] = up[2]; f[1] = 0.0f;  f[2] = -up[0];
+    }
+
+    // No heading with the left-right axis near vertical (wrong pose for the mode) or the field vertical
+    if (f[0] * f[0] + f[1] * f[1] + f[2] * f[2] < 0.12f) return false;
+    if (e[0] * e[0] + e[1] * e[1] + e[2] * e[2] < 1e-4f) return false;
+
+    // Bearing of forward clockwise from magnetic north; equals atan2(y, x) when lying flat
+    float h = atan2f(f[0] * e[0] + f[1] * e[1] + f[2] * e[2], f[0] * n[0] + f[1] * n[1] + f[2] * n[2]) / DEG2RAD;
+    if (h < 0.0f) h += 360.0f;
+    *deg = h;
+    return true;
+}
+
+// LVGL angle of the viewer's "up" on screen (arrow start, arc start, N pip reference)
+// Remote turns the screen 90 deg right, so its viewer-up is the screen's left edge, matching the Remote bubble
+static int32_t ecompass_view_up_deg(void)
+{
+    return accel_mode == MODE_REMOTE ? ARC_TOP_DEG - 90 : ARC_TOP_DEG;
+}
+
+// Eigen-decompose a symmetric 3x3 in place (cyclic Jacobi): eigenvalues end on a's diagonal, eigenvectors in v's columns
+static void ecompass_jacobi(float a[3][3], float v[3][3])
+{
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) v[i][j] = (i == j) ? 1.0f : 0.0f;
+    }
+
+    for (int sweep = 0; sweep < 8; sweep++) {
+        for (int p = 0; p < 2; p++) {
+            for (int q = p + 1; q < 3; q++) {
+                if (a[p][q] == 0.0f) continue;
+
+                // Rotation in the p-q plane that zeroes a[p][q]
+                float th = (a[q][q] - a[p][p]) / (2.0f * a[p][q]);
+                float t = copysignf(1.0f, th) / (fabsf(th) + sqrtf(th * th + 1.0f));
+                float c = 1.0f / sqrtf(t * t + 1.0f), s = t * c;
+                for (int k = 0; k < 3; k++) {
+                    float kp = a[k][p], kq = a[k][q];
+                    a[k][p] = c * kp - s * kq;
+                    a[k][q] = s * kp + c * kq;
+                }
+                for (int k = 0; k < 3; k++) {
+                    float pk = a[p][k], qk = a[q][k];
+                    a[p][k] = c * pk - s * qk;
+                    a[q][k] = s * pk + c * qk;
+                }
+                for (int k = 0; k < 3; k++) {
+                    float kp = v[k][p], kq = v[k][q];
+                    v[k][p] = c * kp - s * kq;
+                    v[k][q] = s * kp + c * kq;
+                }
+            }
+        }
+    }
+}
+
+// True if a calibration is finite and physically plausible: centre in range, w symmetric, and every
+// ellipsoid radius (1 / an eigenvalue of w) in range
+static bool ecompass_cal_plausible(const ecompass_cal_t *cal)
+{
+    float a[3][3], v[3][3];
+    for (int i = 0; i < 3; i++) {
+        if (!isfinite(cal->c[i]) || fabsf(cal->c[i]) > ECOMPASS_C_MAX) {
+            return false;
+        }
+        for (int j = 0; j < 3; j++) {
+            if (!isfinite(cal->w[i][j]) || cal->w[i][j] != cal->w[j][i]) {
+                return false;
+            }
+            a[i][j] = cal->w[i][j];
+        }
+    }
+
+    ecompass_jacobi(a, v);
+    float r_lo = ECOMPASS_R_MAX, r_hi = 0.0f;
+    for (int i = 0; i < 3; i++) {
+        if (!(a[i][i] > 0.0f)) {
+            return false;
+        }
+        float r = 1.0f / a[i][i];
+        if (r < ECOMPASS_R_MIN || r > ECOMPASS_R_MAX) {
+            return false;
+        }
+        r_lo = fminf(r_lo, r);
+        r_hi = fmaxf(r_hi, r);
+    }
+    return r_lo >= ECOMPASS_R_RATIO * r_hi;
+}
+
+static void ecompass_nvs_save(const ecompass_cal_t *cal)
 {
     nvs_handle_t h;
 
@@ -404,21 +554,23 @@ static void ecompass_nvs_save(float x_min, float x_max, float y_min, float y_max
         return;
     }
 
-    // Write the four bounds as a blob and commit
-    ecompass_blob_t blob = { x_min, x_max, y_min, y_max };
-    err = nvs_set_blob(h, ECOMPASS_NVS_KEY, &blob, sizeof(blob));
+    // Write the calibration as a blob and commit
+    err = nvs_set_blob(h, ECOMPASS_NVS_KEY, cal, sizeof(*cal));
     if (err == ESP_OK) {
         err = nvs_commit(h);
     } else {
         ESP_LOGE(TAG, "ecompass_nvs_save set_blob failed: %s", esp_err_to_name(err));
     }
 
+    // Drop the old flat-only calibration (ESP_ERR_NVS_NOT_FOUND once gone)
+    nvs_erase_key(h, ECOMPASS_NVS_KEY_OLD);
+
     // Close NVS
     nvs_close(h);
 }
 
-// Fill the four bounds from NVS and report whether a valid calibration was loaded
-static bool ecompass_nvs_load(float *x_min, float *x_max, float *y_min, float *y_max)
+// Fill the calibration from NVS and report whether a valid one was loaded
+static bool ecompass_nvs_load(ecompass_cal_t *cal)
 {
     nvs_handle_t h;
 
@@ -431,8 +583,8 @@ static bool ecompass_nvs_load(float *x_min, float *x_max, float *y_min, float *y
         return false;
     }
 
-    // Read the four bounds as a blob
-    ecompass_blob_t blob;
+    // Read the calibration as a blob (another size is an older format: recalibrate)
+    ecompass_cal_t blob;
     size_t sz = sizeof(blob);
     err = nvs_get_blob(h, ECOMPASS_NVS_KEY, &blob, &sz);
     nvs_close(h); // Close NVS
@@ -441,18 +593,16 @@ static bool ecompass_nvs_load(float *x_min, float *x_max, float *y_min, float *y
     }
 
     // Reject corrupt/implausible data so a bad blob can't break the compass
-    float xr = (blob.x_max - blob.x_min) * 0.5f;
-    float yr = (blob.y_max - blob.y_min) * 0.5f;
-    if (xr <= 0.0f || yr <= 0.0f || xr > 500.0f || yr > 500.0f) {
+    if (!ecompass_cal_plausible(&blob)) {
 #ifdef POLYCAST5_DEBUG
-        ESP_LOGW(TAG, "ecompass_nvs_load rejected implausible blob: x_min=%.1f x_max=%.1f y_min=%.1f y_max=%.1f",
-                (double)blob.x_min, (double)blob.x_max, (double)blob.y_min, (double)blob.y_max);
+        ESP_LOGW(TAG, "ecompass_nvs_load rejected implausible blob: c=(%.1f, %.1f, %.1f) w diag=(%.4f, %.4f, %.4f)",
+                (double)blob.c[0], (double)blob.c[1], (double)blob.c[2],
+                (double)blob.w[0][0], (double)blob.w[1][1], (double)blob.w[2][2]);
 #endif
         return false;
     }
 
-    *x_min = blob.x_min; *x_max = blob.x_max;
-    *y_min = blob.y_min; *y_max = blob.y_max;
+    *cal = blob;
     return true;
 }
 
@@ -576,12 +726,14 @@ void lcd_ecompass_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
     static bool heading_init = false;  // Has heading_ref been captured this visit?
     static float arrow_drawn = -1.0f;  // Last relative angle actually rendered (-1 = none yet)
     static float disp_x = 0.0f, disp_y = 0.0f, disp_z = 0.0f; // Latest tilt + heading, Z carried into accel frames too
+    static float accel_up[3];          // Latest board-frame up vector, for tilt compensation
+    static bool accel_up_valid = false; // Has an accel frame arrived this visit?
 
     if (!init) {
         // Seed the calibration from NVS once per boot and trust a valid stored calibration
         if (!ecompass_loaded) {
             ecompass_loaded = true;
-            if (ecompass_nvs_load(&mag_cal_x_min, &mag_cal_x_max, &mag_cal_y_min, &mag_cal_y_max)) {
+            if (ecompass_nvs_load(&mag_cal)) {
                 cal_complete = true;
             }
         }
@@ -623,6 +775,7 @@ void lcd_ecompass_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
         heading_init = false; // Re-capture the "straight ahead" reference on entry
         arrow_drawn = -1.0f;
         disp_x = disp_y = disp_z = 0.0f;
+        accel_up_valid = false;
         init = true;
     }
 
@@ -636,52 +789,33 @@ void lcd_ecompass_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
     // Update arrow + text whenever reading received
     accel_deg_t accel;
     if (xQueueReceive(xAccelReadingsQueue, &accel, 0) == pdTRUE) {
+        accel_up_vector(&accel, accel_up);
+        accel_up_valid = true;
+
         // Draws the X/Y/Z readout (Z = last heading) and hands back the tilt for the mag block below
-        accel_apply_reading(&accel, ball, ARROW_SIZE, val_lbl, disp_z, &disp_x, &disp_y);
+        accel_apply_reading(&accel, accel_up, ball, ARROW_SIZE, val_lbl, disp_z, &disp_x, &disp_y);
     }
 
-    // Compass heading from the magnetometer using the stored hard-/soft-iron calibration
+    // Tilt-compensated compass heading from the calibrated magnetometer; skipped in a pose the mode can't read
     mmc5603_reading_t mag;
-    if (ball && xQueueReceive(xMagReadingsQueue, &mag, 0) == pdTRUE) {
-        // Recover the calibration shape
-        float x_half = (mag_cal_x_max - mag_cal_x_min) * 0.5f; // X radius from the stored calibration
-        float y_half = (mag_cal_y_max - mag_cal_y_min) * 0.5f; // Y radius
+    float raw_heading;
+    if (ball && xQueueReceive(xMagReadingsQueue, &mag, 0) == pdTRUE &&
+            ecompass_heading(&mag, accel_up_valid ? accel_up : NULL, &raw_heading)) {
+        if (!heading_init) {
+            // First sample this visit: take it as "straight ahead" so the arrow starts up
+            arrow_heading = raw_heading;
+            heading_ref = raw_heading;
+            heading_init = true;
+        } else {
+            // Low-pass over the shortest angular path (handles the 360->0 wrap)
+            float d = raw_heading - arrow_heading;
+            while (d > 180.0f) d -= 360.0f;
+            while (d < -180.0f) d += 360.0f;
 
-        if (x_half > 0.0f && y_half > 0.0f) { // Always true once calibrated; guards a bad blob
-#ifdef POLYCAST5_DEBUG_MAGNETO
-            static TickType_t last_cal_log = 0;
-            if (xTaskGetTickCount() - last_cal_log >= pdMS_TO_TICKS(500)) {
-                last_cal_log = xTaskGetTickCount();
-                ESP_LOGI(TAG, "ecompass centre=(%.1f, %.1f) radius=(%.1f, %.1f)",
-                         (double)ecompass_center_x(), (double)ecompass_center_y(),
-                         (double)x_half, (double)y_half);
-            }
-#endif
-            // Hard-iron: subtract the centre. Soft-iron: normalise each axis to its half-span.
-            float cx = (mag.x - ecompass_center_x()) / x_half;
-            float cy = (mag.y - ecompass_center_y()) / y_half;
-
-            // atan2 of the centred unit circle -> heading in degrees, +y convention
-            // rad -> deg; the driver already corrects the 180deg mount, so this is a true bearing
-            float raw_heading = atan2f(cy, cx) / DEG2RAD;
-            if (raw_heading < 0.0f) raw_heading += 360.0f;
-
-            if (!heading_init) {
-                // First sample this visit: take it as "straight ahead" so the arrow starts up
-                arrow_heading = raw_heading;
-                heading_ref = raw_heading;
-                heading_init = true;
-            } else {
-                // Low-pass over the shortest angular path (handles the 360->0 wrap)
-                float d = raw_heading - arrow_heading;
-                while (d > 180.0f) d -= 360.0f;
-                while (d < -180.0f) d += 360.0f;
-
-                // Eases a fraction toward it each frame
-                arrow_heading += d * ARROW_SMOOTH;
-                if (arrow_heading < 0.0f) arrow_heading += 360.0f;
-                else if (arrow_heading >= 360.0f) arrow_heading -= 360.0f;
-            }
+            // Eases a fraction toward it each frame
+            arrow_heading += d * ARROW_SMOOTH;
+            if (arrow_heading < 0.0f) arrow_heading += 360.0f;
+            else if (arrow_heading >= 360.0f) arrow_heading -= 360.0f;
         }
 
         // Show the turn relative to the entry orientation: 0 = straight ahead = arrow up
@@ -704,21 +838,22 @@ void lcd_ecompass_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
         while (dd > 180.0f) dd -= 360.0f;
         while (dd < -180.0f) dd += 360.0f;
         if (arrow_drawn < 0.0f || fabsf(dd) >= 1.0f) {
-            lv_image_set_rotation(ball, (int32_t)lroundf(rel * 10.0f) % 3600);
+            const int32_t up_deg = ecompass_view_up_deg();
+            lv_image_set_rotation(ball, ((int32_t)lroundf(rel * 10.0f) + (up_deg - ARC_TOP_DEG) * 10 + 3600) % 3600);
             arrow_drawn = rel;
 
             // Grow the rim arc to match: from straight-up (0) clockwise through the turn
             if (heading_arc) {
                 int32_t rdeg = (int32_t)lroundf(rel);
                 if (rdeg > 359) rdeg = 359;
-                lv_arc_set_angles(heading_arc, ARC_TOP_DEG, ARC_TOP_DEG + rdeg);
+                lv_arc_set_angles(heading_arc, up_deg, up_deg + rdeg);
             }
 
             // Drift the North pip
             if (heading_npip) {
                 // arrow_heading is kept in [0,360), so 360 - it is the north bearing CW from "up"
                 float north_deg = fmodf(360.0f - arrow_heading, 360.0f);
-                float a = (ARC_TOP_DEG + north_deg) * DEG2RAD; // -> LVGL screen angle (0 = right, +y down)
+                float a = ((float)up_deg + north_deg) * DEG2RAD; // -> LVGL screen angle (0 = right, +y down)
                 lv_obj_align(heading_npip, LV_ALIGN_CENTER,
                              (int32_t)lroundf(NORTH_PIP_R * cosf(a)),
                              (int32_t)lroundf(NORTH_PIP_R * sinf(a)));
@@ -731,6 +866,7 @@ void lcd_ecompass_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
     if (ui_btns->up_btn == 1) { // Next mode (wraps)
         accel_mode = (accel_mode + 1) % MODE_COUNT;
         lv_label_set_text(mode_lbl, accel_mode_name(accel_mode));
+        arrow_drawn = -1.0f; // Redraw the arrow/arc/pip for the new mode's viewer-up
     } else if (ui_btns->down_btn == 1) { // Open the compass calibration page
         lv_anim_delete(ball, NULL); // Stop arrow anims before freeing the object
         lv_obj_delete(cont); // Deletes children
@@ -785,10 +921,176 @@ void lcd_ecompass_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
     }
 }
 
+// Calibration samples (uT), one share per turn
+#define ECOMPASS_CAL_TURNS    3   // Flat, upright, sideways
+#define ECOMPASS_CAL_TURN_PTS 128 // Each turn's share of the buffer
+#define ECOMPASS_CAL_PTS      (ECOMPASS_CAL_TURNS * ECOMPASS_CAL_TURN_PTS)
+#define ECOMPASS_OUTLIER       0.2f // Radial error (fraction of the radius) past which a sample is a glitch
+POLYCAST5_USE_PSRAM_BSS static float cal_pts[ECOMPASS_CAL_PTS][3];
+
+// Squared distance between two 3-vectors
+static inline float ecompass_dist2(const float a[3], const float b[3])
+{
+    return (a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]) + (a[2] - b[2]) * (a[2] - b[2]);
+}
+
+// Radial error of a sample on a calibration's ellipsoid, as a fraction of its radius (0 = on the surface)
+static float ecompass_radial_err(const float p[3], const ecompass_cal_t *cal)
+{
+    float v2 = 0.0f;
+    for (int i = 0; i < 3; i++) {
+        float d = 0.0f;
+        for (int k = 0; k < 3; k++) d += cal->w[i][k] * (p[k] - cal->c[k]);
+        v2 += d * d;
+    }
+    return sqrtf(v2) - 1.0f;
+}
+
+// True if a prior fit (none when NULL) marks sample i as an outlier
+static inline bool ecompass_fit_skip(int i, const ecompass_cal_t *prior)
+{
+    return prior && fabsf(ecompass_radial_err(cal_pts[i], prior)) > ECOMPASS_OUTLIER;
+}
+
+// Least-squares ellipsoid through the first n samples: centre = hard iron, shape = soft iron
+// Fits x^2+y^2+z^2 + a(x^2-z^2) + b(y^2-z^2) + dx + ey + fz + g = 0 (axis weights sum to 3); coupled also fits
+// 2pxy + 2qxz + 2syz, for soft iron that couples the axes. False if degenerate.
+// With a prior fit, its outliers are left out, so a glitch can't drag the result.
+static bool ecompass_fit(int n, bool coupled, const ecompass_cal_t *prior, ecompass_cal_t *out)
+{
+    // Centre and scale the samples to ~unit size so the float normal equations stay well conditioned
+    float mean[3] = { 0.0f, 0.0f, 0.0f };
+    int used = 0;
+    for (int i = 0; i < n; i++) {
+        if (ecompass_fit_skip(i, prior)) continue;
+        for (int k = 0; k < 3; k++) mean[k] += cal_pts[i][k];
+        used++;
+    }
+    if (used < 10) return false;
+    for (int k = 0; k < 3; k++) mean[k] /= (float)used;
+
+    float spread = 0.0f;
+    for (int i = 0; i < n; i++) {
+        if (ecompass_fit_skip(i, prior)) continue;
+        for (int k = 0; k < 3; k++) {
+            float d = cal_pts[i][k] - mean[k];
+            spread += d * d;
+        }
+    }
+    spread = sqrtf(spread / (float)used);
+    if (spread < 1.0f) return false; // Barely moved
+
+    // Normal equations: 6 or 9 unknowns (a, b, d, e, f, g[, p, q, s]) + right-hand side in column nu
+    const int nu = coupled ? 9 : 6;
+    float m[9][10] = { 0 };
+    for (int i = 0; i < n; i++) {
+        if (ecompass_fit_skip(i, prior)) continue;
+        float x = (cal_pts[i][0] - mean[0]) / spread;
+        float y = (cal_pts[i][1] - mean[1]) / spread;
+        float z = (cal_pts[i][2] - mean[2]) / spread;
+        float row[10] = { x * x - z * z, y * y - z * z, x, y, z, 1.0f, 2.0f * x * y, 2.0f * x * z, 2.0f * y * z, 0.0f };
+        row[nu] = -(x * x + y * y + z * z);
+        for (int j = 0; j < nu; j++) {
+            for (int k = j; k <= nu; k++) m[j][k] += row[j] * row[k];
+        }
+    }
+    for (int j = 1; j < nu; j++) {
+        for (int k = 0; k < j; k++) m[j][k] = m[k][j]; // Mirror the symmetric half
+    }
+
+    // Gauss-Jordan elimination with partial pivoting
+    for (int col = 0; col < nu; col++) {
+        int piv = col;
+        for (int j = col + 1; j < nu; j++) {
+            if (fabsf(m[j][col]) > fabsf(m[piv][col])) piv = j;
+        }
+        if (fabsf(m[piv][col]) < 1e-6f * (float)used) return false; // Samples don't pin down an ellipsoid
+        for (int k = 0; k <= nu; k++) {
+            float t = m[col][k]; m[col][k] = m[piv][k]; m[piv][k] = t;
+        }
+        for (int j = 0; j < nu; j++) {
+            if (j == col) continue;
+            float s = m[j][col] / m[col][col];
+            for (int k = col; k <= nu; k++) m[j][k] -= s * m[col][k];
+        }
+    }
+    float sol[9] = { 0 };
+    for (int j = 0; j < nu; j++) sol[j] = m[j][nu] / m[j][j];
+
+    // Quadric x'Qx + l.x + g = 0: its eigenbasis gives the ellipsoid's axes
+    float a[3][3] = {
+        { 1.0f + sol[0], sol[6],        sol[7]                 },
+        { sol[6],        1.0f + sol[1], sol[8]                 },
+        { sol[7],        sol[8],        1.0f - sol[0] - sol[1] },
+    };
+    float v[3][3];
+    ecompass_jacobi(a, v);
+
+    // Centre in the eigenbasis (t), then the level k_sum of (x - c)'Q(x - c) = k_sum
+    float t[3], k_sum = -sol[5];
+    for (int e = 0; e < 3; e++) {
+        if (!(a[e][e] > 0.0f)) return false; // Not an ellipsoid
+        const float le = v[0][e] * sol[2] + v[1][e] * sol[3] + v[2][e] * sol[4];
+        t[e] = -le / (2.0f * a[e][e]);
+        k_sum += a[e][e] * t[e] * t[e];
+    }
+    if (!(k_sum > 0.0f)) return false;
+
+    // Back in uT: c = mean + spread * V t, w = V sqrt(D / k_sum) V' / spread (built symmetric)
+    for (int i = 0; i < 3; i++) {
+        out->c[i] = mean[i] + spread * (v[i][0] * t[0] + v[i][1] * t[1] + v[i][2] * t[2]);
+        for (int j = i; j < 3; j++) {
+            float w = 0.0f;
+            for (int e = 0; e < 3; e++) w += v[i][e] * sqrtf(a[e][e] / k_sum) * v[j][e];
+            out->w[i][j] = out->w[j][i] = w / spread;
+        }
+    }
+    return true;
+}
+
+// RMS radial error (fraction) of the first n samples on a fit, outliers left out and counted into *outliers
+static float ecompass_fit_rms(int n, const ecompass_cal_t *cal, int *outliers)
+{
+    float err = 0.0f;
+    int used = 0;
+    *outliers = 0;
+    for (int i = 0; i < n; i++) {
+        float d = ecompass_radial_err(cal_pts[i], cal);
+        if (fabsf(d) > ECOMPASS_OUTLIER) {
+            (*outliers)++;
+            continue;
+        }
+        err += d * d;
+        used++;
+    }
+    return used ? sqrtf(err / (float)used) : 1.0f;
+}
+
 void lcd_ecompass_calibration_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
 {
-    #define ECOMPASS_REFRESH_MS 25 // Pull fresh mag samples at ~40 Hz while calibrating
-    #define ECOMPASS_SECTORS_REQ 12 // Wedges (of 12) that count as a full turn
+    #define ECOMPASS_REFRESH_MS  25     // Pull fresh accel + mag samples at ~40 Hz while calibrating
+    #define ECOMPASS_SECTORS_REQ 12     // Wedges (of 12) that count as a full turn
+    #define ECOMPASS_CAL_STEP_MIN 1.0f  // Min uT between stored samples, so holding still doesn't skew the fit
+    #define ECOMPASS_CAL_STEP_MAX 4.0f  // Spacing cap, so a strong field still gets enough samples per circle
+    #define ECOMPASS_POSE_MIN    0.8f   // |up| along a turn's vertical axis from which its pose counts (within ~37 deg)
+    #define ECOMPASS_STEADY_MAX  0.15f  // Max up-vector change over the last 3 reads (~9 deg) for them to steer the arrow +
+                                        // wedges: a read tipping into the pose leaks the vertical field sideways
+    #define ECOMPASS_RMS_MAX     0.10f  // Max RMS radial fit error: more means a distorted field (metal nearby)
+    #define ECOMPASS_OUTLIER_PCT 5      // Max % of samples the fit may drop as glitches
+    #define ECOMPASS_JUMP_MAX    150.0f // uT between consecutive reads the field can't move: a glitch
+    #define ECOMPASS_COUPLED_GAIN 0.5f  // Coupled fit used when its RMS is below this share of the axis-aligned one
+    #define ECOMPASS_SENSOR_MS   1000   // No accel/mag frame for this long: that sensor isn't responding
+
+    // Each turn holds a different board axis vertical, so together they pin every axis' centre and scale
+    static const struct {
+        uint8_t vert;          // Board axis pointing up (or down) during the turn
+        const char *prompt;    // Step prompt at the top
+        const char *pose_hint; // Status while held in the wrong pose
+    } turns[ECOMPASS_CAL_TURNS] = {
+        { 2, "1/3: Lay flat, turn a circle", "Lay it flat" },
+        { 0, "2/3: Upright, turn around", "Stand it on its long edge" },
+        { 1, "3/3: Sideways, turn around", "Stand it on its short edge" },
+    };
 
     // Statics
     static bool init = false;
@@ -799,12 +1101,22 @@ void lcd_ecompass_calibration_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
     static lv_obj_t *arrow_img = NULL;   // Live direction arrow (shown while calibrating)
     static lv_obj_t *prog_bar = NULL;    // Coverage progress bar (shown while calibrating)
     static bool calibrating = false;
-    static uint16_t visited_sectors = 0; // Bitmask of the 12x30deg heading wedges seen this run
+    static int cal_turn = 0;             // Index into turns[]
+    static uint16_t visited_sectors = 0; // Bitmask of the 12x30deg wedges seen this turn
+    static float lo[3], hi[3];           // This turn's per-axis extremes; their midpoint centres the arrow
+    static int cal_n = 0;                // Samples in cal_pts
+    static int turn_n0 = 0;              // cal_n when this turn started; SELECT mid-turn redoes the turn from here
+    static float hist[3][6];             // Last 3 mag reads (uT) + the up vector each came with, newest first
+    static int hist_n = 0;
+    static float cal_prev[3];            // Previous read, for the glitch check
+    static bool cal_have_prev = false;
+    static float up[3];                  // Latest board-frame up vector (accel)
+    static bool up_valid = false;
+    static ecompass_cal_t fit;           // Fit saved on finish
+    static bool fit_ready = false;       // All turns done and the fit is good enough to save
+    static bool fit_uneven = false;      // All turns done but the fit is distorted: SELECT restarts the run
     static TickType_t last_refresh = 0;
-
-    // Snapshot of the calibration taken when a run starts, restored if the user backs out
-    static float bk_x_min, bk_x_max, bk_y_min, bk_y_max;
-    static bool bk_cal_complete;
+    static TickType_t last_accel = 0, last_mag = 0; // When each sensor last delivered, to flag a dead one
 
     if (!init) {
         cont = lv_obj_create(ACTIVE_SCR);
@@ -824,14 +1136,14 @@ void lcd_ecompass_calibration_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
         lv_obj_set_style_text_color(title_lbl, user_secondary_color, 0);
         lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 0);
 
-        // Instruction (centre); text changes once a run starts
+        // Instruction (centre); moves to the top as the step prompt once a run starts
         instr_lbl = lv_label_create(cont);
         lv_label_set_long_mode(instr_lbl, LV_LABEL_LONG_WRAP);
         lv_obj_set_width(instr_lbl, lv_pct(100));
         lv_obj_set_style_text_font(instr_lbl, &lv_font_montserrat_14, 0);
         lv_obj_set_style_text_color(instr_lbl, user_secondary_color, 0);
         lv_obj_set_style_text_align(instr_lbl, LV_TEXT_ALIGN_CENTER, 0);
-        lv_label_set_text(instr_lbl, "Lay flat away from metal, then turn a full circle.");
+        lv_label_set_text(instr_lbl, "Away from metal, turn it a full circle flat, upright, then sideways.");
         lv_obj_align(instr_lbl, LV_ALIGN_CENTER, 0, 0);
 
         // Status / progress line at the bottom
@@ -872,106 +1184,236 @@ void lcd_ecompass_calibration_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
         init = true;
     }
 
-    // While a run is active, keep pulling samples, grow the bounds, and show coverage
+    // While a run is active: track each turn, spin the arrow, and fit once all turns are done
+    const bool was_uneven = fit_uneven; // State on screen when SELECT was pressed, before this frame's fit
     if (calibrating) {
-        if (xTaskGetTickCount() - last_refresh >= pdMS_TO_TICKS(ECOMPASS_REFRESH_MS)) {
-            last_refresh = xTaskGetTickCount();
-            xSemaphoreGive(xReadMagSemaphore);
+        const TickType_t now = xTaskGetTickCount();
+        if (now - last_refresh >= pdMS_TO_TICKS(ECOMPASS_REFRESH_MS)) {
+            last_refresh = now;
+            xSemaphoreGive(xReadAccelSemaphore); // Req accel (pose)
+            xSemaphoreGive(xReadMagSemaphore); // Req mag
         }
 
-        // When a reading is received
+        accel_deg_t accel;
+        if (xQueueReceive(xAccelReadingsQueue, &accel, 0) == pdTRUE) {
+            accel_up_vector(&accel, up);
+            up_valid = true;
+            last_accel = now;
+        }
+
+        // When a reading is received (the pose must be known to use it)
         mmc5603_reading_t mag;
-        if (xQueueReceive(xMagReadingsQueue, &mag, 0) == pdTRUE) {
-            // Update calibration bounds
-            if (mag.x < mag_cal_x_min) mag_cal_x_min = mag.x;
-            if (mag.x > mag_cal_x_max) mag_cal_x_max = mag.x;
-            if (mag.y < mag_cal_y_min) mag_cal_y_min = mag.y;
-            if (mag.y > mag_cal_y_max) mag_cal_y_max = mag.y;
+        if (up_valid && xQueueReceive(xMagReadingsQueue, &mag, 0) == pdTRUE) {
+            last_mag = now;
 
-            // Live direction from the hard-iron-centred field
-            // Only act when the vector is clearly off-centre
+            // Use the medoid of the last 3 reads (the one facing their widest gap): a lone spike never comes out
+            memmove(hist[1], hist[0], 2 * sizeof(hist[0]));
+            hist[0][0] = mag.x; hist[0][1] = mag.y; hist[0][2] = mag.z;
+            memcpy(&hist[0][3], up, 3 * sizeof(float));
+            if (hist_n < 3) hist_n++;
+            float gap[3], tip = 0.0f; // gap[i]: field distance^2 between the two reads other than i; tip: max pose change^2
+            for (int i = 0; i < 3; i++) {
+                const float *p = hist[(i + 1) % 3], *q = hist[(i + 2) % 3];
+                gap[i] = ecompass_dist2(p, q);
+                tip = fmaxf(tip, ecompass_dist2(&p[3], &q[3]));
+            }
+            const int med = (gap[0] >= gap[1] && gap[0] >= gap[2]) ? 0 : (gap[1] >= gap[2]) ? 1 : 2;
+            const float *s = hist[med];         // Field (uT)
+            const float *s_up = &hist[med][3];  // Pose it was read in
 
-            // Field vector relative to the circle's center
-            float dx = mag.x - ecompass_center_x();
-            float dy = mag.y - ecompass_center_y();
+            // Drops a glitch read and the one after it; nothing until the medoid has 3 reads
+            bool glitch = hist_n < 3;
+            if (!glitch) {
+                float jump = 0.0f;
+                for (int k = 0; k < 3; k++) {
+                    jump += (s[k] - cal_prev[k]) * (s[k] - cal_prev[k]);
+                    cal_prev[k] = s[k];
+                }
+                glitch = cal_have_prev && jump > ECOMPASS_JUMP_MAX * ECOMPASS_JUMP_MAX;
+                cal_have_prev = true;
+            }
 
-            // Avoid dead zone near the center
-            if (dx * dx + dy * dy > 9.0f) { // > ~3 uT from centre -> valid
-                // Angle of that vector in degrees [0,360); the driver corrects the 180deg mount
-                float heading = atan2f(dy, dx) / DEG2RAD;
-                if (heading < 0.0f) heading += 360.0f;
-                lv_image_set_rotation(arrow_img, (int32_t)lroundf(heading * 10.0f) % 3600); // Rotate arrow img
+            // A turn only counts reads held in its pose, so the turns are in three different planes
+            // Only a steady pose steers the arrow + wedges: turning leaves the board-frame up vector still, tipping doesn't
+            const int vert = turns[cal_turn].vert;
+            const bool posed = fabsf(s_up[vert]) >= ECOMPASS_POSE_MIN;
+            const bool tracked = posed && tip <= ECOMPASS_STEADY_MAX * ECOMPASS_STEADY_MAX;
+            const bool done = fit_ready || fit_uneven;
+            int covered = __builtin_popcount(visited_sectors);
 
-                // Split the circle into 12 wedges of 30 degrees and tally which ones the user has covered
-                int sector = (int)(heading / 30.0f);
-                if (sector >= 0 && sector < 12) {
-                    visited_sectors |= (uint16_t)(1u << sector);
+            if (!glitch && posed && !done) {
+                if (tracked) {
+                    for (int k = 0; k < 3; k++) {
+                        lo[k] = fminf(lo[k], s[k]);
+                        hi[k] = fmaxf(hi[k], s[k]);
+                    }
+                }
+
+                // The two level axes the turn sweeps (flat: X/Y)
+                const int ax_a = (vert + 1) % 3;
+                const int ax_b = (vert + 2) % 3;
+
+                // Store once it has moved far enough from the last stored sample
+                // Spacing follows this turn's radius, so a weak level field (high latitudes) still gets ~60 per circle
+                // (before any tracked read, lo/hi are still unset and the spacing clamps to the minimum)
+                const int cap = (cal_turn + 1) * ECOMPASS_CAL_TURN_PTS;
+                if (cal_n < cap) {
+                    float spacing = fmaxf(hi[ax_a] - lo[ax_a], hi[ax_b] - lo[ax_b]) * 0.05f;
+                    spacing = fminf(fmaxf(spacing, ECOMPASS_CAL_STEP_MIN), ECOMPASS_CAL_STEP_MAX);
+                    float step = 0.0f;
+                    if (cal_n > 0) {
+                        for (int k = 0; k < 3; k++) {
+                            step += (s[k] - cal_pts[cal_n - 1][k]) * (s[k] - cal_pts[cal_n - 1][k]);
+                        }
+                    }
+                    if (cal_n == 0 || step >= spacing * spacing) {
+                        memcpy(cal_pts[cal_n++], s, sizeof(cal_pts[0]));
+                    }
+                }
+
+                // Live direction from this turn's centre; only act when the vector is clearly off-centre
+                float dx = s[ax_a] - (lo[ax_a] + hi[ax_a]) / 2.0f;
+                float dy = s[ax_b] - (lo[ax_b] + hi[ax_b]) / 2.0f;
+                if (tracked && dx * dx + dy * dy > 9.0f) { // > ~3 uT from centre -> valid
+                    float ang = atan2f(dy, dx) / DEG2RAD;
+                    if (ang < 0.0f) ang += 360.0f;
+                    lv_image_set_rotation(arrow_img, (int32_t)lroundf(ang * 10.0f) % 3600); // Rotate arrow img
+
+                    // Split the circle into 12 wedges of 30 degrees and tally which ones the user has covered
+                    int sector = (int)(ang / 30.0f);
+                    if (sector >= 0 && sector < 12) {
+                        visited_sectors |= (uint16_t)(1u << sector);
+                    }
+                }
+
+                covered = __builtin_popcount(visited_sectors);
+                if (covered >= ECOMPASS_SECTORS_REQ) {
+                    if (cal_turn < ECOMPASS_CAL_TURNS - 1) {
+                        // Turn done: start the next pose with a fresh centre and wedge count
+                        cal_turn++;
+                        turn_n0 = cal_n;
+                        visited_sectors = 0;
+                        covered = 0;
+                        for (int k = 0; k < 3; k++) {
+                            lo[k] = 1e9f;
+                            hi[k] = -1e9f;
+                        }
+                        lv_label_set_text(instr_lbl, turns[cal_turn].prompt);
+                    } else {
+                        // All turns done: fit the ellipsoid both ways, each refit without the glitches its first pass shows
+                        // Coupled only when it fits far better (then the axis-aligned fit is wrong): its 3 extra terms
+                        // are noisier on small high-dip circles
+                        ecompass_cal_t pre = { 0 }, axis = { 0 }, coupled = { 0 };
+                        int out_a = 0, out_c = 0;
+                        const bool ok_a = ecompass_fit(cal_n, false, NULL, &pre) && ecompass_fit(cal_n, false, &pre, &axis);
+                        const bool ok_c = ecompass_fit(cal_n, true, NULL, &pre) && ecompass_fit(cal_n, true, &pre, &coupled);
+                        const float rms_a = ok_a ? ecompass_fit_rms(cal_n, &axis, &out_a) : 1.0f;
+                        const float rms_c = ok_c ? ecompass_fit_rms(cal_n, &coupled, &out_c) : 1.0f;
+                        const bool pass_a = ok_a && ecompass_cal_plausible(&axis) && rms_a <= ECOMPASS_RMS_MAX &&
+                                out_a * 100 <= cal_n * ECOMPASS_OUTLIER_PCT;
+                        const bool pass_c = ok_c && ecompass_cal_plausible(&coupled) && rms_c <= ECOMPASS_RMS_MAX &&
+                                out_c * 100 <= cal_n * ECOMPASS_OUTLIER_PCT;
+                        const bool use_c = !pass_a || rms_c < ECOMPASS_COUPLED_GAIN * rms_a;
+                        fit = use_c ? coupled : axis;
+                        fit_ready = use_c ? pass_c : pass_a;
+                        fit_uneven = !fit_ready;
+#ifdef POLYCAST5_DEBUG
+                        ESP_LOGI(TAG, "ecompass fit n=%d rms axis %.3f (%d out) coupled %.3f (%d out) -> %s c=(%.1f, %.1f, %.1f) "
+                                "w=(%.4f, %.4f, %.4f | %.4f, %.4f, %.4f)", cal_n, (double)rms_a, out_a, (double)rms_c, out_c,
+                                !fit_ready ? "uneven" : use_c ? "coupled" : "axis",
+                                (double)fit.c[0], (double)fit.c[1], (double)fit.c[2],
+                                (double)fit.w[0][0], (double)fit.w[1][1], (double)fit.w[2][2],
+                                (double)fit.w[0][1], (double)fit.w[0][2], (double)fit.w[1][2]);
+#endif
+                    }
                 }
             }
 
-            // Counts the set bits = how many distinct wedges have been hit (0–12)
-            int covered = __builtin_popcount(visited_sectors);
-
-            // Map and show percentage of wedges covered
-            int pct = covered * 100 / ECOMPASS_SECTORS_REQ;
-            if (pct > 100) pct = 100;
+            // Map and show percentage: each turn is an equal share of the bar
+            int pct = (cal_turn * ECOMPASS_SECTORS_REQ + covered) * 100 / (ECOMPASS_CAL_TURNS * ECOMPASS_SECTORS_REQ);
+            if (fit_ready || fit_uneven) pct = 100;
             lv_bar_set_value(prog_bar, pct, LV_ANIM_ON);
-            if (covered >= ECOMPASS_SECTORS_REQ) {
+            if (fit_ready) {
                 lv_label_set_text(status_lbl, "Ready - SELECT to finish");
+            } else if (fit_uneven) {
+                // Samples don't sit on one ellipsoid: metal nearby or a magnet moved during the run
+                lv_label_set_text(status_lbl, "Near metal - SELECT: retry");
+            } else if (fabsf(up[turns[cal_turn].vert]) < ECOMPASS_POSE_MIN) { // Live pose: a step just entered hints at once
+                lv_label_set_text(status_lbl, turns[cal_turn].pose_hint);
             } else {
                 char buf[40];
                 snprintf(buf, sizeof(buf), "Keep turning... %d%%", pct);
                 lv_label_set_text(status_lbl, buf);
             }
         }
+
+        // A dead sensor would otherwise look like a run stuck at 0%
+        if (!fit_ready && !fit_uneven) {
+            if (now - last_accel > pdMS_TO_TICKS(ECOMPASS_SENSOR_MS)) {
+                lv_label_set_text(status_lbl, "Tilt sensor not responding");
+            } else if (now - last_mag > pdMS_TO_TICKS(ECOMPASS_SENSOR_MS)) {
+                lv_label_set_text(status_lbl, "Compass not responding");
+            }
+        }
     }
 
     /* User input */
     if (ui_btns->select_btn) {
-        if (!calibrating) {
-            // Start: snapshot the current calibration, then clear it and begin collecting
-            bk_x_min = mag_cal_x_min; bk_x_max = mag_cal_x_max;
-            bk_y_min = mag_cal_y_min; bk_y_max = mag_cal_y_max;
-            bk_cal_complete = cal_complete;
-
-            // Min max start values
-            mag_cal_x_min = mag_cal_y_min = 1e9f; // Biggest possible float
-            mag_cal_x_max = mag_cal_y_max = -1e9f; // Smallest possible float
-            cal_complete = false;
+        if (!calibrating || (was_uneven && fit_uneven)) {
+            // Start, or restart a distorted run: fresh sample set; the calibration in use stays until a fit is accepted
+            cal_n = 0;
+            turn_n0 = 0;
+            cal_turn = 0;
             visited_sectors = 0;
+            for (int k = 0; k < 3; k++) {
+                lo[k] = 1e9f;
+                hi[k] = -1e9f;
+            }
+            hist_n = 0;
+            cal_have_prev = false;
+            up_valid = false;
+            fit_ready = fit_uneven = false;
+            xQueueReset(xAccelReadingsQueue);
             xQueueReset(xMagReadingsQueue);
 
             calibrating = true;
             last_refresh = 0;
+            last_accel = last_mag = xTaskGetTickCount();
             
-            lv_obj_add_flag(title_lbl, LV_OBJ_FLAG_HIDDEN); // Free the top for the arrow
-            lv_obj_add_flag(instr_lbl, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(title_lbl, LV_OBJ_FLAG_HIDDEN); // Free the top for the step prompt
+            lv_label_set_text(instr_lbl, turns[0].prompt);
+            lv_obj_align(instr_lbl, LV_ALIGN_TOP_MID, 0, 0);
             lv_obj_remove_flag(arrow_img, LV_OBJ_FLAG_HIDDEN); // Reveal the live arrow + bar
             lv_obj_remove_flag(prog_bar, LV_OBJ_FLAG_HIDDEN);
             lv_bar_set_value(prog_bar, 0, LV_ANIM_OFF);
             lv_label_set_text(status_lbl, "Keep turning... 0%");
         } else {
-            // Finish: only accept once enough wedges are covered (a real full turn)
-            if (__builtin_popcount(visited_sectors) >= ECOMPASS_SECTORS_REQ) {
+            // Finish: only accept a plausible fit through all turns
+            if (fit_ready) {
+                mag_cal = fit;
                 cal_complete = true;
-                ecompass_nvs_save(mag_cal_x_min, mag_cal_x_max, mag_cal_y_min, mag_cal_y_max); // Save
+                ecompass_nvs_save(&mag_cal); // Save
 
                 // Clean up
                 lv_obj_delete(cont);
                 cont = NULL; title_lbl = instr_lbl = status_lbl = arrow_img = prog_bar = NULL;
                 calibrating = false; init = false;
                 ui_menu->page = ESPNOW_ECOMPASS_PAGE; // Back to the compass
+            } else if (fit_uneven) { // Turned uneven this frame: show it before a SELECT can drop the run
+                lv_label_set_text(status_lbl, "Near metal - SELECT: retry");
             } else {
-                lv_label_set_text(status_lbl, "Not enough - keep turning");
+                // Mid-turn: redo this turn (a disturbed read can leave wedges unreachable); finished turns stay
+                cal_n = turn_n0;
+                visited_sectors = 0;
+                for (int k = 0; k < 3; k++) {
+                    lo[k] = 1e9f;
+                    hi[k] = -1e9f;
+                }
+                lv_bar_set_value(prog_bar, cal_turn * 100 / ECOMPASS_CAL_TURNS, LV_ANIM_OFF);
+                lv_label_set_text(status_lbl, "Turn restarted");
             }
         }
-    } else if (ui_btns->left_btn) { // Cancel / back out
-        if (calibrating) { // Restore the calibration the run replaced
-            mag_cal_x_min = bk_x_min; mag_cal_x_max = bk_x_max;
-            mag_cal_y_min = bk_y_min; mag_cal_y_max = bk_y_max;
-            cal_complete = bk_cal_complete;
-        }
-
+    } else if (ui_btns->left_btn) { // Cancel / back out (the calibration in use is untouched until a run finishes)
         // Clean up
         lv_obj_delete(cont);
         cont = NULL; title_lbl = instr_lbl = status_lbl = arrow_img = prog_bar = NULL;
@@ -986,12 +1428,6 @@ void lcd_ecompass_calibration_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
             ui_menu->page = ESPNOW_PAGE;
         }
     } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
-        if (calibrating) {
-            mag_cal_x_min = bk_x_min; mag_cal_x_max = bk_x_max;
-            mag_cal_y_min = bk_y_min; mag_cal_y_max = bk_y_max;
-            cal_complete = bk_cal_complete;
-        }
-
         // Clean up
         lv_obj_delete(cont);
         cont = NULL; title_lbl = instr_lbl = status_lbl = arrow_img = prog_bar = NULL;
@@ -1018,12 +1454,14 @@ void lcd_ecompass_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_men
     static bool heading_init = false;  // Has heading_ref been captured this visit?
     static float arrow_drawn = -1.0f;  // Last relative angle actually rendered (-1 = none yet)
     static float disp_x = 0.0f, disp_y = 0.0f, disp_z = 0.0f; // Latest tilt + heading, streamed each frame
+    static float accel_up[3];          // Latest board-frame up vector, for tilt compensation
+    static bool accel_up_valid = false; // Has an accel frame arrived since entry / re-zero?
 
     if (!init) {
         // Seed the calibration from NVS once per boot (redundant)
         if (!ecompass_loaded) {
             ecompass_loaded = true;
-            if (ecompass_nvs_load(&mag_cal_x_min, &mag_cal_x_max, &mag_cal_y_min, &mag_cal_y_max)) {
+            if (ecompass_nvs_load(&mag_cal)) {
                 cal_complete = true;
             }
         }
@@ -1073,6 +1511,7 @@ void lcd_ecompass_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_men
         heading_init = false; // Re-capture the "straight ahead" reference on entry
         arrow_drawn = -1.0f;
         disp_x = disp_y = disp_z = 0.0f;
+        accel_up_valid = false;
 
         // Paint the freshly-built stream UI before the radio bring-up
         lv_timer_handler();
@@ -1092,44 +1531,34 @@ void lcd_ecompass_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_men
     bool fresh_sample = false;
     accel_deg_t accel;
     if (xQueueReceive(xAccelReadingsQueue, &accel, 0) == pdTRUE) {
+        accel_up_vector(&accel, accel_up);
+        accel_up_valid = true;
+
         // Draws the X/Y/Z readout (Z = last heading) and hands back the tilt for the mag block below
-        accel_apply_reading(&accel, ball, ARROW_SIZE, val_lbl, disp_z, &disp_x, &disp_y);
+        accel_apply_reading(&accel, accel_up, ball, ARROW_SIZE, val_lbl, disp_z, &disp_x, &disp_y);
         fresh_sample = true;
     }
 
-    // Compass heading from the magnetometer using the stored hard-/soft-iron calibration
+    // Tilt-compensated compass heading from the calibrated magnetometer; skipped in a pose the mode can't read
     mmc5603_reading_t mag;
-    if (ball && xQueueReceive(xMagReadingsQueue, &mag, 0) == pdTRUE) {
-        // Recover the calibration shape
-        float x_half = (mag_cal_x_max - mag_cal_x_min) * 0.5f; // X radius from the stored calibration
-        float y_half = (mag_cal_y_max - mag_cal_y_min) * 0.5f; // Y radius
+    float raw_heading;
+    if (ball && xQueueReceive(xMagReadingsQueue, &mag, 0) == pdTRUE &&
+            ecompass_heading(&mag, accel_up_valid ? accel_up : NULL, &raw_heading)) {
+        if (!heading_init) {
+            // First sample this visit: take it as "straight ahead" so the arrow starts up
+            arrow_heading = raw_heading;
+            heading_ref = raw_heading;
+            heading_init = true;
+        } else {
+            // Low-pass over the shortest angular path (handles the 360->0 wrap)
+            float d = raw_heading - arrow_heading;
+            while (d > 180.0f) d -= 360.0f;
+            while (d < -180.0f) d += 360.0f;
 
-        if (x_half > 0.0f && y_half > 0.0f) { // Always true once calibrated; guards a bad blob
-            // Hard-iron: subtract the centre. Soft-iron: normalise each axis to its half-span.
-            float cx = (mag.x - ecompass_center_x()) / x_half;
-            float cy = (mag.y - ecompass_center_y()) / y_half;
-
-            // atan2 of the centred unit circle -> heading in degrees, +y convention
-            // rad -> deg; the driver already corrects the 180deg mount, so this is a true bearing
-            float raw_heading = atan2f(cy, cx) / DEG2RAD;
-            if (raw_heading < 0.0f) raw_heading += 360.0f;
-
-            if (!heading_init) {
-                // First sample this visit: take it as "straight ahead" so the arrow starts up
-                arrow_heading = raw_heading;
-                heading_ref = raw_heading;
-                heading_init = true;
-            } else {
-                // Low-pass over the shortest angular path (handles the 360->0 wrap)
-                float d = raw_heading - arrow_heading;
-                while (d > 180.0f) d -= 360.0f;
-                while (d < -180.0f) d += 360.0f;
-
-                // Eases a fraction toward it each frame
-                arrow_heading += d * ARROW_SMOOTH;
-                if (arrow_heading < 0.0f) arrow_heading += 360.0f;
-                else if (arrow_heading >= 360.0f) arrow_heading -= 360.0f;
-            }
+            // Eases a fraction toward it each frame
+            arrow_heading += d * ARROW_SMOOTH;
+            if (arrow_heading < 0.0f) arrow_heading += 360.0f;
+            else if (arrow_heading >= 360.0f) arrow_heading -= 360.0f;
         }
 
         // Show the turn relative to the entry orientation: 0 = straight ahead = arrow up
@@ -1152,21 +1581,22 @@ void lcd_ecompass_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_men
         while (dd > 180.0f) dd -= 360.0f;
         while (dd < -180.0f) dd += 360.0f;
         if (arrow_drawn < 0.0f || fabsf(dd) >= 1.0f) {
-            lv_image_set_rotation(ball, (int32_t)lroundf(rel * 10.0f) % 3600);
+            const int32_t up_deg = ecompass_view_up_deg();
+            lv_image_set_rotation(ball, ((int32_t)lroundf(rel * 10.0f) + (up_deg - ARC_TOP_DEG) * 10 + 3600) % 3600);
             arrow_drawn = rel;
 
             // Grow the rim arc to match: from straight-up (0) clockwise through the turn
             if (heading_arc) {
                 int32_t rdeg = (int32_t)lroundf(rel);
                 if (rdeg > 359) rdeg = 359;
-                lv_arc_set_angles(heading_arc, ARC_TOP_DEG, ARC_TOP_DEG + rdeg);
+                lv_arc_set_angles(heading_arc, up_deg, up_deg + rdeg);
             }
 
             // Drift the North pip
             if (heading_npip) {
                 // arrow_heading is kept in [0,360), so 360 - it is the north bearing CW from "up"
                 float north_deg = fmodf(360.0f - arrow_heading, 360.0f);
-                float a = (ARC_TOP_DEG + north_deg) * DEG2RAD; // -> LVGL screen angle (0 = right, +y down)
+                float a = ((float)up_deg + north_deg) * DEG2RAD; // -> LVGL screen angle (0 = right, +y down)
                 lv_obj_align(heading_npip, LV_ALIGN_CENTER,
                              (int32_t)lroundf(NORTH_PIP_R * cosf(a)),
                              (int32_t)lroundf(NORTH_PIP_R * sinf(a)));
@@ -1190,9 +1620,11 @@ void lcd_ecompass_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_men
     if (ui_btns->up_btn == 1) { // Next view mode (wraps)
         accel_mode = (accel_mode + 1) % MODE_COUNT;
         lv_label_set_text(mode_lbl, accel_mode_name(accel_mode));
+        arrow_drawn = -1.0f; // Redraw the arrow/arc/pip for the new mode's viewer-up
     } else if (ui_btns->down_btn == 1) { // Previous view mode (wraps)
         accel_mode = (accel_mode + MODE_COUNT - 1) % MODE_COUNT;
         lv_label_set_text(mode_lbl, accel_mode_name(accel_mode));
+        arrow_drawn = -1.0f; // Redraw the arrow/arc/pip for the new mode's viewer-up
     } else if (ui_btns->select_btn) { // Re-zero: recapture "straight ahead" without restarting the stream
         // Drop any queued samples so the new reference comes from a fresh reading
         xQueueReset(xAccelReadingsQueue);
@@ -1204,9 +1636,10 @@ void lcd_ecompass_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_men
         heading_init = false; // Next mag sample becomes the new "straight ahead"
         arrow_drawn = -1.0f;  // Force the next mag frame to redraw the arrow/arc/pip
         disp_x = disp_y = disp_z = 0.0f;
+        accel_up_valid = false; // The new reference uses a fresh up vector too
 
         // Snap the visuals back to the zeroed pose until fresh samples arrive
-        lv_image_set_rotation(ball, 0);
+        lv_image_set_rotation(ball, (ecompass_view_up_deg() - ARC_TOP_DEG + 360) * 10 % 3600);
         if (heading_arc) {
             lv_arc_set_angles(heading_arc, ARC_TOP_DEG, ARC_TOP_DEG); // Zero-length = nothing drawn
         }

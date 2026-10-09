@@ -4,7 +4,7 @@
  * 
  * GPIO 5-Bit Bus Receiver
  *
- * Reads a 5-bit parallel value (0–31).
+ * Reads a 5-bit parallel value (1–31; 0 is the idle state).
  * Connect each BIT pin on the PolyPlug
  * to the corresponding Arduino input pin below, plus a common GND.
  *
@@ -60,7 +60,7 @@ void loop()
     Serial.print("Received: ");
     Serial.println(value);
 
-    // --- Do something with 'value' (0–31) here ---
+    // --- Do something with 'value' (1–31) here ---
 
     was_idle = false;
   }

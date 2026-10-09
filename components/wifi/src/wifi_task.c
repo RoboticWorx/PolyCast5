@@ -78,6 +78,7 @@ SemaphoreHandle_t xWifiCycleSemaphore;
 SemaphoreHandle_t xWifiPingSemaphore;
 
 SemaphoreHandle_t xWifiRawFramesMutex;
+SemaphoreHandle_t xWifiDataMutex;
 
 EventGroupHandle_t xConnectionIconEventGroup;
 EventGroupHandle_t xWiFiPortalEventGroup;
@@ -114,6 +115,8 @@ static void wifi_task(void *param)
 
     xWifiRawFramesMutex = xSemaphoreCreateMutex();
     configASSERT(xWifiRawFramesMutex);
+    xWifiDataMutex = xSemaphoreCreateMutex();
+    configASSERT(xWifiDataMutex);
     
     xWifiScanQueue = xQueueCreate(WIFI_MAX_NETWORKS, sizeof(wifi_scan_t));
     configASSERT(xWifiScanQueue);
@@ -141,7 +144,7 @@ static void wifi_task(void *param)
     configASSERT(xWifiDataQueue);
     xWifiMqttCmdQueue = xQueueCreate(1, sizeof(wifi_mqtt_t));
     configASSERT(xWifiMqttCmdQueue);
-    xWifiOtaPctQueue = xQueueCreate(1, sizeof(int));
+    xWifiOtaPctQueue = xQueueCreate(1, sizeof(int)); // Must stay depth 1: written with xQueueOverwrite
     configASSERT(xWifiOtaPctQueue);
     xWifiPingQueue = xQueueCreate(1, sizeof(wifi_ping_t));
     configASSERT(xWifiPingQueue);
@@ -230,6 +233,7 @@ static void wifi_task(void *param)
 #endif
                 xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_CONNECTING_BIT); // Not connected / not connecting
             } else {
+                wifi_autoconnect_clear_list_full(); // A new join supersedes an unshown list-full notice
                 xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTING_BIT); // Tell LCD we're trying
 
                 esp_err_t err = wifi_utils_radio_start(selected_network.ssid, selected_network.bssid, selected_network.password);

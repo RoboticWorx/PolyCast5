@@ -367,7 +367,7 @@ void infrared_utils_load_remotes_nvs(void)
     nvs_close(h);
 }
 
-void infrared_utils_save_signal_to_remote_nvs(size_t remote_idx, size_t sig_idx, ir_signal_t *sig, const char *name)
+esp_err_t infrared_utils_save_signal_to_remote_nvs(size_t remote_idx, size_t sig_idx, ir_signal_t *sig, const char *name)
 {
     nvs_handle_t h;
     
@@ -375,7 +375,7 @@ void infrared_utils_save_signal_to_remote_nvs(size_t remote_idx, size_t sig_idx,
     esp_err_t ret = nvs_open(IR_NS, NVS_READWRITE, &h);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to open NVS: %s", esp_err_to_name(ret));
-        return;
+        return ret;
     }
 
     // Format name key
@@ -386,10 +386,7 @@ void infrared_utils_save_signal_to_remote_nvs(size_t remote_idx, size_t sig_idx,
     ret = nvs_set_str(h, key, name);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to save signal name %zu for remote %zu: %s", sig_idx, remote_idx, esp_err_to_name(ret));
-    }
-
-    // Save signal blob (skip NULL signals, e.g. blob failed to load)
-    if (sig) {
+    } else if (sig) { // Save signal blob (skip NULL signals, e.g. blob failed to load); identical rewrites cost nothing
         // Format signal key
         snprintf(key, sizeof(key), IR_SIGNAL_BLOB_FMT, (int)remote_idx, (int)sig_idx);
         size_t blob_size = sizeof(ir_signal_t) + (sig->length * sizeof(rmt_symbol_word_t));
@@ -408,15 +405,40 @@ void infrared_utils_save_signal_to_remote_nvs(size_t remote_idx, size_t sig_idx,
     
     // Close NVS
     nvs_close(h);
+
+    return ret;
 }
 
-void infrared_utils_save_remote_nsig_nvs(size_t remote_idx) {
+void infrared_utils_erase_signal_nvs(size_t remote_idx, size_t sig_idx)
+{
+    nvs_handle_t h;
+
+    // Open NVS
+    if (nvs_open(IR_NS, NVS_READWRITE, &h) != ESP_OK) {
+        return;
+    }
+
+    // Erase name and blob (missing keys are fine)
+    char key[32];
+    snprintf(key, sizeof(key), IR_SIGNAL_NAME_FMT, (int)remote_idx, (int)sig_idx);
+    nvs_erase_key(h, key);
+    snprintf(key, sizeof(key), IR_SIGNAL_BLOB_FMT, (int)remote_idx, (int)sig_idx);
+    nvs_erase_key(h, key);
+
+    // Commit changes
+    nvs_commit(h);
+
+    // Close NVS
+    nvs_close(h);
+}
+
+esp_err_t infrared_utils_save_remote_nsig_nvs(size_t remote_idx) {
     nvs_handle_t h;
     
     // Open NVS
     esp_err_t ret = nvs_open(IR_NS, NVS_READWRITE, &h);
     if (ret != ESP_OK) {
-        return;
+        return ret;
     }
     
     // Format num_signals key
@@ -431,16 +453,18 @@ void infrared_utils_save_remote_nsig_nvs(size_t remote_idx) {
     
     // Close NVS
     nvs_close(h);
+
+    return ret;
 }
 
-void infrared_utils_save_remote_name_nvs(size_t remote_idx)
+esp_err_t infrared_utils_save_remote_name_nvs(size_t remote_idx, const char *name)
 {
     nvs_handle_t h;
     
     // Open NVS
     esp_err_t ret = nvs_open(IR_NS, NVS_READWRITE, &h);
     if (ret != ESP_OK) {
-        return;
+        return ret;
     }
     
     // Format remote name key
@@ -448,47 +472,98 @@ void infrared_utils_save_remote_name_nvs(size_t remote_idx)
     snprintf(key, sizeof(key), IR_REMOTE_NAME_FMT, (int)remote_idx);
     
     // Save name to NVS
-    ret = nvs_set_str(h, key, remotes[remote_idx].name);
+    ret = nvs_set_str(h, key, name);
     
     // Commit changes
     nvs_commit(h);
     
     // Close NVS
     nvs_close(h);
+
+    return ret;
 }
 
-void infrared_utils_save_all_remotes_nvs(void)
+esp_err_t infrared_utils_add_remote_nvs(size_t remote_idx, const char *name)
 {
     nvs_handle_t h;
     
     // Open NVS
     esp_err_t ret = nvs_open(IR_NS, NVS_READWRITE, &h);
     if (ret != ESP_OK) {
-        return;
+        return ret;
+    }
+
+    // Format remote keys
+    char name_key[32];
+    char nsig_key[32];
+    snprintf(name_key, sizeof(name_key), IR_REMOTE_NAME_FMT, (int)remote_idx);
+    snprintf(nsig_key, sizeof(nsig_key), IR_REMOTE_NSIG_FMT, (int)remote_idx);
+
+    // Name and count first, num_remotes last: until it lands the stored remotes are unchanged
+    ret = nvs_set_str(h, name_key, name);
+    if (ret == ESP_OK) {
+        ret = nvs_set_u32(h, nsig_key, 0);
+    }
+    if (ret == ESP_OK) {
+        ret = nvs_set_u8(h, IR_NUM_REMOTES_KEY, (uint8_t)(remote_idx + 1));
+    }
+
+    // Refused: drop what landed (nvs_commit can't roll back)
+    if (ret != ESP_OK) {
+        nvs_erase_key(h, name_key);
+        nvs_erase_key(h, nsig_key);
+    }
+
+    // Commit changes
+    nvs_commit(h);
+
+    // Close NVS
+    nvs_close(h);
+
+    return ret;
+}
+
+// Keep the first failure of a multi-key write
+static void ir_keep_first_err(esp_err_t *err, esp_err_t ret)
+{
+    if (*err == ESP_OK) {
+        *err = ret;
+    }
+}
+
+esp_err_t infrared_utils_save_all_remotes_nvs(void)
+{
+    nvs_handle_t h;
+
+    // Open NVS
+    esp_err_t ret = nvs_open(IR_NS, NVS_READWRITE, &h);
+    if (ret != ESP_OK) {
+        return ret;
     }
 
     // Erase everything
     nvs_erase_all(h);
     nvs_commit(h); // Save
 
-    // Save num_remotes
-    nvs_set_u8(h, IR_NUM_REMOTES_KEY, (uint8_t)num_remotes);
+    // Save num_remotes first: an interrupted rewrite still loads every remote written so far
+    ir_keep_first_err(&ret, nvs_set_u8(h, IR_NUM_REMOTES_KEY, (uint8_t)num_remotes));
 
+    // Erased data can't come back: keep writing what fits and report the first failure
     char key[32];
     for (size_t r = 0; r < num_remotes; r++) {
         // Format remote name key
         snprintf(key, sizeof(key), IR_REMOTE_NAME_FMT, (int)r);
-        nvs_set_str(h, key, remotes[r].name ? remotes[r].name : "REMOTE"); // Save (guard OOM NULL name)
+        ir_keep_first_err(&ret, nvs_set_str(h, key, remotes[r].name ? remotes[r].name : "REMOTE")); // Save (guard OOM NULL name)
 
-        // Format num_signals key
+        // Format num_signals key; before the signals, so an interrupted rewrite still loads the ones written
         snprintf(key, sizeof(key), IR_REMOTE_NSIG_FMT, (int)r);
-        nvs_set_u32(h, key, (uint32_t)remotes[r].num_signals); // Save
+        ir_keep_first_err(&ret, nvs_set_u32(h, key, (uint32_t)remotes[r].num_signals)); // Save
 
         // Save all signals
         for (size_t s = 0; s < remotes[r].num_signals; s++) {
             // Format signals name key
             snprintf(key, sizeof(key), IR_SIGNAL_NAME_FMT, (int)r, (int)s);
-            nvs_set_str(h, key, remotes[r].signal_names[s]); // Save
+            ir_keep_first_err(&ret, nvs_set_str(h, key, remotes[r].signal_names[s])); // Save
 
             // Format signals key
             snprintf(key, sizeof(key), IR_SIGNAL_BLOB_FMT, (int)r, (int)s);
@@ -497,7 +572,7 @@ void infrared_utils_save_all_remotes_nvs(void)
             ir_signal_t *sig = remotes[r].signals[s];
             if (!sig) continue; // Skip NULL signals
             size_t blob_size = sizeof(ir_signal_t) + (sig->length * sizeof(rmt_symbol_word_t));
-            nvs_set_blob(h, key, sig, blob_size); // Save
+            ir_keep_first_err(&ret, nvs_set_blob(h, key, sig, blob_size)); // Save
         }
     }
 
@@ -506,14 +581,16 @@ void infrared_utils_save_all_remotes_nvs(void)
     
     // Close NVS
     nvs_close(h);
+
+    return ret;
 }
 
-void infrared_utils_delete_signal_from_remote_nvs(size_t remote_idx, size_t sig_idx)
+esp_err_t infrared_utils_delete_signal_from_remote_nvs(size_t remote_idx, size_t sig_idx)
 {
     // Ensure valid signal
     if (remote_idx >= num_remotes || sig_idx >= remotes[remote_idx].num_signals) {
         ESP_LOGE(TAG, "Invalid delete: remote %zu, sig %zu", remote_idx, sig_idx);
-        return;
+        return ESP_ERR_INVALID_ARG;
     }
 
     // Free the signal and name from heap
@@ -555,7 +632,7 @@ void infrared_utils_delete_signal_from_remote_nvs(size_t remote_idx, size_t sig_
     // Open NVS
     esp_err_t ret = nvs_open(IR_NS, NVS_READWRITE, &h);
     if (ret != ESP_OK) {
-        return;
+        return ret;
     }
 
     char key[32];
@@ -567,23 +644,46 @@ void infrared_utils_delete_signal_from_remote_nvs(size_t remote_idx, size_t sig_
     snprintf(key, sizeof(key), IR_SIGNAL_BLOB_FMT, (int)remote_idx, (int)(old_ns - 1));
     nvs_erase_key(h, key);
 
-    // Rewrite current signals and names
-    for (size_t i = 0; i < remotes[remote_idx].num_signals; i++) {
+    // Rewrite the shifted signals and names (lower indexes are unchanged)
+    for (size_t i = sig_idx; i < remotes[remote_idx].num_signals; i++) {
         // Format and save name
         snprintf(key, sizeof(key), IR_SIGNAL_NAME_FMT, (int)remote_idx, (int)i);
-        nvs_set_str(h, key, remotes[remote_idx].signal_names[i]);
+        ir_keep_first_err(&ret, nvs_set_str(h, key, remotes[remote_idx].signal_names[i]));
 
         // Format and save signal
         snprintf(key, sizeof(key), IR_SIGNAL_BLOB_FMT, (int)remote_idx, (int)i);
         ir_signal_t *sig = remotes[remote_idx].signals[i];
         if (!sig) continue; // Skip NULL signals
         size_t blob_size = sizeof(ir_signal_t) + (sig->length * sizeof(rmt_symbol_word_t));
-        nvs_set_blob(h, key, sig, blob_size);
+        ir_keep_first_err(&ret, nvs_set_blob(h, key, sig, blob_size));
     }
 
     // Update num_signals
     snprintf(key, sizeof(key), IR_REMOTE_NSIG_FMT, (int)remote_idx); // Format key
-    nvs_set_u32(h, key, (uint32_t)remotes[remote_idx].num_signals); // Save
+    ir_keep_first_err(&ret, nvs_set_u32(h, key, (uint32_t)remotes[remote_idx].num_signals)); // Save
+
+    // A refused shift leaves mixed indexes: erase this remote's shifted slots, then rewrite them from RAM (smaller now, so it fits)
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Signal delete save failed (%s), rewriting remote %zu", esp_err_to_name(ret), remote_idx);
+        for (size_t i = sig_idx; i < old_ns - 1; i++) { // old_ns - 1 is already erased
+            snprintf(key, sizeof(key), IR_SIGNAL_NAME_FMT, (int)remote_idx, (int)i);
+            nvs_erase_key(h, key);
+            snprintf(key, sizeof(key), IR_SIGNAL_BLOB_FMT, (int)remote_idx, (int)i);
+            nvs_erase_key(h, key);
+        }
+        ret = ESP_OK;
+        for (size_t i = sig_idx; i < remotes[remote_idx].num_signals; i++) {
+            snprintf(key, sizeof(key), IR_SIGNAL_NAME_FMT, (int)remote_idx, (int)i);
+            ir_keep_first_err(&ret, nvs_set_str(h, key, remotes[remote_idx].signal_names[i]));
+            snprintf(key, sizeof(key), IR_SIGNAL_BLOB_FMT, (int)remote_idx, (int)i);
+            ir_signal_t *sig = remotes[remote_idx].signals[i];
+            if (!sig) continue; // Skip NULL signals
+            size_t blob_size = sizeof(ir_signal_t) + (sig->length * sizeof(rmt_symbol_word_t));
+            ir_keep_first_err(&ret, nvs_set_blob(h, key, sig, blob_size));
+        }
+        snprintf(key, sizeof(key), IR_REMOTE_NSIG_FMT, (int)remote_idx);
+        ir_keep_first_err(&ret, nvs_set_u32(h, key, (uint32_t)remotes[remote_idx].num_signals));
+    }
 
     // Commit changes
     nvs_commit(h);
@@ -594,14 +694,16 @@ void infrared_utils_delete_signal_from_remote_nvs(size_t remote_idx, size_t sig_
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Deleted signal %zu from remote %zu", sig_idx, remote_idx);
 #endif
+
+    return ret;
 }
 
-void infrared_utils_delete_remote_nvs(size_t remote_idx)
+esp_err_t infrared_utils_delete_remote_nvs(size_t remote_idx)
 {
     // Ensure valid
     if (remote_idx >= num_remotes) {
         ESP_LOGE(TAG, "Invalid remote delete: %zu", remote_idx);
-        return;
+        return ESP_ERR_INVALID_ARG;
     }
     
     // Free resources
@@ -632,7 +734,19 @@ void infrared_utils_delete_remote_nvs(size_t remote_idx)
     }
 
     // Resave to NVS
-    infrared_utils_save_all_remotes_nvs();
+    return infrared_utils_save_all_remotes_nvs();
+}
+
+bool infrared_utils_nvs_has_room(size_t entries)
+{
+    nvs_stats_t st;
+
+    // A failed query lets the write itself decide
+    if (nvs_get_stats(NULL, &st) != ESP_OK) {
+        return true;
+    }
+
+    return st.available_entries >= entries;
 }
 
 void infrared_utils_clear_nvs(void)

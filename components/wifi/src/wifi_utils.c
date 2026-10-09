@@ -18,6 +18,7 @@
 #include "esp_http_client.h"
 #include "esp_crt_bundle.h"
 #include "cJSON.h"
+#include "nvs.h"
 
 #include "wifi_utils.h"
 #include "wifi_autoconnect.h"
@@ -293,6 +294,77 @@ static const char* iana_to_posix(const char *iana)
     return NULL;
 }
 
+#define TZ_NVS_NS "time_zone" // Not SRS_NS: "forget notebooks" wipes that
+#define TZ_NVS_KEY "posix"
+#define TZ_POSIX_MAX 64
+
+static volatile bool s_tz_set = false; // A resolved TZ (provider or NVS) is applied
+
+// Apply a resolved POSIX TZ and persist it so the next boot applies it before anything reads local time
+static void tz_commit(const char *posix)
+{
+    setenv("TZ", posix, 1);
+    tzset();
+    s_tz_set = true;
+
+    nvs_handle_t h;
+    if (nvs_open(TZ_NVS_NS, NVS_READWRITE, &h) != ESP_OK) {
+        ESP_LOGW(TAG, "tz_commit: nvs_open failed");
+        return;
+    }
+
+    // Write only on change: nvs_set_str hits flash immediately
+    char stored[TZ_POSIX_MAX];
+    size_t len = sizeof(stored);
+    if (nvs_get_str(h, TZ_NVS_KEY, stored, &len) != ESP_OK || strcmp(stored, posix) != 0) {
+        if (nvs_set_str(h, TZ_NVS_KEY, posix) != ESP_OK) {
+            ESP_LOGW(TAG, "tz_commit: nvs_set_str failed");
+        }
+    }
+    nvs_close(h);
+}
+
+// Drop a possibly stale TZ so SRS looks it up again, also after a soft reboot (TZ env left as is)
+static void tz_forget(void)
+{
+    s_tz_set = false;
+
+    nvs_handle_t h;
+    if (nvs_open(TZ_NVS_NS, NVS_READWRITE, &h) != ESP_OK) {
+        ESP_LOGW(TAG, "tz_forget: nvs_open failed");
+        return;
+    }
+    (void)nvs_erase_key(h, TZ_NVS_KEY); // ESP_ERR_NVS_NOT_FOUND if never saved
+    nvs_close(h);
+}
+
+void wifi_utils_tz_restore(void)
+{
+    nvs_handle_t h;
+    if (nvs_open(TZ_NVS_NS, NVS_READONLY, &h) != ESP_OK) {
+        return; // Never resolved on this unit
+    }
+
+    char posix[TZ_POSIX_MAX];
+    size_t len = sizeof(posix);
+    esp_err_t err = nvs_get_str(h, TZ_NVS_KEY, posix, &len);
+    nvs_close(h);
+
+    // Missing, oversized or malformed (newlib reads a bad TZ as UTC): stay unresolved so SRS looks it up
+    if (err != ESP_OK || !isalpha((unsigned char)posix[0])) {
+        return;
+    }
+
+    setenv("TZ", posix, 1);
+    tzset();
+    s_tz_set = true;
+}
+
+bool wifi_utils_tz_is_set(void)
+{
+    return s_tz_set;
+}
+
 // Apply a fixed-offset POSIX TZ built from API offsets (correct "now", no future DST rules)
 static void tz_apply_fixed_posix_from_offsets(int raw_offset_s, int dst_offset_s, bool dst_now)
 {
@@ -322,11 +394,8 @@ static void tz_apply_fixed_posix_from_offsets(int raw_offset_s, int dst_offset_s
         snprintf(tzbuf, sizeof(tzbuf), "UTC%+d:%02d", sign * h, m);
     }
 
-    // Set the TZ environment variable
-    setenv("TZ", tzbuf, 1);
-
-    // Apply the TZ immediately
-    tzset();
+    // Apply and persist the TZ
+    tz_commit(tzbuf);
 
     // Log the applied fixed-offset TZ
 #ifdef POLYCAST5_DEBUG
@@ -502,14 +571,31 @@ static void strtrim_inplace(char *s)
     *end = '\0';
 }
 
-// Fetch IANA timezone over HTTP, map to POSIX or apply fixed-offset; returns ESP_OK on success
+// True if s is shaped like an IANA ID ("Area/City"); a filter/block page is not a provider answer
+static bool looks_like_iana(const char *s)
+{
+    if (strlen(s) >= TZ_POSIX_MAX || !isalpha((unsigned char)s[0]) || !strchr(s, '/')) {
+        return false;
+    }
+    for (const char *p = s; *p; ++p) {
+        if (!isalnum((unsigned char)*p) && !strchr("_/+-", *p)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Fetch IANA timezone over HTTP, map to POSIX or apply fixed-offset; ESP_ERR_NOT_SUPPORTED if a provider named a zone we can't apply
 esp_err_t wifi_utils_apply_timezone_auto(void)
 {
     // Response body buffer
     char *body = NULL;
 
-    // Default result is failure (caller may set TZ=UTC0 on failure)
+    // Default result is failure (caller keeps a TZ saved earlier, never a guess)
     esp_err_t ret = ESP_FAIL;
+
+    // A provider answered with a zone we can't apply (a saved TZ may be stale)
+    bool unmapped = false;
 
     // Try #1: worldtimeapi.org (JSON: timezone + raw_offset/dst_offset/dst)
     if (http_get_body_retry("http://worldtimeapi.org/api/ip", &body, NULL)) {
@@ -538,11 +624,8 @@ esp_err_t wifi_utils_apply_timezone_auto(void)
 
                 // If mapping found, apply it
                 if (posix) {
-                    // Set POSIX TZ
-                    setenv("TZ", posix, 1);
-
-                    // Apply immediately
-                    tzset();
+                    // Apply and persist POSIX TZ
+                    tz_commit(posix);
 
                     // Log success
 #ifdef POLYCAST5_DEBUG
@@ -560,55 +643,8 @@ esp_err_t wifi_utils_apply_timezone_auto(void)
                     // Mark success
                     ret = ESP_OK;
                 }
-            }
-
-            // Free JSON object
-            cJSON_Delete(root);
-
-            // If success, return immediately
-            if (ret == ESP_OK) {
-                return ret;
-            }
-        }
-    }
-
-    // Try #2: ip-api.com (JSON with "timezone" only; no offsets)
-    if (http_get_body_retry("http://ip-api.com/json", &body, NULL)) {
-        // Parse JSON
-        cJSON *root = cJSON_Parse(body);
-
-        // Free body buffer
-        free(body);
-        body = NULL;
-
-        // If JSON parsed
-        if (root) {
-            // Extract "timezone" (IANA)
-            const cJSON *tz = cJSON_GetObjectItemCaseSensitive(root, "timezone");
-
-            // Pull C string if present
-            const char *iana = (cJSON_IsString(tz) && tz->valuestring) ? tz->valuestring : NULL;
-
-            // If IANA present
-            if (iana) {
-                // Map to POSIX (table only; no offsets on this endpoint)
-                const char *posix = iana_to_posix(iana);
-
-                // If mapped, apply and succeed
-                if (posix) {
-                    // Set POSIX TZ
-                    setenv("TZ", posix, 1);
-
-                    // Apply immediately
-                    tzset();
-
-                    // Log success (ip-api path)
-#ifdef POLYCAST5_DEBUG
-                    ESP_LOGI("AUTO_TZ", "Applied TZ: IANA='%s' -> POSIX='%s' (ip-api)", iana, posix);
-#endif
-
-                    // Mark success
-                    ret = ESP_OK;
+                else {
+                    unmapped = true;
                 }
             }
 
@@ -622,7 +658,65 @@ esp_err_t wifi_utils_apply_timezone_auto(void)
         }
     }
 
-    // Try #3: ipapi.co/timezone (plain text IANA string)
+    // Try #2: ip-api.com (JSON: timezone + offset, the current UTC offset in seconds incl. DST)
+    if (http_get_body_retry("http://ip-api.com/json/?fields=status,timezone,offset", &body, NULL)) {
+        // Parse JSON
+        cJSON *root = cJSON_Parse(body);
+
+        // Free body buffer
+        free(body);
+        body = NULL;
+
+        // If JSON parsed
+        if (root) {
+            // Extract "timezone" (IANA) and "offset"
+            const cJSON *tz = cJSON_GetObjectItemCaseSensitive(root, "timezone");
+            const cJSON *offset = cJSON_GetObjectItemCaseSensitive(root, "offset");
+
+            // Pull C string if present
+            const char *iana = (cJSON_IsString(tz) && tz->valuestring) ? tz->valuestring : NULL;
+
+            // If IANA present
+            if (iana) {
+                // Map to POSIX
+                const char *posix = iana_to_posix(iana);
+
+                // If mapped, apply and succeed
+                if (posix) {
+                    // Apply and persist POSIX TZ
+                    tz_commit(posix);
+
+                    // Log success (ip-api path)
+#ifdef POLYCAST5_DEBUG
+                    ESP_LOGI("AUTO_TZ", "Applied TZ: IANA='%s' -> POSIX='%s' (ip-api)", iana, posix);
+#endif
+
+                    // Mark success
+                    ret = ESP_OK;
+                }
+                // If unmapped but we have the offset, apply fixed-offset POSIX
+                else if (cJSON_IsNumber(offset)) {
+                    tz_apply_fixed_posix_from_offsets(offset->valueint, 0, false);
+
+                    // Mark success
+                    ret = ESP_OK;
+                }
+                else {
+                    unmapped = true;
+                }
+            }
+
+            // Free JSON object
+            cJSON_Delete(root);
+
+            // If success, return immediately
+            if (ret == ESP_OK) {
+                return ret;
+            }
+        }
+    }
+
+    // Try #3: ipapi.co/timezone (plain text IANA string, no offset: unmapped names fail)
     if (http_get_body_retry("http://ipapi.co/timezone", &body, NULL)) {
         // Trim whitespace/newlines
         strtrim_inplace(body);
@@ -634,11 +728,8 @@ esp_err_t wifi_utils_apply_timezone_auto(void)
 
             // If mapped, apply and succeed
             if (posix) {
-                // Set POSIX TZ
-                setenv("TZ", posix, 1);
-
-                // Apply immediately
-                tzset();
+                // Apply and persist POSIX TZ
+                tz_commit(posix);
 
                 // Log success (ipapi path)
 #ifdef POLYCAST5_DEBUG
@@ -647,6 +738,9 @@ esp_err_t wifi_utils_apply_timezone_auto(void)
 
                 // Mark success
                 ret = ESP_OK;
+            }
+            else if (looks_like_iana(body)) {
+                unmapped = true;
             }
         }
 
@@ -660,8 +754,8 @@ esp_err_t wifi_utils_apply_timezone_auto(void)
         }
     }
 
-    // All providers failed or we couldn't map; let caller fall back to UTC0
-    return ESP_FAIL;
+    // All providers failed or we couldn't map
+    return unmapped ? ESP_ERR_NOT_SUPPORTED : ESP_FAIL;
 }
 
 void wifi_utils_get_current_date_time(void)
@@ -701,13 +795,20 @@ void wifi_utils_get_current_date_time(void)
     }
     
     // Get local time zone over http
-    if (wifi_utils_apply_timezone_auto() != ESP_OK) {
-        // Fallback
-        //setenv("TZ", "UTC0", 1); // UTC
-        setenv("TZ", "EST5EDT,M3.2.0/2,M11.1.0/2", 1); // Fallback to EST
-        tzset();
+    esp_err_t tz_err = wifi_utils_apply_timezone_auto();
+    if (tz_err != ESP_OK) {
+        // A provider named a zone we can't apply: the saved one may be stale
+        if (tz_err == ESP_ERR_NOT_SUPPORTED && s_tz_set) {
+            tz_forget();
+        }
         
-        ESP_LOGE(TAG, "wifi_utils_apply_timezone_auto FAILED: Falling back to EST (EST5EDT,M3.2.0/2,M11.1.0/2)");
+        // Never guess a zone: keep a saved one only if no provider answered, else fail so SRS retries on its next entry
+        if (!s_tz_set) {
+            ESP_LOGE(TAG, "wifi_utils_apply_timezone_auto FAILED: no time zone resolved");
+            xEventGroupSetBits(xWifiEventGroup, WIFI_DATE_TIME_FAILED_BIT); // Tell waiters it's over
+            return;
+        }
+        ESP_LOGW(TAG, "wifi_utils_apply_timezone_auto FAILED: keeping the saved time zone");
     }
     
     char strftime_buf[64];
@@ -762,7 +863,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 #endif
         wifi_utils_radio_stop();
 
-        // Notify we disconnected
+        // Notify we disconnected (a pending list-full notice stays: the network is still unsaved)
         xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_MQTT_CONNECTED_BIT | WIFI_CONNECTING_BIT);
 
         // Stop any active ARP/NDP spoof
@@ -790,8 +891,15 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
         sta_gw = e->ip_info.gw;
         sta_gw_valid = true;
 
-        // Notify we connected
-        xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTED_BIT);
+        // Save first so a full saved list is flagged together with the connect
+        esp_err_t save_err = wifi_autoconnect_remember_current_network();
+
+        // Notify we connected (a pending list-full notice clears only when its own network saves)
+        if (save_err == ESP_ERR_NO_MEM) {
+            xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_SAVE_LIST_FULL_BIT);
+        } else {
+            xEventGroupSetBits(xWifiEventGroup, WIFI_CONNECTED_BIT);
+        }
         xEventGroupClearBits(xWifiEventGroup, WIFI_CONNECTING_BIT | WIFI_CONNECTING_FAILED_BIT); // No longer trying; an earlier give-up is stale
 
         // Connected icon
@@ -800,8 +908,6 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
         // RGB indicator
         uint8_t rgb_state = RGB_SET_GREEN;
         xQueueSend(xLEDQueue, &rgb_state, portMAX_DELAY);
-
-        wifi_autoconnect_remember_current_network();
 
         // If WIFI_CHECK_OTA_ON_CONN_BIT is set, check for OTA firmware update on this connection
         if (xEventGroupGetBits(xWifiEventGroup) & WIFI_CHECK_OTA_ON_CONN_BIT) {
@@ -956,7 +1062,9 @@ esp_err_t wifi_utils_radio_stop(void)
     
     xSemaphoreGive(xWifiCanSleepSemaphore);
 
+    xSemaphoreTake(xWifiDataMutex, portMAX_DELAY);
     memset(&wifi_data, 0, sizeof(wifi_data)); // Zero out wifi_data if initialized
+    xSemaphoreGive(xWifiDataMutex);
     
     return err;
 }
@@ -1512,14 +1620,73 @@ static void wifi_sniffer_data_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 
     int8_t rssi = pkt->rx_ctrl.rssi;
     
-    // Check uniqueness
+    // Runs in the Wi-Fi RX path: never block. Try-lock and drop on contention so the LCD
+    // can snapshot wifi_data without the list being mutated mid-qsort (try-lock, not a timed window).
+    if (xSemaphoreTake(xWifiDataMutex, 0) != pdTRUE) {
+        return;
+    }
+
+    // Check uniqueness (caller holds xWifiDataMutex)
     record_client(sa, rssi);
 
-    wifi_data.rate = pkt->rx_ctrl.rate;
+    wifi_data.rx_rate = pkt->rx_ctrl.rate;
+    wifi_data.rx_bb_format = pkt->rx_ctrl.cur_bb_format;
     wifi_data.channel = pkt->rx_ctrl.channel;
+
+    xSemaphoreGive(xWifiDataMutex);
+
+    // Nudge the LCD that new data is available; it copies under the lock before sorting
     wifi_data_t *p = &wifi_data;
     if (xQueueSend(xWifiDataQueue, &p, 0) != pdTRUE) {
         //ESP_LOGE(TAG, "xWifiDataQueue send failed");
+    }
+}
+
+uint16_t wifi_utils_rx_rate_mbps_x2(uint8_t bb_format, uint8_t rate)
+{
+    // Legacy only: HT/VHT/HE carry an L-SIG rate code (usually 6 Mbps) that isn't the real rate
+    switch (bb_format) {
+        case RX_BB_FORMAT_11B: // 11b DSSS/CCK rate code
+            switch (rate) {
+                case 0x00: return 2;  // 1 Mbps long preamble
+                case 0x01: return 4;  // 2 Mbps long preamble
+                case 0x02: return 11; // 5.5 Mbps long preamble
+                case 0x03: return 22; // 11 Mbps long preamble
+                case 0x05: return 4;  // 2 Mbps short preamble
+                case 0x06: return 11; // 5.5 Mbps short preamble
+                case 0x07: return 22; // 11 Mbps short preamble
+                default:   return 0;
+            }
+        case RX_BB_FORMAT_11G: // == RX_BB_FORMAT_11A: OFDM L-SIG RATE field
+            switch (rate) {
+                case 0x08: return 96;  // 48 Mbps
+                case 0x09: return 48;  // 24 Mbps
+                case 0x0A: return 24;  // 12 Mbps
+                case 0x0B: return 12;  // 6 Mbps
+                case 0x0C: return 108; // 54 Mbps
+                case 0x0D: return 72;  // 36 Mbps
+                case 0x0E: return 36;  // 18 Mbps
+                case 0x0F: return 18;  // 9 Mbps
+                default:   return 0;
+            }
+        default:
+            return 0;
+    }
+}
+
+const char *wifi_utils_rx_phy_str(uint8_t bb_format)
+{
+    switch (bb_format) {
+        case RX_BB_FORMAT_11B:     return "11b";
+        case RX_BB_FORMAT_11G:     return "11g"; // == RX_BB_FORMAT_11A
+        case RX_BB_FORMAT_HT:      return "11n";
+        case RX_BB_FORMAT_VHT:
+        case RX_BB_FORMAT_VHT_MU:  return "11ac";
+        case RX_BB_FORMAT_HE_SU:
+        case RX_BB_FORMAT_HE_MU:
+        case RX_BB_FORMAT_HE_ERSU:
+        case RX_BB_FORMAT_HE_TB:   return "11ax";
+        default:                   return "-";
     }
 }
 
@@ -1669,7 +1836,11 @@ void wifi_utils_init_promiscuous(wifi_sniff_t *network)
         err = esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_beacon_cb); // Sniff beacon frames
     } else if (network->mask == WIFI_PROMIS_FILTER_MASK_DATA) {
         err = esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_data_cb); // Sniff data frames
+        // The cb is already registered and promiscuous mode may still be on from the beacon
+        // session, so clear under the lock to avoid racing a live callback
+        xSemaphoreTake(xWifiDataMutex, portMAX_DELAY);
         memset(&wifi_data, 0, sizeof(wifi_data)); // Reset counts so chart reflects this session
+        xSemaphoreGive(xWifiDataMutex);
     } else if (network->mask == WIFI_PROMIS_FILTER_MASK_RAW_USEFUL) {
         err = esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_raw_cb); // Sniff everything
     } else {

@@ -183,8 +183,8 @@ static void ota_task(void *_)
 #endif
             }
 
-            // Send percentage to LCD
-            xQueueSend(xWifiOtaPctQueue, &pct, 0);
+            // Send percentage to LCD (depth 1: LCD reads the newest %)
+            xQueueOverwrite(xWifiOtaPctQueue, &pct);
         } else { // Fallback when content length is unknown: every ~64KB
             if (read - last >= 64 * 1024) {
                 last = read;
@@ -220,7 +220,7 @@ static void ota_task(void *_)
 
         int done = -1;
         // Send OTA success to LCD
-        xQueueSend(xWifiOtaPctQueue, &done, portMAX_DELAY);
+        xQueueOverwrite(xWifiOtaPctQueue, &done);
 
         vTaskDelay(pdMS_TO_TICKS(1000));
         esp_restart(); // Restart
@@ -233,8 +233,8 @@ static void ota_task(void *_)
     ESP_LOGE(TAG, "OTA error! Restarting: %s", esp_err_to_name(err));
 
     int fail = -2;
-    // Send OTA failed to LCD
-    xQueueSend(xWifiOtaPctQueue, &fail, pdMS_TO_TICKS(100));
+    // Send OTA failed to LCD (replaces any unread %, so "Update failed" always shows)
+    xQueueOverwrite(xWifiOtaPctQueue, &fail);
 
     vTaskDelay(pdMS_TO_TICKS(2000));
     esp_restart(); // Restart

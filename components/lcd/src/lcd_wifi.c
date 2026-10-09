@@ -376,6 +376,10 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
 			lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
             
+            if (lbl_wait) { // Reuse any leftover label instead of orphaning it
+                lv_obj_delete(lbl_wait);
+                lbl_wait = NULL;
+            }
             lbl_wait = lv_label_create(ACTIVE_SCR);
             lcd_format_label(lbl_wait, "Scanning for networks...\nPlease wait, then select\na network to monitor.", user_secondary_color,
                     &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
@@ -446,8 +450,14 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
 			// Stop loading animation
 			lcd_anim_loading_stop();
 
-            lv_obj_delete(lbl_wait);
-            lbl_wait = NULL;
+            if (lbl_wait) {
+                lv_obj_delete(lbl_wait);
+                lbl_wait = NULL;
+            }
+            if (lbl_option) { // Results can arrive before DOWN; the select exits never delete it
+                lv_obj_delete(lbl_option);
+                lbl_option = NULL;
+            }
             scanning = false;
             scanned = true;
         }
@@ -501,8 +511,10 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
         }
         
         if (!scanning) {
-            // Wait label
-            lbl_wait = lv_label_create(ACTIVE_SCR);
+            // Wait label: reuse the existing one (e.g. "No networks found") so a retry doesn't orphan it
+            if (!lbl_wait) {
+                lbl_wait = lv_label_create(ACTIVE_SCR);
+            }
             lcd_format_label(lbl_wait, "Scanning for networks...", user_secondary_color,
                     &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, -10);
             
@@ -638,6 +650,10 @@ void lcd_wifi_scan_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wif
         if (lbl_option) { // Delete if exists
             lv_obj_delete(lbl_option);
             lbl_option = NULL;
+        }
+        if (lbl_wait) { // Delete leftover "No networks found" label so it doesn't leak onto WIFI_PAGE
+            lv_obj_delete(lbl_wait);
+            lbl_wait = NULL;
         }
 #ifdef POLYCAST5_CHECK_OTA_ON_CONN
         // Check for OTA on connect
@@ -2109,6 +2125,8 @@ void lcd_wifi_get_password(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t 
         ti.arrow_bot = ui_menu->arrow_bot;
         ti.arrow_left = ui_menu->arrow_left;
         ti.arrow_right = ui_menu->arrow_right;
+        ti.battery_txt = ui_menu->lbl_battery_txt;
+        ti.battery_icon = ui_menu->lbl_battery_icon;
         lcd_text_input_start(&ti);
     }
 
@@ -2647,18 +2665,41 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
     }
 
     // When new data received
-    wifi_data_t *wifi_data;
-    if (xQueueReceive(xWifiDataQueue, &wifi_data, 0) == pdTRUE) {
-        // Update top
+    // Copy the live global under the lock, then sort/render our own copy so the sniffer
+    // callback never mutates the array mid-qsort. Static/PSRAM: ~1.2 KB is too big for the stack.
+    POLYCAST5_USE_PSRAM_BSS static wifi_data_t snap;
+    bool have_frame = false;
+    wifi_data_t *shared;
+    if (xQueueReceive(xWifiDataQueue, &shared, 0) == pdTRUE) {
+        xSemaphoreTake(xWifiDataMutex, portMAX_DELAY);
+        memcpy(&snap, shared, sizeof(snap));
+        xSemaphoreGive(xWifiDataMutex);
+        have_frame = (snap.client_count > 0); // Stale pointer to a reset snapshot: zeroed fields would decode as 11b 1 Mbps
+    }
+
+    if (have_frame) {
+        // Update top: show Mbps for legacy frames only, else the PHY tag (rx_ctrl.rate isn't Mbps for HT/VHT/HE)
         char top_buf[64];
-        snprintf(top_buf, sizeof(top_buf), "%" PRIu32 " users on Ch%" PRIu32 "@%" PRIu32 "Mbps\n", wifi_data->client_count, wifi_data->channel, wifi_data->rate);
+        uint16_t rate_x2 = wifi_utils_rx_rate_mbps_x2(snap.rx_bb_format, snap.rx_rate);
+        if (rate_x2 != 0) {
+            if (rate_x2 & 1) {
+                snprintf(top_buf, sizeof(top_buf), "%" PRIu32 " users on Ch%" PRIu32 "@%u.5Mbps\n",
+                        snap.client_count, snap.channel, (unsigned)(rate_x2 / 2));
+            } else {
+                snprintf(top_buf, sizeof(top_buf), "%" PRIu32 " users on Ch%" PRIu32 "@%uMbps\n",
+                        snap.client_count, snap.channel, (unsigned)(rate_x2 / 2));
+            }
+        } else {
+            snprintf(top_buf, sizeof(top_buf), "%" PRIu32 " users on Ch%" PRIu32 " %s\n",
+                    snap.client_count, snap.channel, wifi_utils_rx_phy_str(snap.rx_bb_format));
+        }
         lv_label_set_text(lbl_clients, top_buf);
         
         // Sort by packet count
-        qsort(wifi_data->clients, wifi_data->client_count, sizeof(wifi_data->clients[0]), cmp_pkt_count);
+        qsort(snap.clients, snap.client_count, sizeof(snap.clients[0]), cmp_pkt_count);
 
         // Rebuild chart
-        uint32_t bars = MIN(wifi_data->client_count, MAX_BARS); // Cap at MAX_BARS
+        uint32_t bars = MIN(snap.client_count, MAX_BARS); // Cap at MAX_BARS
         
         // Resize the chart’s internal point buffer so you never draw empty slots
         lv_chart_set_point_count(chart, bars);
@@ -2666,8 +2707,8 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
         // Compute max count among displayed bars for range scaling
         uint32_t max_count = 1;
         for (uint32_t i = 0; i < bars; ++i) {
-            if (wifi_data->clients[i].pkt_count > max_count) {
-                max_count = wifi_data->clients[i].pkt_count;
+            if (snap.clients[i].pkt_count > max_count) {
+                max_count = snap.clients[i].pkt_count;
             }
         }
 
@@ -2683,7 +2724,7 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
 
         // Copy each client's packet count into the array (sorted)
         for (uint32_t i = 0; i < bars; ++i) {
-            uint32_t c = wifi_data->clients[i].pkt_count;
+            uint32_t c = snap.clients[i].pkt_count;
             ya[i] = (c > (uint32_t)INT32_MAX) ? INT32_MAX : (int32_t)c;
         }
 
@@ -2697,18 +2738,18 @@ void lcd_wifi_data_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
         size_t off = 0;
         off += snprintf(buf, sizeof(buf), "Unique users (MACs):\n");
 
-        for (uint32_t i = 0; i < wifi_data->client_count && off < sizeof(buf); ++i) {
-            const uint8_t *m = wifi_data->clients[i].mac;
-            if (wifi_data->clients[i].pkt_count > 1) {
+        for (uint32_t i = 0; i < snap.client_count && off < sizeof(buf); ++i) {
+            const uint8_t *m = snap.clients[i].mac;
+            if (snap.clients[i].pkt_count > 1) {
                 off += snprintf(buf + off, sizeof(buf) - off,
                         "%02X:%02X:%02X:%02X:%02X:%02X: %" PRIu32 "pkts\n",
                         m[0], m[1], m[2], m[3], m[4], m[5],
-                        wifi_data->clients[i].pkt_count);
+                        snap.clients[i].pkt_count);
             } else {
                 off += snprintf(buf + off, sizeof(buf) - off,
                         "%02X:%02X:%02X:%02X:%02X:%02X: %" PRIu32 "pkt\n",
                         m[0], m[1], m[2], m[3], m[4], m[5],
-                        wifi_data->clients[i].pkt_count);
+                        snap.clients[i].pkt_count);
             }
         }
         lv_label_set_text(lbl_info, buf);
@@ -2884,6 +2925,8 @@ void lcd_wifi_create_custom_name(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_m
         ti.arrow_bot = ui_menu->arrow_bot;
         ti.arrow_left = ui_menu->arrow_left;
         ti.arrow_right = ui_menu->arrow_right;
+        ti.battery_txt = ui_menu->lbl_battery_txt;
+        ti.battery_icon = ui_menu->lbl_battery_icon;
         lcd_text_input_start(&ti);
     }
 
@@ -2989,6 +3032,24 @@ static void hide_wifi_send_page(wifi_menu_t *wifi_menu)
     lv_obj_add_flag(wifi_menu->wifi_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
 }
 
+// Send page edge detector, resynced on entry so the label and send gate match the live bits
+static bool send_page_mqtt_connected = false;
+static EventBits_t send_page_last_bits = 0;
+
+void lcd_wifi_send_page_enter(wifi_menu_t *wifi_menu)
+{
+    // An ack that landed while the page was closed isn't this visit's
+    xEventGroupClearBits(xWifiEventGroup, WIFI_MQTT_SUCCESS_BIT);
+
+    // SUCCESS stays masked so an ack racing the clear still edges
+    send_page_last_bits = xEventGroupGetBits(xWifiEventGroup) & ~WIFI_MQTT_SUCCESS_BIT;
+    send_page_mqtt_connected = (send_page_last_bits & WIFI_MQTT_CONNECTED_BIT) != 0;
+
+    // That ack would have restored the ready text, so drop a stale "Sending..." here
+    lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_ins,
+            send_page_mqtt_connected ? MQTT_READY_TXT : MQTT_CONNECTING_TXT);
+}
+
 static void prompt_name_or_del(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
 {
     lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
@@ -3037,6 +3098,8 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, wifi_menu_t *wifi_menu)
             lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_edit, LV_OBJ_FLAG_HIDDEN);
             lv_obj_remove_flag(wifi_menu->wifi_submenu.arrow_top, LV_OBJ_FLAG_HIDDEN);
             lv_obj_remove_flag(wifi_menu->wifi_submenu.arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+            lcd_wifi_send_page_enter(wifi_menu);
             
             // Switch pages
             ui_menu->page = WIFI_SEND_PAGE;
@@ -3147,25 +3210,23 @@ void lcd_wifi_send_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
     
     // Define statics
     static bool three_dots = false;
-    static bool mqtt_connected = false;
     static uint32_t select_hold = 0; // SELECT hold-to-repeat (+3)
     
     // Update labels on status
-    static EventBits_t last_wifi_event_bits = {0};
     EventBits_t wifi_event_bits = xEventGroupGetBits(xWifiEventGroup);
-    if (wifi_event_bits != last_wifi_event_bits) { // Only act on changes
+    if (wifi_event_bits != send_page_last_bits) { // Only act on changes
         // If Wi-Fi MQTT connected bit transitioned 0 -> 1
-        if ((wifi_event_bits & WIFI_MQTT_CONNECTED_BIT) && !(last_wifi_event_bits & WIFI_MQTT_CONNECTED_BIT)) {
+        if ((wifi_event_bits & WIFI_MQTT_CONNECTED_BIT) && !(send_page_last_bits & WIFI_MQTT_CONNECTED_BIT)) {
             lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_ins, MQTT_READY_TXT);
-            mqtt_connected = true;
+            send_page_mqtt_connected = true;
         }
         // If Wi-Fi MQTT connected bit transitioned 1 -> 0
-        if ((last_wifi_event_bits & WIFI_MQTT_CONNECTED_BIT) && !(wifi_event_bits & WIFI_MQTT_CONNECTED_BIT)) {
+        if ((send_page_last_bits & WIFI_MQTT_CONNECTED_BIT) && !(wifi_event_bits & WIFI_MQTT_CONNECTED_BIT)) {
             lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_ins, MQTT_CONNECTING_TXT);
-            mqtt_connected = false;
+            send_page_mqtt_connected = false;
         }
         // If Wi-Fi MQTT success bit transitioned 0 -> 1
-        if ((wifi_event_bits & WIFI_MQTT_SUCCESS_BIT) && !(last_wifi_event_bits & WIFI_MQTT_SUCCESS_BIT)) {
+        if ((wifi_event_bits & WIFI_MQTT_SUCCESS_BIT) && !(send_page_last_bits & WIFI_MQTT_SUCCESS_BIT)) {
             lv_label_set_text(wifi_menu->wifi_submenu.lbl_receipt, LV_SYMBOL_OK);
             lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
             
@@ -3173,9 +3234,10 @@ void lcd_wifi_send_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
             
             // Reset for next time
             xEventGroupClearBits(xWifiEventGroup, WIFI_MQTT_SUCCESS_BIT);
+            wifi_event_bits &= ~WIFI_MQTT_SUCCESS_BIT; // So the next ack edges even if it lands next tick
         }
         
-        last_wifi_event_bits = wifi_event_bits;
+        send_page_last_bits = wifi_event_bits;
     }
     
     // Holding SELECT keeps stepping the command by 3
@@ -3193,7 +3255,7 @@ void lcd_wifi_send_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wi
         }
         lv_obj_remove_flag(wifi_menu->wifi_submenu.lbl_receipt, LV_OBJ_FLAG_HIDDEN);
         
-        if (mqtt_connected) {
+        if (send_page_mqtt_connected) {
             lv_label_set_text(wifi_menu->wifi_submenu.lbl_send_ins, MQTT_SENDING_TXT);
             
             wifi_mqtt_t wifi_mqtt;
@@ -3712,7 +3774,7 @@ void lcd_wifi_dump_wifi_topic_nvs(void)
 
 /* ---- Manage saved Wi-Fi networks (forget) ---- */
 
-#define MANAGE_NET_MAX 20 // Must mirror MAX_KNOWN_NETWORKS in wifi_autoconnect.c
+#define MANAGE_NET_MAX WIFI_AUTOCONNECT_MAX_KNOWN
 
 static lv_obj_t *manage_net_list = NULL;
 static lv_obj_t *manage_net_empty_lbl = NULL;
@@ -3977,6 +4039,10 @@ void lcd_wifi_network_info_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_men
 
         if (forgetting_current) {
             xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+        } else if (ferr == ESP_OK && prev.ssid[0] != '\0' && (xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT) &&
+                !wifi_autoconnect_is_known(prev.ssid)) {
+            // The freed slot saves the live network a full list turned away (also drops its notice)
+            (void)wifi_autoconnect_remember_current_network();
         }
 
         lcd_wifi_network_info_teardown();

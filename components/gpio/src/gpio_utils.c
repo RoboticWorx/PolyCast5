@@ -29,8 +29,14 @@
 #define ADC_CH ADC_CHANNEL_4
 #define NUM_ADC_SAMPLES 16384
 
-volatile int16_t rbg_blink_period_ms = 25; // Default rgb period
-volatile int16_t rgb_blink_total_ms = 125; // Default rgb total
+volatile int16_t rbg_blink_period_ms = 20; // Default rgb half-period (40 ms blink); never 0, xTimerCreate asserts
+volatile int16_t rgb_blink_total_ms = 120; // Default rgb total
+
+// UI timings must land on whole ticks or several shown values run the same
+_Static_assert(TIMING_STEP_MS % portTICK_PERIOD_MS == 0, "TIMING_STEP_MS must be a whole number of ticks");
+_Static_assert(HAPTIC_MIN_MS % TIMING_STEP_MS == 0 && HAPTIC_MAX_MS % TIMING_STEP_MS == 0, "Haptic range off the timing grid");
+_Static_assert(RGB_PERIOD_MIN_MS % TIMING_STEP_MS == 0 && RGB_PERIOD_MAX_MS % TIMING_STEP_MS == 0, "RGB period range off the timing grid");
+_Static_assert(RGB_TOTAL_MIN_MS % TIMING_STEP_MS == 0 && RGB_TOTAL_MAX_MS % TIMING_STEP_MS == 0, "RGB total range off the timing grid");
 
 static TimerHandle_t rgb_blink_timer;
 static TimerHandle_t rgb_blink_stop_timer;

@@ -83,6 +83,11 @@ void lcd_espnow_update_menu(espnow_menu_t *espnow_menu);
 void lcd_espnow_refresh_list_for_mode(espnow_menu_t *menu);
 
 /**
+ * @brief Drop pending ESP-NOW command results. Call before switching to ESPNOW_OPTION_PAGE
+ */
+void lcd_espnow_drain_receipts(void);
+
+/**
  * @brief Executes when specific ESP-NOW option is selected
  *
  * @param [in] ui_btns UI input structure

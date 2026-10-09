@@ -47,6 +47,7 @@
 #include "espnow_task.h"
 #include "espnow_utils.h"
 #include "wifi_task.h"
+#include "wifi_utils.h"
 #include "ai_task.h"
 #include "verify_hardware.h"
 
@@ -163,6 +164,9 @@ void app_main(void)
     
     // Initialize NVS flash
     gpio_utils_init_nvs();
+
+    // Local time survives a soft reboot but the TZ doesn't: re-apply it before any task computes a date
+    wifi_utils_tz_restore();
 
     // DFS scales CPU between min/max based on load
     // Explicitly request 240 MHz max even though Kconfig caps boot at 160 MHz

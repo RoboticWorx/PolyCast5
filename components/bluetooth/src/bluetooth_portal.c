@@ -1468,8 +1468,8 @@ static esp_err_t category_one_delete(httpd_req_t *req)
         index = atoi(param);
     }
 
-    // Validate
-    if (index < 0) {
+    // Validate (bound before the uint8_t cast, or 256 would delete category 0)
+    if (index < 0 || index >= BT_MAX_CATEGORIES) {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad index");
     }
 

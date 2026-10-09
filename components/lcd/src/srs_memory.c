@@ -73,6 +73,17 @@ static bool rtc_synced(void)
     return (t.tm_year >= 125); // Years since 1900
 }
 
+// Days since 1970-01-01 of a proleptic Gregorian date (Hinnant's days_from_civil, integer only)
+static uint32_t srs_days_from_civil(int y, unsigned m, unsigned d)
+{
+    y -= (m <= 2);
+    const int era = (y >= 0 ? y : y - 399) / 400;
+    const unsigned yoe = (unsigned)(y - era * 400); // [0, 399]
+    const unsigned doy = (153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + d - 1; // [0, 365]
+    const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy; // [0, 146096]
+    return (uint32_t)(era * 146097 + (int)doe - 719468);
+}
+
 static int srs_find_by_page(uint16_t page)
 {
     // Check if page exists
@@ -90,6 +101,11 @@ static int srs_find_by_page(uint16_t page)
 // Check if a page is due
 static bool srs_is_due(const srs_entry_t *e, uint32_t today)
 {
+    // Final review done: before the bounds check, which logs
+    if (e->step & SRS_STEP_DONE) {
+        return false;
+    }
+
     // Bounds check against corrupted NVS data
     if (e->step >= SRS_NUM_STEPS) {
         ESP_LOGE(TAG, "Invalid step %u for page %u", e->step, e->page);
@@ -105,8 +121,8 @@ static bool srs_is_due(const srs_entry_t *e, uint32_t today)
 
 bool srs_sync_time_over_wifi(void)
 {
-    // Check if RTC synced
-    if (rtc_synced()) {
+    // Check if RTC synced and the local time zone resolved (else retry: SNTP alone leaves "today" in UTC)
+    if (rtc_synced() && wifi_utils_tz_is_set()) {
 #ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "Time already synced");
 #endif
@@ -132,7 +148,8 @@ bool srs_sync_time_over_wifi(void)
         ESP_LOGI(TAG, "Wi-Fi already connected");
 #endif
 
-        // Request to get date and time
+        // Request to get date and time; a late result from a timed-out visit doesn't count
+        xEventGroupClearBits(xWifiEventGroup, WIFI_GOT_DATE_TIME_BIT | WIFI_DATE_TIME_FAILED_BIT);
         xEventGroupSetBits(xWifiEventGroup, WIFI_GET_DATE_TIME_BIT);
 
         // Wait (bounded) for it to complete or fail
@@ -205,7 +222,8 @@ bool srs_sync_time_over_wifi(void)
     lcd_clear_pending_inputs = true; // Clear user inputs from wait
 
     if (connected) {
-        // Request to get date and time
+        // Request to get date and time; a late result from a timed-out visit doesn't count
+        xEventGroupClearBits(xWifiEventGroup, WIFI_GOT_DATE_TIME_BIT | WIFI_DATE_TIME_FAILED_BIT);
         xEventGroupSetBits(xWifiEventGroup, WIFI_GET_DATE_TIME_BIT);
         
         // Wait (bounded) for it to complete or fail
@@ -323,10 +341,19 @@ void srs_mark_reviewed_index(int idx, uint32_t today)
         return;
     }
     
-    // Increment step
-    if (srs_tbl[idx].step < (SRS_NUM_STEPS - 1)) {
-        srs_tbl[idx].step++;
+    srs_entry_t *e = &srs_tbl[idx];
+
+    // Finished (SRS_STEP_DONE) or corrupt: nothing to advance
+    if (e->step >= SRS_NUM_STEPS) {
+        return;
     }
+
+    // Skip every review already due by today; the creation day stays the anchor
+    uint16_t step = e->step;
+    while (step < SRS_NUM_STEPS && today >= e->start_day + srs_days[step]) {
+        step++;
+    }
+    e->step = (step >= SRS_NUM_STEPS) ? (SRS_STEP_DONE | (SRS_NUM_STEPS - 1)) : step;
     
     // Persist to NVS
     srs_nvs_save();
@@ -360,6 +387,7 @@ int srs_build_due_list(int *out_idx, int max_out, uint32_t today)
             const srs_entry_t *Ei = &srs_tbl[srs_tmp_idx[i]];
             const srs_entry_t *Ej = &srs_tbl[srs_tmp_idx[j]];
 
+            // Only due entries are collected, so step < SRS_NUM_STEPS (never SRS_STEP_DONE)
             int need_i = (int)srs_days[Ei->step];
             int need_j = (int)srs_days[Ej->step];
 
@@ -396,11 +424,9 @@ int srs_build_due_list(int *out_idx, int max_out, uint32_t today)
     return total_due;
 }
 
-// Converts Unix seconds to whole days
+// Today's local calendar date as whole days; the UTC offset and DST can't shift it
 uint32_t srs_days_since_epoch_local(void)
 {
-    tzset(); // Redundant
-
     time_t now = time(NULL);
 
     if (now <= 0) {
@@ -408,21 +434,15 @@ uint32_t srs_days_since_epoch_local(void)
     }
 
     struct tm lt;
-    localtime_r(&now, &lt); // Uses TZ/DST that was set with tzset()
-    lt.tm_hour = 0;
-    lt.tm_min = 0;
-    lt.tm_sec = 0;
-    lt.tm_isdst = -1; // Let mktime() decide DST
-
-    time_t local_midnight_epoch = mktime(&lt);
+    localtime_r(&now, &lt); // Uses the TZ applied by wifi_utils
+    uint32_t today = srs_days_from_civil(lt.tm_year + 1900, (unsigned)lt.tm_mon + 1, (unsigned)lt.tm_mday);
 
 #ifdef POLYCAST5_DEBUG
-    ESP_LOGI(TAG, "0-based srs_days_since_epoch now = %" PRId64 "s", (int64_t)local_midnight_epoch); // Seconds
-    ESP_LOGI(TAG, "0-based srs_days_since_epoch now = %" PRIu32 "d", (uint32_t)(local_midnight_epoch / 86400)); // Days
+    ESP_LOGI(TAG, "srs_days_since_epoch now = %04d-%02d-%02d = %" PRIu32 "d",
+            lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday, today);
 #endif
 
-    // Round down by 86400 -> today index
-    return (uint32_t)(local_midnight_epoch / 86400); // 0-based
+    return today; // 0-based
 }
 
 void srs_nvs_load(void)
@@ -532,6 +552,36 @@ void srs_nvs_save(void)
     
     // Close NVS
     nvs_close(h);
+}
+
+esp_err_t srs_forget_all(void)
+{
+    nvs_handle_t h;
+
+    // Open NVS
+    esp_err_t err = nvs_open(SRS_NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "srs_forget_all nvs_open failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    // Wipe every key in the namespace
+    err = nvs_erase_all(h);
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+    nvs_close(h);
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "srs_forget_all nvs_erase_all failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    // Match RAM to the empty namespace
+    srs_cnt = 0;
+    srs_last_page = 0;
+
+    return ESP_OK;
 }
 
 #ifdef POLYCAST5_SRS_CALIBRATING
@@ -678,22 +728,13 @@ static uint32_t parse_date_to_days(const char *date_str)
         return 0;
     }
     
-    struct tm t = {0};
-    t.tm_year = year - 1900;
-    t.tm_mon = month - 1;
-    t.tm_mday = day;
-    t.tm_hour = 0;
-    t.tm_min = 0;
-    t.tm_sec = 0;
-    t.tm_isdst = -1;
-    
-    time_t epoch = mktime(&t);
-    if (epoch <= 0) {
+    if (year < 1970 || month < 1 || month > 12 || day < 1 || day > 31) {
         ESP_LOGE(TAG, "Failed to convert date: %s", date_str);
         return 0;
     }
     
-    return (uint32_t)(epoch / 86400); // Convert to days
+    // Same calendar-date numbering as srs_days_since_epoch_local
+    return srs_days_from_civil(year, (unsigned)month, (unsigned)day);
 }
 
 void srs_batch_load_from_dates(const srs_calibration_entry_t *entries, int count)
@@ -712,11 +753,16 @@ void srs_batch_load_from_dates(const srs_calibration_entry_t *entries, int count
             int32_t days_since = (int32_t)(today - start_day);
             
             // Determine step based on next scheduled interval
-            uint8_t step = 0;
+            uint16_t step = 0;
             if (days_since > 0) {
                 while (step + 1 < SRS_NUM_STEPS && (uint32_t)days_since > srs_days[step]) {
                     step++;
                 }
+            }
+
+            // Past the final review (assumed done): complete
+            if (days_since > (int32_t)srs_days[SRS_NUM_STEPS - 1]) {
+                step = SRS_STEP_DONE | (SRS_NUM_STEPS - 1);
             }
 
             // Find if page already exists
@@ -738,8 +784,9 @@ void srs_batch_load_from_dates(const srs_calibration_entry_t *entries, int count
                 srs_last_page = page;
             }
             
-            ESP_LOGI(TAG, "Added Pg. %u: start_day=%" PRIu32 " (%s), days_since=%d, step=%d", 
-                    page, start_day, entries[i].date, days_since, step);
+            ESP_LOGI(TAG, "Added Pg. %u: start_day=%" PRIu32 " (%s), days_since=%d, step=%d%s",
+                    page, start_day, entries[i].date, days_since, step & SRS_STEP_MASK,
+                    (step & SRS_STEP_DONE) ? " (done)" : "");
         }
     }
     

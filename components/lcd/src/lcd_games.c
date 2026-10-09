@@ -621,8 +621,10 @@ void lcd_games_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t 
         // Score label (position adjusted for layout)
         tetris_score_label = lv_label_create(ACTIVE_SCR);
         lv_label_set_text(tetris_score_label, "Score: 0");
+        lv_obj_set_style_text_font(tetris_score_label, &lv_font_montserrat_14, 0); // 16 px line fits above the canvas
         lv_obj_set_style_text_color(tetris_score_label, user_secondary_color, 0);
-        lv_obj_align(tetris_score_label, LV_ALIGN_TOP_MID, 0, -20); // Above canvas, adjust
+        lv_obj_align(tetris_score_label, LV_ALIGN_TOP_MID, 0, 0); // Strip above the canvas (y 0..15, canvas starts at 17)
+        lv_obj_add_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN); // Score label takes its spot
 
         // Game over label (hidden initially)
         tetris_game_over_label = lv_label_create(ACTIVE_SCR);
@@ -657,6 +659,8 @@ void lcd_games_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t 
             snprintf(buf, sizeof(buf), "Game Over!\nScore: %" PRIu32 "\nHigh Score: %" PRIu32, tetris_score, high_score);
             lv_label_set_text(tetris_game_over_label, buf);
             lv_obj_remove_flag(tetris_game_over_label, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(tetris_score_label, LV_OBJ_FLAG_HIDDEN); // Overlay shows the score
+            lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN);
 
             tetris_game_over_handled = true;
             tetris_game_over_tick = xTaskGetTickCount();
@@ -732,6 +736,7 @@ void lcd_games_tetris_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, games_menu_t 
 
         // Show games menu
         lv_obj_remove_flag(games_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(ui_menu->arrow_top, LV_OBJ_FLAG_HIDDEN); // Hidden for the score label
 
         // Hide right arrow
         lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);

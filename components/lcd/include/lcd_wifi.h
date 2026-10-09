@@ -197,6 +197,13 @@ void lcd_wifi_manage_networks_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_
 void lcd_wifi_network_info_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_menu);
 
 /**
+ * @brief Drop a stale MQTT ack and reset the status text. Call before switching to WIFI_SEND_PAGE
+ *
+ * @param [in] wifi_menu Wi-Fi menu structure
+ */
+void lcd_wifi_send_page_enter(wifi_menu_t *wifi_menu);
+
+/**
  * @brief Executes Wi-Fi send page to send data via MQTT
  *
  * @param [in] ui_btns UI input structure

@@ -15,12 +15,13 @@
 #include "nvs.h"
 
 #include "wifi_utils.h"
+#include "wifi_autoconnect.h"
 
 #include "wifi_task.h"
 
 #define TAG "WIFI_AUTOCONNECT"
 
-#define MAX_KNOWN_NETWORKS 20
+#define MAX_KNOWN_NETWORKS WIFI_AUTOCONNECT_MAX_KNOWN
 #define NVS_NS "autoconnect"
 #define NVS_KEY_COUNT "count"
 #define NVS_KEY_LIST "list"
@@ -32,8 +33,9 @@ static size_t known_network_count = 0;
 
 static wifi_login_t last_known_pick = {0};
 static bool known_networks_loaded = false;
+static char list_full_ssid[sizeof(((wifi_login_t *)0)->ssid)] = {0}; // Network a full list turned away; kept until saved or its notice shows
 
-// Serializes access to known_networks[]/known_network_count/last_known_pick, which are
+// Serializes access to known_networks[]/known_network_count/last_known_pick/list_full_ssid, which are
 // touched by the Wi-Fi task mand the LCD task
 static SemaphoreHandle_t s_known_mutex = NULL;
 #define KNOWN_LOCK()   do { if (s_known_mutex) xSemaphoreTake(s_known_mutex, portMAX_DELAY); } while (0)
@@ -194,11 +196,11 @@ static void wifi_autoconnect_fill_password_from_known(wifi_login_t *net)
     }
 }
 
-static void wifi_autoconnect_remember_network(const wifi_login_t *net)
+static esp_err_t wifi_autoconnect_remember_network(const wifi_login_t *net)
 {
     // Check if valid network
     if (!net || net->ssid[0] == '\0') {
-        return;
+        return ESP_ERR_INVALID_ARG;
     }
 
     // See if we already know this network
@@ -211,19 +213,22 @@ static void wifi_autoconnect_remember_network(const wifi_login_t *net)
             }
 
             known_networks[i] = updated;
-            wifi_autoconnect_save_to_nvs();
-            return;
+            return wifi_autoconnect_save_to_nvs();
         }
     }
 
     // If we have space, add it
     if (known_network_count < MAX_KNOWN_NETWORKS) {
         known_networks[known_network_count++] = *net;
-        wifi_autoconnect_save_to_nvs();
+        return wifi_autoconnect_save_to_nvs();
     }
+
+    // Full: don't evict, the caller tells the user
+    ESP_LOGW(TAG, "Saved list full (%d): '%s' not saved", MAX_KNOWN_NETWORKS, net->ssid);
+    return ESP_ERR_NO_MEM;
 }
 
-void wifi_autoconnect_remember_current_network(void)
+esp_err_t wifi_autoconnect_remember_current_network(void)
 {
     wifi_config_t current = {0};
 
@@ -231,7 +236,7 @@ void wifi_autoconnect_remember_current_network(void)
     esp_err_t err = esp_wifi_get_config(WIFI_IF_STA, &current);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "wifi_autoconnect_remember_current_network: esp_wifi_get_config failed: %s", esp_err_to_name(err));
-        return;
+        return err;
     }
 
     // Copy SSID and password from current config
@@ -245,10 +250,41 @@ void wifi_autoconnect_remember_current_network(void)
     }
 
     KNOWN_LOCK();
-    wifi_autoconnect_remember_network(&net);
+    err = wifi_autoconnect_remember_network(&net);
+    if (err == ESP_ERR_NO_MEM) {
+        strlcpy(list_full_ssid, net.ssid, sizeof(list_full_ssid)); // Named by the Wi-Fi page notice
+    } else if (err == ESP_OK && strncmp(list_full_ssid, net.ssid, sizeof(list_full_ssid)) == 0) {
+        // Only saving the turned-away network itself drops its notice
+        list_full_ssid[0] = '\0';
+        xEventGroupClearBits(xWifiEventGroup, WIFI_SAVE_LIST_FULL_BIT);
+    }
     wifi_autoconnect_fill_password_from_known(&net);
-    last_known_pick = net;
+    last_known_pick = net; // Kept even when not saved so the session can reconnect
     last_known_network_conn_failed = false;
+    KNOWN_UNLOCK();
+
+    return err;
+}
+
+bool wifi_autoconnect_take_list_full(char *ssid_out, size_t len)
+{
+    KNOWN_LOCK();
+    bool pending = (xEventGroupClearBits(xWifiEventGroup, WIFI_SAVE_LIST_FULL_BIT) & WIFI_SAVE_LIST_FULL_BIT) != 0;
+    if (pending) {
+        if (ssid_out && len > 0) {
+            strlcpy(ssid_out, list_full_ssid, len);
+        }
+        list_full_ssid[0] = '\0';
+    }
+    KNOWN_UNLOCK();
+    return pending;
+}
+
+void wifi_autoconnect_clear_list_full(void)
+{
+    KNOWN_LOCK();
+    list_full_ssid[0] = '\0';
+    xEventGroupClearBits(xWifiEventGroup, WIFI_SAVE_LIST_FULL_BIT);
     KNOWN_UNLOCK();
 }
 

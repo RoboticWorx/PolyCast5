@@ -162,6 +162,7 @@ enum {
     WIFI_MANAGE_NETWORKS_PAGE,
     WIFI_NETWORK_INFO_PAGE,
     GPIO_IR_EXPANSION_PAGE,
+    TOOLS_SRS_FORGET_PAGE,
 };
 
 // Security features that show a one-time authorized/educational-use disclaimer before their first use

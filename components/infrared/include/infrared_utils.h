@@ -7,6 +7,7 @@
 #include "driver/rmt_tx.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "esp_err.h"
 #include <stddef.h>
 
 // Configuration macros
@@ -23,6 +24,9 @@
 
 #define MAX_STORED_SIGNALS 1650 // 30 signals per remote if 50 (33 - 3 default)
 #define MAX_REMOTES 50
+
+#define IR_NVS_SIGNAL_ENTRIES 80 // Free NVS entries to learn + name a signal: 2 KiB blob (64 data + 3 headers), 2 names, count, margin
+#define IR_NVS_REMOTE_ENTRIES 8 // Free NVS entries to add a remote: name, count, num_rem, margin
 
 #define IR_NUM_BASE_OPTIONS 3 // Remote name, Edit, Add New
 
@@ -87,44 +91,82 @@ void infrared_utils_load_remotes_nvs(void);
  *
  * @param remote_idx Index of the remote
  * @param sig_idx Index of the signal within the remote
- * @param sig The signal data
+ * @param sig The signal data (NULL saves only the name)
  * @param name The signal name
+ *
+ * @return ESP_OK, or the first NVS error (ESP_ERR_NVS_NOT_ENOUGH_SPACE when full)
  */
-void infrared_utils_save_signal_to_remote_nvs(size_t remote_idx, size_t sig_idx, ir_signal_t *sig, const char *name);
+esp_err_t infrared_utils_save_signal_to_remote_nvs(size_t remote_idx, size_t sig_idx, ir_signal_t *sig, const char *name);
+
+/**
+ * @brief Erases a signal's name and blob from NVS (rollback; the stored count is the caller's)
+ *
+ * @param remote_idx Index of the remote
+ * @param sig_idx Index of the signal within the remote
+ */
+void infrared_utils_erase_signal_nvs(size_t remote_idx, size_t sig_idx);
 
 /** 
  * @brief Saves the number of signals for a remote to NVS
  *
  * @param remote_idx Index of the remote
+ *
+ * @return ESP_OK or the NVS error
  */
-void infrared_utils_save_remote_nsig_nvs(size_t remote_idx);
+esp_err_t infrared_utils_save_remote_nsig_nvs(size_t remote_idx);
 
 /** 
  * @brief Saves a remote's name to NVS
  *
  * @param remote_idx Index of the remote
+ * @param name The new name (RAM is the caller's, once this succeeds)
+ *
+ * @return ESP_OK or the NVS error
  */
-void infrared_utils_save_remote_name_nvs(size_t remote_idx);
+esp_err_t infrared_utils_save_remote_name_nvs(size_t remote_idx, const char *name);
+
+/**
+ * @brief Appends an empty remote to NVS; a failure leaves the stored remotes unchanged
+ *
+ * @param remote_idx Index of the new remote (the current num_remotes)
+ * @param name The remote name
+ *
+ * @return ESP_OK or the NVS error
+ */
+esp_err_t infrared_utils_add_remote_nvs(size_t remote_idx, const char *name);
 
 /** 
  * @brief Saves all remotes and signals to NVS
+ *
+ * @return ESP_OK, or the first NVS error (whatever fit is still saved)
  */
-void infrared_utils_save_all_remotes_nvs(void);
+esp_err_t infrared_utils_save_all_remotes_nvs(void);
 
 /** 
  * @brief Deletes a given signal from a given remote over NVS
  *
  * @param remote_idx Index of the remote
  * @param sig_idx Index of the signal to delete
+ *
+ * @return ESP_OK or the NVS error (RAM is updated either way)
  */
-void infrared_utils_delete_signal_from_remote_nvs(size_t remote_idx, size_t sig_idx);
+esp_err_t infrared_utils_delete_signal_from_remote_nvs(size_t remote_idx, size_t sig_idx);
 
 /** 
  * @brief Deletes a given remote from NVS
  *
  * @param remote_idx Index of the remote to delete
+ *
+ * @return ESP_OK or the NVS error (RAM is updated either way)
  */
-void infrared_utils_delete_remote_nvs(size_t remote_idx);
+esp_err_t infrared_utils_delete_remote_nvs(size_t remote_idx);
+
+/**
+ * @brief Whether NVS reports enough free entries for a write (advisory: writes can still fail)
+ *
+ * @param entries Entries the write needs, e.g. IR_NVS_SIGNAL_ENTRIES
+ */
+bool infrared_utils_nvs_has_room(size_t entries);
 
 /** 
  * @brief Clear all IR data from NVS

@@ -2646,6 +2646,8 @@ void lcd_bluetooth_rename_peer_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         ti.arrow_bot = ui_menu->arrow_bot;
         ti.arrow_left = ui_menu->arrow_left;
         ti.arrow_right = ui_menu->arrow_right;
+        ti.battery_txt = ui_menu->lbl_battery_txt;
+        ti.battery_icon = ui_menu->lbl_battery_icon;
         lcd_text_input_start(&ti);
     }
 

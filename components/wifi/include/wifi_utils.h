@@ -113,9 +113,29 @@ typedef struct {
 typedef struct {
     wifi_data_clients_t clients[MAX_MAC_CLIENTS];
     uint32_t client_count;
-    uint32_t rate;
+    uint8_t rx_rate;      // Last data frame: raw rx_ctrl.rate (11b code or L-SIG rate), not Mbps
+    uint8_t rx_bb_format; // Last data frame: rx_ctrl.cur_bb_format (RX_BB_FORMAT_*)
     uint32_t channel;
 } wifi_data_t;
+
+/**
+ * @brief Decode a sniffed data frame's PHY rate to Mbps (half-Mbps units) for legacy frames only
+ *
+ * @param [in] bb_format rx_ctrl.cur_bb_format of the frame (RX_BB_FORMAT_*)
+ * @param [in] rate rx_ctrl.rate of the frame
+ *
+ * @returns rate in half-Mbps units (e.g. 108 = 54 Mbps, 11 = 5.5 Mbps), or 0 for HT/VHT/HE or unknown
+ */
+uint16_t wifi_utils_rx_rate_mbps_x2(uint8_t bb_format, uint8_t rate);
+
+/**
+ * @brief Short PHY tag ("11n"/"11ac"/"11ax"/...) for a sniffed data frame's bb_format
+ *
+ * @param [in] bb_format rx_ctrl.cur_bb_format of the frame (RX_BB_FORMAT_*)
+ *
+ * @returns ASCII PHY tag, or "-" if unknown
+ */
+const char *wifi_utils_rx_phy_str(uint8_t bb_format);
 
 /**
  * @brief Gets previous Wi-Fi config from NVS
@@ -200,6 +220,18 @@ void wifi_utils_parse_rsn_ie(const uint8_t *rsn, size_t rsn_len, wifi_beacon_t *
  * @brief Gets the current date and time from pool.ntp
  */
 void wifi_utils_get_current_date_time(void);
+
+/**
+ * @brief Applies the time zone saved by the last successful lookup; call at boot before any task reads local time
+ */
+void wifi_utils_tz_restore(void);
+
+/**
+ * @brief Whether a resolved time zone (looked up or restored) is applied
+ *
+ * @returns True if local time is in the user's zone, false if it is UTC or a lookup named a zone it can't apply
+ */
+bool wifi_utils_tz_is_set(void);
 
 
 #endif // WIFI_UTILS_H

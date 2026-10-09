@@ -41,6 +41,7 @@
 #include "wifi_utils.h"
 #include "wifi_ping.h"
 #include "wifi_task.h"
+#include "wifi_autoconnect.h" // WIFI_AUTOCONNECT_MAX_KNOWN, wifi_autoconnect_take_list_full
 #include "infrared_utils.h"
 #include "infrared_task.h"
 #include "gpio_utils.h"
@@ -222,6 +223,11 @@ static void lcd_backlight_set(bool on)
 
 void lcd_device_sleep(void)
 {
+    // A pending hotkey pick doesn't survive sleep
+    if (xConnectionIconEventGroup) {
+        xEventGroupClearBits(xConnectionIconEventGroup, ICON_BIT_HOTKEY_ACTIVE);
+    }
+
     // Remember whether anything was running before we stop it
     bool anim_was_running = lcd_anim_is_running();
 
@@ -2555,10 +2561,16 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
         
         ui_menu->page = INFRARED_REMOTE_EDIT_PAGE;
     } else if (ui_btns->select_btn == 1 && ir_menu->index == 2) { // Add new signal selected
-        // Abort if we've reached the maximum number of peers
+        // Abort if we've reached the maximum number of peers, or NVS can't hold another signal
+        const char *full_txt = NULL;
         if (ir_menu->size >= MAX_IR_OPTIONS) {
+            full_txt = "Max signals added!";
+        } else if (!infrared_utils_nvs_has_room(IR_NVS_SIGNAL_ENTRIES)) {
+            full_txt = "Storage full!";
+        }
+        if (full_txt) {
 #ifdef POLYCAST5_DEBUG
-            ESP_LOGW(TAG, "Max IR menu options reached");
+            ESP_LOGW(TAG, "Can't add IR signal: %s", full_txt);
 #endif
             
             // Hide IR menu
@@ -2566,9 +2578,9 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
             
             // User notice
             lv_obj_t *lbl_rst = lv_label_create(ACTIVE_SCR);
-            lcd_format_label(lbl_rst, "Max signals added!", user_secondary_color,
+            lcd_format_label(lbl_rst, full_txt, user_secondary_color,
                      &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
-            lv_timer_handler();
+            lv_refr_now(NULL); // Render now (lv_timer_handler only refreshes every 33 ms)
             vTaskDelay(pdMS_TO_TICKS(1000));
             lv_obj_delete(lbl_rst);
             lcd_clear_pending_inputs = true;
@@ -2967,6 +2979,8 @@ void lcd_espnow_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espn
         // Show right arrow
         lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
         
+        lcd_espnow_drain_receipts(); // Results from while away (hotkeys, a previous visit) aren't shown
+
         ui_menu->page = ESPNOW_OPTION_PAGE;
     } else if (ui_btns->left_btn == 1) { // Back selected
         // Hide ESP-NOW menu
@@ -3101,6 +3115,42 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
         }
 
         last_wifi_event_bits = wifi_event_bits;
+    }
+
+    // The joined network was not saved because the saved list is full (no eviction)
+    char full_ssid[sizeof(((wifi_login_t *)0)->ssid)];
+    if ((wifi_event_bits & WIFI_SAVE_LIST_FULL_BIT) && wifi_autoconnect_take_list_full(full_ssid, sizeof(full_ssid))) {
+        lv_obj_add_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
+
+        bool arrows_hidden[4];
+        lcd_arrows_hide(ui_menu, arrows_hidden);
+
+        // A removal saves it only while still on it, so always ask for a rejoin
+        char full_txt[80];
+        snprintf(full_txt, sizeof(full_txt), "not saved: list full (%d).\nRemove one in Manage\nNetworks, then rejoin.",
+                WIFI_AUTOCONNECT_MAX_KNOWN);
+
+        lv_obj_t *lbl_full = lv_label_create(ACTIVE_SCR);
+        lv_obj_set_style_text_align(lbl_full, LV_TEXT_ALIGN_CENTER, 0);
+        lcd_format_label(lbl_full, full_txt, user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, lv_font_get_line_height(&lv_font_montserrat_18) / 2);
+
+        // Name the network on the line above; a long SSID ends in dots (the connected one may differ)
+        lv_obj_t *lbl_ssid = lv_label_create(ACTIVE_SCR);
+        lv_obj_set_style_text_align(lbl_ssid, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_long_mode(lbl_ssid, LV_LABEL_LONG_DOT);
+        lv_obj_set_size(lbl_ssid, HOR_RES - 20, lv_font_get_line_height(&lv_font_montserrat_18));
+        lcd_format_label(lbl_ssid, (full_ssid[0] != '\0') ? full_ssid : "Network", user_secondary_color,
+                &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_align_to(lbl_ssid, lbl_full, LV_ALIGN_OUT_TOP_MID, 0, 0);
+        lv_refr_now(NULL); // Render now (lv_timer_handler only refreshes every 33 ms)
+        vTaskDelay(pdMS_TO_TICKS(2500));
+        lv_obj_delete(lbl_ssid);
+        lv_obj_delete(lbl_full);
+        lcd_clear_pending_inputs = true;
+
+        lcd_arrows_restore(ui_menu, arrows_hidden);
+        lv_obj_remove_flag(wifi_menu->main_list, LV_OBJ_FLAG_HIDDEN);
     }
 
 #ifdef POLYCAST5_CHECK_OTA_ON_CONN
@@ -3352,6 +3402,8 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
                 // Show right arrow
                 lv_obj_remove_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
                 
+                lcd_wifi_send_page_enter(wifi_menu);
+
                 ui_menu->page = WIFI_SEND_PAGE;
             } else {
                 lbl_conf = lv_label_create(ACTIVE_SCR);
@@ -3599,7 +3651,8 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
         LCD_LOADING_ANIM_START_DEFAULT();
         lv_timer_handler();
 
-        // Check for OTA on connect
+        // Check for OTA on connect; a result left from an earlier check is stale
+        xEventGroupClearBits(xWifiEventGroup, WIFI_OTA_AVAILABLE_BIT);
         xEventGroupSetBits(xWifiEventGroup, WIFI_CHECK_OTA_ON_CONN_BIT);
 
         // Connect to previous Wi-Fi network
@@ -3656,6 +3709,9 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
                 lcd_clear_pending_inputs = true; // Clear any button presses during wait
             }
         } else {
+            // A later connect (even a retry during this prompt) must not run this check
+            xEventGroupClearBits(xWifiEventGroup, WIFI_CHECK_OTA_ON_CONN_BIT);
+
             lv_label_set_text(lbl_check, OTA_CONN_FAILED_TXT);
             lv_timer_handler();
             lcd_anim_loading_stop();
@@ -3684,6 +3740,9 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
         lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
         
         lv_timer_handler();
+
+        // Check is over: drop a pending check and any late result
+        xEventGroupClearBits(xWifiEventGroup, WIFI_CHECK_OTA_ON_CONN_BIT | WIFI_OTA_AVAILABLE_BIT);
 
         // Disconnect from Wi-Fi
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);

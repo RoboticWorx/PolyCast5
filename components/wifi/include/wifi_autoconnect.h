@@ -9,6 +9,8 @@
 
 #include "wifi_utils.h"
 
+#define WIFI_AUTOCONNECT_MAX_KNOWN 20 // Saved-network cap; a full list never evicts
+
 /**
  * @brief Picks the last known network or if not available the network with the strongest RSSI from scan results
  *
@@ -18,8 +20,25 @@ esp_err_t wifi_autoconnect_pick_known_network(wifi_login_t *out);
 
 /**
  * @brief Remembers the currently connected network in the known networks list
+ *
+ * @returns ESP_OK if saved or updated, ESP_ERR_NO_MEM if the list is full (not saved), else an error
  */
-void wifi_autoconnect_remember_current_network(void);
+esp_err_t wifi_autoconnect_remember_current_network(void);
+
+/**
+ * @brief Takes a pending saved-list-full notice and clears WIFI_SAVE_LIST_FULL_BIT
+ *
+ * @param [out] ssid_out Destination for the SSID the full list turned away
+ * @param [in] len Size of the destination buffer
+ *
+ * @returns true if a notice was pending, false otherwise
+ */
+bool wifi_autoconnect_take_list_full(char *ssid_out, size_t len);
+
+/**
+ * @brief Drops a pending saved-list-full notice (a new join supersedes it)
+ */
+void wifi_autoconnect_clear_list_full(void);
 
 /**
  * @brief Loads persisted known networks from NVS (safe to call multiple times)

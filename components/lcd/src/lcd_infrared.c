@@ -40,6 +40,24 @@ static int edit_idx = 0;
 static bool new_remote = false;
 
 
+// Blocking centered notice; callers hide what it would overlap
+static void ir_notice(const char *txt)
+{
+    lv_obj_t *lbl = lv_label_create(ACTIVE_SCR);
+    lcd_format_label(lbl, txt, user_secondary_color,
+            &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
+    lv_refr_now(NULL); // Render now (lv_timer_handler only refreshes every 33 ms)
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    lv_obj_delete(lbl);
+    lcd_clear_pending_inputs = true;
+}
+
+// Notice text for a refused IR save
+static const char *ir_save_err_txt(esp_err_t err)
+{
+    return err == ESP_ERR_NVS_NOT_ENOUGH_SPACE ? "Storage full!" : "Save failed!";
+}
+
 void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_menu)
 {
     #define REMOTE_TXT "Remote option:"
@@ -107,6 +125,39 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
     } else if (ui_btns->select_btn) { // Actions on select
         // Create new remote
         if (edit_idx == 1) {
+            // Full: say so instead of opening a name keyboard that only exits via OK
+            xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
+            bool remotes_full = num_remotes >= MAX_REMOTES;
+            xSemaphoreGive(xInfraredDataMutex); // Release IR
+            const char *full_txt = NULL;
+            if (remotes_full) {
+                full_txt = "Max remotes added!";
+            } else if (!infrared_utils_nvs_has_room(IR_NVS_REMOTE_ENTRIES)) {
+                full_txt = "Storage full!";
+            }
+            if (full_txt) {
+#ifdef POLYCAST5_DEBUG
+                ESP_LOGW(TAG, "Can't add remote: %s", full_txt);
+#endif
+                // Hide edit page
+                lv_obj_add_flag(lbl_title, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_add_flag(lbl_name, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_add_flag(lbl_back, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_add_flag(lbl_edit, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_add_flag(lbl_select, LV_OBJ_FLAG_HIDDEN);
+
+                ir_notice(full_txt);
+
+                // Show edit page
+                lv_obj_remove_flag(lbl_title, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_remove_flag(lbl_name, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_remove_flag(lbl_back, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_remove_flag(lbl_edit, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_remove_flag(lbl_select, LV_OBJ_FLAG_HIDDEN);
+
+                return;
+            }
+
             new_remote = true;
             ui_menu->page = INFRARED_REMOTE_NAME_PAGE;
 
@@ -121,7 +172,7 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
             xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
             size_t del_remote = ir_current_remote;
             size_t remotes_before = num_remotes;
-            infrared_utils_delete_remote_nvs(del_remote);
+            esp_err_t err = infrared_utils_delete_remote_nvs(del_remote);
             size_t remotes_left = num_remotes;
             xSemaphoreGive(xInfraredDataMutex); // Release IR
 
@@ -137,6 +188,11 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
             lv_obj_delete(lbl_edit);
             lv_obj_delete(lbl_select);
             lbl_title = lbl_name = lbl_back = lbl_edit = lbl_select = NULL;
+
+            // RAM already dropped it; NVS may disagree until the next save
+            if (err != ESP_OK) {
+                ir_notice(ir_save_err_txt(err));
+            }
             
             // Go to previous remote, clamped so index 0 can't underflow and the index stays valid after the delete
             xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
@@ -161,7 +217,7 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
             xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
             size_t del_remote = ir_current_remote;
             size_t signals_before = remotes[del_remote].num_signals;
-            infrared_utils_delete_signal_from_remote_nvs(del_remote, (size_t)edit_idx - IR_NUM_BASE_OPTIONS);
+            esp_err_t err = infrared_utils_delete_signal_from_remote_nvs(del_remote, (size_t)edit_idx - IR_NUM_BASE_OPTIONS);
             bool deleted = remotes[del_remote].num_signals < signals_before;
             xSemaphoreGive(xInfraredDataMutex); // Release IR
 
@@ -180,6 +236,11 @@ void lcd_ir_edit_remotes(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_m
             lv_obj_delete(lbl_edit);
             lv_obj_delete(lbl_select);
             lbl_title = lbl_name = lbl_back = lbl_edit = lbl_select = NULL;
+
+            // RAM already dropped it; NVS may disagree until the next save
+            if (err != ESP_OK) {
+                ir_notice(ir_save_err_txt(err));
+            }
         }
     } else if (ui_btns->left_btn) { // Exit
         // Reset
@@ -345,6 +406,8 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
         ti.arrow_bot = ui_menu->arrow_bot;
         ti.arrow_left = ui_menu->arrow_left;
         ti.arrow_right = ui_menu->arrow_right;
+        ti.battery_txt = ui_menu->lbl_battery_txt;
+        ti.battery_icon = ui_menu->lbl_battery_icon;
         lcd_text_input_start(&ti);
     }
 
@@ -357,28 +420,35 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
             ESP_LOGI(TAG, "%s", saved_name);
 #endif
         /* Update options */
+        esp_err_t err = ESP_OK;
         // If overwriting an existing as a rename
         if (ir_menu_overwrite) {
-            // Rename remote
+            // Rename remote; RAM takes the name only once NVS has it
             if (ir_index_overwrite == 0) {
                 xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
-                free(remotes[ir_current_remote].name);
-                remotes[ir_current_remote].name = strdup(saved_name);
-                infrared_utils_save_remote_name_nvs(ir_current_remote);
+                err = infrared_utils_save_remote_name_nvs(ir_current_remote, saved_name);
+                if (err == ESP_OK) {
+                    free(remotes[ir_current_remote].name);
+                    remotes[ir_current_remote].name = strdup(saved_name);
+                }
                 xSemaphoreGive(xInfraredDataMutex); // Release IR
             } else { // Rename signal
                 size_t sig_idx = ir_index_overwrite - 3; // Offset by default options
                 xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
-                free(remotes[ir_current_remote].signal_names[sig_idx]);
-                remotes[ir_current_remote].signal_names[sig_idx] = strdup(saved_name);
-                infrared_utils_save_signal_to_remote_nvs(ir_current_remote, sig_idx, remotes[ir_current_remote].signals[sig_idx], saved_name);
+                err = infrared_utils_save_signal_to_remote_nvs(ir_current_remote, sig_idx, remotes[ir_current_remote].signals[sig_idx], saved_name);
+                if (err == ESP_OK) {
+                    free(remotes[ir_current_remote].signal_names[sig_idx]);
+                    remotes[ir_current_remote].signal_names[sig_idx] = strdup(saved_name);
+                }
                 xSemaphoreGive(xInfraredDataMutex); // Release IR
             }
             
             // Update the button's label in-place
-            lv_obj_t *btn = ir_menu->btns[ir_index_overwrite];
-            lv_obj_t *child_lbl = lv_obj_get_child(btn, 0);
-            lv_label_set_text(child_lbl, saved_name);
+            if (err == ESP_OK) {
+                lv_obj_t *btn = ir_menu->btns[ir_index_overwrite];
+                lv_obj_t *child_lbl = lv_obj_get_child(btn, 0);
+                lv_label_set_text(child_lbl, saved_name);
+            }
 
             // Clean up
             ir_menu_overwrite = false;
@@ -386,8 +456,10 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
             // Adding new remote
             if (new_remote) {
                 // Limit check
-                if (num_remotes >= MAX_REMOTES) {
+                if (num_remotes >= MAX_REMOTES) { // Guard: Add New already refuses this
+#ifdef POLYCAST5_DEBUG
                     ESP_LOGW(TAG, "Max remotes reached");
+#endif
                     // Widget already torn down; escape instead of trapping the user on the locked
                     // name page (which would just re-open the keyboard with no EXIT).
                     new_remote = false;
@@ -395,20 +467,20 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
                     return;
                 }
                 
-                // Add the remote
+                // Add the remote: NVS first, so a refused save leaves RAM as it was
                 xSemaphoreTake(xInfraredDataMutex, portMAX_DELAY); // Lock IR
                 size_t new_idx = num_remotes;
-                remotes[new_idx].name = strdup(saved_name);
-                remotes[new_idx].num_signals = 0;
-                remotes[new_idx].signals = NULL;
-                remotes[new_idx].signal_names = NULL;
-                num_remotes++;
+                err = infrared_utils_add_remote_nvs(new_idx, saved_name);
+                if (err == ESP_OK) {
+                    remotes[new_idx].name = strdup(saved_name);
+                    remotes[new_idx].num_signals = 0;
+                    remotes[new_idx].signals = NULL;
+                    remotes[new_idx].signal_names = NULL;
+                    num_remotes++;
                 
-                // Current is new
-                ir_current_remote = new_idx;
-                
-                // Save new remote to NVS
-                infrared_utils_save_all_remotes_nvs();
+                    // Current is new
+                    ir_current_remote = new_idx;
+                }
                 xSemaphoreGive(xInfraredDataMutex); // Release IR
 
                 new_remote = false;
@@ -420,24 +492,26 @@ void lcd_ir_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t
                 size_t ns = remotes[ir_current_remote].num_signals - 1; // num_signals
                 
                 // Save to remote
-                free(remotes[ir_current_remote].signal_names[ns]); // Free the temporary empty name
-                remotes[ir_current_remote].signal_names[ns] = strdup(saved_name);
-                infrared_utils_save_signal_to_remote_nvs(ir_current_remote, ns, remotes[ir_current_remote].signals[ns], saved_name);
+                err = infrared_utils_save_signal_to_remote_nvs(ir_current_remote, ns, remotes[ir_current_remote].signals[ns], saved_name);
+                if (err == ESP_OK) {
+                    free(remotes[ir_current_remote].signal_names[ns]); // Free the temporary empty name
+                    remotes[ir_current_remote].signal_names[ns] = strdup(saved_name);
+                } else { // Can't be named: drop the learned signal, keys first so the count rewrite has room
+                    infrared_utils_erase_signal_nvs(ir_current_remote, ns);
+                    free(remotes[ir_current_remote].signals[ns]);
+                    free(remotes[ir_current_remote].signal_names[ns]);
+                    remotes[ir_current_remote].num_signals--;
+                    infrared_utils_save_remote_nsig_nvs(ir_current_remote);
+                }
                 xSemaphoreGive(xInfraredDataMutex); // Release IR
             
-                // Create new button for new option
-                ir_menu->btns[ir_menu->size] = lv_list_add_btn(ir_menu->main_list, NULL, saved_name);
-                lv_obj_set_size(ir_menu->btns[ir_menu->size], 100, 28);
-                lv_obj_add_style(ir_menu->btns[ir_menu->size], &ir_menu->btn_style, 0);
-    
-                // Create and format text label
-                lv_obj_t *lbl = lv_obj_get_child(ir_menu->btns[ir_menu->size], 0);
-                lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL);
-                lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-                lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -1);
-                
-                ir_menu->size++;
+                // No list button here: INFRARED_PAGE rebuilds the list from RAM on return
             }
+        }
+    
+        // Refused by NVS: nothing was added or renamed
+        if (err != ESP_OK) {
+            ir_notice(ir_save_err_txt(err));
         }
         
         // Go back
@@ -695,8 +769,9 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *ir_menu)
     lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(ui_menu->arrow_right, LV_OBJ_FLAG_HIDDEN);
     
-    // Drop a too-long result left by a cancelled attempt
+    // Drop results left by a cancelled attempt
     xSemaphoreTake(xInfraredSignalTooLongSemaphore, 0);
+    xQueueReset(xInfraredSignalSavedQueue);
 
     // Restart infrared RX
     xSemaphoreGive(xInfraredStartRxSemaphore);
@@ -720,9 +795,10 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *ir_menu)
     
     // Wait until signal received and saved    
     gpio_screen_changed(); // Taps and holds from before this prompt don't count
+    esp_err_t save_err = ESP_OK;
     while (1) {
         // Signal received and saved successfully
-        if (xSemaphoreTake(xInfraredSignalSavedSemaphore, 0) == pdTRUE) {
+        if (xQueueReceive(xInfraredSignalSavedQueue, &save_err, 0) == pdTRUE && save_err == ESP_OK) {
             lv_obj_delete(img_save_remote); // Delete img
             
             // Saving... text
@@ -754,14 +830,20 @@ void lcd_ir_save_new_signal(ui_menu_t *ui_menu, ir_menu_t *ir_menu)
             break;
         }
         
-        // Signal filled the RX buffer: cut off, not saved
-        if (xSemaphoreTake(xInfraredSignalTooLongSemaphore, 0) == pdTRUE) {
+        // Signal filled the RX buffer (cut off) or NVS refused it: not saved
+        const char *fail_txt = NULL;
+        if (save_err != ESP_OK) {
+            fail_txt = ir_save_err_txt(save_err);
+        } else if (xSemaphoreTake(xInfraredSignalTooLongSemaphore, 0) == pdTRUE) {
+            fail_txt = "Signal too long!";
+        }
+        if (fail_txt) {
             lv_obj_delete(img_save_remote); // Delete img
 
             // Notice text
             lv_obj_center(lbl_ins);
             lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_20, 0);
-            lv_label_set_text(lbl_ins, "Signal too long!");
+            lv_label_set_text(lbl_ins, fail_txt);
             lv_timer_handler(); // Show
 
             // Wait then clear

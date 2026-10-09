@@ -645,6 +645,8 @@ void lcd_espnow_create_custom_name(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espno
         ti.arrow_bot = ui_menu->arrow_bot;
         ti.arrow_left = ui_menu->arrow_left;
         ti.arrow_right = ui_menu->arrow_right;
+        ti.battery_txt = ui_menu->lbl_battery_txt;
+        ti.battery_icon = ui_menu->lbl_battery_icon;
         lcd_text_input_start(&ti);
     }
 
@@ -886,6 +888,8 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
                 
             lcd_clear_pending_inputs = true; // Clear any false inputs
             
+            lcd_espnow_drain_receipts(); // Results that landed during the prompt aren't shown
+
             // Switch pages
             ui_menu->page = ESPNOW_OPTION_PAGE;
             
@@ -979,6 +983,14 @@ static void prompt_name_or_del(ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
         
         vTaskDelay(pdMS_TO_TICKS(10));
     }
+}
+
+void lcd_espnow_drain_receipts(void)
+{
+    // Results given while the page was closed (hotkeys, a previous visit) aren't this visit's
+    xSemaphoreTake(xEspCmdTxSuccessSemaphore, 0);
+    xSemaphoreTake(xEspCmdTxFailedSemaphore, 0);
+    xSemaphoreTake(xEspCmdRxStatusSemaphore, 0);
 }
 
 void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)

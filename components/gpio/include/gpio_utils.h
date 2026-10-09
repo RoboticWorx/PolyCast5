@@ -15,17 +15,34 @@
 #define LCD_LEDC_CHANNEL LEDC_CHANNEL_0
 #define LCD_LEDC_TIMER LEDC_TIMER_0
 
-#define HAPTIC_MAX_MS 50
+// Haptic/RGB UI step: one FreeRTOS tick at 100 Hz, so every shown value runs distinctly
+#define TIMING_STEP_MS 10
+
+#define HAPTIC_MAX_MS 100
 #define HAPTIC_MIN_MS 10
 
 // Slack past a buzz's intended end before gpio_task forces the motor off
 // Covers normal timer-daemon latency; anything beyond it means the OFF write was lost
 #define HAPTIC_WATCHDOG_GRACE_MS 100
 
+// RGB period is the half-period (on or off time; UI shows 2x); 0 = blink off
 #define RGB_PERIOD_MAX_MS 50
 #define RGB_PERIOD_MIN_MS 0
 #define RGB_TOTAL_MAX_MS 500
 #define RGB_TOTAL_MIN_MS 40
+
+/**
+ * @brief Clamp a stored timing to [lo, hi] and floor it onto the TIMING_STEP_MS grid (what the tick timers ran)
+ */
+static inline int32_t gpio_utils_snap_ms(int32_t ms, int32_t lo, int32_t hi)
+{
+    if (ms < lo) {
+        ms = lo;
+    } else if (ms > hi) {
+        ms = hi;
+    }
+    return ms - (ms % TIMING_STEP_MS);
+}
 
 // Battery under-voltage cutoff, in volts as measured through the ADC front end
 #define BATT_CUTOFF_VBAT      3.35f // Drop 3V3_EN below this

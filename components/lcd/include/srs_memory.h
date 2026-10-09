@@ -17,16 +17,22 @@ LTP of synapses between neurons in the brain.
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "esp_err.h"
+
 #define SRS_NS "srs"
 
 #define SRS_MAX_ENTRIES 2048 // Max number of entries
 #define SRS_NUM_STEPS 8
+#define SRS_STEP_DONE 0x8000 // srs_entry_t.step flag: final review done, never due again
+#define SRS_STEP_MASK 0x7FFF // srs_entry_t.step without SRS_STEP_DONE
 
 typedef struct {
     uint16_t page; // Notebook page number
-    uint16_t step; // 0...SRS_NUM_STEPS - 1: e.g. 1d > 3d > 7d ...
+    uint16_t step; // 0...SRS_NUM_STEPS - 1: e.g. 1d > 3d > 7d ..., | SRS_STEP_DONE after the final review
     uint32_t start_day; // Day of creation relative to epoch
 } srs_entry_t;
+
+_Static_assert(sizeof(srs_entry_t) == 8, "srs_entry_t is the NVS blob layout");
 
 extern srs_entry_t srs_tbl[SRS_MAX_ENTRIES];
 
@@ -51,11 +57,9 @@ void srs_nvs_save(void);
 void srs_nvs_load(void);
 
 /** 
- * @brief Gets days since local time epoch
+ * @brief Gets today's local calendar date as days since 1970-01-01
  *
- * @param [in] calibrate Offset to add days in the case that the user isn't starting from scratch
- *
- * @returns Days since epoch
+ * @returns Days since epoch, independent of the UTC offset and DST
  */
 uint32_t srs_days_since_epoch_local(void);
 
@@ -91,6 +95,13 @@ void srs_add_or_reset(uint16_t page, uint32_t today);
  * @returns Next default page
  */
 uint16_t srs_next_default_page(void);
+
+/** 
+ * @brief Erases every SRS notebook entry from NVS and RAM
+ *
+ * @returns ESP_OK on success
+ */
+esp_err_t srs_forget_all(void);
 
 /** 
  * @brief Gets the current time and data over Wi-Fi to sync to RTC

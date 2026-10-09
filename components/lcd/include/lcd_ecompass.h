@@ -23,7 +23,8 @@ void lcd_ecompass_stream_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_men
 
 /**
  * @brief Compass calibration page (entered with DOWN from the ecompass page). SELECT starts/stops a
- *        manual hard-/soft-iron calibration turn; the result is saved to NVS.
+ *        manual 3-axis hard-/soft-iron calibration (three guided turns: flat, upright, sideways);
+ *        the result is saved to NVS.
  *
  * @param [in] ui_btns UI input structure
  * @param [in] ui_menu UI menu structure
