@@ -28,6 +28,7 @@
 
 #include "esp_err.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
 
 #include "esp_bt.h"
 #if !CONFIG_BT_NIMBLE_ENABLED
@@ -78,6 +79,15 @@ esp_err_t esp_hid_gap_deinit(void);
 
 esp_err_t esp_hid_ble_gap_adv_init(uint16_t appearance, const char *device_name);
 esp_err_t esp_hid_ble_gap_adv_start(void);
+
+// Open (true) or close the whitelist for this session; the stored preferred peer is never erased
+void esp_hid_gap_set_pair_window(bool open);
+
+// True once the current link is encrypted; reports sent before that are dropped by the host
+bool esp_hid_gap_link_encrypted(void);
+
+// Tick count when the link last encrypted; valid while esp_hid_gap_link_encrypted() is true
+TickType_t esp_hid_gap_link_enc_tick(void);
 
 #ifdef __cplusplus
 }

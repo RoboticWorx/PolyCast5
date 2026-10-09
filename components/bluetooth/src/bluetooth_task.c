@@ -10,6 +10,7 @@
 #include "esp_random.h"
 
 #include "bluetooth_utils.h"
+#include "esp_hid_gap.h"
 #include "portmacro.h"
 #include "bluetooth_task.h"
 #include "bluetooth_nvs.h"
@@ -43,22 +44,29 @@ static const TickType_t battery_timer_interval = pdMS_TO_TICKS(1000);
 #define STREAM_BUF_SZ 512
 #define STREAM_END_MARKER "!END!"
 #define STREAM_END_MARKER_LEN 5
+// Longest '<...' held while waiting for '>' (parse_and_send_tag reads at most 63 tag chars); longer runs type literally
+#define STREAM_TAG_MAX 64
+_Static_assert(STREAM_TAG_MAX + STREAM_END_MARKER_LEN < STREAM_BUF_SZ - 1, "stream_buf must outgrow the longest hold");
 POLYCAST5_USE_PSRAM_BSS static char stream_buf[STREAM_BUF_SZ];
 static size_t stream_buf_len = 0;
 static bool stream_end_detected = false;
 
-// Append text to stream_buf, flush complete segments (no partial <tag> or !END!) via send_script
-static void stream_buf_append(const char *text, size_t len)
+// Host link the current stream types to, pinned by its first chunk
+static bool stream_link_set = false;
+static uint32_t stream_link_epoch = 0;
+
+// Append one piece that fits in stream_buf, flush complete segments (no partial <tag> or !END!) via send_script
+static void stream_buf_append_piece(const char *text, size_t len)
 {
     if (stream_end_detected) {
         return; // Already hit !END!, ignore further chunks
     }
 
-    // Append as much as fits
-    size_t space = STREAM_BUF_SZ - 1 - stream_buf_len;
-    if (len > space) {
-        len = space;
+    if (!stream_link_set) {
+        stream_link_epoch = bluetooth_utils_link_epoch();
+        stream_link_set = true;
     }
+
     memcpy(stream_buf + stream_buf_len, text, len);
     stream_buf_len += len;
     stream_buf[stream_buf_len] = '\0';
@@ -69,7 +77,7 @@ static void stream_buf_append(const char *text, size_t len)
         // Send everything before !END!
         if (end_marker > stream_buf) {
             *end_marker = '\0';
-            bluetooth_utils_send_script(stream_buf, BLUETOOTH_TAP_MS);
+            bluetooth_utils_send_script_on_link(stream_buf, BLUETOOTH_TAP_MS, stream_link_epoch);
         }
         stream_buf_len = 0;
         stream_buf[0] = '\0';
@@ -89,6 +97,11 @@ static void stream_buf_append(const char *text, size_t len)
         }
     }
 
+    // Too long to be a tag: release it so a bare '<' can't fill the buffer (send_script types it literally)
+    if (last_open && (size_t)(stream_buf + stream_buf_len - last_open) > STREAM_TAG_MAX) {
+        last_open = NULL;
+    }
+
     size_t safe_len = last_open ? (size_t)(last_open - stream_buf) : stream_buf_len;
 
     // Hold back potential partial !END! prefix at the tail of the safe portion
@@ -104,8 +117,17 @@ static void stream_buf_append(const char *text, size_t len)
         // Temporarily NULL-terminate the safe portion and send it
         char saved = stream_buf[safe_len];
         stream_buf[safe_len] = '\0';
-        bluetooth_utils_send_script(stream_buf, BLUETOOTH_TAP_MS);
+        bool sent = bluetooth_utils_send_script_on_link(stream_buf, BLUETOOTH_TAP_MS, stream_link_epoch);
         stream_buf[safe_len] = saved;
+
+        // Link lost or replaced: drop the rest of this stream so a reconnecting host never gets its tail
+        if (!sent) {
+            stream_buf_len = 0;
+            stream_buf[0] = '\0';
+            stream_end_detected = true; // Ignore chunks until the end sentinel
+            xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT | BLUETOOTH_STREAM_ABORT_BIT);
+            return;
+        }
 
         // Shift remainder to front
         size_t remain = stream_buf_len - safe_len;
@@ -117,12 +139,32 @@ static void stream_buf_append(const char *text, size_t len)
     }
 }
 
+// Append a whole streamed delta in buffer-sized pieces so nothing is clipped
+static void stream_buf_append(const char *text, size_t len)
+{
+    while (len > 0 && !stream_end_detected
+            && !(xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_CANCEL_TYPING_BIT)) {
+        size_t n = STREAM_BUF_SZ - 1 - stream_buf_len;
+        if (n >= len) {
+            n = len;
+        } else {
+            // End the piece before a split UTF-8 sequence so it folds whole (at most 3 continuation bytes)
+            for (int k = 0; k < 3 && ((unsigned char)text[n] & 0xC0) == 0x80; ++k) {
+                n--;
+            }
+        }
+        stream_buf_append_piece(text, n);
+        text += n;
+        len -= n;
+    }
+}
+
 // Flush whatever is left in stream_buf (called on end-of-stream)
 static void stream_buf_flush(void)
 {
     if (stream_buf_len > 0) {
         stream_buf[stream_buf_len] = '\0';
-        bluetooth_utils_send_script(stream_buf, BLUETOOTH_TAP_MS);
+        bluetooth_utils_send_script_on_link(stream_buf, BLUETOOTH_TAP_MS, stream_link_epoch);
         stream_buf_len = 0;
         stream_buf[0] = '\0';
     }
@@ -142,6 +184,7 @@ static void stream_buf_discard_all(void)
     stream_buf_len = 0;
     stream_buf[0] = '\0';
     stream_end_detected = false;
+    stream_link_set = false;
 }
 
 static void bluetooth_task(void *arg)
@@ -213,7 +256,9 @@ static void bluetooth_task(void *arg)
         if (xQueueReceive(xBluetoothMediaCmdQueue, &bluetooth_cmd, 0) == pdTRUE) {
             /* Initialization stuff */
             // Initialize command received
-            if (bluetooth_cmd == BLUETOOTH_CMD_INIT) {
+            if (bluetooth_cmd == BLUETOOTH_CMD_INIT || bluetooth_cmd == BLUETOOTH_CMD_INIT_PAIR_NEW) {
+                stream_buf_discard_all(); // A chunk queued after the last DEINIT would latch this session's stream state
+                esp_hid_gap_set_pair_window(bluetooth_cmd == BLUETOOTH_CMD_INIT_PAIR_NEW);
                 bluetooth_utils_init();
             } else if (bluetooth_cmd == BLUETOOTH_CMD_DEINIT) { // De-initialize command received
                 stream_buf_discard_all();
@@ -411,6 +456,7 @@ static void bluetooth_task(void *arg)
                     xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT);
                 }
                 stream_end_detected = false; // Reset for next stream
+                stream_link_set = false;
             }
         }
 

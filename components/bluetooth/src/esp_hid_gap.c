@@ -752,6 +752,55 @@ static struct ble_hs_adv_fields fields;
 // Bluetooth stack state (owned by bluetooth_utils.c)
 extern volatile bluetooth_state_t bluetooth_state;
 
+// Pair-new session: advertise openly without touching the stored default
+static volatile bool s_pair_window = false;
+
+// Connection creating a new bond (no keys at connect, or re-paired)
+static uint16_t s_new_bond_conn = BLE_HS_CONN_HANDLE_NONE;
+
+// Connection whose encryption is up; hosts drop reports sent before it
+static volatile uint16_t s_enc_conn = BLE_HS_CONN_HANDLE_NONE;
+
+// Tick of the last successful ENC_CHANGE; written before s_enc_conn so an encrypted reader sees it
+static volatile TickType_t s_enc_tick;
+
+void esp_hid_gap_set_pair_window(bool open)
+{
+    s_pair_window = open;
+}
+
+bool esp_hid_gap_link_encrypted(void)
+{
+    return s_enc_conn != BLE_HS_CONN_HANDLE_NONE;
+}
+
+TickType_t esp_hid_gap_link_enc_tick(void)
+{
+    return s_enc_tick;
+}
+
+// True if NimBLE holds keys for this identity address
+static bool peer_has_bond(const ble_addr_t *addr)
+{
+    struct ble_store_key_sec key;
+    struct ble_store_value_sec value;
+
+    memset(&key, 0, sizeof(key));
+    key.peer_addr = *addr;
+    return ble_store_read_our_sec(&key, &value) == 0;
+}
+
+// Default whose bond REPEAT_PAIRING deleted; its resolving-list entry admits it until controller deinit
+static ble_addr_t s_repair_addr;
+static volatile bool s_repair_pending = false;
+
+// Default can still connect: NimBLE holds its keys, or its re-pair is pending this session
+static bool pref_is_live(const ble_addr_t *pref)
+{
+    return peer_has_bond(pref)
+            || (s_repair_pending && ble_addr_cmp(pref, &s_repair_addr) == 0);
+}
+
 esp_err_t esp_hid_ble_gap_adv_init(uint16_t appearance, const char *device_name)
 {
     ble_uuid16_t *uuid16, *uuid16_1;
@@ -765,6 +814,8 @@ esp_err_t esp_hid_ble_gap_adv_init(uint16_t appearance, const char *device_name)
 
     free((void *)fields.uuids16); // Free previous allocation on reinit (before memset clears the pointer)
     memset(&fields, 0, sizeof fields);
+    s_enc_conn = BLE_HS_CONN_HANDLE_NONE;
+    s_new_bond_conn = BLE_HS_CONN_HANDLE_NONE; // Handles are reused across sessions
 
     /* Advertise two flags:
      *     o Discoverability in forthcoming advertisement (general)
@@ -815,6 +866,7 @@ static int
 nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
 {
     struct ble_gap_conn_desc desc;
+    bool live;
     int rc;
 
     switch (event->type) {
@@ -824,11 +876,36 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
                 event->connect.status == 0 ? "established" : "failed",
                 event->connect.status);
 
+        // EAGAIN: link dropped before its connect was posted (still listed, no DISCONNECT follows)
+        // Any other status is a failed remote feature read on a link that stays up
+        live = event->connect.status != BLE_HS_EAGAIN
+                && ble_gap_conn_find(event->connect.conn_handle, &desc) == 0;
+
+        // A bonded host re-encrypting must not count as a new pairing
+        if (live) {
+            s_new_bond_conn = BLE_HS_CONN_HANDLE_NONE;
+            s_enc_conn = BLE_HS_CONN_HANDLE_NONE;
+            // ENC_CHANGE can precede this event (posted after the remote feature read); take the link's state
+            if (desc.sec_state.encrypted) {
+                s_enc_conn = event->connect.conn_handle;
+            }
+            if (!peer_has_bond(&desc.peer_id_addr)) {
+                s_new_bond_conn = event->connect.conn_handle;
+            }
+        } else {
+            if (s_enc_conn == event->connect.conn_handle) {
+                s_enc_conn = BLE_HS_CONN_HANDLE_NONE;
+            }
+            if (s_new_bond_conn == event->connect.conn_handle) {
+                s_new_bond_conn = BLE_HS_CONN_HANDLE_NONE;
+            }
+        }
+
         // A failed connection attempt stops advertising but produces no ADV_COMPLETE
         // (adv uses BLE_HS_FOREVER) and no DISCONNECT (no link was ever established),
         // so nothing else re-arms it - restart here or the HID stays unconnectable
-        // until Bluetooth is toggled off/on
-        if (event->connect.status != 0 && bluetooth_state == BT_STATE_RUNNING) {
+        // until Bluetooth is toggled off/on. A live link keeps it off until DISCONNECT
+        if (!live && bluetooth_state == BT_STATE_RUNNING) {
             rc = esp_hid_ble_gap_adv_start();
             if (rc != 0) {
                 ESP_LOGE(TAG, "failed to restart advertising after connect failure; rc=%d", rc);
@@ -837,6 +914,9 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
         return 0;
     case BLE_GAP_EVENT_DISCONNECT:
         ESP_LOGI(TAG, "disconnect; reason=%d", event->disconnect.reason);
+        s_enc_conn = BLE_HS_CONN_HANDLE_NONE;
+        // A stale handle would mark the next link's early ENC_CHANGE as a new bond
+        s_new_bond_conn = BLE_HS_CONN_HANDLE_NONE;
 
         return 0;
     case BLE_GAP_EVENT_CONN_UPDATE:
@@ -886,13 +966,21 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
         // Non-zero status means pairing/encryption FAILED (wrong passkey,
         // cancelled dialog, SM timeout) - never persist that peer
         if (event->enc_change.status != 0) {
+            s_enc_conn = BLE_HS_CONN_HANDLE_NONE;
             return 0;
         }
+        s_enc_tick = xTaskGetTickCount();
+        s_enc_conn = event->enc_change.conn_handle;
 
         rc = ble_gap_conn_find(event->enc_change.conn_handle, &desc);
         if (rc != 0) {
             ESP_LOGE(TAG, "ble_gap_conn_find failed on enc_change: %d", rc);
             return 0;
+        }
+
+        // Re-pair completed: keys are persisted, the live check covers it again
+        if (s_repair_pending && ble_addr_cmp(&desc.peer_id_addr, &s_repair_addr) == 0) {
+            s_repair_pending = false;
         }
 
         // Save this as a bonded peer
@@ -902,11 +990,19 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
         ESP_LOGI(TAG, "Saving a valid peer");
 #endif
 
-        // If no preferred peer exists, set this one by default
+        // Set this one as default if none exists, or if it is a new bond made while pairing another
         {
             bool found = false;
             ble_addr_t pref;
-            if (bluetooth_nvs_get_preferred_peer(&pref, &found) != ESP_OK || !found) {
+            bool new_bond = (event->enc_change.conn_handle == s_new_bond_conn);
+            bool claim = s_pair_window && new_bond;
+            if (!claim) {
+                // A default whose keys were evicted can never reconnect; replace it too
+                claim = (bluetooth_nvs_get_preferred_peer(&pref, &found) != ESP_OK || !found
+                        || !pref_is_live(&pref));
+            }
+
+            if (claim) {
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "Saving as preferred peer");
 #endif
@@ -918,6 +1014,11 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
                     ESP_LOGE(TAG, "bluetooth_nvs_set_preferred_peer failed: %s", esp_err_to_name(err));
                 }
 #endif
+
+                // Later advertising restarts whitelist the new device
+                if (new_bond) {
+                    s_pair_window = false;
+                }
             }
         }
         
@@ -946,6 +1047,18 @@ nimble_hid_gap_event(struct ble_gap_event *event, void *arg)
             return 0;
         }
         ble_store_util_delete_peer(&desc.peer_id_addr);
+        s_new_bond_conn = event->repeat_pairing.conn_handle;
+
+        // Keep the default whitelisted and owning the default until its re-pair succeeds
+        {
+            ble_addr_t pref;
+            bool found = false;
+            if (bluetooth_nvs_get_preferred_peer(&pref, &found) == ESP_OK && found
+                    && ble_addr_cmp(&pref, &desc.peer_id_addr) == 0) {
+                s_repair_addr = desc.peer_id_addr;
+                s_repair_pending = true;
+            }
+        }
 
         /* Return BLE_GAP_REPEAT_PAIRING_RETRY to indicate that the host should
          * continue with the pairing operation.
@@ -1050,7 +1163,9 @@ esp_err_t esp_hid_ble_gap_adv_start(void)
 #endif
     
     // Preferred peer found -> directed advertising
-    if (found && (pref.type == BLE_ADDR_PUBLIC || pref.type == BLE_ADDR_RANDOM)) {
+    // Not while pairing another, and never to a peer whose keys NimBLE evicted (it could never connect)
+    if (found && !s_pair_window && pref_is_live(&pref)
+            && (pref.type == BLE_ADDR_PUBLIC || pref.type == BLE_ADDR_RANDOM)) {
         // Clear and program whitelist with exactly this peer
         (void)ble_gap_wl_set(NULL, 0); // Clear whitelist
         rc = ble_gap_wl_set(&pref, 1); // This peer only
@@ -1229,6 +1344,8 @@ static esp_err_t init_low_level(uint8_t mode)
 
 static esp_err_t deinit_low_level(void)
 {
+    // Controller deinit drops the resolving list, so a deleted default can no longer connect
+    s_repair_pending = false;
     return nimble_port_deinit();
 }
 #endif

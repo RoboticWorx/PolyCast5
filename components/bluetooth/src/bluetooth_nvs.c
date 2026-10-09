@@ -145,7 +145,7 @@ esp_err_t bluetooth_nvs_clear_peers_list(bool preferred_only)
         nvs_close(h);
     }
 
-    // Else only preferred peer
+    // Preferred peer, plus every per-address label when clearing all
     // Open BT_PEERS_NS NVS
     err = nvs_open(BT_PEERS_NS, NVS_READWRITE, &h);
     if (err != ESP_OK) {
@@ -163,6 +163,11 @@ esp_err_t bluetooth_nvs_clear_peers_list(bool preferred_only)
     }
     if (err == ESP_OK) {
         err = err2;
+    }
+
+    // Labels outlive the index otherwise, and come back when the same host re-pairs
+    if (err == ESP_OK && !preferred_only) {
+        err = nvs_erase_all(h);
     }
 
     // Commit and close
@@ -441,4 +446,86 @@ esp_err_t bluetooth_nvs_remove_peer(const ble_addr_t *addr)
     }
 
     return ESP_OK;
+}
+
+static bool bt_addr_in_list(const ble_addr_t *a, const ble_addr_t *list, int n)
+{
+    for (int i = 0; i < n; ++i) {
+        if (a->type == list[i].type && memcmp(a->val, list[i].val, 6) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void bluetooth_nvs_prune_peers(const ble_addr_t *bonded, int bonded_count)
+{
+    // Guard
+    if (!bonded || bonded_count <= 0) {
+        return;
+    }
+
+    // Open NVS
+    nvs_handle_t h;
+    if (nvs_open(BT_IDX_NS, NVS_READWRITE, &h) != ESP_OK) {
+        return;
+    }
+
+    // Read existing; never rewrite an index that could not be read
+    ble_addr_t tmp[BT_MAX_PEERS] = {0};
+    size_t sz = sizeof(tmp);
+    if (nvs_get_blob(h, BT_IDX_KEY, tmp, &sz) != ESP_OK) {
+        nvs_close(h);
+        return;
+    }
+
+    // Count entries NimBLE holds no bond for
+    int n = (int)(sz / sizeof(ble_addr_t));
+    int n_dropped = 0;
+    ble_addr_t pref = {0};
+    bool found = false;
+    bluetooth_nvs_get_preferred_peer(&pref, &found);
+    for (int i = 0; i < n; ++i) {
+        if (!bt_addr_in_list(&tmp[i], bonded, bonded_count)) {
+            n_dropped++;
+
+            // Clear the default first so a power cut never leaves it naming a dropped peer
+            if (found && pref.type == tmp[i].type && memcmp(pref.val, tmp[i].val, 6) == 0) {
+                bluetooth_nvs_clear_peers_list(true);
+                found = false;
+            }
+        }
+    }
+
+    if (n_dropped == 0) {
+        nvs_close(h);
+        return;
+    }
+
+    // Drop labels before the index; an interrupted prune just leaves unlabeled entries for the next one
+    int kept = 0;
+    for (int i = 0; i < n; ++i) {
+        if (bt_addr_in_list(&tmp[i], bonded, bonded_count)) {
+            tmp[kept++] = tmp[i];
+        } else {
+            bluetooth_nvs_set_peer_label(&tmp[i], NULL);
+        }
+    }
+
+    // Write the compacted list back, or erase it if nothing remains
+    esp_err_t err;
+    if (kept > 0) {
+        err = nvs_set_blob(h, BT_IDX_KEY, tmp, kept * sizeof(ble_addr_t));
+    } else {
+        err = nvs_erase_key(h, BT_IDX_KEY);
+    }
+    nvs_close(h);
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "bluetooth_nvs_prune_peers: index write failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    ESP_LOGW(TAG, "Pruned %d peer(s) whose bond NimBLE no longer holds", n_dropped);
 }

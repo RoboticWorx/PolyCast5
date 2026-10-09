@@ -2,6 +2,9 @@
 
 #include <string.h>
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+
 #include "esp_log.h"
 #include "esp_wifi.h"
 #include "esp_netif.h"
@@ -13,6 +16,9 @@
 #include "espnow_task.h"
 
 #define TAG "ESPNOW_UTILS"
+
+// MAC-layer result of the last unicast frame (depth 1, latest wins)
+static QueueHandle_t send_status_queue;
 
 esp_err_t espnow_utils_wifi_driver_init(void)
 {
@@ -80,14 +86,21 @@ static void send_cb(const wifi_tx_info_t *info, esp_now_send_status_t status)
             status == ESP_NOW_SEND_SUCCESS ? "OK" : "FAIL");
 #endif
     
-    if (status == ESP_NOW_SEND_SUCCESS) {
-        xSemaphoreGive(xEspCmdRxStatusSemaphore);
-    }
+    // Runs in the Wi-Fi task: hand off without blocking
+    xQueueOverwrite(send_status_queue, &status);
 }
 
 esp_err_t espnow_utils_espnow_init(const uint8_t *mac, uint8_t channel, bool encrypt, const uint8_t *lmk)
 {
     esp_err_t err;
+
+    if (!send_status_queue) {
+        send_status_queue = xQueueCreate(1, sizeof(esp_now_send_status_t));
+        if (!send_status_queue) {
+            ESP_LOGE(TAG, "send_status_queue create failed");
+            return ESP_ERR_NO_MEM;
+        }
+    }
 
     // Initialize ESP-NOW
     err = esp_now_init();
@@ -146,8 +159,23 @@ esp_err_t espnow_utils_send_data(const uint8_t *mac, const uint8_t *data, size_t
         len = ESP_NOW_MAX_DATA_LEN;
     }
     
+    // Drop any earlier frame's result so a wait only sees this one
+    xQueueReset(send_status_queue);
+    
     // Send to given MAC
     return esp_now_send(mac, data, len);
+}
+
+bool espnow_utils_wait_delivery(TickType_t timeout)
+{
+    esp_now_send_status_t status;
+    
+    // No callback after esp_now_deinit, so a timeout counts as not delivered
+    if (xQueueReceive(send_status_queue, &status, timeout) != pdPASS) {
+        return false;
+    }
+    
+    return status == ESP_NOW_SEND_SUCCESS;
 }
 
 esp_err_t espnow_utils_register_recv_cb(esp_now_recv_cb_t cb)

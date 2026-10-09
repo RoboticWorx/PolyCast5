@@ -45,7 +45,7 @@ void bluetooth_nvs_add_to_peers_list(const ble_addr_t *peer);
 /** 
  * @brief Clears all bluetooth peers in NVS
  *
- * @param [in] preferred_only If true, only erase the preferred peer
+ * @param [in] preferred_only If true, only erase the preferred peer; if false, also erase the peer index and every peer label
  *
  * @returns ESP error status
  */
@@ -100,6 +100,14 @@ esp_err_t bluetooth_nvs_set_peer_label(const ble_addr_t *addr, const char *label
  * @returns ESP error status
  */
 esp_err_t bluetooth_nvs_remove_peer(const ble_addr_t *addr);
+
+/** 
+ * @brief Drop index entries NimBLE no longer holds a bond for, with their labels and the preferred peer if dropped
+ *
+ * @param [in] bonded Identity addresses NimBLE holds bonds for
+ * @param [in] bonded_count Number of entries in bonded; 0 does nothing
+ */
+void bluetooth_nvs_prune_peers(const ble_addr_t *bonded, int bonded_count);
 
 
 #endif // BLUETOOTH_NVS_H

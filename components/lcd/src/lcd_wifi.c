@@ -1787,8 +1787,8 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
             }
         }
     }
-    // Send frames to Grok once connected
-    if (state == AI_PKT_SEND_AI) {
+    // Send frames to Grok once connected. Skipped on an exit this tick: the exit branch below resets state
+    if (state == AI_PKT_SEND_AI && !(ui_btns->left_btn || ui_btns->home_btn || ui_btns->pwr_btn)) {
         lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
         lv_label_set_text(lbl_ins, "Analyzing captured\npackets with AI...\n\nPlease wait...");
         lv_timer_handler(); // Update immediately
@@ -1835,6 +1835,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
             .free_ptr = frames_copy,
             .free_on_done = true,
             .reasoning = true, // Want accuracy
+            .gen = ai_visit_gen,
         };
 
         // Actually send it
@@ -1948,6 +1949,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 
         // Disable Wi-Fi
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+        ai_visit_gen++; // Drops the result of an analysis still running
     } else if (ui_btns->left_btn) { // Go back
 		// Stop loading animation
 		lcd_anim_loading_stop();
@@ -1980,6 +1982,7 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
 
         // Disable Wi-Fi
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+        ai_visit_gen++; // Drops the result of an analysis still running
     } else if (ui_btns->home_btn || ui_btns->pwr_btn) { // Home or power off
         // Delete objects
         lv_obj_delete(lbl_ins);
@@ -1993,6 +1996,10 @@ void lcd_wifi_ai_packet_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, wifi_menu_t
         // Reset statics
         init = true;
         lbl_ins = lbl_config = NULL;
+        
+        // Disable Wi-Fi; also aborts an in-flight analysis that would keep ai_task busy
+        xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+        ai_visit_gen++; // A DNS lookup survives the teardown; this drops that analysis's result
         
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
 

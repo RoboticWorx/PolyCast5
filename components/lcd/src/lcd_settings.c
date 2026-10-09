@@ -2982,9 +2982,12 @@ void lcd_settings_pin_nvs_load(settings_menu_t *menu)
     if (err == ESP_ERR_NVS_NOT_FOUND || err == ESP_ERR_NVS_NOT_INITIALIZED) {
         menu->pin_menu.pin_set = false;
         menu->pin_menu.unlock_pin[0] = '\0';
+
+        if (err != ESP_ERR_NVS_NOT_FOUND) {
 #ifdef POLYCAST5_DEBUG
-        ESP_LOGW(TAG, "lcd_settings_pin_nvs_load nvs_open failed: %s", esp_err_to_name(err));
+            ESP_LOGW(TAG, "lcd_settings_pin_nvs_load nvs_open failed: %s", esp_err_to_name(err));
 #endif
+        }
         
         return;
     }
@@ -3079,9 +3082,12 @@ void lcd_settings_pin_attempts_nvs_load(void)
     // Open NVS
     esp_err_t err = nvs_open(SETTINGS_ATTEMPTS_NS, NVS_READONLY, &h);
     if (err != ESP_OK) {
+        // NOT_FOUND: no attempts saved yet, keep the default 0
+        if (err != ESP_ERR_NVS_NOT_FOUND) {
 #ifdef POLYCAST5_DEBUG
-        ESP_LOGW(TAG, "Pin attempts nvs_open failed: %s", esp_err_to_name(err));
+            ESP_LOGW(TAG, "Pin attempts nvs_open failed: %s", esp_err_to_name(err));
 #endif
+        }
         
         return;
     }
@@ -3463,10 +3469,8 @@ void lcd_settings_uptime_nvs_load(uint64_t *uptime_seconds)
     // Open NVS
     esp_err_t err = nvs_open(SETTINGS_UPTIME_NS, NVS_READONLY, &h);
     if (err != ESP_OK) {
-        if (err == ESP_ERR_NVS_NOT_FOUND) {
+        if (err != ESP_ERR_NVS_NOT_FOUND) {
             ESP_LOGW(TAG, "lcd_settings_uptime_nvs_load: open failed: %s", esp_err_to_name(err));
-        } else {
-            ESP_LOGE(TAG, "lcd_settings_uptime_nvs_load: open failed: %s", esp_err_to_name(err));
         }
         return;
     }

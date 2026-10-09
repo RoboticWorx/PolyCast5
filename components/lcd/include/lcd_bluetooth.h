@@ -16,15 +16,15 @@
 typedef struct ui_btns_t ui_btns_t;
 typedef struct ui_menu_t ui_menu_t;
 
-// Simple "known devices" list
+// Simple "known devices" list (row 0 is "Pair Another")
 typedef struct {
-    char labels[BT_MAX_PEERS][18]; // "AA:BB:CC:DD:EE:FF"
-    ble_addr_t peers[BT_MAX_PEERS]; // Identity addresses
+    char labels[BT_MAX_PEERS + 1][18]; // "AA:BB:CC:DD:EE:FF"
+    ble_addr_t peers[BT_MAX_PEERS + 1]; // Identity addresses
     int size;
     int index;
     lv_obj_t *main_list;
     lv_style_t btn_style, sel_style;
-    lv_obj_t *btns[BT_MAX_PEERS], *cont;
+    lv_obj_t *btns[BT_MAX_PEERS + 1], *cont;
 } bluetooth_peer_menu_t;
 
 typedef struct {

@@ -32,6 +32,7 @@ static bool accel_streaming = false;
 static uint8_t accel_stream_mac[ESPNOW_MAC_SIZE];
 
 SemaphoreHandle_t xEspCmdRxStatusSemaphore;
+SemaphoreHandle_t xEspCmdRxFailedSemaphore;
 SemaphoreHandle_t xEspCmdTxSuccessSemaphore;
 SemaphoreHandle_t xEspCmdTxFailedSemaphore;
 
@@ -42,10 +43,20 @@ QueueHandle_t xEspSendMqttQueue;
 QueueHandle_t xEspEcompassStreamCtrlQueue;
 QueueHandle_t xEspEcompassStreamQueue;
 
+// A newer command already queued owns the page's receipt, so an older command's result is dropped
+static void cmd_result_give(SemaphoreHandle_t result)
+{
+    if (uxQueueMessagesWaiting(xEspSendCmdQueue) == 0) {
+        xSemaphoreGive(result);
+    }
+}
+
 static void espnow_task(void *param)
 {
     xEspCmdRxStatusSemaphore = xSemaphoreCreateBinary();
     configASSERT(xEspCmdRxStatusSemaphore);
+    xEspCmdRxFailedSemaphore = xSemaphoreCreateBinary();
+    configASSERT(xEspCmdRxFailedSemaphore);
     xEspCmdTxSuccessSemaphore = xSemaphoreCreateBinary();
     configASSERT(xEspCmdTxSuccessSemaphore);
     xEspCmdTxFailedSemaphore = xSemaphoreCreateBinary();
@@ -200,12 +211,12 @@ static void espnow_task(void *param)
             err = espnow_utils_wifi_radio_start(WIFI_CHANNEL);
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "cmd: radio_start failed: %s", esp_err_to_name(err));
-                xSemaphoreGive(xEspCmdTxFailedSemaphore);
+                cmd_result_give(xEspCmdTxFailedSemaphore);
                 continue;
             }
             if (espnow_utils_espnow_init(espnow_cmd.mac_selected, WIFI_CHANNEL, espnow_cmd.enc, espnow_cmd.enc ? espnow_cmd.lmk : NULL) != ESP_OK) {
                 ESP_LOGE(TAG, "cmd: espnow_init failed");
-                xSemaphoreGive(xEspCmdTxFailedSemaphore);
+                cmd_result_give(xEspCmdTxFailedSemaphore);
                 espnow_utils_espnow_deinit();
                 espnow_utils_wifi_radio_stop();
                 continue;
@@ -220,7 +231,7 @@ static void espnow_task(void *param)
             if (espnow_cmd.enc) { // Yes encryption
                 if (!espnow_auth_build_frame(espnow_cmd.lmk, espnow_cmd.cmd_to_send, tx_payload)) {
                     ESP_LOGE(TAG, "Failed to build authenticated frame");
-                    xSemaphoreGive(xEspCmdTxFailedSemaphore);
+                    cmd_result_give(xEspCmdTxFailedSemaphore);
                     espnow_utils_espnow_deinit();
                     espnow_utils_wifi_radio_stop();
                     continue;
@@ -231,7 +242,7 @@ static void espnow_task(void *param)
                 // Check payload
                 if (tx_payload_len < 0 || tx_payload_len >= (int)sizeof(tx_payload)) {
                     ESP_LOGE(TAG, "Payload snprintf failed or too long.");
-                    xSemaphoreGive(xEspCmdTxFailedSemaphore);
+                    cmd_result_give(xEspCmdTxFailedSemaphore);
                     espnow_utils_espnow_deinit();
                     espnow_utils_wifi_radio_stop();
                     continue;
@@ -254,13 +265,17 @@ static void espnow_task(void *param)
             // Send the data
             if (espnow_utils_send_data(espnow_cmd.mac_selected, tx_payload, tx_payload_len) == ESP_OK) {
                 // Notify the LCD that the transmission was successful
-                xSemaphoreGive(xEspCmdTxSuccessSemaphore);
-            } else {
-                xSemaphoreGive(xEspCmdTxFailedSemaphore); // Mark as failed TX for LCD
-            }
+                cmd_result_give(xEspCmdTxSuccessSemaphore);
 
-            // Wait for ACK frame
-            vTaskDelay(pdMS_TO_TICKS(100));
+                // Wait for the peer's MAC ACK; no result before teardown counts as not received
+                if (espnow_utils_wait_delivery(pdMS_TO_TICKS(200))) {
+                    cmd_result_give(xEspCmdRxStatusSemaphore);
+                } else {
+                    cmd_result_give(xEspCmdRxFailedSemaphore);
+                }
+            } else {
+                cmd_result_give(xEspCmdTxFailedSemaphore); // Mark as failed TX for LCD
+            }
 
             // Stop radio and de-initialize ESP-NOW
             espnow_utils_espnow_deinit();
@@ -293,10 +308,6 @@ static void espnow_task(void *param)
                 espnow_utils_espnow_deinit();
                 espnow_utils_wifi_radio_stop();
                 accel_streaming = false;
-
-                // Streaming's per-frame send_cb repeatedly gives the delivery semaphore
-                // Drain it so the command page doesn't later see a stale received without a command being sent
-                xSemaphoreTake(xEspCmdRxStatusSemaphore, 0);
             }
         }
 

@@ -1852,7 +1852,7 @@ void lcd_tools_how_srs_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t
         lv_obj_align_to(instr_lbl, title_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
         // Set custom text based on hotkey index
-        const char *instr_text = "Press RIGHT to skip. Hold SELECT to forget notebooks.\n\n"
+        const char *instr_text = "Press RIGHT to skip. Hold SELECT to forget notebooks. Or keep reading.\n\n"
                                  "The SRS memory planner is a tool to help you remember new information based on the Ebbinghaus "
                                  "forgetting curve (via Spaced Repetition System).\n\nBasically, the more you review things, the "
                                  "better you remember them at increasingly impressive intervals.\n\n"

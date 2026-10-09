@@ -1108,17 +1108,32 @@ esp_err_t ai_utils_send_command_xai_stream(const char *system_prompt, const char
     esp_http_client_set_header(client, "Content-Type", "application/json");
     esp_http_client_set_header(client, "Accept", "text/event-stream");
 
-    // Attach POST body
-    esp_http_client_set_post_field(client, payload, strlen(payload));
-
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "Stream: free heap before perform: free=%u LFB=%u",
             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
 #endif
 
-    // Perform the request (blocks; SSE chunks arrive via http_evt_stream callback)
-    esp_err_t err = esp_http_client_perform(client);
+    // Drive the request by hand: perform() reads the whole body even after the callback aborts.
+    // SSE bytes still arrive via http_evt_stream; rd only sinks esp_http_client_read's copy
+    int payload_len = (int)strlen(payload);
+    esp_err_t err = esp_http_client_open(client, payload_len);
+    if (err == ESP_OK && esp_http_client_write(client, payload, payload_len) != payload_len) {
+        err = ESP_FAIL;
+    }
+    if (err == ESP_OK && esp_http_client_fetch_headers(client) < 0) {
+        err = ESP_ERR_HTTP_FETCH_HEADER;
+    }
+    if (err == ESP_OK) {
+        // Small reads bound how much arrives after an abort; closing the socket then stops generation
+        char rd[128];
+        int n = 0;
+        while (!sctx.aborted && (n = esp_http_client_read(client, rd, sizeof(rd))) > 0) {
+        }
+        if (n < 0 && !sctx.aborted) {
+            err = ESP_FAIL;
+        }
+    }
 
     // Read HTTP status code
     int status = esp_http_client_get_status_code(client);

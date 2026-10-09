@@ -12,6 +12,7 @@ typedef struct {
 } espnow_enc_key_result_t;
 
 extern SemaphoreHandle_t xEspCmdRxStatusSemaphore;
+extern SemaphoreHandle_t xEspCmdRxFailedSemaphore;
 extern SemaphoreHandle_t xEspCmdTxSuccessSemaphore;
 extern SemaphoreHandle_t xEspCmdTxFailedSemaphore;
 

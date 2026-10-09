@@ -991,6 +991,7 @@ void lcd_espnow_drain_receipts(void)
     xSemaphoreTake(xEspCmdTxSuccessSemaphore, 0);
     xSemaphoreTake(xEspCmdTxFailedSemaphore, 0);
     xSemaphoreTake(xEspCmdRxStatusSemaphore, 0);
+    xSemaphoreTake(xEspCmdRxFailedSemaphore, 0);
 }
 
 void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *espnow_menu)
@@ -998,15 +999,30 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
     #define BUF_SIZE 4
     
     static uint32_t select_hold = 0; // SELECT hold-to-repeat (+3)
+    static uint32_t receipts_pending = 0; // Sends from this page still owed a final result
     
+    // Always take results; drop ones no send on this visit is waiting for (hotkeys, earlier visits)
     if (xSemaphoreTake(xEspCmdTxSuccessSemaphore, 0) == pdTRUE) { // If transmission successful
-        lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT LV_SYMBOL_OK);
-    } else if (xSemaphoreTake(xEspCmdTxFailedSemaphore, 0) == pdTRUE) { // If transmission failed
-        lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT LV_SYMBOL_CLOSE);
+        if (receipts_pending) {
+            lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT LV_SYMBOL_OK);
+        }
+    } else if (xSemaphoreTake(xEspCmdTxFailedSemaphore, 0) == pdTRUE) { // If transmission failed (final)
+        if (receipts_pending) {
+            lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT LV_SYMBOL_CLOSE);
+            receipts_pending--;
+        }
     }
     
     if (xSemaphoreTake(xEspCmdRxStatusSemaphore, 0) == pdTRUE) { // If data received
-        lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, RX_TXT LV_SYMBOL_OK);
+        if (receipts_pending) {
+            lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, RX_TXT LV_SYMBOL_OK);
+            receipts_pending--;
+        }
+    } else if (xSemaphoreTake(xEspCmdRxFailedSemaphore, 0) == pdTRUE) { // If peer never ACKed
+        if (receipts_pending) {
+            lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, RX_TXT LV_SYMBOL_CLOSE);
+            receipts_pending--;
+        }
     }
     
     // Holding SELECT keeps stepping the command by 3
@@ -1061,6 +1077,7 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
 
         // Send the command
         xQueueSend(xEspSendCmdQueue, &espnow_cmd, portMAX_DELAY);
+        receipts_pending++;
         
         // RGB indicator
         uint8_t rgb_state = RGB_BLINK_TEAL;
@@ -1071,6 +1088,7 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
         // Reset receipts
         lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT);
         lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, RX_TXT);
+        receipts_pending = 0;
         
         // Back to default
         espnow_menu->espnow_submenu.cmd_to_send = 1;
@@ -1107,6 +1125,7 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
         // Reset receipts
         lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT);
         lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, RX_TXT);
+        receipts_pending = 0;
         
         // Back to default
         espnow_menu->espnow_submenu.cmd_to_send = 1;
@@ -1159,6 +1178,7 @@ void lcd_espnow_option(ui_btns_t *ui_btns, ui_menu_t *ui_menu, espnow_menu_t *es
         // Reset receipts
         lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_tx, TX_TXT);
         lv_label_set_text(espnow_menu->espnow_submenu.lbl_send_rx, RX_TXT);
+        receipts_pending = 0;
         
         // Back to default
         espnow_menu->espnow_submenu.cmd_to_send = 1;

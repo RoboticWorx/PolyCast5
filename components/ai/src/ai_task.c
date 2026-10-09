@@ -30,22 +30,31 @@ char ai_wifi_portal_pass[64];
 
 volatile bool mic_recording = false; // To lcd_bluetooth.c
 
+volatile uint32_t ai_visit_gen = 0; // To lcd_bluetooth.c and lcd_wifi.c
+static uint32_t req_gen = 0; // ai_visit_gen the running command was sent under
+
 POLYCAST5_USE_PSRAM_BSS static char prompt_buf[AI_PROMPT_NVS_MAX_LEN] = {0};
 POLYCAST5_USE_PSRAM_BSS static char ai_response[AI_RESPONSE_MAX_LEN] = {0};
 POLYCAST5_USE_PSRAM_BSS static char user_transcript[AI_USER_TRANSCRIPT_MAX_LEN];
 
+// The page that sent the running command was left: its result must not reach a later visit
+// Wi-Fi teardown doesn't fail a pending DNS lookup, so a request can resume on the next connection
+static inline bool req_abandoned(void)
+{
+    return req_gen != ai_visit_gen;
+}
+
 // Streaming callback: queues each content delta for bluetooth_task to type over BLE
 static esp_err_t stream_to_bluetooth_cb(const char *delta, void *ctx)
 {
-    (void)ctx;
-
-    // If BLE was torn down mid-stream, abort the HTTP request
-    if (xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_CANCEL_TYPING_BIT) {
+    // Page left (now or since the request was sent) or host link lost: abort the HTTP request
+    if (req_abandoned() || (xEventGroupGetBits(xBluetoothEventGroup) & (BLUETOOTH_CANCEL_TYPING_BIT | BLUETOOTH_STREAM_ABORT_BIT))) {
         return ESP_FAIL;
     }
 
-    // Signal done thinking
+    // Signal done thinking. ctx records it per request: the LCD clears the bit when it consumes it
     xEventGroupSetBits(xAiEventGroup, AI_DONE_THINKING_BIT);
+    *(bool *)ctx = true;
 
     if (delta && delta[0]) {
         char *copy = strdup(delta);
@@ -57,14 +66,12 @@ static esp_err_t stream_to_bluetooth_cb(const char *delta, void *ctx)
             ESP_LOGI(TAG, "Streaming AI BLE: '%s'", copy);
 #endif
             // Queue the strdup'd chunk; bluetooth_task drains and free()s it
-            if (xQueueSend(xBluetoothAiStreamQueue, &copy, pdMS_TO_TICKS(5000)) != pdTRUE) {
-#ifdef POLYCAST5_DEBUG
-                ESP_LOGW(TAG, "stream_to_bluetooth_cb timeout (%u bytes)", (unsigned)strlen(copy));
-#endif
-#ifdef POLYCAST5_DEBUG_PASSWORDS
-                ESP_LOGW(TAG, "stream_to_bluetooth_cb timeout: '%s'", copy);
-#endif
-                free(copy); // Queue full/timeout
+            // Waits out long typing stalls (<delay=>) so no text or !END! is lost; leaving the page cancels
+            while (xQueueSend(xBluetoothAiStreamQueue, &copy, pdMS_TO_TICKS(500)) != pdTRUE) {
+                if (req_abandoned() || (xEventGroupGetBits(xBluetoothEventGroup) & (BLUETOOTH_CANCEL_TYPING_BIT | BLUETOOTH_STREAM_ABORT_BIT))) {
+                    free(copy);
+                    return ESP_FAIL; // Abort the HTTP stream
+                }
             }
         }
     }
@@ -186,10 +193,15 @@ static void ai_task(void *pvParameters)
     while (1) {
         ai_cmd_t cmd = {0};
 
+        // Idle again; every continue path lands here
+        xEventGroupClearBits(xAiEventGroup, AI_BUSY_BIT);
+
         // Block until AI task activated
         if (xQueueReceive(xAiCmdQueue, &cmd, portMAX_DELAY) != pdTRUE) {
             continue;
         }
+        xEventGroupSetBits(xAiEventGroup, AI_BUSY_BIT);
+        req_gen = cmd.gen;
 
 #ifdef POLYCAST5_DEBUG
         ESP_LOGI(TAG, "AI task received command type=%d, msg_len=%u, reasoning=%d", (int)cmd.type, (unsigned)cmd.msg_len, cmd.reasoning);
@@ -199,6 +211,7 @@ static void ai_task(void *pvParameters)
         memset(ai_response, 0, sizeof(ai_response));
 
         const char *query = NULL;
+        bool streamed = false; // Set once a chat delta went to BLE
 
         if (cmd.type == AI_CMD_KEYBOARD_START_REC) {
             if (!mic_recording) {
@@ -254,10 +267,14 @@ static void ai_task(void *pvParameters)
             ESP_LOGI(TAG, "STT uploading PCM: samples=%u", (unsigned)pcm.samples);
 #endif
 
-            // Transcribe via xAI /v1/stt REST endpoint
-            err = ai_voice_stt_transcribe_pcm16_xai(pcm.pcm16, pcm.samples, user_transcript, sizeof(user_transcript));
+            // Transcribe via xAI /v1/stt REST endpoint, unless the page was already left
+            err = req_abandoned() ? ESP_ERR_INVALID_STATE :
+                    ai_voice_stt_transcribe_pcm16_xai(pcm.pcm16, pcm.samples, user_transcript, sizeof(user_transcript));
 
-            if (err == ESP_OK) {
+            if (req_abandoned()) {
+                // Page left before or during STT: no lookup or chat, no result bits
+                ESP_LOGW(TAG, "Abandoned request dropped after STT");
+            } else if (err == ESP_OK) {
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "STT transcript resolved (len=%u)", (unsigned)strlen(user_transcript));
 #endif
@@ -290,13 +307,20 @@ static void ai_task(void *pvParameters)
                     }
 #endif
                     // Call chat API with SSE streaming (types each chunk over BLE as it arrives)
-                    err = ai_utils_send_command_xai_stream(prompt, user_transcript, ai_response, sizeof(ai_response), cmd.reasoning, stream_to_bluetooth_cb, NULL);
+                    // A link-loss abort left by an earlier stream must not end this one
+                    xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_STREAM_ABORT_BIT);
+                    err = ai_utils_send_command_xai_stream(prompt, user_transcript, ai_response, sizeof(ai_response), cmd.reasoning, stream_to_bluetooth_cb, &streamed);
 
                     // Send NULL sentinel so bluetooth_task flushes any buffered partial tag
-                    // Only on success/normal completion - on abort the queue was already drained
-                    if (!(xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_CANCEL_TYPING_BIT)) {
+                    // Only on success/normal completion - on abort or page exit the queue was already drained
+                    if (!req_abandoned() && !(xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_CANCEL_TYPING_BIT)) {
                         char *end_marker = NULL;
-                        xQueueSend(xBluetoothAiStreamQueue, &end_marker, pdMS_TO_TICKS(5000));
+                        // A lost sentinel strands the page on 'Done! Typing...'; bluetooth_task always drains or discards
+                        while (xQueueSend(xBluetoothAiStreamQueue, &end_marker, pdMS_TO_TICKS(500)) != pdTRUE) {
+                            if (xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_CANCEL_TYPING_BIT) {
+                                break;
+                            }
+                        }
                     }
                 }
             } else {
@@ -325,8 +349,11 @@ static void ai_task(void *pvParameters)
             err = ai_utils_send_command_xai(prompt, cmd.msg, ai_response, sizeof(ai_response), cmd.reasoning);
         }
 
+        // Page left since the command was sent: a credential, answer or analysis must not reach a later visit
+        if (req_abandoned()) {
+            ESP_LOGW(TAG, "Stale AI result dropped: page was left");
         // If good, log and send to bluetooth task
-        if (err == ESP_OK) {
+        } else if (err == ESP_OK) {
             if (cmd.type == AI_CMD_KEYBOARD_DONE_REC) {
 #ifdef POLYCAST5_DEBUG
                 ESP_LOGI(TAG, "AI keyboard script streamed (len=%u)", (unsigned)strlen(ai_response));
@@ -381,8 +408,9 @@ static void ai_task(void *pvParameters)
                 xQueueOverwrite(xWifiAiRawSniffQueue, &ai_script_ptr);
             // Explicitly release the AI keyboard from its "thinking" state, or the UI hangs forever
             // STT failures above already raised a bit, so check none raised before
-            } else if (!(xEventGroupGetBits(xAiEventGroup) &
-                    (AI_RATE_LIMITED_BIT | AI_THINKING_FAILED_BIT | AI_DONE_THINKING_BIT))) {
+            // A stream that already typed part of its answer ends via the sentinel's DONE_TYPING instead
+            } else if (!streamed && !(xEventGroupGetBits(xAiEventGroup) &
+                    (AI_RATE_LIMITED_BIT | AI_THINKING_FAILED_BIT))) {
                 if (err == ESP_ERR_NOT_FOUND &&
                         (cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD || cmd.type == AI_CMD_CUSTOM)) {
                     // No saved entry matched the query (Grok replies "-1")
@@ -397,6 +425,8 @@ static void ai_task(void *pvParameters)
             free(cmd.free_ptr);
         }
 
+        // Pacing only: a command queued during it still runs next
+        xEventGroupClearBits(xAiEventGroup, AI_BUSY_BIT);
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }

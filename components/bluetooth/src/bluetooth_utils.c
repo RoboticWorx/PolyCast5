@@ -33,6 +33,10 @@
 // Note: Security Level 2 in menuconfig 'BLE SM' required for iOS pairing!
 #define DEVICE_NAME "PolyCast5"
 
+// Script start: longest wait for a fresh link's encryption, then the host HID settle
+#define BT_ENC_WAIT_MS 1500
+#define BT_ENC_SETTLE_MS 150
+
 /* Consumer-control report encoding (matches your sender) */
 #define HID_CC_RPT_MUTE 1
 #define HID_CC_RPT_POWER 2
@@ -168,6 +172,87 @@ static esp_hid_device_config_t ble_hid_config = {
 static uint8_t bt_mod_state = 0;
 static uint8_t bt_keys_state[6] = {0};
 
+// Bumped on each host connect; a script started on one link must not continue on the next
+static volatile uint32_t bt_link_epoch = 0;
+static uint32_t bt_typing_epoch = 0;
+
+// Latched when the link drops or changes mid-script; ends that script
+static bool bt_link_lost = false;
+
+// Host connected: esp_hidd's own flag (what input_set checks) and the connect event already seen
+static bool bt_host_connected(void)
+{
+    return bluetooth_state == BT_STATE_RUNNING && esp_hidd_dev_connected(ble_hid_param.hid_dev)
+            && (xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_CONNECTED_BIT);
+}
+
+// Host linked: connected and encrypted, so it accepts the reports
+static bool bt_host_linked(void)
+{
+    return bt_host_connected() && esp_hid_gap_link_encrypted();
+}
+
+// False once the link dropped or a new host connected since the script started
+static bool bt_link_ok(void)
+{
+    if (!bt_link_lost && (!bt_host_linked() || bt_link_epoch != bt_typing_epoch)) {
+        bt_link_lost = true;
+    }
+
+    return !bt_link_lost;
+}
+
+// Starts a script on the link link_epoch names; false if that host is gone
+static bool bt_typing_begin(uint32_t link_epoch)
+{
+    bt_typing_epoch = link_epoch;
+    bt_link_lost = false;
+
+    // A press racing the connect waits for encryption
+    if (!esp_hid_gap_link_encrypted()) {
+        TickType_t start = xTaskGetTickCount();
+        uint16_t cmd_buf; // Dummy value
+        while (!esp_hid_gap_link_encrypted() && bt_host_connected() && bt_link_epoch == link_epoch
+                && (xTaskGetTickCount() - start) < pdMS_TO_TICKS(BT_ENC_WAIT_MS)
+                && xQueuePeek(xBluetoothMediaCmdQueue, &cmd_buf, 0) != pdTRUE
+                && !(xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_CANCEL_TYPING_BIT)) {
+            vTaskDelay(1);
+        }
+
+        // Superseded by a queued command or cancel while the same host was still encrypting: drop it quietly
+        if (!esp_hid_gap_link_encrypted() && bt_host_connected() && bt_link_epoch == link_epoch
+                && (xQueuePeek(xBluetoothMediaCmdQueue, &cmd_buf, 0) == pdTRUE
+                    || (xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_CANCEL_TYPING_BIT))) {
+            return false; // bt_link_lost stays false, so no TYPING_FAILED
+        }
+    }
+
+    // Typing starts BT_ENC_SETTLE_MS after encryption so the host's HID driver is up; an older link is not delayed
+    if (esp_hid_gap_link_encrypted()) {
+        TickType_t age = xTaskGetTickCount() - esp_hid_gap_link_enc_tick();
+        if (age < pdMS_TO_TICKS(BT_ENC_SETTLE_MS)) {
+            vTaskDelay(pdMS_TO_TICKS(BT_ENC_SETTLE_MS) - age);
+        }
+    }
+
+    return bt_link_ok();
+}
+
+// Script result; a failure raises BLUETOOTH_TYPING_FAILED_BIT for the UI
+static bool bt_typing_end(void)
+{
+    if (bt_link_lost) {
+        xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_TYPING_FAILED_BIT);
+    }
+
+    return !bt_link_lost;
+}
+
+uint32_t bluetooth_utils_link_epoch(void)
+{
+    return bt_link_epoch;
+}
+
 // Sends a single Consumer Control usage (press or release)
 static inline void cc_send_usage(uint16_t usage, bool key_pressed)
 {
@@ -185,9 +270,9 @@ static inline void cc_send_usage(uint16_t usage, bool key_pressed)
 
 void bluetooth_utils_send_media(uint8_t cmd, bool key_pressed)
 {
-    if (bluetooth_state != BT_STATE_RUNNING) {
+    if (!bt_host_linked()) {
 #ifdef POLYCAST5_DEBUG
-        ESP_LOGW(TAG, "Cannot send media command; Bluetooth not running");
+        ESP_LOGW(TAG, "Cannot send media command; no host connected");
 #endif
         return;
     }
@@ -270,8 +355,9 @@ void bluetooth_utils_send_media(uint8_t cmd, bool key_pressed)
 static void hid_input_send(uint8_t rpt_id, const uint8_t *data, size_t len)
 {
     for (int attempt = 0; attempt < HID_SEND_MAX_TRIES; ++attempt) {
-        // Stop retrying if the link went away, or we would spin until the cap
-        if (bluetooth_state != BT_STATE_RUNNING) {
+        // Stop if the link went away or changed: input_set fails at once with no host, and a
+        // reconnected host must not receive the rest of the script
+        if (!bt_link_ok()) {
             return;
         }
 
@@ -703,9 +789,10 @@ static bool key_name_to_hid(const char *name, uint8_t *kc)
 
     // F1-F24
     if ((name[0] == 'f' || name[0] == 'F') && isdigit((unsigned char)name[1])) {
-        long fn = strtol(name + 1, NULL, 10);
+        char *fn_end = NULL;
+        long fn = strtol(name + 1, &fn_end, 10);
 
-        if (fn >= 1 && fn <= 12) {
+        if (*fn_end == '\0' && fn >= 1 && fn <= 12) {
             *kc = (uint8_t)(HID_KC_F1 + (fn - 1));
             return true;
         }
@@ -797,7 +884,8 @@ static bool bt_typing_should_abort(void)
 {
     uint16_t cmd_buf; // Dummy value
     return (xQueuePeek(xBluetoothMediaCmdQueue, &cmd_buf, 0) == pdTRUE)
-            || (xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_CANCEL_TYPING_BIT);
+            || (xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_CANCEL_TYPING_BIT)
+            || !bt_link_ok();
 }
 
 // True if a keycode types one printable character that advances the cursor by one
@@ -817,11 +905,15 @@ static bool kc_is_text_key(uint8_t kc)
 // Returns true if it consumed a token and sent it
 // *consumed_end points to the closing '>' or NULL if none
 static bool parse_and_send_tag(const char *start, const char **consumed_end, uint32_t tap_ms, size_t *typed_count) {
-    // Start points at the '<'
-    const char *gt = strchr(start, '>'); // Points to first occurrence of '>'
-    if (!gt) {
+    // Start points at the '<'; a tag closes at the first '>' with no '<' before it, inner <= 63 chars
+    // Matches the AI stream's hold rules, so streamed text parses the same however the chunks split
+    const char *gt = start + 1;
+    while (*gt && *gt != '>' && *gt != '<' && gt - start < 64) {
+        ++gt;
+    }
+    if (*gt != '>') {
         *consumed_end = NULL;
-        return false; // No closing '>'
+        return false; // No closing '>' (or another '<' / too long)
     }
 
     // Extract inside text (without < and >)
@@ -990,10 +1082,20 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
             continue;
         }
 
+        // '<', '>' and '+' cannot appear raw in a chord, so they go by name; the ASCII path adds shift
+        const char *key = tok;
+        if (!icmp(tok, "lt") || !icmp(tok, "less")) {
+            key = "<";
+        } else if (!icmp(tok, "gt") || !icmp(tok, "greater")) {
+            key = ">";
+        } else if (!icmp(tok, "plus")) {
+            key = "+";
+        }
+
         // If it's a named key, convert to its HID usage code and add it to the chord
         // Named keys (enter, tab, esc, home, end, pgup, pgdn, f1...f12, etc.)
         uint8_t kc = 0;
-        if (key_name_to_hid(tok, &kc)) {
+        if (key_name_to_hid(key, &kc)) {
             if (nkeys < 6) {
                 keys[nkeys++] = kc;
             }
@@ -1001,14 +1103,14 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
         }
 
         // Else: Single ASCII character -> convert to HID
-        if (tok[1] == '\0') {
-            uint8_t amod = 0, akc = 0;
-            if (ascii_to_hid(tok[0], &amod, &akc)) {
-                mods |= amod; // Shift for symbols if needed
-                if (nkeys < 6) {
-                    keys[nkeys++] = akc;
-                }
-            }
+        uint8_t amod = 0, akc = 0;
+        if (key[1] != '\0' || !ascii_to_hid(key[0], &amod, &akc)) {
+            *consumed_end = NULL;
+            return false; // Unknown token: not a tag, caller types '<' literally
+        }
+        mods |= amod; // Shift for symbols if needed
+        if (nkeys < 6) {
+            keys[nkeys++] = akc;
         }
     }
 
@@ -1066,14 +1168,23 @@ static bool parse_and_send_tag(const char *start, const char **consumed_end, uin
 }
 
 // Send script
-void bluetooth_utils_send_script(const char *script, uint32_t tap_ms)
+bool bluetooth_utils_send_script(const char *script, uint32_t tap_ms)
 {
-    // Make sure up
-    if (bluetooth_state != BT_STATE_RUNNING || !script) {
+    return bluetooth_utils_send_script_on_link(script, tap_ms, bt_link_epoch);
+}
+
+bool bluetooth_utils_send_script_on_link(const char *script, uint32_t tap_ms, uint32_t link_epoch)
+{
+    if (!script) {
+        return false;
+    }
+
+    // Make sure that host is still linked
+    if (!bt_typing_begin(link_epoch)) {
 #ifdef POLYCAST5_DEBUG
-        ESP_LOGW(TAG, "Cannot send script; Bluetooth not running");
+        ESP_LOGW(TAG, "Cannot send script; no host connected");
 #endif
-        return;
+        return bt_typing_end();
     }
 
     const char *s = script;
@@ -1138,18 +1249,24 @@ void bluetooth_utils_send_script(const char *script, uint32_t tap_ms)
         }
     }
 
-    // Safety: release anything left down by <down:...> tags
+    // Safety: release anything left down by <down:...> tags (no-op once the link is lost)
     kbd_state_clear();
+
+    return bt_typing_end();
 }
 
-void bluetooth_utils_send_literal(const char *text, uint32_t tap_ms)
+bool bluetooth_utils_send_literal(const char *text, uint32_t tap_ms)
 {
-    // Make sure up
-    if (bluetooth_state != BT_STATE_RUNNING || !text) {
+    if (!text) {
+        return false;
+    }
+
+    // Make sure a host is linked
+    if (!bt_typing_begin(bt_link_epoch)) {
 #ifdef POLYCAST5_DEBUG
-        ESP_LOGW(TAG, "Cannot send literal; Bluetooth not running");
+        ESP_LOGW(TAG, "Cannot send literal; no host connected");
 #endif
-        return;
+        return bt_typing_end();
     }
 
     // Type each character literally, no tag parsing
@@ -1179,6 +1296,8 @@ void bluetooth_utils_send_literal(const char *text, uint32_t tap_ms)
     }
 
     kbd_state_clear();
+
+    return bt_typing_end();
 }
 
 void bluetooth_utils_set_battery_level(uint8_t percent)
@@ -1257,7 +1376,6 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 
     (void)handler_args;
     (void)base;
-    (void)event_data; // Silence unused warnings
 
     switch (event) {
         case ESP_HIDD_START_EVENT:
@@ -1267,6 +1385,17 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 
             break;
         case ESP_HIDD_CONNECT_EVENT: {
+            // NimBLE posts CONNECT(BLE_HS_EAGAIN) for a link that dropped before its connect was reported,
+            // with no DISCONNECT after it, so it is not a link. (nimble_hidd.c fills connect.status despite
+            // esp_hidd.h calling it Classic-only.) Other nonzero statuses are a failed feature read on a live link
+            const esp_hidd_event_data_t *param = (const esp_hidd_event_data_t *)event_data;
+            if (param != NULL && param->connect.status == BLE_HS_EAGAIN) {
+                break;
+            }
+
+            // New link: before the bit, so a script that sees the bit also sees this epoch
+            bt_link_epoch++;
+
             // Signal Bluetooth is connected
             xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_CONNECTED_BIT);
 
@@ -1360,6 +1489,31 @@ static void bluetooth_utils_reconcile_bonds(void)
     }
 }
 
+// Drop index entries (and the default) whose bond NimBLE evicted or never stored
+static void bluetooth_utils_prune_peer_index(void)
+{
+    // An empty store usually means the bond load failed; pruning then would wipe the index
+    // and the next reconcile would unpair every bond
+    ble_addr_t bonded[CONFIG_BT_NIMBLE_MAX_BONDS];
+    int bonded_count = 0;
+    if (ble_store_util_bonded_peers(bonded, &bonded_count, CONFIG_BT_NIMBLE_MAX_BONDS) != 0 || bonded_count == 0) {
+        return;
+    }
+
+    bluetooth_nvs_prune_peers(bonded, bonded_count);
+}
+
+// Round-robin eviction, then drop the evicted peer from the index right away
+static int bluetooth_utils_store_status_cb(struct ble_store_status_event *event, void *arg)
+{
+    int rc = ble_store_util_status_rr(event, arg);
+    if (rc == 0 && event->event_code == BLE_STORE_EVENT_OVERFLOW) {
+        bluetooth_utils_prune_peer_index();
+    }
+
+    return rc;
+}
+
 void bluetooth_utils_init(void)
 {
 #ifdef POLYCAST5_DEBUG
@@ -1416,7 +1570,10 @@ void bluetooth_utils_init(void)
     }
 
     ble_store_config_init();
-    ble_hs_cfg.store_status_cb = ble_store_util_status_rr;
+    ble_hs_cfg.store_status_cb = bluetooth_utils_store_status_cb;
+
+    // Store is loaded; prune before sync starts advertising so a dead default is never whitelisted
+    bluetooth_utils_prune_peer_index();
 
     ret = esp_nimble_enable(ble_hid_device_host_task);
     if (ret != ESP_OK) {
@@ -1505,6 +1662,9 @@ void bluetooth_utils_deinit(void)
 
     // Safety net: clear icon in case HID disconnect event didn't fire during stop
     xEventGroupClearBits(xConnectionIconEventGroup, ICON_BIT_BT_CONNECTED);
+
+    // A pair-new whitelist opening lasts one session
+    esp_hid_gap_set_pair_window(false);
 
     bluetooth_state = BT_STATE_OFF;
 }

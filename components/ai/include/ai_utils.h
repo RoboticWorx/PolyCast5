@@ -4,6 +4,7 @@
 #include "esp_err.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 // NVS keys for xAI (Grok) API key
 #define XAI_NS "xai"
@@ -43,6 +44,9 @@ typedef struct {
 
     // True = use reasoning model, false = non-reasoning
     bool reasoning;
+
+    // ai_visit_gen at send; ai_task drops the result once the sending page is left
+    uint32_t gen;
 } ai_cmd_t;
 
 /** 

@@ -1133,9 +1133,11 @@ bool lcd_is_first_boot(void)
     // Open NVS
     esp_err_t err = nvs_open(LCD_FIRST_BOOT_NS, NVS_READONLY, &h);
     if (err != ESP_OK) {
+        if (err != ESP_ERR_NVS_NOT_FOUND) {
 #ifdef POLYCAST5_DEBUG
-        ESP_LOGW(TAG, "lcd_is_first_boot nvs_open failed: %s", esp_err_to_name(err));
+            ESP_LOGW(TAG, "lcd_is_first_boot nvs_open failed: %s", esp_err_to_name(err));
 #endif
+        }
 
         // Failed to open -> DNE
         return true;

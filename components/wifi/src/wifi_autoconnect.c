@@ -108,7 +108,7 @@ static void wifi_autoconnect_load_from_nvs(void)
     uint32_t count = 0;
     err = nvs_get_u32(nvs, NVS_KEY_COUNT, &count);
     if (err != ESP_OK || count == 0) {
-        if (err != ESP_ERR_NVS_NOT_FOUND) {
+        if (err != ESP_ERR_NVS_NOT_FOUND && err != ESP_OK) {
             ESP_LOGE(TAG, "wifi_autoconnect_load_from_nvs: nvs_get_u32 failed: %s", esp_err_to_name(err));
         }
         nvs_close(nvs);

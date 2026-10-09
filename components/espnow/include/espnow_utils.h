@@ -1,6 +1,8 @@
 #ifndef ESPNOW_UTILS_H
 #define ESPNOW_UTILS_H
 
+#include "freertos/FreeRTOS.h"
+
 #include "esp_err.h"
 #include "esp_now.h"
 
@@ -91,6 +93,15 @@ esp_err_t espnow_utils_espnow_deinit(void);
  * @return ESP_OK on success
  */
 esp_err_t espnow_utils_send_data(const uint8_t *mac, const uint8_t *data, size_t len);
+
+/**
+ * @brief Wait for the MAC-layer result of the last espnow_utils_send_data() frame
+ *
+ * @param [in] timeout Ticks to wait for the send callback
+ *
+ * @return true if the peer ACKed, false on failure or timeout
+ */
+bool espnow_utils_wait_delivery(TickType_t timeout);
 
 /**
  * @brief Register an ESP-NOW receive callback

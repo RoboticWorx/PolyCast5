@@ -52,6 +52,9 @@ static uint8_t current_category = 0;
 // Keyboard page init flag, file scope so the sub page's Home/Power exit (which deinits BT) can force a re-init
 static bool keyboard_page_init = false;
 
+// "Not connected" notice over the Auto Keyboard lists, created on first use
+static lv_obj_t *keyboard_notice = NULL;
+
 
 POLYCAST5_USE_PSRAM_BSS static char script_labels[BT_MAX_KEYBOARD_SCRIPTS][BT_SCRIPT_LABEL_MAX_LEN + 1];
 
@@ -782,6 +785,7 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
     // Statics
     static bool init = false;
     static lv_obj_t *lbl_home = NULL;
+    static lv_obj_t *lbl_link = NULL; // "Not connected" under HOME while no host is linked
 
     // Outer ring
     static lv_obj_t *ring = NULL;
@@ -808,6 +812,12 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
         lbl_home = lv_label_create(ACTIVE_SCR);
         lcd_format_label(lbl_home, "HOME", user_secondary_color,
                 &lv_font_montserrat_16, LV_ALIGN_LEFT_MID, 17, 0);
+
+        // Fits left of the ring; shown/hidden each tick from the link state
+        lbl_link = lv_label_create(ACTIVE_SCR);
+        lv_obj_set_style_text_align(lbl_link, LV_TEXT_ALIGN_CENTER, 0);
+        lcd_format_label(lbl_link, "Not\nconnected.\nPlease wait.", user_secondary_color,
+                &lv_font_montserrat_14, LV_ALIGN_LEFT_MID, 8, 37);
 
         // Create styles
         lv_style_init(&style_ring);
@@ -1043,6 +1053,16 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
         init = true;
     }
 
+    // Presses still go out; the BT task drops them at once while no host is linked
+    bool linked = (xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_CONNECTED_BIT) && esp_hid_gap_link_encrypted();
+    if (lbl_link && linked != lv_obj_has_flag(lbl_link, LV_OBJ_FLAG_HIDDEN)) {
+        if (linked) {
+            lv_obj_add_flag(lbl_link, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_remove_flag(lbl_link, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
     // Reset visuals if no button event this tick
     if (ui_btns->up_btn != 1 && ui_btns->right_btn != 1 && ui_btns->down_btn != 1 && ui_btns->left_btn != 1 && ui_btns->select_btn != 1)
     {
@@ -1201,6 +1221,7 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
         // Delete objects
         lv_obj_delete(ring); // Deletes children
         lv_obj_delete(lbl_home);
+        lv_obj_delete(lbl_link);
         
         // Reset styles
         lv_style_reset(&style_ring);
@@ -1210,7 +1231,7 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
         // Reset statics
         circ_up = circ_right = circ_down = circ_left = circ_center = NULL;
         lbl_up = lbl_right = lbl_down = lbl_left = lbl_center = NULL;
-        lbl_home = NULL;
+        lbl_home = lbl_link = NULL;
         init = false;
 
         // Show arrows
@@ -1230,6 +1251,7 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
         // Delete objects
         lv_obj_delete(ring); // Deletes children
         lv_obj_delete(lbl_home);
+        lv_obj_delete(lbl_link);
         
         // Reset styles
         lv_style_reset(&style_ring);
@@ -1239,7 +1261,7 @@ void lcd_bluetooth_media_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_
         // Reset statics
         circ_up = circ_right = circ_down = circ_left = circ_center = NULL;
         lbl_up = lbl_right = lbl_down = lbl_left = lbl_center = NULL;
-        lbl_home = NULL;
+        lbl_home = lbl_link = NULL;
         init = false;
 
         lcd_transition_back(false, ui_menu); // True = home, false = sleep
@@ -1396,6 +1418,8 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     #define AI_KEYB_THINKING_TXT "Thinking..."
     #define AI_KEYB_LISTENING_TXT "Listening..." // Only shown if the orb failed to allocate
     #define AI_KEYB_DONE_TXT "Done! Typing..."
+    #define AI_KEYB_NOT_CONN_TXT "Not connected!"
+    #define AI_KEYB_BUSY_TXT "AI busy!\nPlease try again."
     #define AI_KEYB_READY_FONT lv_font_montserrat_22
 
     typedef enum {
@@ -1431,7 +1455,8 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         xEventGroupClearBits(xAiEventGroup, AI_THINKING_FAILED_BIT);
         xEventGroupClearBits(xAiEventGroup, AI_NO_MATCH_BIT);
         xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT);
-        xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_CANCEL_TYPING_BIT);
+        xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_TYPING_FAILED_BIT);
+        // CANCEL stays set: bluetooth_task clears it after the last visit's DEINIT, so that visit's queued chunks are discarded
 
         // Default to non-reasoning (faster and cheaper, but less accurate)
         use_reasoning = false;
@@ -1625,32 +1650,39 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         // Reset state
         state = AI_KEYB_IDLE;
     } else if (state == AI_KEYB_IDLE && select_pressed) { // Initial press
+        // ai_task runs one command at a time; while it is busy (e.g. a packet analysis) nothing would record
+        bool ai_busy = (xEventGroupGetBits(xAiEventGroup) & AI_BUSY_BIT) || uxQueueMessagesWaiting(xAiCmdQueue) != 0;
+
         // Start mic_recording
-        mic_recording = true;
+        mic_recording = !ai_busy;
         ai_cmd_t cmd = {
             .type = AI_CMD_KEYBOARD_START_REC,
         };
 
         // Actually send it
-        if (xQueueSend(xAiCmdQueue, &cmd, portMAX_DELAY) != pdPASS) {
-            ESP_LOGE(TAG, "Failed: xAiCmdQueue AI_CMD_KEYBOARD_START_REC");
-            state = AI_KEYB_IDLE;
-        }
+        if (ai_busy || xQueueSend(xAiCmdQueue, &cmd, pdMS_TO_TICKS(100)) != pdPASS) {
+            ESP_LOGW(TAG, "AI busy: AI_CMD_KEYBOARD_START_REC not sent");
+            mic_recording = false;
 
-        // Show orb
-        lcd_voice_orb_start();
-
-        // Hide text labels - if the orb could not allocate, keep a label up instead
-        if (lcd_voice_orb_is_available()) {
-            lv_obj_add_flag(lbl_ins, LV_OBJ_FLAG_HIDDEN);
+            // Stay idle
+            lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
+            lv_label_set_text(lbl_ins, AI_KEYB_BUSY_TXT);
         } else {
-            lv_obj_set_style_text_font(lbl_ins, &AI_KEYB_READY_FONT, 0);
-            lv_label_set_text(lbl_ins, AI_KEYB_LISTENING_TXT);
-        }
-        lv_obj_add_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+            // Show orb
+            lcd_voice_orb_start();
 
-        state = AI_KEYB_RECORDING;
+            // Hide text labels - if the orb could not allocate, keep a label up instead
+            if (lcd_voice_orb_is_available()) {
+                lv_obj_add_flag(lbl_ins, LV_OBJ_FLAG_HIDDEN);
+            } else {
+                lv_obj_set_style_text_font(lbl_ins, &AI_KEYB_READY_FONT, 0);
+                lv_label_set_text(lbl_ins, AI_KEYB_LISTENING_TXT);
+            }
+            lv_obj_add_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+
+            state = AI_KEYB_RECORDING;
+        }
     }
 
     // While held: update count - stop only on release (or buffer full)
@@ -1662,24 +1694,34 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
             ai_cmd_t cmd = {
                 .type = AI_CMD_KEYBOARD_DONE_REC,
                 .reasoning = use_reasoning,
+                .gen = ai_visit_gen,
             };
 
-            // Actually send it
-            if (xQueueSend(xAiCmdQueue, &cmd, portMAX_DELAY) != pdPASS) {
-                ESP_LOGE(TAG, "Failed: xAiCmdQueue AI_CMD_KEYBOARD_DONE_REC");
-                state = AI_KEYB_IDLE;
-            }
+            // Drop the previous request's completion bits: a failed stream's end sentinel still raises DONE_TYPING
+            xEventGroupClearBits(xAiEventGroup, AI_DONE_THINKING_BIT);
+            xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT | BLUETOOTH_TYPING_FAILED_BIT);
 
             // Hide orb
             lcd_voice_orb_stop();
 
             // Show instructions
             lv_obj_remove_flag(lbl_ins, LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_style_text_font(lbl_ins, &AI_KEYB_READY_FONT, 0);
-            lv_label_set_text(lbl_ins, AI_KEYB_THINKING_TXT);
 
-            // Switched to AI_KEYB_DONE_TXT in xQueueReceive xWifiAiRawSniffQueue
-            state = AI_KEYB_RESPONSE_WAITING; // Waiting for analysis to complete
+            // Actually send it. A still-queued START_REC means ai_task is busy; it drops that once mic_recording is false
+            if (xQueueSend(xAiCmdQueue, &cmd, pdMS_TO_TICKS(100)) != pdPASS) {
+                ESP_LOGW(TAG, "AI busy: AI_CMD_KEYBOARD_DONE_REC not sent");
+                lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
+                lv_label_set_text(lbl_ins, AI_KEYB_BUSY_TXT);
+                lv_obj_remove_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
+                state = AI_KEYB_IDLE;
+            } else {
+                lv_obj_set_style_text_font(lbl_ins, &AI_KEYB_READY_FONT, 0);
+                lv_label_set_text(lbl_ins, AI_KEYB_THINKING_TXT);
+
+                // Switched to AI_KEYB_DONE_TXT in xQueueReceive xWifiAiRawSniffQueue
+                state = AI_KEYB_RESPONSE_WAITING; // Waiting for analysis to complete
+            }
         }
     }
 
@@ -1695,10 +1737,12 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     }
     // When AI has finished typing
     if ((xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_DONE_TYPING_BIT) && state == AI_KEYB_TYPING_WAITING) {
-        lv_label_set_text(lbl_ins, AI_KEYB_HOLD_TALK_TXT);
+        // Typing stops when the host link drops; say so instead of offering to talk again
+        bool failed = (xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_TYPING_FAILED_BIT) != 0;
+        lv_label_set_text(lbl_ins, failed ? AI_KEYB_NOT_CONN_TXT : AI_KEYB_HOLD_TALK_TXT);
 
         // Clear bits
-        xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT);
+        xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_DONE_TYPING_BIT | BLUETOOTH_TYPING_FAILED_BIT);
         xEventGroupClearBits(xAiEventGroup, AI_DONE_THINKING_BIT); // Just in case
 
         // Show reasoning
@@ -1740,6 +1784,9 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 
         // Disconnect from Wi-Fi
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+
+        // Abandon this visit's AI request: a DNS lookup survives the teardown, so ai_task drops its result
+        ai_visit_gen++;
 
         // Signal any in-progress AI typing to abort
         xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_CANCEL_TYPING_BIT);
@@ -1786,6 +1833,9 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 
         // Disconnect from Wi-Fi
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+
+        // Abandon this visit's AI request: a DNS lookup survives the teardown, so ai_task drops its result
+        ai_visit_gen++;
 
         // Signal any in-progress AI typing to abort
         xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_CANCEL_TYPING_BIT);
@@ -1838,6 +1888,9 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         // Disconnect from Wi-Fi
         xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
 
+        // Abandon this visit's AI request: a DNS lookup survives the teardown, so ai_task drops its result
+        ai_visit_gen++;
+
         // Signal any in-progress AI typing to abort
         xEventGroupSetBits(xBluetoothEventGroup, BLUETOOTH_CANCEL_TYPING_BIT);
 
@@ -1860,6 +1913,43 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         lcd_anim_label_y_animate_reset();
         
         lcd_transition_back(ui_btns->home_btn == 1, ui_menu); // True = home, false = sleep
+    }
+}
+
+// Shows the notice when a script found no host or lost it; the next press hides it
+static void keyboard_notice_update(const ui_btns_t *ui_btns)
+{
+    if (keyboard_notice && (ui_btns->up_btn || ui_btns->down_btn || ui_btns->right_btn || ui_btns->left_btn
+            || ui_btns->select_btn || ui_btns->home_btn || ui_btns->pwr_btn)) {
+        lv_obj_add_flag(keyboard_notice, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    if (!(xEventGroupGetBits(xBluetoothEventGroup) & BLUETOOTH_TYPING_FAILED_BIT)) {
+        return;
+    }
+    xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_TYPING_FAILED_BIT);
+
+    // The list fills the screen, so float an opaque box over it
+    if (!keyboard_notice) {
+        keyboard_notice = lv_label_create(ACTIVE_SCR);
+        lv_obj_set_style_bg_color(keyboard_notice, user_primary_color, 0);
+        lv_obj_set_style_bg_opa(keyboard_notice, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_color(keyboard_notice, user_secondary_color, 0);
+        lv_obj_set_style_border_width(keyboard_notice, 2, 0);
+        lv_obj_set_style_radius(keyboard_notice, 6, 0);
+        lv_obj_set_style_pad_all(keyboard_notice, 8, 0);
+        lcd_format_label(keyboard_notice, "Not connected!", user_secondary_color,
+                &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
+    }
+    lv_obj_remove_flag(keyboard_notice, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(keyboard_notice);
+}
+
+static void keyboard_notice_delete(void)
+{
+    if (keyboard_notice) {
+        lv_obj_delete(keyboard_notice);
+        keyboard_notice = NULL;
     }
 }
 
@@ -1887,8 +1977,13 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
         uint16_t cmd = BLUETOOTH_CMD_INIT;
         xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
         
+        // Drop a failure from an earlier page; the INIT send returns only once older typing ended
+        xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_TYPING_FAILED_BIT);
+        
         keyboard_page_init = true;
     }
+
+    keyboard_notice_update(ui_btns);
 
     // Long right -> go to index 2 (first user index). Checked first: the hold may have queued a +5 this tick
     if (lcd_take_long_press(GPIO_BTN_RIGHT, &ui_btns->right_btn)) {
@@ -1929,6 +2024,7 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 
         // Hide bluetooth keyboard menu
         lv_obj_add_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+        keyboard_notice_delete();
         
         // Show bluetooth menu
         lv_obj_remove_flag(bluetooth_menu->main_list, LV_OBJ_FLAG_HIDDEN);
@@ -1948,6 +2044,7 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 
         // Hide bluetooth keyboard menu
         lv_obj_add_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+        keyboard_notice_delete();
         
         // Reset static
         keyboard_page_init = false;
@@ -1962,6 +2059,7 @@ void lcd_bluetooth_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 
             // Hide keyboard menu
             lv_obj_add_flag(bluetooth_menu->bluetooth_keyboard_menu.main_list, LV_OBJ_FLAG_HIDDEN);
+            keyboard_notice_delete();
             
             // Reset static
             keyboard_page_init = false;
@@ -2001,6 +2099,8 @@ void lcd_bluetooth_keyboard_sub_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blu
 
         init = true;
     }
+
+    keyboard_notice_update(ui_btns);
     
     // Up button
     if (ui_btns->up_btn == 1) {
@@ -2044,6 +2144,7 @@ void lcd_bluetooth_keyboard_sub_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blu
 
         // Hide submenu
         lv_obj_add_flag(submenu->main_list, LV_OBJ_FLAG_HIDDEN);
+        keyboard_notice_delete();
         
         // Clean up
         lv_obj_clean(submenu->main_list);
@@ -2212,7 +2313,7 @@ static void prompt_rename_or_del(ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth
             &lv_font_montserrat_30, LV_ALIGN_CENTER, 0, 0);
                  
     lv_obj_t *lbl_exit = lv_label_create(ACTIVE_SCR);
-    lcd_format_label(lbl_exit, "DEFAULT", user_secondary_color,
+    lcd_format_label(lbl_exit, "SELECT", user_secondary_color,
             &lv_font_montserrat_18, LV_ALIGN_RIGHT_MID, -16, -1);
                  
     lv_obj_t *lbl_name = lv_label_create(ACTIVE_SCR);
@@ -2330,7 +2431,7 @@ static void peer_menu_build(bluetooth_peer_menu_t *pm)
 {
     // Read cached peers (BT stays OFF)
     bluetooth_peer_info_t tmp[BT_MAX_PEERS];
-    int n = bluetooth_nvs_get_peers_list(tmp, BT_MAX_PEERS - 1); // Row 0 is "Pair Another", so peers occupy rows 1..BT_MAX_PEERS-1
+    int n = bluetooth_nvs_get_peers_list(tmp, BT_MAX_PEERS); // Row 0 is "Pair Another", so peers occupy rows 1..BT_MAX_PEERS
     if (n < 0) { // Index unreadable - show empty list as graceful fallback
         ESP_LOGE(TAG, "peer_menu_build: bluetooth_nvs_get_peers_list failed: %d", n);
         n = 0; // Treat as empty
@@ -2575,11 +2676,8 @@ void lcd_bluetooth_pair_new_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
 
         lv_timer_handler();
         
-        // No whitelist: anyone can pair
-        bluetooth_nvs_clear_peers_list(true); // Clear preferred peer
-    
-        // Active bluetooth
-        uint16_t cmd = BLUETOOTH_CMD_INIT;
+        // Active bluetooth with no whitelist for this session; the stored default survives backing out
+        uint16_t cmd = BLUETOOTH_CMD_INIT_PAIR_NEW;
         xQueueSend(xBluetoothMediaCmdQueue, &cmd, portMAX_DELAY);
 
         init = true;
@@ -3134,21 +3232,24 @@ uint8_t lcd_bluetooth_script_selected_get(void)
      esp_err_t err = nvs_open(KEYBOARD_SELECTED_IDX_NS, NVS_READONLY, &h);
      if (err == ESP_OK) {
         // Get count
-          if (nvs_get_u8(h, KEYBOARD_SELECTED_IDX_KEY, &sel) != ESP_OK) {
+          err = nvs_get_u8(h, KEYBOARD_SELECTED_IDX_KEY, &sel);
+          if (err != ESP_OK) {
             // 0 if DNE
                sel = 0;
                
 #ifdef POLYCAST5_DEBUG
-            ESP_LOGE(TAG, "lcd_bluetooth_script_selected_set nvs_get_u8 failed: %s", esp_err_to_name(err));
+            ESP_LOGE(TAG, "lcd_bluetooth_script_selected_get nvs_get_u8 failed: %s", esp_err_to_name(err));
 #endif
           }
           
           // Close NVS
           nvs_close(h);
      } else {
+        if (err != ESP_ERR_NVS_NOT_FOUND) {
 #ifdef POLYCAST5_DEBUG
-        ESP_LOGW(TAG, "lcd_bluetooth_script_selected_set nvs_open failed: %s", esp_err_to_name(err));
+            ESP_LOGW(TAG, "lcd_bluetooth_script_selected_get nvs_open failed: %s", esp_err_to_name(err));
 #endif
+        }
     }
     
     return sel;

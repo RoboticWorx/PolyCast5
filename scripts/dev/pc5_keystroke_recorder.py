@@ -76,6 +76,9 @@ FUNCTION_KEYS = {
     keyboard.Key.f10: "f10", keyboard.Key.f11: "f11", keyboard.Key.f12: "f12",
 }
 
+# Characters the device parser cannot take raw inside a tag
+SYMBOL_NAMES = {"<": "lt", ">": "gt", "+": "plus"}
+
 # Collapse L/R variants to a single logical modifier the PolyCast5 parser understands.
 MOD_MAP = {
     keyboard.Key.ctrl:    "ctrl",
@@ -180,6 +183,10 @@ def main():
             # Letters: lower-case; SHIFT appears via modifier if held
             if len(ch) == 1 and ch.isalpha():
                 return ch.lower()
+
+            # Tag delimiters and the chord separator go by name; raw they break the tag
+            if ch in SYMBOL_NAMES:
+                return SYMBOL_NAMES[ch]
 
             # Digits/symbols: as-is
             if len(ch) == 1 and ch.isprintable():

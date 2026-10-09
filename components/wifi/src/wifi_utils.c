@@ -1020,6 +1020,11 @@ esp_err_t wifi_utils_radio_start(const char *ssid, const uint8_t* bssid, const c
         return err;
     }
 
+    // Config portals leave storage in RAM mode; force FLASH so this join persists as the last network
+    if (esp_wifi_set_storage(WIFI_STORAGE_FLASH) != ESP_OK) {
+        ESP_LOGW(TAG, "wifi_utils_radio_start: esp_wifi_set_storage(FLASH) failed");
+    }
+
     // Set config
     err = esp_wifi_set_config(WIFI_IF_STA, &cfg);
     if (err != ESP_OK) {

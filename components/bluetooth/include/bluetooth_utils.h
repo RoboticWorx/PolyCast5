@@ -135,7 +135,8 @@ typedef struct {
 #define BLUETOOTH_CMD_INIT 0
 #define BLUETOOTH_CMD_DEINIT 1
 #define BLUETOOTH_CMD_UNPAIR_ALL 2
-#define BLUETOOTH_CMD_UNPAIR_ALL_NO_REINIT 3 // Must be at end (largest number)
+#define BLUETOOTH_CMD_UNPAIR_ALL_NO_REINIT 3
+#define BLUETOOTH_CMD_INIT_PAIR_NEW 4 // Init with the whitelist open for this session; must be at end (largest number)
 
 #define BLUETOOTH_SCRIPT_OFFSET 1000
 
@@ -219,16 +220,38 @@ void bluetooth_utils_send_media(uint8_t key_cmd, bool key_pressed);
  *
  * @param [in] s String to send
  * @param [in] tap_ms Delay between characters
+ *
+ * @return false if no host was linked or the link dropped or changed mid-script (typing stops there)
  */
-void bluetooth_utils_send_script(const char *s, uint32_t tap_ms);
+bool bluetooth_utils_send_script(const char *s, uint32_t tap_ms);
+
+/**
+ * @brief Send a keyboard string only to the host link link_epoch names (one text split over calls)
+ *
+ * @param [in] s String to send
+ * @param [in] tap_ms Delay between characters
+ * @param [in] link_epoch Value of bluetooth_utils_link_epoch() when the text started
+ *
+ * @return false if that host is gone, or the link dropped or changed mid-script
+ */
+bool bluetooth_utils_send_script_on_link(const char *s, uint32_t tap_ms, uint32_t link_epoch);
+
+/**
+ * @brief Current host link generation; changes on every host connect
+ *
+ * @return Link generation
+ */
+uint32_t bluetooth_utils_link_epoch(void);
 
 /**
  * @brief Send a literal text string over bluetooth (no tag parsing)
  *
  * @param [in] text String to send
  * @param [in] tap_ms Delay between characters
+ *
+ * @return false if no host was linked or the link dropped or changed mid-text (typing stops there)
  */
-void bluetooth_utils_send_literal(const char *text, uint32_t tap_ms);
+bool bluetooth_utils_send_literal(const char *text, uint32_t tap_ms);
 
 /**
  * @brief Sends the battery level to the connected device

@@ -6,6 +6,8 @@
 #define BLUETOOTH_CONNECTED_BIT     (1U << 0)
 #define BLUETOOTH_DONE_TYPING_BIT   (1U << 1)
 #define BLUETOOTH_CANCEL_TYPING_BIT (1U << 2)
+#define BLUETOOTH_TYPING_FAILED_BIT (1U << 3) // Typing found no host, or the link dropped or changed; UI clears it
+#define BLUETOOTH_STREAM_ABORT_BIT  (1U << 4) // AI stream lost its link; ai_task ends the request and clears it before the next
 extern EventGroupHandle_t xBluetoothEventGroup;
 
 extern QueueHandle_t xBluetoothMediaCmdQueue;

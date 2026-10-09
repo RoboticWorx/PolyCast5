@@ -342,8 +342,9 @@ static void wifi_task(void *param)
             }
         }
 
-        // Check for Wi-Fi requests: taken and cleared atomically, so none can stick or go unseen
-        EventBits_t wifi_req_bits = xEventGroupClearBits(xWifiEventGroup, WIFI_REQUEST_BITS);
+        // Check for Wi-Fi requests: taken and cleared atomically, so none can stick or go unseen.
+        // ClearBits returns the whole group, so mask it, or lingering status bits look like requests
+        EventBits_t wifi_req_bits = xEventGroupClearBits(xWifiEventGroup, WIFI_REQUEST_BITS) & WIFI_REQUEST_BITS;
 
         // A pending disconnect wins: wifi_task_request_reconnect() clears it, so it is newer than any UI reconnect
         if (wifi_req_bits & WIFI_DISCONNECT_BIT) {
