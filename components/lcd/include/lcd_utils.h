@@ -331,9 +331,9 @@ void lcd_scroll_down(lv_obj_t *lbl_top, lv_obj_t *lbl_mid, lv_obj_t *lbl_bot, co
  * @param [in] menu UI menu structure
  * @param [in] txt Pass new text at top or bottom into animation callback for scroll functions
  * @param [in] scrolling_up Direction being scrolled (up/!up)
- * @param [in] speed_px_s Speed to move animation
+ * @param [in] duration_ms Animation length; keep it >= ~2 LVGL refresh periods so a frame lands mid-move
  */
-void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32_t speed_px_s);
+void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32_t duration_ms);
 
 /**
  * @brief Perform swipe animation for wireless selection page (left or right)

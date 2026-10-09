@@ -42,7 +42,7 @@ static const char *TAG = "LCD_ORB";
 #define ORB_CX_Q8 ((ORB_W << 7) - 128)
 #define ORB_CY_Q8 ((ORB_H << 7) - 128)
 
-#define ORB_FRAME_PERIOD 33 // Matches LV_DEF_REFR_PERIOD. Effective rate is nearer 20-25 fps
+#define ORB_FRAME_PERIOD 33 // Effective rate is nearer 20-25 fps
 
 #define ORB_R_MIN 10 // Blob radius at silence
 #define ORB_R_MAX 36 // Blob radius at full level. With ORB_DEFORM_GAIN 100 a lobe reaches

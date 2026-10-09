@@ -57,7 +57,7 @@
 #define FLUSH_CHUNK 2
 
 #define SWIPE_SPEED 1200
-#define SCROLL_SPEED 400
+#define SCROLL_ANIM_MS 50 // Ease-out over ~2 LVGL frames (LV_DEF_REFR_PERIOD 20): visible slide, original's speed
 #define IR_LABELS_OFFSET 20
 
 #define SELECTION_DEFAULT_IDX 3 // Default starting selection menu index
@@ -107,7 +107,6 @@ static const char *TAG = "LCD_FUNCS";
 static TFT_t tft;
 static lv_display_t *disp; // LVGL display handle
 
-static bool already_scrolling = false;
 static bool scrolling_menu = false;
 static bool scrolling_up = false;
 
@@ -118,6 +117,8 @@ typedef struct {
     const char *txt; // The next string to show
     bool up; // Direction: true=you’re scrolling up, false=scrolling down
 } scroll_ctx_t;
+
+POLYCAST5_USE_PSRAM_BSS static scroll_ctx_t scroll_ctx; // Scroll in flight, committed by scroll_deleted_cb
 
 static void st7789_flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_map)
 {
@@ -608,55 +609,46 @@ void lcd_format_center_button(lv_obj_t *btn_mid, lv_color_t user_primary_color, 
     lv_obj_add_style(btn_mid, &lbl_mid_style, 0);
 }
 
-static void scroll_ready_cb(lv_anim_t * a)
+static void scroll_deleted_cb(lv_anim_t * a)
 {
-    // Able to start new animation
-    already_scrolling = false;
-    
+    (void)a; // Runs on completion and on lv_anim_del, so a scroll cut short still lands
+
+    // Top anim can trail by a tick: stop it so it can't move the label after the align below
+    lv_anim_del(scroll_ctx.top, (lv_anim_exec_xcb_t)lv_obj_set_y);
+
     // Adjust labels for scroll up or down
-    scroll_ctx_t * ctx = (scroll_ctx_t *)a->user_data;
-    if (ctx->up) {
-        lcd_scroll_up(ctx->top, ctx->mid, ctx->bot, ctx->txt);
-        lv_obj_align(ctx->bot, LV_ALIGN_BOTTOM_MID, 0, -15);
+    if (scroll_ctx.up) {
+        lcd_scroll_up(scroll_ctx.top, scroll_ctx.mid, scroll_ctx.bot, scroll_ctx.txt);
     } else {
-        lcd_scroll_down(ctx->top, ctx->mid, ctx->bot, ctx->txt);
-        lv_obj_align(ctx->top, LV_ALIGN_TOP_MID, 0, 15);
+        lcd_scroll_down(scroll_ctx.top, scroll_ctx.mid, scroll_ctx.bot, scroll_ctx.txt);
     }
-    
-    // Delete when done
-    lv_anim_del(ctx->bot, (lv_anim_exec_xcb_t)lv_obj_set_y);
-    lv_anim_del(ctx->top, (lv_anim_exec_xcb_t)lv_obj_set_y);
-    free(ctx);
+
+    // Both labels back to rest
+    lv_obj_align(scroll_ctx.top, LV_ALIGN_TOP_MID, 0, 15);
+    lv_obj_align(scroll_ctx.bot, LV_ALIGN_BOTTOM_MID, 0, -15);
 }
 
-void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32_t speed_px_s)
+static void lcd_scroll_anim_finish(ui_menu_t *menu)
 {
-    // If already in animation, don't make a new one
-    if (already_scrolling) {
-        return;
-    }
-    already_scrolling = true;
-    
+    // Deleting the bottom anim runs scroll_deleted_cb, landing the scroll now. No-op when idle
+    lv_anim_del(menu->lbl_bot, (lv_anim_exec_xcb_t)lv_obj_set_y);
+}
+
+void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32_t duration_ms)
+{
+    // Land a scroll still in flight instead of dropping this one, so labels keep up with the index
+    lcd_scroll_anim_finish(menu);
+
     /* Decide start/end Y */
     // Bottom element
     const lv_coord_t start_b = scrolling_up ? -15 : -25;
     const lv_coord_t end_b = scrolling_up ? -25 : -15;
     // Top element
     const lv_coord_t start_t = scrolling_up ? 25 : 15;
-    const lv_coord_t end_t = scrolling_up ? 15 : 35;
+    const lv_coord_t end_t = scrolling_up ? 15 : 25;
 
-    // Compute how long the move should take (ms)
-    const uint32_t dist = LV_ABS(end_b - start_b);
-    const uint32_t dur  = (dist * 1000U) / speed_px_s;
-
-    // Allocate and populate callback context
-    scroll_ctx_t *ctx = malloc(sizeof(*ctx));
-    if (!ctx) {
-        ESP_LOGE(TAG, "lcd_scroll_anim: Failed to allocate scroll context");
-        already_scrolling = false;
-        return;
-    }
-    *ctx = (scroll_ctx_t){
+    // Populate callback context
+    scroll_ctx = (scroll_ctx_t){
       .top = menu->lbl_top,
       .mid = menu->lbl_mid,
       .bot = menu->lbl_bot,
@@ -673,9 +665,9 @@ void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32
         lv_label_set_text(menu->lbl_bot, lv_label_get_text(menu->lbl_mid));
     }
     lv_anim_set_exec_cb(&a1, (lv_anim_exec_xcb_t)lv_obj_set_y);
-    lv_anim_set_path_cb(&a1, lv_anim_path_linear);
+    lv_anim_set_path_cb(&a1, lv_anim_path_ease_out);
     lv_anim_set_values(&a1, start_b, end_b);
-    lv_anim_set_time(&a1, dur);
+    lv_anim_set_time(&a1, duration_ms);
     
     // Top animation
     lv_anim_t a2;
@@ -685,15 +677,12 @@ void lcd_scroll_anim(ui_menu_t *menu, const char *txt, bool scrolling_up, uint32
         lv_label_set_text(menu->lbl_top, lv_label_get_text(menu->lbl_mid));
     }
     lv_anim_set_exec_cb(&a2, (lv_anim_exec_xcb_t)lv_obj_set_y);
-    lv_anim_set_path_cb(&a2, lv_anim_path_linear);
+    lv_anim_set_path_cb(&a2, lv_anim_path_ease_out);
     lv_anim_set_values(&a2, start_t, end_t);
-    lv_anim_set_time(&a2, dur);
+    lv_anim_set_time(&a2, duration_ms);
 
-    // Hook up the ready callback
-    lv_anim_set_ready_cb(&a1,  scroll_ready_cb);
-    lv_anim_set_user_data(&a1, ctx);
- 
-    lv_anim_set_user_data(&a2, ctx);
+    // Commit on completion, or early via lcd_scroll_anim_finish
+    lv_anim_set_deleted_cb(&a1, scroll_deleted_cb);
 
     // Enqueue it
     lv_anim_start(&a1);
@@ -2402,6 +2391,11 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
         espnow_menu_t *espnow_menu, wifi_menu_t *wifi_menu, tools_menu_t *tools_menu, games_menu_t *games_menu,
         settings_menu_t *settings_menu, bluetooth_menu_t *bluetooth_menu, gpio_menu_t *gpio_menu)
 {
+    // Land a scroll still in flight before leaving: SELECT opens whatever lbl_mid shows
+    if (ui_btns->select_btn == 1 || ui_btns->left_btn == 1 || ui_btns->home_btn == 1 || ui_btns->pwr_btn == 1) {
+        lcd_scroll_anim_finish(ui_menu);
+    }
+
     if (ui_btns->up_btn == 1) {
         scrolling_menu = true;
         scrolling_up = false;
@@ -2466,7 +2460,7 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
 #endif
 
             const char *next_bottom = ui_menu->options[(ui_menu->index + 1) % ui_menu->size];
-            lcd_scroll_anim(ui_menu, next_bottom, scrolling_up, SCROLL_SPEED);
+            lcd_scroll_anim(ui_menu, next_bottom, scrolling_up, SCROLL_ANIM_MS);
             
             // Update thumb y (reversed direction, precise double, no jump)
             int max_y = SELECTION_SCROLLBAR_CONT_HEIGHT - SELECTION_SCROLLBAR_THUMB_HEIGHT;
@@ -2481,7 +2475,7 @@ void lcd_selection_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_me
 #endif
 
             const char *next_top = ui_menu->options[(ui_menu->index + ui_menu->size - 1) % ui_menu->size];
-            lcd_scroll_anim(ui_menu, next_top, scrolling_up, SCROLL_SPEED);
+            lcd_scroll_anim(ui_menu, next_top, scrolling_up, SCROLL_ANIM_MS);
             
             // Update thumb y (reversed direction, precise double, no jump)
             int max_y = SELECTION_SCROLLBAR_CONT_HEIGHT - SELECTION_SCROLLBAR_THUMB_HEIGHT;
@@ -2582,7 +2576,7 @@ void lcd_infrared_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, ir_menu_t *ir_men
             lv_obj_t *lbl_rst = lv_label_create(ACTIVE_SCR);
             lcd_format_label(lbl_rst, full_txt, user_secondary_color,
                      &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
-            lv_refr_now(NULL); // Render now (lv_timer_handler only refreshes every 33 ms)
+            lv_refr_now(NULL); // Render now (lv_timer_handler only refreshes every LV_DEF_REFR_PERIOD)
             vTaskDelay(pdMS_TO_TICKS(1000));
             lv_obj_delete(lbl_rst);
             lcd_clear_pending_inputs = true;
@@ -3145,7 +3139,7 @@ void lcd_wifi_page(ui_btns_t  *ui_btns, ui_menu_t *ui_menu, wifi_menu_t *wifi_me
         lcd_format_label(lbl_ssid, (full_ssid[0] != '\0') ? full_ssid : "Network", user_secondary_color,
                 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
         lv_obj_align_to(lbl_ssid, lbl_full, LV_ALIGN_OUT_TOP_MID, 0, 0);
-        lv_refr_now(NULL); // Render now (lv_timer_handler only refreshes every 33 ms)
+        lv_refr_now(NULL); // Render now (lv_timer_handler only refreshes every LV_DEF_REFR_PERIOD)
         vTaskDelay(pdMS_TO_TICKS(2500));
         lv_obj_delete(lbl_ssid);
         lv_obj_delete(lbl_full);
@@ -3694,7 +3688,7 @@ void lcd_settings_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, settings_menu_t *
                 ui_menu->page = SETTINGS_OTA_CONFIRM_PAGE;
                 return;
             } else {
-                lv_label_set_text(lbl_check, "No new updates.");
+                lv_label_set_text(lbl_check, "Already up to date!");
                 lv_timer_handler();
                 lcd_anim_loading_stop();
                 lv_timer_handler();

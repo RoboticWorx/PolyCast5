@@ -577,7 +577,7 @@ void lcd_tools_dice_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_menu_t *t
                 for (;;) {
                     uint32_t frame_start = (uint32_t)(esp_timer_get_time() / 1000);
                     bool rolling = lcd_dice_roll_step(frame_start);
-                    lv_refr_now(NULL); // Render this frame now (lv_timer_handler only refreshes every 33 ms)
+                    lv_refr_now(NULL); // Render this frame now (lv_timer_handler only refreshes every LV_DEF_REFR_PERIOD)
                     if (!rolling) break;
 
                     // Sleep out the rest of the frame period
@@ -1967,13 +1967,13 @@ void lcd_tools_srs_forget_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, tools_men
         lv_obj_set_style_text_align(lbl_result, LV_TEXT_ALIGN_CENTER, 0);
         lcd_format_label(lbl_result, "Forgetting...", user_secondary_color,
                 &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
-        lv_refr_now(NULL); // Render now (lv_timer_handler only refreshes every 33 ms)
+        lv_refr_now(NULL); // Render now (lv_timer_handler only refreshes every LV_DEF_REFR_PERIOD)
 
         // Wipe and show the real result
         bool forgotten = (srs_forget_all() == ESP_OK);
         lcd_format_label(lbl_result, forgotten ? "Notebooks forgotten." : "Couldn't forget\nnotebooks!",
                 user_secondary_color, &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
-        lv_refr_now(NULL); // Render now (lv_timer_handler only refreshes every 33 ms)
+        lv_refr_now(NULL); // Render now (lv_timer_handler only refreshes every LV_DEF_REFR_PERIOD)
         vTaskDelay(pdMS_TO_TICKS(1500));
         lv_obj_delete(lbl_result);
         lcd_clear_pending_inputs = true; // Taps made during the notice don't count

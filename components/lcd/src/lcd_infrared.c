@@ -46,7 +46,7 @@ static void ir_notice(const char *txt)
     lv_obj_t *lbl = lv_label_create(ACTIVE_SCR);
     lcd_format_label(lbl, txt, user_secondary_color,
             &lv_font_montserrat_18, LV_ALIGN_CENTER, 0, 0);
-    lv_refr_now(NULL); // Render now (lv_timer_handler only refreshes every 33 ms)
+    lv_refr_now(NULL); // Render now (lv_timer_handler only refreshes every LV_DEF_REFR_PERIOD)
     vTaskDelay(pdMS_TO_TICKS(1000));
     lv_obj_delete(lbl);
     lcd_clear_pending_inputs = true;
