@@ -2,12 +2,14 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "esp_heap_caps.h"
+#include "esp_timer.h"
 #include "driver/i2c_master.h"
 #include "esp_log.h"
 #include "nvs.h"
@@ -57,6 +59,25 @@
 // Re-run the rangefinder self-calibration once ambient has moved this far (1.3 mm/C)
 #define TOF_RECAL_DELTA_C100 300
 
+// Room temperature for the skin-to-core conversion. The spot sensor's die is the only usable thermometer, and only
+// until the array (~92 mW) and rangefinder (~66 mW) warm the module: latch it early, then let it follow only downward.
+#define ROOM_LATCH_SAMPLES 3    // Median of the first three fresh samples, ~2.5 s after open
+#define ROOM_CARRY_US      (10LL * 60 * 1000000) // A re-open inside this finds the module still warm: keep the old floor
+#define ROOM_SELFHEAT_C100 0    // BENCH: latched die minus a reference thermometer beside a settled handset (~50 expected)
+#define ROOM_DIE_MIN_C100  -4000 // Die readings outside -40..85 C are torn or post-POR reads, never a room
+#define ROOM_DIE_MAX_C100  8500
+
+// Body temperature from forehead skin. Only shown inside the distance the spot sensor's 50 deg view fills with forehead.
+#define BODY_DIST_MIN_MM    10   // Omron's 1-3 cm guidance; also the rangefinder's trusted floor
+#define BODY_DIST_MAX_MM    40   // Field-of-view loss is ~0.1 C of skin here, 0.15-0.35 C by 50 mm
+#define BODY_TOF_FRESH_MS   500  // ~Two 200 ms ranging budgets; an older range cannot gate a skin sample
+// Per-design skin offset onto the table's skin scale. 140 is from published MLX9061x forehead data at 2-3 cm (Sensors
+// 2021, PMC8198193), ~1.3-1.5 C under the table's 34.75 C anchor - not this module. BENCH: refine against a forehead thermometer.
+#define BODY_SKIN_TRIM_C100 140
+#define BODY_SKIN_MIN_C100  3000 // Table floor; below it is usually aim, distance or hair
+#define BODY_SKIN_MAX_C100  4000
+#define BODY_SKIN_WIN       3    // Median of three fresh samples, restarted whenever the distance gate drops
+
 QueueHandle_t xIrExpStatusQueue = NULL;
 QueueHandle_t xIrExpCtrlQueue = NULL;
 QueueHandle_t xIrExpDoneQueue = NULL;
@@ -77,6 +98,10 @@ static ir_exp_tof_detail_t s_detail;
 
 // When the array was last woken; absolute accuracy needs up to 180 s of thermal settling after that
 static TickType_t s_imager_wake_tick = 0;
+
+// Last session's room floor, kept across page visits. esp_timer, not the tick: the tick stops in light sleep.
+static int16_t s_room_floor_c100 = INT16_MIN;
+static int64_t s_room_floor_us = 0;
 
 const int16_t *ir_exp_get_frame(uint8_t idx)
 {
@@ -301,6 +326,163 @@ static int32_t tof_push(int32_t mm)
     return sum / s_tof_n;
 }
 
+// Oral minus forehead-centre skin, 0.01 C, from Microlife's clinical lookup (US 2005/0094705 A1 FIG. 6, digitised to
+// ~0.05 C). Rows are skin 30..38 C; the patent draws 38-40 as one bundle, so the last row stands for all three.
+// Columns are ambient 4..40 C in 2 C steps. Its ambient slope is ~-0.1 C/C, a quarter of Exergen's temporal-artery
+// formula, which matters because the only ambient on this module is a die its neighbours warm.
+#define CORE_SKIN_MIN_C100 3000
+#define CORE_SKIN_ROWS     9
+#define CORE_AMB_MIN_C100  400
+#define CORE_AMB_STEP_C100 200
+#define CORE_AMB_COLS      19
+
+static const int16_t s_core_offset[CORE_SKIN_ROWS][CORE_AMB_COLS] = {
+    { 676, 644, 616, 591, 568, 542, 523, 507, 494, 481, 466, 457, 449, 443, 438, 434, 432, 434, 440 }, // 30 C
+    { 639, 605, 571, 538, 515, 490, 470, 453, 438, 424, 411, 399, 390, 382, 374, 365, 364, 364, 378 }, // 31 C
+    { 594, 555, 524, 495, 466, 440, 417, 395, 378, 361, 349, 338, 327, 317, 312, 307, 300, 305, 316 }, // 32 C
+    { 543, 512, 480, 448, 424, 398, 376, 354, 332, 314, 299, 283, 268, 257, 253, 247, 246, 250, 259 }, // 33 C
+    { 496, 465, 438, 408, 381, 351, 325, 302, 280, 261, 243, 227, 213, 203, 197, 195, 194, 200, 205 }, // 34 C
+    { 458, 432, 407, 376, 349, 317, 288, 260, 234, 213, 192, 173, 159, 150, 148, 145, 149, 154, 159 }, // 35 C
+    { 432, 402, 375, 348, 317, 283, 256, 221, 196, 173, 144, 125, 109, 100,  96,  92,  97, 104, 114 }, // 36 C
+    { 403, 387, 361, 335, 301, 275, 245, 221, 189, 160, 130,  98,  67,  56,  51,  50,  51,  55,  68 }, // 37 C
+    { 385, 359, 335, 304, 278, 244, 215, 185, 155, 125, 102,  86,  55,  41,  28,  20,  17,  26,  28 }, // 38-40 C
+};
+
+// Skin plus the bilinearly interpolated offset. Skin above 38 C takes the 38-40 C row unchanged, as the patent draws
+// it; the other clamps are for safety only - callers gate LO/HI/room first.
+static int16_t core_from_skin(int16_t skin_c100, int16_t amb_c100)
+{
+    int32_t f = skin_c100 - CORE_SKIN_MIN_C100;
+    if (f < 0) f = 0;
+    if (f > (CORE_SKIN_ROWS - 1) * 100) f = (CORE_SKIN_ROWS - 1) * 100;
+    int32_t a = amb_c100 - CORE_AMB_MIN_C100;
+    if (a < 0) a = 0;
+    if (a > (CORE_AMB_COLS - 1) * CORE_AMB_STEP_C100) a = (CORE_AMB_COLS - 1) * CORE_AMB_STEP_C100;
+
+    int32_t row = f / 100;
+    int32_t col = a / CORE_AMB_STEP_C100;
+    if (row > CORE_SKIN_ROWS - 2) row = CORE_SKIN_ROWS - 2; // Top edge interpolates the last cell at weight 1
+    if (col > CORE_AMB_COLS - 2) col = CORE_AMB_COLS - 2;
+    const int32_t fr = f - row * 100;                // 0..100
+    const int32_t fc = a - col * CORE_AMB_STEP_C100; // 0..200
+
+    // One rounded division: two truncating passes bias every result up, as the offsets fall along both axes
+    const int16_t *r0 = s_core_offset[row];
+    const int16_t *r1 = s_core_offset[row + 1];
+    const int32_t num = (r0[col] * (CORE_AMB_STEP_C100 - fc) + r0[col + 1] * fc) * (100 - fr)
+                      + (r1[col] * (CORE_AMB_STEP_C100 - fc) + r1[col + 1] * fc) * fr;
+
+    return (int16_t)(skin_c100 + (num + CORE_AMB_STEP_C100 * 50) / (CORE_AMB_STEP_C100 * 100));
+}
+
+static int32_t median3(int32_t a, int32_t b, int32_t c)
+{
+    if (a > b) { const int32_t t = a; a = b; b = t; }
+    if (b > c) { b = c; }
+    return (a > b) ? a : b;
+}
+
+// Per-session body estimate, fed one fresh spot-sensor sample at a time
+typedef struct {
+    int16_t room_win[ROOM_LATCH_SAMPLES]; // Most recent plausible die samples
+    uint8_t room_n;         // Samples in room_win, up to ROOM_LATCH_SAMPLES
+    uint8_t room_i;
+    int16_t room_floor;     // Lower of the carry and every running median since the latch, 0.01 C, or INT16_MIN until latched
+    bool room_cold;         // Fell below the window this visit: the device was acclimating, so from then on the floor
+                            // tracks the running median both ways and is never carried
+    int16_t room_carry;     // Last session's floor if still inside ROOM_CARRY_US, else INT16_MIN
+    int32_t skin_win[BODY_SKIN_WIN];
+    uint8_t skin_n;         // Samples in skin_win since the distance gate last held
+    uint8_t skin_i;
+} body_est_t;
+
+static void body_reset(body_est_t *b)
+{
+    memset(b, 0, sizeof(*b));
+    b->room_floor = INT16_MIN;
+    b->room_carry = (s_room_floor_c100 != INT16_MIN &&
+            esp_timer_get_time() - s_room_floor_us < ROOM_CARRY_US) ? s_room_floor_c100 : INT16_MIN;
+}
+
+// Fold in one fresh pair and set room_c100, body_c100 and body_state. have_range: the rangefinder has a current answer;
+// dist_ok: every range since the last sample was inside the gate.
+static void body_update(body_est_t *b, ir_exp_status_t *st, float t_obj, float t_amb, bool have_range, bool dist_ok)
+{
+    // Room: median of the first three samples, before the neighbours' heat arrives; after that only a fall in the
+    // running median is believed, so one torn read cannot drag the floor down for this visit and the next. Once it has
+    // been below the window it follows the median both ways: that rise is a cold device warming up, not self-heating.
+    const float die = t_amb * 100.0f;
+    if (die >= (float)ROOM_DIE_MIN_C100 && die <= (float)ROOM_DIE_MAX_C100) { // Also rejects NaN
+        b->room_win[b->room_i] = (int16_t)lrintf(die);
+        b->room_i = (uint8_t)((b->room_i + 1) % ROOM_LATCH_SAMPLES);
+        if (b->room_n < ROOM_LATCH_SAMPLES) {
+            b->room_n++;
+        }
+        if (b->room_n == ROOM_LATCH_SAMPLES) {
+            const int16_t m = (int16_t)median3(b->room_win[0], b->room_win[1], b->room_win[2]);
+            if (b->room_floor == INT16_MIN) {
+                b->room_floor = (b->room_carry != INT16_MIN && b->room_carry < m) ? b->room_carry : m;
+#ifdef POLYCAST5_DEBUG
+                ESP_LOGI(TAG, "Room latched at %d (median %d, carry %d), 0.01 C",
+                        (int)b->room_floor, (int)m, (int)b->room_carry);
+#endif
+            } else if (b->room_cold || m < b->room_floor) {
+                b->room_floor = m;
+            }
+        }
+    }
+    if (b->room_floor != INT16_MIN) {
+        if ((int32_t)b->room_floor - ROOM_SELFHEAT_C100 < IR_EXP_ROOM_MIN_C100) {
+            b->room_cold = true;
+        }
+        // A cold visit's floor is never carried: as the lower value it would win the next latch and hold it in ROOM
+        s_room_floor_c100 = b->room_cold ? INT16_MIN : b->room_floor;
+        s_room_floor_us = esp_timer_get_time(); // Refreshed every sample, so the carry window opens at session end
+    }
+    const int32_t room = (b->room_floor != INT16_MIN) ? (int32_t)b->room_floor - ROOM_SELFHEAT_C100 : INT16_MIN;
+    st->room_c100 = (int16_t)room;
+
+    // Skin: only samples taken inside the distance gate count, so a reading never mixes in one taken from too far
+    if (!have_range) {
+        b->skin_n = 0;
+        st->body_state = IR_EXP_BODY_NONE; // No distance to gate on: say nothing rather than hint
+        return;
+    }
+    if (!dist_ok) {
+        b->skin_n = 0;
+        st->body_state = IR_EXP_BODY_FAR;
+        return;
+    }
+    if (!(t_obj > -100.0f && t_obj < 200.0f)) { // Also rejects NaN; past this lrintf saturates and the trim would overflow
+        b->skin_n = 0;
+        st->body_state = IR_EXP_BODY_NONE;
+        return;
+    }
+    b->skin_win[b->skin_i] = (int32_t)lrintf(t_obj * 100.0f) + BODY_SKIN_TRIM_C100;
+    b->skin_i = (uint8_t)((b->skin_i + 1) % BODY_SKIN_WIN);
+    if (b->skin_n < BODY_SKIN_WIN) {
+        b->skin_n++;
+    }
+
+    if (room == INT16_MIN || b->skin_n < BODY_SKIN_WIN) {
+        st->body_state = IR_EXP_BODY_NONE;
+        return;
+    }
+    const int32_t skin = median3(b->skin_win[0], b->skin_win[1], b->skin_win[2]);
+
+    // Never clamp an input and still show a number
+    if (room < IR_EXP_ROOM_MIN_C100 || room > IR_EXP_ROOM_MAX_C100) {
+        st->body_state = IR_EXP_BODY_ROOM;
+    } else if (skin < BODY_SKIN_MIN_C100) {
+        st->body_state = IR_EXP_BODY_LO;
+    } else if (skin > BODY_SKIN_MAX_C100) {
+        st->body_state = IR_EXP_BODY_HI;
+    } else {
+        st->body_c100 = core_from_skin((int16_t)skin, (int16_t)room);
+        st->body_state = IR_EXP_BODY_OK;
+    }
+}
+
 static bool imager_park(void); // Defined below; session_stop() parks on the way out
 void ir_exp_cold_park_all(void); // Also below; the retry path for a refused teardown
 
@@ -499,6 +681,9 @@ static void ir_exp_task(void *arg)
     memset(&st, 0, sizeof(st));
     st.dist_mm = VL53L4CX_NO_TARGET;
     st.medical_c100 = IR_EXP_MEDICAL_NONE;
+    st.room_c100 = INT16_MIN;
+    body_est_t body;
+    body_reset(&body);
 
     TickType_t next_frame = 0;
     TickType_t last_publish = 0;
@@ -514,6 +699,9 @@ static void ir_exp_task(void *arg)
     TickType_t last_tof_tick = 0;
     TickType_t last_med_tick = 0;
     TickType_t session_tick = 0; // When the current session started, for the above
+    // The BODY gate reads unaveraged ranges: the 3-deep display average lags a pull-back by up to ~25 mm
+    int32_t body_raw_mm = VL53L4CX_NO_TARGET; // Latest range
+    bool body_gate_broken = false;            // A range outside the gate since the last spot sample
 
     while (1) {
         // Between sessions this task exists only long enough to be told to stop, so the idle block is unbounded.
@@ -543,6 +731,10 @@ static void ir_exp_task(void *arg)
                         memset(&st, 0, sizeof(st));
                         st.dist_mm = VL53L4CX_NO_TARGET;
                         st.medical_c100 = IR_EXP_MEDICAL_NONE;
+                        st.room_c100 = INT16_MIN;
+                        body_reset(&body); // Picks up the last visit's room floor if it is recent enough
+                        body_raw_mm = VL53L4CX_NO_TARGET;
+                        body_gate_broken = false;
                         // WARMING starts SET, cleared only by the first good frame: IMAGER alone would claim a live image
                         st.flags = (uint8_t)(IR_EXP_FLAG_WARMING |
                                              (done.imager ? IR_EXP_FLAG_IMAGER : 0) |
@@ -663,6 +855,12 @@ static void ir_exp_task(void *arg)
                         tof_reset();
                         st.dist_mm = VL53L4CX_NO_TARGET;
                     }
+
+                    // The next spot sample integrated across this range, so one out of the gate disqualifies it
+                    body_raw_mm = mm;
+                    if (mm < BODY_DIST_MIN_MM || mm > BODY_DIST_MAX_MM) { // NO_TARGET is negative
+                        body_gate_broken = true;
+                    }
                 }
             }
         }
@@ -678,9 +876,18 @@ static void ir_exp_task(void *arg)
                 xSemaphoreGive(xI2CBusMutex);
                 if (r == ESP_OK) {
                     st.medical_c100 = (int16_t)(t_obj * 100.0f);
-                    amb_c100 = (int16_t)(t_amb * 100.0f);
+                    amb_c100 = (int16_t)(t_amb * 100.0f); // Live, for the ToF recalibration - not the room estimate
                     last_med_tick = now;
                     st.flags |= IR_EXP_FLAG_MEDICAL; // Re-arm if a fault withdrew it
+
+                    // A range is held through a stalled ranger, so it must also be recent; with none, BODY says nothing
+                    // rather than hinting at a distance it cannot see. Every range since the last sample must be in the gate.
+                    const bool have_range = (st.flags & IR_EXP_FLAG_TOF) && last_tof_tick != 0 &&
+                            (int32_t)(now - last_tof_tick) <= (int32_t)pdMS_TO_TICKS(BODY_TOF_FRESH_MS);
+                    const bool dist_ok = have_range && !body_gate_broken &&
+                            body_raw_mm >= BODY_DIST_MIN_MM && body_raw_mm <= BODY_DIST_MAX_MM;
+                    body_gate_broken = false; // Consumed by this sample
+                    body_update(&body, &st, t_obj, t_amb, have_range, dist_ok);
                 }
             }
         }
@@ -724,10 +931,14 @@ static void ir_exp_task(void *arg)
         if ((st.flags & IR_EXP_FLAG_TOF) && tof_gone) {
             st.flags &= (uint8_t)~IR_EXP_FLAG_TOF;
             st.dist_mm = VL53L4CX_NO_TARGET;
+            tof_reset(); // The first range after a stall must not be averaged with ranges from before it
+            body_raw_mm = VL53L4CX_NO_TARGET;
         }
         if ((st.flags & IR_EXP_FLAG_MEDICAL) && med_gone) {
             st.flags &= (uint8_t)~IR_EXP_FLAG_MEDICAL;
             st.medical_c100 = IR_EXP_MEDICAL_NONE;
+            st.body_state = IR_EXP_BODY_NONE;
+            body.skin_n = 0; // A resumed sensor must not be medianed against samples from before the gap
         }
 
         // FAULT tracks the ARRAY alone, as a pure function of its flag so it cannot latch on: a held image looks

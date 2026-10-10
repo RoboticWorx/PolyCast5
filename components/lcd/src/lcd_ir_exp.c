@@ -12,6 +12,7 @@
 #include "esp_log.h"
 #include "esp_heap_caps.h"
 #include "esp_err.h"
+#include "nvs.h"
 
 #include "polycast5_macros.h"
 #include "gpio_task.h"
@@ -20,6 +21,9 @@
 
 #define TAG "LCD_IR_EXP"
 
+#define IRX_NVS_NS      "ir_exp"  // NVS namespace
+#define IRX_NVS_PAL_KEY "palette" // Last palette picked, so the next visit opens on it across reboots
+
 /* =============== Layout =============== */
 #define IRX_CANVAS_W 180 // 4:3 against the 32x24 sensor, so no aspect distortion
 #define IRX_CANVAS_H 135 // Full screen height
@@ -27,14 +31,20 @@
 #define IRX_PANEL_H  115
 #define IRX_PANEL_Y  20  // Starts below the battery indicator at the top right
 
-#define IRX_ROW_SPOT_CAP 0  // ink   3..12
-#define IRX_ROW_SPOT_C   11 // ink  14..24
-#define IRX_ROW_SPOT_F   23 // ink  26..36
-#define IRX_ROW_DIST_CAP 42 // ink  45..54  <- 9 px below the SPOT group
-#define IRX_ROW_DIST_VAL 53 // ink  56..66
-#define IRX_ROW_MED_CAP  72 // ink  75..84  <- 9 px below the DIST group
-#define IRX_ROW_MED_C    83 // ink  86..96
-#define IRX_ROW_MED_F    95 // ink  98..108, and the 16 px box ends exactly on 111
+#define IRX_ROW_DIST_CAP 0  // ink   3..12
+#define IRX_ROW_DIST_VAL 11 // ink  14..24
+#define IRX_ROW_RAW_CAP  30 // ink  33..42  <- 9 px below the DIST group
+#define IRX_ROW_RAW_C    41 // ink  44..54
+#define IRX_ROW_RAW_F    53 // ink  56..66
+#define IRX_ROW_BODY_CAP 72 // ink  75..84  <- 9 px below the RAW group
+#define IRX_ROW_BODY_C   83 // ink  86..96
+#define IRX_ROW_BODY_F   95 // ink  98..108, and the 16 px box ends exactly on 111
+
+// Crosshair temperature, beside the reticle rather than in the column: the reticle arms end 7 px from centre
+#define IRX_SPOT_DX     10
+#define IRX_SPOT_LAYERS 5 // Four outline copies, then the face
+
+#define IRX_TIP_W 168 // ROOM explainer: the image width less 6 px each side, centred over the image
 
 #define IRX_FRAME_MS 125 // 8 fps; the producer publishes at the same rate
 
@@ -71,10 +81,13 @@ static lv_obj_t *irx_canvas = NULL;
 static lv_obj_t *irx_panel = NULL;
 static lv_obj_t *irx_cap[3] = { NULL, NULL, NULL };
 static lv_obj_t *irx_val[3] = { NULL, NULL, NULL };
-// Fahrenheit line under the two temperature readouts. NULL at index 1, which is DIST.
+// Fahrenheit line under the two temperature readouts. NULL at index 0, which is DIST.
 static lv_obj_t *irx_val_f[3] = { NULL, NULL, NULL };
+static lv_obj_t *irx_spot = NULL; // Array crosshair temperature over the image: a bare container of IRX_SPOT_LAYERS labels
 static lv_obj_t *irx_status = NULL;
 static bool irx_status_shown = false; // Whether irx_status currently has text worth showing
+static lv_obj_t *irx_room_tip = NULL; // Explains a ROOM refusal; up only while BODY is in that state
+static bool irx_room_tip_shown = false;
 
 // Detail view: everything the rangefinder reports beyond the headline distance. One transparent root parents the
 // lot, so hiding it is one delete with no chance of leaking a child.
@@ -97,6 +110,7 @@ static irx_tap_t *irx_tap_y = NULL;  // IRX_CANVAS_H entries
 static int16_t *irx_mid = NULL;      // MLX90642_ROWS x IRX_CANVAS_W intermediate
 
 static uint8_t irx_pal_idx = 0;
+static uint8_t irx_pal_stored = UINT8_MAX; // The index NVS holds, so an unchanged pick costs no write; MAX until loaded
 static int32_t irx_lo = 0;
 static int32_t irx_hi = 0;
 static bool irx_range_seeded = false;
@@ -178,6 +192,47 @@ static void irx_build_palette(uint8_t which)
         const uint8_t g = (uint8_t)((int)a->g + ((((int)b->g - (int)a->g) * t) >> 8));
         const uint8_t bl = (uint8_t)((int)a->b + ((((int)b->b - (int)a->b) * t) >> 8));
         irx_palette[i] = lv_color_to_u16(lv_color_make(r, g, bl));
+    }
+}
+
+// Restore the last palette picked. Once per boot is enough: irx_pal_idx is static, so later visits already hold it.
+static void irx_pal_nvs_load(void)
+{
+    nvs_handle_t h;
+    if (nvs_open(IRX_NVS_NS, NVS_READONLY, &h) == ESP_OK) { // Fails on first boot: the namespace does not exist yet
+        uint8_t stored = 0;
+        if (nvs_get_u8(h, IRX_NVS_PAL_KEY, &stored) == ESP_OK && stored < IRX_PAL_COUNT) {
+            irx_pal_idx = stored;
+        }
+        nvs_close(h);
+    }
+    irx_pal_stored = irx_pal_idx; // Missing or out of range reads as the default, which needs no write either
+}
+
+// Persist the palette as soon as it is picked, so a flat battery cannot lose it. Skipped when NVS already matches.
+static void irx_pal_nvs_save(void)
+{
+    if (irx_pal_idx == irx_pal_stored) {
+        return;
+    }
+
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(IRX_NVS_NS, NVS_READWRITE, &h);
+    if (err == ESP_OK) {
+        err = nvs_set_u8(h, IRX_NVS_PAL_KEY, irx_pal_idx);
+        if (err == ESP_OK) {
+            err = nvs_commit(h);
+        }
+        nvs_close(h);
+    }
+
+    if (err == ESP_OK) {
+        irx_pal_stored = irx_pal_idx;
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGI(TAG, "Saved palette %u", (unsigned)irx_pal_idx);
+#endif
+    } else {
+        ESP_LOGE(TAG, "Failed to save the palette: %s", esp_err_to_name(err));
     }
 }
 
@@ -339,7 +394,8 @@ static void irx_fmt_unit(char *buf, size_t n, int32_t v100, char unit)
     // Sign is handled explicitly: integer division would drop it for values like -0.5 C
     const char *sign = (v100 < 0) ? "-" : "";
     const int32_t v = (v100 < 0) ? -v100 : v100;
-    snprintf(buf, n, "%s%d.%d%c", sign, (int)(v / 100), (int)((v % 100) / 10), unit);
+    const int32_t tenths = (v + 5) / 10; // Rounded, not truncated
+    snprintf(buf, n, "%s%d.%d%c", sign, (int)(tenths / 10), (int)(tenths % 10), unit);
 }
 
 static void irx_fmt_temp(char *buf, size_t n, int32_t c100, bool valid)
@@ -351,15 +407,28 @@ static void irx_fmt_temp(char *buf, size_t n, int32_t c100, bool valid)
     irx_fmt_unit(buf, n, c100, 'C');
 }
 
-// Same reading in Fahrenheit, for the second line under each temperature. Integer hundredths - the C5 has no FPU
-// and this runs on every published frame. Truncation toward zero costs at most 0.01 F, under the sensor's accuracy.
+// Same reading in Fahrenheit, for the second line under each temperature. Integer maths - the C5 has no FPU and this
+// runs on every published frame. Exact thousandths truncated to hundredths, so irx_fmt_unit's rounding stays exact.
 static void irx_fmt_temp_f(char *buf, size_t n, int32_t c100, bool valid)
 {
     if (!valid) {
         snprintf(buf, n, "--");
         return;
     }
-    irx_fmt_unit(buf, n, ((c100 * 9) / 5) + 3200, 'F');
+    irx_fmt_unit(buf, n, (c100 * 18 + 32000) / 10, 'F');
+}
+
+// What BODY shows in place of a number. FAR reads "hold at" here and "1-4cm" on the Fahrenheit line below; ROOM puts
+// the refused room estimate there.
+static const char *irx_body_word(uint8_t state)
+{
+    switch (state) {
+    case IR_EXP_BODY_FAR:  return "hold at"; // Lower case: "HOLD" is the freeze label
+    case IR_EXP_BODY_LO:   return "LO";
+    case IR_EXP_BODY_HI:   return "HI";
+    case IR_EXP_BODY_ROOM: return "ROOM"; // Room estimate outside 16-32 C
+    default:               return "--";
+    }
 }
 
 static void irx_fmt_dist(char *buf, size_t n, int32_t mm, bool valid)
@@ -446,6 +515,38 @@ static void irx_set_status(const char *txt)
     irx_status_shown = true;
 }
 
+// Show the ROOM explainer for this room estimate, or hide it. ROOM needs the forehead in range, so this only ever
+// appears mid-measurement. Visibility is tracked for irx_hide_detail(), as with the status label.
+static void irx_set_room_tip(bool show, int16_t room_c100)
+{
+    if (irx_room_tip == NULL) {
+        return;
+    }
+
+    if (!show) {
+        lv_obj_add_flag(irx_room_tip, LV_OBJ_FLAG_HIDDEN);
+        irx_room_tip_shown = false;
+        return;
+    }
+
+    const bool warm = room_c100 > IR_EXP_ROOM_MAX_C100;
+    char now_f[16];
+    char lim_f[16];
+    char msg[160];
+    irx_fmt_temp_f(now_f, sizeof(now_f), room_c100, true);
+    irx_fmt_temp_f(lim_f, sizeof(lim_f), warm ? IR_EXP_ROOM_MAX_C100 : IR_EXP_ROOM_MIN_C100, true);
+    if (warm) {
+        snprintf(msg, sizeof(msg), "BODY sensor too warm: %s (max %s). "
+                "Take it out to let it cool for a few minutes and try again.", now_f, lim_f);
+    } else {
+        snprintf(msg, sizeof(msg), "BODY sensor too cool: %s (min %s). "
+                "Let the device warm up indoors for a few minutes and try again.", now_f, lim_f);
+    }
+    lv_label_set_text(irx_room_tip, msg);
+    lv_obj_remove_flag(irx_room_tip, LV_OBJ_FLAG_HIDDEN);
+    irx_room_tip_shown = true;
+}
+
 static void irx_timer_cb(lv_timer_t *t)
 {
     (void)t;
@@ -472,21 +573,43 @@ static void irx_timer_cb(lv_timer_t *t)
     const bool img_live = (st.flags & IR_EXP_FLAG_IMAGER) && !(st.flags & IR_EXP_FLAG_WARMING);
 
     if (!irx_frozen) {
+        // C over F, as in the column; two short lines stay clear of the panel where one long one would not
         const int32_t spot_c100 = (int32_t)st.center_c50 * 2; // 0.02 C -> 0.01 C
+        char spot_f[16];
+        char spot[34];
         irx_fmt_temp(buf, sizeof(buf), spot_c100, img_live);
-        lv_label_set_text(irx_val[0], buf);
-        irx_fmt_temp_f(buf, sizeof(buf), spot_c100, img_live);
-        lv_label_set_text(irx_val_f[0], buf);
+        irx_fmt_temp_f(spot_f, sizeof(spot_f), spot_c100, img_live);
+        snprintf(spot, sizeof(spot), "%s\n%s", buf, spot_f);
+        for (int i = 0; i < IRX_SPOT_LAYERS; ++i) { // Outline copies and face carry the same text
+            lv_label_set_text(lv_obj_get_child(irx_spot, i), spot);
+        }
 
         irx_fmt_dist(buf, sizeof(buf), st.dist_mm, (st.flags & IR_EXP_FLAG_TOF) != 0);
-        lv_label_set_text(irx_val[1], buf);
+        lv_label_set_text(irx_val[0], buf);
 
         const bool med_live = (st.flags & IR_EXP_FLAG_MEDICAL) &&
                 st.medical_c100 != IR_EXP_MEDICAL_NONE;
         irx_fmt_temp(buf, sizeof(buf), st.medical_c100, med_live);
-        lv_label_set_text(irx_val[2], buf);
+        lv_label_set_text(irx_val[1], buf);
         irx_fmt_temp_f(buf, sizeof(buf), st.medical_c100, med_live);
-        lv_label_set_text(irx_val_f[2], buf);
+        lv_label_set_text(irx_val_f[1], buf);
+
+        // The producer gates the estimate, so only OK carries a number; every other state says why there is none
+        if (st.body_state == IR_EXP_BODY_OK) {
+            irx_fmt_temp(buf, sizeof(buf), st.body_c100, true);
+            lv_label_set_text(irx_val[2], buf);
+            irx_fmt_temp_f(buf, sizeof(buf), st.body_c100, true);
+            lv_label_set_text(irx_val_f[2], buf);
+        } else if (st.body_state == IR_EXP_BODY_ROOM) {
+            // The room estimate it refused, so a warm handset reads as one rather than as a fault
+            lv_label_set_text(irx_val[2], irx_body_word(st.body_state));
+            irx_fmt_temp_f(buf, sizeof(buf), st.room_c100, true);
+            lv_label_set_text(irx_val_f[2], buf);
+        } else {
+            lv_label_set_text(irx_val[2], irx_body_word(st.body_state));
+            lv_label_set_text(irx_val_f[2], (st.body_state == IR_EXP_BODY_FAR) ? "1-4cm" : "--");
+        }
+        irx_set_room_tip(st.body_state == IR_EXP_BODY_ROOM, st.room_c100);
     }
 
     if ((int32_t)(xTaskGetTickCount() - irx_pal_show_until) < 0) {
@@ -608,10 +731,10 @@ static void irx_build_ui(void)
     lv_obj_set_style_pad_all(irx_panel, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_remove_flag(irx_panel, LV_OBJ_FLAG_SCROLLABLE);
 
-    static const char *const caps[3] = { "SPOT", "DIST", "MED" };
-    static const int16_t cap_y[3] = { IRX_ROW_SPOT_CAP, IRX_ROW_DIST_CAP, IRX_ROW_MED_CAP };
-    static const int16_t val_y[3] = { IRX_ROW_SPOT_C, IRX_ROW_DIST_VAL, IRX_ROW_MED_C };
-    static const int16_t f_y[3] = { IRX_ROW_SPOT_F, -1, IRX_ROW_MED_F }; // -1: no second unit
+    static const char *const caps[3] = { "DIST", "RAW", "BODY" };
+    static const int16_t cap_y[3] = { IRX_ROW_DIST_CAP, IRX_ROW_RAW_CAP, IRX_ROW_BODY_CAP };
+    static const int16_t val_y[3] = { IRX_ROW_DIST_VAL, IRX_ROW_RAW_C, IRX_ROW_BODY_C };
+    static const int16_t f_y[3] = { -1, IRX_ROW_RAW_F, IRX_ROW_BODY_F }; // -1: no second unit
 
     for (int i = 0; i < 3; ++i) {
         irx_cap[i] = lv_label_create(irx_panel);
@@ -639,6 +762,24 @@ static void irx_build_ui(void)
         }
     }
 
+    // White text over four black copies offset 1 px diagonally - an outline, since LVGL 9.2 has none. Reads over every palette
+    // colour like a backed label would, but hides only the glyph edges instead of a box beside the reticle. Left-aligned, so a
+    // wider value grows away from the reticle.
+    static const int8_t spot_ofs[IRX_SPOT_LAYERS][2] = { { 0, 0 }, { 2, 0 }, { 0, 2 }, { 2, 2 }, { 1, 1 } }; // Face last
+    irx_spot = lv_obj_create(ACTIVE_SCR);
+    lv_obj_remove_style_all(irx_spot); // Transparent, unpadded; sized by its labels
+    lv_obj_set_size(irx_spot, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_remove_flag(irx_spot, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    for (int i = 0; i < IRX_SPOT_LAYERS; ++i) {
+        lv_obj_t *l = lv_label_create(irx_spot);
+        lv_label_set_text(l, "--\n--");
+        lv_obj_set_style_text_font(l, &lv_font_montserrat_12, 0);
+        lv_obj_set_style_text_line_space(l, -2, 0); // 13 px pitch: 4 px between the C and F ink
+        lv_obj_set_style_text_color(l, (i == IRX_SPOT_LAYERS - 1) ? lv_color_white() : lv_color_black(), 0);
+        lv_obj_set_pos(l, spot_ofs[i][0], spot_ofs[i][1]);
+    }
+    lv_obj_align(irx_spot, LV_ALIGN_LEFT_MID, IRX_CANVAS_W / 2 + IRX_SPOT_DX - 1, 0); // -1: the face sits 1 px in
+
     irx_status = lv_label_create(ACTIVE_SCR);
     lv_label_set_text(irx_status, "");
     lv_obj_set_style_text_font(irx_status, &lv_font_montserrat_12, 0);
@@ -652,6 +793,22 @@ static void irx_build_ui(void)
     // paint the dark square over the corner until the first timer tick set a state.
     lv_obj_add_flag(irx_status, LV_OBJ_FLAG_HIDDEN);
     irx_status_shown = false;
+
+    // Created last so it draws over the readout beside the reticle; wraps to ~5 lines at this width
+    irx_room_tip = lv_label_create(ACTIVE_SCR);
+    lv_label_set_long_mode(irx_room_tip, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(irx_room_tip, IRX_TIP_W);
+    lv_label_set_text(irx_room_tip, "");
+    lv_obj_set_style_text_font(irx_room_tip, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(irx_room_tip, lv_color_white(), 0);
+    lv_obj_set_style_text_align(irx_room_tip, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_bg_color(irx_room_tip, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(irx_room_tip, LV_OPA_80, 0);
+    lv_obj_set_style_radius(irx_room_tip, 4, 0);
+    lv_obj_set_style_pad_all(irx_room_tip, 4, 0);
+    lv_obj_align(irx_room_tip, LV_ALIGN_LEFT_MID, (IRX_CANVAS_W - IRX_TIP_W) / 2, 0);
+    lv_obj_add_flag(irx_room_tip, LV_OBJ_FLAG_HIDDEN);
+    irx_room_tip_shown = false;
 }
 
 /* =============== Detail view =============== */
@@ -713,9 +870,11 @@ static void irx_hide_detail(void)
 
     if (irx_canvas != NULL) lv_obj_remove_flag(irx_canvas, LV_OBJ_FLAG_HIDDEN);
     if (irx_panel != NULL) lv_obj_remove_flag(irx_panel, LV_OBJ_FLAG_HIDDEN);
+    if (irx_spot != NULL) lv_obj_remove_flag(irx_spot, LV_OBJ_FLAG_HIDDEN);
     // Only if it had text: unhiding an empty one would paint the dark square for a frame until the
     // next timer tick blanked it again.
     if (irx_status != NULL && irx_status_shown) lv_obj_remove_flag(irx_status, LV_OBJ_FLAG_HIDDEN);
+    if (irx_room_tip != NULL && irx_room_tip_shown) lv_obj_remove_flag(irx_room_tip, LV_OBJ_FLAG_HIDDEN);
 }
 
 static void irx_show_detail(void)
@@ -727,7 +886,9 @@ static void irx_show_detail(void)
     // Hide, never delete - see the note above.
     if (irx_canvas != NULL) lv_obj_add_flag(irx_canvas, LV_OBJ_FLAG_HIDDEN);
     if (irx_panel != NULL) lv_obj_add_flag(irx_panel, LV_OBJ_FLAG_HIDDEN);
+    if (irx_spot != NULL) lv_obj_add_flag(irx_spot, LV_OBJ_FLAG_HIDDEN);
     if (irx_status != NULL) lv_obj_add_flag(irx_status, LV_OBJ_FLAG_HIDDEN);
+    if (irx_room_tip != NULL) lv_obj_add_flag(irx_room_tip, LV_OBJ_FLAG_HIDDEN);
 
     irx_det_root = lv_obj_create(lv_scr_act());
     lv_obj_remove_style_all(irx_det_root);
@@ -1037,11 +1198,20 @@ static void irx_cleanup(void)
         lv_obj_delete(irx_panel); // Deletes the caption and value labels with it
         irx_panel = NULL;
     }
+    if (irx_spot != NULL) {
+        lv_obj_delete(irx_spot);
+        irx_spot = NULL;
+    }
     if (irx_status != NULL) {
         lv_obj_delete(irx_status);
         irx_status = NULL;
     }
     irx_status_shown = false;
+    if (irx_room_tip != NULL) {
+        lv_obj_delete(irx_room_tip);
+        irx_room_tip = NULL;
+    }
+    irx_room_tip_shown = false;
     if (irx_canvas != NULL) {
         lv_obj_delete(irx_canvas);
         irx_canvas = NULL;
@@ -1070,6 +1240,11 @@ void lcd_gpio_ir_exp_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
         // If picking this page as a hotkey
         if (!lv_obj_has_flag(ui_menu->lbl_hotkey_icon, LV_OBJ_FLAG_HIDDEN)) {
             lcd_hotkey_save_page_as_hotkey(ui_menu);
+        }
+
+        // Before irx_alloc() builds the palette from it
+        if (irx_pal_stored == UINT8_MAX) {
+            irx_pal_nvs_load();
         }
 
         // Probing can retry the bus speed and wait on the rangefinder's firmware, blocking lcd_task for seconds - paint first
@@ -1164,11 +1339,13 @@ void lcd_gpio_ir_exp_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
         irx_build_palette(irx_pal_idx);
         irx_set_status(irx_pal_names[irx_pal_idx]);
         irx_pal_show_until = xTaskGetTickCount() + pdMS_TO_TICKS(1200);
+        irx_pal_nvs_save();
     } else if (ui_btns->down_btn == 1) {
         irx_pal_idx = (uint8_t)((irx_pal_idx + 1) % IRX_PAL_COUNT);
         irx_build_palette(irx_pal_idx);
         irx_set_status(irx_pal_names[irx_pal_idx]);
         irx_pal_show_until = xTaskGetTickCount() + pdMS_TO_TICKS(1200);
+        irx_pal_nvs_save();
     } else if (ui_btns->right_btn == 1) { // Everything the rangefinder reports
         if (irx_have_tof) {
             irx_mode = IRX_MODE_DETAIL;

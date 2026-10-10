@@ -20,6 +20,18 @@
 // medical_c100 when the first measurement pair has not completed yet
 #define IR_EXP_MEDICAL_NONE INT16_MIN
 
+// ir_exp_status_t.body_state: whether body_c100 holds a reading, and if not, why
+#define IR_EXP_BODY_NONE 0 // No skin reading yet, no current range, or the room temperature has not latched
+#define IR_EXP_BODY_OK   1 // body_c100 is the oral-equivalent estimate
+#define IR_EXP_BODY_LO   2 // Skin below the conversion's range - usually aim, distance or hair
+#define IR_EXP_BODY_HI   3 // Skin above it
+#define IR_EXP_BODY_ROOM 4 // Room temperature outside the range the conversion holds over
+#define IR_EXP_BODY_FAR  5 // Rangefinder puts the forehead outside the distance the spot sensor's view fills
+
+// Room window for BODY, 0.01 C; outside it the state is IR_EXP_BODY_ROOM. Public so the page can quote it.
+#define IR_EXP_ROOM_MIN_C100 1600 // Below this the commercial units refuse too ("LO A")
+#define IR_EXP_ROOM_MAX_C100 3200 // Above this the offset table bottoms out and turns back up
+
 // Plain values only - lcd_task owns every LVGL object, so nothing here may be a pointer.
 typedef struct {
     uint32_t seq;          // Bumped on every publish so the UI redraws only on change
@@ -30,6 +42,9 @@ typedef struct {
     int16_t  t_die_c100;   // Array die temperature, 0.01 C. NOT ambient.
     int32_t  dist_mm;      // Averaged range as displayed, or VL53L4CX_NO_TARGET
     int16_t  medical_c100; // Medical spot temperature, 0.01 C, or IR_EXP_MEDICAL_NONE
+    int16_t  room_c100;    // Room estimate behind body_c100, 0.01 C, or INT16_MIN until latched
+    int16_t  body_c100;    // Oral-equivalent body temperature, 0.01 C; valid only when body_state is OK
+    uint8_t  body_state;   // IR_EXP_BODY_*
     uint8_t  flags;        // IR_EXP_FLAG_*
 } ir_exp_status_t;
 

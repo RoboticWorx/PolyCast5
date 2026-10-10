@@ -79,6 +79,9 @@ static struct {
 // different ones, so no object temperature is valid until both have been observed once.
 static uint8_t s_seen_cycles = 0;
 
+// Set when init could not clear new_data: the first flag seen may then predate the last park, so it is dropped unread.
+static bool s_drop_first = false;
+
 // Read one 16-bit word. Address goes out MSByte first, as does the data.
 static esp_err_t mlx_read_word(uint16_t reg, uint16_t *out)
 {
@@ -241,11 +244,12 @@ esp_err_t mlx90632_init(uint32_t scl_hz)
         goto fail;
     }
 
-    // Flag the part as running so a later brown-out shows up as this bit going back to 0
+    // Flag the part as running so a later brown-out shows up as this bit going back to 0, and drop any sample latched
+    // before the last park: left set, it counts as one of the two primed cycles and pairs a stale RAM slot with a fresh one.
     uint16_t status = 0;
-    if (mlx_read_word(MLX_REG_STATUS, &status) == ESP_OK) {
-        (void)mlx_write_word(MLX_REG_STATUS, (uint16_t)(status | MLX_STAT_BROWN_OUT));
-    }
+    s_drop_first = !(mlx_read_word(MLX_REG_STATUS, &status) == ESP_OK &&
+            mlx_write_word(MLX_REG_STATUS,
+                (uint16_t)((status | MLX_STAT_BROWN_OUT) & ~MLX_STAT_NEW_DATA)) == ESP_OK);
 
     // Do not assume the power mode. The datasheet calls continuous the default, but the control register is
     // loaded from EEPROM at power-on and parts have shipped in sleeping-step, which produces no measurements.
@@ -364,6 +368,11 @@ esp_err_t mlx90632_read_object(float *t_obj_c, float *t_amb_c)
 
     // Acknowledge the sample so the device can flag the next one
     (void)mlx_write_word(MLX_REG_STATUS, (uint16_t)(status & ~MLX_STAT_NEW_DATA));
+
+    if (s_drop_first) { // See s_drop_first: not counted towards the two primed cycles either
+        s_drop_first = false;
+        return ESP_ERR_NOT_FINISHED;
+    }
 
     const float RAM_4 = (float)(int16_t)ram[0];
     const float RAM_5 = (float)(int16_t)ram[1];

@@ -26,7 +26,7 @@ idf_component_register(
         common
 
     PRIV_REQUIRES
-        gpio esp_driver_i2c nvs_flash
+        gpio esp_driver_i2c nvs_flash esp_timer
 )
 
 # ST's sources are vendored unmodified and are not warning-clean under this project's

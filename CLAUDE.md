@@ -39,6 +39,11 @@ The firmware is task-based. `main/main.c` initializes hardware (NVS, I2C, SPI, L
 - Never push/commit code. If asked, only create the commit message.
 - Do not run build commands, user will confirm build success manually.
 - There is no test framework; validation is done by flashing to hardware.
+- For ESP32-C5 hardware questions (TRM, datasheet, errata, design guidelines), you can query the `espressif-docs` MCP server when connected. For IDF API details prefer the local v6.0.1 tree; the server indexes only the latest IDF.
+
+Already installed:
+`claude mcp add --transport http --scope user espressif-docs https://mcp.espressif.com/docs`
+`claude mcp add --transport http --scope user espressif-components https://components.espressif.com/mcp`
 
 ## Code Style
 
