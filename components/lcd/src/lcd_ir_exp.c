@@ -110,7 +110,7 @@ static irx_tap_t *irx_tap_y = NULL;  // IRX_CANVAS_H entries
 static int16_t *irx_mid = NULL;      // MLX90642_ROWS x IRX_CANVAS_W intermediate
 
 static uint8_t irx_pal_idx = 0;
-static uint8_t irx_pal_stored = UINT8_MAX; // The index NVS holds, so an unchanged pick costs no write; MAX until loaded
+static uint8_t irx_pal_stored = UINT8_MAX; // Index of the palette whose id NVS holds, so an unchanged pick costs no write; MAX until loaded
 static int32_t irx_lo = 0;
 static int32_t irx_hi = 0;
 static bool irx_range_seeded = false;
@@ -122,9 +122,6 @@ static TickType_t irx_pal_show_until = 0; // Hold the palette name on screen aft
 
 // Defined with the rest of the detail view below; the page timer above needs the declaration
 static void irx_detail_tick(void);
-
-static const char *const irx_pal_names[] = { "IRONBOW", "GRAY", "RAINBOW" };
-#define IRX_PAL_COUNT (sizeof(irx_pal_names) / sizeof(irx_pal_names[0]))
 
 /* =============== Palettes =============== */
 
@@ -156,24 +153,91 @@ static const irx_stop_t irx_rainbow[] = {
     { 255, 220,   0,   0 },
 };
 
+// Google's Turbo (2019), sampled every 16th entry of the published 256-entry table: within 6/255 per channel of it.
+// Rainbow's detail without its false bands.
+static const irx_stop_t irx_turbo[] = {
+    {   0,  48,  18,  59 },
+    {  16,  64,  64, 162 },
+    {  32,  70, 107, 227 },
+    {  48,  66, 148, 255 },
+    {  64,  40, 188, 235 },
+    {  80,  24, 221, 194 },
+    {  96,  50, 242, 152 },
+    { 112, 109, 254,  98 },
+    { 128, 164, 252,  60 },
+    { 144, 205, 236,  52 },
+    { 160, 238, 207,  58 },
+    { 176, 253, 172,  52 },
+    { 192, 251, 126,  33 },
+    { 208, 235,  80,  14 },
+    { 224, 208,  47,   5 },
+    { 240, 169,  22,   1 },
+    { 255, 122,   4,   3 },
+};
+
+// Navy through blue and white into gold: cold stands out, for drafts and insulation gaps
+static const irx_stop_t irx_arctic[] = {
+    {   0,   0,   5,  35 },
+    {  55,  15,  45, 140 },
+    { 110,  40, 125, 215 },
+    { 150, 150, 210, 245 },
+    { 175, 245, 245, 245 },
+    { 215, 250, 200,  60 },
+    { 255, 255, 140,   0 },
+};
+
+// Grayscale with only the top 15% of the span coloured, red through orange to yellow, so the hottest point is the
+// only colour on screen. The gray stops short of white so the jump to red reads.
+static const irx_stop_t irx_hotspot[] = {
+    {   0,   0,   0,   0 },
+    { 216, 200, 200, 200 },
+    { 217, 210,   0,   0 },
+    { 236, 255, 120,   0 },
+    { 255, 255, 240,  40 },
+};
+
+typedef struct {
+    const char *name;
+    uint8_t id;              // What NVS stores; fixed per palette so the cycle order can change
+    const irx_stop_t *stops; // NULL for the two grayscale ramps, which are generated exactly
+    uint8_t n;
+    bool invert;             // Grayscale only: hot is black
+} irx_pal_t;
+
+#define IRX_STOPS(a) (a), (uint8_t)(sizeof(a) / sizeof((a)[0]))
+
+// Row order is the UP/DOWN cycle order and may change freely. The id is what NVS stores (IRX_NVS_PAL_KEY): never
+// renumber or reuse one, or a saved pick reopens as a different palette. 0-2 are the original indices.
+static const irx_pal_t irx_pals[] = {
+    { "IRONBOW",   0, IRX_STOPS(irx_ironbow), false },
+    { "RAINBOW",   2, IRX_STOPS(irx_rainbow), false },
+    { "GRAY",      1, NULL, 0,                false },
+    { "BLACK HOT", 3, NULL, 0,                true  },
+    { "TURBO",     4, IRX_STOPS(irx_turbo),   false },
+    { "ARCTIC",    5, IRX_STOPS(irx_arctic),  false },
+    { "HOT SPOT",  6, IRX_STOPS(irx_hotspot), false },
+};
+#define IRX_PAL_COUNT (sizeof(irx_pals) / sizeof(irx_pals[0]))
+
 // Expand the control points into a full 256-entry RGB565 lookup, once per palette change, so the per-pixel path
 // is a single table read
 static void irx_build_palette(uint8_t which)
 {
-    if (irx_palette == NULL) {
+    if (irx_palette == NULL || which >= IRX_PAL_COUNT) {
         return;
     }
 
-    if (which == 1) { // Grayscale
+    const irx_pal_t *p = &irx_pals[which];
+    if (p->stops == NULL) { // Grayscale, white hot or black hot
         for (int i = 0; i < 256; ++i) {
-            irx_palette[i] = lv_color_to_u16(lv_color_make((uint8_t)i, (uint8_t)i, (uint8_t)i));
+            const uint8_t v = p->invert ? (uint8_t)(255 - i) : (uint8_t)i;
+            irx_palette[i] = lv_color_to_u16(lv_color_make(v, v, v));
         }
         return;
     }
 
-    const irx_stop_t *stops = (which == 2) ? irx_rainbow : irx_ironbow;
-    const int n = (which == 2) ? (int)(sizeof(irx_rainbow) / sizeof(irx_rainbow[0]))
-                               : (int)(sizeof(irx_ironbow) / sizeof(irx_ironbow[0]));
+    const irx_stop_t *stops = p->stops;
+    const int n = p->n;
 
     int seg = 0;
     for (int i = 0; i < 256; ++i) {
@@ -201,12 +265,17 @@ static void irx_pal_nvs_load(void)
     nvs_handle_t h;
     if (nvs_open(IRX_NVS_NS, NVS_READONLY, &h) == ESP_OK) { // Fails on first boot: the namespace does not exist yet
         uint8_t stored = 0;
-        if (nvs_get_u8(h, IRX_NVS_PAL_KEY, &stored) == ESP_OK && stored < IRX_PAL_COUNT) {
-            irx_pal_idx = stored;
+        if (nvs_get_u8(h, IRX_NVS_PAL_KEY, &stored) == ESP_OK) {
+            for (uint8_t i = 0; i < IRX_PAL_COUNT; ++i) {
+                if (irx_pals[i].id == stored) {
+                    irx_pal_idx = i;
+                    break;
+                }
+            }
         }
         nvs_close(h);
     }
-    irx_pal_stored = irx_pal_idx; // Missing or out of range reads as the default, which needs no write either
+    irx_pal_stored = irx_pal_idx; // Missing or unknown id reads as the default, which needs no write either
 }
 
 // Persist the palette as soon as it is picked, so a flat battery cannot lose it. Skipped when NVS already matches.
@@ -219,7 +288,7 @@ static void irx_pal_nvs_save(void)
     nvs_handle_t h;
     esp_err_t err = nvs_open(IRX_NVS_NS, NVS_READWRITE, &h);
     if (err == ESP_OK) {
-        err = nvs_set_u8(h, IRX_NVS_PAL_KEY, irx_pal_idx);
+        err = nvs_set_u8(h, IRX_NVS_PAL_KEY, irx_pals[irx_pal_idx].id);
         if (err == ESP_OK) {
             err = nvs_commit(h);
         }
@@ -229,7 +298,7 @@ static void irx_pal_nvs_save(void)
     if (err == ESP_OK) {
         irx_pal_stored = irx_pal_idx;
 #ifdef POLYCAST5_DEBUG
-        ESP_LOGI(TAG, "Saved palette %u", (unsigned)irx_pal_idx);
+        ESP_LOGI(TAG, "Saved palette %s", irx_pals[irx_pal_idx].name);
 #endif
     } else {
         ESP_LOGE(TAG, "Failed to save the palette: %s", esp_err_to_name(err));
@@ -1337,13 +1406,13 @@ void lcd_gpio_ir_exp_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, gpio_menu_t *g
     } else if (ui_btns->up_btn == 1) {
         irx_pal_idx = (uint8_t)((irx_pal_idx + IRX_PAL_COUNT - 1) % IRX_PAL_COUNT);
         irx_build_palette(irx_pal_idx);
-        irx_set_status(irx_pal_names[irx_pal_idx]);
+        irx_set_status(irx_pals[irx_pal_idx].name);
         irx_pal_show_until = xTaskGetTickCount() + pdMS_TO_TICKS(1200);
         irx_pal_nvs_save();
     } else if (ui_btns->down_btn == 1) {
         irx_pal_idx = (uint8_t)((irx_pal_idx + 1) % IRX_PAL_COUNT);
         irx_build_palette(irx_pal_idx);
-        irx_set_status(irx_pal_names[irx_pal_idx]);
+        irx_set_status(irx_pals[irx_pal_idx].name);
         irx_pal_show_until = xTaskGetTickCount() + pdMS_TO_TICKS(1200);
         irx_pal_nvs_save();
     } else if (ui_btns->right_btn == 1) { // Everything the rangefinder reports

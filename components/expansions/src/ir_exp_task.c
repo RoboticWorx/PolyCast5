@@ -60,7 +60,8 @@
 #define TOF_RECAL_DELTA_C100 300
 
 // Room temperature for the skin-to-core conversion. The spot sensor's die is the only usable thermometer, and only
-// until the array (~92 mW) and rangefinder (~66 mW) warm the module: latch it early, then let it follow only downward.
+// until the array (~92 mW) and rangefinder (~66 mW) warm the module: latch it early, then let it follow only downward
+// unless it has been below the window this visit (a cold device warming up).
 #define ROOM_LATCH_SAMPLES 3    // Median of the first three fresh samples, ~2.5 s after open
 #define ROOM_CARRY_US      (10LL * 60 * 1000000) // A re-open inside this finds the module still warm: keep the old floor
 #define ROOM_SELFHEAT_C100 0    // BENCH: latched die minus a reference thermometer beside a settled handset (~50 expected)
@@ -387,7 +388,8 @@ typedef struct {
     int16_t room_win[ROOM_LATCH_SAMPLES]; // Most recent plausible die samples
     uint8_t room_n;         // Samples in room_win, up to ROOM_LATCH_SAMPLES
     uint8_t room_i;
-    int16_t room_floor;     // Lower of the carry and every running median since the latch, 0.01 C, or INT16_MIN until latched
+    int16_t room_floor;     // Lower of the carry and every running median since the latch (the latest median once
+                            // room_cold), 0.01 C, or INT16_MIN until latched
     bool room_cold;         // Fell below the window this visit: the device was acclimating, so from then on the floor
                             // tracks the running median both ways and is never carried
     int16_t room_carry;     // Last session's floor if still inside ROOM_CARRY_US, else INT16_MIN
@@ -435,7 +437,8 @@ static void body_update(body_est_t *b, ir_exp_status_t *st, float t_obj, float t
         if ((int32_t)b->room_floor - ROOM_SELFHEAT_C100 < IR_EXP_ROOM_MIN_C100) {
             b->room_cold = true;
         }
-        // A cold visit's floor is never carried: as the lower value it would win the next latch and hold it in ROOM
+        // A cold visit's floor is never carried: as the lower value it would win the next latch and flag that visit
+        // cold too, so its floor would follow self-heating up
         s_room_floor_c100 = b->room_cold ? INT16_MIN : b->room_floor;
         s_room_floor_us = esp_timer_get_time(); // Refreshed every sample, so the carry window opens at session end
     }
