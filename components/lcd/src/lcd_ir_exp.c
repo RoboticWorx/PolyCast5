@@ -202,6 +202,7 @@ typedef struct {
     const irx_stop_t *stops; // NULL for the two grayscale ramps, which are generated exactly
     uint8_t n;
     bool invert;             // Grayscale only: hot is black
+    bool raw;                // Draw the 32x24 sensor pixels as blocks instead of interpolating
 } irx_pal_t;
 
 #define IRX_STOPS(a) (a), (uint8_t)(sizeof(a) / sizeof((a)[0]))
@@ -209,13 +210,14 @@ typedef struct {
 // Row order is the UP/DOWN cycle order and may change freely. The id is what NVS stores (IRX_NVS_PAL_KEY): never
 // renumber or reuse one, or a saved pick reopens as a different palette. 0-2 are the original indices.
 static const irx_pal_t irx_pals[] = {
-    { "IRONBOW",   0, IRX_STOPS(irx_ironbow), false },
-    { "RAINBOW",   2, IRX_STOPS(irx_rainbow), false },
-    { "GRAY",      1, NULL, 0,                false },
-    { "BLACK HOT", 3, NULL, 0,                true  },
-    { "TURBO",     4, IRX_STOPS(irx_turbo),   false },
-    { "ARCTIC",    5, IRX_STOPS(irx_arctic),  false },
-    { "HOT SPOT",  6, IRX_STOPS(irx_hotspot), false },
+    { "IRONBOW",    0, IRX_STOPS(irx_ironbow), false, false },
+    { "RAINBOW",    2, IRX_STOPS(irx_rainbow), false, false },
+    { "GRAY",       1, NULL, 0,                false, false },
+    { "BLACK HOT",  3, NULL, 0,                true,  false },
+    { "RAW PIXELS", 7, IRX_STOPS(irx_rainbow), false, true  },
+    { "TURBO",      4, IRX_STOPS(irx_turbo),   false, false },
+    { "ARCTIC",     5, IRX_STOPS(irx_arctic),  false, false },
+    { "HOT SPOT",   6, IRX_STOPS(irx_hotspot), false, false },
 };
 #define IRX_PAL_COUNT (sizeof(irx_pals) / sizeof(irx_pals[0]))
 
@@ -417,6 +419,50 @@ static void irx_render(const int16_t *src)
             if (n > 255) n = 255;
 
             out[x] = irx_palette[n];
+        }
+    }
+}
+
+// The source sample nearest an output coordinate: the heavier of the two taps bracketing it. Reuses the
+// interpolation tables, so the blocks sit exactly where the smooth image puts each pixel, mirroring included.
+static inline int16_t irx_nearest(const irx_tap_t *tp)
+{
+    return (tp->w[1] >= tp->w[2]) ? tp->idx[1] : tp->idx[2];
+}
+
+// The sensor's own 32x24 pixels as blocks, no interpolation. 180/32 is not whole, so blocks are 5 or 6 px. Each
+// sensor row goes through the palette once and is spread across the width; output rows from the same sensor row copy
+// the one above.
+static void irx_render_raw(const int16_t *src)
+{
+    const int32_t span = irx_hi - irx_lo;
+    const int32_t recip = (span > 0) ? ((255 << 16) / span) : 0;
+    uint16_t line[MLX90642_COLS];
+    int prev = -1;
+
+    for (int y = 0; y < IRX_CANVAS_H; ++y) {
+        uint16_t *out = irx_fb + y * irx_stride_px;
+        const int r = irx_nearest(&irx_tap_y[y]);
+        if (r == prev) {
+            memcpy(out, out - irx_stride_px, IRX_CANVAS_W * sizeof(uint16_t));
+            continue;
+        }
+        prev = r;
+
+        const int16_t *srow = src + r * MLX90642_COLS;
+        for (int c = 0; c < MLX90642_COLS; ++c) {
+            // Clamp before scaling, as in irx_render: an out-of-span sample would overflow the multiply
+            int32_t d = (int32_t)srow[c] - irx_lo;
+            if (d < 0) d = 0;
+            else if (d > span) d = span;
+
+            int32_t n = (d * recip) >> 16;
+            if (n > 255) n = 255;
+
+            line[c] = irx_palette[n];
+        }
+        for (int x = 0; x < IRX_CANVAS_W; ++x) {
+            out[x] = line[irx_nearest(&irx_tap_x[x])];
         }
     }
 }
@@ -726,7 +772,11 @@ static void irx_timer_cb(lv_timer_t *t)
         }
     }
 
-    irx_render(frame);
+    if (irx_pals[irx_pal_idx].raw) {
+        irx_render_raw(frame);
+    } else {
+        irx_render(frame);
+    }
     irx_draw_crosshair();
     lv_obj_invalidate(irx_canvas);
 }
