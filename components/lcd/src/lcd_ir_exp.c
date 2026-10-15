@@ -33,10 +33,10 @@
 
 #define IRX_ROW_DIST_CAP 0  // ink   3..12
 #define IRX_ROW_DIST_VAL 11 // ink  14..24
-#define IRX_ROW_RAW_CAP  30 // ink  33..42  <- 9 px below the DIST group
-#define IRX_ROW_RAW_C    41 // ink  44..54
-#define IRX_ROW_RAW_F    53 // ink  56..66
-#define IRX_ROW_BODY_CAP 72 // ink  75..84  <- 9 px below the RAW group
+#define IRX_ROW_MM_CAP   30 // ink  33..42  <- 9 px below the DIST group; the '/' runs 30..43
+#define IRX_ROW_MM_MIN   41 // ink  44..54
+#define IRX_ROW_MM_MAX   53 // ink  56..66
+#define IRX_ROW_BODY_CAP 72 // ink  75..84  <- 9 px below the MIN/MAX group
 #define IRX_ROW_BODY_C   83 // ink  86..96
 #define IRX_ROW_BODY_F   95 // ink  98..108, and the 16 px box ends exactly on 111
 
@@ -81,8 +81,8 @@ static lv_obj_t *irx_canvas = NULL;
 static lv_obj_t *irx_panel = NULL;
 static lv_obj_t *irx_cap[3] = { NULL, NULL, NULL };
 static lv_obj_t *irx_val[3] = { NULL, NULL, NULL };
-// Fahrenheit line under the two temperature readouts. NULL at index 0, which is DIST.
-static lv_obj_t *irx_val_f[3] = { NULL, NULL, NULL };
+// Second line: the maximum under MIN/MAX, Fahrenheit under BODY. NULL at index 0, which is DIST.
+static lv_obj_t *irx_val2[3] = { NULL, NULL, NULL };
 static lv_obj_t *irx_spot = NULL; // Array crosshair temperature over the image: a bare container of IRX_SPOT_LAYERS labels
 static lv_obj_t *irx_status = NULL;
 static bool irx_status_shown = false; // Whether irx_status currently has text worth showing
@@ -522,8 +522,8 @@ static void irx_fmt_temp(char *buf, size_t n, int32_t c100, bool valid)
     irx_fmt_unit(buf, n, c100, 'C');
 }
 
-// Same reading in Fahrenheit, for the second line under each temperature. Integer maths - the C5 has no FPU and this
-// runs on every published frame. Exact thousandths truncated to hundredths, so irx_fmt_unit's rounding stays exact.
+// Same reading in Fahrenheit. Integer maths - the C5 has no FPU and this runs on every published frame. Exact
+// thousandths truncated to hundredths, so irx_fmt_unit's rounding stays exact.
 static void irx_fmt_temp_f(char *buf, size_t n, int32_t c100, bool valid)
 {
     if (!valid) {
@@ -688,7 +688,7 @@ static void irx_timer_cb(lv_timer_t *t)
     const bool img_live = (st.flags & IR_EXP_FLAG_IMAGER) && !(st.flags & IR_EXP_FLAG_WARMING);
 
     if (!irx_frozen) {
-        // C over F, as in the column; two short lines stay clear of the panel where one long one would not
+        // C over F, as in the BODY row; two short lines stay clear of the panel where one long one would not
         const int32_t spot_c100 = (int32_t)st.center_c50 * 2; // 0.02 C -> 0.01 C
         char spot_f[16];
         char spot[34];
@@ -702,27 +702,26 @@ static void irx_timer_cb(lv_timer_t *t)
         irx_fmt_dist(buf, sizeof(buf), st.dist_mm, (st.flags & IR_EXP_FLAG_TOF) != 0);
         lv_label_set_text(irx_val[0], buf);
 
-        const bool med_live = (st.flags & IR_EXP_FLAG_MEDICAL) &&
-                st.medical_c100 != IR_EXP_MEDICAL_NONE;
-        irx_fmt_temp(buf, sizeof(buf), st.medical_c100, med_live);
+        // Coldest and hottest pixel on screen: neither renderer strays outside the source samples it draws from
+        irx_fmt_temp(buf, sizeof(buf), (int32_t)st.min_c50 * 2, img_live);
         lv_label_set_text(irx_val[1], buf);
-        irx_fmt_temp_f(buf, sizeof(buf), st.medical_c100, med_live);
-        lv_label_set_text(irx_val_f[1], buf);
+        irx_fmt_temp(buf, sizeof(buf), (int32_t)st.max_c50 * 2, img_live);
+        lv_label_set_text(irx_val2[1], buf);
 
         // The producer gates the estimate, so only OK carries a number; every other state says why there is none
         if (st.body_state == IR_EXP_BODY_OK) {
             irx_fmt_temp(buf, sizeof(buf), st.body_c100, true);
             lv_label_set_text(irx_val[2], buf);
             irx_fmt_temp_f(buf, sizeof(buf), st.body_c100, true);
-            lv_label_set_text(irx_val_f[2], buf);
+            lv_label_set_text(irx_val2[2], buf);
         } else if (st.body_state == IR_EXP_BODY_ROOM) {
             // The room estimate it refused, so a warm handset reads as one rather than as a fault
             lv_label_set_text(irx_val[2], irx_body_word(st.body_state));
             irx_fmt_temp_f(buf, sizeof(buf), st.room_c100, true);
-            lv_label_set_text(irx_val_f[2], buf);
+            lv_label_set_text(irx_val2[2], buf);
         } else {
             lv_label_set_text(irx_val[2], irx_body_word(st.body_state));
-            lv_label_set_text(irx_val_f[2], (st.body_state == IR_EXP_BODY_FAR) ? "1-4cm" : "--");
+            lv_label_set_text(irx_val2[2], (st.body_state == IR_EXP_BODY_FAR) ? "1-4cm" : "--");
         }
         irx_set_room_tip(st.body_state == IR_EXP_BODY_ROOM, st.room_c100);
     }
@@ -850,10 +849,10 @@ static void irx_build_ui(void)
     lv_obj_set_style_pad_all(irx_panel, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_remove_flag(irx_panel, LV_OBJ_FLAG_SCROLLABLE);
 
-    static const char *const caps[3] = { "DIST", "RAW", "BODY" };
-    static const int16_t cap_y[3] = { IRX_ROW_DIST_CAP, IRX_ROW_RAW_CAP, IRX_ROW_BODY_CAP };
-    static const int16_t val_y[3] = { IRX_ROW_DIST_VAL, IRX_ROW_RAW_C, IRX_ROW_BODY_C };
-    static const int16_t f_y[3] = { -1, IRX_ROW_RAW_F, IRX_ROW_BODY_F }; // -1: no second unit
+    static const char *const caps[3] = { "DIST", "MIN/MAX", "BODY" }; // MIN/MAX is 56 px: the full column, no margin
+    static const int16_t cap_y[3] = { IRX_ROW_DIST_CAP, IRX_ROW_MM_CAP, IRX_ROW_BODY_CAP };
+    static const int16_t val_y[3] = { IRX_ROW_DIST_VAL, IRX_ROW_MM_MIN, IRX_ROW_BODY_C };
+    static const int16_t val2_y[3] = { -1, IRX_ROW_MM_MAX, IRX_ROW_BODY_F }; // -1: no second line
 
     for (int i = 0; i < 3; ++i) {
         irx_cap[i] = lv_label_create(irx_panel);
@@ -869,15 +868,15 @@ static void irx_build_ui(void)
         lv_obj_set_style_text_color(irx_val[i], user_secondary_color, 0);
         lv_obj_align(irx_val[i], LV_ALIGN_TOP_LEFT, 0, val_y[i]);
 
-        // Fahrenheit under the Celsius in the same font and colour - same reading, so neither unit is subordinate.
-        // The 2 px row gap against the 9 px group gap is what says the two lines belong together.
-        irx_val_f[i] = NULL;
-        if (f_y[i] >= 0) {
-            irx_val_f[i] = lv_label_create(irx_panel);
-            lv_label_set_text(irx_val_f[i], "--");
-            lv_obj_set_style_text_font(irx_val_f[i], &lv_font_montserrat_14, 0);
-            lv_obj_set_style_text_color(irx_val_f[i], user_secondary_color, 0);
-            lv_obj_align(irx_val_f[i], LV_ALIGN_TOP_LEFT, 0, f_y[i]);
+        // Second line in the same font and colour, so neither is subordinate: the maximum under the minimum, Fahrenheit
+        // under BODY's Celsius. The 2 px row gap against the 9 px group gap is what says the two lines belong together.
+        irx_val2[i] = NULL;
+        if (val2_y[i] >= 0) {
+            irx_val2[i] = lv_label_create(irx_panel);
+            lv_label_set_text(irx_val2[i], "--");
+            lv_obj_set_style_text_font(irx_val2[i], &lv_font_montserrat_14, 0);
+            lv_obj_set_style_text_color(irx_val2[i], user_secondary_color, 0);
+            lv_obj_align(irx_val2[i], LV_ALIGN_TOP_LEFT, 0, val2_y[i]);
         }
     }
 
@@ -1337,7 +1336,7 @@ static void irx_cleanup(void)
     }
     memset(irx_cap, 0, sizeof(irx_cap));
     memset(irx_val, 0, sizeof(irx_val));
-    memset(irx_val_f, 0, sizeof(irx_val_f)); // Deleted with irx_panel, just drop the handles
+    memset(irx_val2, 0, sizeof(irx_val2)); // Deleted with irx_panel, just drop the handles
 
     irx_free();
 
