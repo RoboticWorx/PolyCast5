@@ -6,8 +6,9 @@
 #include <stdbool.h>
 #include "esp_err.h"
 
-// Returned when the API rejects the request with HTTP 429 (out of credits / rate limited)
-#define AI_VOICE_ERR_RATE_LIMITED 0x2001
+#define AI_VOICE_SAMPLE_RATE_HZ 16000 // PCM rate from ai_voice_record_pcm16_16k()
+#define AI_VOICE_MIN_SAMPLES (AI_VOICE_SAMPLE_RATE_HZ / 4) // 250 ms: anything shorter is a tap, not speech
+#define AI_VOICE_MAX_SAMPLES (AI_VOICE_SAMPLE_RATE_HZ * 60) // Recording stops itself at 60 s
 
 // Audio buffer returned by ai_voice_record_pcm16_16k()
 // Must call ai_voice_free_pcm() when done
@@ -47,10 +48,13 @@ esp_err_t ai_voice_mic_selftest(bool *alive);
 /**
  * @brief Records audio from the I2S microphone and downsamples it to 16kHz mono 16-bit PCM
  * 
+ * Stops on its own at AI_VOICE_MAX_SAMPLES, or early if PSRAM can't grow the buffer, keeping
+ * what it has. Either way it clears *keep_recording so the caller can tell.
+ *
  * @param keep_recording Pointer to a volatile bool: recording continues while true, stops when false
  * @param out Pointer to output struct to fill
  * 
- * @returns ESP error status
+ * @returns ESP error status (ESP_ERR_NO_MEM only if nothing could be stored)
  */
 esp_err_t ai_voice_record_pcm16_16k(volatile bool *keep_recording, ai_voice_pcm_t *out);
 
@@ -88,14 +92,14 @@ esp_err_t ai_voice_force_sleep_pins_low(void);
  * ai_provider_resolve_stt() (e.g. xAI grok-stt or OpenAI/Groq Whisper), using the
  * separate STT key when one is configured. Wraps the PCM in a 44-byte WAV (RIFF)
  * header and POSTs as multipart/form-data with language=en. Streams the body so
- * memory use stays bounded even for ~30s recordings. Returns AI_VOICE_ERR_RATE_LIMITED on HTTP 429.
+ * memory use stays bounded even for 60 s recordings.
  *
  * @param pcm16 Pointer to PCM16 samples
  * @param samples Number of samples in pcm16
  * @param out_text Output buffer for transcript text
  * @param out_text_sz Size of out_text buffer
  *
- * @returns ESP error status
+ * @returns ESP_OK, AI_ERR_NO_SPEECH for an empty transcript, another AI_ERR_* code (ai_utils.h), or ESP_ERR_NO_MEM
  */
 esp_err_t ai_voice_stt_transcribe_pcm16_xai(const int16_t *pcm16, size_t samples, char *out_text, size_t out_text_sz);
 

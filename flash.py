@@ -131,6 +131,15 @@ steps: 1) build, 2) load build outputs, 3) build a per-partition "plan",
 the chip (and its hardware-revision eFuse), 6) decide what changed, 7) print the plan, 8) flash, 9) save state.
 Everything above main() is a helper those steps call.
 ----------------------------------------------------------------------------
+If you get:
+E (759) esp_image: Checksum failed. Calculated 0xaf read 0x89
+E (762) boot: OTA app partition slot 0 is not bootable
+E (768) esp_image: image at 0x550000 has invalid magic byte (nothing flashed here?):
+
+Use:
+python flash.py --all
+python -m esptool --chip esp32c5 -p COM68 --after no-reset write-flash --encrypt --flash-mode dio --flash-size 16MB --flash-freq 40m 0x2000 build\bootloader\bootloader.bin
+
 """
 
 from __future__ import annotations

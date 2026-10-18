@@ -9,6 +9,7 @@
 #include "esp_http_client.h"
 #include "esp_crt_bundle.h"
 #include "esp_heap_caps.h"
+#include "esp_tls_errors.h"
 
 #include "cJSON.h"
 #include "nvs.h"
@@ -544,6 +545,84 @@ static int json_sanitize_u0000_inplace(char *s)
     return cnt;
 }
 
+const char *ai_err_to_name(esp_err_t err)
+{
+    switch (err) {
+        case AI_ERR_RATE_LIMITED: return "AI_ERR_RATE_LIMITED";
+        case AI_ERR_AUTH:         return "AI_ERR_AUTH";
+        case AI_ERR_CONFIG:       return "AI_ERR_CONFIG";
+        case AI_ERR_NETWORK:      return "AI_ERR_NETWORK";
+        case AI_ERR_TLS:          return "AI_ERR_TLS";
+        case AI_ERR_TIMEOUT:      return "AI_ERR_TIMEOUT";
+        case AI_ERR_BAD_REPLY:    return "AI_ERR_BAD_REPLY";
+        case AI_ERR_EMPTY_REPLY:  return "AI_ERR_EMPTY_REPLY";
+        case AI_ERR_NO_SPEECH:    return "AI_ERR_NO_SPEECH";
+        case AI_ERR_TOO_SHORT:    return "AI_ERR_TOO_SHORT";
+        case AI_ERR_WIFI_LOST:    return "AI_ERR_WIFI_LOST";
+        default: break;
+    }
+
+    // The status itself is logged where the response arrives
+    if (AI_ERR_IS_HTTP(err)) {
+        return "AI_ERR_HTTP";
+    }
+
+    return esp_err_to_name(err);
+}
+
+static bool strcasestr_local_bool(const char *hay, const char *needle);
+
+esp_err_t ai_err_from_http_status(int status, const char *body)
+{
+    // Providers disagree on codes: xAI sends 403 for a team without credits and 400 for a bad key
+    if (body && (status == 400 || status == 401 || status == 403)) {
+        if (strcasestr_local_bool(body, "credit") || strcasestr_local_bool(body, "spending limit")) {
+            return AI_ERR_RATE_LIMITED;
+        }
+        if (strcasestr_local_bool(body, "api key") || strcasestr_local_bool(body, "api_key")) {
+            return AI_ERR_AUTH;
+        }
+    }
+
+    switch (status) {
+        case 401:
+        case 403:
+            return AI_ERR_AUTH;
+        case 402: // Payment required: OpenRouter/DeepSeek balance
+        case 429:
+            return AI_ERR_RATE_LIMITED;
+        default:
+            // Out of range (no status line at all) means the reply wasn't HTTP
+            return (status >= 100 && status <= 999) ? AI_ERR_HTTP(status) : AI_ERR_BAD_REPLY;
+    }
+}
+
+esp_err_t ai_err_from_http_client(struct esp_http_client *client, int err)
+{
+    // Always read, so the esp-tls error is cleared either way
+    int tls_code = 0;
+    int tls_flags = 0;
+    esp_err_t tls_err = esp_http_client_get_and_clear_last_tls_error(client, &tls_code, &tls_flags);
+
+    // Socket poll timeouts: esp_http_client_read/fetch_headers return -ESP_ERR_HTTP_EAGAIN
+    if (err == -ESP_ERR_HTTP_EAGAIN || err == ESP_ERR_HTTP_EAGAIN || err == ESP_ERR_HTTP_READ_TIMEOUT ||
+            tls_err == ESP_ERR_ESP_TLS_CONNECTION_TIMEOUT || tls_err == ESP_ERR_ESP_TLS_SERVER_HANDSHAKE_TIMEOUT) {
+        return AI_ERR_TIMEOUT;
+    }
+
+    // A handshake that died on the socket (MBEDTLS_ERR_NET_*: link dropped or reset) is the network, not TLS
+    // esp-tls stores the mbedtls code negated, so it is positive here
+    bool net_code = (tls_code >= 0x42 && tls_code <= 0x52);
+
+    // Rejected certificate (flags) or a failed handshake: captive portal, SSL inspection, TLS 1.3-only server
+    if (tls_flags != 0 || (tls_err == ESP_ERR_MBEDTLS_SSL_HANDSHAKE_FAILED && !net_code)) {
+        ESP_LOGE(TAG, "TLS failed: %s (mbedtls=-0x%04x, cert flags=0x%x)", esp_err_to_name(tls_err), (unsigned)tls_code, (unsigned)tls_flags);
+        return AI_ERR_TLS;
+    }
+
+    return AI_ERR_NETWORK;
+}
+
 // xAI (Grok) request (Chat Completions API)
 esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *command, char *response_buf, size_t buf_sz, bool reasoning)
 {
@@ -559,7 +638,7 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
     POLYCAST5_USE_PSRAM_BSS static ai_chat_cfg_t chat;
     if (ai_provider_resolve_chat(&chat) != ESP_OK) {
         ESP_LOGE(TAG, "No chat provider configured (custom URL missing?)");
-        return ESP_FAIL;
+        return AI_ERR_CONFIG;
     }
 
     // Load API key from NVS (may be empty for keyless local providers;
@@ -577,7 +656,7 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
     }
     if (!key_usable && chat.key_required) {
         ESP_LOGE(TAG, "No usable API key for the selected provider");
-        return ESP_FAIL;
+        return AI_ERR_CONFIG;
     }
 
     // Build JSON payload for /v1/chat/completions
@@ -663,11 +742,13 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
         .user_data = &acc,
     };
 
+    // NULL on an unparseable URL (custom endpoint) or no memory
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (!client) {
+        ESP_LOGE(TAG, "esp_http_client_init failed (bad URL?)");
         free(payload);
         acc_free(&acc);
-        return ESP_FAIL;
+        return AI_ERR_CONFIG;
     }
 
     // Build Authorization header: "Bearer <key>".
@@ -703,23 +784,23 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
     // Read HTTP status code
     int status = esp_http_client_get_status_code(client);
 
+    // A non-200 status line means the server answered, whatever perform() made of it (a 401 returns ESP_ERR_NOT_SUPPORTED)
+    bool refused = (status >= 100 && status != 200);
+
+    // Network/TLS failure: classify before cleanup frees the client
+    if (err != ESP_OK && !refused) {
+        ESP_LOGE(TAG, "xAI HTTP POST failed: %s", esp_err_to_name(err));
+        err = ai_err_from_http_client(client, err);
+    }
+
     // Cleanup request resources
     free(payload);
     esp_http_client_close(client);
     esp_http_client_cleanup(client);
 
-    // Network/TLS/HTTP failure
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "xAI HTTP POST failed: %s", esp_err_to_name(err));
+    if (err != ESP_OK && !refused) {
         acc_free(&acc);
         return err;
-    }
-
-    // Empty body means something went wrong upstream
-    if (acc.len == 0 || !acc.buf) {
-        ESP_LOGE(TAG, "Empty HTTP body (len=0) from xAI");
-        acc_free(&acc);
-        return ESP_FAIL;
     }
 
 #ifdef POLYCAST5_DEBUG
@@ -736,10 +817,19 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
             (acc.len > (size_t)snip) ? "..." : "");
 #endif
 
-    // Non-200 still might include useful error JSON in body (already logged)
+    // Non-200 still might include useful error JSON in body (logged above in debug builds)
     if (status != 200) {
+        ESP_LOGE(TAG, "xAI HTTP status %d (expected 200)", status);
+        esp_err_t status_err = ai_err_from_http_status(status, acc.buf);
         acc_free(&acc);
-        return ESP_FAIL;
+        return status_err;
+    }
+
+    // Empty body means something went wrong upstream
+    if (acc.len == 0 || !acc.buf) {
+        ESP_LOGE(TAG, "Empty HTTP body (len=0) from xAI");
+        acc_free(&acc);
+        return AI_ERR_EMPTY_REPLY;
     }
 
     // If we ran out of memory or hit the cap, don't try to parse partial JSON
@@ -765,7 +855,7 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
     if (!json) {
         ESP_LOGE(TAG, "xAI JSON parse failed (body_len=%u)", (unsigned)acc.len);
         acc_free(&acc);
-        return ESP_FAIL;
+        return AI_ERR_BAD_REPLY;
     }
 
     // Extract assistant output text from xAI payload
@@ -789,20 +879,20 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
 #endif // POLYCAST5_DEBUG
 
     if (!extracted_text || !extracted_text[0]) {
-        // Error logging
+        // An error object in a 200 is the server failing, not the model staying silent
+        esp_err_t reply_err = AI_ERR_EMPTY_REPLY;
         cJSON *err_obj = cJSON_GetObjectItem(json, "error");
         if (cJSON_IsObject(err_obj)) {
             cJSON *msg = cJSON_GetObjectItem(err_obj, "message");
-            if (cJSON_IsString(msg)) {
-                ESP_LOGE(TAG, "xAI error: %s", msg->valuestring);
-            }
+            ESP_LOGE(TAG, "xAI error: %s", cJSON_IsString(msg) ? msg->valuestring : "(no message)");
+            reply_err = AI_ERR_BAD_REPLY;
         } else {
             ESP_LOGE(TAG, "xAI: no output text in response");
         }
 
         cJSON_Delete(json);
         acc_free(&acc);
-        return ESP_FAIL;
+        return reply_err;
     }
 
     // Warn if our local buffer will truncate the extracted text
@@ -825,7 +915,8 @@ esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *comma
     strip_wrappers_inplace(response_buf);
 
     if (response_buf[0] == '\0') {
-        return ESP_FAIL;
+        ESP_LOGE(TAG, "xAI: reply was only quotes/fences/whitespace");
+        return AI_ERR_EMPTY_REPLY;
     }
 
     return ESP_OK;
@@ -849,7 +940,13 @@ typedef struct {
     size_t line_cap;
 
     bool aborted; // Set if callback returned an error or OOM
+    bool oom; // The abort was the line buffer failing to grow
+
+    size_t err_len; // Bytes of a non-200 body kept in stream_err_body
 } stream_ctx_t;
+
+// Start of a non-200 body, so the status can be read with the provider's own words (not re-entrant, like the stream)
+POLYCAST5_USE_PSRAM_BSS static char stream_err_body[256];
 
 // Extract content delta from a single SSE JSON chunk and forward to callback
 static void stream_process_sse_line(stream_ctx_t *s, const char *line, size_t len)
@@ -937,6 +1034,7 @@ static void stream_feed_bytes(stream_ctx_t *s, const char *data, size_t len)
             char *nb = (char *)realloc(s->line_buf, nc);
             if (!nb) {
                 s->aborted = true;
+                s->oom = true;
                 return;
             }
             s->line_buf = nb;
@@ -959,6 +1057,8 @@ static esp_err_t http_evt_stream(esp_http_client_event_t *evt)
         // Reset state for a new request
         s->resp_len = 0;
         s->line_len = 0;
+        s->err_len = 0;
+        stream_err_body[0] = '\0';
         if (s->resp_buf && s->resp_sz > 0) {
             s->resp_buf[0] = '\0';
         }
@@ -966,6 +1066,18 @@ static esp_err_t http_evt_stream(esp_http_client_event_t *evt)
     }
 
     if (evt->event_id == HTTP_EVENT_ON_DATA && evt->data && evt->data_len > 0) {
+        // A non-200 body is an error message, not SSE: keep its start for ai_err_from_http_status()
+        if (esp_http_client_get_status_code(evt->client) != 200) {
+            size_t n = (size_t)evt->data_len;
+            if (n > sizeof(stream_err_body) - 1 - s->err_len) {
+                n = sizeof(stream_err_body) - 1 - s->err_len;
+            }
+            memcpy(stream_err_body + s->err_len, evt->data, n);
+            s->err_len += n;
+            stream_err_body[s->err_len] = '\0';
+            return ESP_OK;
+        }
+
         stream_feed_bytes(s, (const char *)evt->data, (size_t)evt->data_len);
     }
 
@@ -994,7 +1106,7 @@ esp_err_t ai_utils_send_command_xai_stream(const char *system_prompt, const char
     POLYCAST5_USE_PSRAM_BSS static ai_chat_cfg_t chat;
     if (ai_provider_resolve_chat(&chat) != ESP_OK) {
         ESP_LOGE(TAG, "No chat provider configured (custom URL missing?)");
-        return ESP_FAIL;
+        return AI_ERR_CONFIG;
     }
 
     // Load API key from NVS (may be empty for keyless local providers;
@@ -1012,7 +1124,7 @@ esp_err_t ai_utils_send_command_xai_stream(const char *system_prompt, const char
     }
     if (!key_usable && chat.key_required) {
         ESP_LOGE(TAG, "No usable API key for the selected provider");
-        return ESP_FAIL;
+        return AI_ERR_CONFIG;
     }
 
     // Build JSON payload (same as non-streaming, but with "stream": true)
@@ -1071,7 +1183,10 @@ esp_err_t ai_utils_send_command_xai_stream(const char *system_prompt, const char
         .line_len = 0,
         .line_cap = 0,
         .aborted  = false,
+        .oom      = false,
+        .err_len  = 0,
     };
+    stream_err_body[0] = '\0';
 
     // Configure HTTPS request
     esp_http_client_config_t config = {
@@ -1085,11 +1200,13 @@ esp_err_t ai_utils_send_command_xai_stream(const char *system_prompt, const char
         .user_data = &sctx,
     };
 
+    // NULL on an unparseable URL (custom endpoint) or no memory
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (!client) {
+        ESP_LOGE(TAG, "Stream: esp_http_client_init failed (bad URL?)");
         free(payload);
         free(sctx.line_buf);
-        return ESP_FAIL;
+        return AI_ERR_CONFIG;
     }
 
     // Build Authorization header: "Bearer <key>" (see the non-streaming variant):
@@ -1116,27 +1233,44 @@ esp_err_t ai_utils_send_command_xai_stream(const char *system_prompt, const char
 
     // Drive the request by hand: perform() reads the whole body even after the callback aborts.
     // SSE bytes still arrive via http_evt_stream; rd only sinks esp_http_client_read's copy
+    // A read/fetch timeout comes back as -ESP_ERR_HTTP_EAGAIN, anything else as ESP_FAIL
     int payload_len = (int)strlen(payload);
-    esp_err_t err = esp_http_client_open(client, payload_len);
-    if (err == ESP_OK && esp_http_client_write(client, payload, payload_len) != payload_len) {
-        err = ESP_FAIL;
+    esp_err_t net_err = esp_http_client_open(client, payload_len);
+    if (net_err == ESP_OK) {
+        int wlen = esp_http_client_write(client, payload, payload_len);
+        if (wlen != payload_len) {
+            net_err = (wlen == 0) ? ESP_ERR_HTTP_EAGAIN : ESP_ERR_HTTP_WRITE_DATA; // 0 = the send poll timed out
+        }
     }
-    if (err == ESP_OK && esp_http_client_fetch_headers(client) < 0) {
-        err = ESP_ERR_HTTP_FETCH_HEADER;
+    if (net_err == ESP_OK) {
+        int hdr = esp_http_client_fetch_headers(client);
+        if (hdr < 0) {
+            net_err = (hdr == -ESP_ERR_HTTP_EAGAIN) ? ESP_ERR_HTTP_EAGAIN : ESP_ERR_HTTP_FETCH_HEADER;
+        }
     }
-    if (err == ESP_OK) {
+    if (net_err == ESP_OK) {
         // Small reads bound how much arrives after an abort; closing the socket then stops generation
         char rd[128];
         int n = 0;
         while (!sctx.aborted && (n = esp_http_client_read(client, rd, sizeof(rd))) > 0) {
         }
         if (n < 0 && !sctx.aborted) {
-            err = ESP_FAIL;
+            net_err = (n == -ESP_ERR_HTTP_EAGAIN) ? ESP_ERR_HTTP_EAGAIN : ESP_FAIL;
         }
     }
 
     // Read HTTP status code
     int status = esp_http_client_get_status_code(client);
+
+    // A non-200 status line means the server answered: its status says more than how the body read ended
+    bool refused = (status >= 100 && status != 200);
+
+    // Network/TLS failure: classify before cleanup frees the client
+    esp_err_t err = ESP_OK;
+    if (net_err != ESP_OK && !refused) {
+        ESP_LOGE(TAG, "Stream: HTTP POST failed: %s", esp_err_to_name(net_err));
+        err = ai_err_from_http_client(client, net_err);
+    }
 
     // Cleanup HTTP resources
     free(payload);
@@ -1147,30 +1281,31 @@ esp_err_t ai_utils_send_command_xai_stream(const char *system_prompt, const char
     free(sctx.line_buf);
 
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Stream: HTTP POST failed: %s", esp_err_to_name(err));
         return err;
     }
 
     if (status != 200) {
         ESP_LOGE(TAG, "Stream: HTTP status %d (expected 200)", status);
-        return ESP_FAIL;
+        return ai_err_from_http_status(status, stream_err_body);
     }
 
+    // OOM, or on_delta stopped it (page left or BLE link lost)
     if (sctx.aborted) {
-        ESP_LOGW(TAG, "Stream: aborted by callback or OOM");
-        return ESP_FAIL;
+        ESP_LOGW(TAG, "Stream: aborted by %s", sctx.oom ? "OOM" : "callback");
+        return sctx.oom ? ESP_ERR_NO_MEM : ESP_FAIL;
     }
 
     if (response_buf[0] == '\0') {
         ESP_LOGE(TAG, "Stream: no content deltas received");
-        return ESP_FAIL;
+        return AI_ERR_EMPTY_REPLY;
     }
 
     // Strip any wrapper quotes/fences from the assembled response
     strip_wrappers_inplace(response_buf);
 
     if (response_buf[0] == '\0') {
-        return ESP_FAIL;
+        ESP_LOGE(TAG, "Stream: reply was only quotes/fences/whitespace");
+        return AI_ERR_EMPTY_REPLY;
     }
 
 #ifdef POLYCAST5_DEBUG
@@ -1379,6 +1514,28 @@ static bool is_custom_candidate(const char *cat_name)
             strcasestr_local_bool(cat, "custom commands");
 }
 
+// Reads script i's label and category name. True if it belongs in a catalog filtered by is_candidate
+static bool script_is_candidate(uint16_t i, bool (*is_candidate)(const char *cat_name),
+        char *label, size_t label_sz, char *cat_name, size_t cat_sz)
+{
+    uint8_t cat_idx = 0;
+    label[0] = '\0';
+    cat_name[0] = '\0';
+
+    // i = global script index
+    // Get this script's label and category
+    (void)bluetooth_portal_script_label_get_nvs(i, label, label_sz);
+    (void)bluetooth_portal_script_cat_idx_get_nvs(i, &cat_idx);
+
+    // Get cat_name of cat_idx
+    if (bluetooth_portal_category_name_get_nvs(cat_idx, cat_name, cat_sz) != ESP_OK) {
+        cat_name[0] = '\0';
+    }
+
+    // Consider only labelled scripts in a matching category
+    return label[0] != '\0' && is_candidate(cat_name);
+}
+
 esp_err_t ai_utils_lookup_custom(const char *query, char *out_script, size_t out_sz)
 {
     // Validate
@@ -1404,27 +1561,14 @@ esp_err_t ai_utils_lookup_custom(const char *query, char *out_script, size_t out
     candidate_creds[0] = '\0';
     size_t used = 0;
 
+    // Shared by the catalog loop and the pick check: this frame sits under a TLS session on a 4 KB stack
+    char label[BT_SCRIPT_LABEL_MAX_LEN + 1];
+    char cat_name[BT_CAT_LABEL_MAX_LEN + 1];
+
     // Loop through all saved BT scripts
     for (uint16_t i = 0; i < total; ++i) {
-        char label[BT_SCRIPT_LABEL_MAX_LEN + 1] = {0};
-        uint8_t cat_idx = 0;
-        char cat_name[BT_CAT_LABEL_MAX_LEN + 1] = {0};
-
-        // i = global script index
-        // Get this script's label and category
-        (void)bluetooth_portal_script_label_get_nvs(i, label, sizeof(label));
-        (void)bluetooth_portal_script_cat_idx_get_nvs(i, &cat_idx);
-
-        // Get cat_name of cat_idx
-        if (bluetooth_portal_category_name_get_nvs(cat_idx, cat_name, sizeof(cat_name)) != ESP_OK) {
-            cat_name[0] = '\0';
-        }
-
-        // Check if should consider: not empty + custom category
-        if (label[0] == '\0') {
-            continue;
-        }
-        if (!is_custom_candidate(cat_name)) {
+        // Not empty + custom category
+        if (!script_is_candidate(i, is_custom_candidate, label, sizeof(label), cat_name, sizeof(cat_name))) {
             continue;
         }
 
@@ -1472,7 +1616,7 @@ esp_err_t ai_utils_lookup_custom(const char *query, char *out_script, size_t out
     long idx = strtol(model_reply, &endp, 10);
     if (endp == model_reply) {
         ESP_LOGE(TAG, "No digits parsed from Grok reply: '%s'", model_reply);
-        return ESP_FAIL;
+        return AI_ERR_BAD_REPLY;
     }
 
     // Validate index range
@@ -1484,6 +1628,12 @@ esp_err_t ai_utils_lookup_custom(const char *query, char *out_script, size_t out
         }
 
         ESP_LOGE(TAG, "Grok reply index out of range: '%s'", model_reply);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    // The model can name any index: only type one the catalog offered
+    if (!script_is_candidate((uint16_t)idx, is_custom_candidate, label, sizeof(label), cat_name, sizeof(cat_name))) {
+        ESP_LOGE(TAG, "Grok reply index %ld is not a Custom command", idx);
         return ESP_ERR_NOT_FOUND;
     }
 
@@ -1523,32 +1673,18 @@ esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out
         return ESP_ERR_NOT_FOUND;
     }
 
-    // First pass: include only likely credential entries
-    // If none, fall back to all
+    // Include only likely credential entries
     candidate_creds[0] = '\0'; // Candidate credentials
     size_t used = 0;
 
+    // Shared by the catalog loop and the pick check: this frame sits under a TLS session on a 4 KB stack
+    char label[BT_SCRIPT_LABEL_MAX_LEN + 1];
+    char cat_name[BT_CAT_LABEL_MAX_LEN + 1];
+
     // Loop through all saved BT scripts
     for (uint16_t i = 0; i < total; ++i) {
-        char label[BT_SCRIPT_LABEL_MAX_LEN + 1] = {0};
-        uint8_t cat_idx = 0;
-        char cat_name[BT_CAT_LABEL_MAX_LEN + 1] = {0};
-
-        // i = global script index
-        // Get this script's label and category
-        (void)bluetooth_portal_script_label_get_nvs(i, label, sizeof(label));
-        (void)bluetooth_portal_script_cat_idx_get_nvs(i, &cat_idx);
-
-        // Get cat_name of cat_idx
-        if (bluetooth_portal_category_name_get_nvs(cat_idx, cat_name, sizeof(cat_name)) != ESP_OK) {
-            cat_name[0] = '\0';
-        }
-
-        // Check if should consider: not empty + credential-like category
-        if (label[0] == '\0') {
-            continue;
-        }
-        if (!is_cred_candidate(cat_name)) {
+        // Not empty + credential-like category
+        if (!script_is_candidate(i, is_cred_candidate, label, sizeof(label), cat_name, sizeof(cat_name))) {
             continue;
         }
 
@@ -1565,6 +1701,14 @@ esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out
         }
 
         used += (size_t)n;
+    }
+
+    // Nothing to pick from: an empty list only invites a non-index reply
+    if (used == 0) {
+#ifdef POLYCAST5_DEBUG
+        ESP_LOGW(TAG, "ai_utils_lookup_creds: no credential category scripts found");
+#endif
+        return ESP_ERR_NOT_FOUND;
     }
 
     const char *want = (type == AI_CMD_CRED_PASSWORD) ? "password" : "username";
@@ -1592,7 +1736,7 @@ esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out
     long idx = strtol(model_reply, &endp, 10); // Base 10
     if (endp == model_reply) { // No digits parsed
         ESP_LOGE(TAG, "No digits parsed from Grok reply: '%s'", model_reply);
-        return ESP_FAIL;
+        return AI_ERR_BAD_REPLY;
     }
 
     // Validate index range
@@ -1605,6 +1749,12 @@ esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out
         }
 
         ESP_LOGE(TAG, "Grok reply index out of range: '%s'", model_reply);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    // The model can name any index: only type one the catalog offered
+    if (!script_is_candidate((uint16_t)idx, is_cred_candidate, label, sizeof(label), cat_name, sizeof(cat_name))) {
+        ESP_LOGE(TAG, "Grok reply index %ld is not a credential", idx);
         return ESP_ERR_NOT_FOUND;
     }
 

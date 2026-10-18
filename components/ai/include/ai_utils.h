@@ -20,6 +20,28 @@
 #define AI_CMD_MAX_LEN (1024 * 256) // Large to send raw frames
 #define AI_API_KEY_MAX_LEN 256
 
+// AI error codes: above every ESP-IDF range, so esp_err_to_name() never mislabels them
+#define AI_ERR_BASE          0x20000
+#define AI_ERR_RATE_LIMITED  (AI_ERR_BASE + 1)  // HTTP 429/402: rate limited or out of credits
+#define AI_ERR_AUTH          (AI_ERR_BASE + 2)  // HTTP 401/403: API key rejected
+#define AI_ERR_CONFIG        (AI_ERR_BASE + 3)  // Provider, URL or key unusable
+#define AI_ERR_NETWORK       (AI_ERR_BASE + 4)  // DNS/connect failed or the link dropped
+#define AI_ERR_TLS           (AI_ERR_BASE + 5)  // TLS handshake or certificate check failed
+#define AI_ERR_TIMEOUT       (AI_ERR_BASE + 6)  // Server stopped answering
+#define AI_ERR_BAD_REPLY     (AI_ERR_BASE + 7)  // Reply couldn't be parsed
+#define AI_ERR_EMPTY_REPLY   (AI_ERR_BASE + 8)  // Reply had no usable content
+#define AI_ERR_NO_SPEECH     (AI_ERR_BASE + 9)  // Transcript came back empty
+#define AI_ERR_TOO_SHORT     (AI_ERR_BASE + 10) // Recording too short to be speech
+#define AI_ERR_WIFI_LOST     (AI_ERR_BASE + 11) // Wi-Fi down and didn't come back
+
+// Any other non-200 HTTP status, carried in the code itself
+#define AI_ERR_HTTP_BASE        (AI_ERR_BASE + 0x1000)
+#define AI_ERR_HTTP(status)     (AI_ERR_HTTP_BASE + (status))
+#define AI_ERR_IS_HTTP(err)     ((err) >= AI_ERR_HTTP(100) && (err) <= AI_ERR_HTTP(999))
+#define AI_ERR_HTTP_STATUS(err) ((int)((err) - AI_ERR_HTTP_BASE))
+
+struct esp_http_client; // esp_http_client_handle_t, without making every includer depend on esp_http_client
+
 typedef enum {
     AI_CMD_NONE = 0,
     AI_CMD_KEYBOARD_START_REC,
@@ -48,6 +70,40 @@ typedef struct {
     // ai_visit_gen at send; ai_task drops the result once the sending page is left
     uint32_t gen;
 } ai_cmd_t;
+
+/**
+ * @brief Name of an AI_ERR_* code for logs, or esp_err_to_name() for anything else
+ *
+ * @param [in] err Error code
+ *
+ * @returns Constant name string
+ */
+const char *ai_err_to_name(esp_err_t err);
+
+/**
+ * @brief Map a non-200 HTTP status to an AI error code
+ *
+ * For 400/401/403 the body decides first: providers disagree on codes (xAI answers a team
+ * without credits with 403 and a bad key with 400).
+ *
+ * @param [in] status HTTP status from the server
+ * @param [in] body NUL-terminated error body, or NULL
+ *
+ * @returns AI_ERR_AUTH (401/403), AI_ERR_RATE_LIMITED (402/429), otherwise AI_ERR_HTTP(status)
+ */
+esp_err_t ai_err_from_http_status(int status, const char *body);
+
+/**
+ * @brief Classify a failed HTTP exchange as a network, TLS or timeout error
+ *
+ * Reads and clears the client's last esp-tls error, so call it once, before the client is cleaned up.
+ *
+ * @param [in] client The esp_http_client_handle_t that failed
+ * @param [in] err What failed: an esp_err_t, or the negative return of esp_http_client_read/fetch_headers
+ *
+ * @returns AI_ERR_TLS, AI_ERR_TIMEOUT or AI_ERR_NETWORK
+ */
+esp_err_t ai_err_from_http_client(struct esp_http_client *client, int err);
 
 /** 
  * @brief Save xAI API key to NVS
@@ -105,7 +161,7 @@ bool ai_config_is_ready_for_voice(void);
  * @param [in] buf_sz Size of the response buffer
  * @param [in] reasoning True to use reasoning model, false for non-reasoning
  *
- * @returns ESP error status
+ * @returns ESP_OK, an AI_ERR_* code, or ESP_ERR_NO_MEM / ESP_ERR_INVALID_ARG
  */
 esp_err_t ai_utils_send_command_xai(const char *system_prompt, const char *command, char *response_buf, size_t buf_sz, bool reasoning);
 
@@ -133,7 +189,7 @@ typedef esp_err_t (*ai_stream_cb_t)(const char *delta_text, void *user_ctx);
  * @param [in] on_delta Callback for each streaming content delta (may be NULL)
  * @param [in] user_ctx Opaque pointer forwarded to on_delta
  *
- * @returns ESP error status
+ * @returns ESP_OK, an AI_ERR_* code, ESP_FAIL if on_delta aborted, or ESP_ERR_NO_MEM / ESP_ERR_INVALID_ARG
  */
 esp_err_t ai_utils_send_command_xai_stream(const char *system_prompt, const char *command, char *response_buf, size_t buf_sz,
         bool reasoning, ai_stream_cb_t on_delta, void *user_ctx);
@@ -146,7 +202,7 @@ esp_err_t ai_utils_send_command_xai_stream(const char *system_prompt, const char
  * @param [out] out_script Buffer to store the resulting Bluetooth script
  * @param [in] out_sz Size of the output script buffer
  *
- * @returns ESP error status
+ * @returns ESP_OK, ESP_ERR_NOT_FOUND if no saved credential matched, or an ai_utils_send_command_xai() error
  */
 esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out_script, size_t out_sz);
 
@@ -157,7 +213,7 @@ esp_err_t ai_utils_lookup_creds(ai_cmd_type_t type, const char *query, char *out
  * @param [out] out_script Buffer to store the resulting Bluetooth script
  * @param [in] out_sz Size of the output script buffer
  *
- * @returns ESP error status
+ * @returns ESP_OK, ESP_ERR_NOT_FOUND if no saved custom command matched, or an ai_utils_send_command_xai() error
  */
 esp_err_t ai_utils_lookup_custom(const char *query, char *out_script, size_t out_sz);
 

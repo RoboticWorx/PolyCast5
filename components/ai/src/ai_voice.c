@@ -29,7 +29,7 @@
 #define TAG "AI_VOICE"
 
 #define MIC_FS_HZ 48000 // 48kHz input from mic
-#define STT_FS_HZ 16000 // 16kHz output for STT
+#define STT_FS_HZ AI_VOICE_SAMPLE_RATE_HZ // 16kHz output for STT
 
 // Each read pulls this many stereo frames (larger reads reduce overhead, smaller reads reduce latency)
 #define FRAMES_PER_READ 256
@@ -411,10 +411,22 @@ esp_err_t ai_voice_record_pcm16_16k(volatile bool *keep_recording, ai_voice_pcm_
         size_t words_read  = bytes_read / sizeof(int32_t);
         size_t frames_read = words_read / 2; // L,R per frame
 
-        // Ensure enough capacity for new samples (each 3 frames -> 1 sample)
         size_t new_samples = frames_read / 3;
+
+        // Full: stop and keep what was captured
+        if (out_idx + new_samples > AI_VOICE_MAX_SAMPLES) {
+            ESP_LOGW(TAG, "ai_voice_record_pcm16_16k: %u-sample limit reached, stopping", (unsigned)AI_VOICE_MAX_SAMPLES);
+            *keep_recording = false;
+            break;
+        }
+
+        // Ensure enough capacity for new samples (each 3 frames -> 1 sample), never past the limit
+        bool grow_failed = false;
         while (out_idx + new_samples > capacity) {
             size_t new_capacity = capacity ? (capacity * 2) : INITIAL_BUFFER_SAMPLES;
+            if (new_capacity > AI_VOICE_MAX_SAMPLES) {
+                new_capacity = AI_VOICE_MAX_SAMPLES;
+            }
             int16_t *new_pcm = (int16_t *)heap_caps_realloc(
                     pcm16,
                     new_capacity * sizeof(int16_t),
@@ -422,13 +434,25 @@ esp_err_t ai_voice_record_pcm16_16k(volatile bool *keep_recording, ai_voice_pcm_
             );
             if (!new_pcm) {
                 ESP_LOGE(TAG, "ai_voice_record_pcm16_16k: No mem to resize PCM buffer (%u samples)", (unsigned)new_capacity);
-                if (pcm16) {
-                    heap_caps_free(pcm16);
+
+                // Nothing stored yet: a real failure
+                if (out_idx == 0) {
+                    if (pcm16) {
+                        heap_caps_free(pcm16);
+                    }
+                    return ESP_ERR_NO_MEM;
                 }
-                return ESP_ERR_NO_MEM;
+
+                // Otherwise stop early and keep what fits (realloc left the old block intact)
+                grow_failed = true;
+                break;
             }
             pcm16 = new_pcm;
             capacity = new_capacity;
+        }
+        if (grow_failed) {
+            *keep_recording = false;
+            break;
         }
 
         int16_t block_peak = 0; // Peak tracker for this block
@@ -582,7 +606,7 @@ static esp_err_t stt_http_write_all(esp_http_client_handle_t client, const uint8
         int n = esp_http_client_write(client, (const char *)(buf + written), chunk);
         if (n <= 0) {
             ESP_LOGE(TAG, "stt_http_write_all: esp_http_client_write failed (n=%d)", n);
-            return ESP_FAIL;
+            return (n == 0) ? ESP_ERR_HTTP_EAGAIN : ESP_ERR_HTTP_WRITE_DATA; // 0 = the send poll timed out
         }
 
         // Advance by however many bytes actually landed
@@ -590,6 +614,19 @@ static esp_err_t stt_http_write_all(esp_http_client_handle_t client, const uint8
     }
 
     return ESP_OK;
+}
+
+// True if the transcript holds a letter or digit: silence can come back as "", " " or "."
+static bool transcript_has_words(const char *s)
+{
+    for (; *s; ++s) {
+        unsigned char c = (unsigned char)*s;
+        if ((c >= '0' && c <= '9') || ((c | 0x20) >= 'a' && (c | 0x20) <= 'z') || c >= 0x80) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 esp_err_t ai_voice_stt_transcribe_pcm16_xai(const int16_t *pcm16, size_t samples, char *out_text, size_t out_text_sz)
@@ -610,7 +647,7 @@ esp_err_t ai_voice_stt_transcribe_pcm16_xai(const int16_t *pcm16, size_t samples
     POLYCAST5_USE_PSRAM_BSS static ai_stt_cfg_t stt;
     if (ai_provider_resolve_stt(&stt) != ESP_OK || !stt.available) {
         ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: no STT provider configured (enable a separate STT provider for chat-only models)");
-        return ESP_FAIL;
+        return AI_ERR_CONFIG;
     }
 
     // Load the STT API key: the separate key when configured, otherwise the primary/chat key
@@ -638,7 +675,7 @@ esp_err_t ai_voice_stt_transcribe_pcm16_xai(const int16_t *pcm16, size_t samples
     }
     if (err != ESP_OK || api_key[0] == '\0') {
         ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: no usable STT API key (%s) - re-enter the key for the selected STT provider", esp_err_to_name(err));
-        return ESP_FAIL;
+        return AI_ERR_CONFIG;
     }
 
     // Key<->provider binding (final guard): refuse to send a key saved for a different provider
@@ -647,7 +684,7 @@ esp_err_t ai_voice_stt_transcribe_pcm16_xai(const int16_t *pcm16, size_t samples
                                      : ai_provider_load_key_provider_nvs();
     if (key_prov != stt.provider_idx) {
         ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: saved STT key belongs to a different provider - re-enter the key for the selected STT provider");
-        return ESP_FAIL;
+        return AI_ERR_CONFIG;
     }
 
     // Precompute sizes that drive Content-Length.
@@ -731,11 +768,11 @@ esp_err_t ai_voice_stt_transcribe_pcm16_xai(const int16_t *pcm16, size_t samples
         .disable_auto_redirect = true,
     };
 
-    // Create the HTTP client (one-shot: we destroy it at cleanup)
+    // Create the HTTP client (one-shot: we destroy it at cleanup). STT URLs are fixed presets, so NULL means no memory
     client = esp_http_client_init(&cfg);
     if (!client) {
         ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: esp_http_client_init failed");
-        return ESP_FAIL;
+        return ESP_ERR_NO_MEM;
     }
 
     // Attach the three custom headers (Authorization + the multipart Content-Type + Accept)
@@ -752,27 +789,42 @@ esp_err_t ai_voice_stt_transcribe_pcm16_xai(const int16_t *pcm16, size_t samples
     err = esp_http_client_open(client, (int)content_length);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: esp_http_client_open failed: %s", esp_err_to_name(err));
+        err = ai_err_from_http_client(client, err);
         goto cleanup;
     }
 
     // Stream the body in four pieces. Order matters: prefix headers, WAV header, PCM payload, closing boundary.
     err = stt_http_write_all(client, (const uint8_t *)mp_prefix, (size_t)prefix_len);
-    if (err != ESP_OK) goto cleanup;
 
-    err = stt_http_write_all(client, wav_hdr, sizeof(wav_hdr));
-    if (err != ESP_OK) goto cleanup;
+    if (err == ESP_OK) {
+        err = stt_http_write_all(client, wav_hdr, sizeof(wav_hdr));
+    }
 
     // PCM samples are int16_t; ESP32-C5 is little-endian which matches the WAV spec, so write raw bytes
-    err = stt_http_write_all(client, (const uint8_t *)pcm16, pcm_bytes);
-    if (err != ESP_OK) goto cleanup;
+    if (err == ESP_OK) {
+        err = stt_http_write_all(client, (const uint8_t *)pcm16, pcm_bytes);
+    }
 
-    err = stt_http_write_all(client, (const uint8_t *)mp_suffix, (size_t)suffix_len);
-    if (err != ESP_OK) goto cleanup;
+    if (err == ESP_OK) {
+        err = stt_http_write_all(client, (const uint8_t *)mp_suffix, (size_t)suffix_len);
+    }
+
+    if (err != ESP_OK) {
+        err = ai_err_from_http_client(client, err);
+        goto cleanup;
+    }
 
     // Read response status line + headers. fetch_headers returns Content-Length (>0),
     // 0 if the server uses chunked encoding, or negative on error.
     int content_len = esp_http_client_fetch_headers(client);
     int status = esp_http_client_get_status_code(client);
+
+    // No response: timed out (-ESP_ERR_HTTP_EAGAIN) or the connection closed
+    if (content_len < 0) {
+        ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: no response headers (%d)", content_len);
+        err = ai_err_from_http_client(client, content_len);
+        goto cleanup;
+    }
 
 #ifdef POLYCAST5_DEBUG
     ESP_LOGI(TAG, "STT response: status=%d content_len=%d", status, content_len);
@@ -799,8 +851,11 @@ esp_err_t ai_voice_stt_transcribe_pcm16_xai(const int16_t *pcm16, size_t samples
     while (resp_len + 1 < cap) {
         int r = esp_http_client_read(client, resp_buf + resp_len, (int)(cap - 1 - resp_len));
         if (r < 0) {
-            ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: esp_http_client_read failed (r=%d)", r);
-            err = ESP_FAIL;
+            ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: esp_http_client_read failed (r=%d, HTTP %d)", r, status);
+
+            // A refusal's status says more than how its body read ended
+            resp_buf[resp_len] = '\0';
+            err = (status >= 100 && status != 200) ? ai_err_from_http_status(status, resp_buf) : ai_err_from_http_client(client, r);
             goto cleanup;
         }
         if (r == 0) {
@@ -810,47 +865,39 @@ esp_err_t ai_voice_stt_transcribe_pcm16_xai(const int16_t *pcm16, size_t samples
     }
     resp_buf[resp_len] = '\0';
 
-    // Map documented xAI /v1/stt status codes to a descriptive log + return value.
-    // Only 429 gets its own return code so the UI can show the "Out of credits" screen;
-    // everything else bubbles up as ESP_FAIL so the generic "thinking failed" screen shows.
+    // Map documented xAI /v1/stt status codes to a descriptive log; the UI shows what the code means
     if (status != 200) {
         switch (status) {
             case 400:
                 // Malformed request (bad multipart framing, unsupported audio format, etc.)
                 ESP_LOGE(TAG, "STT 400 Bad Request: %s", resp_buf);
-                err = ESP_FAIL;
                 break;
             case 401:
                 // API key is missing or invalid - user must fix it in the Wi-Fi portal
                 ESP_LOGE(TAG, "STT 401 Unauthorized - check your xAI API key: %s", resp_buf);
-                err = ESP_FAIL;
                 break;
             case 413:
-                // File > 500 MB. PolyCast5 caps at ~4 min = ~8 MB, so this shouldn't fire.
+                // File > 500 MB. Recordings stop at 60 s (~2 MB), so this shouldn't fire.
                 ESP_LOGE(TAG, "STT 413 Payload Too Large (>500 MB): %s", resp_buf);
-                err = ESP_FAIL;
                 break;
             case 429:
-                // Rate limited / out of credits - surface as a distinct UI state
+                // Rate limited / out of credits
                 ESP_LOGE(TAG, "STT 429 Rate Limited / out of credits: %s", resp_buf);
-                err = AI_VOICE_ERR_RATE_LIMITED;
                 break;
             case 502:
                 // xAI-side upstream failure (not expected for direct file upload)
                 ESP_LOGE(TAG, "STT 502 Bad Gateway: %s", resp_buf);
-                err = ESP_FAIL;
                 break;
             case 503:
                 // xAI backend temporarily unavailable - user can retry
                 ESP_LOGE(TAG, "STT 503 Service Unavailable - retry later: %s", resp_buf);
-                err = ESP_FAIL;
                 break;
             default:
                 // Any status we don't recognize (still log body for diagnosis)
                 ESP_LOGE(TAG, "STT unexpected HTTP %d: %s", status, resp_buf);
-                err = ESP_FAIL;
                 break;
         }
+        err = ai_err_from_http_status(status, resp_buf);
         goto cleanup;
     }
 
@@ -858,7 +905,7 @@ esp_err_t ai_voice_stt_transcribe_pcm16_xai(const int16_t *pcm16, size_t samples
     cJSON *j = cJSON_ParseWithLength(resp_buf, resp_len);
     if (!j) {
         ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: cJSON_Parse failed");
-        err = ESP_FAIL;
+        err = AI_ERR_BAD_REPLY;
         goto cleanup;
     }
 
@@ -866,7 +913,7 @@ esp_err_t ai_voice_stt_transcribe_pcm16_xai(const int16_t *pcm16, size_t samples
     if (!cJSON_IsString(text) || !text->valuestring) {
         ESP_LOGE(TAG, "ai_voice_stt_transcribe_pcm16_xai: response missing 'text'");
         cJSON_Delete(j);
-        err = ESP_FAIL;
+        err = AI_ERR_BAD_REPLY;
         goto cleanup;
     }
 
@@ -876,8 +923,8 @@ esp_err_t ai_voice_stt_transcribe_pcm16_xai(const int16_t *pcm16, size_t samples
 
     cJSON_Delete(j);
 
-    // Treat an empty transcript as failure so downstream parsing doesn't act on "nothing said"
-    err = (out_text[0] != '\0') ? ESP_OK : ESP_FAIL;
+    // Treat a wordless transcript as failure so downstream parsing doesn't act on "nothing said"
+    err = transcript_has_words(out_text) ? ESP_OK : AI_ERR_NO_SPEECH;
 
 cleanup:
     // heap_caps_free handles both heap_caps_malloc and malloc pointers on ESP-IDF

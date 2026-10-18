@@ -11,6 +11,7 @@
 #include "esp_random.h"
 
 #include "wifi_task.h"
+#include "wifi_utils.h"
 #include "gpio_task.h"
 #include "ai_key_portal.h"
 #include "bluetooth_task.h"
@@ -37,11 +38,63 @@ POLYCAST5_USE_PSRAM_BSS static char prompt_buf[AI_PROMPT_NVS_MAX_LEN] = {0};
 POLYCAST5_USE_PSRAM_BSS static char ai_response[AI_RESPONSE_MAX_LEN] = {0};
 POLYCAST5_USE_PSRAM_BSS static char user_transcript[AI_USER_TRANSCRIPT_MAX_LEN];
 
+// Where and why the last request failed; written before AI_THINKING_FAILED_BIT is raised
+static ai_fail_t last_fail = {0};
+
 // The page that sent the running command was left: its result must not reach a later visit
 // Wi-Fi teardown doesn't fail a pending DNS lookup, so a request can resume on the next connection
 static inline bool req_abandoned(void)
 {
     return req_gen != ai_visit_gen;
+}
+
+// Records where and why the request failed, then tells the LCD
+static void signal_fail(ai_fail_stage_t stage, esp_err_t err)
+{
+    // A network error with Wi-Fi down is the Wi-Fi's doing, not the server's
+    if ((err == AI_ERR_NETWORK || err == AI_ERR_TIMEOUT || err == AI_ERR_TLS) &&
+            !(xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT)) {
+        err = AI_ERR_WIFI_LOST;
+    }
+
+    last_fail.stage = stage;
+    last_fail.err = err;
+    xEventGroupSetBits(xAiEventGroup, AI_THINKING_FAILED_BIT);
+}
+
+ai_fail_t ai_task_get_fail(void)
+{
+    return last_fail;
+}
+
+// Wi-Fi can drop while the page is open and nothing rejoins on its own: ask, then wait for it
+// False if it stays down or the page was left
+static bool wait_for_wifi(void)
+{
+    if (xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT) {
+        return true;
+    }
+
+    // The press already asked; a second request joins the attempt in progress
+    wifi_task_request_reconnect();
+
+    // Page left meanwhile: its disconnect, which the request just cleared, must still win
+    if (req_abandoned()) {
+        xEventGroupSetBits(xWifiEventGroup, WIFI_DISCONNECT_BIT);
+        return false;
+    }
+
+    ESP_LOGW(TAG, "Wi-Fi down: waiting for it to reconnect");
+    for (uint32_t waited_ms = 0; waited_ms < WIFI_CONN_TIMEOUT_MS; waited_ms += 100) {
+        if (xEventGroupWaitBits(xWifiEventGroup, WIFI_CONNECTED_BIT, pdFALSE, pdFALSE, pdMS_TO_TICKS(100)) & WIFI_CONNECTED_BIT) {
+            return true;
+        }
+        if (req_abandoned()) {
+            return false;
+        }
+    }
+
+    return false;
 }
 
 // Streaming callback: queues each content delta for bluetooth_task to type over BLE
@@ -212,6 +265,7 @@ static void ai_task(void *pvParameters)
 
         const char *query = NULL;
         bool streamed = false; // Set once a chat delta went to BLE
+        ai_fail_stage_t fail_stage = AI_FAIL_STAGE_STT; // Step a DONE_REC failure is reported against
 
         if (cmd.type == AI_CMD_KEYBOARD_START_REC) {
             if (!mic_recording) {
@@ -222,11 +276,11 @@ static void ai_task(void *pvParameters)
             }
 
             // Enable mic
-            // On failure, surface as a retryable thinking error so the device doesn't reboot when internal RAM is tight
+            // On failure, surface as a retryable mic error so the device doesn't reboot when internal RAM is tight
             err = ai_voice_init();
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "ai_voice_init failed: %s", esp_err_to_name(err));
-                xEventGroupSetBits(xAiEventGroup, AI_THINKING_FAILED_BIT);
+                signal_fail(AI_FAIL_STAGE_MIC, err);
                 continue;
             }
 
@@ -234,10 +288,11 @@ static void ai_task(void *pvParameters)
             ESP_LOGI(TAG, "Starting ai_voice_record_pcm16_16k");
 #endif
 
+            // Returns on release, or at the length limit with mic_recording cleared so the LCD sends DONE_REC itself
             err = ai_voice_record_pcm16_16k(&mic_recording, &pcm);
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "ai_voice_record_pcm16_16k failed: %s", esp_err_to_name(err));
-                xEventGroupSetBits(xAiEventGroup, AI_THINKING_FAILED_BIT);
+                signal_fail(AI_FAIL_STAGE_MIC, err);
                 ai_voice_free_pcm(&pcm);
                 esp_err_t deinit_err = ai_voice_deinit();
                 if (deinit_err != ESP_OK) {
@@ -268,8 +323,16 @@ static void ai_task(void *pvParameters)
 #endif
 
             // Transcribe via xAI /v1/stt REST endpoint, unless the page was already left
-            err = req_abandoned() ? ESP_ERR_INVALID_STATE :
-                    ai_voice_stt_transcribe_pcm16_xai(pcm.pcm16, pcm.samples, user_transcript, sizeof(user_transcript));
+            if (req_abandoned()) {
+                err = ESP_ERR_INVALID_STATE;
+            } else if (pcm.samples < AI_VOICE_MIN_SAMPLES) {
+                // A tap, not speech: nothing worth uploading (a release before recording began leaves 0)
+                err = AI_ERR_TOO_SHORT;
+            } else if (!wait_for_wifi()) {
+                err = AI_ERR_WIFI_LOST;
+            } else {
+                err = ai_voice_stt_transcribe_pcm16_xai(pcm.pcm16, pcm.samples, user_transcript, sizeof(user_transcript));
+            }
 
             if (req_abandoned()) {
                 // Page left before or during STT: no lookup or chat, no result bits
@@ -285,9 +348,11 @@ static void ai_task(void *pvParameters)
                 cmd.type = parse_kind_and_query(user_transcript, &query);
                 if (cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD) {
                     // Lookup credentials via AI
+                    fail_stage = AI_FAIL_STAGE_LOOKUP;
                     err = ai_utils_lookup_creds(cmd.type, query, ai_response, sizeof(ai_response));
                 } else if (cmd.type == AI_CMD_CUSTOM) {
                     // Lookup custom command via AI
+                    fail_stage = AI_FAIL_STAGE_LOOKUP;
                     err = ai_utils_lookup_custom(query, ai_response, sizeof(ai_response));
                 } else if (cmd.type == AI_CMD_DICTATE) {
                     // No AI call - just copy the raw transcript directly
@@ -308,6 +373,7 @@ static void ai_task(void *pvParameters)
 #endif
                     // Call chat API with SSE streaming (types each chunk over BLE as it arrives)
                     // A link-loss abort left by an earlier stream must not end this one
+                    fail_stage = AI_FAIL_STAGE_CHAT;
                     xEventGroupClearBits(xBluetoothEventGroup, BLUETOOTH_STREAM_ABORT_BIT);
                     err = ai_utils_send_command_xai_stream(prompt, user_transcript, ai_response, sizeof(ai_response), cmd.reasoning, stream_to_bluetooth_cb, &streamed);
 
@@ -324,14 +390,8 @@ static void ai_task(void *pvParameters)
                     }
                 }
             } else {
-                ESP_LOGE(TAG, "STT failed: %s", esp_err_to_name(err));
-
-                // Signal specific error type
-                if (err == AI_VOICE_ERR_RATE_LIMITED) {
-                    xEventGroupSetBits(xAiEventGroup, AI_RATE_LIMITED_BIT);
-                } else {
-                    xEventGroupSetBits(xAiEventGroup, AI_THINKING_FAILED_BIT);
-                }
+                // Reported against fail_stage (STT) below
+                ESP_LOGE(TAG, "STT failed: %s", ai_err_to_name(err));
             }
             // Free the PCM buffer in PSRAM
             // The mic was already torn down so STT had the DMA-capable internal SRAM it needed for the AES-encrypted upload
@@ -400,23 +460,21 @@ static void ai_task(void *pvParameters)
                 xQueueOverwrite(xWifiAiRawSniffQueue, &ai_script_ptr); // Depth 1: replaces an unread result instead of blocking
             }
         } else {
-            ESP_LOGE(TAG, "AI request failed: %s", esp_err_to_name(err));
+            ESP_LOGE(TAG, "AI request failed: %s", ai_err_to_name(err));
 
             if (cmd.type == AI_CMD_RAW_FRAMES) {
                 // NULL result = failed. The packet page reads its own queue: a late keyboard result can't fake or mask it
                 char *ai_script_ptr = NULL;
                 xQueueOverwrite(xWifiAiRawSniffQueue, &ai_script_ptr);
             // Explicitly release the AI keyboard from its "thinking" state, or the UI hangs forever
-            // STT failures above already raised a bit, so check none raised before
             // A stream that already typed part of its answer ends via the sentinel's DONE_TYPING instead
-            } else if (!streamed && !(xEventGroupGetBits(xAiEventGroup) &
-                    (AI_RATE_LIMITED_BIT | AI_THINKING_FAILED_BIT))) {
+            } else if (!streamed) {
                 if (err == ESP_ERR_NOT_FOUND &&
                         (cmd.type == AI_CMD_CRED_USERNAME || cmd.type == AI_CMD_CRED_PASSWORD || cmd.type == AI_CMD_CUSTOM)) {
                     // No saved entry matched the query (Grok replies "-1")
                     xEventGroupSetBits(xAiEventGroup, AI_NO_MATCH_BIT); // Show no match
                 } else {
-                    xEventGroupSetBits(xAiEventGroup, AI_THINKING_FAILED_BIT); // Generic failure
+                    signal_fail(fail_stage, err);
                 }
             }
         }

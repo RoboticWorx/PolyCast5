@@ -1405,6 +1405,62 @@ void lcd_bluetooth_ai_config_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blueto
     }
 }
 
+// AI keyboard failure text: the step that failed, then why and what to do
+static void ai_keyb_fail_text(const ai_fail_t *fail, char *buf, size_t sz)
+{
+    // Failures that read the same whichever step hit them
+    switch (fail->err) {
+        case AI_ERR_TOO_SHORT:
+            snprintf(buf, sz, "Too short!\nKeep holding\nwhile you talk.");
+            return;
+        case AI_ERR_NO_SPEECH:
+            snprintf(buf, sz, "Didn't catch that!\nSpeak closer to\nthe mic.");
+            return;
+        case AI_ERR_WIFI_LOST:
+            // Also a drop mid-request, which nothing tried to rejoin yet: the next press does
+            snprintf(buf, sz, "Wi-Fi lost!\nCheck your network\nand try again.");
+            return;
+        case AI_ERR_RATE_LIMITED:
+            snprintf(buf, sz, "Out of API credits\nor rate limited!\nCheck your account.");
+            return;
+        default:
+            break;
+    }
+
+    const char *what;
+    switch (fail->stage) {
+        case AI_FAIL_STAGE_MIC:    what = "Mic failed!"; break;
+        case AI_FAIL_STAGE_STT:    what = "Speech-to-text failed!"; break;
+        case AI_FAIL_STAGE_LOOKUP: what = "Lookup failed!"; break;
+        default:                   what = "AI reply failed!"; break;
+    }
+
+    // Middle line stays short: the settings icon sits beside it
+    switch (fail->err) {
+        case ESP_ERR_NO_MEM:     snprintf(buf, sz, "%s\nOut of memory.\nPlease try again.", what); break;
+        case AI_ERR_NETWORK:     snprintf(buf, sz, "%s\nCan't reach server.\nCheck your internet.", what); break;
+        case AI_ERR_TLS:         snprintf(buf, sz, "%s\nSecure link failed.\nCheck network or URL.", what); break;
+        case AI_ERR_TIMEOUT:     snprintf(buf, sz, "%s\nServer timed out.\nPlease try again.", what); break;
+        case AI_ERR_AUTH:        snprintf(buf, sz, "%s\nAPI key rejected.\nCheck AI settings.", what); break;
+        case AI_ERR_CONFIG:      snprintf(buf, sz, "%s\nAI not set up.\nCheck AI settings.", what); break;
+        case AI_ERR_BAD_REPLY:   snprintf(buf, sz, "%s\nUnexpected reply.\nPlease try again.", what); break;
+        case AI_ERR_EMPTY_REPLY: snprintf(buf, sz, "%s\nEmpty reply.\nPlease try again.", what); break;
+        default:
+            if (AI_ERR_IS_HTTP(fail->err)) {
+                // 5xx is the provider's problem; anything else refused the request itself (model, URL)
+                int status = AI_ERR_HTTP_STATUS(fail->err);
+                if (status >= 500) {
+                    snprintf(buf, sz, "%s\nServer error %d.\nTry again later.", what, status);
+                } else {
+                    snprintf(buf, sz, "%s\nRefused (HTTP %d).\nCheck AI settings.", what, status);
+                }
+            } else {
+                snprintf(buf, sz, "%s\nError 0x%x.\nPlease try again.", what, (unsigned)fail->err);
+            }
+            break;
+    }
+}
+
 void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetooth_menu_t *bluetooth_menu)
 {
     #define AI_BT_FAILED_TXT "Connection failed!\nPlease pair to a\nBluetooth device at\nleast once and make\nsure you are in range."
@@ -1440,6 +1496,7 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     static ai_keyb_state_t state = AI_KEYB_IDLE;
     static bool last_select = false;
     static bool use_reasoning = false;
+    static bool wifi_wait_shown = false; // "Connecting to Wi-Fi..." is up while ai_task waits on the link
     
     // Only execute once
     if (!do_once) {
@@ -1597,18 +1654,8 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
     bool select_released = (!select_now && last_select);
     last_select = select_now;
 
-    // If rate limited / out of API credits
-    if (xEventGroupGetBits(xAiEventGroup) & AI_RATE_LIMITED_BIT) {
-        lv_obj_remove_flag(lbl_ins, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
-        lcd_voice_orb_stop();
-        lv_label_set_text(lbl_ins, "Out of API credits!\nCheck your usage:\nconsole.x.ai");
-        lv_obj_remove_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
-        xEventGroupClearBits(xAiEventGroup, AI_RATE_LIMITED_BIT);
-        state = AI_KEYB_IDLE;
-    // If thinking error occurred
-    } else if (xEventGroupGetBits(xAiEventGroup) & AI_THINKING_FAILED_BIT) {
+    // If a step failed
+    if (xEventGroupGetBits(xAiEventGroup) & AI_THINKING_FAILED_BIT) {
         // Show instructions label
         lv_obj_remove_flag(lbl_ins, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
@@ -1616,8 +1663,11 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
         // Hide orb
         lcd_voice_orb_stop();
 
-        // Show error
-        lv_label_set_text(lbl_ins, "Thinking failed!\nPlease try again.");
+        // Show what failed and why
+        ai_fail_t fail = ai_task_get_fail();
+        char fail_txt[96];
+        ai_keyb_fail_text(&fail, fail_txt, sizeof(fail_txt));
+        lv_label_set_text(lbl_ins, fail_txt);
 
         // Show reasoning
         lv_obj_remove_flag(lbl_reasoning, LV_OBJ_FLAG_HIDDEN);
@@ -1668,6 +1718,11 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
             lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
             lv_label_set_text(lbl_ins, AI_KEYB_BUSY_TXT);
         } else {
+            // Wi-Fi dropped since the page connected: rejoin while the user talks; ai_task waits for it before uploading
+            if (!(xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT)) {
+                wifi_task_request_reconnect();
+            }
+
             // Show orb
             lcd_voice_orb_start();
 
@@ -1687,8 +1742,8 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
 
     // While held: update count - stop only on release (or buffer full)
     if (state == AI_KEYB_RECORDING) {
-        // When done capturing
-        if (select_released) {
+        // When done capturing: released, or ai_task cleared mic_recording at the length limit
+        if (select_released || !mic_recording) {
             // Stop mic_recording
             mic_recording = false;
             ai_cmd_t cmd = {
@@ -1716,13 +1771,27 @@ void lcd_bluetooth_ai_keyboard_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, blue
                 lv_obj_remove_flag(ui_menu->arrow_bot, LV_OBJ_FLAG_HIDDEN);
                 state = AI_KEYB_IDLE;
             } else {
-                lv_obj_set_style_text_font(lbl_ins, &AI_KEYB_READY_FONT, 0);
-                lv_label_set_text(lbl_ins, AI_KEYB_THINKING_TXT);
+                // ai_task waits for the link before uploading: say so until it's back
+                wifi_wait_shown = !(xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT);
+                if (wifi_wait_shown) {
+                    lv_obj_set_style_text_font(lbl_ins, &lv_font_montserrat_16, 0);
+                    lv_label_set_text(lbl_ins, AI_KEYB_WIFI_CONNECTING_TXT);
+                } else {
+                    lv_obj_set_style_text_font(lbl_ins, &AI_KEYB_READY_FONT, 0);
+                    lv_label_set_text(lbl_ins, AI_KEYB_THINKING_TXT);
+                }
 
                 // Switched to AI_KEYB_DONE_TXT in xQueueReceive xWifiAiRawSniffQueue
                 state = AI_KEYB_RESPONSE_WAITING; // Waiting for analysis to complete
             }
         }
+    }
+
+    // Wi-Fi is back while ai_task waited on it: now it's thinking
+    if (state == AI_KEYB_RESPONSE_WAITING && wifi_wait_shown && (xEventGroupGetBits(xWifiEventGroup) & WIFI_CONNECTED_BIT)) {
+        wifi_wait_shown = false;
+        lv_obj_set_style_text_font(lbl_ins, &AI_KEYB_READY_FONT, 0);
+        lv_label_set_text(lbl_ins, AI_KEYB_THINKING_TXT);
     }
 
     // When AI has finished thinking
