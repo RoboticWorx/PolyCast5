@@ -49,6 +49,7 @@ typedef struct {
     const char *reasoning_on;    // reasoning_effort value when cmd.reasoning==true
     const char *reasoning_off;   // reasoning_effort value when cmd.reasoning==false
     bool        key_required;    // false for custom/local (keyless allowed)
+    const char *key_prefix;      // Every key for this provider starts with this ("" = any key accepted)
     bool        has_stt;         // Provider also offers STT under the same key
     const char *stt_url;         // Audio/STT endpoint (only if has_stt)
     const char *stt_model_def;   // Default STT model (only if has_stt); unused when stt_send_model is false

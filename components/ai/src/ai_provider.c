@@ -17,7 +17,7 @@ static const ai_provider_t k_providers[AI_PROVIDER_COUNT] = {
         .id = "xai", .display = "xAI (Grok)",
         .chat_url = "https://api.x.ai/v1/chat/completions", .chat_model_def = "grok-4.3",
         .send_reasoning_effort = true, .reasoning_on = "medium", .reasoning_off = "none",
-        .key_required = true, .has_stt = true,
+        .key_required = true, .key_prefix = "xai-", .has_stt = true,
         .stt_url = "https://api.x.ai/v1/stt", .stt_model_def = "grok-stt", .stt_fmt_field = "format",
         .stt_send_model = false, .stt_fmt_value = "true", // /v1/stt has no model field; format=true => Inverse Text Normalization ("$100")
     },
@@ -25,7 +25,7 @@ static const ai_provider_t k_providers[AI_PROVIDER_COUNT] = {
         .id = "openai", .display = "OpenAI",
         .chat_url = "https://api.openai.com/v1/chat/completions", .chat_model_def = "gpt-4o",
         .send_reasoning_effort = false, .reasoning_on = "none", .reasoning_off = "none",
-        .key_required = true, .has_stt = true,
+        .key_required = true, .key_prefix = "sk-", .has_stt = true,
         .stt_url = "https://api.openai.com/v1/audio/transcriptions", .stt_model_def = "whisper-1", .stt_fmt_field = "response_format",
         .stt_send_model = true, .stt_fmt_value = "json", // OpenAI Whisper: model + response_format=json
     },
@@ -33,7 +33,7 @@ static const ai_provider_t k_providers[AI_PROVIDER_COUNT] = {
         .id = "groq", .display = "Groq",
         .chat_url = "https://api.groq.com/openai/v1/chat/completions", .chat_model_def = "openai/gpt-oss-120b",
         .send_reasoning_effort = false, .reasoning_on = "none", .reasoning_off = "none",
-        .key_required = true, .has_stt = true,
+        .key_required = true, .key_prefix = "gsk_", .has_stt = true,
         .stt_url = "https://api.groq.com/openai/v1/audio/transcriptions", .stt_model_def = "whisper-large-v3-turbo", .stt_fmt_field = "response_format",
         .stt_send_model = true, .stt_fmt_value = "json", // Groq Whisper: model + response_format=json
     },
@@ -41,21 +41,21 @@ static const ai_provider_t k_providers[AI_PROVIDER_COUNT] = {
         .id = "deepseek", .display = "DeepSeek",
         .chat_url = "https://api.deepseek.com/v1/chat/completions", .chat_model_def = "deepseek-v4-flash",
         .send_reasoning_effort = false, .reasoning_on = "none", .reasoning_off = "none",
-        .key_required = true, .has_stt = false,
+        .key_required = true, .key_prefix = "sk-", .has_stt = false,
         .stt_url = "", .stt_model_def = "", .stt_fmt_field = "", .stt_send_model = false, .stt_fmt_value = "",
     },
     [AI_PROVIDER_OPENROUTER] = {
         .id = "openrouter", .display = "OpenRouter",
         .chat_url = "https://openrouter.ai/api/v1/chat/completions", .chat_model_def = "anthropic/claude-sonnet-4.5",
         .send_reasoning_effort = false, .reasoning_on = "none", .reasoning_off = "none",
-        .key_required = true, .has_stt = false,
+        .key_required = true, .key_prefix = "sk-or-", .has_stt = false,
         .stt_url = "", .stt_model_def = "", .stt_fmt_field = "", .stt_send_model = false, .stt_fmt_value = "",
     },
     [AI_PROVIDER_CUSTOM] = {
         .id = "custom", .display = "Custom / Local",
         .chat_url = "", .chat_model_def = "",
         .send_reasoning_effort = false, .reasoning_on = "none", .reasoning_off = "none",
-        .key_required = false, .has_stt = false,
+        .key_required = false, .key_prefix = "", .has_stt = false,
         .stt_url = "", .stt_model_def = "", .stt_fmt_field = "", .stt_send_model = false, .stt_fmt_value = "",
     },
 };

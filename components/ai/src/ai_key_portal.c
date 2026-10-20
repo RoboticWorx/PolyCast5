@@ -99,6 +99,152 @@ static bool key_is_sane(const char *key)
     return true;
 }
 
+// Key families by issuer: the longest prefix a key matches says who issued it
+typedef struct {
+    const char *prefix;
+    uint8_t owners;     // Bit per ai_provider_id_t whose keys start with this
+    const char *other;  // Issuer outside the registry, or NULL
+    const char *hint;   // Chat-field advice for an `other` key
+} key_family_t;
+
+#define KEY_OWNER(p) (1u << (p))
+
+static const key_family_t k_key_families[] = {
+    { "xai-",        KEY_OWNER(AI_PROVIDER_XAI),        NULL, NULL },
+    { "gsk_",        KEY_OWNER(AI_PROVIDER_GROQ),       NULL, NULL },
+    { "sk-or-",      KEY_OWNER(AI_PROVIDER_OPENROUTER), NULL, NULL },
+    { "sk-proj-",    KEY_OWNER(AI_PROVIDER_OPENAI),     NULL, NULL },
+    { "sk-svcacct-", KEY_OWNER(AI_PROVIDER_OPENAI),     NULL, NULL },
+    { "sk-service-", KEY_OWNER(AI_PROVIDER_OPENAI),     NULL, NULL },
+    { "sk-admin-",   KEY_OWNER(AI_PROVIDER_OPENAI),     NULL, NULL },
+    { "sk-None-",    KEY_OWNER(AI_PROVIDER_OPENAI),     NULL, NULL },
+    { "sk-ant-",     0, "Anthropic (Claude)", " For Claude models, select OpenRouter and paste an OpenRouter key." },
+    { "sk-",         KEY_OWNER(AI_PROVIDER_OPENAI) | KEY_OWNER(AI_PROVIDER_DEEPSEEK), NULL, NULL }, // Legacy OpenAI or DeepSeek
+};
+
+// DeepSeek keys are "sk-" + 32 lowercase letters/digits; legacy OpenAI keys are longer and mixed-case
+static bool is_deepseek_key(const char *key)
+{
+    if (strncmp(key, "sk-", 3) != 0 || strlen(key) != 35) {
+        return false;
+    }
+
+    for (const char *p = key + 3; *p; ++p) {
+        if (!((*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9'))) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// Family of the key, or NULL; *owners gets the providers that could have issued it
+static const key_family_t *key_family(const char *key, uint8_t *owners)
+{
+    const key_family_t *best = NULL;
+    for (size_t i = 0; i < sizeof(k_key_families) / sizeof(k_key_families[0]); ++i) {
+        const key_family_t *f = &k_key_families[i];
+        const size_t n = strlen(f->prefix);
+        if (strncmp(key, f->prefix, n) == 0 && (!best || n > strlen(best->prefix))) {
+            best = f;
+        }
+    }
+
+    *owners = best ? best->owners : 0;
+
+    // A plain "sk-" key's shape can still name its issuer. Legacy OpenAI keys embed "T3BlbkFJ"
+    // (base64 "OpenAI"), which a lowercase DeepSeek key cannot hold
+    if (best && strcmp(best->prefix, "sk-") == 0) {
+        if (is_deepseek_key(key)) {
+            *owners = KEY_OWNER(AI_PROVIDER_DEEPSEEK);
+        } else if (strstr(key, "T3BlbkFJ") != NULL) {
+            *owners = KEY_OWNER(AI_PROVIDER_OPENAI);
+        }
+    }
+
+    return best;
+}
+
+// A key must be its provider's: the provider otherwise answers only "incorrect API key".
+// Returns NULL if the key fits prov, else what is wrong in buf, for the portal to show.
+// stt picks the field: the STT key, whose dropdown offers only providers with speech-to-text.
+static const char *key_prefix_error(bool stt, uint8_t prov, const char *key, char *buf, size_t buf_sz)
+{
+    const char *field = stt ? "STT API key" : "API key";
+    const char *role = stt ? "STT provider" : "chat provider";
+    const ai_provider_t *want = ai_provider_get(prov);
+    const char *px = want->key_prefix;
+    const size_t px_len = strlen(px);
+    if (px_len == 0) {
+        return NULL; // Custom/local: any key format
+    }
+
+    uint8_t owners = 0;
+    const key_family_t *fam = key_family(key, &owners);
+    if (owners & KEY_OWNER(prov)) {
+        return NULL;
+    }
+
+    if (fam && fam->other) {
+        snprintf(buf, buf_sz, "the %s is a key for %s (it starts with \"%s\"), which %s does not accept. "
+                "Paste a key for %s.%s",
+                field, fam->other, fam->prefix, want->display, want->display, stt ? "" : fam->hint);
+    } else if (fam) {
+        // Name every possible issuer; only those that can fill this field are worth selecting
+        char names[96] = {0};
+        char pick[96] = {0};
+        for (size_t i = 0; i < ai_provider_count(); ++i) {
+            const ai_provider_t *p = ai_provider_get((int)i);
+            if (!(owners & KEY_OWNER(i))) {
+                continue;
+            }
+            if (names[0] != '\0') {
+                strlcat(names, " or ", sizeof(names));
+            }
+            strlcat(names, p->display, sizeof(names));
+            if (!stt || p->has_stt) {
+                if (pick[0] != '\0') {
+                    strlcat(pick, " or ", sizeof(pick));
+                }
+                strlcat(pick, p->display, sizeof(pick));
+            }
+        }
+
+        char advice[192]; // Fits the longest names/pick list plus its sentence
+        if (pick[0] != '\0') {
+            snprintf(advice, sizeof(advice), "Paste a key for %s, or select %s.", want->display, pick);
+        } else {
+            snprintf(advice, sizeof(advice), "%s has no speech-to-text, so paste a key for %s.", names, want->display);
+        }
+
+        if (strcmp(fam->prefix, px) == 0) {
+            // Same prefix as the selected provider's keys: only the key's shape told them apart
+            snprintf(buf, buf_sz, "the %s looks like a key for %s, not %s: both start with \"%s\", but the rest "
+                    "of the key is in %s's format. %s",
+                    field, names, want->display, px, names, advice);
+        } else {
+            // Spell out the selected provider's prefix only when the key doesn't already start with it
+            char theirs[64] = "";
+            if (strncmp(key, px, px_len) != 0) {
+                snprintf(theirs, sizeof(theirs), ", whose keys start with \"%s\"", px);
+            }
+            snprintf(buf, buf_sz, "the %s looks like a key for %s (it starts with \"%s\"), but the %s is %s%s. %s",
+                    field, names, fam->prefix, role, want->display, theirs, advice);
+        }
+    } else if (strncasecmp(key, px, px_len) == 0) {
+        // Phone autocapitalize turns "xai-" into "Xai-"
+        snprintf(buf, buf_sz, "the %s starts with \"%.*s\", but %s keys start with \"%s\". "
+                "Keys are case-sensitive: paste the key exactly as your provider shows it.",
+                field, (int)px_len, key, want->display, px);
+    } else {
+        snprintf(buf, buf_sz, "the %s does not start with \"%s\", but every %s key does. "
+                "Paste the whole key, including the \"%s\" at the start.",
+                field, px, want->display, px);
+    }
+
+    return buf;
+}
+
 // Copy + trim a JSON string field into a fixed buffer. Returns false when the value is
 // present but longer than the buffer holds, so callers reject the request with a clear
 // error instead of silently truncating and saving a mangled value. An absent field keeps
@@ -295,6 +441,15 @@ static esp_err_t key_post(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "invalid api_key");
     }
 
+    // The key is bound to the selected chat provider, so it must be that provider's format
+    ai_provider_cfg_t cur;
+    ai_provider_load_config_nvs(&cur);
+    char prefix_msg[320];
+    if (key[0] != '\0' && key_prefix_error(false, cur.chat_prov, key, prefix_msg, sizeof(prefix_msg))) {
+        cJSON_Delete(j);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, prefix_msg);
+    }
+
     // Save to NVS (canonical storage in ai_funcs.c)
     esp_err_t e = ai_utils_save_api_key_nvs(key);
 
@@ -306,8 +461,6 @@ static esp_err_t key_post(httpd_req_t *req)
 
     // Bind a non-empty key to the currently selected chat provider (empty = erase, no stamp needed)
     if (key[0] != '\0') {
-        ai_provider_cfg_t cur;
-        ai_provider_load_config_nvs(&cur);
         if (ai_provider_save_key_provider_nvs(cur.chat_prov) != ESP_OK) {
             return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "NVS write failed - the key was saved but not bound to its provider; re-enter it");
         }
@@ -525,6 +678,30 @@ static esp_err_t provider_post(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "invalid stt_key");
     }
 
+    // Provider each key is saved and bound for: this request's selection, or the stored one on
+    // a body without chat_prov (there the parsed cfg holds defaults, not the stored selection)
+    uint8_t key_prov = cfg.chat_prov;
+    uint8_t stt_key_prov = cfg.stt_prov;
+    if (!has_cfg) {
+        ai_provider_cfg_t cur;
+        ai_provider_load_config_nvs(&cur);
+        key_prov = cur.chat_prov;
+        stt_key_prov = cur.stt_prov;
+    }
+
+    // Each key that will be saved must be its provider's format
+    char prefix_msg[320];
+    if (!clear_key && api_key[0] != '\0' &&
+            key_prefix_error(false, key_prov, api_key, prefix_msg, sizeof(prefix_msg))) {
+        cJSON_Delete(j);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, prefix_msg);
+    }
+    if (!clear_stt_key && stt_key[0] != '\0' && cfg.stt_sep &&
+            key_prefix_error(true, stt_key_prov, stt_key, prefix_msg, sizeof(prefix_msg))) {
+        cJSON_Delete(j);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, prefix_msg);
+    }
+
     cJSON_Delete(j);
 
     /* ---- All checks passed: apply. Only NVS faults can fail past this point.
@@ -547,16 +724,9 @@ static esp_err_t provider_post(httpd_req_t *req)
         if (ai_utils_save_api_key_nvs(api_key) != ESP_OK) {
             return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "NVS write failed - settings saved but the API key was not; re-enter it");
         }
-        // Bind the key to the provider it was entered for. On a key-only request (no chat_prov
-        // in the body) use the stored selection. A missing stamp defaults to xAI, which is
-        // fail-safe: a mismatch simply prevents the key from being used, never mis-sent.
-        uint8_t kp = cfg.chat_prov;
-        if (!has_cfg) {
-            ai_provider_cfg_t cur;
-            ai_provider_load_config_nvs(&cur);
-            kp = cur.chat_prov;
-        }
-        if (ai_provider_save_key_provider_nvs(kp) != ESP_OK) {
+        // Bind the key to the provider it was entered for. A missing stamp defaults to xAI, which
+        // is fail-safe: a mismatch simply prevents the key from being used, never mis-sent.
+        if (ai_provider_save_key_provider_nvs(key_prov) != ESP_OK) {
             return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "NVS write failed - the key was saved but not bound to its provider; re-enter it");
         }
     }
@@ -571,15 +741,8 @@ static esp_err_t provider_post(httpd_req_t *req)
         if (ai_provider_save_stt_key_nvs(stt_key) != ESP_OK) {
             return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "NVS write failed - settings saved but the STT key was not; re-enter it");
         }
-        // Bind the STT key to its provider. On a body without chat_prov the parsed cfg holds
-        // defaults, not the stored selection, so fall back to the stored stt_prov
-        uint8_t sp = cfg.stt_prov;
-        if (!has_cfg) {
-            ai_provider_cfg_t cur;
-            ai_provider_load_config_nvs(&cur);
-            sp = cur.stt_prov;
-        }
-        if (ai_provider_save_stt_key_provider_nvs(sp) != ESP_OK) {
+        // Bind the STT key to its provider
+        if (ai_provider_save_stt_key_provider_nvs(stt_key_prov) != ESP_OK) {
             return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "NVS write failed - the STT key was saved but not bound to its provider; re-enter it");
         }
     }
