@@ -31,6 +31,17 @@ esp_err_t ai_voice_init(void);
  */
 esp_err_t ai_voice_deinit(void);
 
+/** Result of ai_voice_mic_selftest(). Slots are scored separately: the T5848's LR
+ *  pin is tied to GND, so it must drive the LEFT slot and leave the right tristated.
+ *  An open LR joint moves it to the right slot, which a combined count cannot see. */
+typedef struct {
+    bool alive;        // Live varying data on the expected (left) slot
+    bool wrong_slot;   // Data on the right slot instead - LR (pin 2) not tied to GND
+    uint8_t left_pct;  // Percent of left-slot words nonzero (expect near 100)
+    uint8_t right_pct; // Percent of right-slot words nonzero (expect 0)
+    int32_t spread;    // max-min of the active slot's 24-bit samples; 0 if stuck
+} ai_voice_mic_probe_t;
+
 /**
  * @brief Boot hardware self-test: verify the T5848 mic is driving the I2S data line.
  *        Brings the I2S channel up, samples ~110 ms of data with a pull-down on SD
@@ -38,12 +49,16 @@ esp_err_t ai_voice_deinit(void);
  *        constant value), then tears the channel back down.
  *        Boot-time only: must not run concurrently with dictation.
  *
- * @param alive Set true if the data line shows a live, varying signal;
- *              false if silent or stuck at a constant value
+ *        Proves the electrical chain: the 1V8 rail, all three FXLP34P5X translators,
+ *        and a powered, clocked, converting die. It cannot see a blocked acoustic
+ *        port, a punctured membrane or low sensitivity - the idle noise floor is the
+ *        mic's own EIN, not the room, so it reads the same either way.
  *
- * @returns ESP_OK if the probe ran (see *alive), or the I2S/memory error that stopped it
+ * @param out Probe result; see ai_voice_mic_probe_t
+ *
+ * @returns ESP_OK if the probe ran (see out->alive), or the I2S/memory error that stopped it
  */
-esp_err_t ai_voice_mic_selftest(bool *alive);
+esp_err_t ai_voice_mic_selftest(ai_voice_mic_probe_t *out);
 
 /**
  * @brief Records audio from the I2S microphone and downsamples it to 16kHz mono 16-bit PCM

@@ -1238,19 +1238,35 @@ void verify_hardware_run(void)
     gpio_config(&tsop_cfg);
     gpio_utils_en_tsop_receiver(true);
 
-    // T5848 microphone: no control interface, so presence is inferred from data
-    // liveness (a present mic's noise floor vs. a pulled-down silent line)
-    bool mic_alive = false;
-    esp_err_t err = ai_voice_mic_selftest(&mic_alive);
+    /*
+     * T5848 microphone: no control interface, so presence is inferred from data
+     * liveness (a present mic's noise floor vs. a pulled-down silent line).
+     *
+     * Proves the electrical chain only - the 1V8 rail, all three FXLP34P5X
+     * translators, and a powered, clocked, converting die. A blocked acoustic port,
+     * a punctured membrane and low sensitivity all pass, because the idle noise
+     * floor is the mic's own EIN rather than the room. Those need an acoustic test.
+     */
+    ai_voice_mic_probe_t mic = { 0 };
+    esp_err_t err = ai_voice_mic_selftest(&mic);
     if (err != ESP_OK) {
         vh_record("mic-alive", VH_G_AUDIO, "T5848 microphone (I2S)", VH_FAIL,
                 VH_NO_VALUE, "probe failed: %s", esp_err_to_name(err));
-    } else if (!mic_alive) {
-        vh_record("mic-alive", VH_G_AUDIO, "T5848 microphone (I2S)", VH_FAIL,
-                VH_NO_VALUE, "data line silent or stuck (mic absent, SD disconnected or shorted)");
+    } else if (mic.wrong_slot) {
+        // LR (pin 2) is tied to GND for the left slot. Open that joint and the mic
+        // drives the right one instead: every capture reads silence
+        vh_record("mic-alive", VH_G_AUDIO, "T5848 microphone (I2S)", VH_FAIL, mic.right_pct,
+                "driving the RIGHT slot (L %u%% R %u%%) - LR pin 2 not tied to GND",
+                mic.left_pct, mic.right_pct);
+    } else if (!mic.alive) {
+        vh_record("mic-alive", VH_G_AUDIO, "T5848 microphone (I2S)", VH_FAIL, mic.left_pct,
+                "silent or stuck (L %u%% R %u%% spread %ld) - mic absent, SD open/shorted, or 1V8 dead",
+                mic.left_pct, mic.right_pct, (long)mic.spread);
     } else {
-        vh_record("mic-alive", VH_G_AUDIO, "T5848 microphone (I2S)", VH_PASS,
-                VH_NO_VALUE, "data line alive");
+        // Numbers logged on PASS too: a batch distribution makes a sick die stand out
+        vh_record("mic-alive", VH_G_AUDIO, "T5848 microphone (I2S)", VH_PASS, mic.left_pct,
+                "left slot alive (L %u%% R %u%% spread %ld)",
+                mic.left_pct, mic.right_pct, (long)mic.spread);
     }
 
     // SX1262: reset, then read a register with a known nonzero reset default

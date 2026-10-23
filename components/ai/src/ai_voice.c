@@ -293,12 +293,12 @@ esp_err_t ai_voice_force_sleep_pins_low(void)
     return err;
 }
 
-esp_err_t ai_voice_mic_selftest(bool *alive)
+esp_err_t ai_voice_mic_selftest(ai_voice_mic_probe_t *out)
 {
-    if (!alive) {
+    if (!out) {
         return ESP_ERR_INVALID_ARG;
     }
-    *alive = false;
+    memset(out, 0, sizeof(*out));
 
     esp_err_t err = ai_voice_init();
     if (err != ESP_OK) {
@@ -309,15 +309,22 @@ esp_err_t ai_voice_mic_selftest(bool *alive)
     gpio_set_pull_mode(I2S_T5848_SD_PIN, GPIO_PULLDOWN_ONLY);
 
     enum { PROBE_WORDS = 512 }; // 256 stereo frames, ~5.3 ms per read at 48 kHz
-    size_t nonzero = 0;
-    size_t total = 0;
-    int32_t s24_min = INT32_MAX; // Range of the nonzero samples (variation check)
-    int32_t s24_max = INT32_MIN;
+    // Scored per slot: the mic drives only its own, so a combined count cannot tell
+    // the expected left slot from the right one an open LR joint would move it to
+    size_t nonzero[2] = { 0, 0 }; // [0] = left, [1] = right
+    size_t total[2] = { 0, 0 };
+    int32_t s24_min[2] = { INT32_MAX, INT32_MAX }; // Range of the nonzero samples (variation check)
+    int32_t s24_max[2] = { INT32_MIN, INT32_MIN };
     int32_t *words = malloc(PROBE_WORDS * sizeof(int32_t));
     if (words == NULL) {
         err = ESP_ERR_NO_MEM;
-        goto out;
+        goto done;
     }
+
+    // Index parity of the next left word, carried across blocks (warm-up included).
+    // Reads are frame-aligned in practice, but assuming it would invert the slots for
+    // every later block after one short read and report a good mic as wrong-slot
+    size_t parity = 0;
 
     // Discard the first 16 reads (~85 ms) so the mic has been clocked for a while
     // before anything counts, then score the next 4 (~85-107 ms)
@@ -327,31 +334,52 @@ esp_err_t ai_voice_mic_selftest(bool *alive)
         if (err != ESP_OK) {
             break;
         }
-        if (block < 16) {
-            continue; // Warm-up: discard
-        }
-        for (size_t i = 0; i < bytes_read / sizeof(int32_t); i++) {
-            int32_t s24 = words[i] >> 8; // 24-bit payload lives in bits [31:8]
-            if (s24 != 0) {
-                if (s24 < s24_min) s24_min = s24;
-                if (s24 > s24_max) s24_max = s24;
-                nonzero++;
+        size_t words_read = bytes_read / sizeof(int32_t);
+
+        if (block >= 16) { // Warm-up blocks still advance the parity, they just do not score
+            for (size_t i = 0; i < words_read; i++) {
+                int slot = (int)((i + parity) & 1); // Interleaved L,R,L,R...
+                int32_t s24 = words[i] >> 8; // 24-bit payload lives in bits [31:8]
+                if (s24 != 0) {
+                    if (s24 < s24_min[slot]) s24_min[slot] = s24;
+                    if (s24 > s24_max[slot]) s24_max[slot] = s24;
+                    nonzero[slot]++;
+                }
+                total[slot]++;
             }
-            total++;
+        }
+
+        parity = (parity + words_read) & 1;
+    }
+
+    // A slot is driven if well over an eighth of its words are nonzero. A quiet room
+    // still dithers the noise floor across nearly every word of the mic's own slot,
+    // and the pull-down holds the tristated slot at exact zeros, so the two are far
+    // apart. Variation (min != max) separates a live mic from an SD line stuck high
+    // or bridged to a clock
+    if (err == ESP_OK && total[0] > 0 && total[1] > 0) {
+        bool driven[2];
+        for (int s = 0; s < 2; s++) {
+            driven[s] = (nonzero[s] * 8 > total[s]) && (s24_min[s] != s24_max[s]);
+        }
+
+        out->left_pct = (uint8_t)((nonzero[0] * 100) / total[0]);
+        out->right_pct = (uint8_t)((nonzero[1] * 100) / total[1]);
+
+        // LR is tied to GND, so left is the only slot the mic may drive
+        out->alive = driven[0] && !driven[1];
+        out->wrong_slot = driven[1] && !driven[0];
+
+        // Report the spread of whichever slot saw more data, driven or not: a weak
+        // mic that misses the threshold still shows a nonzero spread, and that
+        // separates it from a dead line in the failure message
+        int active = (nonzero[0] >= nonzero[1]) ? 0 : 1;
+        if (s24_max[active] != INT32_MIN) {
+            out->spread = s24_max[active] - s24_min[active];
         }
     }
 
-    // Liveness = enough nonzero samples AND variation among them
-    // The mic only drives its slot of the stereo frame, so even a silent room yields a noise
-    // floor dithering across many codes on ~half the words
-    
-    // All-zero means no mic on the line; one constant nonzero value (min == max) means the SD line is
-    // stuck high or bridged to a clock, not a live mic
-    if (err == ESP_OK && total > 0) {
-        *alive = (nonzero > total / 64) && (s24_min != s24_max);
-    }
-
-out:
+done:
     free(words);
     gpio_set_pull_mode(I2S_T5848_SD_PIN, GPIO_FLOATING);
     ai_voice_deinit();
