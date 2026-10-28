@@ -698,9 +698,9 @@ void lcd_bluetooth_pairing_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoot
         lv_obj_align_to(pin_lbl, instr_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
 
         // Load pairing key from NVS
-        uint32_t pairing_key;
+        uint32_t pairing_key = 0; // Same fallback the passkey handler injects
         bluetooth_nvs_pairing_key_load(&pairing_key); // pairing_key
-        lv_label_set_text_fmt(pin_lbl, "     %" PRIu32, pairing_key);
+        lv_label_set_text_fmt(pin_lbl, "     %06" PRIu32, pairing_key); // Hosts expect all 6 digits
 
         // Instructions label (scrollable if text is long)
         ending_lbl = lv_label_create(cont);
@@ -714,6 +714,7 @@ void lcd_bluetooth_pairing_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoot
         const char *ending_text =
                 "Note:\nAfter this pairing, PolyCast5 will automatically reconnect "
                 "when selecting an option from the Bluetooth menu. You DON'T need to come back here!\n\n"
+                "To pair a different device, go to 'Known Devices' then select 'Pair Another'.\n\n"
                 "The RGB LED will turn blue to indicate PolyCast5 has connected.\n\nIf you don't wish to "
                 "see this, it can be disabled in settings by setting 'Blink every' to 0 for 'Adjust RGB LED'.";
         
@@ -2721,9 +2722,9 @@ void lcd_bluetooth_pair_new_page(ui_btns_t *ui_btns, ui_menu_t *ui_menu, bluetoo
         lv_obj_align_to(pin_lbl, instr_lbl, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);    
         
         // Load pairing key from NVS
-        uint32_t pairing_key;
+        uint32_t pairing_key = 0; // Same fallback the passkey handler injects
         bluetooth_nvs_pairing_key_load(&pairing_key); // pairing_key
-        lv_label_set_text_fmt(pin_lbl, "     %" PRIu32, pairing_key);
+        lv_label_set_text_fmt(pin_lbl, "     %06" PRIu32, pairing_key); // Hosts expect all 6 digits
 
         lv_timer_handler();
 

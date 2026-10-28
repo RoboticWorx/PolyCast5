@@ -25,6 +25,7 @@
   "autoMemoryEnabled": true,
   "enableWorkflows": true,
   "ultracode": true,
+  "idleCompaction": false,
   "enabledPlugins": {
     "ralph-loop@claude-plugins-official": true
   }

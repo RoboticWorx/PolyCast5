@@ -1549,7 +1549,8 @@ void bluetooth_utils_init(void)
         return;
     }
 
-    ret = esp_hid_ble_gap_adv_init(ESP_HID_APPEARANCE_KEYBOARD, DEVICE_NAME);
+    // Can't be KEYBOARD: If it is Android then submits its own random PIN instead of asking for ours, so pairing fails
+    ret = esp_hid_ble_gap_adv_init(ESP_HID_APPEARANCE_GENERIC, DEVICE_NAME);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "esp_hid_ble_gap_adv_init failed: %s", esp_err_to_name(ret));
         esp_hid_gap_deinit();
