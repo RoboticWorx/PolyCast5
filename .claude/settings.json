@@ -13,6 +13,9 @@
 
       "WebFetch(domain:x.ai)",
       "WebFetch(domain:docs.x.ai)",
+
+      "mcp__espressif-components__*",
+      "mcp__claude-in-chrome__*",
       
       "Bash(ls:*)",
       "Bash(find:*)",

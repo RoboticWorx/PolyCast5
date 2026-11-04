@@ -23,7 +23,9 @@ That's it. The script figures out everything else:
     the build and the chip disagree (which would brick the board).
   * Handles the very first flash of a brand-new board with --first: a virgin
     chip has no encryption key burned yet, so everything goes on as plaintext
-    and the bootloader encrypts the flash itself on the first boot.
+    and the bootloader encrypts the flash itself on the first boot. A blank
+    board boot-loops and its port keeps dropping out; --first waits for it and
+    catches it in download mode, no BOOT/RESET buttons needed.
   * Reads the board's hardware-revision eFuse (BLOCK_USR_DATA bytes 0-1) on
     every run that connects to the board (not --dry-run, --monitoronly or
     --list-ports), and burns POLYCAST5_HW_VERSION from polycast5_macros.h into
@@ -90,6 +92,16 @@ First flash of a brand-new board (--first):
 
         python flash.py --first
 
+    A blank board has nothing to boot, so it resets over and over and each
+    reset drops its USB port off the bus. --first polls for the port
+    (up to 60 s, so it can also be plugged in after starting) and resets the
+    chip into download mode the instant the port is back; download mode never
+    resets, so the port then stays put for the whole flash. Auto-detect can't
+    tell a blank board from another Espressif USB device: it stops if it sees
+    two during the wait or the 3 s after the catch, but one that's alone on
+    the bus is taken as the board. With any other Espressif device plugged in,
+    pass -p.
+
     Every image (bootloader, partition table, otadata, app AND assets) is
     written unencrypted - the same set of bytes a plain `idf.py -p PORT flash`
     puts on the chip. Then, on the very first boot, the bootloader generates a
@@ -152,6 +164,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 
@@ -184,6 +197,16 @@ USB_JTAG_PID  = 0x1001
 # Retry serial connects a few times - the built-in USB-Serial-JTAG occasionally
 # needs a second attempt to drop back into the download stub between commands.
 CONNECT_ATTEMPTS = "3"
+
+# A blank board boot-loops and its port drops off the bus on every reset;
+# --first polls for it this often, for this long (see catch_board()). A port
+# that stays listed but won't open for CATCH_BUSY_S is held by another program.
+# After an auto-detected catch, a second Espressif port appearing within
+# CATCH_SETTLE_S means the wrong device may have been caught.
+CATCH_TIMEOUT_S = 60
+CATCH_POLL_S    = 0.02
+CATCH_BUSY_S    = 5
+CATCH_SETTLE_S  = 3
 
 
 # ===========================================================================
@@ -827,6 +850,18 @@ def describe_port(p) -> str:
     return f"{p.device}  [{vid}:{pid}]  {p.description}{sn}"
 
 
+def die_ambiguous(group, *hints: str, flags: str = "") -> "NoReturn":   # type: ignore[name-defined]
+    # Several equally-good matches -> don't guess, list them and stop.
+    # `flags` goes into the suggested command (e.g. " --first").
+    print(red("Could not auto-pick a port; multiple matching boards found:"))
+    for p in group:
+        print(yellow(f"  {describe_port(p)}"))
+    die("ambiguous serial port (more than one board attached).",
+        *hints,
+        f"Unplug all but one, or pass the right one:  python {PROG}{flags} -p COMx",
+        "Use the sn= serial number above to tell identical boards apart.")
+
+
 def autodetect_port() -> str:
     ports = list_serial_ports()
     if ports is None:
@@ -849,13 +884,7 @@ def autodetect_port() -> str:
             print(cyan(f"Auto-detected port: {describe_port(chosen)}"))
             return chosen.device
         if len(group) > 1:
-            # Several equally-good matches -> don't guess, list them and stop.
-            print(red("Could not auto-pick a port; multiple matching boards found:"))
-            for p in group:
-                print(yellow(f"  {describe_port(p)}"))
-            die("ambiguous serial port (more than one board attached).",
-                f"Unplug all but one, or pass the right one:  python {PROG} -p COMx",
-                "Use the sn= serial number above to tell identical boards apart.")
+            die_ambiguous(group)
 
     # No tier matched but there's exactly one port overall -> it's almost certainly it.
     if len(ports) == 1:
@@ -906,6 +935,11 @@ def read_chip_mac(port: str, chip: str, after: str = "hard-reset") -> str | None
     if proc.returncode != 0:
         print(yellow("Couldn't read the chip MAC (connect failed); will flash everything."))
         return None
+    return parse_mac(out)
+
+
+def parse_mac(out: str) -> str | None:
+    """Pull the base MAC out of esptool read-mac output, or None (and say so)."""
     # On C5/C6 esptool prints an 8-byte EUI64 on the first "MAC:" line and the
     # real 6-byte address on "BASE MAC:". Prefer BASE MAC; accept exactly 6 octets.
     six = r"([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})"
@@ -933,6 +967,198 @@ def read_chip_fe(port: str, chip: str, after: str = "hard-reset") -> bool | None
     if not m:
         return None
     return m.group(1).lower() == "enabled"
+
+
+# ===========================================================================
+# Catching a boot-looping board (--first). A blank board has nothing to boot:
+# the ROM finds no image and resets the chip, over and over, and each reset
+# takes the built-in USB-Serial-JTAG off the bus, so the port only exists in
+# short windows. ROM download mode never resets, so once the chip is in it the
+# port stays put.
+# ===========================================================================
+def find_board_port(explicit: str | None, seen: dict) -> tuple[str, str, bool] | None:
+    """The board's port as (device, description, is USB-Serial-JTAG) if it's
+    on the bus right now, else None. Auto-detect takes only the built-in
+    USB-Serial-JTAG: while the board is off the bus, autodetect_port()'s
+    looser tiers would pick some other port. Every USB-Serial-JTAG port it
+    lists with a serial number is added to `seen` for catch_board()'s
+    ambiguity check."""
+    if explicit and "://" in explicit:
+        return explicit, explicit, False  # rfc2217:// etc. are never listed: esptool's job
+    # Checked before listing, so a port that appears mid-listing can't look
+    # like an unlisted alias below.
+    existed = bool(explicit) and os.name != "nt" and os.path.exists(explicit)
+    try:
+        ports = list_serial_ports()
+    except Exception:
+        return None  # pyserial can raise on a device that detaches mid-listing
+    if ports is None:
+        die("pyserial is not available, so the board can't be caught in download mode.",
+            "Run this from an ESP-IDF terminal (it ships pyserial).")
+    is_usj = lambda p: p.vid == ESPRESSIF_VID and p.pid == USB_JTAG_PID
+    if not explicit:
+        match = [p for p in ports if is_usj(p)]
+        for p in match:
+            # A board detaching mid-listing can come back without its serial
+            # number; keying that by name would count one board twice.
+            if p.serial_number:
+                seen.setdefault(p.serial_number, p)
+    elif os.name == "nt":
+        name = explicit.upper()                      # COM7 == com7
+        if name.startswith("\\\\.\\"):
+            name = name[4:]                          # \\.\COM10 == COM10
+        match = [p for p in ports if p.device.upper() == name]
+    else:
+        # -p may be a symlink (/dev/serial/by-id/...).
+        want = os.path.realpath(explicit)
+        match = [p for p in ports if os.path.realpath(p.device) == want]
+        if not match and existed and os.path.exists(explicit):
+            # Unlisted alias (macOS /dev/tty.* for the listed /dev/cu.*): no
+            # VID/PID, so leave the reset to esptool.
+            return explicit, explicit, False
+    if not match:
+        return None
+    return match[0].device, describe_port(match[0]), is_usj(match[0])
+
+
+def hold_in_download_mode(device: str) -> str | None:
+    """Reset the chip into ROM download mode over the built-in USB-Serial-JTAG.
+    Same line sequence as esptool's USBJTAGSerialReset, sent from this process
+    because launching esptool costs ~200 ms of the window. Returns None once
+    sent, else why the port couldn't be opened. Windows doesn't fail line
+    writes to a port that dropped mid-sequence, so None isn't proof:
+    catch_board() confirms with esptool."""
+    import serial
+    port = serial.Serial()
+    port.port = device
+    port.exclusive = True  # as esptool: a port another program holds fails to open
+    if os.name == "nt":
+        # As esptool, Windows only: it raises both lines on open otherwise.
+        # On POSIX the kernel raises both on open, and lowering them from
+        # there passes through (0,1) - a normal-boot reset.
+        port.dtr = False
+        port.rts = False
+
+    def set_rts(state: bool) -> None:
+        port.rts = state
+        port.dtr = port.dtr  # usbser.sys only sends a new RTS along with a DTR write
+
+    try:
+        port.open()
+        set_rts(False)
+        port.dtr = False     # idle
+        time.sleep(0.1)
+        port.dtr = True      # request download mode
+        set_rts(False)
+        time.sleep(0.1)
+        set_rts(True)        # reset; RTS first to pass through (1,1), not (0,0)
+        port.dtr = False
+        set_rts(True)        # Windows only propagates DTR on an RTS write
+        time.sleep(0.1)
+        port.dtr = False
+        set_rts(False)       # out of reset, into download mode
+    except Exception as e:  # incl. termios.error from a tty that hung up mid-open
+        return str(e) or type(e).__name__
+    finally:
+        try:
+            port.close()
+        except Exception:
+            pass
+    return None
+
+
+def catch_board(explicit: str | None, chip: str) -> tuple[str, str | None]:
+    """--first's connect: wait for the board's port, catch the chip in ROM
+    download mode and leave it there. Returns (port, MAC or None). The reset
+    goes out the moment the port is listed; esptool's read-mac then proves the
+    chip is held. Retries every window until CATCH_TIMEOUT_S, then dies."""
+    print(cyan(f"Waiting for the board (up to {CATCH_TIMEOUT_S} s)..."))
+    print(gray("  A blank board reboots in a loop, so its port keeps dropping out; "
+               "it is caught the moment it's back."))
+    deadline = time.monotonic() + CATCH_TIMEOUT_S
+    last = (f"{explicit} never appeared" if explicit
+            else "no USB-Serial-JTAG port (303A:1001) ever appeared")
+    shown = None
+    busy_since = None  # when the listed port started refusing to open
+    seen: dict = {}    # auto-detect: every USB-Serial-JTAG port listed so far
+    reset_any = False  # a hold went out (that chip now sits in download mode)
+
+    # A board that stays on the bus and one that drops in and out are rarely
+    # listed in the same poll, so ambiguity counts every port seen so far.
+    def die_if_ambiguous() -> None:
+        if len(seen) > 1:
+            die_ambiguous(list(seen.values()),
+                          "--first can't tell which one is the blank board.",
+                          *(["A board this run reset sits in download mode until "
+                             "it's replugged."] if reset_any else []),
+                          flags=" --first")
+
+    while time.monotonic() < deadline:
+        found = find_board_port(explicit, seen)
+        die_if_ambiguous()
+        if found is None:
+            busy_since = None
+            time.sleep(CATCH_POLL_S)
+            continue
+        port, desc, usj = found
+        if port != shown:
+            print(cyan(f"Board port: {desc}"))
+            shown = port
+        # A USB-UART bridge stays on the bus whatever the chip does, and
+        # esptool's own reset is the right one for it.
+        if usj:
+            err = hold_in_download_mode(port)
+            if err:
+                last = err  # still enumerating, or gone again
+                if busy_since is None:
+                    busy_since = time.monotonic()
+                elif time.monotonic() - busy_since > CATCH_BUSY_S:
+                    die(f"{port} is on the bus but won't open ({err}).",
+                        "Close any idf.py monitor / serial terminal holding it, then retry.")
+                time.sleep(CATCH_POLL_S)
+                continue
+            busy_since = None
+            reset_any = True
+        proc = run(esptool_cmd(port, chip, "default-reset", "no-reset", "read-mac"),
+                   capture=True, fatal=False)
+        if proc is None:
+            die("could not launch esptool.",
+                "Run this from an ESP-IDF terminal so `python -m esptool` works.")
+        out = proc.stdout or ""
+        die_if_locked_device(out)
+        if proc.returncode == 0:
+            if not explicit:
+                # A device that stays on the bus (another board, a devkit) is
+                # caught ahead of a blank board that's mid-reboot. Give the
+                # blank one CATCH_SETTLE_S to show up before trusting the catch.
+                settle = time.monotonic() + CATCH_SETTLE_S
+                while time.monotonic() < settle:
+                    find_board_port(None, seen)
+                    die_if_ambiguous()
+                    time.sleep(CATCH_POLL_S)
+            print(green("Caught: the chip is in download mode."))
+            return port, parse_mac(out)
+        lines = [l.strip() for l in out.splitlines() if l.strip()]
+        last = lines[-1] if lines else f"esptool exit {proc.returncode}"
+        wrong = re.search(r"This chip is [^\n]*", out)
+        if wrong:
+            # Retrying can't change the chip.
+            die(f"the device on {port} isn't the chip this build is for.",
+                f"esptool: {wrong.group(0).strip()}",
+                *(["It now sits in download mode until it's replugged."] if usj else []),
+                f"Plug in the board to flash, or pass its port:  python {PROG} --first -p COMx")
+        if not usj:
+            # A bridge doesn't drop off the bus, so waiting changes nothing.
+            die(f"couldn't connect to the board on {port}.",
+                f"esptool: {last}",
+                "Close any idf.py monitor / serial terminal holding the port, then retry.")
+        print(gray("  Missed it; waiting for the next window..."))
+    die(f"couldn't catch the board in download mode within {CATCH_TIMEOUT_S} s.",
+        f"Last error: {last}",
+        "Check the USB cable (a charge-only cable never shows a port) and close any",
+        "idf.py monitor / serial terminal holding the port, then retry.",
+        f"A board on a USB-UART bridge needs its port passed:  python {PROG} --first -p COMx",
+        "Last resort: hold BOOT, tap RESET, release BOOT, then re-run.")
 
 
 # ===========================================================================
@@ -1101,7 +1327,8 @@ def main() -> int:
     parser.add_argument("--first", action="store_true",
                         help="FIRST flash of a brand-new board (efuses not burned yet): write "
                              "every image as plaintext and let the bootloader enable flash "
-                             "encryption on the first boot.")
+                             "encryption on the first boot. Waits for a boot-looping board "
+                             "and catches it in download mode.")
     parser.add_argument("--erase", action="store_true",
                         help="FULL chip erase before flashing (DESTROYS NVS/keys/settings; "
                              "last-resort recovery - prefer --all).")
@@ -1293,17 +1520,26 @@ def main() -> int:
         print(gray(f"[dry-run] would read the hardware-revision eFuse and burn "
                    f"v{macro_int('POLYCAST5_HW_VERSION')} if it's blank."))
     else:
-        port = args.port or autodetect_port()
-        print(cyan("Connecting to device..."))
-        # On a --first run that can actually burn, leave the chip in download
-        # mode between probes. A board that already holds a plaintext app but
-        # hasn't burned its efuses yet would otherwise start the one-way
-        # encryption pass on the first probe's hard-reset, and the next probe's
+        # On --first, leave the chip in download mode between probes. A blank
+        # board would go back to boot-looping on a hard-reset and the next
+        # probe could miss its port. On an FE build, a board that already holds
+        # a plaintext app but hasn't burned its efuses yet would start the
+        # one-way encryption pass on that hard-reset, and the next probe's
         # reset would interrupt it.
-        probe_after = "no-reset" if burning else "hard-reset"
-        mac = read_chip_mac(port, chip, probe_after)  # also the connectivity check
+        probe_after = "no-reset" if args.first else "hard-reset"
+        if args.first:
+            # A blank board's port keeps dropping out: wait for it and catch
+            # the chip in download mode (no BOOT/RESET buttons needed).
+            port, mac = catch_board(args.port, chip)  # also the connectivity check
+        else:
+            port = args.port or autodetect_port()
+            print(cyan("Connecting to device..."))
+            mac = read_chip_mac(port, chip, probe_after)  # also the connectivity check
         if mac:
             print(green(f"Connected. Chip MAC: {mac}"))
+        # --first leaves the chip in download mode; say so on an abort below.
+        parked = (["The board was left in download mode; the next flash (or a "
+                   "power-cycle) boots it again."] if args.first else [])
 
         # Refuse to flash if the build's encryption assumption disagrees with the
         # chip's real efuse state - that mismatch is the classic way to brick.
@@ -1317,7 +1553,8 @@ def main() -> int:
                 "Close any open idf.py monitor / serial terminal and retry.",
                 "Run this from an ESP-IDF terminal so `python -m esptool` works.",
                 "If this device was locked down, do NOT flash it over USB - it can",
-                "only be updated over OTA. See www.polycast5.com/blogs/docs/lock-it-down")
+                "only be updated over OTA. See www.polycast5.com/blogs/docs/lock-it-down",
+                *parked)
         elif burning:
             # --first asserts "virgin board". The one thing that MUST hold is
             # that the chip really has no key burned: writing plaintext over an
@@ -1349,7 +1586,8 @@ def main() -> int:
                 # Chip is encrypted but the build is plaintext - the reverse brick.
                 die("flashing plaintext images to a chip that HAS flash encryption "
                     "enabled would brick it.",
-                    "Rebuild with CONFIG_SECURE_FLASH_ENC_ENABLED=y to match the board.")
+                    "Rebuild with CONFIG_SECURE_FLASH_ENC_ENABLED=y to match the board.",
+                    *parked)
         else:
             print(green(f"Chip flash-encryption: {'ON' if chip_fe else 'OFF'} (matches build)."))
 
