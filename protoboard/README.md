@@ -6,7 +6,7 @@ See [polycast5.com/blogs/tutorials/create-external-hardware](https://polycast5.c
 
 <p align="center">
   <img
-    src="https://raw.githubusercontent.com/RoboticWorx/PolyCast5/protoboard/pc5-protoboard.png"
+    src="pc5-protoboard.png"
     alt="PolyCast5 Protoboard"
     width="66%"
   />
